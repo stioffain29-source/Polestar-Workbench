@@ -27,12 +27,17 @@ export default function Layout({ children }: LayoutProps) {
       title: "TOPICS",
       items: [
         { label: "Fuel", href: "/topics/fuel", icon: Droplet },
-        { label: "Flashpoint", href: "/topics/flashpoint", icon: Flame },
-        { label: "Protests & Civil Unrest", href: "/topics/protests", icon: Users },
         { label: "Fertiliser", href: "/topics/fertiliser", icon: Package },
         { label: "Energy", href: "/topics/energy", icon: Zap },
         { label: "Shipping", href: "/topics/shipping", icon: Ship },
         { label: "Cargo Watch", href: "/topics/cargo-watch", icon: Package },
+        { label: "Civil Protests & Civil Unrest", href: "/topics/protests", icon: Users },
+      ]
+    },
+    {
+      title: "REPORT PRODUCTS",
+      items: [
+        { label: "Flashpoint", href: "/topics/protests", icon: Flame },
       ]
     },
     {
