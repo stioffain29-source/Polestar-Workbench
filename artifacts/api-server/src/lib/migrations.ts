@@ -11,6 +11,7 @@ const REQUIRED_TOPIC_REPORTS: Array<{
   { topic: "fuel",        title: "APAC Fuel Theft & Diversion Outlook" },
   { topic: "fertiliser",  title: "South Asia Fertiliser Supply Risk Brief" },
   { topic: "cargo_watch", title: "APAC Cargo Theft & Hijack Monthly" },
+  { topic: "energy",      title: "APAC Energy Watch" },
 ];
 
 // Reports that were previously auto-seeded but have since been retired.
@@ -109,9 +110,9 @@ export async function runDataMigrations(): Promise<void> {
         const [existing] = await db
           .select({ n: sql<number>`count(*)::int` })
           .from(reportsTable)
-          .where(eq(reportsTable.topic, seed.topic));
+          .where(eq(reportsTable.title, seed.title));
         const n = existing?.n ?? 0;
-        logger.info({ topic: seed.topic, existing: n }, "runDataMigrations: report seed check");
+        logger.info({ topic: seed.topic, title: seed.title, existing: n }, "runDataMigrations: report seed check");
         if (n === 0) {
           const inserted = await db
             .insert(reportsTable)
