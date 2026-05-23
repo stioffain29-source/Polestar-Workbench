@@ -131,6 +131,9 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
       })()
     : "";
   const topicLabel = report.topic ? TOPIC_LABELS[report.topic] ?? report.topic : "";
+  const subhead = report.topic === "protests" ? "Flashpoint" : topicLabel;
+  const tertiary = report.topic === "protests" ? "Activism, Protests & Civil Unrest" : "";
+  const cadence = report.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing";
   const fastFacts = computePreviewFastFacts(report);
 
   return (
@@ -159,8 +162,22 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
             color: "rgba(255,255,255,0.85)",
           }}
         >
-          Polestar Insights · {topicLabel} · {report.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing"}
+          Polestar Insights · {subhead} · {cadence}
         </div>
+        {tertiary && (
+          <div
+            className="uppercase mb-2"
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 400,
+              fontSize: 9,
+              letterSpacing: "0.25em",
+              color: "rgba(255,255,255,0.65)",
+            }}
+          >
+            {tertiary}
+          </div>
+        )}
         <h1
           className="mb-3"
           style={{

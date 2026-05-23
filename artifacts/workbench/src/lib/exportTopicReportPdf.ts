@@ -116,15 +116,23 @@ function drawCover(ctx: Ctx, data: TopicReportData, topicLabel: string) {
     pdf.addImage(polestarLogo, "PNG", MX + 22, ctx.y + 22, 140, 21, undefined, "FAST");
   } catch { /* ignore */ }
 
+  const subhead = data.topic === "protests" ? "FLASHPOINT" : topicLabel.toUpperCase();
+  const tertiary = data.topic === "protests" ? "Activism, Protests & Civil Unrest" : "";
+
   setText(pdf, WHITE);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
-  pdf.text(sanitize(`POLESTAR INSIGHTS  ·  ${topicLabel.toUpperCase()}`), MX + 22, ctx.y + 60);
+  pdf.text(sanitize(`POLESTAR INSIGHTS  ·  ${subhead}`), MX + 22, ctx.y + 60);
+
+  if (tertiary) {
+    pdf.setFontSize(7);
+    pdf.text(sanitize(tertiary), MX + 22, ctx.y + 70);
+  }
 
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(22);
   const titleLines: string[] = pdf.splitTextToSize(sanitize(data.title || "Untitled report"), CW - 44);
-  pdf.text(titleLines.slice(0, 2), MX + 22, ctx.y + 82);
+  pdf.text(titleLines.slice(0, 2), MX + 22, ctx.y + (tertiary ? 92 : 82));
 
   let metaY = ctx.y + heroH - 14;
   pdf.setFont("helvetica", "normal");
