@@ -1,0 +1,89 @@
+Make these changes only. Do not redesign the whole dashboard.
+
+1. Backfill
+
+Backfill should not have its own main sidebar page.
+
+Remove “Backfill” from the left sidebar navigation.
+
+Backfill should become a simple button/action on the relevant admin/import area only.
+
+Button label:
+Run Backfill
+
+The backfill function should remain available, but it does not need a full page in the main navigation.
+
+Do not change the import logic.
+
+2. Rename Strike Tracker
+
+Rename “Strike Tracker” to:
+
+Missile Strike Tracker
+
+This applies to:
+- sidebar section labels
+- page titles
+- headers
+- buttons
+- export names where relevant
+
+The sidebar should show:
+
+Missile Strike Trackers
+- Maritime - Hormuz
+- Land - GCC
+
+Do not use the generic wording “Strike Tracker” anymore.
+
+3. Land - GCC page layout
+
+Rebuild the Land - GCC missile strike page layout to match the reference screenshot.
+
+The page should be titled:
+
+Missile Strike Tracker
+
+Subtitle:
+Land-based missile and drone strikes against Saudi Arabia, Kuwait, UAE, Oman, Bahrain, Qatar, and Jordan. Maritime incidents, naval interceptions, and threat-only reports are excluded.
+
+Layout requirements:
+- top filter bar with range, country, weapon, and target filters
+- top-right action buttons:
+  - Run Backfill
+  - Export CSV
+- daily strike timeline chart across the top
+- two-column chart grid underneath
+- charts for:
+  - total strikes by country
+  - UAE strikes by emirate
+  - attack context
+  - weapon family
+- lower “Strike profile” section with smaller charts:
+  - target
+  - weapon
+  - casualties
+  - impact
+
+Use the same clean card layout, spacing, chart hierarchy, and plain operational style shown in the reference.
+
+4. Maritime - Hormuz page
+
+Apply the same “Missile Strike Tracker” naming and layout style to the Maritime - Hormuz page, but keep maritime-specific data and labels.
+
+5. Do not change
+
+Do not change the database.
+Do not re-import data.
+Do not add new features.
+Do not add review queues.
+Do not change the wider workbench layout.
+Do not alter risk colours.
+
+Acceptance criteria:
+- Backfill is no longer a sidebar page.
+- Backfill is available as a button.
+- “Strike Tracker” is renamed to “Missile Strike Tracker”.
+- Land - GCC page visually matches the reference layout.
+- Maritime - Hormuz uses the same page style.
+- Existing filters and export still work.

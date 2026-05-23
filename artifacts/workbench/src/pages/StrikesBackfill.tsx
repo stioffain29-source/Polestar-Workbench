@@ -67,9 +67,9 @@ export default function StrikesBackfill() {
   return (
     <div className="max-w-[1800px] mx-auto space-y-5">
       <div>
-        <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Strike Tracker</div>
-        <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Manual Backfill</h1>
-        <p className="text-muted-foreground font-sans mt-1 text-sm">Record a historic or new strike event into the tracker.</p>
+        <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Missile Strike Tracker</div>
+        <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Run Backfill</h1>
+        <p className="text-muted-foreground font-sans mt-1 text-sm">Record a historic or new missile strike event into the tracker.</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_460px] gap-5">

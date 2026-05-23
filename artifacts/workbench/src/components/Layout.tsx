@@ -36,11 +36,10 @@ export default function Layout({ children }: LayoutProps) {
       ]
     },
     {
-      title: "STRIKE TRACKERS",
+      title: "MISSILE STRIKE TRACKERS",
       items: [
         { label: "Maritime - Hormuz", href: "/strikes/maritime", icon: Navigation },
         { label: "Land - GCC", href: "/strikes/land", icon: Target },
-        { label: "Backfill", href: "/strikes/backfill", icon: History },
       ]
     },
     {
