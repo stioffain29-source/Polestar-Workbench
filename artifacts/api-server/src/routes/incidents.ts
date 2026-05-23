@@ -68,7 +68,7 @@ router.get("/incidents/by-topic", async (req, res): Promise<void> => {
     .select({
       topic: incidentsTable.topic,
       count: sql<number>`count(*)::int`,
-      criticalCount: sql<number>`sum(case when ${incidentsTable.severity} = 'critical' then 1 else 0 end)::int`,
+      criticalCount: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
     })
     .from(incidentsTable)
     .where(gte(incidentsTable.occurredAt, since))

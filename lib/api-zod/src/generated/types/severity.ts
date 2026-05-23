@@ -10,9 +10,9 @@ export type Severity = typeof Severity[keyof typeof Severity];
 
 
 export const Severity = {
+  insignificant: 'insignificant',
   low: 'low',
   moderate: 'moderate',
-  elevated: 'elevated',
   high: 'high',
-  critical: 'critical',
+  extreme: 'extreme',
 } as const;

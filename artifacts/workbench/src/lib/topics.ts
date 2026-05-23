@@ -10,8 +10,16 @@ export const TOPIC_LABELS: Record<string, string> = {
 
 export const TOPICS = Object.keys(TOPIC_LABELS) as Array<keyof typeof TOPIC_LABELS>;
 
-export const SEVERITY_LEVELS = ["low", "moderate", "elevated", "high", "critical"] as const;
+export const SEVERITY_LEVELS = ["insignificant", "low", "moderate", "high", "extreme"] as const;
 export const CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
+
+export const SEVERITY_LABELS: Record<string, string> = {
+  insignificant: "Insignificant",
+  low: "Low",
+  moderate: "Moderate",
+  high: "High",
+  extreme: "Extreme",
+};
 
 export const MUNITIONS = ["drone", "ballistic_missile", "cruise_missile", "mixed", "unknown"] as const;
 export const TARGET_CATEGORIES = [
@@ -28,10 +36,10 @@ export const REPORT_STATUSES = ["draft","review","published"] as const;
 
 export function severityClass(s: string): string {
   switch (s) {
-    case "critical": return "bg-destructive text-destructive-foreground";
+    case "extreme": return "bg-destructive text-destructive-foreground";
     case "high": return "bg-accent text-accent-foreground";
-    case "elevated": return "bg-primary text-primary-foreground";
-    case "moderate": return "bg-muted text-muted-foreground";
+    case "moderate": return "bg-primary text-primary-foreground";
+    case "low": return "bg-muted text-muted-foreground";
     default: return "bg-secondary text-secondary-foreground";
   }
 }

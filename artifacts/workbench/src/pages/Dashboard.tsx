@@ -112,7 +112,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2 mb-1">
                           <span className={cn(
                             "px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
-                            incident.severity === 'critical' ? "bg-destructive text-destructive-foreground" :
+                            incident.severity === 'extreme' ? "bg-destructive text-destructive-foreground" :
                             incident.severity === 'high' ? "bg-accent text-accent-foreground" :
                             "bg-muted text-muted-foreground"
                           )}>

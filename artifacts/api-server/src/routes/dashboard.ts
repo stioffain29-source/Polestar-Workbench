@@ -20,7 +20,7 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
   const [totals] = await db
     .select({
       total: sql<number>`count(*)::int`,
-      critical: sql<number>`sum(case when ${incidentsTable.severity} = 'critical' then 1 else 0 end)::int`,
+      critical: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
     })
     .from(incidentsTable)
     .where(gte(incidentsTable.occurredAt, since7d));
@@ -41,7 +41,7 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
       const [agg] = await db
         .select({
           count: sql<number>`count(*)::int`,
-          critical: sql<number>`sum(case when ${incidentsTable.severity} = 'critical' then 1 else 0 end)::int`,
+          critical: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
         })
         .from(incidentsTable)
         .where(and(eq(incidentsTable.topic, topic), gte(incidentsTable.occurredAt, since7d)));

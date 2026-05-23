@@ -56,7 +56,7 @@ export default function MapPage() {
           title: i.title,
           country: i.country,
           when: i.occurredAt,
-          color: i.severity === "critical" ? "#A33232" : i.severity === "high" ? "#4655FF" : "#E2E2E2",
+          color: i.severity === "extreme" ? "#A33232" : i.severity === "high" ? "#4655FF" : "#E2E2E2",
         }));
     }
     const strikes = view === "maritime" ? maritime : land;
@@ -148,9 +148,9 @@ export default function MapPage() {
       <div className="text-xs text-muted-foreground font-sans">
         Showing {points.length} markers. Hover for detail.
         <span className="inline-flex items-center gap-3 ml-6">
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#A33232" }} /> Critical</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#4655FF" }} /> Elevated</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#E2E2E2" }} /> Standard</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#A33232" }} /> Extreme</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#4655FF" }} /> High</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#E2E2E2" }} /> Moderate / Low</span>
         </span>
       </div>
     </div>

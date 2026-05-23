@@ -515,7 +515,7 @@ components:
 
     Severity:
       type: string
-      enum: [low, moderate, elevated, high, critical]
+      enum: [insignificant, low, moderate, high, extreme]
 
     Confidence:
       type: string

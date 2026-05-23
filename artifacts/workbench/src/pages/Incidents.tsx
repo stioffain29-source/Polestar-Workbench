@@ -221,7 +221,7 @@ function IncidentForm({ onSaved }: { onSaved: () => void }) {
     summary: "",
     country: "",
     location: "",
-    severity: "moderate",
+    severity: "low",
     confidence: "medium",
     source: "",
     sourceUrl: "",
