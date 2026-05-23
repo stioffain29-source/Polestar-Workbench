@@ -1,4 +1,4 @@
-import { format, parseISO, min as dateMin, max as dateMax } from "date-fns";
+import { format, parseISO } from "date-fns";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
@@ -15,6 +15,7 @@ export interface PdfIncident {
   severity: string;
   occurredAt: string;
   country?: string | null;
+  location?: string | null;
 }
 
 export interface PdfCountry {
@@ -26,82 +27,227 @@ export interface PdfCountry {
   keyNumbers?: { label: string; value: string; context?: string | null }[] | null;
 }
 
-function computeFastFacts(
-  country: PdfCountry,
+const NOT_IDENTIFIED = "Not identified";
+const TABLE_ROW_LIMIT = 12;
+
+interface DerivedFacts {
+  validDates: Date[];
+  earliest: Date | null;
+  latest: Date | null;
+  highestKey: string;
+  highestLabel: string;
+  topTopicLabel: string;
+  topTopicCount: number;
+  topAreaLabel: string;
+  topAreaCount: number;
+  severityCounts: Record<string, number>;
+  topicCounts: Map<string, number>;
+}
+
+function deriveFacts(
   incidents: PdfIncident[],
   topicLabels: Record<string, string>,
-): KpiCardData[] {
-  let period = "No incidents in window";
-  let latest = "—";
-  if (incidents.length > 0) {
-    const dates = incidents
-      .map((i) => { try { return parseISO(i.occurredAt); } catch { return null; } })
-      .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
-    if (dates.length > 0) {
-      period = `${format(dateMin(dates), "dd MMM")} – ${format(dateMax(dates), "dd MMM yyyy")}`;
-      latest = format(dateMax(dates), "dd MMM yyyy");
-    }
+): DerivedFacts {
+  const validDates: Date[] = [];
+  for (const i of incidents) {
+    try {
+      const d = parseISO(i.occurredAt);
+      if (!isNaN(d.getTime())) validDates.push(d);
+    } catch { /* skip */ }
   }
+  validDates.sort((a, b) => a.getTime() - b.getTime());
+  const earliest = validDates[0] ?? null;
+  const latest = validDates[validDates.length - 1] ?? null;
 
   let highestKey = "";
   let highestRank = 0;
+  const severityCounts: Record<string, number> = {
+    extreme: 0, high: 0, moderate: 0, low: 0, insignificant: 0,
+  };
   for (const i of incidents) {
     const k = sevKey(i.severity);
+    if (k in severityCounts) severityCounts[k] += 1;
     const r = SEV_RANK[k] ?? 0;
     if (r > highestRank) { highestRank = r; highestKey = k; }
   }
-  const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : "—";
+  const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : NOT_IDENTIFIED;
 
-  const topicCount = new Map<string, number>();
-  for (const i of incidents) topicCount.set(i.topic, (topicCount.get(i.topic) ?? 0) + 1);
-  let mostCommonLabel = "—";
-  let mostCommonN = 0;
-  for (const [t, n] of topicCount) {
-    if (n > mostCommonN) { mostCommonN = n; mostCommonLabel = topicLabels[t] ?? t; }
+  const topicCounts = new Map<string, number>();
+  for (const i of incidents) topicCounts.set(i.topic, (topicCounts.get(i.topic) ?? 0) + 1);
+  let topTopicLabel = NOT_IDENTIFIED;
+  let topTopicCount = 0;
+  for (const [t, n] of topicCounts) {
+    if (n > topTopicCount) { topTopicCount = n; topTopicLabel = topicLabels[t] ?? t; }
   }
 
-  let mainArea = country.region || "—";
-  if (country.keyNumbers && country.keyNumbers.length > 0) {
-    const withCtx = country.keyNumbers.find((k) => !!k.context && k.context.trim().length > 0);
-    if (withCtx?.context) mainArea = withCtx.context;
+  const areaCounts = new Map<string, number>();
+  for (const i of incidents) {
+    const loc = (i.location ?? "").trim();
+    if (!loc) continue;
+    if (/^unknown$/i.test(loc)) continue;
+    const first = loc.split(/[;,/]/)[0].trim();
+    if (!first) continue;
+    areaCounts.set(first, (areaCounts.get(first) ?? 0) + 1);
+  }
+  let topAreaLabel = NOT_IDENTIFIED;
+  let topAreaCount = 0;
+  for (const [a, n] of areaCounts) {
+    if (n > topAreaCount) { topAreaCount = n; topAreaLabel = a; }
   }
 
+  return {
+    validDates, earliest, latest, highestKey, highestLabel,
+    topTopicLabel, topTopicCount, topAreaLabel, topAreaCount,
+    severityCounts, topicCounts,
+  };
+}
+
+function periodString(facts: DerivedFacts): string {
+  if (!facts.earliest || !facts.latest) return "No incidents on file";
+  if (facts.earliest.getTime() === facts.latest.getTime()) {
+    return format(facts.earliest, "dd MMM yyyy");
+  }
+  return `${format(facts.earliest, "dd MMM yyyy")} - ${format(facts.latest, "dd MMM yyyy")}`;
+}
+
+function buildKpiCards(
+  facts: DerivedFacts,
+  incidents: PdfIncident[],
+): KpiCardData[] {
   return [
-    { label: "Reporting Period", value: period },
+    { label: "Reporting Period", value: periodString(facts) },
     { label: "Total Records", value: String(incidents.length), note: "Incidents on file for this country" },
-    { label: "Highest Severity", value: highestLabel, severity: highestKey || undefined, note: highestKey ? "Worst rating in window" : undefined },
-    { label: "Most Affected Area", value: mainArea },
-    { label: "Latest Incident", value: latest },
-    { label: "Key Issue Type", value: mostCommonLabel === "—" ? "—" : mostCommonLabel, note: mostCommonN > 0 ? `${mostCommonN} record${mostCommonN === 1 ? "" : "s"}` : undefined },
+    {
+      label: "Highest Severity",
+      value: facts.highestLabel,
+      severity: facts.highestKey || undefined,
+      note: facts.highestKey ? "Worst rating in window" : undefined,
+    },
+    {
+      label: "Most Affected Area",
+      value: facts.topAreaLabel,
+      note: facts.topAreaCount > 0
+        ? `${facts.topAreaCount} record${facts.topAreaCount === 1 ? "" : "s"}`
+        : "No location field populated",
+    },
+    {
+      label: "Latest Incident",
+      value: facts.latest ? format(facts.latest, "dd MMM yyyy") : NOT_IDENTIFIED,
+    },
+    {
+      label: "Main Issue Type",
+      value: facts.topTopicLabel,
+      note: facts.topTopicCount > 0
+        ? `${facts.topTopicCount} record${facts.topTopicCount === 1 ? "" : "s"}`
+        : undefined,
+    },
   ];
 }
 
-function drawCover(ctx: Ctx, country: PdfCountry) {
+function buildExecutiveSummary(
+  country: PdfCountry,
+  facts: DerivedFacts,
+  incidents: PdfIncident[],
+): string {
+  if (incidents.length === 0) {
+    return `No incidents are currently on file for ${country.name}. This report will populate as records are added to the Polestar Workbench.`;
+  }
+  const parts: string[] = [];
+  parts.push(
+    `Polestar holds ${incidents.length} record${incidents.length === 1 ? "" : "s"} for ${country.name} (${country.region}) covering ${periodString(facts)}.`,
+  );
+  if (facts.topTopicCount > 0) {
+    parts.push(
+      `The main issue type is ${facts.topTopicLabel} with ${facts.topTopicCount} record${facts.topTopicCount === 1 ? "" : "s"}.`,
+    );
+  }
+  if (facts.highestKey) {
+    parts.push(`The highest severity recorded is ${facts.highestLabel}.`);
+  }
+  if (facts.topAreaCount > 0) {
+    parts.push(`The most affected area on file is ${facts.topAreaLabel}.`);
+  }
+  return parts.join(" ");
+}
+
+function drawCover(ctx: Ctx, country: PdfCountry, issueDate: string) {
   const { pdf, MX, CW } = ctx;
-  const heroH = 96;
+  const heroH = 130;
+
+  // Navy band
   setFill(pdf, NAVY);
   pdf.rect(MX, ctx.y, CW, heroH, "F");
+  // Electric blue accent strip (right)
   setFill(pdf, ELECTRIC);
   pdf.rect(MX + CW - 5, ctx.y, 5, heroH, "F");
+
+  // Logo
   try {
-    pdf.addImage(polestarLogo, "PNG", MX + 22, ctx.y + 30, 140, 21, undefined, "FAST");
+    pdf.addImage(polestarLogo, "PNG", MX + 22, ctx.y + 22, 140, 21, undefined, "FAST");
   } catch { /* ignore */ }
+
+  // Right column block
+  const rightX = MX + CW - 20;
+
+  // "Country Report" eyebrow
   setText(pdf, WHITE);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(20);
-  pdf.text(sanitize(country.name.toUpperCase()), MX + CW - 20, ctx.y + 54, { align: "right" });
+  pdf.setFontSize(8);
+  pdf.text(sanitize("COUNTRY REPORT"), rightX, ctx.y + 30, { align: "right" });
+
+  // Country name (large)
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(22);
+  pdf.text(sanitize(country.name.toUpperCase()), rightX, ctx.y + 58, { align: "right" });
+
+  // Region
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  pdf.text(sanitize(country.region.toUpperCase()), rightX, ctx.y + 76, { align: "right" });
+
+  // Issue date row at bottom-left of band
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
-  pdf.text(sanitize(`${country.region.toUpperCase()}  ·  COUNTRY REPORT`),
-    MX + CW - 20, ctx.y + 74, { align: "right" });
+  pdf.text(sanitize(`POLESTAR ADVISORY  ·  ISSUE DATE ${issueDate.toUpperCase()}`), MX + 22, ctx.y + heroH - 18);
+
   ctx.y += heroH + 20;
 }
 
-function drawTopicChart(ctx: Ctx, incidents: PdfIncident[], topicLabels: Record<string, string>) {
-  if (incidents.length === 0) return;
-  const counts = new Map<string, number>();
-  for (const i of incidents) counts.set(i.topic, (counts.get(i.topic) ?? 0) + 1);
-  const data = Array.from(counts.entries())
+function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
+  const order = ["extreme", "high", "moderate", "low", "insignificant"] as const;
+  const total = order.reduce((s, k) => s + facts.severityCounts[k], 0);
+  if (total === 0) return;
+
+  drawSectionHeading(ctx, "Severity Distribution");
+  const { pdf, MX, CW } = ctx;
+  const rowH = 18;
+  const labelW = 110;
+  const countW = 36;
+  const barAreaX = MX + labelW;
+  const barAreaW = CW - labelW - countW - 8;
+  const chartH = order.length * rowH + 10;
+  ensureSpace(ctx, chartH);
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  order.forEach((k, idx) => {
+    const ry = ctx.y + idx * rowH;
+    setText(pdf, DUSK);
+    pdf.text(sanitize(SEV_LABEL[k] ?? k), MX, ry + 12);
+    const n = facts.severityCounts[k];
+    const w = total === 0 ? 0 : (n / total) * barAreaW;
+    setFill(pdf, SEV_COLOR[k] ?? POLAR);
+    pdf.rect(barAreaX, ry + 4, w, 10, "F");
+    setText(pdf, NAVY);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(String(n), barAreaX + barAreaW + 6, ry + 12);
+    pdf.setFont("helvetica", "normal");
+  });
+  ctx.y += chartH + 18;
+}
+
+function drawTopicChart(ctx: Ctx, facts: DerivedFacts, topicLabels: Record<string, string>) {
+  const data = Array.from(facts.topicCounts.entries())
     .map(([topic, n]) => ({ label: topicLabels[topic] ?? topic, n }))
     .sort((a, b) => b.n - a.n)
     .slice(0, 8);
@@ -112,8 +258,9 @@ function drawTopicChart(ctx: Ctx, incidents: PdfIncident[], topicLabels: Record<
   const { pdf, MX, CW } = ctx;
   const rowH = 18;
   const labelW = 150;
+  const countW = 36;
   const barAreaX = MX + labelW;
-  const barAreaW = CW - labelW - 40;
+  const barAreaW = CW - labelW - countW - 8;
   const chartH = data.length * rowH + 10;
   ensureSpace(ctx, chartH);
 
@@ -128,13 +275,17 @@ function drawTopicChart(ctx: Ctx, incidents: PdfIncident[], topicLabels: Record<
     pdf.rect(barAreaX, ry + 4, w, 10, "F");
     setText(pdf, NAVY);
     pdf.setFont("helvetica", "bold");
-    pdf.text(String(d.n), barAreaX + w + 6, ry + 12);
+    pdf.text(String(d.n), barAreaX + barAreaW + 6, ry + 12);
     pdf.setFont("helvetica", "normal");
   });
   ctx.y += chartH + 18;
 }
 
-function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[], topicLabels: Record<string, string>) {
+function drawIncidentTable(
+  ctx: Ctx,
+  incidents: PdfIncident[],
+  topicLabels: Record<string, string>,
+) {
   if (incidents.length === 0) return;
   drawSectionHeading(ctx, "Related Incidents");
   const { pdf, MX, CW } = ctx;
@@ -159,14 +310,17 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[], topicLabels: Reco
     pdf.setFontSize(8);
   };
 
-  ensureSpace(ctx, rowH + 4);
-  drawHeader();
-
+  // Sort newest first, then limit
   const sorted = [...incidents].sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
+  const rows = sorted.slice(0, TABLE_ROW_LIMIT);
+  const truncated = sorted.length - rows.length;
 
-  for (const i of sorted) {
+  ensureSpace(ctx, rowH + 4);
+  drawHeader();
+
+  for (const i of rows) {
     const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
     const rh = Math.max(rowH, titleLines.length * 11 + 8);
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
@@ -200,7 +354,37 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[], topicLabels: Reco
 
     ctx.y += rh;
   }
-  ctx.y += 10;
+  ctx.y += 8;
+
+  if (truncated > 0) {
+    ensureSpace(ctx, 16);
+    setText(pdf, DUSK);
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(8);
+    pdf.text(
+      sanitize(`Showing ${rows.length} most recent of ${sorted.length} records. Additional records remain available in the Workbench.`),
+      ctx.MX,
+      ctx.y + 10,
+    );
+    pdf.setFont("helvetica", "normal");
+    ctx.y += 16;
+  }
+}
+
+function drawNarrativeOrPlaceholder(ctx: Ctx, heading: string, body: string | null | undefined) {
+  drawSectionHeading(ctx, heading);
+  const trimmed = (body ?? "").trim();
+  if (trimmed) {
+    renderProse(ctx, trimmed);
+  } else {
+    const { pdf, MX } = ctx;
+    setText(pdf, DUSK);
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(9);
+    pdf.text(sanitize("Not on file. Edit this country report in the Workbench to populate this section."), MX, ctx.y + 10);
+    pdf.setFont("helvetica", "normal");
+    ctx.y += 22;
+  }
 }
 
 export async function exportCountryReportPdf(
@@ -215,27 +399,34 @@ export async function exportCountryReportPdf(
     issueDate,
   });
 
-  drawCover(ctx, country);
+  drawCover(ctx, country, issueDate);
 
+  const facts = deriveFacts(incidents, topicLabels);
+
+  // 1. Executive Summary (auto-derived from data — always populated honestly)
+  drawSectionHeading(ctx, "Executive Summary");
+  renderProse(ctx, buildExecutiveSummary(country, facts, incidents));
+
+  // 2. Fast Facts
   drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, computeFastFacts(country, incidents, topicLabels));
+  drawFastFactsKpiCards(ctx, buildKpiCards(facts, incidents));
 
-  if (country.overview) {
-    drawSectionHeading(ctx, "Situation");
-    renderProse(ctx, country.overview);
-  }
-  if (country.trendSummary) {
-    drawSectionHeading(ctx, "What Happened");
-    renderProse(ctx, country.trendSummary);
-  }
-  if (country.implications) {
-    drawSectionHeading(ctx, "Implications for Business");
-    renderProse(ctx, country.implications);
-  }
+  // 3. Narrative sections — show placeholder when source field is empty
+  drawNarrativeOrPlaceholder(ctx, "Situation", country.overview);
+  drawNarrativeOrPlaceholder(ctx, "What Happened", country.trendSummary);
+  drawNarrativeOrPlaceholder(ctx, "What Matters", null);
+  drawNarrativeOrPlaceholder(ctx, "Implications for Business", country.implications);
+  drawNarrativeOrPlaceholder(ctx, "Watch Next", null);
+  drawNarrativeOrPlaceholder(ctx, "Polestar View", null);
 
-  drawTopicChart(ctx, incidents, topicLabels);
+  // 4. Visuals
+  drawSeverityChart(ctx, facts);
+  drawTopicChart(ctx, facts, topicLabels);
+
+  // 5. Related incidents — limited
   drawIncidentTable(ctx, incidents, topicLabels);
 
+  // 6. Source Notes / Disclaimer
   drawSourceNotes(ctx);
   drawDisclaimer(ctx);
 

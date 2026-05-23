@@ -1,0 +1,92 @@
+The Papua country report PDF is off brand.
+
+Fix the PDF export only. Do not change the dashboard, database, map, imports or categories.
+
+Problems:
+1. Date range is wrong. It shows “27 May - 19 May 2026”. Date ranges must run oldest to newest.
+2. Fast Facts are cramped and some fields are wrong. “Most affected area: Stable” is not acceptable.
+3. The report is mostly a long incident table. That is not a country report.
+4. The layout does not match Polestar house style.
+5. The incident table should support the assessment, not dominate the report.
+
+Required structure:
+
+1. Cover/header band
+Use a strong navy Polestar header band.
+Include:
+- Polestar Advisory
+- report title
+- country
+- report type
+- issue date
+
+2. Fast Facts as KPI cards
+Use accented KPI cards near the top.
+
+Cards:
+- Reporting period
+- Total records
+- Highest severity
+- Most affected location or country area
+- Latest incident
+- Main issue type
+
+If the value is not known, say “Not identified”.
+Do not put “Stable” as an area.
+
+3. Country assessment sections
+Use these headings:
+- Executive Summary
+- Fast Facts
+- Situation
+- What Happened
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Source Notes / Data Notes
+- Disclaimer
+
+4. Add useful visuals
+Add at least one useful visual if data supports it:
+- severity distribution
+- incidents over time
+- incidents by area/location
+- incident type breakdown
+
+Do not add decorative visuals.
+
+5. Incident table
+Limit the related incidents table to the most relevant recent records, for example 10 to 15 rows.
+
+Do not dump every incident into the report.
+
+If needed, add:
+“Additional records remain available in the Workbench.”
+
+6. Pagination
+Keep footer:
+Polestar Advisory · Confidential · Report date · Page X of Y
+
+Page numbering must be correct.
+
+7. Brand style
+Use:
+- navy header
+- white body
+- dark navy section headings
+- thin blue divider lines
+- clean KPI cards
+- slight accent colour only where useful
+- no clutter
+- no orange cover
+- no stock imagery
+
+Acceptance criteria:
+- Date range is correct.
+- Fast Facts are KPI cards.
+- No nonsense values such as “Most affected area: Stable”.
+- Report reads like a country assessment, not a database dump.
+- Incident table is limited.
+- Footer page numbers are correct.
+- No dashboard or database changes.
