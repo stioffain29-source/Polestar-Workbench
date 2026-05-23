@@ -1,11 +1,12 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetCountryReport, useListIncidents } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { ArrowLeft, Download, Loader2 } from "lucide-react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
-import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
+import { slugifyForFilename } from "@/lib/exportPdf";
+import { exportCountryReportPdf } from "@/lib/exportCountryReportPdf";
 
 export default function CountryReport() {
   const [, params] = useRoute("/countries/:slug");
@@ -14,15 +15,16 @@ export default function CountryReport() {
   const { data: incidents = [] } = useListIncidents(country ? { country: country.name } : {}, {
     query: { enabled: !!country },
   } as never);
-  const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
 
   const downloadPdf = async () => {
-    if (!reportRef.current || !country) return;
+    if (!country) return;
     setExporting(true);
     try {
-      await exportElementToPdf(
-        reportRef.current,
+      await exportCountryReportPdf(
+        country,
+        incidents,
+        TOPIC_LABELS,
         `polestar-country-report-${slugifyForFilename(country.name)}.pdf`,
       );
     } finally {
@@ -49,7 +51,6 @@ export default function CountryReport() {
         </button>
       </div>
 
-      <div ref={reportRef} className="space-y-6 bg-background p-px">
       <div
         className="report-hero rounded-sm px-10 py-10 text-white flex items-center justify-between gap-10"
         style={{
@@ -99,7 +100,6 @@ export default function CountryReport() {
             </div>
           ))}
         </div>
-      </div>
       </div>
     </div>
   );
