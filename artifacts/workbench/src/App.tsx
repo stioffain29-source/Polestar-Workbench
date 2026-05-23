@@ -16,6 +16,7 @@ import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
 import Countries from "./pages/Countries";
 import CountryReport from "./pages/CountryReport";
+import Reports from "./pages/Reports";
 import ReportEditor from "./pages/ReportEditor";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/sources" component={Sources} />
         <Route path="/countries" component={Countries} />
         <Route path="/countries/:slug" component={CountryReport} />
+        <Route path="/reports" component={Reports} />
         <Route path="/reports/:id" component={ReportEditor} />
         <Route component={NotFound} />
       </Switch>

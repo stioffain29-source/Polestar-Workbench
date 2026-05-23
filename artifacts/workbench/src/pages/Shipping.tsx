@@ -10,7 +10,6 @@ import {
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
-import TopicReports from "@/components/TopicReports";
 
 const MIDDLE_EAST = new Set([
   "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
@@ -699,8 +698,6 @@ export default function Shipping() {
           Kept in totals; excluded from country-level charts. Source records show <span className="font-semibold">Country not identified</span> in place of "Unknown".
         </div>
       </div>
-
-      <TopicReports topic="shipping" />
     </div>
   );
 }
