@@ -1,7 +1,6 @@
 import { useListIncidents } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { TOPIC_LABELS, severityClass } from "@/lib/topics";
-import { cn } from "@/lib/utils";
+import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 
 export default function Timeline() {
   const { data: incidents = [], isLoading } = useListIncidents({});
@@ -37,7 +36,7 @@ export default function Timeline() {
                   <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic]}</span></div>
                   <div className="p-3 font-medium">{i.title}</div>
                   <div className="p-3 text-xs">{i.country}</div>
-                  <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", severityClass(i.severity))}>{i.severity}</span></div>
+                  <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
                 </div>
               ))}
             </div>

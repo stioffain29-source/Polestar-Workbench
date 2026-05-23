@@ -21,14 +21,23 @@ export const SEVERITY_LABELS: Record<string, string> = {
   extreme: "Extreme",
 };
 
-// Rating colours — placeholder palette until final spec is supplied.
-// Update these five values and every map / badge will follow.
+// Rating colours — drawn from the approved Polestar palette
+// (Midnight Blue, Dusk Gray, Electric Blue, Polar Gray + subdued red).
+// Update these five values and every map / badge / chart will follow.
 export const RATING_COLORS: Record<string, string> = {
   extreme: "#A33232",
   high: "#4655FF",
   moderate: "#0B0B3D",
-  low: "#9A9AA8",
+  low: "#303030",
   insignificant: "#E2E2E2",
+};
+
+export const RATING_TEXT_COLORS: Record<string, string> = {
+  extreme: "#FFFFFF",
+  high: "#FFFFFF",
+  moderate: "#FFFFFF",
+  low: "#FFFFFF",
+  insignificant: "#303030",
 };
 
 export const MARKER_FILL_OPACITY = 0.78;
@@ -78,6 +87,18 @@ export function severityClass(s: string): string {
     case "low": return "bg-muted text-muted-foreground";
     default: return "bg-secondary text-secondary-foreground";
   }
+}
+
+// Inline style equivalent — guaranteed to match RATING_COLORS regardless of
+// tailwind token theming. Prefer this for severity badges.
+export function severityBadgeStyle(s: string): {
+  backgroundColor: string;
+  color: string;
+} {
+  return {
+    backgroundColor: RATING_COLORS[s] ?? RATING_COLORS.insignificant,
+    color: RATING_TEXT_COLORS[s] ?? RATING_TEXT_COLORS.insignificant,
+  };
 }
 
 export function sourceStatusClass(s: string): string {

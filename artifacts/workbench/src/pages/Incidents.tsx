@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TOPICS, TOPIC_LABELS, SEVERITY_LEVELS, CONFIDENCE_LEVELS, severityClass } from "@/lib/topics";
+import { TOPICS, TOPIC_LABELS, SEVERITY_LEVELS, CONFIDENCE_LEVELS, severityBadgeStyle } from "@/lib/topics";
 import { cn } from "@/lib/utils";
 
 const WINDOWS = [7, 14, 30, 60, 90, 120];
@@ -123,7 +123,7 @@ export default function Incidents() {
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic] ?? i.topic}</span></div>
                 <div className="p-3 font-medium truncate">{i.title}</div>
                 <div className="p-3 text-xs">{i.country}</div>
-                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", severityClass(i.severity))}>{i.severity}</span></div>
+                <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
                 <div className="p-3 text-xs uppercase font-serif">{i.confidence}</div>
                 <div className="p-3 text-xs text-muted-foreground truncate">{i.source ?? "—"}</div>
                 <div className="p-3 flex items-center justify-center">

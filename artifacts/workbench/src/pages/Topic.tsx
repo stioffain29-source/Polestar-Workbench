@@ -1,8 +1,8 @@
 import { useRoute } from "wouter";
 import { useListIncidents, useGetIncidentCountsByTopic } from "@workspace/api-client-react";
-import { TOPIC_LABELS, SEVERITY_LEVELS, severityClass } from "@/lib/topics";
+import { TOPIC_LABELS, SEVERITY_LEVELS, severityBadgeStyle, ratingColor } from "@/lib/topics";
 import { format } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
 
 export default function Topic() {
@@ -43,7 +43,11 @@ export default function Topic() {
               <XAxis dataKey="severity" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
               <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
               <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
-              <Bar dataKey="count" fill="#4655FF" />
+              <Bar dataKey="count">
+                {severityData.map((d) => (
+                  <Cell key={d.severity} fill={ratingColor(d.severity)} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -64,7 +68,7 @@ export default function Topic() {
                 <div className="p-3 font-mono text-xs">{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                 <div className="p-3 font-medium">{i.title}</div>
                 <div className="p-3 text-xs">{i.country}</div>
-                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", severityClass(i.severity))}>{i.severity}</span></div>
+                <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
               </div>
             ))}
           </div>

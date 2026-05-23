@@ -1,7 +1,7 @@
 import { useRoute, Link } from "wouter";
 import { useGetCountryReport, useListIncidents } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { TOPIC_LABELS, severityClass } from "@/lib/topics";
+import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
@@ -56,7 +56,7 @@ export default function CountryReport() {
               <div className="p-3 font-mono text-xs">{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
               <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic]}</span></div>
               <div className="p-3 font-medium">{i.title}</div>
-              <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", severityClass(i.severity))}>{i.severity}</span></div>
+              <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
             </div>
           ))}
         </div>
