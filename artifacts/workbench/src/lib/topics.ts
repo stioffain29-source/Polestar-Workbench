@@ -2,6 +2,7 @@ export const TOPIC_LABELS: Record<string, string> = {
   fuel: "Fuel",
   flashpoint: "Flashpoint",
   protests: "Protests & Civil Unrest",
+  fertiliser: "Fertiliser",
   energy: "Energy",
   shipping: "Shipping",
   cargo_watch: "Cargo Watch",

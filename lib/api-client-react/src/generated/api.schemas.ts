@@ -16,6 +16,7 @@ export const Topic = {
   fuel: 'fuel',
   flashpoint: 'flashpoint',
   protests: 'protests',
+  fertiliser: 'fertiliser',
   energy: 'energy',
   shipping: 'shipping',
   cargo_watch: 'cargo_watch',
