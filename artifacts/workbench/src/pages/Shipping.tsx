@@ -389,26 +389,33 @@ export default function Shipping() {
               <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} />
               <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3">
-              {vesselIncidents.slice(0, 18).map((v) => (
-                <VesselCard
+            <div
+              className="flex gap-3 mt-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1"
+              style={{ scrollbarWidth: "thin" }}
+              role="region"
+              aria-label="Vessel attack incidents carousel"
+            >
+              {vesselIncidents.slice(0, 24).map((v) => (
+                <div
                   key={v.id}
-                  title={v.title}
-                  date={isNaN(v.occurredDate.getTime()) ? null : format(v.occurredDate, "dd MMM yyyy")}
-                  country={identifyCountry(v.country)}
-                  location={v.location && !/^unknown$/i.test(v.location.trim()) ? v.location : null}
-                  severity={v.severity}
-                  type={v.vesselType}
-                  summary={v.summary ?? null}
-                  sourceUrl={v.sourceUrl ?? null}
-                />
+                  className="snap-start shrink-0 w-[280px] md:w-[300px] xl:w-[320px]"
+                >
+                  <VesselCard
+                    title={v.title}
+                    date={isNaN(v.occurredDate.getTime()) ? null : format(v.occurredDate, "dd MMM yyyy")}
+                    country={identifyCountry(v.country)}
+                    location={v.location && !/^unknown$/i.test(v.location.trim()) ? v.location : null}
+                    severity={v.severity}
+                    type={v.vesselType}
+                    summary={v.summary ?? null}
+                    sourceUrl={v.sourceUrl ?? null}
+                  />
+                </div>
               ))}
             </div>
-            {vesselIncidents.length > 18 && (
-              <p className="text-[11px] text-muted-foreground italic mt-2">
-                Showing 18 most recent of {vesselIncidents.length} hostile vessel incidents.
-              </p>
-            )}
+            <p className="text-[11px] text-muted-foreground italic mt-2">
+              Showing latest vessel attack/threat incidents. Full records remain available in the incident table.
+            </p>
           </>
         )}
       </Section>
