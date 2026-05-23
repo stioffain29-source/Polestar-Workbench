@@ -25,11 +25,11 @@ export const SEVERITY_LABELS: Record<string, string> = {
 // (Midnight Blue, Dusk Gray, Electric Blue, Polar Gray + subdued red).
 // Update these five values and every map / badge / chart will follow.
 export const RATING_COLORS: Record<string, string> = {
-  extreme: "#A33232",
-  high: "#4655FF",
-  moderate: "#0B0B3D",
-  low: "#303030",
-  insignificant: "#E2E2E2",
+  extreme: "#800000",
+  high: "#C0392B",
+  moderate: "#E67E22",
+  low: "#6FB872",
+  insignificant: "#B8C2CC",
 };
 
 export const RATING_TEXT_COLORS: Record<string, string> = {
