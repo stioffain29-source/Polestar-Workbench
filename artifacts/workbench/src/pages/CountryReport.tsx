@@ -31,7 +31,7 @@ export default function CountryReport() {
       </div>
 
       <div
-        className="report-hero rounded-sm px-10 py-12 text-white flex items-center gap-10"
+        className="report-hero rounded-sm px-10 py-10 text-white flex items-center justify-between gap-10"
         style={{
           background: "linear-gradient(to right, #0B0B3D 0%, #0B0B3D 38%, #4655FF 100%)",
           WebkitPrintColorAdjust: "exact",
@@ -41,13 +41,12 @@ export default function CountryReport() {
         <img
           src={polestarLogo}
           alt="Polestar Advisory"
-          className="shrink-0 h-12 w-auto"
-          style={{ maxWidth: 280 }}
+          className="shrink-0 h-10 w-auto"
+          style={{ maxWidth: 240 }}
         />
-        <div className="border-l border-white/30 pl-10">
-          <div className="text-[10px] font-sans uppercase tracking-widest opacity-80">{country.region}</div>
-          <h1 className="text-4xl font-serif font-bold uppercase tracking-tight mt-2">{country.name}</h1>
-        </div>
+        <h1 className="text-2xl font-serif font-bold uppercase tracking-tight text-right">
+          {country.name}
+        </h1>
       </div>
 
       {country.keyNumbers && country.keyNumbers.length > 0 && (
