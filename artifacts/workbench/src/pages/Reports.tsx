@@ -111,10 +111,16 @@ export default function Reports() {
             </div>
             <Link href={`/reports/${r.id}`} className="block mt-3">
               <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Polestar Insights</div>
-              <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors mt-0.5">{r.title}</h2>
+              <div className="text-[11px] font-sans uppercase tracking-wider text-primary mt-0.5">
+                {r.topic === "protests" ? "Flashpoint" : TOPIC_LABELS[r.topic]} · {r.topic === "cargo_watch" ? "Monthly" : "Weekly"}
+              </div>
+              {r.topic === "protests" && (
+                <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-0.5">Activism, Protests &amp; Civil Unrest</div>
+              )}
+              <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors mt-1.5">{r.title}</h2>
             </Link>
             <div className="text-xs text-muted-foreground mt-2 font-mono">
-              {TOPIC_LABELS[r.topic]} · {format(new Date(r.issueDate), "d MMM yyyy")}{r.author ? ` · ${r.author}` : ""}
+              {format(new Date(r.issueDate), "d MMM yyyy")}{r.author ? ` · ${r.author}` : ""}
             </div>
             <Link href={`/reports/${r.id}`}>
               <div className="mt-4 pt-3 border-t border-border text-xs font-sans uppercase tracking-wider text-accent inline-flex items-center gap-1 group-hover:gap-2 transition-all">
