@@ -28,6 +28,16 @@ function classifyRegion(country: string | null | undefined): Region {
   return "Other / Unknown";
 }
 
+const NOT_IDENTIFIED = "Country not identified";
+
+function identifyCountry(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const first = raw.split(/[;,]/)[0].trim();
+  if (!first) return null;
+  if (/^unknown$/i.test(first)) return null;
+  return first;
+}
+
 // Shipping issue types — movement, ports, routes, vessels, chokepoints, maritime
 // disruption. Theft / pilferage / hijack belong to Cargo Watch and are NOT
 // classified here; if a shipping record mentions theft only, it falls to
@@ -84,14 +94,27 @@ export default function Shipping() {
     return Array.from(m.entries()).map(([issue, count]) => ({ issue, count })).sort((a, b) => b.count - a.count);
   }, [enriched]);
 
+  const notIdentifiedCount = useMemo(
+    () => enriched.filter((i) => identifyCountry(i.country) === null).length,
+    [enriched],
+  );
+
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
     enriched.forEach((i) => {
-      const c = (i.country ?? "Unknown").split(/[;,]/)[0].trim() || "Unknown";
+      const c = identifyCountry(i.country);
+      if (c === null) return; // excluded from the country chart
       m.set(c, (m.get(c) ?? 0) + 1);
     });
-    return Array.from(m.entries()).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count).slice(0, 12);
-  }, [enriched]);
+    const ranked = Array.from(m.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12);
+    if (ranked.length === 0 && notIdentifiedCount > 0) {
+      ranked.push({ country: NOT_IDENTIFIED, count: notIdentifiedCount });
+    }
+    return ranked;
+  }, [enriched, notIdentifiedCount]);
 
   const bySeverity = useMemo(() => SEVERITY_LEVELS.map((s) => ({
     severity: s,
@@ -115,13 +138,14 @@ export default function Shipping() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-px bg-border p-px rounded-sm overflow-hidden">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Shipping Incidents" value={total} />
         <Kpi label="APAC" value={ap} />
         <Kpi label="Middle East" value={me} />
         <Kpi label="Other / Unknown" value={ot} />
         <Kpi label="With Coordinates" value={withCoords.length} small />
         <Kpi label="With Source Link" value={withSource} small />
+        <Kpi label="Country Not Identified" value={notIdentifiedCount} small />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

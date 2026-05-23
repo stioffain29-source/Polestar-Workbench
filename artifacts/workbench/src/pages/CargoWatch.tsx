@@ -29,6 +29,16 @@ function classifyRegion(country: string | null | undefined): Region {
   return "Other / Unknown";
 }
 
+const NOT_IDENTIFIED = "Country not identified";
+
+function identifyCountry(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const first = raw.split(/[;,]/)[0].trim();
+  if (!first) return null;
+  if (/^unknown$/i.test(first)) return null;
+  return first;
+}
+
 const CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
   { label: "Electronics", pattern: /\b(electronic|smartphone|laptop|mobile phone|consumer electronics|tv|television|tablet)\b/i },
   { label: "Tobacco", pattern: /\b(tobacco|cigarette|cigar|vape|e-cigarette)\b/i },
@@ -84,23 +94,39 @@ export default function CargoWatch() {
     return Array.from(m.entries()).map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
   }, [enriched]);
 
+  const notIdentifiedCount = useMemo(
+    () => enriched.filter((i) => identifyCountry(i.country) === null).length,
+    [enriched],
+  );
+
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
     enriched.forEach((i) => {
-      const c = (i.country ?? "Unknown").split(/[;,]/)[0].trim() || "Unknown";
+      const c = identifyCountry(i.country);
+      if (c === null) return; // excluded from the country chart
       m.set(c, (m.get(c) ?? 0) + 1);
     });
-    return Array.from(m.entries()).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count).slice(0, 12);
-  }, [enriched]);
+    const ranked = Array.from(m.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12);
+    if (ranked.length === 0 && notIdentifiedCount > 0) {
+      ranked.push({ country: NOT_IDENTIFIED, count: notIdentifiedCount });
+    }
+    return ranked;
+  }, [enriched, notIdentifiedCount]);
 
   const stacked = useMemo(() => {
-    const topCountries = byCountry.slice(0, 10).map((c) => c.country);
+    const topCountries = byCountry
+      .filter((c) => c.country !== NOT_IDENTIFIED)
+      .slice(0, 10)
+      .map((c) => c.country);
     const categories = byCategory.map((c) => c.category);
     return topCountries.map((country) => {
       const row: Record<string, string | number> = { country };
       categories.forEach((cat) => { row[cat] = 0; });
       enriched
-        .filter((i) => ((i.country ?? "Unknown").split(/[;,]/)[0].trim() || "Unknown") === country)
+        .filter((i) => identifyCountry(i.country) === country)
         .forEach((i) => { row[i.category] = (row[i.category] as number) + 1; });
       return row;
     });
@@ -124,13 +150,14 @@ export default function CargoWatch() {
         <p className="text-sm text-muted-foreground font-sans mt-1">Cargo theft, hijack and loss incidents across APAC and the Middle East.</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-px bg-border p-px rounded-sm overflow-hidden">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Cargo Incidents" value={total} />
         <Kpi label="APAC" value={ap} />
         <Kpi label="Middle East" value={me} />
         <Kpi label="Other / Unknown" value={ot} />
         <Kpi label="Records Mentioning Value" value={valueMentions} small />
         <Kpi label="Records Mentioning Company" value={companyMentions} small />
+        <Kpi label="Country Not Identified" value={notIdentifiedCount} small />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
