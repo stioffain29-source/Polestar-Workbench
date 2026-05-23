@@ -3,20 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Polestar Advisory Workbench API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: incidents
+  - name: strikes
+  - name: sources
+  - name: reports
+  - name: countries
+  - name: dashboard
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +29,947 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/overview:
+    get:
+      operationId: getDashboardOverview
+      tags: [dashboard]
+      summary: Operational overview across all topic areas
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverview"
+
+  /incidents:
+    get:
+      operationId: listIncidents
+      tags: [incidents]
+      parameters:
+        - name: topic
+          in: query
+          schema: { $ref: "#/components/schemas/Topic" }
+        - name: country
+          in: query
+          schema: { type: string }
+        - name: severity
+          in: query
+          schema: { $ref: "#/components/schemas/Severity" }
+        - name: days
+          in: query
+          description: Limit to incidents within the past N days
+          schema: { type: integer, minimum: 1, maximum: 365 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Incident" }
+    post:
+      operationId: createIncident
+      tags: [incidents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IncidentInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incident" }
+
+  /incidents/{id}:
+    get:
+      operationId: getIncident
+      tags: [incidents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incident" }
+    patch:
+      operationId: updateIncident
+      tags: [incidents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IncidentUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incident" }
+    delete:
+      operationId: deleteIncident
+      tags: [incidents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /incidents/recent:
+    get:
+      operationId: getRecentIncidents
+      tags: [incidents]
+      summary: Recent priority incidents across all topics
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Incident" }
+
+  /incidents/by-topic:
+    get:
+      operationId: getIncidentCountsByTopic
+      tags: [incidents]
+      summary: Counts of recent incidents grouped by topic
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 365 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TopicCount" }
+
+  /strikes:
+    get:
+      operationId: listStrikes
+      tags: [strikes]
+      parameters:
+        - name: theatre
+          in: query
+          schema: { $ref: "#/components/schemas/StrikeTheatre" }
+        - name: country
+          in: query
+          schema: { type: string }
+        - name: days
+          in: query
+          schema: { type: integer, enum: [7, 14, 30, 60, 90, 120] }
+        - name: munition
+          in: query
+          schema: { $ref: "#/components/schemas/Munition" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Strike" }
+    post:
+      operationId: createStrike
+      tags: [strikes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StrikeInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Strike" }
+
+  /strikes/{id}:
+    get:
+      operationId: getStrike
+      tags: [strikes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Strike" }
+    patch:
+      operationId: updateStrike
+      tags: [strikes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StrikeUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Strike" }
+    delete:
+      operationId: deleteStrike
+      tags: [strikes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /strikes/summary:
+    get:
+      operationId: getStrikeSummary
+      tags: [strikes]
+      summary: Aggregated strike counts by munition, infrastructure, and timeline
+      parameters:
+        - name: theatre
+          in: query
+          schema: { $ref: "#/components/schemas/StrikeTheatre" }
+        - name: days
+          in: query
+          schema: { type: integer, enum: [7, 14, 30, 60, 90, 120] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StrikeSummary" }
+
+  /sources:
+    get:
+      operationId: listSources
+      tags: [sources]
+      parameters:
+        - name: topic
+          in: query
+          schema: { $ref: "#/components/schemas/Topic" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/SourceStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Source" }
+    post:
+      operationId: createSource
+      tags: [sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SourceInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Source" }
+
+  /sources/{id}:
+    patch:
+      operationId: updateSource
+      tags: [sources]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SourceUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Source" }
+    delete:
+      operationId: deleteSource
+      tags: [sources]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /sources/health:
+    get:
+      operationId: getSourceHealth
+      tags: [sources]
+      summary: Source health summary counts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SourceHealth" }
+
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      parameters:
+        - name: topic
+          in: query
+          schema: { $ref: "#/components/schemas/Topic" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/ReportStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Report" }
+    post:
+      operationId: createReport
+      tags: [reports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReportInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+    patch:
+      operationId: updateReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReportUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /countries:
+    get:
+      operationId: listCountryReports
+      tags: [countries]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CountryReport" }
+    post:
+      operationId: createCountryReport
+      tags: [countries]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CountryReportInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryReport" }
+
+  /countries/{slug}:
+    get:
+      operationId: getCountryReport
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryReport" }
+    patch:
+      operationId: updateCountryReport
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CountryReportUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryReport" }
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
 
+    Topic:
+      type: string
+      enum:
+        - fuel
+        - flashpoint
+        - protests
+        - energy
+        - shipping
+        - cargo_watch
+
+    Severity:
+      type: string
+      enum: [low, moderate, elevated, high, critical]
+
+    Confidence:
+      type: string
+      enum: [low, medium, high]
+
+    StrikeTheatre:
+      type: string
+      enum: [maritime_hormuz, land_gcc]
+
+    Munition:
+      type: string
+      enum: [drone, ballistic_missile, cruise_missile, mixed, unknown]
+
+    InfrastructureCategory:
+      type: string
+      enum:
+        - government
+        - power
+        - military
+        - civilian_residential
+        - port
+        - airport
+        - oil_gas
+        - industrial
+        - commercial
+        - unknown
+
+    TargetCategory:
+      type: string
+      enum:
+        - military_site
+        - government_facility
+        - energy_infrastructure
+        - port_maritime
+        - airport_aviation
+        - civilian_area
+        - commercial_site
+        - industrial_site
+        - vessel
+        - unknown
+
+    SourceType:
+      type: string
+      enum: [rss, api, scraper, manual, social, government, news]
+
+    SourceStatus:
+      type: string
+      enum: [operational, delayed, stale, failing, blocked, not_configured]
+
+    ReportStatus:
+      type: string
+      enum: [draft, review, published]
+
+    Incident:
+      type: object
+      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt]
+      properties:
+        id: { type: integer }
+        topic: { $ref: "#/components/schemas/Topic" }
+        title: { type: string }
+        summary: { type: string }
+        country: { type: string }
+        location: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        occurredAt: { type: string, format: date-time }
+        severity: { $ref: "#/components/schemas/Severity" }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        source: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        analystNotes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    IncidentInput:
+      type: object
+      required: [topic, title, summary, country, occurredAt, severity, confidence]
+      properties:
+        topic: { $ref: "#/components/schemas/Topic" }
+        title: { type: string, minLength: 1 }
+        summary: { type: string }
+        country: { type: string }
+        location: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        occurredAt: { type: string, format: date-time }
+        severity: { $ref: "#/components/schemas/Severity" }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        source: { type: string }
+        sourceUrl: { type: string }
+        analystNotes: { type: string }
+
+    IncidentUpdate:
+      type: object
+      properties:
+        topic: { $ref: "#/components/schemas/Topic" }
+        title: { type: string }
+        summary: { type: string }
+        country: { type: string }
+        location: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        occurredAt: { type: string, format: date-time }
+        severity: { $ref: "#/components/schemas/Severity" }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        source: { type: string }
+        sourceUrl: { type: string }
+        analystNotes: { type: string }
+
+    TopicCount:
+      type: object
+      required: [topic, count, criticalCount]
+      properties:
+        topic: { $ref: "#/components/schemas/Topic" }
+        count: { type: integer }
+        criticalCount: { type: integer }
+
+    Strike:
+      type: object
+      required:
+        - id
+        - theatre
+        - country
+        - occurredAt
+        - munition
+        - targetCategory
+        - infrastructure
+        - confidence
+        - createdAt
+      properties:
+        id: { type: integer }
+        theatre: { $ref: "#/components/schemas/StrikeTheatre" }
+        country: { type: string }
+        location: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        occurredAt: { type: string, format: date-time }
+        munition: { $ref: "#/components/schemas/Munition" }
+        targetCategory: { $ref: "#/components/schemas/TargetCategory" }
+        infrastructure: { $ref: "#/components/schemas/InfrastructureCategory" }
+        casualties: { type: ["integer", "null"] }
+        source: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        summary: { type: ["string", "null"] }
+        analystNotes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    StrikeInput:
+      type: object
+      required: [theatre, country, occurredAt, munition, targetCategory, infrastructure, confidence]
+      properties:
+        theatre: { $ref: "#/components/schemas/StrikeTheatre" }
+        country: { type: string }
+        location: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        occurredAt: { type: string, format: date-time }
+        munition: { $ref: "#/components/schemas/Munition" }
+        targetCategory: { $ref: "#/components/schemas/TargetCategory" }
+        infrastructure: { $ref: "#/components/schemas/InfrastructureCategory" }
+        casualties: { type: integer }
+        source: { type: string }
+        sourceUrl: { type: string }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        summary: { type: string }
+        analystNotes: { type: string }
+
+    StrikeUpdate:
+      type: object
+      properties:
+        theatre: { $ref: "#/components/schemas/StrikeTheatre" }
+        country: { type: string }
+        location: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        occurredAt: { type: string, format: date-time }
+        munition: { $ref: "#/components/schemas/Munition" }
+        targetCategory: { $ref: "#/components/schemas/TargetCategory" }
+        infrastructure: { $ref: "#/components/schemas/InfrastructureCategory" }
+        casualties: { type: integer }
+        source: { type: string }
+        sourceUrl: { type: string }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        summary: { type: string }
+        analystNotes: { type: string }
+
+    StrikeBucket:
+      type: object
+      required: [key, count]
+      properties:
+        key: { type: string }
+        count: { type: integer }
+
+    StrikeTimelinePoint:
+      type: object
+      required: [date, count]
+      properties:
+        date: { type: string, format: date }
+        count: { type: integer }
+
+    StrikeSummary:
+      type: object
+      required:
+        - total
+        - totalCasualties
+        - byMunition
+        - byInfrastructure
+        - byCountry
+        - timeline
+      properties:
+        total: { type: integer }
+        totalCasualties: { type: integer }
+        byMunition:
+          type: array
+          items: { $ref: "#/components/schemas/StrikeBucket" }
+        byInfrastructure:
+          type: array
+          items: { $ref: "#/components/schemas/StrikeBucket" }
+        byCountry:
+          type: array
+          items: { $ref: "#/components/schemas/StrikeBucket" }
+        timeline:
+          type: array
+          items: { $ref: "#/components/schemas/StrikeTimelinePoint" }
+
+    Source:
+      type: object
+      required:
+        - id
+        - name
+        - topic
+        - sourceType
+        - status
+        - reliability
+        - manualReviewRequired
+        - createdAt
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        topic: { $ref: "#/components/schemas/Topic" }
+        sourceType: { $ref: "#/components/schemas/SourceType" }
+        url: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/SourceStatus" }
+        lastSuccessAt: { type: ["string", "null"], format: date-time }
+        lastFailureAt: { type: ["string", "null"], format: date-time }
+        errorMessage: { type: ["string", "null"] }
+        reliability: { type: integer, minimum: 0, maximum: 5 }
+        manualReviewRequired: { type: boolean }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    SourceInput:
+      type: object
+      required: [name, topic, sourceType, status, reliability, manualReviewRequired]
+      properties:
+        name: { type: string }
+        topic: { $ref: "#/components/schemas/Topic" }
+        sourceType: { $ref: "#/components/schemas/SourceType" }
+        url: { type: string }
+        status: { $ref: "#/components/schemas/SourceStatus" }
+        lastSuccessAt: { type: string, format: date-time }
+        lastFailureAt: { type: string, format: date-time }
+        errorMessage: { type: string }
+        reliability: { type: integer, minimum: 0, maximum: 5 }
+        manualReviewRequired: { type: boolean }
+        notes: { type: string }
+
+    SourceUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        topic: { $ref: "#/components/schemas/Topic" }
+        sourceType: { $ref: "#/components/schemas/SourceType" }
+        url: { type: string }
+        status: { $ref: "#/components/schemas/SourceStatus" }
+        lastSuccessAt: { type: string, format: date-time }
+        lastFailureAt: { type: string, format: date-time }
+        errorMessage: { type: string }
+        reliability: { type: integer, minimum: 0, maximum: 5 }
+        manualReviewRequired: { type: boolean }
+        notes: { type: string }
+
+    SourceHealthBucket:
+      type: object
+      required: [status, count]
+      properties:
+        status: { $ref: "#/components/schemas/SourceStatus" }
+        count: { type: integer }
+
+    SourceHealth:
+      type: object
+      required: [total, manualReviewCount, byStatus]
+      properties:
+        total: { type: integer }
+        manualReviewCount: { type: integer }
+        byStatus:
+          type: array
+          items: { $ref: "#/components/schemas/SourceHealthBucket" }
+
+    Report:
+      type: object
+      required:
+        - id
+        - title
+        - topic
+        - status
+        - issueDate
+        - createdAt
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        topic: { $ref: "#/components/schemas/Topic" }
+        countrySlug: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        issueDate: { type: string, format: date }
+        situation: { type: ["string", "null"] }
+        whatHappened: { type: ["string", "null"] }
+        hardNumbers:
+          type: ["array", "null"]
+          items: { $ref: "#/components/schemas/KpiCard" }
+        whatMatters: { type: ["string", "null"] }
+        implications: { type: ["string", "null"] }
+        polestarView: { type: ["string", "null"] }
+        watchNext: { type: ["string", "null"] }
+        author: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    KpiCard:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value: { type: string }
+        accent: { type: string }
+        context: { type: string }
+
+    ReportInput:
+      type: object
+      required: [title, topic, status, issueDate]
+      properties:
+        title: { type: string }
+        topic: { $ref: "#/components/schemas/Topic" }
+        countrySlug: { type: string }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        issueDate: { type: string, format: date }
+        situation: { type: string }
+        whatHappened: { type: string }
+        hardNumbers:
+          type: array
+          items: { $ref: "#/components/schemas/KpiCard" }
+        whatMatters: { type: string }
+        implications: { type: string }
+        polestarView: { type: string }
+        watchNext: { type: string }
+        author: { type: string }
+
+    ReportUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        topic: { $ref: "#/components/schemas/Topic" }
+        countrySlug: { type: string }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        issueDate: { type: string, format: date }
+        situation: { type: string }
+        whatHappened: { type: string }
+        hardNumbers:
+          type: array
+          items: { $ref: "#/components/schemas/KpiCard" }
+        whatMatters: { type: string }
+        implications: { type: string }
+        polestarView: { type: string }
+        watchNext: { type: string }
+        author: { type: string }
+
+    CountryReport:
+      type: object
+      required: [id, slug, name, region, createdAt]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        region: { type: string }
+        overview: { type: ["string", "null"] }
+        trendSummary: { type: ["string", "null"] }
+        implications: { type: ["string", "null"] }
+        keyNumbers:
+          type: ["array", "null"]
+          items: { $ref: "#/components/schemas/KpiCard" }
+        createdAt: { type: string, format: date-time }
+
+    CountryReportInput:
+      type: object
+      required: [slug, name, region]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        region: { type: string }
+        overview: { type: string }
+        trendSummary: { type: string }
+        implications: { type: string }
+        keyNumbers:
+          type: array
+          items: { $ref: "#/components/schemas/KpiCard" }
+
+    CountryReportUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        region: { type: string }
+        overview: { type: string }
+        trendSummary: { type: string }
+        implications: { type: string }
+        keyNumbers:
+          type: array
+          items: { $ref: "#/components/schemas/KpiCard" }
+
+    DashboardTopicCard:
+      type: object
+      required: [topic, label, incidentCount, criticalCount]
+      properties:
+        topic: { $ref: "#/components/schemas/Topic" }
+        label: { type: string }
+        incidentCount: { type: integer }
+        criticalCount: { type: integer }
+        latestHeadline: { type: ["string", "null"] }
+        latestAt: { type: ["string", "null"], format: date-time }
+
+    DashboardOverview:
+      type: object
+      required:
+        - totalIncidents7d
+        - criticalIncidents7d
+        - activeSources
+        - failingSources
+        - reportsInProgress
+        - topicCards
+        - recentIncidents
+        - sourceAlerts
+        - reportsPipeline
+      properties:
+        totalIncidents7d: { type: integer }
+        criticalIncidents7d: { type: integer }
+        activeSources: { type: integer }
+        failingSources: { type: integer }
+        reportsInProgress: { type: integer }
+        topicCards:
+          type: array
+          items: { $ref: "#/components/schemas/DashboardTopicCard" }
+        recentIncidents:
+          type: array
+          items: { $ref: "#/components/schemas/Incident" }
+        sourceAlerts:
+          type: array
+          items: { $ref: "#/components/schemas/Source" }
+        reportsPipeline:
+          type: array
+          items: { $ref: "#/components/schemas/Report" }

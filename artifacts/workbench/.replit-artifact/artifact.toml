@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Polestar Advisory Workbench"
+version = "1.0.0"
+id = "artifacts/workbench"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22653
+
+[services.development]
+run = "pnpm --filter @workspace/workbench run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/workbench", "run", "build" ]
+publicDir = "artifacts/workbench/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22653"
+BASE_PATH = "/"

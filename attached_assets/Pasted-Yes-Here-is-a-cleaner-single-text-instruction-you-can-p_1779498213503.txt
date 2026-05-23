@@ -1,0 +1,270 @@
+Yes. Here is a cleaner single text instruction you can paste into Replit, Claude, or a developer brief.
+
+Polestar Advisory Workbench Dashboard Build Instruction
+
+Create a private internal dashboard for Polestar Advisory, a private security advisory company. The dashboard will act as the main operational workbench for collecting, scraping, reviewing, analysing and turning open source data into branded client reports.
+
+The visual style must feel semi tactical and corporate. It should look like a serious security intelligence workbench, not a generic SaaS dashboard and not a military fantasy interface. The tone should be polished, restrained, operational and business suitable.
+
+The dashboard is for internal use by Polestar Advisory and will support reporting across APAC and the Middle East.
+
+Core dashboard sections
+
+The dashboard must include the following topic areas:
+
+Fuel
+Monitor fuel related disruptions, pricing pressure, shortages, policy changes, protests linked to fuel, transport impacts and regional operational consequences.
+
+Flashpoint
+This section covers fertiliser. The dashboard label should be Flashpoint, not Fertiliser. It should monitor fertiliser supply, pricing, export controls, production disruption, agricultural impact and food security implications.
+
+Protests and Civil Unrest
+Monitor demonstrations, riots, strikes, road blocks, election related unrest, activist action, labour unrest and public disorder events.
+
+Energy
+Monitor power generation, grid disruption, electricity shortages, energy policy, infrastructure attacks, blackouts and operational impacts.
+
+Shipping
+Monitor maritime disruption, port disruption, chokepoints, vessel delays, shipping security and regional maritime risk.
+
+Cargo Watch
+Monitor warehouse theft, cargo theft, logistics crime, truck hijacking, depot theft, insider activity, supply chain theft and organised cargo crime across the region.
+
+Missile Strike Tracker, Maritime
+Create a missile and drone strike tracker focused only on the Strait of Hormuz. This is for maritime incidents only.
+
+Missile Strike Tracker, Land Based
+Create a missile and drone strike tracker for land based incidents only in the following GCC and nearby countries:
+
+Jordan
+Oman
+United Arab Emirates
+Saudi Arabia
+Kuwait
+Bahrain
+Qatar
+
+The missile strike trackers must support selectable time windows:
+
+120 days
+90 days
+60 days
+30 days
+14 days
+7 days
+
+The missile strike tracker must also include a backfill feature so historic incidents can be added manually or imported later.
+
+Each strike incident must record:
+
+Date and time
+Country
+Location
+Latitude and longitude where available
+Whether the incident is maritime or land based
+Target type
+Munition type
+Casualties
+Infrastructure type
+Source
+Confidence level
+Summary
+Analyst notes
+
+Munition categories must be:
+
+Drone
+Ballistic missile
+Cruise missile
+Mixed
+Unknown
+
+Infrastructure categories must include:
+
+Government
+Power
+Military
+Civilian or residential
+Port
+Airport
+Oil and gas
+Industrial
+Commercial
+Unknown
+
+Target categories should include:
+
+Military site
+Government facility
+Energy infrastructure
+Port or maritime asset
+Airport or aviation asset
+Civilian area
+Commercial site
+Industrial site
+Vessel
+Unknown
+
+Country reporting section
+
+Create a country reporting section. The first country report areas are:
+
+Papua New Guinea
+Papua, meaning Indonesian Papua
+
+The Indonesian Papua section should be labelled simply as Papua. Additional country report areas must be easy to add later.
+
+Country reports should support narrative reporting, incident review, trend summaries, maps, key numbers and client relevant implications.
+
+Source health page
+
+Create a dedicated Source Health page.
+
+This page must show the status of all data sources used by the dashboard. It should show whether each source is working, failing, stale, blocked, delayed or not yet configured.
+
+The Source Health page should include:
+
+Source name
+Topic area
+Source type
+Last successful scrape
+Last failed scrape
+Status
+Error message
+Reliability rating
+Manual review required flag
+Notes
+
+Use clear status indicators, but keep the design within the Polestar brand colours.
+
+Reporting output
+
+The dashboard must generate PDF reports branded as Polestar Insights.
+
+Reports must follow the Polestar Advisory brand style and must not deviate from it.
+
+Reports should be written in prose, not bullet heavy text. Avoid hyphens in prose. Keep the writing clear, direct, professional and client suitable.
+
+Each report should use the following core structure:
+
+Situation
+What Happened
+Hard Numbers
+What Matters
+Implications for Business
+Polestar View
+Watch Next
+
+The Hard Numbers section should include KPI cards. Each KPI card should have a thin vertical accent strip using the relevant Polestar brand colour. The KPI cards should be clean, restrained and not overly decorative.
+
+Brand rules
+
+Use the following fonts across the dashboard and PDF reports:
+
+Roboto
+Roboto Condensed
+
+Use Roboto Condensed Bold for main titles, strong headings, callouts and social media style graphics.
+
+Use Roboto Condensed Medium for subtitles, eyebrow text, section labels and secondary headings.
+
+Use Roboto Light for body copy where a lighter, cleaner visual style is required.
+
+Use the Roboto regular family for body copy, pull quotes and supporting text. Italics may be used where needed.
+
+The overall typography must feel clean, modern, structured and professional, with condensed headings and lighter body text.
+
+Brand colours
+
+Use only the following Polestar Advisory core colours:
+
+Midnight Blue
+Hex: #0B0B3D
+Use as the primary dark brand colour, especially for headers, dark backgrounds, report bands and premium visual treatments.
+
+Dusk Gray
+Hex: #303030
+Use for dark neutral text, secondary backgrounds and supporting design elements.
+
+Electric Blue
+Hex: #4655FF
+Use as the energetic accent colour for highlights, lines, icons, emphasis, buttons, links and selected visual elements.
+
+Polar Gray
+Hex: #E2E2E2
+Use for pale backgrounds, panels, dividers and neutral space.
+
+Gradient
+
+Use an Electric Blue linear gradient moving from Midnight Blue into Electric Blue.
+
+Gradient colours:
+
+#0B0B3D to #4655FF
+
+The gradient should run diagonally at approximately minus 130 degrees.
+
+Use the gradient for hero panels, covers, title slides, report headers, branded backgrounds and high impact visual areas.
+
+Visual direction
+
+The Polestar look must be sophisticated, polished, dynamic and modern.
+
+The palette is anchored by gray and dark blue, with electric blue used as a sharp accent to add energy and standout.
+
+Avoid non brand colours.
+
+Do not add decorative effects such as drop shadows, blurs, outlines or unnecessary logo treatments.
+
+Do not create a neon cyber dashboard. Do not create a generic blue SaaS interface. The correct look is corporate security intelligence with a controlled tactical edge.
+
+Dashboard layout
+
+The workbench should include:
+
+Main landing dashboard
+Topic navigation
+Incident and event database
+Map view
+Timeline view
+Source health page
+Report builder
+PDF export function
+Country reports section
+Manual backfill tool
+Source ingestion status
+Analyst notes field
+Client ready report preview
+
+The landing page should show a clear operational overview across all topic areas, including recent incidents, priority alerts, source health warnings and reports in progress.
+
+PDF export requirements
+
+PDF reports must have:
+
+Consistent Polestar Insights branding
+Roboto and Roboto Condensed typography
+Midnight Blue headers
+Electric Blue accents
+Clean footer
+Page numbers
+Report title
+Date of issue
+Topic label
+Clear section hierarchy
+No layout drift between topic areas
+
+The PDF export style must be consistent across:
+
+Fuel
+Flashpoint
+Protests and Civil Unrest
+Energy
+Shipping
+Cargo Watch
+Missile Strike Tracker Maritime
+Missile Strike Tracker Land Based
+Papua New Guinea
+Papua
+
+All reports must look as though they come from the same Polestar Insights product family.
