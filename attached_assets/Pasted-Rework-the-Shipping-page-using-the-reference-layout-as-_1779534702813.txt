@@ -1,0 +1,207 @@
+Rework the Shipping page using the reference layout as a functional guide.
+
+Do not copy the external design, branding, colours, wording or layout exactly.
+
+Use Polestar style:
+- white background
+- navy headings
+- clean cards
+- KPI cards with subtle accent lines
+- slight transparency and darker borders on chart colours
+- no dark cyber dashboard look
+
+Do not change the database.
+Do not re-import data.
+Do not change Cargo Watch.
+Do not change the map globally.
+Do not add live feeds.
+Do not invent AIS, vessel tracking, dark activity, fleet counts, Hormuz transits or destination analysis unless that data already exists in the database.
+
+Shipping page purpose:
+The Shipping page should give an operational shipping picture, not just a flat incident list.
+
+Shipping covers:
+- port disruption
+- chokepoint risk
+- vessel attacks
+- route diversion
+- shipping delays
+- insurance or freight pressure
+- naval or maritime advisories
+- port strikes or labour disruption
+- cargo movement disruption
+
+Cargo theft, pilferage, hijacking, warehouse theft, depot theft, seal tampering and logistics crime belong under Cargo Watch, not Shipping.
+
+Required page structure:
+
+1. Page header
+
+Title:
+Shipping
+
+Subtitle:
+Port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance pressure, naval advisories, port strikes and cargo movement disruption. Cargo theft and pilferage are tracked under Cargo Watch.
+
+2. Fast Facts
+
+Do not use the term BLUF.
+
+Use the heading:
+
+Fast Facts
+
+Fast Facts should be the top row of 4 to 5 short KPI or insight cards.
+
+Each card should have:
+- number
+- short title
+- one or two sentence operational summary
+
+Examples:
+- total shipping incidents
+- highest severity
+- main affected region
+- main issue type
+- latest significant incident
+
+Use only current database records.
+Do not invent anything.
+
+3. Key Metrics
+
+Add KPI cards for:
+- total shipping incidents
+- incidents in last 7 days
+- incidents in last 30 days
+- highest severity
+- main affected region
+- records with source links
+- records with coordinates
+
+4. Regional split
+
+Show incidents by region:
+- Middle East
+- APAC
+- Other / Unknown
+
+Use country to assign region.
+
+Middle East:
+Saudi Arabia, UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iran, Iraq, Yemen, Israel, Lebanon, Syria
+
+APAC:
+Singapore, Malaysia, Indonesia, Thailand, Vietnam, Philippines, Cambodia, Laos, Myanmar, India, Pakistan, Bangladesh, Sri Lanka, China, Taiwan, South Korea, Japan, Australia, New Zealand, Papua New Guinea
+
+If country is blank, null or unclear, show it as:
+Country not identified
+
+Do not show “Unknown” as if it is a country.
+
+5. Issue type breakdown
+
+Add a useful issue type breakdown.
+
+Use categories such as:
+- Chokepoint risk
+- Vessel attack
+- Port disruption
+- Route diversion
+- Naval / maritime advisory
+- Insurance / freight pressure
+- Cargo movement disruption
+- Other maritime
+
+Use existing fields or simple title/summary classification.
+Do not invent incident details.
+
+6. Daily intelligence summary
+
+Add three short text cards:
+- Transit / route activity
+- Port and chokepoint watch
+- Key intelligence note
+
+These should be based on the current shipping records only.
+
+If the data does not support one of these summaries, show:
+Data not currently available.
+
+7. Shipping map
+
+Keep the map.
+
+Only plot records with latitude and longitude.
+
+If there are no geocoded shipping records for the selected view, show:
+No geocoded shipping records available for this view.
+
+Do not invent coordinates.
+
+8. Charts
+
+Include:
+- incident timeline
+- incidents by region
+- incidents by issue type
+- incidents by country
+- severity distribution
+
+Chart styling:
+- slightly translucent fills
+- darker border/edge
+- fill opacity around 0.78
+- border/stroke around 1.5px to 2px
+- use Polestar risk colours where severity is shown
+
+9. Recent incidents
+
+Keep a recent incidents list/table with:
+- date
+- title
+- country
+- region
+- issue type
+- severity
+- source/source URL if available
+
+10. Data quality handling
+
+Do not display “Unknown” as a country.
+
+Use:
+Country not identified
+
+Keep those records in totals, but separate them from proper country charts where possible.
+
+Add a small note/card:
+Records with country not identified: X
+
+11. Report builder alignment
+
+Shipping reports should use this focus:
+- route disruption
+- port disruption
+- vessel attack
+- chokepoint risk
+- maritime advisories
+- freight or insurance pressure
+- operational impact
+
+Do not include cargo theft or pilferage in Shipping reports. That belongs in Cargo Watch.
+
+12. Acceptance criteria
+
+- Shipping page shows a useful operational picture.
+- Fast Facts appears at the top.
+- No BLUF wording appears anywhere.
+- Total shipping records reflect the imported production dataset.
+- Page separates region, issue type, country, severity and recent incidents.
+- “Unknown” is not displayed as a country.
+- Map only plots records with coordinates.
+- No fake AIS or vessel movement data is created.
+- No Cargo Watch changes.
+- No database changes.
+- No re-import.
+- No unrelated changes.
