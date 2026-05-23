@@ -1,9 +1,21 @@
-import { useGetDashboardOverview } from "@workspace/api-client-react";
+import { useGetDashboardOverview, useGetIncidentCountsByTopic, type DashboardTopicCard } from "@workspace/api-client-react";
 import { AlertTriangle, Activity, CheckCircle2, XCircle, FileText, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { severityBadgeStyle } from "@/lib/topics";
+
+const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
+  { label: "24h", days: 1 },
+  { label: "7d", days: 7 },
+  { label: "14d", days: 14 },
+  { label: "30d", days: 30 },
+  { label: "60d", days: 60 },
+  { label: "90d", days: 90 },
+  { label: "180d", days: 180 },
+  { label: "1y", days: 365 },
+];
 
 export default function Dashboard() {
   const { data: overview, isLoading, isError } = useGetDashboardOverview();
@@ -58,40 +70,7 @@ export default function Dashboard() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {overview.topicCards.map((topic) => (
-              <Link key={topic.topic} href={`/topics/${topic.topic}`} className="block">
-                <div className="bg-card border border-border p-4 rounded-sm hover:border-accent/50 transition-colors group cursor-pointer h-full flex flex-col relative overflow-hidden">
-                  {topic.criticalCount > 0 && (
-                    <div className="absolute top-0 right-0 w-2 h-full bg-destructive" />
-                  )}
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors">
-                      {topic.label.toUpperCase()}
-                    </h3>
-                    <div className="text-right">
-                      <div className="text-2xl font-serif font-bold leading-none">{topic.incidentCount}</div>
-                      <div className="text-xs text-muted-foreground font-sans">Total Incidents</div>
-                      <div className="text-[10px] text-muted-foreground font-mono mt-1">{topic.incidentCount7d} in last 7d</div>
-                    </div>
-                  </div>
-                  
-                  {topic.latestHeadline ? (
-                    <div className="mt-auto pt-3 border-t border-border/50">
-                      <p className="text-sm font-sans line-clamp-2 text-foreground/80 group-hover:text-foreground">
-                        {topic.latestHeadline}
-                      </p>
-                      {topic.latestAt && (
-                        <p className="text-xs text-muted-foreground mt-1 font-mono">
-                          {formatDistanceToNow(new Date(topic.latestAt), { addSuffix: true })}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-auto pt-3 text-sm text-muted-foreground font-sans italic">
-                      No recent incidents
-                    </div>
-                  )}
-                </div>
-              </Link>
+              <TopicCard key={topic.topic} topic={topic} />
             ))}
           </div>
 
@@ -240,6 +219,67 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TopicCard({ topic }: { topic: DashboardTopicCard }) {
+  const [days, setDays] = useState(7);
+  const { data: counts = [] } = useGetIncidentCountsByTopic({ days });
+  const windowCount = counts.find((c) => c.topic === topic.topic)?.count ?? 0;
+  const windowLabel = WINDOW_OPTIONS.find((w) => w.days === days)?.label ?? `${days}d`;
+
+  return (
+    <div className="bg-card border border-border p-4 rounded-sm hover:border-accent/50 transition-colors group h-full flex flex-col relative overflow-hidden">
+      {topic.criticalCount > 0 && (
+        <div className="absolute top-0 right-0 w-2 h-full bg-destructive" />
+      )}
+      <div className="flex justify-between items-start mb-3 gap-3">
+        <Link href={`/topics/${topic.topic}`} className="block flex-1 min-w-0">
+          <h3 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors truncate">
+            {topic.label.toUpperCase()}
+          </h3>
+        </Link>
+        <Link href={`/topics/${topic.topic}`} className="text-right block">
+          <div className="text-2xl font-serif font-bold leading-none">{topic.incidentCount}</div>
+          <div className="text-[10px] text-muted-foreground font-sans uppercase tracking-wider">Total Incidents</div>
+        </Link>
+      </div>
+
+      <div className="border-t border-border/50 pt-2 mb-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[10px] font-sans uppercase tracking-wider text-muted-foreground">In selected window</div>
+          <div className="text-sm font-serif font-bold text-primary">{windowCount}</div>
+        </div>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="w-full text-[11px] font-mono bg-muted/40 border border-border rounded-sm px-2 py-1 cursor-pointer hover:bg-muted/60 focus:outline-none focus:border-accent"
+          aria-label={`Time window for ${topic.label}`}
+        >
+          {WINDOW_OPTIONS.map((w) => (
+            <option key={w.days} value={w.days}>{w.label}</option>
+          ))}
+        </select>
+        <div className="text-[9px] text-muted-foreground font-mono mt-1 text-right">showing last {windowLabel}</div>
+      </div>
+
+      {topic.latestHeadline ? (
+        <Link href={`/topics/${topic.topic}`} className="mt-auto pt-2 border-t border-border/50 block">
+          <p className="text-sm font-sans line-clamp-2 text-foreground/80 group-hover:text-foreground">
+            {topic.latestHeadline}
+          </p>
+          {topic.latestAt && (
+            <p className="text-xs text-muted-foreground mt-1 font-mono">
+              {formatDistanceToNow(new Date(topic.latestAt), { addSuffix: true })}
+            </p>
+          )}
+        </Link>
+      ) : (
+        <div className="mt-auto pt-2 border-t border-border/50 text-sm text-muted-foreground font-sans italic">
+          No recent incidents
+        </div>
+      )}
     </div>
   );
 }
