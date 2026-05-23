@@ -228,6 +228,7 @@ function TopicCard({ topic }: { topic: DashboardTopicCard }) {
   const { data: counts = [] } = useGetIncidentCountsByTopic({ days });
   const windowCount = counts.find((c) => c.topic === topic.topic)?.count ?? 0;
   const windowLabel = WINDOW_OPTIONS.find((w) => w.days === days)?.label ?? `${days}d`;
+  const href = `/topics/${topic.topic.replace(/_/g, "-")}`;
 
   return (
     <div className="bg-card border border-border p-4 rounded-sm hover:border-accent/50 transition-colors group h-full flex flex-col relative overflow-hidden">
@@ -235,12 +236,12 @@ function TopicCard({ topic }: { topic: DashboardTopicCard }) {
         <div className="absolute top-0 right-0 w-2 h-full bg-destructive" />
       )}
       <div className="flex justify-between items-start mb-3 gap-3">
-        <Link href={`/topics/${topic.topic}`} className="block flex-1 min-w-0">
+        <Link href={href} className="block flex-1 min-w-0">
           <h3 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors truncate">
             {topic.label.toUpperCase()}
           </h3>
         </Link>
-        <Link href={`/topics/${topic.topic}`} className="text-right block">
+        <Link href={href} className="text-right block">
           <div className="text-2xl font-serif font-bold leading-none">{topic.incidentCount}</div>
           <div className="text-[10px] text-muted-foreground font-sans uppercase tracking-wider">Total Incidents</div>
         </Link>
@@ -265,7 +266,7 @@ function TopicCard({ topic }: { topic: DashboardTopicCard }) {
       </div>
 
       {topic.latestHeadline ? (
-        <Link href={`/topics/${topic.topic}`} className="mt-auto pt-2 border-t border-border/50 block">
+        <Link href={href} className="mt-auto pt-2 border-t border-border/50 block">
           <p className="text-sm font-sans line-clamp-2 text-foreground/80 group-hover:text-foreground">
             {topic.latestHeadline}
           </p>

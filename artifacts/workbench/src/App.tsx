@@ -9,6 +9,7 @@ import Incidents from "./pages/Incidents";
 import MapPage from "./pages/Map";
 import Timeline from "./pages/Timeline";
 import Topic from "./pages/Topic";
+import CargoWatch from "./pages/CargoWatch";
 import Strikes from "./pages/Strikes";
 import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/incidents" component={Incidents} />
         <Route path="/map" component={MapPage} />
         <Route path="/timeline" component={Timeline} />
+        <Route path="/topics/cargo-watch" component={CargoWatch} />
         <Route path="/topics/:topic" component={Topic} />
         <Route path="/strikes/backfill" component={StrikesBackfill} />
         <Route path="/strikes/:theatre" component={Strikes} />

@@ -1,0 +1,89 @@
+Fix Cargo Watch display.
+
+Do not re-import data.
+Do not redesign the whole dashboard.
+Do not change other pages.
+
+Cargo Watch needs to show the imported cargo data broken down properly.
+
+Required changes:
+
+1. Keep the existing Cargo Watch page.
+
+2. Add regional split:
+- Middle East
+- APAC
+- Other / Unknown
+
+Use country to assign region.
+
+Middle East should include:
+Saudi Arabia, UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iran, Iraq, Yemen, Israel, Lebanon, Syria
+
+APAC should include:
+Singapore, Malaysia, Indonesia, Thailand, Vietnam, Philippines, Cambodia, Laos, Myanmar, India, Pakistan, Bangladesh, Sri Lanka, China, Taiwan, South Korea, Japan, Australia, New Zealand, Papua New Guinea
+
+If country is blank or not in either list, put it under Other / Unknown.
+
+3. Add country breakdown.
+
+Cargo Watch should show:
+- incidents by country
+- incidents by region
+- incidents by cargo category/type
+
+4. Add cargo category breakdown.
+
+Use any existing field that identifies cargo type/category.
+
+Expected categories include:
+- Electronics
+- Tobacco
+- Alcohol
+- FMCG
+- Food
+- Fuel
+- Pharmaceuticals
+- Chemicals
+- Other
+
+If no cargo type exists, mark as Other. Do not invent a category.
+
+5. Add summary cards:
+- Total cargo incidents
+- APAC incidents
+- Middle East incidents
+- Other / Unknown incidents
+- Confirmed value stolen, if available
+- Incidents with companies named, if available
+
+6. Add charts:
+- incidents by region
+- incidents by country
+- incidents by cargo category
+- stacked country by cargo category if the data supports it
+
+7. Recent incidents list should show:
+- date
+- title
+- country
+- region
+- cargo category if available
+- severity
+- source/source URL if available
+
+8. Map:
+Keep the existing cargo map.
+Only plot cargo records with coordinates.
+Do not invent coordinates.
+
+9. Acceptance criteria:
+Cargo Watch no longer shows only a simple 8-row view.
+It clearly shows cargo incidents broken down by:
+- country
+- region
+- cargo category
+
+No database changes unless needed to read already-imported fields.
+No re-import.
+No unrelated changes.
