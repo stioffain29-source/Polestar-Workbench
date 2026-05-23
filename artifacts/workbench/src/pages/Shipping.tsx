@@ -281,12 +281,48 @@ export default function Shipping() {
     return c;
   }, [vesselIncidents]);
 
-  const transitRecords = recent7.filter((i) =>
-    i.issue === "Vessel Attack" || i.issue === "Route Diversion" || i.issue === "Chokepoint Risk" || i.issue === "Naval / Maritime Advisory",
+  // Daily Intelligence Summary derivations.
+  // Source: the same `enriched` array that feeds the rest of the Shipping
+  // page (charts, vessel attacks, recent incidents). No artificial 7-day
+  // narrowing here — when no shipping records arrived in the last week the
+  // buckets were going blank even though matching records were visible
+  // elsewhere on the page.
+  const sortedEnriched = useMemo(
+    () =>
+      [...enriched]
+        .filter((i) => !isNaN(i.occurredDate.getTime()))
+        .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
+    [enriched],
   );
-  const portRecords = recent7.filter((i) =>
-    i.issue === "Port Disruption" || i.issue === "Port Strike / Labour" || i.issue === "Cargo Movement Disruption" || i.issue === "Shipping Delay",
-  );
+
+  const TRANSIT_ISSUES = new Set([
+    "Vessel Attack",
+    "Route Diversion",
+    "Chokepoint Risk",
+    "Naval / Maritime Advisory",
+    "Port Disruption",
+    "Shipping Delay",
+  ]);
+  // Waterways / chokepoints + port-side keywords. We text-match across the
+  // location, title and summary so chokepoint references that were classified
+  // under another issue label (e.g. a vessel attack in the Strait of Hormuz)
+  // still surface under Port and Chokepoint Watch.
+  const PORT_CHOKEPOINT_RE =
+    /\b(strait of hormuz|bab[- ]el[- ]mandeb|red sea|gulf of oman|arabian gulf|persian gulf|suez canal|malacca|chokepoint|port of |port strike|port congestion|berth congestion|container backlog|harbou?r)\b/i;
+  const PORT_ISSUES = new Set([
+    "Port Disruption",
+    "Port Strike / Labour",
+    "Cargo Movement Disruption",
+    "Shipping Delay",
+    "Chokepoint Risk",
+  ]);
+
+  const transitRecords = sortedEnriched.filter((i) => TRANSIT_ISSUES.has(i.issue));
+  const portRecords = sortedEnriched.filter((i) => {
+    if (PORT_ISSUES.has(i.issue)) return true;
+    const blob = `${i.title} ${i.summary ?? ""} ${i.location ?? ""}`;
+    return PORT_CHOKEPOINT_RE.test(blob);
+  });
   const intelRecord = latestSignificant;
 
   // Page render
@@ -461,7 +497,7 @@ export default function Shipping() {
             label="Transit / Route Activity"
             body={
               transitRecords.length > 0
-                ? `${transitRecords.length} transit-related record${transitRecords.length === 1 ? "" : "s"} in the past 7 days, covering vessel attacks, route diversion, chokepoint risk and naval advisories. Most recent: ${transitRecords[0].title}.`
+                ? `${transitRecords.length} transit-related record${transitRecords.length === 1 ? "" : "s"} on file, covering vessel attacks, route diversion, chokepoint risk, naval advisories, port disruption and shipping delays. Most recent: ${transitRecords[0].title}.`
                 : null
             }
           />
@@ -469,7 +505,7 @@ export default function Shipping() {
             label="Port and Chokepoint Watch"
             body={
               portRecords.length > 0
-                ? `${portRecords.length} port-side record${portRecords.length === 1 ? "" : "s"} in the past 7 days, covering port disruption, port strikes, cargo movement disruption and shipping delays. Most recent: ${portRecords[0].title}.`
+                ? `${portRecords.length} port and chokepoint record${portRecords.length === 1 ? "" : "s"} on file across the Strait of Hormuz, Bab el-Mandeb, Red Sea, Gulf of Oman, Arabian Gulf and regional ports. Most recent: ${portRecords[0].title}.`
                 : null
             }
           />
@@ -720,7 +756,7 @@ function IntelCard({ label, body }: { label: string; body: string | null }) {
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent" />
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mt-1">{label}</div>
       <p className="text-sm text-primary font-sans leading-relaxed mt-2">
-        {body ?? <span className="italic text-muted-foreground">Data not currently available.</span>}
+        {body ?? <span className="italic text-muted-foreground">No matching records in current view.</span>}
       </p>
     </div>
   );
