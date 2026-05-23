@@ -119,7 +119,7 @@ function drawCover(ctx: Ctx, data: TopicReportData, topicLabel: string) {
   setText(pdf, WHITE);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
-  pdf.text(sanitize(`${topicLabel.toUpperCase()}  ·  WEEKLY BRIEFING`), MX + 22, ctx.y + 60);
+  pdf.text(sanitize(`POLESTAR INSIGHTS  ·  ${topicLabel.toUpperCase()}`), MX + 22, ctx.y + 60);
 
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(22);

@@ -110,7 +110,8 @@ export default function Reports() {
               <button onClick={() => { if (confirm("Delete report?")) del.mutate({ id: r.id }, { onSuccess: () => { qc.invalidateQueries({ queryKey: getListReportsQueryKey() }); qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }); } }); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
             <Link href={`/reports/${r.id}`} className="block mt-3">
-              <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors">{r.title}</h2>
+              <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Polestar Insights</div>
+              <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors mt-0.5">{r.title}</h2>
             </Link>
             <div className="text-xs text-muted-foreground mt-2 font-mono">
               {TOPIC_LABELS[r.topic]} · {format(new Date(r.issueDate), "d MMM yyyy")}{r.author ? ` · ${r.author}` : ""}

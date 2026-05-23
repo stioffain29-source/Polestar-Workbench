@@ -174,7 +174,8 @@ export default function ReportEditor() {
           <Link href="/reports" className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1">
             <ArrowLeft className="w-3 h-3" /> All Reports
           </Link>
-          <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{form.title || "Untitled report"}</h1>
+          <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mt-2">Polestar Insights</div>
+          <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-0.5">{form.title || "Untitled report"}</h1>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadPdf} disabled={exporting} className="rounded-sm">
