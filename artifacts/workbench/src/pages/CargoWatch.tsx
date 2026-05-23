@@ -10,7 +10,7 @@ import { ExternalLink } from "lucide-react";
 
 const MIDDLE_EAST = new Set([
   "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
-  "Jordan","Iran","Iraq","Yemen","Israel","Lebanon","Syria",
+  "Jordan","Iraq","Yemen","Israel","Lebanon","Syria","Turkey","Turkiye","Türkiye",
 ]);
 
 const APAC = new Set([
@@ -188,7 +188,7 @@ export default function CargoWatch() {
 
       {me === 0 && (
         <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
-          Middle East coverage gap: the imported legacy dataset does not contain cargo theft, pilferage or hijack records for Saudi Arabia, the UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iran, Iraq, Yemen, Israel, Lebanon or Syria. Maritime piracy and vessel attacks involving these countries are tracked under Shipping.
+          Middle East coverage gap: the imported legacy dataset does not contain cargo theft, pilferage or hijack records for Saudi Arabia, the UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iraq, Yemen, Israel, Lebanon, Syria or Turkey. Maritime piracy and vessel attacks involving these countries are tracked under Shipping.
         </div>
       )}
 

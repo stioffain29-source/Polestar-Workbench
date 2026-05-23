@@ -13,7 +13,7 @@ import { ExternalLink } from "lucide-react";
 
 const MIDDLE_EAST = new Set([
   "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
-  "Jordan","Iran","Iraq","Yemen","Israel","Lebanon","Syria",
+  "Jordan","Iraq","Yemen","Israel","Lebanon","Syria","Turkey","Turkiye","Türkiye",
 ]);
 const APAC = new Set([
   "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","Cambodia","Laos","Myanmar",
