@@ -4,6 +4,7 @@ import {
   Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, History, Radio, FileText, Flag, Search, Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import polestarLogo from "@assets/Reverse_white_logo_vert_1779500138062.png";
 
 interface LayoutProps {
   children: ReactNode;
@@ -73,15 +74,12 @@ export default function Layout({ children }: LayoutProps) {
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0 bg-sidebar border-r border-sidebar-border flex flex-col no-print">
         <div className="p-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-primary-foreground text-primary flex items-center justify-center">
-              <Activity className="w-4 h-4" />
-            </div>
-            <div className="font-serif font-bold text-sidebar-foreground tracking-wider uppercase text-lg">
-              POLESTAR ADVISORY
-            </div>
-          </div>
-          <div className="text-xs text-sidebar-foreground/60 mt-1 uppercase font-serif tracking-widest font-bold">
+          <img
+            src={polestarLogo}
+            alt="Polestar Advisory"
+            className="w-40 h-auto"
+          />
+          <div className="text-xs text-sidebar-foreground/60 mt-3 uppercase font-serif tracking-widest font-bold">
             Workbench
           </div>
         </div>
