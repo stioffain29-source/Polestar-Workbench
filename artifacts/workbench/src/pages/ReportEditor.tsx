@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
   useGetReport, useUpdateReport,
@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, REPORT_STATUSES } from "@/lib/topics";
 import ReportPreview from "@/components/ReportPreview";
-import { ArrowLeft, Printer, Save } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
+import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 
 type TopicGuide = {
   scope: string;
@@ -78,6 +79,21 @@ export default function ReportEditor() {
   const { data: report, isLoading } = useGetReport(id);
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const downloadPdf = async () => {
+    if (!previewRef.current) return;
+    setExporting(true);
+    try {
+      await exportElementToPdf(
+        previewRef.current,
+        `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (!report) return;
@@ -123,7 +139,10 @@ export default function ReportEditor() {
           <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{form.title || "Untitled report"}</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.print()} className="rounded-sm"><Printer className="w-4 h-4 mr-2" /> Print / PDF</Button>
+          <Button variant="outline" onClick={downloadPdf} disabled={exporting} className="rounded-sm">
+            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? "Generating PDF..." : "Download PDF"}
+          </Button>
           <Button onClick={save} className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"><Save className="w-4 h-4 mr-2" /> Save</Button>
         </div>
       </div>
@@ -166,7 +185,7 @@ export default function ReportEditor() {
           <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} placeholder={guide?.polestarView} className="rounded-sm" /></Field>
         </div>
 
-        <div className="bg-white border border-border rounded-sm overflow-hidden">
+        <div ref={previewRef} className="bg-white border border-border rounded-sm overflow-hidden">
           <ReportPreview report={form} />
         </div>
       </div>
