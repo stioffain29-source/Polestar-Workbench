@@ -186,6 +186,12 @@ export default function CargoWatch() {
         </div>
       )}
 
+      {me === 0 && (
+        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
+          Middle East coverage gap: the imported legacy dataset does not contain cargo theft, pilferage or hijack records for Saudi Arabia, the UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iran, Iraq, Yemen, Israel, Lebanon or Syria. Maritime piracy and vessel attacks involving these countries are tracked under Shipping.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Incidents by Region">
           <ResponsiveContainer width="100%" height="100%">
