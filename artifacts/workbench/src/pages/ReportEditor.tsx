@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
-  useGetReport, useUpdateReport,
+  useGetReport, useUpdateReport, useListIncidents,
   getGetReportQueryKey, getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
 } from "@workspace/api-client-react";
@@ -13,7 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TOPICS, TOPIC_LABELS, REPORT_STATUSES } from "@/lib/topics";
 import ReportPreview from "@/components/ReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
-import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
+import { slugifyForFilename } from "@/lib/exportPdf";
+import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
+
+const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
 
 type TopicGuide = {
   scope: string;
@@ -57,6 +60,7 @@ interface FormState {
   topic: string;
   status: string;
   issueDate: string;
+  executiveSummary: string;
   situation: string;
   whatHappened: string;
   whatMatters: string;
@@ -68,6 +72,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   title: "", topic: "fuel", status: "draft", issueDate: new Date().toISOString().slice(0, 10),
+  executiveSummary: "",
   situation: "", whatHappened: "",
   whatMatters: "", implications: "", polestarView: "", watchNext: "", author: "",
 };
@@ -79,15 +84,35 @@ export default function ReportEditor() {
   const { data: report, isLoading } = useGetReport(id);
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
-  const previewRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const { data: incidents = [] } = useListIncidents({});
 
   const downloadPdf = async () => {
-    if (!previewRef.current) return;
     setExporting(true);
     try {
-      await exportElementToPdf(
-        previewRef.current,
+      await exportTopicReportPdf(
+        {
+          title: form.title,
+          topic: form.topic,
+          issueDate: form.issueDate,
+          author: form.author,
+          executiveSummary: form.executiveSummary,
+          situation: form.situation,
+          whatHappened: form.whatHappened,
+          whatMatters: form.whatMatters,
+          implications: form.implications,
+          watchNext: form.watchNext,
+          polestarView: form.polestarView,
+        },
+        incidents.map((i) => ({
+          id: i.id,
+          title: i.title,
+          topic: i.topic,
+          severity: i.severity,
+          occurredAt: i.occurredAt,
+          country: i.country,
+        })),
+        TOPIC_LABELS,
         `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`,
       );
     } finally {
@@ -97,11 +122,18 @@ export default function ReportEditor() {
 
   useEffect(() => {
     if (!report) return;
+    let exec = "";
+    try {
+      exec = (typeof window !== "undefined" && window.localStorage)
+        ? (window.localStorage.getItem(execSummaryStorageKey(report.id)) ?? "")
+        : "";
+    } catch { exec = ""; }
     setForm({
       title: report.title ?? "",
       topic: report.topic ?? "fuel",
       status: report.status ?? "draft",
       issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
+      executiveSummary: exec,
       situation: report.situation ?? "",
       whatHappened: report.whatHappened ?? "",
       whatMatters: report.whatMatters ?? "",
@@ -115,7 +147,13 @@ export default function ReportEditor() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = () => {
-    update.mutate({ id, data: form as never }, {
+    const { executiveSummary, ...persistable } = form;
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(execSummaryStorageKey(id), executiveSummary);
+      }
+    } catch { /* ignore */ }
+    update.mutate({ id, data: persistable as never }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetReportQueryKey(id) });
         qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
@@ -177,6 +215,7 @@ export default function ReportEditor() {
             <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => set("issueDate", e.target.value)} className="rounded-sm" /></Field>
           </div>
           <Field label="Author"><Input value={form.author} onChange={(e) => set("author", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Executive Summary"><Textarea rows={4} value={form.executiveSummary} onChange={(e) => set("executiveSummary", e.target.value)} placeholder="One short paragraph at the top of the brief: the dominant structural read for this cycle." className="rounded-sm" /></Field>
           <Field label="Situation"><Textarea rows={4} value={form.situation} onChange={(e) => set("situation", e.target.value)} placeholder={guide?.situation} className="rounded-sm" /></Field>
           <Field label="What Happened"><Textarea rows={5} value={form.whatHappened} onChange={(e) => set("whatHappened", e.target.value)} placeholder={guide?.whatHappened} className="rounded-sm" /></Field>
           <Field label="What Matters"><Textarea rows={4} value={form.whatMatters} onChange={(e) => set("whatMatters", e.target.value)} placeholder={guide?.whatMatters} className="rounded-sm" /></Field>
@@ -185,7 +224,7 @@ export default function ReportEditor() {
           <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} placeholder={guide?.polestarView} className="rounded-sm" /></Field>
         </div>
 
-        <div ref={previewRef} className="bg-white border border-border rounded-sm overflow-hidden">
+        <div className="bg-white border border-border rounded-sm overflow-hidden">
           <ReportPreview report={form} />
         </div>
       </div>
