@@ -21,6 +21,7 @@ const REQUIRED_TOPIC_REPORTS: Array<{
  * not been applied yet, so it is safe to run repeatedly across deploys.
  */
 export async function runDataMigrations(): Promise<void> {
+  logger.info("runDataMigrations: starting");
   try {
     // 1) Severity vocabulary: critical/elevated/moderate/low  →
     //    insignificant/low/moderate/high/extreme.
@@ -82,22 +83,33 @@ export async function runDataMigrations(): Promise<void> {
     //    topic, so re-runs and new environments self-heal without
     //    duplicating cards.
     const today = new Date().toISOString().slice(0, 10);
+    logger.info({ count: REQUIRED_TOPIC_REPORTS.length }, "runDataMigrations: entering report seed loop");
     for (const seed of REQUIRED_TOPIC_REPORTS) {
-      const [existing] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(reportsTable)
-        .where(eq(reportsTable.topic, seed.topic));
-      if ((existing?.n ?? 0) === 0) {
-        await db.insert(reportsTable).values({
-          title: seed.title,
-          topic: seed.topic,
-          status: "draft",
-          issueDate: today,
-          author: "J. Sterling",
-        });
-        logger.info({ topic: seed.topic, title: seed.title }, "Seeded missing topic report");
+      try {
+        const [existing] = await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(reportsTable)
+          .where(eq(reportsTable.topic, seed.topic));
+        const n = existing?.n ?? 0;
+        logger.info({ topic: seed.topic, existing: n }, "runDataMigrations: report seed check");
+        if (n === 0) {
+          const inserted = await db
+            .insert(reportsTable)
+            .values({
+              title: seed.title,
+              topic: seed.topic,
+              status: "draft",
+              issueDate: today,
+              author: "J. Sterling",
+            })
+            .returning({ id: reportsTable.id });
+          logger.info({ topic: seed.topic, title: seed.title, id: inserted[0]?.id }, "Seeded missing topic report");
+        }
+      } catch (seedErr) {
+        logger.error({ err: seedErr, topic: seed.topic }, "Failed to seed topic report");
       }
     }
+    logger.info("runDataMigrations: finished");
   } catch (err) {
     logger.error({ err }, "Data migration failed (continuing startup)");
   }
