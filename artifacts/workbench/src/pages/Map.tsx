@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { useListIncidents, useListStrikes } from "@workspace/api-client-react";
-import { severityClass } from "@/lib/topics";
+import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
 import { cn } from "@/lib/utils";
+
+// Map a strike munition to the rating palette so all map markers share the
+// same approved colours and styling rules.
+function munitionRating(munition: string): string {
+  if (munition === "ballistic_missile" || munition === "cruise_missile") return "extreme";
+  if (munition === "drone") return "high";
+  if (munition === "mixed") return "moderate";
+  return "low";
+}
 
 const COUNTRY_LABELS: Array<{ name: string; lat: number; lng: number }> = [
   { name: "Saudi Arabia", lat: 24, lng: 45 },
@@ -56,7 +65,7 @@ export default function MapPage() {
           title: i.title,
           country: i.country,
           when: i.occurredAt,
-          color: i.severity === "extreme" ? "#A33232" : i.severity === "high" ? "#4655FF" : "#E2E2E2",
+          rating: i.severity,
         }));
     }
     const strikes = view === "maritime" ? maritime : land;
@@ -69,7 +78,7 @@ export default function MapPage() {
         title: `${s.munition.replace(/_/g, " ")} · ${s.targetCategory.replace(/_/g, " ")}`,
         country: s.country,
         when: s.occurredAt,
-        color: s.munition === "ballistic_missile" || s.munition === "cruise_missile" ? "#A33232" : "#4655FF",
+        rating: munitionRating(s.munition),
       }));
   }, [view, incidents, maritime, land]);
 
@@ -128,10 +137,19 @@ export default function MapPage() {
           })}
           {points.map((p) => {
             const [x, y] = project(p.lat, p.lng);
+            const s = markerStyle(p.rating);
             return (
               <g key={p.id} onMouseEnter={() => setHover(p)} onMouseLeave={() => setHover(null)} style={{ cursor: "pointer" }}>
-                <circle cx={x} cy={y} r={8} fill={p.color} opacity={0.2} />
-                <circle cx={x} cy={y} r={4} fill={p.color} />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={6}
+                  fill={s.fill}
+                  fillOpacity={s.fillOpacity}
+                  stroke={s.stroke}
+                  strokeOpacity={s.strokeOpacity}
+                  strokeWidth={s.strokeWidth}
+                />
               </g>
             );
           })}
@@ -145,12 +163,22 @@ export default function MapPage() {
         )}
       </div>
 
-      <div className="text-xs text-muted-foreground font-sans">
-        Showing {points.length} markers. Hover for detail.
-        <span className="inline-flex items-center gap-3 ml-6">
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#A33232" }} /> Extreme</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#4655FF" }} /> High</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: "#E2E2E2" }} /> Moderate / Low</span>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground font-sans">
+        <span>Showing {points.length} markers. Hover for detail.</span>
+        <span className="inline-flex items-center gap-4">
+          {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((r) => (
+            <span key={r} className="inline-flex items-center gap-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  backgroundColor: RATING_COLORS[r],
+                  opacity: 0.78,
+                  border: `1.5px solid ${RATING_COLORS[r]}`,
+                }}
+              />
+              {SEVERITY_LABELS[r]}
+            </span>
+          ))}
         </span>
       </div>
     </div>

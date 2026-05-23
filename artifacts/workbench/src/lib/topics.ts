@@ -21,6 +21,42 @@ export const SEVERITY_LABELS: Record<string, string> = {
   extreme: "Extreme",
 };
 
+// Rating colours — placeholder palette until final spec is supplied.
+// Update these five values and every map / badge will follow.
+export const RATING_COLORS: Record<string, string> = {
+  extreme: "#A33232",
+  high: "#4655FF",
+  moderate: "#0B0B3D",
+  low: "#9A9AA8",
+  insignificant: "#E2E2E2",
+};
+
+export const MARKER_FILL_OPACITY = 0.78;
+export const MARKER_BORDER_WIDTH = 1.5;
+
+export function ratingColor(rating: string): string {
+  return RATING_COLORS[rating] ?? RATING_COLORS.insignificant;
+}
+
+// Standard marker styling — apply identically on every map surface
+// (dashboard, topic, country report, strike tracker, cargo watch, PDF export).
+export function markerStyle(rating: string): {
+  fill: string;
+  fillOpacity: number;
+  stroke: string;
+  strokeOpacity: number;
+  strokeWidth: number;
+} {
+  const c = ratingColor(rating);
+  return {
+    fill: c,
+    fillOpacity: MARKER_FILL_OPACITY,
+    stroke: c,
+    strokeOpacity: 1,
+    strokeWidth: MARKER_BORDER_WIDTH,
+  };
+}
+
 export const MUNITIONS = ["drone", "ballistic_missile", "cruise_missile", "mixed", "unknown"] as const;
 export const TARGET_CATEGORIES = [
   "military_site","government_facility","energy_infrastructure","port_maritime",
