@@ -9,9 +9,15 @@ const REQUIRED_TOPIC_REPORTS: Array<{
   title: string;
 }> = [
   { topic: "fuel",        title: "APAC Fuel Theft & Diversion Outlook" },
-  { topic: "flashpoint",  title: "Indo-Pacific Flashpoint Tracker" },
   { topic: "fertiliser",  title: "South Asia Fertiliser Supply Risk Brief" },
   { topic: "cargo_watch", title: "APAC Cargo Theft & Hijack Monthly" },
+];
+
+// Reports that were previously auto-seeded but have since been retired.
+// Removed on startup so they disappear from every environment without
+// requiring manual deletion in the UI.
+const RETIRED_REPORT_TITLES: string[] = [
+  "Indo-Pacific Flashpoint Tracker",
 ];
 
 /**
@@ -82,6 +88,20 @@ export async function runDataMigrations(): Promise<void> {
     //    Builder. Idempotent: only inserts when no report exists for the
     //    topic, so re-runs and new environments self-heal without
     //    duplicating cards.
+    // 3a) Remove any reports retired from the seed list, in every env.
+    for (const retiredTitle of RETIRED_REPORT_TITLES) {
+      try {
+        const res = await db
+          .delete(reportsTable)
+          .where(eq(reportsTable.title, retiredTitle));
+        if (res.rowCount && res.rowCount > 0) {
+          logger.info({ title: retiredTitle, rows: res.rowCount }, "Removed retired report");
+        }
+      } catch (delErr) {
+        logger.error({ err: delErr, title: retiredTitle }, "Failed to remove retired report");
+      }
+    }
+
     const today = new Date().toISOString().slice(0, 10);
     logger.info({ count: REQUIRED_TOPIC_REPORTS.length }, "runDataMigrations: entering report seed loop");
     for (const seed of REQUIRED_TOPIC_REPORTS) {
