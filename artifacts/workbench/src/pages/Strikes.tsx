@@ -178,7 +178,7 @@ export default function Strikes() {
   const [weapon, setWeapon] = useState<string>("");
   const [target, setTarget] = useState<string>("");
 
-  const { data: strikes = [] } = useListStrikes({ theatre, days: days as 7 });
+  const { data: strikes = [], isLoading } = useListStrikes({ theatre, days: days as 7 });
 
   const filtered = useMemo(() => {
     return strikes.filter((s) =>
@@ -285,6 +285,22 @@ export default function Strikes() {
           {filtered.length} strikes in window · {filtered.length} rows
         </div>
       </div>
+
+      {!isLoading && strikes.length === 0 && (
+        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
+          {theatre === "maritime_hormuz" ? (
+            <>
+              No maritime-theatre strikes are currently on file. The imported dataset only contains land-based strikes across the GCC.{" "}
+              <Link href="/strikes/land" className="text-accent hover:underline">View Land — GCC</Link>.
+            </>
+          ) : (
+            <>
+              No land-theatre strikes are currently on file in the imported dataset.{" "}
+              <Link href="/strikes/maritime" className="text-accent hover:underline">View Maritime — Hormuz</Link>.
+            </>
+          )}
+        </div>
+      )}
 
       {/* Daily timeline */}
       <Card
