@@ -34,6 +34,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
   "label": zod.string(),
   "incidentCount": zod.number(),
+  "incidentCount7d": zod.number(),
   "criticalCount": zod.number(),
   "latestHeadline": zod.string().nullish(),
   "latestAt": zod.coerce.date().nullish()

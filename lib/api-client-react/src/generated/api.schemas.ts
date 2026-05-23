@@ -450,6 +450,7 @@ export interface DashboardTopicCard {
   topic: Topic;
   label: string;
   incidentCount: number;
+  incidentCount7d: number;
   criticalCount: number;
   /** @nullable */
   latestHeadline?: string | null;

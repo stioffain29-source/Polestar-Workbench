@@ -69,7 +69,8 @@ export default function Dashboard() {
                     </h3>
                     <div className="text-right">
                       <div className="text-2xl font-serif font-bold leading-none">{topic.incidentCount}</div>
-                      <div className="text-xs text-muted-foreground font-sans">Incidents</div>
+                      <div className="text-xs text-muted-foreground font-sans">Total Incidents</div>
+                      <div className="text-[10px] text-muted-foreground font-mono mt-1">{topic.incidentCount7d} in last 7d</div>
                     </div>
                   </div>
                   

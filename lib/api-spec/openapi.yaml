@@ -935,11 +935,12 @@ components:
 
     DashboardTopicCard:
       type: object
-      required: [topic, label, incidentCount, criticalCount]
+      required: [topic, label, incidentCount, incidentCount7d, criticalCount]
       properties:
         topic: { $ref: "#/components/schemas/Topic" }
         label: { type: string }
         incidentCount: { type: integer }
+        incidentCount7d: { type: integer }
         criticalCount: { type: integer }
         latestHeadline: { type: ["string", "null"] }
         latestAt: { type: ["string", "null"], format: date-time }

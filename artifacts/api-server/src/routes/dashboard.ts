@@ -38,7 +38,11 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
 
   const topicCards = await Promise.all(
     Object.entries(TOPICS).map(async ([topic, label]) => {
-      const [agg] = await db
+      const [total] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(incidentsTable)
+        .where(eq(incidentsTable.topic, topic));
+      const [agg7d] = await db
         .select({
           count: sql<number>`count(*)::int`,
           critical: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
@@ -54,8 +58,9 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
       return {
         topic,
         label,
-        incidentCount: agg?.count ?? 0,
-        criticalCount: agg?.critical ?? 0,
+        incidentCount: total?.count ?? 0,
+        incidentCount7d: agg7d?.count ?? 0,
+        criticalCount: agg7d?.critical ?? 0,
         latestHeadline: latest?.title ?? null,
         latestAt: latest?.occurredAt ?? null,
       };
