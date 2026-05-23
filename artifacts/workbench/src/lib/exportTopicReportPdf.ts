@@ -144,11 +144,12 @@ export async function exportTopicReportPdf(
   filename: string,
 ): Promise<void> {
   const topicLabel = topicLabels[data.topic] ?? data.topic;
+  const cadence = data.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing";
   let headerDate = data.issueDate;
   try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
 
   const ctx = createCtx({
-    kind: `${topicLabel} · Weekly Briefing`,
+    kind: `${topicLabel} · ${cadence}`,
     issueDate: headerDate,
   });
 

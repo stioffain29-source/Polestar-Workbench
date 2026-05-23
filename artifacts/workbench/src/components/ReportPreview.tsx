@@ -159,7 +159,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
             color: "rgba(255,255,255,0.85)",
           }}
         >
-          {topicLabel} · Weekly Briefing
+          Polestar Insights · {topicLabel} · {report.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing"}
         </div>
         <h1
           className="mb-3"
