@@ -1,0 +1,217 @@
+Fix Cargo Watch scope filtering.
+
+Cargo Watch is currently showing some records that are outside geography or outside scope.
+
+This must be fixed as a display/filter/classification issue only.
+
+Do not change the database.
+Do not delete records.
+Do not re-import data.
+Do not redesign the page.
+Do not change Cargo Watch’s purpose.
+
+Cargo Watch scope
+
+Cargo Watch is only for cargo theft, hijack and logistics crime in:
+
+- APAC
+- Middle East
+
+Africa is out of scope.
+Europe is out of scope.
+North America is out of scope.
+South America is out of scope.
+
+Do not include South Africa, Kenya, Nigeria, Ghana, Egypt, Morocco, Italy, Canada, the United States, Brazil, Poland, or any other out-of-scope country in the main Cargo Watch view.
+
+Accepted APAC geography
+
+Include only if the incident location is in:
+
+Singapore
+Malaysia
+Indonesia
+Thailand
+Vietnam
+Philippines
+Cambodia
+Laos
+Myanmar
+India
+Pakistan
+Bangladesh
+Sri Lanka
+China
+Taiwan
+South Korea
+Japan
+Australia
+New Zealand
+Papua New Guinea
+
+Accepted Middle East geography
+
+Include only if the incident location is in:
+
+Saudi Arabia
+United Arab Emirates
+UAE
+Oman
+Qatar
+Bahrain
+Kuwait
+Jordan
+Iran
+Iraq
+Yemen
+Israel
+Lebanon
+Syria
+
+Location aliases
+
+Treat these as Middle East / APAC locations only where they clearly refer to the incident location:
+
+Dubai = United Arab Emirates
+Abu Dhabi = United Arab Emirates
+Jebel Ali = United Arab Emirates
+Riyadh = Saudi Arabia
+Jeddah = Saudi Arabia
+Dammam = Saudi Arabia
+Doha = Qatar
+Manama = Bahrain
+Muscat = Oman
+Soekarno-Hatta = Indonesia
+Tanjung Priok = Indonesia
+
+Do not classify by nationality or publisher
+
+Geography must be based on incident location.
+
+Do not classify a record as India just because:
+- it says “Indian-origin”
+- it says “Indians”
+- the publisher is India Today
+- an Indian company is mentioned
+- Indian nationals are involved overseas
+
+Do not classify a record as New Zealand, Australia, India, etc. just because the source or company has links there.
+
+Examples to exclude
+
+Exclude records like:
+- Nestlé / KitKat cargo theft if it happened in Italy
+- lobster theft if it is not APAC or Middle East cargo/logistics crime
+- Indians in Canada stories
+- US, Canada, Italy, Africa, Europe or South America cargo crime stories
+
+These can be counted only as:
+
+Excluded / out of scope
+
+They must not appear in:
+- main Cargo Watch totals
+- country charts
+- regional charts
+- cargo category charts
+- recent incidents
+- map
+- report outputs
+
+Accepted incident scope
+
+Include only records about:
+- cargo theft
+- warehouse theft
+- depot theft
+- truck hijacking
+- container theft
+- pilferage
+- seal tampering
+- insider-enabled theft
+- logistics crime involving goods in transit or storage
+
+Exclude records about:
+- consumer product anti-theft features
+- policy articles only
+- general corruption
+- electricity theft
+- fish/lobster theft unless clearly cargo/logistics theft in APAC or Middle East
+- general crime not tied to cargo/logistics
+- maritime vessel attacks
+- port congestion
+- freight rates
+- commercial partnerships
+- payment disputes
+
+Maritime vessel attacks belong in Shipping, not Cargo Watch.
+
+Country not identified
+
+If the country cannot be confidently identified as APAC or Middle East, do not show it as a main country or region.
+
+Keep it in a small data-quality note only:
+
+Records needing country review: X
+
+Do not show “Country not identified” as a main chart bar.
+
+Out-of-scope handling
+
+Add or keep a small note:
+
+Out-of-scope records excluded: X
+
+These records stay in the database but are excluded from the main Cargo Watch view.
+
+Cargo category handling
+
+Too much is still hiding in “Other”.
+
+Improve classification using title, summary and source text.
+
+Use these categories where supported by the record text:
+
+- FMCG
+- Electronics
+- Alcohol
+- Tobacco
+- Fuel
+- Food
+- Pharmaceuticals
+- Chemicals
+- Vehicles / Auto Parts
+- Textiles / Apparel
+- Cash / High Value Goods
+- General Cargo
+- Other
+
+Use “General Cargo” for generic freight, container, truck, depot or warehouse theft where the exact goods are not known.
+
+Use “Other” only when the record is genuinely unclassifiable.
+
+Do not invent cargo types.
+
+Report before and after
+
+Before applying the final display change, report:
+
+- current Cargo Watch total
+- accepted in-scope total
+- out-of-scope excluded total
+- records needing country review
+- examples of excluded records and why
+- final country breakdown
+- final cargo category breakdown
+
+Acceptance criteria
+
+- Cargo Watch only shows APAC and Middle East cargo/logistics crime.
+- Africa is excluded.
+- Europe, North America and South America are excluded.
+- Italy, Canada and similar out-of-scope examples no longer appear in the main Cargo Watch view.
+- Country is based on incident location, not nationality or publisher.
+- “Country not identified” is not a main chart category.
+- “Other” is reduced where better cargo categories can be parsed.
+- Total displayed Cargo Watch count reflects only in-scope records.
+- Database remains unchanged.

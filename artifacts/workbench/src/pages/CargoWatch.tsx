@@ -8,37 +8,107 @@ import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, Cartes
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
 
+// Cargo Watch scope: APAC + Middle East cargo / hijack / logistics crime only.
+// Turkey is intentionally excluded per the current scope spec; Iran is included.
 const MIDDLE_EAST = new Set([
   "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
-  "Jordan","Iraq","Yemen","Israel","Lebanon","Syria","Turkey","Turkiye","Türkiye",
+  "Jordan","Iran","Iraq","Yemen","Israel","Lebanon","Syria",
 ]);
 
 const APAC = new Set([
   "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","Cambodia","Laos","Myanmar",
   "India","Pakistan","Bangladesh","Sri Lanka","China","Taiwan","South Korea","Japan",
-  "Australia","New Zealand","Papua New Guinea","West Papua",
+  "Australia","New Zealand","Papua New Guinea",
 ]);
 
 type Region = "Middle East" | "APAC" | "Out of scope" | "Country not identified";
 
-function classifyRegion(country: string | null | undefined): Region {
-  if (!country) return "Country not identified";
-  const first = country.split(/[;,]/)[0].trim();
-  if (!first) return "Country not identified";
-  if (/^unknown$/i.test(first)) return "Country not identified";
-  if (MIDDLE_EAST.has(first)) return "Middle East";
-  if (APAC.has(first)) return "APAC";
-  return "Out of scope";
-}
+// City / sub-region aliases per the scope spec. Mapped to canonical country
+// names so a record tagged "Dubai" or "Hong Kong" is treated as UAE / China.
+const COUNTRY_ALIASES: Record<string, string> = {
+  // UAE
+  "dubai": "UAE", "abu dhabi": "UAE", "jebel ali": "UAE", "sharjah": "UAE",
+  // Saudi Arabia
+  "riyadh": "Saudi Arabia", "jeddah": "Saudi Arabia", "dammam": "Saudi Arabia",
+  // Other GCC
+  "doha": "Qatar", "manama": "Bahrain", "muscat": "Oman",
+  // Indonesia
+  "soekarno-hatta": "Indonesia", "soekarno hatta": "Indonesia",
+  "tanjung priok": "Indonesia", "west papua": "Indonesia",
+  // China (Hong Kong is part of the China SAR, treated as China for APAC scope)
+  "hong kong": "China",
+};
 
-const NOT_IDENTIFIED = "Country not identified";
+function normalizeCountry(name: string): string {
+  return COUNTRY_ALIASES[name.toLowerCase()] ?? name;
+}
 
 function identifyCountry(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const first = raw.split(/[;,]/)[0].trim();
   if (!first) return null;
   if (/^unknown$/i.test(first)) return null;
-  return first;
+  return normalizeCountry(first);
+}
+
+function classifyRegion(country: string | null | undefined): Region {
+  const first = identifyCountry(country);
+  if (!first) return "Country not identified";
+  if (MIDDLE_EAST.has(first)) return "Middle East";
+  if (APAC.has(first)) return "APAC";
+  return "Out of scope";
+}
+
+// Out-of-scope context: explicit foreign location words in the headline /
+// summary override an APAC/ME country tag. Geography only — no brand or
+// nationality tokens. Used to catch records like "Indian-origin men arrested
+// in Canada" (country tagged India, incident in Canada) or South African
+// records tagged Unknown but mentioning Gauteng / Johannesburg / Musina.
+const OOS_CONTEXT_RE = /\b(in Canada|in the US|in the United States|in Italy|in Europe|in Africa|in Brazil|in Mexico|in the UK|in Britain|in Germany|in France|in Spain|US Northeast|Italian|Polish|Kenyan|Nigerian|Ghanaian|Moroccan|Egyptian|Mexican|Brazilian|Gauteng|Johannesburg|Pretoria|Cape Town|Musina|Vryburg|Gqeberha|Port Elizabeth|Philippi|Sowetan)\b/i;
+
+// Nationality-only triggers (e.g. "Indian-origin men arrested in Canada").
+// Treated as out-of-scope ONLY when combined with an explicit foreign-location
+// word, so a real APAC story about "Indian-origin businessmen in Mumbai" is
+// not wrongly excluded.
+const NATIONALITY_OFFSHORE_RE = /\b(Indian[- ]origin|Punjab[- ]origin|Pakistani[- ]origin|Filipino[- ]origin|Bangladeshi[- ]origin)\b/i;
+
+// Records that are clearly NOT cargo / logistics theft incidents — civic /
+// governance / film / non-cargo crime — even if the source feed labels them
+// as cargo-related.
+const NON_CARGO_RE = /\b(trailer.*film|heist film|movie review|HAM Berat|kekerasan|pemenuhan SDM|nakes|gubernur|pemprov|prioritaskan|infrastruktur|kabupaten|pemkot diminta|fasilitasi penyelesaian|consumer.*anti-theft|anti-theft feature|electricity theft|port congestion|freight rate|commercial partnership|payment dispute)\b/i;
+
+// Required cargo / logistics incident vocabulary. At least one match needed
+// or the record is excluded from the main view as "not a cargo incident".
+const CARGO_INCIDENT_RE = /\b(cargo|freight|container|truck|lorry|hijack|warehouse|godown|depot|pilfer|seal[- ]?tamper|consignment|shipment|parcel|logistic|theft|stolen|stole|robbery|burglar|raid|loot|siphon|smuggl|fraud|busted)\b/i;
+
+// Non-cargo "fish/lobster/oyster" pattern unless the same text also clearly
+// frames it as cargo/logistics theft (per spec).
+const NON_CARGO_FISH_RE = /\b(lobster|oyster|fish theft)\b/i;
+
+type Scope = "in_scope" | "out_of_scope_geo" | "excluded_non_cargo" | "country_review";
+
+function classifyScope(i: Incident, region: Region): Scope {
+  const text = `${i.title} ${i.summary ?? ""}`;
+  // Reject non-cargo / civic / film / etc. content first.
+  if (NON_CARGO_RE.test(text)) return "excluded_non_cargo";
+  // Fish/lobster/oyster only counts as cargo if cargo verbs are also present.
+  if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|warehouse|depot|consignment|shipment|logistic)\b/i.test(text)) {
+    return "excluded_non_cargo";
+  }
+  // Must reference cargo / logistics crime vocabulary at all.
+  if (!CARGO_INCIDENT_RE.test(text)) return "excluded_non_cargo";
+  // Foreign-location override: text says incident is in a non-scope country.
+  if (OOS_CONTEXT_RE.test(text)) return "out_of_scope_geo";
+  // Nationality-only override applies only when paired with explicit foreign
+  // place name (Canada/US/Europe). Already handled above; keep here as a
+  // belt-and-braces for combined phrasing like "Indian-origin ... Canada".
+  if (NATIONALITY_OFFSHORE_RE.test(text) && /\b(Canada|United States|USA|US|UK|Britain|Italy|Europe|Africa|Brazil|Mexico|Australia)\b/i.test(text) && region !== "APAC" && region !== "Middle East") {
+    return "out_of_scope_geo";
+  }
+  // Country-driven classification.
+  if (region === "Out of scope") return "out_of_scope_geo";
+  if (region === "Country not identified") return "country_review";
+  return "in_scope";
 }
 
 // Specific cargo type rules run first; the General Cargo fallback catches
@@ -79,26 +149,42 @@ const REGION_COLOR: Record<Region, string> = {
   "Out of scope": "#B8C2CC",
 };
 
+const NOT_IDENTIFIED = "Country not identified";
+
 const CAT_PALETTE = ["#0B0B3D", "#2A9D8F", "#E67E22", "#4655FF", "#F4D35E", "#6FB872", "#B8C2CC", "#303030", "#7A8FA6"];
 
 export default function CargoWatch() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "cargo_watch" });
 
-  // Scope: APAC + Middle East only. Records that classify to a country outside
-  // those regions (e.g. South Africa, Canada, US, UK, Brazil) are dropped from
-  // this view. Records with no identifiable country are kept and surfaced as
-  // "Country not identified" so dirty data is not hidden.
+  // Scope: APAC + Middle East cargo / logistics crime ONLY.
+  //   - region classified from incident country (with location-text override)
+  //   - non-cargo content (governance, film reviews, electricity theft, etc.)
+  //     and explicit foreign-location context ("in Canada", "Indian-origin",
+  //     "KitKat" / "Nestlé") are excluded from the main view.
+  //   - records with no identifiable country sit in a small data-quality
+  //     bucket and are kept out of charts/totals.
+  // No DB writes — pure UI filtering.
   const allEnriched = useMemo(
-    () => incidents.map((i) => ({
-      ...i,
-      region: classifyRegion(i.country),
-      category: classifyCategory(i),
-    })),
+    () => incidents.map((i) => {
+      const region = classifyRegion(i.country);
+      return {
+        ...i,
+        region,
+        category: classifyCategory(i),
+        scope: classifyScope(i, region),
+      };
+    }),
     [incidents],
   );
-  const outOfScopeCount = allEnriched.filter((i) => i.region === "Out of scope").length;
+
+  const totalInDb = allEnriched.length;
+  const outOfScopeCount = allEnriched.filter((i) => i.scope === "out_of_scope_geo").length;
+  const excludedNonCargoCount = allEnriched.filter((i) => i.scope === "excluded_non_cargo").length;
+  const notIdentifiedCount = allEnriched.filter((i) => i.scope === "country_review").length;
+
+  // Only in-scope records reach the charts, KPIs, map, and table.
   const enriched = useMemo(
-    () => allEnriched.filter((i) => i.region !== "Out of scope"),
+    () => allEnriched.filter((i) => i.scope === "in_scope"),
     [allEnriched],
   );
 
@@ -124,11 +210,6 @@ export default function CargoWatch() {
     enriched.forEach((i) => m.set(i.category, (m.get(i.category) ?? 0) + 1));
     return Array.from(m.entries()).map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
   }, [enriched]);
-
-  const notIdentifiedCount = useMemo(
-    () => enriched.filter((i) => identifyCountry(i.country) === null).length,
-    [enriched],
-  );
 
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
@@ -176,29 +257,32 @@ export default function CargoWatch() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-px bg-border p-px rounded-sm overflow-hidden">
-        <Kpi label="Total Cargo Incidents" value={total} />
+        <Kpi label="In-Scope Incidents" value={total} />
         <Kpi label="APAC" value={ap} />
         <Kpi label="Middle East" value={me} />
         <Kpi label="Records Mentioning Value" value={valueMentions} small />
         <Kpi label="Records Mentioning Company" value={companyMentions} small />
-        <Kpi label="Excluded (Out of Scope)" value={outOfScopeCount} small />
+        <Kpi label="Total in Source Data" value={totalInDb} small />
       </div>
 
-      {notIdentifiedCount > 0 && (
-        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
-          Records needing country review: {notIdentifiedCount} (kept in totals but excluded from the country and region charts).
+      <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2 space-y-1">
+        <div>
+          Showing {total} in-scope cargo / logistics crime record{total === 1 ? "" : "s"} from {totalInDb} total. Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
         </div>
-      )}
-
-      {outOfScopeCount > 0 && (
-        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
-          {outOfScopeCount} cargo record{outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East (e.g. North America, Europe, Africa, South America) are excluded from this view.
-        </div>
-      )}
+        {outOfScopeCount > 0 && (
+          <div>Out-of-scope records excluded (incident location outside APAC / Middle East, e.g. South Africa, Canada, United States, Italy): {outOfScopeCount}.</div>
+        )}
+        {excludedNonCargoCount > 0 && (
+          <div>Non-cargo records excluded (governance, civil affairs, film reviews, consumer anti-theft features, electricity theft, port congestion, freight rates, etc.): {excludedNonCargoCount}.</div>
+        )}
+        {notIdentifiedCount > 0 && (
+          <div>Records needing country review: {notIdentifiedCount} (country could not be confidently identified — kept in source data, excluded from charts).</div>
+        )}
+      </div>
 
       {me === 0 && (
         <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
-          Middle East coverage gap: the imported legacy dataset does not contain cargo theft, pilferage or hijack records for Saudi Arabia, the UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iraq, Yemen, Israel, Lebanon, Syria or Turkey. Maritime piracy and vessel attacks involving these countries are tracked under Shipping.
+          Middle East coverage gap: the imported legacy dataset does not contain cargo theft, pilferage or hijack records for Saudi Arabia, the UAE, Oman, Qatar, Bahrain, Kuwait, Jordan, Iran, Iraq, Yemen, Israel, Lebanon or Syria. Maritime piracy and vessel attacks involving these countries are tracked under Shipping.
         </div>
       )}
 
