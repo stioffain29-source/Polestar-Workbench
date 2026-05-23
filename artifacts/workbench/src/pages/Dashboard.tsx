@@ -3,6 +3,7 @@ import { AlertTriangle, Activity, CheckCircle2, XCircle, FileText, ArrowRight } 
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { severityBadgeStyle } from "@/lib/topics";
 
 export default function Dashboard() {
   const { data: overview, isLoading, isError } = useGetDashboardOverview();
@@ -110,12 +111,10 @@ export default function Dashboard() {
                     <div className="flex justify-between items-start gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={cn(
-                            "px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
-                            incident.severity === 'extreme' ? "bg-destructive text-destructive-foreground" :
-                            incident.severity === 'high' ? "bg-accent text-accent-foreground" :
-                            "bg-muted text-muted-foreground"
-                          )}>
+                          <span
+                            className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm"
+                            style={severityBadgeStyle(incident.severity)}
+                          >
                             {incident.severity}
                           </span>
                           <span className="text-xs font-mono text-muted-foreground">
