@@ -1,9 +1,36 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { useListIncidents, useListStrikes } from "@workspace/api-client-react";
 import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+// Controlled category list per spec.
+const INCIDENT_CATEGORIES = [
+  "Fuel",
+  "Fertiliser",
+  "Civil Unrest",
+  "Energy / Grid",
+  "Shipping",
+  "Cargo",
+  "Other",
+] as const;
+
+const MARITIME_CATEGORIES = ["Maritime Strike"] as const;
+const LAND_CATEGORIES = ["Land Strike"] as const;
+
+function topicToCategory(topic: string): string {
+  switch (topic) {
+    case "fuel": return "Fuel";
+    case "fertiliser": return "Fertiliser";
+    case "protests": return "Civil Unrest";
+    case "energy": return "Energy / Grid";
+    case "shipping": return "Shipping";
+    case "cargo_watch": return "Cargo";
+    default: return "Other";
+  }
+}
 
 function munitionRating(munition: string): string {
   if (munition === "ballistic_missile" || munition === "cruise_missile") return "extreme";
@@ -12,39 +39,88 @@ function munitionRating(munition: string): string {
   return "low";
 }
 
+type Point = {
+  id: string;
+  lat: number;
+  lng: number;
+  title: string;
+  category: string;
+  country: string;
+  location: string | null;
+  when: string;
+  rating: string;
+  summary: string;
+};
+
 export default function MapPage() {
   const [view, setView] = useState<"incidents" | "maritime" | "land">("incidents");
   const { data: incidents = [] } = useListIncidents({});
   const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz" });
   const { data: land = [] } = useListStrikes({ theatre: "land_gcc" });
 
-  const points = useMemo(() => {
+  const availableCategories = useMemo<readonly string[]>(() => {
+    if (view === "incidents") return INCIDENT_CATEGORIES;
+    if (view === "maritime") return MARITIME_CATEGORIES;
+    return LAND_CATEGORIES;
+  }, [view]);
+
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(
+    () => new Set(INCIDENT_CATEGORIES),
+  );
+
+  // When the tab changes, default to all categories of the new tab on.
+  useEffect(() => {
+    setActiveCategories(new Set(availableCategories));
+  }, [availableCategories]);
+
+  const allPoints = useMemo<Point[]>(() => {
     if (view === "incidents") {
       return incidents
         .filter((i) => i.latitude != null && i.longitude != null)
-        .map((i) => ({
+        .map<Point>((i) => ({
           id: `i-${i.id}`,
           lat: i.latitude!,
           lng: i.longitude!,
           title: i.title,
+          category: topicToCategory(i.topic),
           country: i.country,
+          location: i.location ?? null,
           when: i.occurredAt,
           rating: i.severity,
+          summary: i.summary,
         }));
     }
     const strikes = view === "maritime" ? maritime : land;
+    const fixedCat = view === "maritime" ? "Maritime Strike" : "Land Strike";
     return strikes
       .filter((s) => s.latitude != null && s.longitude != null)
-      .map((s) => ({
+      .map<Point>((s) => ({
         id: `s-${s.id}`,
         lat: s.latitude!,
         lng: s.longitude!,
         title: `${s.munition.replace(/_/g, " ")} · ${s.targetCategory.replace(/_/g, " ")}`,
+        category: fixedCat,
         country: s.country,
+        location: s.location ?? null,
         when: s.occurredAt,
         rating: munitionRating(s.munition),
+        summary: `${s.munition.replace(/_/g, " ")} on ${s.targetCategory.replace(/_/g, " ")} in ${s.country}.`,
       }));
   }, [view, incidents, maritime, land]);
+
+  const visiblePoints = useMemo(
+    () => allPoints.filter((p) => activeCategories.has(p.category)),
+    [allPoints, activeCategories],
+  );
+
+  function toggle(cat: string) {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-4">
@@ -69,50 +145,92 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
-        <MapContainer
-          center={[15, 80]}
-          zoom={4}
-          minZoom={2}
-          scrollWheelZoom
-          worldCopyJump
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            subdomains={["a", "b", "c", "d"]}
-          />
-          {points.map((p) => {
-            const s = markerStyle(p.rating);
-            return (
-              <CircleMarker
-                key={p.id}
-                center={[p.lat, p.lng]}
-                radius={7}
-                pathOptions={{
-                  color: s.stroke,
-                  opacity: s.strokeOpacity,
-                  weight: s.strokeWidth,
-                  fillColor: s.fill,
-                  fillOpacity: s.fillOpacity,
-                }}
-              >
-                <LeafletTooltip direction="top" offset={[0, -6]}>
-                  <div style={{ fontFamily: "Roboto Condensed, sans-serif" }}>
-                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#666" }}>{p.country}</div>
-                    <div style={{ fontWeight: 700, color: "#0B0B3D" }}>{p.title}</div>
-                    <div style={{ fontSize: 11, color: "#666", fontFamily: "monospace" }}>{new Date(p.when).toLocaleString()}</div>
-                  </div>
-                </LeafletTooltip>
-              </CircleMarker>
-            );
-          })}
-        </MapContainer>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
+        <div className="rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
+          <MapContainer
+            center={[15, 80]}
+            zoom={4}
+            minZoom={2}
+            scrollWheelZoom
+            worldCopyJump
+            style={{ height: "100%", width: "100%" }}
+          >
+            <TileLayer
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              subdomains={["a", "b", "c", "d"]}
+            />
+            {visiblePoints.map((p) => {
+              const s = markerStyle(p.rating);
+              return (
+                <CircleMarker
+                  key={p.id}
+                  center={[p.lat, p.lng]}
+                  radius={7}
+                  pathOptions={{
+                    color: s.stroke,
+                    opacity: s.strokeOpacity,
+                    weight: s.strokeWidth,
+                    fillColor: s.fill,
+                    fillOpacity: s.fillOpacity,
+                  }}
+                >
+                  <LeafletTooltip direction="top" offset={[0, -6]}>
+                    <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 280 }}>
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#666" }}>
+                        {p.category}
+                      </div>
+                      <div style={{ fontWeight: 700, color: "#0B0B3D", marginTop: 2 }}>{p.title}</div>
+                      <div style={{ fontSize: 11, color: "#303030", marginTop: 4 }}>
+                        <div>
+                          <strong>Country:</strong> {p.country}
+                          {p.location ? ` · ${p.location}` : ""}
+                        </div>
+                        <div>
+                          <strong>Date:</strong> {format(new Date(p.when), "dd MMM yyyy HH:mm")}
+                        </div>
+                        <div>
+                          <strong>Risk:</strong> {SEVERITY_LABELS[p.rating] ?? p.rating}
+                        </div>
+                      </div>
+                      {p.summary && (
+                        <div style={{ fontSize: 11, color: "#303030", marginTop: 6, lineHeight: 1.35 }}>
+                          {p.summary.length > 220 ? `${p.summary.slice(0, 217)}…` : p.summary}
+                        </div>
+                      )}
+                    </div>
+                  </LeafletTooltip>
+                </CircleMarker>
+              );
+            })}
+          </MapContainer>
+        </div>
+
+        <aside className="bg-card border border-border rounded-sm p-4 h-fit">
+          <div className="font-serif font-bold uppercase text-primary text-sm tracking-wide mb-1">Categories</div>
+          <div className="text-[11px] font-sans text-muted-foreground mb-3">
+            Showing {visiblePoints.length} of {allPoints.length} markers
+          </div>
+          <div className="space-y-2">
+            {availableCategories.map((cat) => {
+              const checked = activeCategories.has(cat);
+              return (
+                <label key={cat} className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(cat)}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  <span>{cat}</span>
+                </label>
+              );
+            })}
+          </div>
+        </aside>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground font-sans">
-        <span>Showing {points.length} markers. Hover for detail.</span>
         <span className="inline-flex items-center gap-4">
           {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((r) => (
             <span key={r} className="inline-flex items-center gap-1.5">

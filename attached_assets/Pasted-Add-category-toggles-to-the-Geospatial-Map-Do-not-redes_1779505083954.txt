@@ -1,0 +1,98 @@
+Add category toggles to the Geospatial Map.
+
+Do not redesign the map. The basemap is now working and must stay as it is.
+
+Current requirement:
+Users need to toggle incident categories on and off, for example:
+- Fuel
+- Fertiliser
+- Civil Unrest
+- Energy / Grid
+- Shipping
+- Cargo
+- Maritime Strikes
+- Land Strikes
+
+The user should be able to show or hide each category without changing the underlying data.
+
+Required behaviour:
+
+1. Add a category filter control
+Place a clear filter panel on or beside the map.
+It should be readable and not hidden in the footer.
+
+Suggested label:
+“Categories”
+
+2. Use checkboxes or toggle switches
+Each category should have its own checkbox/toggle.
+Default state: all categories switched on.
+
+3. Filtering logic
+When a category is switched off, markers from that category should disappear from the map.
+When switched back on, they should reappear.
+Do not delete, mutate, or reload the source data unnecessarily.
+This should be client-side filtering of the marker display.
+
+4. Data field
+Use the existing incident category field if one already exists.
+If category names are inconsistent, normalise them into a controlled list.
+
+Controlled category list:
+Fuel
+Fertiliser
+Civil Unrest
+Energy / Grid
+Shipping
+Cargo
+Maritime Strike
+Land Strike
+Other
+
+5. Marker tooltips
+The tooltip for each marker must show the category clearly.
+
+Tooltip should include:
+- Incident title
+- Category
+- Country
+- Location
+- Date
+- Risk rating
+- Short summary
+
+6. Interaction with existing tabs
+The existing tabs must still work:
+- Incidents
+- Maritime Strikes
+- Land Strikes
+
+Category toggles should work within the selected tab.
+
+Example:
+If the user is on the Incidents tab and switches off Fuel, fuel incidents disappear.
+If the user is on Maritime Strikes, only maritime strike records should show.
+If the user switches off Maritime Strike, those markers disappear.
+
+7. Add visible count
+Show a simple count near the filter panel:
+“Showing X of Y markers”
+
+This count must update when categories are toggled.
+
+8. Do not add advanced functions yet
+Do not add heatmaps.
+Do not add routes.
+Do not add client locations.
+Do not add police, military or medical overlays.
+Do not change the basemap.
+Do not redesign the page.
+
+Acceptance criteria:
+- The map still renders with the current basemap.
+- All categories are visible by default.
+- User can toggle each category on/off.
+- Marker count updates correctly.
+- Tooltips show category.
+- Tabs and category toggles work together.
+- No unrelated UI changes.
