@@ -6,11 +6,13 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "import:legacy": "tsx ./src/import-legacy.ts",
+    "scrape:cargo-watch": "tsx ./src/scrape-cargo-watch.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "drizzle-orm": "catalog:",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
