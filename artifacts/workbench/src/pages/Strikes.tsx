@@ -24,6 +24,22 @@ const SUBTITLE: Record<"maritime_hormuz" | "land_gcc", string> = {
 // reserved for severity rendering elsewhere in the workbench.
 const CAT_PALETTE = ["#0B0B3D", "#2A9D8F", "#E67E22", "#C0392B", "#4655FF", "#F4D35E", "#6FB872", "#B8C2CC"];
 
+// Standard chart styling: slight translucency + darker edge so bars read
+// crisply on the Polar Gray background. Matches the marker convention in
+// lib/topics.ts (0.78 fill opacity, 1.5px stroke).
+const CHART_FILL_OPACITY = 0.78;
+const CHART_STROKE_WIDTH = 1.5;
+
+function darken(hex: string, amount = 0.35): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = Math.max(0, Math.round(((n >> 16) & 0xff) * (1 - amount)));
+  const g = Math.max(0, Math.round(((n >> 8) & 0xff) * (1 - amount)));
+  const b = Math.max(0, Math.round((n & 0xff) * (1 - amount)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 function resolveTheatre(slug: string | undefined): "maritime_hormuz" | "land_gcc" {
   if (slug === "land" || slug === "land_gcc") return "land_gcc";
   return "maritime_hormuz";
@@ -171,7 +187,7 @@ export default function Strikes() {
             <XAxis dataKey="date" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} interval="preserveStartEnd" />
             <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} />
             <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
-            <Area type="monotone" dataKey="count" stroke="#0B0B3D" strokeWidth={1.5} fill="url(#strikeArea)" />
+            <Area type="monotone" dataKey="count" stroke={darken("#4655FF")} strokeWidth={CHART_STROKE_WIDTH} fill="url(#strikeArea)" fillOpacity={CHART_FILL_OPACITY} />
           </AreaChart>
         </ResponsiveContainer>
       </Card>
@@ -200,10 +216,10 @@ export default function Strikes() {
           </Card>
         )}
         <Card
-          title={theatre === "land_gcc" ? "Attack context" : "Maritime context"}
-          subtitle={`Single-system vs combined (multi-weapon) salvos. Bars sum to ${filtered.length}.`}
+          title="Strikes by target type"
+          subtitle={`Target category recorded for each strike. Bars sum to ${filtered.length}.`}
         >
-          <CatBar data={byInfra} />
+          {byTarget.length === 0 ? <Empty /> : <CatBar data={byTarget} />}
         </Card>
         <Card
           title="Weapon family"
@@ -315,7 +331,18 @@ function CatBar({ data, height = 240 }: { data: { key: string; count: number }[]
         <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} />
         <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
         <Bar dataKey="count">
-          {data.map((_, i) => <Cell key={i} fill={CAT_PALETTE[i % CAT_PALETTE.length]} />)}
+          {data.map((_, i) => {
+            const fill = CAT_PALETTE[i % CAT_PALETTE.length];
+            return (
+              <Cell
+                key={i}
+                fill={fill}
+                fillOpacity={CHART_FILL_OPACITY}
+                stroke={darken(fill)}
+                strokeWidth={CHART_STROKE_WIDTH}
+              />
+            );
+          })}
           <LabelList dataKey="count" position="top" fontSize={10} fill="#303030" />
         </Bar>
       </BarChart>
