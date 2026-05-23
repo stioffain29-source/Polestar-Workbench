@@ -1,0 +1,109 @@
+Fix Cargo Watch Middle East population.
+
+Problem:
+Cargo Watch shows:
+Middle East: 0
+
+That is wrong. Middle East cargo records need to be identified, counted and displayed by country.
+
+Do not redesign the page.
+Do not re-import data unless absolutely necessary.
+Do not change other topic pages.
+
+Fix the Cargo Watch regional assignment and country sections.
+
+1. Middle East region list
+
+Cargo Watch Middle East should include records from:
+
+Saudi Arabia
+United Arab Emirates
+UAE
+Oman
+Qatar
+Bahrain
+Kuwait
+Jordan
+Iran
+Iraq
+Yemen
+Israel
+Lebanon
+Syria
+
+Also handle common variants:
+Dubai = United Arab Emirates
+Abu Dhabi = United Arab Emirates
+Jebel Ali = United Arab Emirates
+Riyadh = Saudi Arabia
+Jeddah = Saudi Arabia
+Dammam = Saudi Arabia
+Doha = Qatar
+Manama = Bahrain
+Muscat = Oman
+Kuwait City = Kuwait
+
+2. Find why Middle East is zero
+
+Check whether Middle East records are being missed because:
+- country names are stored as UAE instead of United Arab Emirates
+- locations mention Dubai, Jebel Ali, Riyadh, etc. but country is blank
+- importer placed Middle East cargo records under Other / Unknown
+- frontend region mapper does not include country aliases
+- topic filter is only picking APAC cargo records
+
+3. Populate Middle East properly
+
+Use existing country and location fields only.
+
+Do not invent incidents.
+Do not invent coordinates.
+Do not change source text.
+
+If country is blank but location clearly identifies a country, use it for display classification only.
+
+Example:
+Location contains Dubai or Jebel Ali → display region as Middle East and country as United Arab Emirates.
+
+4. Add regional country sections
+
+Cargo Watch should show sections or breakdowns for:
+
+APAC countries
+Middle East countries
+Other / Unknown countries
+
+Middle East section should show country counts, not just a single Middle East total.
+
+Example display:
+Middle East
+- United Arab Emirates: X
+- Saudi Arabia: X
+- Qatar: X
+- Oman: X
+- Kuwait: X
+
+APAC
+- Indonesia: X
+- India: X
+- Papua New Guinea: X
+etc.
+
+5. Charts
+
+Update charts so they show:
+- incidents by region
+- incidents by country
+- country by cargo category
+
+But make sure Middle East countries are included properly.
+
+6. Acceptance criteria
+
+- Middle East no longer shows zero if Middle East cargo records exist.
+- Cargo Watch has APAC, Middle East and Other / Unknown country sections.
+- UAE/Dubai/Jebel Ali/Riyadh style records are classified correctly for display.
+- Total remains 196.
+- No records are deleted.
+- No fake records are created.
+- No unrelated pages are changed.
