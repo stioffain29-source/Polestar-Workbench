@@ -1,6 +1,18 @@
-import { db, incidentsTable } from "@workspace/db";
+import { db, incidentsTable, reportsTable } from "@workspace/db";
 import { sql, eq, or } from "drizzle-orm";
 import { logger } from "./logger";
+
+// Topics that must each have at least one report card in the Report Builder.
+// Kept in sync with TOPIC_LABELS on the client.
+const REQUIRED_TOPIC_REPORTS: Array<{
+  topic: string;
+  title: string;
+}> = [
+  { topic: "fuel",        title: "APAC Fuel Theft & Diversion Outlook" },
+  { topic: "flashpoint",  title: "Indo-Pacific Flashpoint Tracker" },
+  { topic: "fertiliser",  title: "South Asia Fertiliser Supply Risk Brief" },
+  { topic: "cargo_watch", title: "APAC Cargo Theft & Hijack Monthly" },
+];
 
 /**
  * Idempotent data migrations applied at startup.
@@ -63,6 +75,27 @@ export async function runDataMigrations(): Promise<void> {
       `);
       if (res.rowCount && res.rowCount > 0) {
         logger.info({ rows: res.rowCount }, "Reclassified fertiliser incidents");
+      }
+    }
+    // 3) Ensure every topic has at least one report card in the Report
+    //    Builder. Idempotent: only inserts when no report exists for the
+    //    topic, so re-runs and new environments self-heal without
+    //    duplicating cards.
+    const today = new Date().toISOString().slice(0, 10);
+    for (const seed of REQUIRED_TOPIC_REPORTS) {
+      const [existing] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(reportsTable)
+        .where(eq(reportsTable.topic, seed.topic));
+      if ((existing?.n ?? 0) === 0) {
+        await db.insert(reportsTable).values({
+          title: seed.title,
+          topic: seed.topic,
+          status: "draft",
+          issueDate: today,
+          author: "J. Sterling",
+        });
+        logger.info({ topic: seed.topic, title: seed.title }, "Seeded missing topic report");
       }
     }
   } catch (err) {
