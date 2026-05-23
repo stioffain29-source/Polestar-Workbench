@@ -163,11 +163,6 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-            <div className="p-3 border-t border-border bg-muted/10 text-center">
-               <Link href="/reports" className="text-xs font-sans font-medium text-accent hover:underline uppercase tracking-wide">
-                 Go to Report Builder
-               </Link>
-            </div>
           </div>
 
           <div className="bg-card border border-border rounded-sm flex flex-col">

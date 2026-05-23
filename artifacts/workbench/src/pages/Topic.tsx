@@ -4,6 +4,7 @@ import { TOPIC_LABELS, SEVERITY_LEVELS, severityBadgeStyle, ratingColor } from "
 import { format } from "date-fns";
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
+import TopicReports from "@/components/TopicReports";
 
 export default function Topic() {
   const [, params] = useRoute("/topics/:topic");
@@ -74,6 +75,8 @@ export default function Topic() {
           </div>
         )}
       </div>
+
+      <TopicReports topic={topic} />
     </div>
   );
 }

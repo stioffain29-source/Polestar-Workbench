@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend } from "recharts";
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
+import TopicReports from "@/components/TopicReports";
 
 const MIDDLE_EAST = new Set([
   "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
@@ -341,6 +342,8 @@ export default function CargoWatch() {
           </div>
         )}
       </div>
+
+      <TopicReports topic="cargo_watch" />
     </div>
   );
 }

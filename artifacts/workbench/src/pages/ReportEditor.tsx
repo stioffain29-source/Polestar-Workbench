@@ -171,8 +171,11 @@ export default function ReportEditor() {
     <div className="max-w-[1900px] mx-auto space-y-4">
       <div className="flex items-end justify-between no-print">
         <div>
-          <Link href="/reports" className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1">
-            <ArrowLeft className="w-3 h-3" /> All Reports
+          <Link
+            href={`/topics/${form.topic === "cargo_watch" ? "cargo-watch" : form.topic}`}
+            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3 h-3" /> Back to {form.topic === "cargo_watch" ? "Cargo Watch" : form.topic.charAt(0).toUpperCase() + form.topic.slice(1)}
           </Link>
           <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{form.title || "Untitled report"}</h1>
         </div>
