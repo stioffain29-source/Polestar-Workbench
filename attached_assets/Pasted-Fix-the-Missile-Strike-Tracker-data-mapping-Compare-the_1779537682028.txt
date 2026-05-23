@@ -1,0 +1,91 @@
+Fix the Missile Strike Tracker data mapping.
+
+Compare the new Missile Strike Tracker against the old dashboard reference.
+
+The old dashboard shows useful breakdowns for:
+- target
+- weapon
+- casualties
+- impact
+- attack context
+- UAE emirate
+
+The new dashboard is showing too many “unknown” values, especially:
+- target = unknown
+- impact = unknown
+- location = unknown
+- weapon = unknown
+
+That is not acceptable if the old dashboard had parsed values.
+
+Task:
+Find where the old dashboard derived these values and apply the same mapping/parsing logic to the new Missile Strike Tracker.
+
+Do not redesign the page.
+Do not change the database unless needed to use already-imported fields.
+Do not re-import data.
+Do not invent values.
+
+Check whether the useful fields exist in:
+- title
+- summary
+- source text
+- metadata
+- legacy fields
+- old parser logic
+- imported strike records
+
+Required output:
+1. Restore useful target categories:
+- Oil & Gas
+- Power / Grid
+- Government
+- Aviation
+- Civilian
+- Industrial
+- Military
+- Other
+
+2. Restore useful weapon categories:
+- Drone
+- Ballistic missile
+- Cruise missile
+- Unknown
+
+3. Restore useful casualty categories:
+- None reported
+- Reported
+- Unknown
+
+4. Restore useful impact categories:
+- No impact
+- Disruption
+- Damage
+- Severe
+- Unknown
+
+5. Restore attack context:
+- Single-system
+- Combined
+- Unknown
+
+But do not show a chart if it only contains one useless “unknown” bar.
+
+6. UAE emirate chart:
+Use meaningful labels:
+- Abu Dhabi
+- Fujairah
+- Dubai
+- Unknown
+
+Do not show long messy labels like industrial zone strings unless needed in the table.
+
+7. Strike log:
+Replace repeated “Unknown” where better values can be parsed from the record.
+
+8. Acceptance criteria:
+- New tracker shows the same kind of useful breakdowns as the old dashboard.
+- Unknown is only used when the data genuinely cannot be parsed.
+- No fake values are invented.
+- No page redesign.
+- No unrelated changes.
