@@ -41,19 +41,28 @@ function identifyCountry(raw: string | null | undefined): string | null {
   return first;
 }
 
+// Specific cargo type rules run first; the General Cargo fallback catches
+// generic freight/container/truck wording so that "Other" is reserved for
+// genuinely unclear records. Order matters — more specific rules first.
 const CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
-  { label: "Electronics", pattern: /\b(electronic|smartphone|laptop|mobile phone|consumer electronics|tv|television|tablet)\b/i },
-  { label: "Tobacco", pattern: /\b(tobacco|cigarette|cigar|vape|e-cigarette)\b/i },
-  { label: "Alcohol", pattern: /\b(alcohol|liquor|whisky|whiskey|wine|beer|spirits)\b/i },
-  { label: "FMCG", pattern: /\b(fmcg|consumer goods|household goods|personal care|toiletries)\b/i },
-  { label: "Food", pattern: /\b(food|grain|rice|wheat|sugar|edible oil|produce|frozen|meat|poultry|dairy)\b/i },
-  { label: "Fuel", pattern: /\b(fuel|petrol|diesel|gasoline|lpg|cng|kerosene)\b/i },
-  { label: "Pharmaceuticals", pattern: /\b(pharma|pharmaceutical|medicine|drug|vaccine)\b/i },
-  { label: "Chemicals", pattern: /\b(chemical|fertili[sz]er|solvent|ammonia|acid|industrial chemical)\b/i },
+  { label: "Cash / High Value Goods", pattern: /\b(cash|currency|bullion|gold|silver|jewell?ery|diamond|atm|valuables|high[- ]value)\b/i },
+  { label: "Electronics", pattern: /\b(electronic|electronics|smartphone|smartphones|mobile phone|mobile phones|cellphone|laptop|laptops|semiconductor|semiconductors|chip|chips|tv|television|tablet|tablets|gadget|consumer electronics|appliance|appliances)\b/i },
+  { label: "Pharmaceuticals", pattern: /\b(pharma|pharmaceutical|pharmaceuticals|medicine|medicines|medical supplies|medical supply|vaccine|vaccines|drug|drugs)\b/i },
+  { label: "Tobacco", pattern: /\b(tobacco|cigarette|cigarettes|cigar|cigars|vape|vapes|e-cigarette|e-cigarettes)\b/i },
+  { label: "Alcohol", pattern: /\b(alcohol|liquor|whisky|whiskey|wine|wines|beer|beers|spirits|rum|vodka|gin)\b/i },
+  { label: "Fuel", pattern: /\b(fuel|petrol|diesel|gasoline|lpg|cng|kerosene|jet fuel|aviation fuel)\b/i },
+  { label: "Vehicles / Auto Parts", pattern: /\b(vehicle|vehicles|auto parts|car parts|motorcycle|motorcycles|motorbike|tyres?|tires|automobile|automobiles|spare parts|car|cars|truck part|truck parts)\b/i },
+  { label: "Textiles / Apparel", pattern: /\b(garment|garments|textile|textiles|apparel|clothing|fabric|fabrics|cotton|denim)\b/i },
+  { label: "Chemicals", pattern: /\b(chemical|chemicals|fertili[sz]er|fertili[sz]ers|solvent|solvents|ammonia|acid|hazmat|industrial chemical)\b/i },
+  { label: "Food", pattern: /\b(food|foods|grain|grains|rice|wheat|sugar|edible oil|produce|frozen|meat|poultry|dairy|seafood|fish|coffee|tea|beef|chicken)\b/i },
+  { label: "FMCG", pattern: /\b(fmcg|consumer goods|household goods|household|personal care|toiletries|fast[- ]moving)\b/i },
+  // General Cargo — generic freight/container/truck wording with no specific cargo type detail.
+  { label: "General Cargo", pattern: /\b(cargo|freight|container|containers|shipment|shipments|consignment|consignments|truck|trucks|lorry|lorries|warehouse|godown|depot|parcel|parcels|goods)\b/i },
 ];
 
 function classifyCategory(i: Incident): string {
-  const text = `${i.title} ${i.summary ?? ""}`;
+  // Per spec: parse from title + summary + source text.
+  const text = `${i.title} ${i.summary ?? ""} ${i.source ?? ""}`;
   for (const r of CATEGORY_RULES) {
     if (r.pattern.test(text)) return r.label;
   }
@@ -94,15 +103,18 @@ export default function CargoWatch() {
   );
 
   const total = enriched.length;
+  // Region chart shows only the two in-scope regions. Records with no
+  // identifiable country are still counted in `total` and surfaced via a
+  // small data-quality note below, but they are not a main chart category.
   const byRegion = useMemo(() => {
     const m = new Map<Region, number>([
       ["Middle East", 0],
       ["APAC", 0],
-      ["Country not identified", 0],
     ]);
     enriched.forEach((i) => {
-      if (i.region === "Out of scope") return;
-      m.set(i.region, (m.get(i.region) ?? 0) + 1);
+      if (i.region === "Middle East" || i.region === "APAC") {
+        m.set(i.region, (m.get(i.region) ?? 0) + 1);
+      }
     });
     return Array.from(m.entries()).map(([region, count]) => ({ region, count }));
   }, [enriched]);
@@ -125,21 +137,14 @@ export default function CargoWatch() {
       if (c === null) return; // excluded from the country chart
       m.set(c, (m.get(c) ?? 0) + 1);
     });
-    const ranked = Array.from(m.entries())
+    return Array.from(m.entries())
       .map(([country, count]) => ({ country, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 12);
-    if (ranked.length === 0 && notIdentifiedCount > 0) {
-      ranked.push({ country: NOT_IDENTIFIED, count: notIdentifiedCount });
-    }
-    return ranked;
-  }, [enriched, notIdentifiedCount]);
+  }, [enriched]);
 
   const stacked = useMemo(() => {
-    const topCountries = byCountry
-      .filter((c) => c.country !== NOT_IDENTIFIED)
-      .slice(0, 10)
-      .map((c) => c.country);
+    const topCountries = byCountry.slice(0, 10).map((c) => c.country);
     const categories = byCategory.map((c) => c.category);
     return topCountries.map((country) => {
       const row: Record<string, string | number> = { country };
@@ -170,15 +175,20 @@ export default function CargoWatch() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-px bg-border p-px rounded-sm overflow-hidden">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Cargo Incidents" value={total} />
         <Kpi label="APAC" value={ap} />
         <Kpi label="Middle East" value={me} />
-        <Kpi label="Country Not Identified" value={notIdentifiedCount} small />
         <Kpi label="Records Mentioning Value" value={valueMentions} small />
         <Kpi label="Records Mentioning Company" value={companyMentions} small />
         <Kpi label="Excluded (Out of Scope)" value={outOfScopeCount} small />
       </div>
+
+      {notIdentifiedCount > 0 && (
+        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
+          Records needing country review: {notIdentifiedCount} (kept in totals but excluded from the country and region charts).
+        </div>
+      )}
 
       {outOfScopeCount > 0 && (
         <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
@@ -269,7 +279,7 @@ export default function CargoWatch() {
                     <LeafletTooltip>
                       <div className="text-xs">
                         <div className="font-bold">{i.title}</div>
-                        <div>{identifyCountry(i.country) ?? NOT_IDENTIFIED} · {i.region} · {i.category}</div>
+                        <div>{identifyCountry(i.country) ?? "—"} · {i.region} · {i.category}</div>
                       </div>
                     </LeafletTooltip>
                   </CircleMarker>
@@ -307,7 +317,7 @@ export default function CargoWatch() {
                   <tr key={i.id} className="hover:bg-muted/30">
                     <td className="p-2 font-mono text-xs whitespace-nowrap">{format(new Date(i.occurredAt), "dd MMM yyyy")}</td>
                     <td className="p-2 font-medium">{i.title}</td>
-                    <td className="p-2 text-xs">{identifyCountry(i.country) ?? NOT_IDENTIFIED}</td>
+                    <td className="p-2 text-xs">{identifyCountry(i.country) ?? "—"}</td>
                     <td className="p-2 text-xs">{i.region}</td>
                     <td className="p-2 text-xs">{i.category}</td>
                     <td className="p-2">

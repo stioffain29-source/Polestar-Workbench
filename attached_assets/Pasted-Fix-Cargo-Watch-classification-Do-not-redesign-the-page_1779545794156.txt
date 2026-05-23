@@ -1,0 +1,62 @@
+Fix Cargo Watch classification.
+
+Do not redesign the page.
+Do not re-import data.
+Do not change the database unless absolutely necessary.
+Do not invent values.
+
+Problems:
+1. “Country not identified” is not useful as a main visible chart category.
+2. Too many cargo records are being grouped under “Other”.
+
+Fix country handling:
+- Keep records with no country in the total.
+- Do not show “Country not identified” as a main bar in the region chart.
+- Move it to a small data-quality note only:
+  “Records needing country review: X”
+- Keep country charts focused on actual countries.
+
+Fix cargo category handling:
+Too many records are being classified as Other.
+
+Improve cargo category parsing using title, summary and source text.
+
+Use these categories where the text supports it:
+- FMCG
+- Electronics
+- Alcohol
+- Tobacco
+- Fuel
+- Food
+- Pharmaceuticals
+- Chemicals
+- Vehicles / Auto Parts
+- Textiles / Apparel
+- Cash / High Value Goods
+- General Cargo
+- Other
+
+Do not default everything unclear to Other if a better category can be parsed from the wording.
+
+Examples:
+- “electronics”, “mobile”, “phone”, “laptop”, “semiconductor” → Electronics
+- “cigarettes”, “tobacco” → Tobacco
+- “alcohol”, “liquor”, “beer”, “wine” → Alcohol
+- “food”, “rice”, “grain”, “meat”, “seafood” → Food
+- “fuel”, “diesel”, “petrol”, “gasoline” → Fuel
+- “medicine”, “pharma”, “vaccine”, “medical supplies” → Pharmaceuticals
+- “chemical”, “fertiliser”, “hazmat” → Chemicals
+- “vehicle”, “auto parts”, “car parts”, “tyres” → Vehicles / Auto Parts
+- “garments”, “textiles”, “apparel”, “clothing” → Textiles / Apparel
+- “cash”, “gold”, “jewellery”, “high value” → Cash / High Value Goods
+- generic freight/container/truck goods with no detail → General Cargo
+- truly unclear → Other
+
+Acceptance criteria:
+- “Country not identified” is not shown as a main chart category.
+- Country charts show actual countries only.
+- Data-quality note shows how many records need country review.
+- “Other” cargo category reduces if better categories can be parsed.
+- No fake cargo types are invented.
+- Total Cargo Watch count remains correct.
+- No unrelated changes.
