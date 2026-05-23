@@ -1,0 +1,83 @@
+Add a separate “Vessel Attacks” section to the Shipping page.
+
+Do not make it part of the general Shipping incident feed.
+
+Do not pull in general shipping stories, freight news, payment disputes, LNG applications, port congestion, or cargo theft.
+
+This section is only for hostile maritime incidents involving vessels.
+
+Section title:
+Vessel Attacks
+
+Subtitle:
+Hostile maritime incidents affecting vessels in the Strait of Hormuz, Arabian Gulf and Gulf of Oman.
+
+Place it as its own section on the Shipping page, separate from:
+- Fast Facts
+- Key Metrics
+- Regional Split
+- Issue Type Breakdown
+- General Recent Incidents
+
+Use only records that clearly involve:
+- vessel attacked
+- vessel fired upon
+- missile or drone strike affecting a vessel
+- small craft attack
+- boarding by hostile or unauthorised personnel
+- vessel seizure
+- near miss
+- credible maritime threat to a vessel
+
+Exclude:
+- general freight news
+- port congestion
+- payment disputes
+- commercial partnerships
+- shipping finance
+- routine vessel movements
+- cargo theft or pilferage
+
+KPI cards:
+- Total vessel attack/threat incidents
+- Attacks
+- Near miss
+- Seized
+
+Incident cards should show:
+- vessel name if known, otherwise incident title
+- date
+- waterway/location
+- country if available
+- incident type
+- severity
+- short summary
+- source link
+
+Do not invent:
+- vessel names
+- IMO numbers
+- AIS status
+- distances
+- bearings
+- cargo details
+
+If that data is not already in the record, do not show it.
+
+Keep Polestar style:
+- white background
+- navy headings
+- clean cards
+- severity-coloured accent border
+- no dark cyber style
+- no copied external branding
+
+Acceptance criteria:
+- Vessel Attacks is a separate Shipping section.
+- It only includes genuine hostile vessel incidents.
+- It does not include general shipping news.
+- It does not include cargo theft.
+- Counts are based only on the strict hostile-event subset.
+- No database changes.
+- No re-import.
+- No Cargo Watch changes.

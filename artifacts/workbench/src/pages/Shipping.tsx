@@ -76,31 +76,30 @@ function classifyIssue(i: Incident): string {
 // underlying incident already carries.
 // ---------------------------------------------------------------------------
 
-type VesselIncidentType = "Attack" | "Near miss" | "Seized" | "Threat" | "Unknown";
+type VesselIncidentType = "Attack" | "Near miss" | "Seized" | "Threat";
 
-const VESSEL_NOUN_RE =
-  /\b(vessel|tanker|ship|carrier|bulk carrier|container ship|cargo ship|freighter|dhow|boat|barge|chemical tanker|product tanker|crude tanker|lpg tanker|lng carrier|vlcc|suezmax|aframax)\b/i;
-
-// Words that look vessel-ish but actually indicate market / commercial /
-// corporate news. If a record only matches these, we drop it.
+// Commercial / market / finance / regulatory noise. Records whose text matches
+// any of these are excluded outright — even if a stray attack token appears in
+// the headline — because they are not hostile maritime incidents.
 const COMMERCIAL_RE =
-  /\b(orderbook|newbuild|newbuilds|charter (rate|assessment|index)|time charter|freight rate|baltic dry|index|results|earnings|profit|acquisition|fleet renewal|delivered (resilient|strong)|sold|sale of|orders?\b|orderb|quarterly|annual report)\b/i;
+  /\b(orderbook|newbuild|newbuilds|charter (rate|assessment|index)|time charter|freight rate|spot rate|baltic dry|world container index|earnings|profit|results|acquisition|fleet renewal|partnership|deal|merger|joint venture|sold|sale of|orders?\b|quarterly|annual report|lng (application|approval|terminal application)|payment dispute|invoice|tariff dispute|port congestion|berth congestion|container backlog|shipping finance|bond issu|equity raise|ipo)\b/i;
 
 const VESSEL_RULES: Array<{ type: VesselIncidentType; pattern: RegExp }> = [
-  { type: "Seized", pattern: /\b(seized|seizure|boarded|hijack(ed)?|detained .*(vessel|ship|tanker|crew)|commandeered)\b/i },
-  { type: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near)\b/i },
-  { type: "Attack", pattern: /\b(attack(ed)? (on |by )?(a |the )?(ship|tanker|vessel|carrier|dhow)|vessel attack|tanker attack|missile (hit|struck) (a |the )?(ship|tanker|vessel|carrier)|drone (hit|struck) (a |the )?(ship|tanker|vessel|carrier)|ship hit|tanker hit|vessel on fire|small craft attack|houthi attack|terrorist attack on (a |the )?(vessel|ship|tanker))\b/i },
-  { type: "Threat", pattern: /\b(ukmto|maritime (advisory|warning|threat)|threat to shipping|hostile (act|activity)|suspicious approach|approached by (small craft|skiffs?))\b/i },
+  { type: "Seized", pattern: /\b(seized|seizure|boarded by|hijack(ed)?|detained .*(vessel|ship|tanker|crew)|commandeered|vessel (taken|captured))\b/i },
+  { type: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near|shot down near (a |the )?(vessel|tanker|ship))\b/i },
+  { type: "Attack", pattern: /\b(attack(ed)? (on |by )?(a |the )?(ship|tanker|vessel|carrier|dhow)|vessel attack|tanker attack|missile (hit|struck|targeted) (a |the )?(ship|tanker|vessel|carrier)|drone (hit|struck|targeted) (a |the )?(ship|tanker|vessel|carrier)|ship hit|tanker hit|vessel (hit|on fire|ablaze|struck)|small craft attack|skiff attack|houthi attack|terrorist attack on (a |the )?(vessel|ship|tanker)|fired (upon|at) (a |the )?(vessel|ship|tanker))\b/i },
+  { type: "Threat", pattern: /\b(ukmto (advisory|warning|alert|incident)|maritime (advisory|warning|threat) (to|against) shipping|threat to (shipping|vessel|tanker|ship)|hostile (act|activity) (toward|against) (a |the )?(vessel|ship|tanker)|suspicious approach (to|by) (vessel|ship|tanker)|approached by (small craft|skiffs?))\b/i },
 ];
 
 function classifyVesselIncident(i: Incident): VesselIncidentType | null {
   const text = `${i.title} ${i.summary ?? ""}`;
+  // Hard exclusion first — commercial / finance / congestion / regulatory news
+  // is never a hostile vessel incident regardless of stray keywords.
+  if (COMMERCIAL_RE.test(text)) return null;
   for (const r of VESSEL_RULES) {
     if (r.pattern.test(text)) return r.type;
   }
-  // Not classified by the rules above — only keep it if the title clearly
-  // names a vessel AND it isn't obviously commercial / market news.
-  if (VESSEL_NOUN_RE.test(i.title) && !COMMERCIAL_RE.test(text)) return "Unknown";
+  // No fallback. Only records that match a strict hostile rule are admitted.
   return null;
 }
 
@@ -109,7 +108,6 @@ const VESSEL_ACCENT: Record<VesselIncidentType, string> = {
   "Near miss": "#E67E22",
   Seized: "#0B0B3D",
   Threat: "#7A8FA6",
-  Unknown: "#B8C2CC",
 };
 
 const REGION_COLOR: Record<Region, string> = {
@@ -278,7 +276,7 @@ export default function Shipping() {
       .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
   }, [enriched]);
   const vesselCounts = useMemo(() => {
-    const c: Record<VesselIncidentType, number> = { Attack: 0, "Near miss": 0, Seized: 0, Threat: 0, Unknown: 0 };
+    const c: Record<VesselIncidentType, number> = { Attack: 0, "Near miss": 0, Seized: 0, Threat: 0 };
     for (const v of vesselIncidents) c[v.vesselType]++;
     return c;
   }, [vesselIncidents]);
@@ -374,24 +372,22 @@ export default function Shipping() {
         </div>
       </Section>
 
-      {/* 3b. Vessels Attacked */}
-      <Section title="Vessels Attacked">
+      {/* 3b. Vessel Attacks — strict hostile-only subset */}
+      <Section title="Vessel Attacks">
         <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
-          Active threat reporting covering the Strait of Hormuz, Arabian Gulf and Gulf of Oman. Records are pulled from existing shipping incidents and respect the same APAC + Middle East scope as the rest of the page. Cargo theft and pilferage remain in Cargo Watch.
+          Hostile maritime incidents affecting vessels in the Strait of Hormuz, Arabian Gulf and Gulf of Oman. Limited to attacks, near misses, seizures and credible threats — general freight, port congestion, finance, partnerships and cargo theft are excluded. Cargo theft and pilferage remain in Cargo Watch.
         </p>
         {vesselIncidents.length === 0 ? (
           <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
-            No vessel attack, near-miss or seizure records currently on file in the shipping dataset.
+            No hostile vessel incidents currently on file in the shipping dataset.
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi label="All vessel incidents" value={vesselIncidents.length} accent="#0B0B3D" />
-              <Kpi label="Attack" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} />
+              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0B0B3D" />
+              <Kpi label="Attacks" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} />
               <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} />
-              {vesselCounts.Seized > 0 && (
-                <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} />
-              )}
+              <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3">
               {vesselIncidents.slice(0, 18).map((v) => (
@@ -410,7 +406,7 @@ export default function Shipping() {
             </div>
             {vesselIncidents.length > 18 && (
               <p className="text-[11px] text-muted-foreground italic mt-2">
-                Showing 18 most recent of {vesselIncidents.length} vessel incidents. Full list available in the Recent Shipping Incidents table below.
+                Showing 18 most recent of {vesselIncidents.length} hostile vessel incidents.
               </p>
             )}
           </>
