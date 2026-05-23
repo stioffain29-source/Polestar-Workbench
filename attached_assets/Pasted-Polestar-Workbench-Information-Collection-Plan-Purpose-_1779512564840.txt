@@ -1,0 +1,459 @@
+Polestar Workbench Information Collection Plan
+
+Purpose
+
+The purpose of this plan is to provide a simple, repeatable method for collecting and maintaining information used in the Polestar Workbench.
+
+The aim is not to collect everything. The aim is to collect information that helps explain operational risk across fuel, fertiliser, civil unrest, energy, shipping, cargo, strikes, and Papua / PNG security conditions.
+
+Collection Cycle
+
+Collect → Check → Categorise → Rate severity → Add to dashboard → Review → Report
+
+Core Collection Rules
+
+1. Do not add information that cannot be sourced.
+2. Do not invent missing coordinates.
+3. Do not use social media as sole confirmation for serious incidents unless clearly marked as unverified.
+4. Do not duplicate existing records.
+5. Use the agreed categories and severity ratings.
+6. Keep titles factual and short.
+7. Keep summaries operational, not dramatic.
+8. If in doubt, hold the record back for review rather than forcing it into the dashboard.
+
+Severity Ratings
+
+Use only:
+
+- Extreme
+- High
+- Moderate
+- Low
+- Insignificant
+
+Categories
+
+Use only:
+
+- Fuel
+- Fertiliser
+- Civil Unrest
+- Energy / Grid
+- Shipping
+- Cargo
+- Land Strike
+- Maritime Strike
+- Papua / PNG
+- Other
+
+Topic Collection Requirements
+
+Fuel
+
+Requirement:
+Track fuel shortages, price shocks, refinery disruption, tanker disruption, subsidy changes, fuel protests and supply interruptions.
+
+Indicators:
+- queues at fuel stations
+- price spikes
+- subsidy removal
+- refinery outages
+- tanker disruption
+- fuel depot protests
+- transport strikes linked to fuel prices
+- disruption to commercial transport or logistics
+
+Sources:
+- local media
+- energy trade press
+- government energy ministries
+- oil and gas industry sources
+- port and shipping reports
+- company statements
+- social media for early warning only
+- GDELT for broad media monitoring and trend scanning
+
+Frequency:
+Daily scan, event-driven update, weekly summary.
+
+Dashboard action:
+Add record if the issue affects supply, pricing, transport, public order or business continuity.
+
+Fertiliser
+
+Requirement:
+Track fertiliser supply, pricing, export bans, subsidy changes, ammonia/urea disruption and agricultural impact.
+
+Indicators:
+- export restrictions
+- price increases
+- shortages before planting seasons
+- port delays affecting fertiliser shipments
+- factory outages
+- farmer protests linked to fertiliser
+- disruption to food production or food security
+
+Sources:
+- fertiliser trade publications
+- agriculture ministries
+- commodity news
+- food security reporting
+- local media
+- shipping and port sources
+- GDELT for broad media monitoring
+
+Frequency:
+Weekly scan, daily if market is moving, event-driven for major disruptions.
+
+Dashboard action:
+Add record if it affects food security, pricing, planting cycles, supply availability or agricultural stability.
+
+Civil Unrest / Protests
+
+Requirement:
+Track protests, strikes, riots, demonstrations, labour action, politically driven unrest and public disorder.
+
+Indicators:
+- protests near government sites
+- roadblocks
+- transport disruption
+- labour strikes
+- police deployment
+- arrests
+- violence between protesters and police
+- election-related unrest
+- unrest linked to food, fuel, wages, religion or ethnic tension
+
+Sources:
+- local media
+- police updates
+- government statements
+- social media for early warning
+- embassy alerts
+- GDELT for broad media/event monitoring
+- company security reports
+- trusted local contacts
+
+Frequency:
+Daily scan, event-driven update.
+
+Dashboard action:
+Add record if there is disruption, violence, arrests, road closures, business impact or escalation potential.
+
+Energy / Grid
+
+Requirement:
+Track power outages, grid instability, power rationing, generation shortages, fuel-to-power disruption and energy infrastructure incidents.
+
+Indicators:
+- blackouts
+- load shedding
+- generation shortfall
+- grid alerts
+- substation fires
+- power station disruption
+- fuel shortages affecting power generation
+- public protest over power supply
+
+Sources:
+- utility providers
+- energy ministries
+- local media
+- grid operator notices
+- business press
+- company statements
+- social media for early warning only
+- GDELT for broad media monitoring
+
+Frequency:
+Daily scan in high-risk countries, weekly elsewhere, event-driven for major outages.
+
+Dashboard action:
+Add record if it affects operations, production, logistics, communications, public order or business continuity.
+
+Shipping
+
+Requirement:
+Track port disruption, vessel attacks, maritime security incidents, chokepoint risk, delays, port strikes and shipping cost pressure.
+
+Indicators:
+- port congestion
+- port closure
+- vessel attacks
+- route diversion
+- canal or chokepoint disruption
+- port labour action
+- insurance cost increases
+- naval advisories
+- piracy or robbery reports
+- vessel seizures
+
+Sources:
+- UKMTO
+- shipping trade press
+- port authority notices
+- AIS/maritime reporting where available
+- company statements
+- local media
+- naval/security advisories
+- GDELT for broad media monitoring
+
+Frequency:
+Daily scan, event-driven update for chokepoints, ports and attacks.
+
+Dashboard action:
+Add record if it affects routes, ports, vessels, freight cost, delays or client supply chains.
+
+Cargo Watch
+
+Requirement:
+Track cargo theft, hijacking, warehouse theft, insider theft, transport disruption and logistics crime.
+
+Indicators:
+- truck hijacking
+- warehouse burglary
+- cargo pilferage
+- seal tampering
+- theft from depots
+- theft from vehicles
+- repeat locations
+- insider involvement
+- route-specific risk
+- organised cargo crime
+
+Sources:
+- logistics security associations
+- TAPA-type reporting where available
+- police reports
+- local media
+- insurer/security bulletins
+- client reporting
+- trusted logistics contacts
+- GDELT for broad media monitoring
+
+Frequency:
+Weekly scan, event-driven for serious incidents.
+
+Dashboard action:
+Add record if it affects logistics, route risk, warehouse security, cargo movement or supply chain resilience.
+
+Land Strikes
+
+Requirement:
+Track drone, missile, rocket and related strike activity on land-based targets in the Middle East and Gulf region.
+
+Indicators:
+- drone attacks
+- missile launches
+- air defence interceptions
+- damage to airports, energy infrastructure, ports, military sites or civilian areas
+- escalation statements
+- repeated attacks against the same sector or location
+- attacks affecting business continuity, travel, aviation or energy supply
+
+Sources:
+- government statements
+- military/security advisories
+- credible news wires
+- regional media
+- aviation/maritime advisories where relevant
+- social media only as early warning
+- GDELT for broad media monitoring
+
+Frequency:
+Daily scan, event-driven update.
+
+Dashboard action:
+Add to strike tracker if the incident has a date, country, target type and credible source.
+
+Maritime Strikes
+
+Requirement:
+Track drone, missile, mine, small boat, seizure or attack activity affecting vessels, ports or maritime infrastructure.
+
+Indicators:
+- vessel attack
+- port attack
+- maritime warning
+- naval interception
+- vessel seizure
+- suspicious approach
+- route closure or diversion
+- insurance escalation
+- impact on chokepoints such as Hormuz, Bab el-Mandeb or the Red Sea
+
+Sources:
+- UKMTO
+- naval/coastguard advisories
+- shipping trade press
+- port authorities
+- credible regional media
+- vessel/company statements
+- GDELT for broad media monitoring
+
+Frequency:
+Daily scan, event-driven update.
+
+Dashboard action:
+Add to maritime tracker if it affects a vessel, port, maritime route or chokepoint.
+
+Papua / PNG
+
+Requirement:
+Track armed group activity, civil unrest, tribal violence, crime, protests, road disruption, mining/security incidents and border issues.
+
+Indicators:
+- TPNPB/OPM activity
+- police or military operations
+- road ambushes
+- tribal fighting
+- election unrest
+- mining disruption
+- port or airport disruption
+- cargo theft or convoy incidents
+- attacks on officials, workers or infrastructure
+- road closures or access restrictions
+
+Sources:
+- local media
+- police statements
+- government updates
+- community reporting
+- trusted local contacts
+- company/security reporting
+- regional media
+- GDELT for broad media monitoring
+
+Frequency:
+Daily scan, weekly review, event-driven update for serious incidents.
+
+Dashboard action:
+Add record if it affects travel, logistics, site security, personnel safety or operational continuity.
+
+Flashpoint / Other
+
+Requirement:
+Capture emerging issues that do not yet fit cleanly into another topic but may become operationally relevant.
+
+Indicators:
+- sudden political tension
+- emerging conflict indicators
+- sanctions or diplomatic escalation
+- severe weather with operational impact
+- border disruption
+- sudden regulatory action
+- public disorder not yet categorised
+- weak signals from multiple sources
+
+Sources:
+- local media
+- regional media
+- government statements
+- embassy alerts
+- GDELT for wide-area scanning
+- social media for early warning only
+- trusted local contacts
+- company/security reports
+
+Frequency:
+Daily scan, weekly review.
+
+Dashboard action:
+Add only if operationally relevant. Do not use Other as a dumping ground. If the issue clearly fits another category, move it there.
+
+Validation Standard
+
+Before adding a record, check:
+
+1. Is there a source?
+2. Is the date clear?
+3. Is the country clear?
+4. Is the category correct?
+5. Is the severity reasonable?
+6. Is the location known?
+7. Are coordinates available?
+8. Is this already in the dashboard?
+9. Is the information operationally useful?
+
+If coordinates are missing, leave them blank. The record can still appear in tables and charts but should not appear on the map.
+
+Source Confidence
+
+High confidence:
+- official government or agency statement
+- recognised news agency
+- reputable trade publication
+- direct company or port authority statement
+- multiple credible sources reporting the same event
+
+Medium confidence:
+- local media with named detail
+- specialist industry source
+- trusted local contact
+- GDELT result supported by another source
+
+Low confidence:
+- single social media post
+- anonymous Telegram claim
+- vague local report
+- unclear location or date
+- unsourced repost
+
+Do not treat low-confidence information as confirmed. Hold it for review or mark it clearly.
+
+Escalation Rule
+
+Escalate for review if:
+
+- severity is High or Extreme
+- source is social media only
+- country is unknown
+- location is unclear
+- the record is in Other / Flashpoint
+- the incident may affect client operations
+- there is a possible duplicate
+- the event is politically, legally or commercially sensitive
+- the event could affect travel, logistics, production, ports, energy or personnel safety
+
+Outputs
+
+The collected information supports:
+
+- dashboard totals
+- topic pages
+- severity charts
+- map markers
+- weekly briefs
+- spot reports
+- client alerts
+- operational review
+
+Review Rhythm
+
+Daily:
+Scan priority sources and add relevant new records.
+
+Weekly:
+Review topic trends and remove noise from reporting outputs.
+
+Monthly:
+Review source quality, categories and recurring data gaps.
+
+GDELT Use
+
+Use GDELT as a broad scanning tool, not as the final source by itself.
+
+Use it to:
+- identify emerging media patterns
+- spot countries or topics gaining attention
+- find early indicators of unrest, disruption or escalation
+- support flashpoint monitoring
+- help locate original media reporting
+
+Do not use GDELT alone as confirmation for serious incidents. Where possible, trace the event back to the original article, government notice, trade source or trusted local source.
+
+Golden Rule
+
+The dashboard should be useful before it is comprehensive.
+
+Bad data is worse than missing data.
