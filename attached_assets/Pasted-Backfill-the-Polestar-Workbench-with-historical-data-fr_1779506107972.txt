@@ -1,0 +1,190 @@
+Backfill the Polestar Workbench with historical data from the old dashboard.
+
+Do not redesign the UI. Do not change the dashboard layout. This is a data import and data normalisation task only.
+
+Current issue:
+The new Workbench only contains a small amount of seed data. I need to import/backfill historical records from the previous dashboard so the topic monitors, map, tables, charts and counts have proper historical depth.
+
+Task:
+Find the old dashboard data source in the project or previous files. It may be in one or more of the following formats:
+- JSON
+- CSV
+- TypeScript seed file
+- JavaScript data file
+- database seed
+- static mock data
+- exported records from the previous dashboard
+
+Import that data into the current Workbench database/schema.
+
+Required approach:
+
+1. First identify the current data model
+Inspect the current schema for:
+- incidents
+- topic monitors
+- fuel
+- fertiliser
+- protests / civil unrest
+- energy
+- shipping
+- cargo watch
+- maritime strikes
+- land strikes
+- country reports
+- timeline records
+
+Do not guess the schema. Inspect it first.
+
+2. Find the old dashboard data
+Search the codebase for historical data files and old mock data using terms such as:
+- fuel
+- fertiliser
+- fertilizer
+- protest
+- civil unrest
+- energy
+- grid
+- shipping
+- cargo
+- maritime
+- Hormuz
+- GCC
+- strike
+- Papua
+- PNG
+- incident
+- severity
+- risk
+- latitude
+- longitude
+
+3. Create a migration/import script
+Create a repeatable script that imports the old records into the new database.
+
+The script should:
+- read the old records
+- map old fields to the new schema
+- normalise categories
+- normalise severity values
+- preserve dates
+- preserve titles and summaries
+- preserve country and location
+- preserve latitude and longitude where available
+- skip duplicate records
+- log how many records were imported by category
+
+4. Use the controlled category list
+All imported records must map to one of these categories:
+
+Fuel
+Fertiliser
+Civil Unrest
+Energy / Grid
+Shipping
+Cargo
+Maritime Strike
+Land Strike
+Other
+
+5. Use the controlled severity list
+All imported records must map to one of these severity values:
+
+Extreme
+High
+Moderate
+Low
+Insignificant
+
+Do not create new severity labels.
+Do not use lowercase labels in the database unless the current schema already requires it.
+If the schema uses lowercase internally, convert to title case for display.
+
+6. Risk colour mapping must remain unchanged
+Do not alter the Polestar risk palette:
+
+Extreme: #800000
+High: #C0392B
+Moderate: #E67E22
+Low: #6FB872
+Insignificant: #B8C2CC
+
+7. Deduplication
+Avoid importing duplicate records.
+
+Use a reasonable duplicate check based on:
+- title
+- date
+- country
+- category
+
+If an exact or near-exact match already exists, skip it and log it as skipped.
+
+8. Missing fields
+If old records are missing fields:
+- keep the original title
+- keep the original date if available
+- set category to Other only if it cannot be mapped
+- set severity to Low only if severity is genuinely missing
+- leave latitude/longitude blank only if no location data exists
+- do not invent false coordinates
+
+9. Map compatibility
+Any imported record with latitude and longitude must appear on the Geospatial Map.
+Category toggles must work with imported records.
+Severity colours must work with imported records.
+Tooltips must show the imported record details.
+
+10. Topic monitor compatibility
+Imported records must populate the correct topic pages:
+- Fuel page shows fuel records
+- Fertiliser page shows fertiliser records
+- Protests & Civil Unrest page shows civil unrest records
+- Energy page shows energy/grid records
+- Shipping page shows shipping records
+- Cargo Watch page shows cargo records
+
+11. Charts and counts
+After import, the dashboard cards, severity distribution charts, latest incident date, total recorded count, and incident tables must update from the imported records.
+
+12. Do not hard-code the backfilled data into React components
+The data must be stored in the database or current data layer.
+The UI should read it normally.
+
+13. Add a clear import command
+Add or document a command I can run again, for example:
+
+npm run import:legacy-data
+
+or
+
+npm run seed:legacy
+
+14. Provide an import report
+At the end, output a simple summary:
+
+Imported:
+- Fuel: X
+- Fertiliser: X
+- Civil Unrest: X
+- Energy / Grid: X
+- Shipping: X
+- Cargo: X
+- Maritime Strike: X
+- Land Strike: X
+- Other: X
+
+Skipped duplicates: X
+Missing coordinates: X
+Import errors: X
+
+Acceptance criteria:
+- Historical records from the old dashboard are imported.
+- No duplicate records are created.
+- Topic pages show old and new data together.
+- Map shows imported records with coordinates.
+- Category toggles work on imported records.
+- Severity colours remain correct.
+- Counts and charts update correctly.
+- There is a repeatable import command.
+- No unrelated UI redesign.
