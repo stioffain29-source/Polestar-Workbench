@@ -2,8 +2,8 @@ import { useRoute, Link } from "wouter";
 import { useGetCountryReport, useListIncidents } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
-import { cn } from "@/lib/utils";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
+import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 export default function CountryReport() {
   const [, params] = useRoute("/countries/:slug");
@@ -17,17 +17,37 @@ export default function CountryReport() {
   if (!country) return <div className="text-sm text-muted-foreground">Country report not found.</div>;
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6">
-      <Link href="/countries" className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1">
-        <ArrowLeft className="w-3 h-3" /> All Countries
-      </Link>
+    <div className="max-w-[1400px] mx-auto space-y-6 print-report">
+      <div className="flex items-center justify-between no-print">
+        <Link href="/countries" className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1">
+          <ArrowLeft className="w-3 h-3" /> All Countries
+        </Link>
+        <button
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-serif font-medium border border-border rounded-sm bg-card hover:bg-muted"
+        >
+          <Printer className="w-3.5 h-3.5" /> Print / PDF
+        </button>
+      </div>
 
       <div
-        className="rounded-sm px-10 py-12 text-white"
-        style={{ background: "linear-gradient(-130deg, #0B0B3D, #4655FF)" }}
+        className="report-hero rounded-sm px-10 py-12 text-white flex items-center gap-10"
+        style={{
+          background: "linear-gradient(to right, #0B0B3D 0%, #0B0B3D 38%, #4655FF 100%)",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
       >
-        <div className="text-[10px] font-sans uppercase tracking-widest opacity-80">{country.region}</div>
-        <h1 className="text-4xl font-serif font-bold uppercase tracking-tight mt-2">{country.name}</h1>
+        <img
+          src={polestarLogo}
+          alt="Polestar Advisory"
+          className="shrink-0 h-12 w-auto"
+          style={{ maxWidth: 280 }}
+        />
+        <div className="border-l border-white/30 pl-10">
+          <div className="text-[10px] font-sans uppercase tracking-widest opacity-80">{country.region}</div>
+          <h1 className="text-4xl font-serif font-bold uppercase tracking-tight mt-2">{country.name}</h1>
+        </div>
       </div>
 
       {country.keyNumbers && country.keyNumbers.length > 0 && (

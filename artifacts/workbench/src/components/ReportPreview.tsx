@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { TOPIC_LABELS } from "@/lib/topics";
+import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 type KpiCard = { label: string; value: string; accent?: string; context?: string };
 
@@ -65,12 +66,17 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
       <div
         className="report-hero px-10 py-12"
         style={{
-          background: "linear-gradient(-130deg, #0B0B3D, #4655FF)",
+          background: "linear-gradient(to right, #0B0B3D 0%, #0B0B3D 38%, #4655FF 100%)",
           color: "#fff",
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
         }}
       >
+        <img
+          src={polestarLogo}
+          alt="Polestar Advisory"
+          style={{ height: 40, width: "auto", maxWidth: 260, marginBottom: 20, display: "block" }}
+        />
         <div
           className="uppercase mb-3"
           style={{
