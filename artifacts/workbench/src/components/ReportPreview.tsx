@@ -119,62 +119,6 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           <Paragraphs text={report.whatHappened} />
         </Section>
 
-        <Section title="Hard Numbers">
-          {report.hardNumbers && report.hardNumbers.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {report.hardNumbers.map((kpi, i) => (
-                <div
-                  key={i}
-                  className="report-kpi p-4 bg-white"
-                  style={{
-                    borderLeft: `4px solid ${kpi.accent || "#4655FF"}`,
-                    background: "#F8F8FA",
-                  }}
-                >
-                  <div
-                    className="uppercase mb-1"
-                    style={{
-                      fontFamily: "'Roboto Condensed', sans-serif",
-                      fontWeight: 500,
-                      fontSize: 10,
-                      letterSpacing: "0.15em",
-                      color: "#303030",
-                    }}
-                  >
-                    {kpi.label}
-                  </div>
-                  <div
-                    className="leading-none"
-                    style={{
-                      fontFamily: "'Roboto Condensed', sans-serif",
-                      fontWeight: 700,
-                      fontSize: 28,
-                      color: "#0B0B3D",
-                    }}
-                  >
-                    {kpi.value}
-                  </div>
-                  {kpi.context && (
-                    <div
-                      className="mt-2"
-                      style={{
-                        fontFamily: "Roboto, sans-serif",
-                        fontWeight: 300,
-                        fontSize: 11,
-                        color: "#666",
-                      }}
-                    >
-                      {kpi.context}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm italic" style={{ color: "#888" }}>No key figures recorded.</p>
-          )}
-        </Section>
-
         <Section title="What Matters">
           <Paragraphs text={report.whatMatters} />
         </Section>
@@ -183,12 +127,12 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           <Paragraphs text={report.implications} />
         </Section>
 
-        <Section title="Polestar View">
-          <Paragraphs text={report.polestarView} />
-        </Section>
-
         <Section title="Watch Next">
           <Paragraphs text={report.watchNext} />
+        </Section>
+
+        <Section title="Polestar View">
+          <Paragraphs text={report.polestarView} />
         </Section>
 
         <div

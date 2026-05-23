@@ -12,9 +12,44 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, REPORT_STATUSES } from "@/lib/topics";
 import ReportPreview from "@/components/ReportPreview";
-import { ArrowLeft, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Printer, Save } from "lucide-react";
 
-type KpiCard = { label: string; value: string; accent?: string; context?: string };
+type TopicGuide = {
+  scope: string;
+  situation: string;
+  whatHappened: string;
+  whatMatters: string;
+  implications: string;
+  polestarView: string;
+  watchNext: string;
+};
+
+const TOPIC_GUIDES: Record<string, TopicGuide> = {
+  shipping: {
+    scope:
+      "Shipping reports cover port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance and freight pressure, naval / maritime advisories, port strikes and cargo movement disruption. Theft and pilferage belong in Cargo Watch.",
+    situation: "Set the maritime backdrop: routes, chokepoints, ports and operators in scope.",
+    whatHappened: "Describe the disruption — vessel, port, route, chokepoint, advisory or labour event. Cite source and date.",
+    whatMatters: "Why this disruption matters for shipping flows, transit times, freight cost or insurance exposure.",
+    implications: "Operational impact on schedules, alternative routes, port calls, premiums and contract terms.",
+    polestarView: "Polestar's read on duration, escalation risk and exposure for clients moving cargo through the area.",
+    watchNext: "Next maritime triggers to watch: further closures, naval movement, advisory updates, rate moves.",
+  },
+  cargo_watch: {
+    scope:
+      "Cargo Watch reports cover cargo theft, pilferage, hijacking, warehouse and depot theft, seal tampering, insider theft and other logistics crime. Port, chokepoint and vessel disruption belong in Shipping.",
+    situation: "Set the cargo-crime backdrop: corridor, depot, warehouse cluster or operator under pressure.",
+    whatHappened: "Describe the theft, hijack, pilferage or insider event. Note value, cargo type and any companies named.",
+    whatMatters: "Why this loss pattern matters — modus operandi, repeat geography, insider involvement, value at risk.",
+    implications: "Operational impact on routing, escort needs, depot security, insurance claims and contract risk.",
+    polestarView: "Polestar's read on whether this is one-off, opportunistic or part of an organised pattern.",
+    watchNext: "Next cargo-crime triggers to watch: copycat incidents, arrests, route shifts, recovery announcements.",
+  },
+};
+
+function guideFor(topic: string): TopicGuide | null {
+  return TOPIC_GUIDES[topic] ?? null;
+}
 
 interface FormState {
   title: string;
@@ -23,7 +58,6 @@ interface FormState {
   issueDate: string;
   situation: string;
   whatHappened: string;
-  hardNumbers: KpiCard[];
   whatMatters: string;
   implications: string;
   polestarView: string;
@@ -33,7 +67,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   title: "", topic: "fuel", status: "draft", issueDate: new Date().toISOString().slice(0, 10),
-  situation: "", whatHappened: "", hardNumbers: [],
+  situation: "", whatHappened: "",
   whatMatters: "", implications: "", polestarView: "", watchNext: "", author: "",
 };
 
@@ -54,7 +88,6 @@ export default function ReportEditor() {
       issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
       situation: report.situation ?? "",
       whatHappened: report.whatHappened ?? "",
-      hardNumbers: (report.hardNumbers as KpiCard[]) ?? [],
       whatMatters: report.whatMatters ?? "",
       implications: report.implications ?? "",
       polestarView: report.polestarView ?? "",
@@ -75,13 +108,10 @@ export default function ReportEditor() {
     });
   };
 
-  const addKpi = () => set("hardNumbers", [...form.hardNumbers, { label: "", value: "", accent: "#4655FF", context: "" }]);
-  const updateKpi = (i: number, k: Partial<KpiCard>) =>
-    set("hardNumbers", form.hardNumbers.map((c, idx) => (idx === i ? { ...c, ...k } : c)));
-  const removeKpi = (i: number) => set("hardNumbers", form.hardNumbers.filter((_, idx) => idx !== i));
-
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading...</div>;
   if (!report) return <div className="text-sm text-muted-foreground">Report not found.</div>;
+
+  const guide = guideFor(form.topic);
 
   return (
     <div className="max-w-[1900px] mx-auto space-y-4">
@@ -100,6 +130,17 @@ export default function ReportEditor() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-sm p-5 space-y-3 no-print">
+          {guide && (
+            <div
+              className="text-[12px] leading-snug p-3 rounded-sm border"
+              style={{ background: "#F3F4FA", borderColor: "#4655FF", color: "#0B0B3D", fontFamily: "Roboto, sans-serif" }}
+            >
+              <div className="uppercase tracking-widest font-bold text-[10px] mb-1" style={{ color: "#4655FF" }}>
+                {TOPIC_LABELS[form.topic]} scope
+              </div>
+              {guide.scope}
+            </div>
+          )}
           <Field label="Title"><Input value={form.title} onChange={(e) => set("title", e.target.value)} className="rounded-sm" /></Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Topic">
@@ -117,32 +158,12 @@ export default function ReportEditor() {
             <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => set("issueDate", e.target.value)} className="rounded-sm" /></Field>
           </div>
           <Field label="Author"><Input value={form.author} onChange={(e) => set("author", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Situation"><Textarea rows={4} value={form.situation} onChange={(e) => set("situation", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="What Happened"><Textarea rows={5} value={form.whatHappened} onChange={(e) => set("whatHappened", e.target.value)} className="rounded-sm" /></Field>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Hard Numbers (KPI Cards)</label>
-              <button onClick={addKpi} className="text-xs text-accent flex items-center gap-1 hover:underline"><Plus className="w-3 h-3" /> Add</button>
-            </div>
-            <div className="space-y-2">
-              {form.hardNumbers.map((k, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_60px_30px] gap-2 items-center">
-                  <Input value={k.label} onChange={(e) => updateKpi(i, { label: e.target.value })} placeholder="Label" className="rounded-sm" />
-                  <Input value={k.value} onChange={(e) => updateKpi(i, { value: e.target.value })} placeholder="Value" className="rounded-sm" />
-                  <Input value={k.context ?? ""} onChange={(e) => updateKpi(i, { context: e.target.value })} placeholder="Context" className="rounded-sm" />
-                  <Input value={k.accent ?? "#4655FF"} onChange={(e) => updateKpi(i, { accent: e.target.value })} placeholder="Accent" className="rounded-sm" />
-                  <button onClick={() => removeKpi(i)} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-                </div>
-              ))}
-              {form.hardNumbers.length === 0 && <div className="text-xs text-muted-foreground italic">No KPI cards yet.</div>}
-            </div>
-          </div>
-
-          <Field label="What Matters"><Textarea rows={4} value={form.whatMatters} onChange={(e) => set("whatMatters", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Implications for Business"><Textarea rows={4} value={form.implications} onChange={(e) => set("implications", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Watch Next"><Textarea rows={3} value={form.watchNext} onChange={(e) => set("watchNext", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Situation"><Textarea rows={4} value={form.situation} onChange={(e) => set("situation", e.target.value)} placeholder={guide?.situation} className="rounded-sm" /></Field>
+          <Field label="What Happened"><Textarea rows={5} value={form.whatHappened} onChange={(e) => set("whatHappened", e.target.value)} placeholder={guide?.whatHappened} className="rounded-sm" /></Field>
+          <Field label="What Matters"><Textarea rows={4} value={form.whatMatters} onChange={(e) => set("whatMatters", e.target.value)} placeholder={guide?.whatMatters} className="rounded-sm" /></Field>
+          <Field label="Implications for Business"><Textarea rows={4} value={form.implications} onChange={(e) => set("implications", e.target.value)} placeholder={guide?.implications} className="rounded-sm" /></Field>
+          <Field label="Watch Next"><Textarea rows={3} value={form.watchNext} onChange={(e) => set("watchNext", e.target.value)} placeholder={guide?.watchNext} className="rounded-sm" /></Field>
+          <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} placeholder={guide?.polestarView} className="rounded-sm" /></Field>
         </div>
 
         <div className="bg-white border border-border rounded-sm overflow-hidden">

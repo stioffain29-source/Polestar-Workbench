@@ -1,0 +1,96 @@
+Add the useful ideas from the sidebar conversation into the Workbench.
+
+Keep it practical. Do not redesign the whole dashboard.
+
+Areas to update:
+
+1. Shipping page
+
+Improve the Shipping topic page so it supports operational reporting, not just a list of incidents.
+
+Shipping should cover:
+- port disruption
+- chokepoint risk
+- vessel attacks
+- route diversion
+- shipping delays
+- insurance or freight pressure
+- naval or maritime advisories
+- port strikes or labour disruption
+- cargo movement disruption
+
+Add useful breakdowns where data supports it:
+- incidents by country
+- incidents by region
+- incidents by issue type
+- incidents by severity
+- recent incidents
+- records with source links
+- map view for records with coordinates
+
+Do not copy the wording or layout of any external maritime intelligence product.
+
+2. Cargo Watch
+
+Cargo Watch should remain focused on:
+- cargo theft
+- pilferage
+- hijacking
+- warehouse theft
+- depot theft
+- seal tampering
+- insider theft
+- logistics crime
+
+Theft and pilferage belong under Cargo Watch, not Shipping.
+
+Cargo Watch should show:
+- total cargo incidents
+- incidents by country
+- incidents by region: APAC / Middle East / Other
+- incidents by cargo type where available
+- recent cargo incidents
+- value stolen if available
+- companies named if available
+- map markers where coordinates exist
+
+3. Do not mix Shipping and Cargo Watch
+
+Shipping = movement, ports, routes, vessels, chokepoints and maritime disruption.
+
+Cargo Watch = theft, pilferage, hijacking, warehouses, depots, trucks and logistics crime.
+
+4. Report Builder
+
+When reports are generated:
+- Shipping reports should focus on route, port, vessel and chokepoint disruption.
+- Cargo Watch reports should focus on theft, pilferage, hijacking and logistics crime.
+
+5. No copying
+
+Do not copy the look, structure, language or branding of any external product.
+
+Use Polestar’s own structure:
+- Situation
+- What Happened
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+
+6. No new live feeds yet
+
+Do not connect external maritime feeds yet.
+Do not add scraping.
+Do not add automation.
+Do not change the database unless a small display field is already available and needs to be surfaced.
+
+First update the dashboard display and report-builder logic using existing data only.
+
+Acceptance criteria:
+- Shipping and Cargo Watch are clearly separated.
+- Cargo theft and pilferage appear under Cargo Watch.
+- Shipping focuses on maritime and port disruption.
+- Reports use Polestar wording and structure.
+- No external product is copied.
+- No unrelated changes.
