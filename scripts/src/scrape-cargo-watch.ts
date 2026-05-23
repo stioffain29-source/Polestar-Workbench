@@ -266,6 +266,7 @@ type Accepted = {
   source: string;
   sourceUrl: string;
   feedLabel: string;
+  reason: string;
 };
 
 type Rejected = {
@@ -326,6 +327,7 @@ async function main(): Promise<void> {
           source: sourceName.slice(0, 200),
           sourceUrl: link,
           feedLabel: feed.label,
+          reason: c.reason,
         });
         perFeed[feed.label].accepted++;
       }
@@ -406,10 +408,20 @@ async function main(): Promise<void> {
   for (const [c, n] of sortedCov) console.log(`  ${c.padEnd(22)} ${n}`);
   if (sortedCov.length === 0) console.log("  (none)");
 
-  console.log("\n=== Sample accepted (up to 8) ===");
-  for (const a of uniqueAccepted.slice(0, 8)) {
-    console.log(`  · [${a.country}] ${a.occurredAt.toISOString().slice(0, 10)} — ${a.title}`);
-    console.log(`    ${a.source} · ${a.sourceUrl}`);
+  const showAll = process.argv.includes("--show-accepts");
+  const acceptsToShow = showAll ? uniqueAccepted : uniqueAccepted.slice(0, 8);
+  console.log(`\n=== ${showAll ? "All" : "Sample"} accepted (${acceptsToShow.length}/${uniqueAccepted.length}) ===`);
+  for (let i = 0; i < acceptsToShow.length; i++) {
+    const a = acceptsToShow[i];
+    console.log(`\n  [${i + 1}] ${a.title}`);
+    console.log(`      date     : ${a.occurredAt.toISOString().slice(0, 10)}`);
+    console.log(`      country  : ${a.country}`);
+    console.log(`      source   : ${a.source}`);
+    console.log(`      url      : ${a.sourceUrl}`);
+    console.log(`      feed     : ${a.feedLabel}`);
+    console.log(`      matched  : ${a.reason}`);
+    const sum = a.summary.length > 400 ? a.summary.slice(0, 400) + "…" : a.summary;
+    console.log(`      summary  : ${sum}`);
   }
 
   console.log("\n=== Sample rejected (up to 8) ===");
