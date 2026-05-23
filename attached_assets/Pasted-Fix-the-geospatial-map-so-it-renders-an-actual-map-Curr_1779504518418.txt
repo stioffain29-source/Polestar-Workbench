@@ -1,0 +1,54 @@
+Fix the geospatial map so it renders an actual map.
+
+Current problem:
+The page is not showing a real map. It is only showing a dark blue square with incident dots and some text labels. This is not acceptable. Before improving markers, legends, filters, or styling, the application must render a proper basemap.
+
+Task:
+Replace the current blue map background/canvas with a real interactive map layer.
+
+Use one of the following:
+- Leaflet with Carto Positron tiles
+- MapLibre with a light basemap
+- OpenStreetMap tiles if easier
+
+Preferred basemap:
+Carto Positron light basemap.
+
+The map must show:
+- land and sea
+- coastlines
+- country borders
+- readable country names
+- geographic context across APAC and the Middle East
+
+Do not simulate a map with a dark rectangle, gridlines, or manually placed labels.
+Do not draw countries manually.
+Do not fake the basemap.
+
+Basic implementation requirements:
+1. The map container must have a real height, for example 70vh or 720px.
+2. The map library CSS must be imported correctly.
+3. The tile layer must load correctly.
+4. The map must be centred on the APAC / Middle East operating area.
+5. Incident markers must be plotted using real latitude and longitude.
+6. The existing tabs can remain, but do not spend time redesigning them.
+7. Do not add heatmaps, routes, overlays, or advanced tools yet.
+
+Suggested Leaflet setup:
+- Install leaflet and react-leaflet if not already installed.
+- Import leaflet CSS:
+  import "leaflet/dist/leaflet.css";
+- Use MapContainer, TileLayer, Marker or CircleMarker.
+- Use Carto Positron tile URL:
+  https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
+
+Example map starting point:
+- center: [10, 95]
+- zoom: 4
+- bounds or view should include the Gulf, South Asia, Southeast Asia, Australia, and western Pacific.
+
+Acceptance criteria:
+When I open the Geospatial Map page, I must see an actual map, not a blue square.
+Country borders, coastlines and labels must be visible.
+Markers must sit on real geographic locations.
+No other redesign work until the basemap is working.
