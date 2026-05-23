@@ -277,7 +277,9 @@ type Rejected = {
 
 async function main(): Promise<void> {
   const commit = process.argv.includes("--commit");
-  console.log(`Cargo Watch scraper — ${FEEDS.length} feeds, mode=${commit ? "COMMIT" : "DRY-RUN"}`);
+  const filterArg = process.argv.find((a) => a.startsWith("--filter="));
+  const titleFilter = filterArg ? filterArg.slice("--filter=".length).toLowerCase() : null;
+  console.log(`Cargo Watch scraper — ${FEEDS.length} feeds, mode=${commit ? "COMMIT" : "DRY-RUN"}${titleFilter ? `, title filter="${titleFilter}"` : ""}`);
 
   const parser = new Parser({
     timeout: 20000,
@@ -368,7 +370,12 @@ async function main(): Promise<void> {
 
   const toInsert: Accepted[] = [];
   let dupeInDb = 0;
+  let filteredOut = 0;
   for (const a of uniqueAccepted) {
+    if (titleFilter && !a.title.toLowerCase().includes(titleFilter)) {
+      filteredOut++;
+      continue;
+    }
     if (existingUrls.has(a.sourceUrl) || existingKeys.has(dedupeKey(a.title, a.occurredAt, a.country))) {
       dupeInDb++;
       continue;
@@ -400,6 +407,7 @@ async function main(): Promise<void> {
   console.log(`  Accepted (raw)       : ${accepted.length}`);
   console.log(`  Accepted (unique)    : ${uniqueAccepted.length}`);
   console.log(`  Duplicate in DB      : ${dupeInDb}`);
+  if (titleFilter) console.log(`  Excluded by filter   : ${filteredOut}`);
   console.log(`  New to insert        : ${toInsert.length}`);
   console.log(`  Rejected             : ${rejected.length}`);
 
