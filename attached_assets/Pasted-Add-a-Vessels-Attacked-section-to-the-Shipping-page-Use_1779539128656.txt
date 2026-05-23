@@ -1,0 +1,79 @@
+Add a “Vessels Attacked” section to the Shipping page.
+
+Use the reference screenshot as a functional guide only.
+Do not copy its dark visual style, colours, branding or wording.
+
+Keep Polestar style:
+- white background
+- navy headings
+- clean cards
+- subtle borders
+- severity-coloured accent edges
+- no dark cyber dashboard look
+
+Purpose:
+Shipping needs a dedicated maritime threat module for vessel attacks, near misses, seizures and hostile maritime activity.
+
+Add a section called:
+
+Vessels Attacked
+
+Subtitle:
+Active threat reporting covering the Strait of Hormuz, Arabian Gulf and Gulf of Oman.
+
+Show three summary KPI cards:
+- All incidents
+- Attack
+- Near miss
+
+If seizure data exists, include:
+- Seized
+
+Use only existing Shipping or Maritime Strike records.
+Do not invent vessels, IMO numbers, AIS status or distances unless the data already exists.
+
+Below the KPI cards, add incident cards for vessel-related records.
+
+Each vessel/incident card should show where available:
+- vessel name or incident title
+- date
+- country / waterway / location
+- incident type: Attack, Near miss, Seized, Threat, Unknown
+- severity
+- short summary
+- source link if available
+
+If vessel name is not known, use the incident title.
+If IMO is not known, do not show IMO.
+If AIS status is not known, do not show AIS status.
+If distance/bearing is not known, do not show it.
+
+Use accent borders:
+- Attack = red/dark red
+- Near miss = amber
+- Seized = dark navy/black accent
+- Threat/Unknown = grey/navy
+
+Placement:
+Put this section below Fast Facts / Key Metrics and above the wider charts.
+
+Filtering:
+The section should respect existing Shipping page filters/date range if present.
+
+Data rules:
+- Use existing records only.
+- Do not re-import.
+- Do not change the database.
+- Do not create fake vessel details.
+- Do not mix cargo theft or warehouse theft into this section.
+- Cargo theft and pilferage stay in Cargo Watch.
+
+Acceptance criteria:
+- Shipping page has a “Vessels Attacked” section.
+- It shows counts for All incidents, Attack and Near miss.
+- It shows readable incident cards.
+- It only uses existing shipping/maritime records.
+- It does not invent vessel details.
+- It does not copy the reference design.
+- No Cargo Watch changes.
+- No database changes.

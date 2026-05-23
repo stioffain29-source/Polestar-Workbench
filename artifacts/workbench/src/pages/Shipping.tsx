@@ -65,6 +65,53 @@ function classifyIssue(i: Incident): string {
   return "Other Maritime";
 }
 
+// ---------------------------------------------------------------------------
+// Vessels Attacked module
+//
+// Picks vessel-centric incidents from the shipping topic and classifies them
+// into the five-tier Vessel Incident vocabulary the user specified. Returns
+// `null` for records that are not vessel incidents (rate indices, charter
+// orderbook news, quarterly results, etc.) so they are excluded from the
+// section. We never invent IMO / AIS / distance — we only surface what the
+// underlying incident already carries.
+// ---------------------------------------------------------------------------
+
+type VesselIncidentType = "Attack" | "Near miss" | "Seized" | "Threat" | "Unknown";
+
+const VESSEL_NOUN_RE =
+  /\b(vessel|tanker|ship|carrier|bulk carrier|container ship|cargo ship|freighter|dhow|boat|barge|chemical tanker|product tanker|crude tanker|lpg tanker|lng carrier|vlcc|suezmax|aframax)\b/i;
+
+// Words that look vessel-ish but actually indicate market / commercial /
+// corporate news. If a record only matches these, we drop it.
+const COMMERCIAL_RE =
+  /\b(orderbook|newbuild|newbuilds|charter (rate|assessment|index)|time charter|freight rate|baltic dry|index|results|earnings|profit|acquisition|fleet renewal|delivered (resilient|strong)|sold|sale of|orders?\b|orderb|quarterly|annual report)\b/i;
+
+const VESSEL_RULES: Array<{ type: VesselIncidentType; pattern: RegExp }> = [
+  { type: "Seized", pattern: /\b(seized|seizure|boarded|hijack(ed)?|detained .*(vessel|ship|tanker|crew)|commandeered)\b/i },
+  { type: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near)\b/i },
+  { type: "Attack", pattern: /\b(attack(ed)? (on |by )?(a |the )?(ship|tanker|vessel|carrier|dhow)|vessel attack|tanker attack|missile (hit|struck) (a |the )?(ship|tanker|vessel|carrier)|drone (hit|struck) (a |the )?(ship|tanker|vessel|carrier)|ship hit|tanker hit|vessel on fire|small craft attack|houthi attack|terrorist attack on (a |the )?(vessel|ship|tanker))\b/i },
+  { type: "Threat", pattern: /\b(ukmto|maritime (advisory|warning|threat)|threat to shipping|hostile (act|activity)|suspicious approach|approached by (small craft|skiffs?))\b/i },
+];
+
+function classifyVesselIncident(i: Incident): VesselIncidentType | null {
+  const text = `${i.title} ${i.summary ?? ""}`;
+  for (const r of VESSEL_RULES) {
+    if (r.pattern.test(text)) return r.type;
+  }
+  // Not classified by the rules above — only keep it if the title clearly
+  // names a vessel AND it isn't obviously commercial / market news.
+  if (VESSEL_NOUN_RE.test(i.title) && !COMMERCIAL_RE.test(text)) return "Unknown";
+  return null;
+}
+
+const VESSEL_ACCENT: Record<VesselIncidentType, string> = {
+  Attack: "#C0392B",
+  "Near miss": "#E67E22",
+  Seized: "#0B0B3D",
+  Threat: "#7A8FA6",
+  Unknown: "#B8C2CC",
+};
+
 const REGION_COLOR: Record<Region, string> = {
   "Middle East": "#0B0B3D",
   "APAC": "#4655FF",
@@ -222,6 +269,20 @@ export default function Shipping() {
       .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
   }, [enriched]);
 
+  // Vessels Attacked — derive from the already-scoped `enriched` list so this
+  // section honours the same APAC + Middle East filter as the rest of the page.
+  const vesselIncidents = useMemo(() => {
+    return enriched
+      .map((i) => ({ ...i, vesselType: classifyVesselIncident(i) }))
+      .filter((i): i is typeof i & { vesselType: VesselIncidentType } => i.vesselType !== null)
+      .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
+  }, [enriched]);
+  const vesselCounts = useMemo(() => {
+    const c: Record<VesselIncidentType, number> = { Attack: 0, "Near miss": 0, Seized: 0, Threat: 0, Unknown: 0 };
+    for (const v of vesselIncidents) c[v.vesselType]++;
+    return c;
+  }, [vesselIncidents]);
+
   const transitRecords = recent7.filter((i) =>
     i.issue === "Vessel Attack" || i.issue === "Route Diversion" || i.issue === "Chokepoint Risk" || i.issue === "Naval / Maritime Advisory",
   );
@@ -311,6 +372,49 @@ export default function Shipping() {
           <Kpi label="With Source Link" value={withSource} accent="#303030" />
           <Kpi label="With Coordinates" value={withCoords.length} accent="#303030" />
         </div>
+      </Section>
+
+      {/* 3b. Vessels Attacked */}
+      <Section title="Vessels Attacked">
+        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
+          Active threat reporting covering the Strait of Hormuz, Arabian Gulf and Gulf of Oman. Records are pulled from existing shipping incidents and respect the same APAC + Middle East scope as the rest of the page. Cargo theft and pilferage remain in Cargo Watch.
+        </p>
+        {vesselIncidents.length === 0 ? (
+          <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
+            No vessel attack, near-miss or seizure records currently on file in the shipping dataset.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Kpi label="All vessel incidents" value={vesselIncidents.length} accent="#0B0B3D" />
+              <Kpi label="Attack" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} />
+              <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} />
+              {vesselCounts.Seized > 0 && (
+                <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} />
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3">
+              {vesselIncidents.slice(0, 18).map((v) => (
+                <VesselCard
+                  key={v.id}
+                  title={v.title}
+                  date={isNaN(v.occurredDate.getTime()) ? null : format(v.occurredDate, "dd MMM yyyy")}
+                  country={identifyCountry(v.country)}
+                  location={v.location && !/^unknown$/i.test(v.location.trim()) ? v.location : null}
+                  severity={v.severity}
+                  type={v.vesselType}
+                  summary={v.summary ?? null}
+                  sourceUrl={v.sourceUrl ?? null}
+                />
+              ))}
+            </div>
+            {vesselIncidents.length > 18 && (
+              <p className="text-[11px] text-muted-foreground italic mt-2">
+                Showing 18 most recent of {vesselIncidents.length} vessel incidents. Full list available in the Recent Shipping Incidents table below.
+              </p>
+            )}
+          </>
+        )}
       </Section>
 
       {/* 4. Regional Split */}
@@ -624,6 +728,56 @@ function ChartCard({ title, children, height = 288 }: { title: string; children:
     <div className="bg-white border border-border rounded-sm p-4">
       <h3 className="font-serif font-bold uppercase text-primary text-sm mb-3 tracking-wide">{title}</h3>
       <div style={{ height }}>{children}</div>
+    </div>
+  );
+}
+
+function VesselCard({
+  title, date, country, location, severity, type, summary, sourceUrl,
+}: {
+  title: string;
+  date: string | null;
+  country: string | null;
+  location: string | null;
+  severity: string;
+  type: VesselIncidentType;
+  summary: string | null;
+  sourceUrl: string | null;
+}) {
+  const accent = VESSEL_ACCENT[type];
+  const where = [country, location].filter(Boolean).join(" · ");
+  return (
+    <div className="bg-white border border-border rounded-sm p-3 relative overflow-hidden flex flex-col gap-2">
+      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: accent }} />
+      <div className="flex items-start justify-between gap-2 pl-2">
+        <div className="text-[10px] uppercase tracking-widest font-sans text-muted-foreground">
+          {type}
+        </div>
+        <span
+          className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm shrink-0"
+          style={severityBadgeStyle(severity)}
+        >
+          {SEVERITY_LABELS[severity] ?? severity}
+        </span>
+      </div>
+      <div className="pl-2 text-sm font-serif font-bold text-primary leading-snug">{title}</div>
+      <div className="pl-2 text-[11px] text-muted-foreground font-sans flex flex-wrap gap-x-3 gap-y-0.5">
+        {date && <span className="font-mono">{date}</span>}
+        {where && <span>{where}</span>}
+      </div>
+      {summary && (
+        <p className="pl-2 text-xs text-foreground/80 font-sans leading-snug line-clamp-3">{summary}</p>
+      )}
+      {sourceUrl && (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pl-2 mt-auto text-[11px] text-accent hover:underline inline-flex items-center gap-1"
+        >
+          <ExternalLink className="w-3 h-3" /> Source
+        </a>
+      )}
     </div>
   );
 }
