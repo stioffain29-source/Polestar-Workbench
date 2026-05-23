@@ -21,14 +21,16 @@ const APAC = new Set([
   "Australia","New Zealand","Papua New Guinea","West Papua",
 ]);
 
-type Region = "Middle East" | "APAC" | "Other / Unknown";
+type Region = "Middle East" | "APAC" | "Out of scope" | "Country not identified";
 
 function classifyRegion(country: string | null | undefined): Region {
-  if (!country) return "Other / Unknown";
+  if (!country) return "Country not identified";
   const first = country.split(/[;,]/)[0].trim();
+  if (!first) return "Country not identified";
+  if (/^unknown$/i.test(first)) return "Country not identified";
   if (MIDDLE_EAST.has(first)) return "Middle East";
   if (APAC.has(first)) return "APAC";
-  return "Other / Unknown";
+  return "Out of scope";
 }
 
 const NOT_IDENTIFIED = "Country not identified";
@@ -66,7 +68,8 @@ function classifyIssue(i: Incident): string {
 const REGION_COLOR: Record<Region, string> = {
   "Middle East": "#0B0B3D",
   "APAC": "#4655FF",
-  "Other / Unknown": "#B8C2CC",
+  "Country not identified": "#7A8FA6",
+  "Out of scope": "#B8C2CC",
 };
 
 const ISSUE_PALETTE = ["#0B0B3D", "#4655FF", "#303030", "#7A8FA6", "#B8C2CC", "#6FB872", "#E67E22", "#C0392B", "#0B0B3D", "#4655FF"];
@@ -89,7 +92,10 @@ function darken(hex: string, amount = 0.18): string {
 export default function Shipping() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "shipping" });
 
-  const enriched = useMemo(
+  // Scope: APAC + Middle East only. Records that classify to a country outside
+  // those regions are dropped from this view. Records with no identifiable
+  // country are kept and surfaced as "Country not identified".
+  const allEnriched = useMemo(
     () => incidents.map((i) => ({
       ...i,
       region: classifyRegion(i.country),
@@ -97,6 +103,11 @@ export default function Shipping() {
       occurredDate: (() => { try { return parseISO(i.occurredAt); } catch { return new Date(NaN); } })(),
     })),
     [incidents],
+  );
+  const outOfScopeCount = allEnriched.filter((i) => i.region === "Out of scope").length;
+  const enriched = useMemo(
+    () => allEnriched.filter((i) => i.region !== "Out of scope"),
+    [allEnriched],
   );
 
   const total = enriched.length;
@@ -111,8 +122,15 @@ export default function Shipping() {
   }, [enriched]);
 
   const byRegion = useMemo(() => {
-    const m = new Map<Region, number>([["Middle East", 0], ["APAC", 0], ["Other / Unknown", 0]]);
-    enriched.forEach((i) => m.set(i.region, (m.get(i.region) ?? 0) + 1));
+    const m = new Map<Region, number>([
+      ["Middle East", 0],
+      ["APAC", 0],
+      ["Country not identified", 0],
+    ]);
+    enriched.forEach((i) => {
+      if (i.region === "Out of scope") return;
+      m.set(i.region, (m.get(i.region) ?? 0) + 1);
+    });
     return Array.from(m.entries()).map(([region, count]) => ({ region, count }));
   }, [enriched]);
 
@@ -167,7 +185,6 @@ export default function Shipping() {
   // Fast Facts — short narrative-style cards.
   const meCount = byRegion.find((r) => r.region === "Middle East")?.count ?? 0;
   const apCount = byRegion.find((r) => r.region === "APAC")?.count ?? 0;
-  const otCount = byRegion.find((r) => r.region === "Other / Unknown")?.count ?? 0;
 
   const mainRegion = useMemo(() => {
     const ranked = [...byRegion].sort((a, b) => b.count - a.count);
@@ -221,9 +238,15 @@ export default function Shipping() {
         <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
         <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Shipping</h1>
         <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
-          Port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance pressure, naval advisories, port strikes and cargo movement disruption. Cargo theft and pilferage are tracked under Cargo Watch.
+          Port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance pressure, naval advisories, port strikes and cargo movement disruption. APAC and the Middle East only — records from other regions are excluded. Cargo theft and pilferage are tracked under Cargo Watch.
         </p>
       </div>
+
+      {outOfScopeCount > 0 && (
+        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
+          {outOfScopeCount} shipping record{outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East (e.g. North America, Europe, Africa, South America) are excluded from this view.
+        </div>
+      )}
 
       {/* 2. Fast Facts */}
       <Section title="Fast Facts">
@@ -293,14 +316,13 @@ export default function Shipping() {
       {/* 4. Regional Split */}
       <Section title="Regional Split">
         <div className="bg-white border border-border rounded-sm p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <RegionRow label="Middle East" count={meCount} total={total} accent={REGION_COLOR["Middle East"]} />
             <RegionRow label="APAC" count={apCount} total={total} accent={REGION_COLOR["APAC"]} />
-            <RegionRow label="Other / Unknown" count={otCount} total={total} accent={REGION_COLOR["Other / Unknown"]} />
-            <RegionRow label={NOT_IDENTIFIED} count={notIdentifiedCount} total={total} accent="#7A8FA6" />
+            <RegionRow label={NOT_IDENTIFIED} count={notIdentifiedCount} total={total} accent={REGION_COLOR["Country not identified"]} />
           </div>
           <p className="text-[11px] text-muted-foreground mt-3">
-            Records with country not identified are kept in totals but separated from the country charts.
+            Records with country not identified are kept in totals but separated from the country charts. Records outside APAC and the Middle East are excluded entirely.
           </p>
         </div>
       </Section>

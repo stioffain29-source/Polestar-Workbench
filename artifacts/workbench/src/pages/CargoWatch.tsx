@@ -19,14 +19,16 @@ const APAC = new Set([
   "Australia","New Zealand","Papua New Guinea","West Papua",
 ]);
 
-type Region = "Middle East" | "APAC" | "Other / Unknown";
+type Region = "Middle East" | "APAC" | "Out of scope" | "Country not identified";
 
 function classifyRegion(country: string | null | undefined): Region {
-  if (!country) return "Other / Unknown";
+  if (!country) return "Country not identified";
   const first = country.split(/[;,]/)[0].trim();
+  if (!first) return "Country not identified";
+  if (/^unknown$/i.test(first)) return "Country not identified";
   if (MIDDLE_EAST.has(first)) return "Middle East";
   if (APAC.has(first)) return "APAC";
-  return "Other / Unknown";
+  return "Out of scope";
 }
 
 const NOT_IDENTIFIED = "Country not identified";
@@ -64,7 +66,8 @@ const COMPANY_RE = /\b(ltd\.?|inc\.?|pvt\.?|corp\.?|llp|holdings|logistics|expre
 const REGION_COLOR: Record<Region, string> = {
   "Middle East": "#0B0B3D",
   "APAC": "#4655FF",
-  "Other / Unknown": "#B8C2CC",
+  "Country not identified": "#7A8FA6",
+  "Out of scope": "#B8C2CC",
 };
 
 const CAT_PALETTE = ["#0B0B3D", "#2A9D8F", "#E67E22", "#4655FF", "#F4D35E", "#6FB872", "#B8C2CC", "#303030", "#7A8FA6"];
@@ -72,7 +75,11 @@ const CAT_PALETTE = ["#0B0B3D", "#2A9D8F", "#E67E22", "#4655FF", "#F4D35E", "#6F
 export default function CargoWatch() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "cargo_watch" });
 
-  const enriched = useMemo(
+  // Scope: APAC + Middle East only. Records that classify to a country outside
+  // those regions (e.g. South Africa, Canada, US, UK, Brazil) are dropped from
+  // this view. Records with no identifiable country are kept and surfaced as
+  // "Country not identified" so dirty data is not hidden.
+  const allEnriched = useMemo(
     () => incidents.map((i) => ({
       ...i,
       region: classifyRegion(i.country),
@@ -80,11 +87,23 @@ export default function CargoWatch() {
     })),
     [incidents],
   );
+  const outOfScopeCount = allEnriched.filter((i) => i.region === "Out of scope").length;
+  const enriched = useMemo(
+    () => allEnriched.filter((i) => i.region !== "Out of scope"),
+    [allEnriched],
+  );
 
   const total = enriched.length;
   const byRegion = useMemo(() => {
-    const m = new Map<Region, number>([["Middle East", 0], ["APAC", 0], ["Other / Unknown", 0]]);
-    enriched.forEach((i) => m.set(i.region, (m.get(i.region) ?? 0) + 1));
+    const m = new Map<Region, number>([
+      ["Middle East", 0],
+      ["APAC", 0],
+      ["Country not identified", 0],
+    ]);
+    enriched.forEach((i) => {
+      if (i.region === "Out of scope") return;
+      m.set(i.region, (m.get(i.region) ?? 0) + 1);
+    });
     return Array.from(m.entries()).map(([region, count]) => ({ region, count }));
   }, [enriched]);
 
@@ -138,7 +157,6 @@ export default function CargoWatch() {
 
   const me = byRegion.find((r) => r.region === "Middle East")?.count ?? 0;
   const ap = byRegion.find((r) => r.region === "APAC")?.count ?? 0;
-  const ot = byRegion.find((r) => r.region === "Other / Unknown")?.count ?? 0;
 
   const allCategoriesForStack = byCategory.map((c) => c.category);
 
@@ -147,18 +165,26 @@ export default function CargoWatch() {
       <div>
         <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
         <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Cargo Watch</h1>
-        <p className="text-sm text-muted-foreground font-sans mt-1">Cargo theft, hijack and loss incidents across APAC and the Middle East.</p>
+        <p className="text-sm text-muted-foreground font-sans mt-1">
+          Cargo theft, hijack and loss incidents across APAC and the Middle East. Records from other regions are excluded.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-7 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Cargo Incidents" value={total} />
         <Kpi label="APAC" value={ap} />
         <Kpi label="Middle East" value={me} />
-        <Kpi label="Other / Unknown" value={ot} />
+        <Kpi label="Country Not Identified" value={notIdentifiedCount} small />
         <Kpi label="Records Mentioning Value" value={valueMentions} small />
         <Kpi label="Records Mentioning Company" value={companyMentions} small />
-        <Kpi label="Country Not Identified" value={notIdentifiedCount} small />
+        <Kpi label="Excluded (Out of Scope)" value={outOfScopeCount} small />
       </div>
+
+      {outOfScopeCount > 0 && (
+        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
+          {outOfScopeCount} cargo record{outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East (e.g. North America, Europe, Africa, South America) are excluded from this view.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Incidents by Region">
@@ -237,7 +263,7 @@ export default function CargoWatch() {
                     <LeafletTooltip>
                       <div className="text-xs">
                         <div className="font-bold">{i.title}</div>
-                        <div>{i.country} · {classifyRegion(i.country)} · {classifyCategory(i)}</div>
+                        <div>{identifyCountry(i.country) ?? NOT_IDENTIFIED} · {i.region} · {i.category}</div>
                       </div>
                     </LeafletTooltip>
                   </CircleMarker>
@@ -275,7 +301,7 @@ export default function CargoWatch() {
                   <tr key={i.id} className="hover:bg-muted/30">
                     <td className="p-2 font-mono text-xs whitespace-nowrap">{format(new Date(i.occurredAt), "dd MMM yyyy")}</td>
                     <td className="p-2 font-medium">{i.title}</td>
-                    <td className="p-2 text-xs">{i.country}</td>
+                    <td className="p-2 text-xs">{identifyCountry(i.country) ?? NOT_IDENTIFIED}</td>
                     <td className="p-2 text-xs">{i.region}</td>
                     <td className="p-2 text-xs">{i.category}</td>
                     <td className="p-2">
