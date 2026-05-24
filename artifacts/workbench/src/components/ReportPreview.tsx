@@ -4,6 +4,9 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
+import { computeFuelHardNumbers } from "@/lib/fuelHardNumbers";
+import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "@/lib/fuelNarratives";
+import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0b0a3d";
@@ -156,7 +159,17 @@ export default function ReportPreview({
   const resolvedTitle = report.topic
     ? resolveReportTitle(report.topic, report.title)
     : (report.title ?? "");
-  const fastFacts = computePreviewFastFacts(report, incidents);
+  const isFuel = report.topic === "fuel";
+  const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
+  const fuelHardNumbers = isFuel && report.issueDate
+    ? computeFuelHardNumbers({ issueDate: report.issueDate, incidents })
+    : [];
+  const fuelRegionalHighlights = isFuel && report.issueDate
+    ? buildFuelRegionalHighlights({ issueDate: report.issueDate, incidents })
+    : null;
+  const fuelProducerBuyerActions = isFuel && report.issueDate
+    ? buildFuelProducerBuyerActions({ issueDate: report.issueDate, incidents })
+    : null;
   const periodLabel = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).label
     : "";
@@ -277,22 +290,52 @@ export default function ReportPreview({
           </Section>
         )}
 
-        <Section title="Fast Facts">
-          <FastFactsGrid cards={fastFacts} />
-          <p
-            className="mt-3"
-            style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
-          >
-            Live values are calculated against incidents on file when the PDF is generated.
-          </p>
-        </Section>
+        {isFuel ? (
+          <>
+            <Section title="Hard Numbers">
+              <FastFactsGrid cards={fuelHardNumbers} />
+              <p
+                className="mt-3"
+                style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
+              >
+                Counts derived from incidents on file in the reporting window. Market price
+                indicators are shown only when a verified source is wired in.
+              </p>
+            </Section>
 
-        <NarrativeSection title="Situation" text={report.situation} />
-        <NarrativeSection title="What Happened" text={report.whatHappened} />
-        <NarrativeSection title="What Matters" text={report.whatMatters} />
-        <NarrativeSection title="Implications for Business" text={report.implications} />
-        <NarrativeSection title="Watch Next" text={report.watchNext} />
-        <NarrativeSection title="Polestar View" text={report.polestarView} />
+            <Section title="Jet Fuel Price Trajectory">
+              <JetFuelTrajectoryChart />
+            </Section>
+
+            <NarrativeSection title="Situation" text={report.situation} />
+            <NarrativeSection title="What Happened" text={report.whatHappened} />
+            <NarrativeSection title="Regional Highlights" text={fuelRegionalHighlights} />
+            <NarrativeSection title="Producer and Buyer Actions" text={fuelProducerBuyerActions} />
+            <NarrativeSection title="What Matters" text={report.whatMatters} />
+            <NarrativeSection title="Implications for Business" text={report.implications} />
+            <NarrativeSection title="Watch Next" text={report.watchNext} />
+            <NarrativeSection title="Polestar View" text={report.polestarView} />
+          </>
+        ) : (
+          <>
+            <Section title="Fast Facts">
+              <FastFactsGrid cards={fastFacts} />
+              <p
+                className="mt-3"
+                style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
+              >
+                Live values are calculated against incidents on file when the PDF is generated.
+              </p>
+            </Section>
+
+            <NarrativeSection title="Situation" text={report.situation} />
+            <NarrativeSection title="What Happened" text={report.whatHappened} />
+            <NarrativeSection title="What Matters" text={report.whatMatters} />
+            <NarrativeSection title="Implications for Business" text={report.implications} />
+            <NarrativeSection title="Watch Next" text={report.watchNext} />
+            <NarrativeSection title="Polestar View" text={report.polestarView} />
+          </>
+        )}
       </div>
 
       {/* Full-bleed Polar Gray footer — website, email, page note */}

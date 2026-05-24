@@ -20,6 +20,8 @@ import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import { computeTopicFastFacts } from "./topicFastFacts";
+import { computeFuelHardNumbers } from "./fuelHardNumbers";
+import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "./fuelNarratives";
 
 export interface TopicReportData {
   title: string;
@@ -47,6 +49,34 @@ export interface TopicReportIncident {
   source?: string | null;
   sourceUrl?: string | null;
   location?: string | null;
+}
+
+function drawJetFuelEmptyCard(ctx: Ctx) {
+  // Bordered card matching JetFuelTrajectoryChart's preview empty-state:
+  // Polar Gray 1pt border, Navy title, Dusk body, Roboto, no shadow.
+  const { pdf, MX, CW } = ctx;
+  const titleH = 14;
+  const bodyH = 18;
+  const padX = 12;
+  const padY = 12;
+  const cardH = titleH + bodyH + padY * 2;
+  ensureSpace(ctx, cardH + 8);
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(1);
+  pdf.rect(MX, ctx.y, CW, cardH, "S");
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(10);
+  pdf.text("Singapore Jet Fuel Benchmark", MX + padX, ctx.y + padY + 10);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  pdf.text(
+    "Jet fuel trajectory data is not available for this reporting cycle.",
+    MX + padX,
+    ctx.y + padY + titleH + 12,
+  );
+  ctx.y += cardH + 10;
 }
 
 function drawRelatedIncidents(
@@ -214,29 +244,68 @@ export async function exportTopicReportPdf(
       location: i.location ?? null,
     }),
   );
-  drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(
-    ctx,
-    computeTopicFastFacts({
-      topic: data.topic,
-      issueDate: data.issueDate,
-      incidents,
-      topicLabel: topicLabels[data.topic] ?? data.topic,
-    }) as KpiCardData[],
-  );
+  const isFuel = data.topic === "fuel";
+  if (isFuel) {
+    // Fuel Watch uses Hard Numbers in the slot Fast Facts occupies for
+    // other topics. The cards are derived from incidents on file —
+    // market-price cards are omitted entirely until a verified source
+    // is wired in (no invented prices).
+    drawSectionHeading(ctx, "Hard Numbers");
+    drawFastFactsKpiCards(
+      ctx,
+      computeFuelHardNumbers({ issueDate: data.issueDate, incidents }) as KpiCardData[],
+    );
 
-  const sections: [string, string | null | undefined][] = [
-    ["Situation", data.situation],
-    ["What Happened", data.whatHappened],
-    ["What Matters", data.whatMatters],
-    ["Implications for Business", data.implications],
-    ["Watch Next", data.watchNext],
-    ["Polestar View", data.polestarView],
-  ];
-  for (const [label, body] of sections) {
-    if (body && body.trim()) {
-      drawSectionHeading(ctx, label);
-      renderProse(ctx, body);
+    // Jet Fuel Price Trajectory — empty-state card mirroring the on-screen
+    // bordered panel from JetFuelTrajectoryChart. We never invent a chart
+    // from incident counts.
+    drawSectionHeading(ctx, "Jet Fuel Price Trajectory");
+    drawJetFuelEmptyCard(ctx);
+
+    const regional = buildFuelRegionalHighlights({ issueDate: data.issueDate, incidents });
+    const producerBuyer = buildFuelProducerBuyerActions({ issueDate: data.issueDate, incidents });
+
+    const fuelSections: [string, string | null | undefined][] = [
+      ["Situation", data.situation],
+      ["What Happened", data.whatHappened],
+      ["Regional Highlights", regional],
+      ["Producer and Buyer Actions", producerBuyer],
+      ["What Matters", data.whatMatters],
+      ["Implications for Business", data.implications],
+      ["Watch Next", data.watchNext],
+      ["Polestar View", data.polestarView],
+    ];
+    for (const [label, body] of fuelSections) {
+      if (body && body.trim()) {
+        drawSectionHeading(ctx, label);
+        renderProse(ctx, body);
+      }
+    }
+  } else {
+    drawSectionHeading(ctx, "Fast Facts");
+    drawFastFactsKpiCards(
+      ctx,
+      computeTopicFastFacts({
+        topic: data.topic,
+        issueDate: data.issueDate,
+        incidents,
+        topicLabel: topicLabels[data.topic] ?? data.topic,
+      }) as KpiCardData[],
+    );
+
+    const sections: [string, string | null | undefined][] = [
+      ["Situation", data.situation],
+      ["What Happened", data.whatHappened],
+      ["What Matters", data.whatMatters],
+      ["Implications for Business", data.implications],
+      ["Watch Next", data.watchNext],
+      ["Polestar View", data.polestarView],
+    ];
+    for (const [label, body] of sections) {
+      if (body && body.trim()) {
+        drawSectionHeading(ctx, label);
+        renderProse(ctx, body);
+      }
     }
   }
 

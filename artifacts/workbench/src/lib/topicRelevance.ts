@@ -38,6 +38,17 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\brecipe\b/,
 ];
 
+// Fuel-specific exclusions. Pure market speculation, equity/finance news
+// and broad oil-price commentary with no operational signal must never
+// lead a Fuel Watch. These records may mention "oil" or "fuel" but they
+// are not fuel-operational incidents.
+const FUEL_EXCLUDE: RegExp[] = [
+  /\b(share price|stock price|equity|investor (call|day|update)|earnings|quarterly (result|results|report)|annual report|dividend|buyback|ipo|market cap)/,
+  /\b(oil futures|crude futures|brent futures|wti futures|futures contract|options trading|hedge fund|speculat(or|ors|ion|ive))/,
+  /\b(analyst (note|target|forecast)|broker (note|target)|price target|sell[- ]side|buy[- ]side rating|upgrade rating|downgrade rating)/,
+  /\b(oil (price|prices) (forecast|outlook|view|prediction|projection) (for|to))/,
+];
+
 // Shipping-specific exclusions. Food-price commentary, airline fuel cost
 // stories and food-security analysis must never lead a Shipping report,
 // even when the text mentions a chokepoint or freight word in passing.
@@ -59,12 +70,18 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\bfuel (shortage|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
     /\bpetrol (shortage|price|prices|station)/,
     /\bdiesel (shortage|price|prices|supply)/,
-    /\b(refinery|refineries) (disruption|outage|shutdown|fire|attack|maintenance)/,
-    /\b(oil|crude) (price|prices|market|supply)/,
-    /\b(subsidy|subsidies) .{0,30}(fuel|petrol|diesel|gas|lpg)/,
-    /\btanker (driver|drivers|strike|shortage|attack)/,
+    /\b(refinery|refineries) (disruption|outage|shutdown|fire|attack|maintenance|closure|halt)/,
+    // Narrowed: macro oil/crude commentary is admitted only when it
+    // carries an operational signal (disruption, shortage, halt, ban,
+    // attack, sanctions or supply-side event). Plain "oil prices rose"
+    // commentary is intentionally excluded — it belongs in market notes.
+    /\b(oil|crude) (shortage|supply (cut|halt|disruption|squeeze)|export ban|export halt|embargo|sanctions|outage|attack|sabotage|spill)/,
+    /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene|jet fuel)/,
+    /\b(fuel|petrol|diesel|gas|lpg|kerosene|jet fuel) .{0,30}(subsidy|levy|duty|excise|tax) (cut|hike|raise|removal|removed|reform|reintroduce)/,
+    /\btanker (driver|drivers|strike|shortage|attack|convoy|blockade)/,
     /\b(lpg|cng) (shortage|price|supply)/,
     /\bpump (price|prices)\b/,
+    /\bforecourt (closure|queue|disruption|shut)/,
     /\bhormuz .{0,40}(oil|crude|tanker|fuel|shipping|supply|price)/,
     /\b(oil|crude|tanker|fuel|shipping|supply|price) .{0,40}hormuz\b/,
   ],
@@ -141,6 +158,11 @@ export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
       if (re.test(text)) return false;
     }
   }
+  if (topic === "fuel") {
+    for (const re of FUEL_EXCLUDE) {
+      if (re.test(text)) return false;
+    }
+  }
   const required = REQUIRED[topic];
   if (!required || required.length === 0) return true;
   for (const re of required) {
@@ -170,13 +192,15 @@ export function sanitizeFactValue(topic: string, raw: string): string {
   if (!v || v === "-" || v === "--") return "Coverage gap";
   if (/^unknown$/i.test(v)) return "Country not identified";
   if (/^other .* incident$/i.test(v)) {
-    if (topic === "fuel") return "Mixed fuel reporting";
-    if (topic === "fertiliser") return "Mixed fertiliser reporting";
-    if (topic === "energy") return "Mixed energy reporting";
-    if (topic === "shipping") return "Mixed maritime reporting";
-    if (topic === "cargo_watch") return "Mixed cargo reporting";
-    if (topic === "protests" || topic === "flashpoint") return "Mixed public order reporting";
-    return "Mixed reporting";
+    // Banned wording removed. Use a neutral signal-quality label so the
+    // card reads honestly when the leader is a residual "Other …" bucket.
+    if (topic === "fuel") return "Multiple fuel incident types";
+    if (topic === "fertiliser") return "Multiple fertiliser incident types";
+    if (topic === "energy") return "Multiple energy incident types";
+    if (topic === "shipping") return "Multiple maritime incident types";
+    if (topic === "cargo_watch") return "Multiple cargo incident types";
+    if (topic === "protests" || topic === "flashpoint") return "Multiple public order incident types";
+    return "Multiple incident types";
   }
   return v;
 }

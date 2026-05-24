@@ -1,0 +1,154 @@
+Fuel Watch structural correction.
+
+Use the previous APAC Fuel Risk Report as the structural benchmark, but keep the newer Polestar Watch cover and branding.
+
+Key correction:
+Hard Numbers should sit where Fast Facts currently sits.
+
+Do not have a weak generic Fast Facts block followed later by Hard Numbers. For Fuel Watch, the top metric section should be called:
+
+HARD NUMBERS
+
+It should appear immediately after the Executive Summary, in the position currently occupied by Fast Facts.
+
+1. Replace Fast Facts with Hard Numbers
+
+Remove the current generic Fast Facts block for Fuel Watch.
+
+Do not show weak cards such as:
+- Mixed fuel reporting
+- Data quality issue
+- generic Total Records only
+- latest incident only
+- most affected country only
+
+Instead, Fuel Watch should show a Hard Numbers section near the top of the report.
+
+Hard Numbers should include the strongest available fuel indicators, for example:
+- Brent crude price
+- WTI crude price
+- Singapore jet fuel benchmark
+- diesel / petrol price movement where available
+- refinery outages
+- fuel shortage count
+- subsidy / levy changes
+- producer or buyer actions
+- chokepoint or route disruption count where fuel-relevant
+- highest severity
+- reporting period
+
+Only show metrics where data exists or can be calculated credibly.
+Do not invent live market data.
+If a metric is not available, omit it rather than showing a dash.
+
+2. Restore the Jet Fuel Price Trajectory chart
+
+Fuel Watch must include the Jet Fuel Price Trajectory chart where data exists.
+
+The previous report included:
+- Jet Fuel Price Trajectory
+- Singapore benchmark
+- last 30 days
+- price movement line
+- date markers / annotations
+
+Bring this concept back into the current Fuel Watch format.
+
+Chart rules:
+- Use the Polestar chart style.
+- Roboto fonts.
+- Approved brand colours only.
+- Clean axis labels.
+- No decorative clutter.
+- No fake data.
+- If there is no jet fuel time-series data available, show a clear empty-state note:
+  “Jet fuel trajectory data is not available for this reporting cycle.”
+- Do not replace the chart with generic incident counts.
+
+3. Fuel Watch section order
+
+Use this order:
+
+- Cover
+- Executive Summary
+- Hard Numbers
+- Jet Fuel Price Trajectory
+- Situation
+- What Happened
+- Regional Highlights
+- Producer and Buyer Actions
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Related Incidents
+- Source Notes / Data Notes
+- Disclaimer
+
+If a section has no data, omit it or show a short clear empty-state note. Do not fill it with generic prose.
+
+4. Keep Fuel Watch analytical, not just incident-based
+
+Fuel Watch should not be only a list of fuel incidents.
+
+It should combine:
+- incident reporting
+- market indicators
+- price movement
+- fuel shortage signals
+- refinery or supply disruption
+- chokepoint pressure
+- producer and buyer actions
+- business impact
+
+The previous report had more useful analytical depth. Restore that depth without copying its wording exactly.
+
+5. Related Incidents filtering
+
+Related Incidents should support the Fuel Watch analysis.
+
+Prioritise:
+- pump price movement
+- fuel shortages
+- rationing
+- refinery disruption
+- fuel levy / subsidy changes
+- tanker or forecourt disruption
+- generator fuel exposure
+- transport fuel disruption
+- direct business continuity impact
+
+Demote or exclude:
+- generic oil price commentary
+- pure market speculation
+- company finance stories
+- articles with no operational fuel relevance
+
+6. Branding and fonts
+
+Roboto is mandatory in preview and PDF.
+
+Use only:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+- #E2E2E2
+
+7. Acceptance check
+
+Export a fresh Fuel Watch PDF and confirm:
+- The section after Executive Summary is Hard Numbers, not generic Fast Facts.
+- Hard Numbers contains useful fuel indicators, not weak placeholder cards.
+- Jet Fuel Price Trajectory chart appears where data exists.
+- If jet fuel data is missing, the report says so clearly.
+- The report has analytical depth similar to the previous Fuel Risk Report.
+- Cover reporting period is not duplicated.
+- No card text overlaps.
+- Prose reads naturally.
+- Related incidents are operationally relevant.
