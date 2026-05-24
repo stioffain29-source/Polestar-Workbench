@@ -394,9 +394,8 @@ export async function exportCountryReportPdf(
   // Full-bleed Polestar cover (page 1) — title, subtitle, reporting period, website.
   drawPolestarCover(ctx, {
     title: country.name,
-    subtitle: `Country Report · ${country.region}`,
-    reportingPeriod: win.label,
-    eyebrow: "POLESTAR ADVISORY",
+    subtitle: "POLESTAR INSIGHTS",
+    reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
   });
   beginBodyPages(ctx);
 

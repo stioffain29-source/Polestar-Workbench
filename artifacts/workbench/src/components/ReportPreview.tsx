@@ -140,19 +140,7 @@ function computePreviewFastFacts(report: ReportPreviewData): KpiPreviewCard[] {
 }
 
 export default function ReportPreview({ report }: { report: ReportPreviewData }) {
-  const issueDateText = report.issueDate
-    ? (() => {
-        try { return format(parseISO(report.issueDate!), "d MMMM yyyy"); }
-        catch { return report.issueDate; }
-      })()
-    : "";
-  // Canonical naming applies everywhere on the cover and running header.
-  // TOPIC_LABELS is still imported for any non-canonical fallback elsewhere.
-  void TOPIC_LABELS;
-  const canon = report.topic ? canonicalTopic(report.topic) : null;
-  const subhead = canon ? canon.topicLine : "";
-  const tertiary = canon?.subtitle ?? "";
-  const cadence = canon ? `${canon.cadence} Briefing` : "Weekly Briefing";
+  void TOPIC_LABELS; void canonicalTopic; void format; void parseISO;
   const resolvedTitle = report.topic
     ? resolveReportTitle(report.topic, report.title)
     : (report.title ?? "");
@@ -163,15 +151,17 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-      {/* Full-bleed gradient page header (logo left, title right) */}
+      {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div
-        className="px-10 flex items-center justify-between"
+        className="flex items-center"
         style={{
           background: BRAND_GRADIENT,
           color: "#fff",
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
-          minHeight: 56,
+          height: 64,
+          paddingLeft: 24,
+          paddingRight: 24,
         }}
       >
         <img
@@ -179,61 +169,38 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           alt="Polestar Advisory"
           style={{ height: 26, width: "auto", maxWidth: 180, display: "block" }}
         />
-        <div
-          className="uppercase"
-          style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: "0.18em",
-          }}
-        >
-          {(resolvedTitle || `${subhead} ${cadence}`).toUpperCase()}
-        </div>
       </div>
 
-      {/* Cover band — full-bleed gradient, title + subtitle + period + website */}
+      {/* 2. Hero band — gradient fallback when no report image is configured. */}
       <div
-        className="px-10 py-12"
+        style={{
+          width: "100%",
+          aspectRatio: "16 / 9",
+          background: BRAND_GRADIENT,
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      />
+
+      {/* 3. Bottom gradient title block — title, subtitle, period, website. */}
+      <div
         style={{
           background: BRAND_GRADIENT,
           color: "#fff",
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
+          paddingLeft: 32,
+          paddingRight: 32,
+          paddingTop: 40,
+          paddingBottom: 28,
         }}
       >
-        <div
-          className="uppercase mb-2"
-          style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
-            fontWeight: 500,
-            fontSize: 10,
-            letterSpacing: "0.3em",
-            color: "rgba(255,255,255,0.85)",
-          }}
-        >
-          Polestar Insights · {subhead} · {cadence}
-        </div>
-        {tertiary && (
-          <div
-            className="uppercase mb-2"
-            style={{
-              fontFamily: "'Roboto Condensed', sans-serif",
-              fontWeight: 400,
-              fontSize: 9,
-              letterSpacing: "0.25em",
-              color: "rgba(255,255,255,0.7)",
-            }}
-          >
-            {tertiary}
-          </div>
-        )}
         <h1
-          className="mb-3"
+          className="mb-4"
           style={{
             fontFamily: "'Roboto Condensed', sans-serif",
             fontWeight: 700,
-            fontSize: 34,
+            fontSize: 44,
             lineHeight: 1.05,
             letterSpacing: "-0.01em",
             textTransform: "uppercase",
@@ -242,29 +209,39 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           {resolvedTitle || "Untitled report"}
         </h1>
         <div
-          className="flex flex-wrap items-center gap-x-4 gap-y-1 uppercase"
+          className="uppercase"
           style={{
             fontFamily: "'Roboto Condensed', sans-serif",
-            fontWeight: 500,
-            fontSize: 11,
-            letterSpacing: "0.15em",
-            color: "rgba(255,255,255,0.9)",
+            fontWeight: 700,
+            fontSize: 13,
+            letterSpacing: "0.22em",
+            marginBottom: 6,
           }}
         >
-          {issueDateText && <span>{issueDateText}</span>}
-          {report.author && <span>·</span>}
-          {report.author && <span>{report.author}</span>}
-          {periodLabel && <span>·</span>}
-          {periodLabel && <span>{periodLabel}</span>}
+          POLESTAR INSIGHTS
         </div>
+        {periodLabel && (
+          <div
+            className="uppercase"
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 400,
+              fontSize: 12,
+              letterSpacing: "0.18em",
+              color: "rgba(255,255,255,0.92)",
+            }}
+          >
+            REPORTING PERIOD: {periodLabel.toUpperCase()}
+          </div>
+        )}
         <div
-          className="mt-8 uppercase"
+          className="uppercase"
           style={{
             fontFamily: "'Roboto Condensed', sans-serif",
             fontWeight: 700,
             fontSize: 11,
             letterSpacing: "0.18em",
-            color: "rgba(255,255,255,0.95)",
+            marginTop: 32,
           }}
         >
           polestar-advisory.com

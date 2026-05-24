@@ -2,11 +2,13 @@ import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages,
+  drawPolestarCover, beginBodyPages, prepareCoverImage,
+  COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize,
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx,
 } from "./pdfChrome";
+import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { LOCATION_NOT_IDENTIFIED as _LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
@@ -351,12 +353,18 @@ export async function exportShippingReportPdf(
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
   const win = resolveReportWindow(data.topic, data.issueDate);
+  let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
+  try {
+    const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
+    coverImage = await prepareCoverImage(shippingCoverUrl, ctx.W, heroH);
+  } catch { /* fall back to gradient hero */ }
   drawPolestarCover(ctx, {
     title: resolvedTitle,
-    subtitle: `${canon.topicLine} · ${cadence}`,
-    reportingPeriod: win.label,
-    eyebrow: `POLESTAR INSIGHTS · ${canon.topicLine.toUpperCase()}`,
+    subtitle: "POLESTAR INSIGHTS",
+    reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
+    coverImage,
   });
+  void cadence;
   beginBodyPages(ctx);
 
   if (data.executiveSummary && data.executiveSummary.trim()) {

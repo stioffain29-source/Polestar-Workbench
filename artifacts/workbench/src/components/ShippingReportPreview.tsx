@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import {
   buildShippingReportDataset,
@@ -326,13 +327,8 @@ export default function ShippingReportPreview({
 }) {
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
-  const canon = canonicalTopic(topic);
-  const subhead = canon.topicLine;
-  const cadence = `${canon.cadence} Briefing`;
   const resolvedTitle = resolveReportTitle(topic, report.title);
-  const issueDateText = (() => {
-    try { return format(new Date(issueDate), "d MMMM yyyy"); } catch { return issueDate; }
-  })();
+  void canonicalTopic; void format;
 
   const ds = useMemo(
     () => buildShippingReportDataset(incidents, topic, issueDate),
@@ -341,34 +337,40 @@ export default function ShippingReportPreview({
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-      {/* Header band */}
+      {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div
-        className="px-10 flex items-center justify-between"
-        style={{ background: BRAND_GRADIENT, color: "#fff", minHeight: 56 }}
+        className="flex items-center"
+        style={{ background: BRAND_GRADIENT, color: "#fff", height: 64, paddingLeft: 24, paddingRight: 24 }}
       >
         <img src={polestarLogo} alt="Polestar Advisory" style={{ height: 26, width: "auto", maxWidth: 180, display: "block" }} />
-        <div
-          className="uppercase"
-          style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.18em" }}
-        >
-          {(resolvedTitle || `${subhead} ${cadence}`).toUpperCase()}
-        </div>
       </div>
 
-      {/* Cover band */}
-      <div className="px-10 py-12" style={{ background: BRAND_GRADIENT, color: "#fff" }}>
-        <div
-          className="uppercase mb-2"
-          style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 500, fontSize: 10, letterSpacing: "0.3em", color: "rgba(255,255,255,0.85)" }}
-        >
-          Polestar Insights · {subhead} · {cadence}
-        </div>
+      {/* 2. Hero image — full width, cropped, no borders. */}
+      <div style={{ width: "100%", aspectRatio: "16 / 9", overflow: "hidden", display: "block" }}>
+        <img
+          src={shippingCoverUrl}
+          alt=""
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      </div>
+
+      {/* 3. Bottom gradient title block — full width, title + subtitle + period + website. */}
+      <div
+        style={{
+          background: BRAND_GRADIENT,
+          color: "#fff",
+          paddingLeft: 32,
+          paddingRight: 32,
+          paddingTop: 40,
+          paddingBottom: 28,
+        }}
+      >
         <h1
-          className="mb-3"
+          className="mb-4"
           style={{
             fontFamily: "'Roboto Condensed', sans-serif",
             fontWeight: 700,
-            fontSize: 34,
+            fontSize: 44,
             lineHeight: 1.05,
             letterSpacing: "-0.01em",
             textTransform: "uppercase",
@@ -377,18 +379,38 @@ export default function ShippingReportPreview({
           {resolvedTitle || "Untitled report"}
         </h1>
         <div
-          className="flex flex-wrap items-center gap-x-4 gap-y-1 uppercase"
-          style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 500, fontSize: 11, letterSpacing: "0.15em", color: "rgba(255,255,255,0.9)" }}
+          className="uppercase"
+          style={{
+            fontFamily: "'Roboto Condensed', sans-serif",
+            fontWeight: 700,
+            fontSize: 13,
+            letterSpacing: "0.22em",
+            marginBottom: 6,
+          }}
         >
-          <span>{issueDateText}</span>
-          {report.author && <span>·</span>}
-          {report.author && <span>{report.author}</span>}
-          <span>·</span>
-          <span>{ds.reportingPeriodLong}</span>
+          POLESTAR INSIGHTS
         </div>
         <div
-          className="mt-8 uppercase"
-          style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.18em", color: "rgba(255,255,255,0.95)" }}
+          className="uppercase"
+          style={{
+            fontFamily: "'Roboto Condensed', sans-serif",
+            fontWeight: 400,
+            fontSize: 12,
+            letterSpacing: "0.18em",
+            color: "rgba(255,255,255,0.92)",
+          }}
+        >
+          REPORTING PERIOD: {ds.reportingPeriodLong.toUpperCase()}
+        </div>
+        <div
+          className="uppercase"
+          style={{
+            fontFamily: "'Roboto Condensed', sans-serif",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: "0.18em",
+            marginTop: 32,
+          }}
         >
           polestar-advisory.com
         </div>

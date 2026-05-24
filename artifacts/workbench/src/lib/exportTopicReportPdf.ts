@@ -230,16 +230,14 @@ export async function exportTopicReportPdf(
 
   // Full-bleed Polestar cover (page 1).
   const win = resolveReportWindow(data.topic, data.issueDate);
-  const eyebrow = canon.subtitle
-    ? `${canon.topicLine.toUpperCase()} · ${canon.subtitle.toUpperCase()}`
-    : `POLESTAR INSIGHTS · ${canon.topicLine.toUpperCase()}`;
   drawPolestarCover(ctx, {
     title: resolvedTitle,
-    subtitle: `${canon.topicLine} · ${cadence}`,
-    reportingPeriod: win.label,
-    eyebrow,
+    subtitle: "POLESTAR INSIGHTS",
+    reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
   });
   void topicLabel;
+  void canon;
+  void cadence;
   // Body pages start here, each with the gradient header band.
   beginBodyPages(ctx);
 

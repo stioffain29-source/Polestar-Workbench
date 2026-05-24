@@ -340,73 +340,150 @@ export function drawFooters(pdf: jsPDF, _reportDate?: string) {
 }
 
 /**
- * Full-bleed Polestar cover. Used by every report builder.
- * - Top gradient band with the white logo
- * - Tall centred gradient hero with title + subtitle + reporting period
- * - Bottom gradient band with the website
- * The whole page is gradient — no white showing on any edge.
+ * Standard Polestar cover layout. Used by every report builder.
+ *
+ *   1. Top gradient band (full width) — Polestar logo on the left.
+ *   2. Hero image (full width, cropped cover-fit) — fills the middle.
+ *      If no image is supplied, the band is filled with the brand gradient
+ *      so the page remains seamless.
+ *   3. Bottom gradient title block (full width) — white title, subtitle,
+ *      reporting period and website (no shadows, no overlap with the image).
+ *
+ * The page is flush to all edges — no white margins anywhere.
  */
 export interface CoverOpts {
   /** Main report title (rendered large, white, uppercase). */
   title: string;
-  /** Subtitle / report family (e.g. "Country Report", "Weekly Briefing"). */
+  /** Subtitle line under the title (e.g. "POLESTAR INSIGHTS"). */
   subtitle: string;
-  /** Reporting-period line (e.g. "Reporting period: 1 May 2026 - 7 May 2026"). */
+  /** Reporting-period line (e.g. "REPORTING PERIOD: 1 MAY 2026 - 7 MAY 2026"). */
   reportingPeriod: string;
-  /** Optional eyebrow line above the title (e.g. region or product family). */
-  eyebrow?: string;
+  /**
+   * Optional cover image. Pass a pre-cropped JPEG/PNG data URL sized to fit
+   * the hero slot; the helper `prepareCoverImage(url, w, h)` handles the
+   * crop. When omitted, the hero slot is filled with the brand gradient.
+   */
+  coverImage?: { dataUrl: string; format: "JPEG" | "PNG" };
 }
+
+/** Cover-band geometries (points). Kept here so previews can mirror them. */
+export const COVER_TOP_BAND_H = 70;
+export const COVER_BOTTOM_BLOCK_H = 240;
+
 export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   const { pdf, W, H } = ctx;
   ctx.suppressHeader = true;
-  // Full-page gradient (no white margins anywhere).
-  drawBrandGradient(pdf, 0, 0, W, H);
 
-  // Logo top-left (in the natural header position).
+  const topH = COVER_TOP_BAND_H;
+  const bottomH = COVER_BOTTOM_BLOCK_H;
+  const heroY = topH;
+  const heroH = H - topH - bottomH;
+
+  // 1. Top gradient band (flush to top/left/right edges).
+  drawBrandGradient(pdf, 0, 0, W, topH);
   try {
-    pdf.addImage(polestarLogo, "PNG", 32, 32, 160, 26, undefined, "FAST");
+    // Logo vertically centred in the top band, flush-left with 24pt inset.
+    const logoH = 26;
+    pdf.addImage(polestarLogo, "PNG", 24, (topH - logoH) / 2, 156, logoH, undefined, "FAST");
   } catch { /* ignore */ }
 
-  // Eyebrow
-  setText(pdf, WHITE);
-  const centreY = H * 0.55;
-  if (opts.eyebrow) {
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.text(sanitize(opts.eyebrow.toUpperCase()), 40, centreY - 90, {
-      charSpace: 1.6,
-    });
+  // 2. Hero image (or gradient fallback) — full width, no borders.
+  if (opts.coverImage) {
+    try {
+      pdf.addImage(opts.coverImage.dataUrl, opts.coverImage.format, 0, heroY, W, heroH, undefined, "FAST");
+    } catch {
+      drawBrandGradient(pdf, 0, heroY, W, heroH);
+    }
+  } else {
+    drawBrandGradient(pdf, 0, heroY, W, heroH);
   }
 
-  // Title (very large, white, uppercase, may wrap to 3 lines)
+  // 3. Bottom gradient title block (flush to bottom/left/right edges).
+  const bottomY = H - bottomH;
+  drawBrandGradient(pdf, 0, bottomY, W, bottomH);
+
+  const padL = 32;
+  setText(pdf, WHITE);
+
+  // Title — large, white, uppercase, up to 2 lines.
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(34);
+  pdf.setFontSize(38);
   const titleLines: string[] = pdf.splitTextToSize(
     sanitize((opts.title || "Untitled report").toUpperCase()),
-    W - 80,
+    W - padL * 2,
   );
-  let ty = centreY - 40;
-  for (const ln of titleLines.slice(0, 3)) {
-    pdf.text(ln, 40, ty);
-    ty += 38;
+  const visibleTitle = titleLines.slice(0, 2);
+  const titleLineH = 42;
+  let ty = bottomY + 70;
+  for (const ln of visibleTitle) {
+    pdf.text(ln, padL, ty);
+    ty += titleLineH;
   }
 
-  // Subtitle
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(13);
-  pdf.text(sanitize(opts.subtitle), 40, ty + 8);
+  // Subtitle (e.g. POLESTAR INSIGHTS).
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(12);
+  pdf.text(sanitize(opts.subtitle.toUpperCase()), padL, ty + 6, { charSpace: 1.6 });
 
-  // Reporting period
+  // Reporting period.
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(10);
-  pdf.text(sanitize(opts.reportingPeriod), 40, ty + 28);
+  pdf.setFontSize(11);
+  pdf.text(sanitize(opts.reportingPeriod.toUpperCase()), padL, ty + 28, { charSpace: 1.2 });
 
-  // Bottom: website (no other text per brand spec).
+  // Website at bottom left, flush above the bottom edge.
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(10);
-  pdf.text(sanitize(POLESTAR_URL), 40, H - 36);
+  pdf.text(sanitize(POLESTAR_URL), padL, H - 24, { charSpace: 1.2 });
 
   ctx.suppressHeader = false;
+}
+
+/**
+ * Load an image URL and return a cover-cropped data URL sized exactly to
+ * `outW x outH` (in any consistent unit — points work fine because jsPDF
+ * accepts the dataURL at the size we pass to `addImage`). The crop preserves
+ * the source aspect ratio and centres the visible area, like CSS `object-fit:
+ * cover`. Returns the dataURL and the format jsPDF should use.
+ */
+export async function prepareCoverImage(
+  src: string,
+  outW: number,
+  outH: number,
+): Promise<{ dataUrl: string; format: "JPEG" | "PNG" }> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("Failed to load cover image"));
+    i.src = src;
+  });
+  // Render at 2x for crisp print output.
+  const scale = 2;
+  const cw = Math.round(outW * scale);
+  const ch = Math.round(outH * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = cw;
+  canvas.height = ch;
+  const g = canvas.getContext("2d");
+  if (!g) throw new Error("Canvas 2D context unavailable");
+  // Cover-fit: scale source so it fully covers the slot, centre-crop overflow.
+  const srcRatio = img.naturalWidth / img.naturalHeight;
+  const dstRatio = cw / ch;
+  let sx = 0;
+  let sy = 0;
+  let sw = img.naturalWidth;
+  let sh = img.naturalHeight;
+  if (srcRatio > dstRatio) {
+    // Source is wider than slot — crop sides.
+    sw = Math.round(img.naturalHeight * dstRatio);
+    sx = Math.round((img.naturalWidth - sw) / 2);
+  } else if (srcRatio < dstRatio) {
+    // Source is taller than slot — crop top/bottom.
+    sh = Math.round(img.naturalWidth / dstRatio);
+    sy = Math.round((img.naturalHeight - sh) / 2);
+  }
+  g.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+  return { dataUrl: canvas.toDataURL("image/jpeg", 0.9), format: "JPEG" };
 }
 
 export function todayLabel(): string {
