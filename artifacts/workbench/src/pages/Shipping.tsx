@@ -13,147 +13,18 @@ import { deriveIncidentCountry, deriveFlagState, LOCATION_NOT_IDENTIFIED } from 
 import {
   CHOKEPOINTS, detectChokepoints, classifyPiracy,
   type PiracyAct,
+  classifyRegion, REGION_COLOR, type Region,
+  classifyIssue, ISSUE_PALETTE,
+  classifyVesselIncident, type VesselIncidentType, VESSEL_ACCENT,
+  TRANSIT_ISSUES, COMMERCIAL_ISSUES,
 } from "@/lib/shippingAnalysis";
 import { ExternalLink } from "lucide-react";
 
-const MIDDLE_EAST = new Set([
-  "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
-  "Jordan","Iraq","Yemen","Israel","Lebanon","Syria","Turkey","Turkiye","Türkiye",
-  "Iran",
-]);
-const APAC = new Set([
-  "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","Cambodia","Laos","Myanmar",
-  "India","Pakistan","Bangladesh","Sri Lanka","China","Taiwan","South Korea","Japan",
-  "Australia","New Zealand","Papua New Guinea","West Papua",
-]);
-
-type Region = "Middle East" | "APAC" | "Out of scope" | "Country not identified";
-
-function classifyRegion(country: string | null | undefined): Region {
-  if (!country) return "Country not identified";
-  const first = country.split(/[;,]/)[0].trim();
-  if (!first) return "Country not identified";
-  if (/^unknown$/i.test(first)) return "Country not identified";
-  if (MIDDLE_EAST.has(first)) return "Middle East";
-  if (APAC.has(first)) return "APAC";
-  return "Out of scope";
-}
-
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
 
-// Shipping issue types — most-specific rule first. "Unclassified maritime
-// record" is reserved for records where no other rule fits, so the chart no
-// longer drowns in a vague "Other Maritime" bucket.
-// Order matters — most-specific rule first. Seizure beats attack (a seizure
-// is also an attack); attack beats chokepoint (a Hormuz hit is an attack on
-// a vessel, not just a chokepoint mention).
-const ISSUE_RULES: Array<{ label: string; pattern: RegExp }> = [
-  { label: "Piracy / armed robbery", pattern: /\b(piracy|pirat(e|es)|armed robbery (against|at sea|on board|in port|at anchorage)|robbery (against|at sea) (a |the )?(ship|vessel|tanker)|robbery on board|attempted boarding|boarded by (pirates|robbers|armed (men|gang|gunmen))|pirates? boarded|robbers? boarded|armed (men|gang|gunmen) boarded|suspicious approach|small craft approach|approached by (a )?skiffs?|skiff (sighted|approach)|crew (kidnap|abduct|held hostage|taken hostage)|theft from vessel|petty theft .{0,15}(anchorage|vessel|ship)|theft .{0,15}anchorage)\b/i },
-  { label: "Vessel seizure", pattern: /\b(vessel seiz|ship seiz|tanker seiz|seized .{0,30}(ship|tanker|vessel|dhow|carrier|cargo)|seizure of .{0,20}(ship|tanker|vessel|dhow|carrier)|hijack(ed)?|commandeered|detained .{0,20}(vessel|tanker|ship|crew|cargo)|stopped in iranian waters|bulk carrier stopped|us[- ]seized vessels?|iran seized|seized two .{0,20}ships?|seized .{0,5}foreign|forced (sale|transfer))\b/i },
-  { label: "Vessel attack", pattern: /\b(vessel attack|tanker attack|ship attack|attack(ed|s)? .{0,30}(ship|tanker|vessel|carrier|dhow|cargo|bulk carrier|container ship)|attack(ed)? by (multiple )?(small (craft|boats?)|skiffs?|iranian)|attack on (a |the )?(ship|tanker|vessel|carrier|dhow|cargo|hmm)|missile .{0,20}(ship|tanker|vessel|carrier|hmm|cargo)|drone .{0,20}(ship|tanker|vessel|carrier|cargo)|fired (upon|at|on)|fired on by|tanker (fired upon|hit|struck|set ablaze|ablaze|on fire)|(ship|vessel|carrier|cargo ship|bulk carrier|container ship|tanker) .{0,20}(hit|struck|set ablaze|ablaze|on fire|catches fire|caught fire|attacked|ablaze)|hit by (gunfire|projectile|projectiles|unknown projectile|unknown projectiles|small craft)|three (vessels|ships|container ships) (hit|targeted|attacked)|gunfire (hit|near|in|in strait)|fire (aboard|on board|aboard a|aboard the|breaks out on|happened at|extinguished on)|fire breaks out on .{0,20}vessels?|external strike|came under fire|comes under fire|targeted by .{0,30}(vessel|ship|iranian|missile|drone)|skiff attack|houthi attack|iranian (attack|strike|vessel)|repel(led)? drone|targeted .{0,20}iranian|ship attack debris|attack debris|near miss|warning shot|narrowly (missed|avoided)|missile (fell|landed) near|drone (fell|landed) near|intercepted near|missile alert)\b/i },
-  { label: "Maritime advisory", pattern: /\b(ukmto (reports?|warns?|warning|advisory|alert|issues warning|says)|ukmto:|naval (advisory|patrol|escort|operation|protection)|coast guard advisory|imo advisory|maritime (warning|advisory|alert|security (crisis|threat))|nav warning|notice to mariners|navy assists|under (u\.s\.|us|american) (military )?(protection|escort)|project freedom|operation freedom|us warship escort|escort (foreign|mission)|escorted to|escorted by|pentagon statement|force protection|navy (assists|monitors))\b/i },
-  { label: "Chokepoint risk", pattern: /\b(strait of hormuz|hormuz strait|bab[- ]el[- ]mandeb|suez canal|panama canal|malacca|lombok strait|singapore strait|gibraltar|chokepoint|transit risk|transit volume|tanker traffic|patrol zones?|red sea (route|risk|transit)|gulf of oman|persian gulf|arabian gulf|hormuz (closure|transit|risk|exit|won't go back|shut)|clears strait)\b/i },
-  { label: "Route diversion", pattern: /\b(reroute|re[- ]routing|diverted?|diverting|divert(ed)? (away|around)|cape of good hope|avoiding (hormuz|red sea|gulf|strait)|vessel delay|transit delay|schedule disruption|shipping delay|delivery delay|delayed (shipment|cargo)|adrift|collision|grounded|crew (repatriated|safe|evacuated|stranded)|vessel (stranded|passed through|relocate|repositioning)|first .{0,30}transits?|traffic shifts? away|ghost tanker|bypassed .{0,20}sanctions|slipped past|moving .{0,20}barrels|ship-to-ship transfers?|sanctions enforcement|sanctions dragnet|sanctions threats?|breaks through sanctions)\b/i },
-  { label: "Port disruption", pattern: /\b(port (workers? )?strike|dock(workers?| strike)|stevedore strike|labour (dispute|stoppage|action)|union (walkout|strike)|port (closure|closed|shutdown|halted|suspended|disruption|congestion)|terminal (closed|shut|congestion)|congestion at (the )?port|berth (closure|delay|congestion)|harbou?r (closure|disruption)|panama canal congestion|canal congestion|maintenance work .{0,20}(canal|port)|port of darwin|port incident|incident at .{0,20}port)\b/i },
-  { label: "Insurance / freight pressure", pattern: /\b(war risk (premium|insurance|zone)|insurance (premium|surcharge|cost)|freight rate|bunker surcharge|p&i club|hull premium|baltic (dry|exchange) index|world container index|new contex|container ship time charter|spot rate(s)?|charter rate|charter assessment|aframax prices|tanker prices|vlcc (market|prices?|freight)|vlgc (freight )?rates?|tankers?: vlcc|freight (rates? (rising|recovery|up|down|surge|soaring)|recovery|soaring)|rates soaring|shipping rates (have )?(shot up|rose|rising|surge)|cheap spot rates|peak season|ws[0-9]+|tce down|tce up|mediterranean\/east index)\b/i },
-  { label: "Commercial shipping disruption", pattern: /\b(cargo (delay|disruption|halt|backlog|movement|flows?)|container (backlog|delay|handling)|supply chain disruption|liner service (suspension|cancell)|service suspension|sailing cancelled|blank sailing|export (halt|suspension)|import (halt|disruption)|market share|orderbook|newbuild|newbuilding|new entrant|charter (acquisition|deal|purchase|locks?|fix(ed|es)?)|locks first|fleet (acquisition|renewal|deal|strategy|exposure)|m&a|merger|joint venture|company of the year|banned from (australia|port)|unpaid crew wages|earnings|quarterly|annual report|first[- ]quarter|q1 (results?|performance)|volume growth|cooperation deal|logistics push|legal action|relocate headquarters|biomethanol|long[- ]term charter|long[- ]term deal|product tanker|crude carrier|vlcc (newbuild|owner|charter|trading|sanctions|supertanker))\b/i },
-];
-
-// Issue Type chart vocabulary. We deliberately reuse the strict hostile-vessel
-// classifier (`classifyVesselIncident`) for the Vessel attack / Vessel seizure
-// labels so the chart aligns with the Vessel Attacks carousel. Without this,
-// the broad ISSUE_RULES regex matched diplomatic follow-up stories ("probe
-// into Hormuz vessel attack", "discussions regarding recent vessel attack",
-// etc.) and inflated Vessel attack by roughly 4x.
-function classifyIssue(i: Incident): string {
-  const text = `${i.title} ${i.summary ?? ""}`;
-  // Piracy / armed robbery wins first (Somali-style boarding is also an attack).
-  if (ISSUE_RULES[0].pattern.test(text)) return ISSUE_RULES[0].label;
-  // Hostile vessel incident — strict.
-  const v = classifyVesselIncident(i);
-  if (v === "Attack" || v === "Near miss") return "Vessel attack";
-  if (v === "Seized") return "Vessel seizure";
-  // Fall through to the remaining buckets, skipping the three labels handled
-  // above (Piracy/armed robbery at index 0, Vessel seizure at 1, Vessel attack
-  // at 2). Anything matching seizure/attack regex that classifyVesselIncident
-  // rejected (diplomatic follow-up, commercial commentary, etc.) is intentionally
-  // allowed to fall into Maritime advisory / Chokepoint risk / Route diversion /
-  // Port disruption / Insurance / Commercial / Unclassified — wherever its
-  // operational meaning actually fits.
-  for (let k = 3; k < ISSUE_RULES.length; k++) {
-    if (ISSUE_RULES[k].pattern.test(text)) return ISSUE_RULES[k].label;
-  }
-  return "Unclassified maritime record";
-}
-
-// ---------------------------------------------------------------------------
-// Vessels Attacked module
-//
-// Picks vessel-centric incidents from the shipping topic and classifies them
-// into the five-tier Vessel Incident vocabulary the user specified. Returns
-// `null` for records that are not vessel incidents (rate indices, charter
-// orderbook news, quarterly results, etc.) so they are excluded from the
-// section. We never invent IMO / AIS / distance — we only surface what the
-// underlying incident already carries.
-// ---------------------------------------------------------------------------
-
-type VesselIncidentType = "Attack" | "Near miss" | "Seized" | "Threat";
-
-// Commercial / market / finance / regulatory noise. Records whose text matches
-// any of these are excluded outright — even if a stray attack token appears in
-// the headline — because they are not hostile maritime incidents.
-const COMMERCIAL_RE =
-  /\b(orderbook|newbuild|newbuilds|charter (rate|assessment|index)|time charter|freight rate|spot rate|baltic dry|world container index|earnings|profit|results|acquisition|fleet renewal|partnership|deal|merger|joint venture|sold|sale of|orders?\b|quarterly|annual report|lng (application|approval|terminal application)|payment dispute|invoice|tariff dispute|port congestion|berth congestion|container backlog|shipping finance|bond issu|equity raise|ipo)\b/i;
-
-// Diplomatic follow-up, investigations, statements and commentary that
-// reference a previous vessel attack are NOT new hostile incidents and
-// must not inflate the Vessel attack count. The Vessel Attacks carousel
-// already relied on COMMERCIAL_RE only; that left diplomacy in. This
-// exclusion brings the issue chart and the carousel into alignment.
-// Every alternate must bind to a prior-incident cue (vessel/tanker/ship/
-// attack/seizure/hijacking) so that fresh hostile reporting which happens
-// to mention a press briefing or an investigation is not suppressed. No
-// standalone generic phrases.
-const DIPLOMATIC_FOLLOWUP_RE =
-  /\b(diplomatic (offensive|response|push|protest|demarche) .{0,60}(vessel|tanker|ship|attack|seizure|hijack)|probe (into|of) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|additional probe .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|investigation (into|of|update) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|discussions? (regarding|about|on) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|talks (about|regarding|on) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|actor behind .{0,40}(attack|vessel|tanker|seizure|hijack)|condemn(s|ed|ation) .{0,40}(attack|vessel|tanker|seizure|hijack)|aftermath of .{0,40}(attack|vessel|tanker|seizure|hijack)|foreign ministry .{0,60}(vessel|tanker|attack|seizure|hijack)|statement (on|about|regarding) .{0,40}(vessel|tanker|attack|seizure|hijack)|response to .{0,40}(vessel|tanker|attack|seizure|hijack)|recent (vessel|tanker|ship) attack|previous (attack|incident|seizure|hijack)|will take .{0,30}(diplomatic|response) .{0,40}(vessel|tanker|attack|seizure|hijack)|to conduct .{0,30}(probe|investigation) .{0,40}(vessel|tanker|attack|seizure|hijack))\b/i;
-
-const VESSEL_RULES: Array<{ type: VesselIncidentType; pattern: RegExp }> = [
-  { type: "Seized", pattern: /\b(seized|seizure|boarded by|hijack(ed)?|detained .*(vessel|ship|tanker|crew)|commandeered|vessel (taken|captured))\b/i },
-  { type: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near|shot down near (a |the )?(vessel|tanker|ship))\b/i },
-  { type: "Attack", pattern: /\b(attack(ed)? (on |by )?(a |the )?(ship|tanker|vessel|carrier|dhow)|vessel attack|tanker attack|missile (hit|struck|targeted) (a |the )?(ship|tanker|vessel|carrier)|drone (hit|struck|targeted) (a |the )?(ship|tanker|vessel|carrier)|ship hit|tanker hit|vessel (hit|on fire|ablaze|struck)|small craft attack|skiff attack|houthi attack|terrorist attack on (a |the )?(vessel|ship|tanker)|fired (upon|at) (a |the )?(vessel|ship|tanker))\b/i },
-  { type: "Threat", pattern: /\b(ukmto (advisory|warning|alert|incident)|maritime (advisory|warning|threat) (to|against) shipping|threat to (shipping|vessel|tanker|ship)|hostile (act|activity) (toward|against) (a |the )?(vessel|ship|tanker)|suspicious approach (to|by) (vessel|ship|tanker)|approached by (small craft|skiffs?))\b/i },
-];
-
-function classifyVesselIncident(i: Incident): VesselIncidentType | null {
-  const text = `${i.title} ${i.summary ?? ""}`;
-  // Hard exclusion first — commercial / finance / congestion / regulatory news
-  // is never a hostile vessel incident regardless of stray keywords. Diplomatic
-  // follow-up, probes, statements and commentary about a previous attack also
-  // do not represent a new hostile incident and must be excluded.
-  if (COMMERCIAL_RE.test(text)) return null;
-  if (DIPLOMATIC_FOLLOWUP_RE.test(text)) return null;
-  for (const r of VESSEL_RULES) {
-    if (r.pattern.test(text)) return r.type;
-  }
-  // No fallback. Only records that match a strict hostile rule are admitted.
-  return null;
-}
-
-const VESSEL_ACCENT: Record<VesselIncidentType, string> = {
-  Attack: "#C0392B",
-  "Near miss": "#E67E22",
-  Seized: "#0B0B3D",
-  Threat: "#7A8FA6",
-};
-
-const REGION_COLOR: Record<Region, string> = {
-  "Middle East": "#0B0B3D",
-  "APAC": "#4655FF",
-  "Country not identified": "#7A8FA6",
-  "Out of scope": "#B8C2CC",
-};
-
-const ISSUE_PALETTE = ["#0B0B3D", "#4655FF", "#303030", "#7A8FA6", "#B8C2CC", "#6FB872", "#E67E22", "#C0392B", "#0B0B3D", "#4655FF"];
+// Region / issue / vessel classifiers are now imported from
+// `@/lib/shippingAnalysis` so the Shipping page and the Shipping report PDF
+// share one source of truth and never drift.
 
 const SEV_RANK: Record<string, number> = {
   insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
@@ -337,19 +208,8 @@ export default function Shipping() {
     [enriched],
   );
 
-  // Labels here MUST match the 10-label vocabulary emitted by ISSUE_RULES.
-  // Used for Daily Intelligence Summary card 1 (chokepoint / route activity).
-  const TRANSIT_ISSUES = new Set([
-    "Chokepoint risk",
-    "Route diversion",
-    "Maritime advisory",
-  ]);
-  const COMMERCIAL_ISSUES = new Set([
-    "Port disruption",
-    "Commercial shipping disruption",
-    "Insurance / freight pressure",
-  ]);
-
+  // TRANSIT_ISSUES / COMMERCIAL_ISSUES come from shippingAnalysis.ts so the
+  // Shipping page and the Shipping report PDF share one vocabulary.
   const transitRecords = sortedEnriched.filter(
     (i) => TRANSIT_ISSUES.has(i.issue) || detectChokepoints(i).length > 0,
   );
