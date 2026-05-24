@@ -290,9 +290,9 @@ export default function CargoWatch() {
         <ChartCard title="Incidents by Region">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byRegion} layout="vertical" margin={{ left: 24, right: 16 }}>
-              <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-              <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={120} />
+              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+              <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+              <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} width={120} />
               <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count">
                 {byRegion.map((d) => <Cell key={d.region} fill={REGION_COLOR[d.region as Region]} />)}
@@ -304,9 +304,9 @@ export default function CargoWatch() {
         <ChartCard title="Incidents by Cargo Category">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byCategory} layout="vertical" margin={{ left: 24, right: 16 }}>
-              <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-              <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <YAxis dataKey="category" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={120} />
+              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+              <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+              <YAxis dataKey="category" type="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} width={120} />
               <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count">
                 {byCategory.map((_, idx) => <Cell key={idx} fill={CAT_PALETTE[idx % CAT_PALETTE.length]} />)}
@@ -318,9 +318,9 @@ export default function CargoWatch() {
         <ChartCard title="Incidents by Country (Top 12)">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byCountry} margin={{ left: 8, right: 16, bottom: 40 }}>
-              <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-              <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
-              <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
+              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+              <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
+              <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
               <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count" fill="#465bff" />
             </BarChart>
@@ -330,9 +330,9 @@ export default function CargoWatch() {
         <ChartCard title="Country × Cargo Category (Top 10)">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stacked} margin={{ left: 8, right: 16, bottom: 40 }}>
-              <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-              <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
-              <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
+              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+              <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
+              <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
               <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
               {allCategoriesForStack.map((cat, idx) => (

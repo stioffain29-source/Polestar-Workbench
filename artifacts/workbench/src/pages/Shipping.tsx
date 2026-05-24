@@ -516,9 +516,9 @@ export default function Shipping() {
         <ChartCard title="Incidents by Issue Type" height={320}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byIssue} layout="vertical" margin={{ left: 24, right: 16 }}>
-              <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-              <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <YAxis dataKey="issue" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={200} />
+              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+              <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+              <YAxis dataKey="issue" type="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} width={200} />
               <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
                 {byIssue.map((_, idx) => {
@@ -605,9 +605,9 @@ export default function Shipping() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={timeline} margin={{ left: 8, right: 16 }}>
-                  <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} interval="preserveStartEnd" />
-                  <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} allowDecimals={false} />
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} interval="preserveStartEnd" />
+                  <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Line type="monotone" dataKey="count" stroke="#0b0a3d" strokeWidth={2} dot={{ r: 3, stroke: "#0b0a3d", strokeWidth: 1.5, fill: "#465bff", fillOpacity: FILL_OPACITY }} />
                 </LineChart>
@@ -618,9 +618,9 @@ export default function Shipping() {
           <ChartCard title="Incidents by Region">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byRegion} layout="vertical" margin={{ left: 24, right: 16 }}>
-                <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-                <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-                <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={130} />
+                <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+                <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} width={130} />
                 <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                 <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
                   {byRegion.map((d) => {
@@ -638,9 +638,9 @@ export default function Shipping() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={byCountry} margin={{ left: 8, right: 16, bottom: 40 }}>
-                  <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-                  <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
-                  <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} allowDecimals={false} />
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                  <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
+                  <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY} />
                 </BarChart>
@@ -651,9 +651,9 @@ export default function Shipping() {
           <ChartCard title="Severity Distribution">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bySeverity}>
-                <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-                <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} allowDecimals={false} />
+                <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+                <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                 <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                 <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
                   {bySeverity.map((d) => {

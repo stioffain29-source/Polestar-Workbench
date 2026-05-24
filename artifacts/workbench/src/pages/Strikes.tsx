@@ -315,9 +315,9 @@ export default function Strikes() {
                 <stop offset="100%" stopColor="#465bff" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} interval="preserveStartEnd" />
-            <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} />
+            <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} interval="preserveStartEnd" />
+            <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} />
             <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
             <Area type="monotone" dataKey="count" stroke={darken("#465bff")} strokeWidth={CHART_STROKE_WIDTH} fill="url(#strikeArea)" fillOpacity={CHART_FILL_OPACITY} />
           </AreaChart>
@@ -462,18 +462,18 @@ function CatBar({ data, height = 240 }: { data: { key: string; count: number }[]
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 18, right: 8, left: 0, bottom: 8 }}>
-        <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" vertical={false} />
+        <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="key"
           tickLine={false}
-          axisLine={{ stroke: "#E2E2E2" }}
+          axisLine={{ stroke: "#e2e2e2" }}
           fontSize={10}
           interval={0}
           angle={data.length > 4 ? -25 : 0}
           textAnchor={data.length > 4 ? "end" : "middle"}
           height={data.length > 4 ? 50 : 30}
         />
-        <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} />
+        <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} />
         <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
         <Bar dataKey="count">
           {data.map((_, i) => {

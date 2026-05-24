@@ -7,7 +7,7 @@ import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const DUSK = "#363636";
-const POLAR = "#E2E2E2";
+const POLAR = "#e2e2e2";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
 const SEV_COLOR: Record<string, string> = {

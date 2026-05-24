@@ -39,9 +39,9 @@ export default function Topic() {
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={severityData}>
-              <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
-              <XAxis dataKey="severity" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
+              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+              <XAxis dataKey="severity" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+              <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
               <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count">
                 {severityData.map((d) => (

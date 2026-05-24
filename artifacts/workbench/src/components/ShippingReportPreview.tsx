@@ -23,7 +23,7 @@ import {
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const DUSK = "#363636";
-const POLAR = "#E2E2E2";
+const POLAR = "#e2e2e2";
 
 // Subtle bar styling helpers. Keep effects restrained: a touch of fill
 // translucency and a slightly darker stroke on the same hue. No gradients,
