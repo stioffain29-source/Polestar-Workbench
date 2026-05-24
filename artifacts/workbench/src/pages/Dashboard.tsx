@@ -5,6 +5,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { severityBadgeStyle } from "@/lib/topics";
+import { resolveReportTitle } from "@/lib/reportNaming";
 
 const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
   { label: "24h", days: 1 },
@@ -142,7 +143,7 @@ export default function Dashboard() {
                     <Link key={report.id} href={`/reports/${report.id}`} className="block p-4 hover:bg-muted/30 transition-colors group">
                       <div className="flex justify-between items-start">
                         <h4 className="font-sans font-medium text-sm line-clamp-2 group-hover:text-accent transition-colors pr-4">
-                          {report.title}
+                          {resolveReportTitle(report.topic, report.title)}
                         </h4>
                         <span className={cn(
                           "flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
