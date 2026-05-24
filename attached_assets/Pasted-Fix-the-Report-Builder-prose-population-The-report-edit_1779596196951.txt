@@ -1,0 +1,151 @@
+Fix the Report Builder prose population.
+
+The report editor is currently showing instruction text such as:
+“One short paragraph at the top of the brief”
+“Set the cargo crime backdrop”
+“Describe the theft, hijack, pilferage or insider event”
+
+That is not acceptable.
+
+The report fields must be populated with draft prose, not writing prompts.
+
+Apply this to all report builders:
+Fuel
+Fertiliser
+Civil Protests and Civil Unrest
+Energy and Grid
+Shipping
+Cargo Watch
+Flashpoint
+Papua and PNG country reports
+
+Do not change the database.
+Do not change imports.
+Do not redesign the dashboard.
+Do not change report structure.
+Do not add AI style filler.
+
+Rule
+
+When a new report is created, each section should be prefilled with short operational prose based on the selected topic, date range and records.
+
+Use my voice:
+Plain spoken
+Direct
+Operational
+No hype
+No consultancy waffle
+No AI style phrasing
+No five word influencer sentences
+No em dashes
+No decorative language
+No weak generic wording
+No “It is important to note”
+No “In today’s complex environment”
+No “This highlights the need”
+No “robust”
+No “comprehensive”
+No “dynamic threat landscape”
+
+Use normal sentences.
+
+The prose should sound like a practical security lead writing a short brief for a leadership team.
+
+Section requirements
+
+Executive Summary
+
+Write one short paragraph giving the main read from the reporting period.
+
+Example style:
+Cargo theft reporting for the period remains concentrated in APAC, with Indonesia and India accounting for the largest share of records. The pattern is still mainly warehouse theft, truck hijack and container loss rather than complex cross border activity. Middle East coverage remains thin and should not be read as absence of activity.
+
+Situation
+
+Set the operating context using the actual records.
+
+What Happened
+
+Summarise the main events in plain terms.
+Mention countries, incident types and severity where useful.
+Do not list every record.
+
+What Matters
+
+Explain why the pattern matters operationally.
+Focus on route risk, repeat geography, cargo type, insider risk, delay, cost, security posture or client exposure.
+
+Implications for Business
+
+Write practical business implications.
+Use language around routing, warehouse controls, escort needs, insurance, supplier assurance, site security, travel, movement planning and reporting gaps.
+
+Watch Next
+
+Write what should be watched next.
+Use concrete indicators, not vague risks.
+
+Polestar View
+
+Give a short judgement.
+Do not overstate.
+Do not pretend certainty where the data is thin.
+
+Data handling
+
+Use only records in the selected report window.
+Weekly reports use a maximum 10 day window.
+Monthly reports use a maximum 35 day window.
+Do not invent facts.
+Do not invent locations.
+Do not invent sources.
+Do not use product names as incident types.
+Do not use Flashpoint, Cargo Watch, Shipping, Fuel, Fertiliser or Energy as incident type labels.
+
+If data is thin, say so plainly.
+
+Example:
+Middle East cargo reporting is thin in this dataset. That should be treated as a coverage gap, not proof that the problem is absent.
+
+Topic specific tone
+
+Cargo Watch
+
+Focus on cargo theft, hijack, pilferage, warehouse theft, depot theft, seal tampering, insider theft and logistics crime.
+
+Shipping
+
+Focus on vessel attacks, port disruption, chokepoints, route diversion, advisories, insurance pressure and shipping delay. Do not pull in cargo theft.
+
+Fuel
+
+Focus on shortages, price pressure, subsidy change, refinery disruption, transport disruption and fuel related unrest.
+
+Fertiliser
+
+Focus on supply, price, export controls, production disruption, farmer pressure and food security implications.
+
+Civil Protests and Civil Unrest
+
+Focus on disruption, location, public order, likely escalation, transport impact and business exposure.
+
+Energy and Grid
+
+Focus on outages, load shedding, grid disruption, generation shortfall and fuel to power issues.
+
+Flashpoint
+
+Flashpoint is a product output from civil protest and unrest data. It should read as a short operational warning or issue brief, not a generic protest list.
+
+Acceptance criteria
+
+Report fields are populated with prose.
+No placeholder writing instructions appear in the editor.
+No AI style language.
+No em dashes.
+No product names used as incident types.
+Every report opens with usable draft text that I can edit.
+The prose is short, direct and operational.
+No database changes.
+No import changes.
+No dashboard redesign.

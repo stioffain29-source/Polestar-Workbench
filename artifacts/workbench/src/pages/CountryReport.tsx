@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
+import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { ArrowLeft, Download, Loader2, Pencil, Save, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { slugifyForFilename } from "@/lib/exportPdf";
@@ -41,14 +42,37 @@ export default function CountryReport() {
 
   useEffect(() => {
     if (!country) return;
+    // Seed empty narrative fields with an operational draft so the editor
+    // opens with usable prose rather than writing prompts. Saved content
+    // always wins.
+    const inputs: DraftableIncident[] = incidents.map((i) => ({
+      topic: i.topic,
+      title: i.title,
+      summary: i.summary,
+      source: i.source,
+      sourceUrl: i.sourceUrl,
+      location: i.location,
+      severity: i.severity,
+      occurredAt: i.occurredAt,
+      country: i.country,
+    }));
+    const drafted = draftCountryReportProse({
+      countryName: country.name ?? "",
+      region: country.region ?? "",
+      incidents: inputs,
+    });
+    const pick = (saved: string | null | undefined, drafted: string) => {
+      const s = (saved ?? "").trim();
+      return s ? (saved as string) : drafted;
+    };
     setDraft({
       name: country.name ?? "",
       region: country.region ?? "",
-      overview: country.overview ?? "",
-      trendSummary: country.trendSummary ?? "",
-      implications: country.implications ?? "",
+      overview: pick(country.overview, drafted.overview),
+      trendSummary: pick(country.trendSummary, drafted.trendSummary),
+      implications: pick(country.implications, drafted.implications),
     });
-  }, [country]);
+  }, [country, incidents]);
 
   const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -270,7 +294,7 @@ function EditableSection({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={Math.max(5, Math.min(20, value.split("\n").length + 2))}
-          placeholder={`Write the ${title.toLowerCase()} narrative...`}
+          placeholder=""
           className="w-full bg-card border border-border rounded-sm p-3 text-sm font-sans text-foreground leading-relaxed focus:outline-none focus:border-accent"
         />
       ) : (

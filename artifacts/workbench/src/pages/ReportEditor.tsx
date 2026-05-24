@@ -15,44 +15,31 @@ import ReportPreview from "@/components/ReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
+import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 
 const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
 
-type TopicGuide = {
-  scope: string;
-  situation: string;
-  whatHappened: string;
-  whatMatters: string;
-  implications: string;
-  polestarView: string;
-  watchNext: string;
+// Short scope reminders shown above the editor. Kept tight on purpose so
+// they read as a topic map, not a writing prompt.
+const TOPIC_SCOPE: Record<string, string> = {
+  shipping:
+    "Shipping covers vessel attack, port and chokepoint disruption, route diversion, naval advisories and freight pressure. Theft and pilferage sit in Cargo Watch.",
+  cargo_watch:
+    "Cargo Watch covers cargo theft, hijack, pilferage, warehouse and depot loss, seal tampering and insider crime. Port and vessel disruption sit in Shipping.",
+  fuel:
+    "Fuel covers shortage, price moves, subsidy change, refinery and transport disruption, and fuel related unrest.",
+  fertiliser:
+    "Fertiliser covers supply, price, export controls, production disruption and farmer pressure.",
+  energy:
+    "Energy covers outages, load shedding, grid disruption, generation shortfall and fuel to power issues.",
+  protests:
+    "Civil protest and unrest covers public order activity, disruption to transport and access, and escalation risk.",
+  flashpoint:
+    "Flashpoint reads as a short operational warning derived from civil unrest data. Keep it tight and actionable.",
 };
 
-const TOPIC_GUIDES: Record<string, TopicGuide> = {
-  shipping: {
-    scope:
-      "Shipping reports cover port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance and freight pressure, naval / maritime advisories, port strikes and cargo movement disruption. Theft and pilferage belong in Cargo Watch.",
-    situation: "Set the maritime backdrop: routes, chokepoints, ports and operators in scope.",
-    whatHappened: "Describe the disruption — vessel, port, route, chokepoint, advisory or labour event. Cite source and date.",
-    whatMatters: "Why this disruption matters for shipping flows, transit times, freight cost or insurance exposure.",
-    implications: "Operational impact on schedules, alternative routes, port calls, premiums and contract terms.",
-    polestarView: "Polestar's read on duration, escalation risk and exposure for clients moving cargo through the area.",
-    watchNext: "Next maritime triggers to watch: further closures, naval movement, advisory updates, rate moves.",
-  },
-  cargo_watch: {
-    scope:
-      "Cargo Watch reports cover cargo theft, pilferage, hijacking, warehouse and depot theft, seal tampering, insider theft and other logistics crime. Port, chokepoint and vessel disruption belong in Shipping.",
-    situation: "Set the cargo-crime backdrop: corridor, depot, warehouse cluster or operator under pressure.",
-    whatHappened: "Describe the theft, hijack, pilferage or insider event. Note value, cargo type and any companies named.",
-    whatMatters: "Why this loss pattern matters — modus operandi, repeat geography, insider involvement, value at risk.",
-    implications: "Operational impact on routing, escort needs, depot security, insurance claims and contract risk.",
-    polestarView: "Polestar's read on whether this is one-off, opportunistic or part of an organised pattern.",
-    watchNext: "Next cargo-crime triggers to watch: copycat incidents, arrests, route shifts, recovery announcements.",
-  },
-};
-
-function guideFor(topic: string): TopicGuide | null {
-  return TOPIC_GUIDES[topic] ?? null;
+function scopeFor(topic: string): string | null {
+  return TOPIC_SCOPE[topic] ?? null;
 }
 
 interface FormState {
@@ -132,21 +119,44 @@ export default function ReportEditor() {
         ? (window.localStorage.getItem(execSummaryStorageKey(report.id)) ?? "")
         : "";
     } catch { exec = ""; }
+
+    // Generate an operational draft for any section that is still empty.
+    // Saved content always wins; the draft only seeds blank fields so a new
+    // report opens with usable prose rather than writing prompts.
+    const topic = report.topic ?? "fuel";
+    const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
+    const inputs: DraftableIncident[] = incidents.map((i) => ({
+      topic: i.topic,
+      title: i.title,
+      summary: i.summary,
+      source: i.source,
+      sourceUrl: i.sourceUrl,
+      location: i.location,
+      severity: i.severity,
+      occurredAt: i.occurredAt,
+      country: i.country,
+    }));
+    const draft = draftTopicReportProse({ topic, issueDate, incidents: inputs });
+    const pick = (saved: string | null | undefined, drafted: string) => {
+      const s = (saved ?? "").trim();
+      return s ? (saved as string) : drafted;
+    };
+
     setForm({
       title: report.title ?? "",
-      topic: report.topic ?? "fuel",
+      topic,
       status: report.status ?? "draft",
-      issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
-      executiveSummary: exec,
-      situation: report.situation ?? "",
-      whatHappened: report.whatHappened ?? "",
-      whatMatters: report.whatMatters ?? "",
-      implications: report.implications ?? "",
-      polestarView: report.polestarView ?? "",
-      watchNext: report.watchNext ?? "",
+      issueDate,
+      executiveSummary: exec.trim() ? exec : draft.executiveSummary,
+      situation: pick(report.situation, draft.situation),
+      whatHappened: pick(report.whatHappened, draft.whatHappened),
+      whatMatters: pick(report.whatMatters, draft.whatMatters),
+      implications: pick(report.implications, draft.implications),
+      polestarView: pick(report.polestarView, draft.polestarView),
+      watchNext: pick(report.watchNext, draft.watchNext),
       author: report.author ?? "",
     });
-  }, [report]);
+  }, [report, incidents]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -169,7 +179,7 @@ export default function ReportEditor() {
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading...</div>;
   if (!report) return <div className="text-sm text-muted-foreground">Report not found.</div>;
 
-  const guide = guideFor(form.topic);
+  const scope = scopeFor(form.topic);
 
   return (
     <div className="max-w-[1900px] mx-auto space-y-4">
@@ -192,15 +202,15 @@ export default function ReportEditor() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-sm p-5 space-y-3 no-print">
-          {guide && (
+          {scope && (
             <div
               className="text-[12px] leading-snug p-3 rounded-sm border"
-              style={{ background: "#F3F4FA", borderColor: "#4655FF", color: "#0B0B3D", fontFamily: "Roboto, sans-serif" }}
+              style={{ background: "#F3F4FA", borderColor: "#465BFF", color: "#0B0A3D", fontFamily: "Roboto, sans-serif" }}
             >
-              <div className="uppercase tracking-widest font-bold text-[10px] mb-1" style={{ color: "#4655FF" }}>
+              <div className="uppercase tracking-widest font-bold text-[10px] mb-1" style={{ color: "#465BFF" }}>
                 {TOPIC_LABELS[form.topic]} scope
               </div>
-              {guide.scope}
+              {scope}
             </div>
           )}
           <Field label="Title"><Input value={form.title} onChange={(e) => set("title", e.target.value)} className="rounded-sm" /></Field>
@@ -220,13 +230,13 @@ export default function ReportEditor() {
             <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => set("issueDate", e.target.value)} className="rounded-sm" /></Field>
           </div>
           <Field label="Author"><Input value={form.author} onChange={(e) => set("author", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Executive Summary"><Textarea rows={4} value={form.executiveSummary} onChange={(e) => set("executiveSummary", e.target.value)} placeholder="One short paragraph at the top of the brief: the dominant structural read for this cycle." className="rounded-sm" /></Field>
-          <Field label="Situation"><Textarea rows={4} value={form.situation} onChange={(e) => set("situation", e.target.value)} placeholder={guide?.situation} className="rounded-sm" /></Field>
-          <Field label="What Happened"><Textarea rows={5} value={form.whatHappened} onChange={(e) => set("whatHappened", e.target.value)} placeholder={guide?.whatHappened} className="rounded-sm" /></Field>
-          <Field label="What Matters"><Textarea rows={4} value={form.whatMatters} onChange={(e) => set("whatMatters", e.target.value)} placeholder={guide?.whatMatters} className="rounded-sm" /></Field>
-          <Field label="Implications for Business"><Textarea rows={4} value={form.implications} onChange={(e) => set("implications", e.target.value)} placeholder={guide?.implications} className="rounded-sm" /></Field>
-          <Field label="Watch Next"><Textarea rows={3} value={form.watchNext} onChange={(e) => set("watchNext", e.target.value)} placeholder={guide?.watchNext} className="rounded-sm" /></Field>
-          <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} placeholder={guide?.polestarView} className="rounded-sm" /></Field>
+          <Field label="Executive Summary"><Textarea rows={4} value={form.executiveSummary} onChange={(e) => set("executiveSummary", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Situation"><Textarea rows={4} value={form.situation} onChange={(e) => set("situation", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="What Happened"><Textarea rows={5} value={form.whatHappened} onChange={(e) => set("whatHappened", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="What Matters"><Textarea rows={4} value={form.whatMatters} onChange={(e) => set("whatMatters", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Implications for Business"><Textarea rows={4} value={form.implications} onChange={(e) => set("implications", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Watch Next"><Textarea rows={3} value={form.watchNext} onChange={(e) => set("watchNext", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} className="rounded-sm" /></Field>
         </div>
 
         <div className="bg-white border border-border rounded-sm overflow-hidden">
