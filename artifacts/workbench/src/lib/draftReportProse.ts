@@ -41,6 +41,15 @@ export interface TopicReportProse {
 }
 
 export interface CountryReportProse {
+  // Auto-derived sections (always populated, never persisted; render-time only).
+  executiveSummary: string;
+  whatMatters: string;
+  watchNext: string;
+  polestarView: string;
+  // Persisted editable sections — mapped to the new section labels:
+  //   overview      -> Situation
+  //   trendSummary  -> What Happened
+  //   implications  -> Implications for Business
   overview: string;
   trendSummary: string;
   implications: string;
@@ -584,7 +593,9 @@ export function draftCountryReportProse(opts: {
   const name = opts.countryName || "this country";
   const region = opts.region || "the region";
   const issueDate = opts.issueDate ?? new Date().toISOString().slice(0, 10);
-  const rawWindow = filterIncidentsToWindow(opts.incidents, "protests", issueDate);
+  // Use the country pseudo-topic window (7-day default, 10-day cap) — the
+  // country builder must never depend on another topic's cadence.
+  const rawWindow = filterIncidentsToWindow(opts.incidents, "country", issueDate);
   const inWindow = rawWindow.filter((i) =>
     isCountryRelevant({
       topic: i.topic,
@@ -597,17 +608,77 @@ export function draftCountryReportProse(opts: {
   const types = topTypesText(inWindow);
   const sev = highestSeverity(inWindow);
 
+  // Pick the leading area for a "geographical signal" sentence (uses the
+  // first location token, properly cased; "Unknown" excluded).
+  const areaCounts = new Map<string, number>();
+  for (const i of inWindow) {
+    const loc = (i.location ?? "").trim();
+    if (!loc || /^unknown$/i.test(loc)) continue;
+    const first = loc.split(/[;,/]/)[0].trim();
+    if (!first) continue;
+    const cased = first
+      .split(/(\s+|-)/)
+      .map((t) => {
+        if (!t || /^\s+$/.test(t) || t === "-") return t;
+        if (t.length >= 2 && t === t.toUpperCase() && /^[A-Z]+$/.test(t)) return t;
+        return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+      })
+      .join("");
+    areaCounts.set(cased, (areaCounts.get(cased) ?? 0) + 1);
+  }
+  const sortedAreas = Array.from(areaCounts.entries()).sort((a, b) => b[1] - a[1]);
+  const leadArea = sortedAreas[0]?.[0] ?? "";
+  const secondArea = sortedAreas[1]?.[0] ?? "";
+  const areaSentence = leadArea
+    ? secondArea
+      ? `${leadArea} and ${secondArea} carry the clearest operational signal this cycle.`
+      : `${leadArea} carries the clearest operational signal this cycle.`
+    : "";
+
+  // Situation — operating environment framing, not a count.
   const overview = total === 0
-    ? `${name} sits in ${region}. Reporting was quiet this cycle; treat that as a coverage gap rather than confirmation that the operating picture is calm.`
-    : `${name} sits in ${region}. The window's read is shaped by ${types || "a mix of public-order and operational disruption events"}, with the operational tempo more relevant than the absolute volume.`;
+    ? `${name} sits in ${region}. Reporting was quiet across the weekly window; treat the silence as a coverage gap rather than a clean operating picture.`
+    : `${name} sits in ${region}. The cycle's reporting is shaped by ${types || "a mix of operational and public-order events"}, and the tempo of activity matters more than the headline volume.${areaSentence ? ` ${areaSentence}` : ""}`;
 
+  // What Happened — pattern read, no "Polestar holds..." opener.
   const trendSummary = total === 0
-    ? "Volume is too thin for a firm trend read. Hold the prior cycle assessment until further records land."
-    : `Activity is ${total < 4 ? "light but useable" : "running at normal cycle tempo"}.${types ? ` Lead patterns are ${types}.` : ""}${sevTail(sev)}`;
+    ? "No fresh records landed in the weekly window. The prior cycle assessment stands until new reporting comes through."
+    : total < 4
+      ? `Reporting is light but workable. ${types ? `The activity that did land points to ${types}` : "The events on file point to a mixed operational picture"}, and a small sample limits how firmly any single pattern can be read.${sevTail(sev)}`
+      : `Activity is running at normal cycle tempo. ${types ? `Lead patterns are ${types}.` : "The mix is broad enough that no single pattern dominates."}${sevTail(sev)}`;
 
+  // What Matters — implications for visibility and source confidence; not
+  // a metric restatement.
+  const whatMatters = total === 0
+    ? "The absence of records does not mean an absence of activity. Source coverage in this window was thin, so any forward read should treat the operating picture as unconfirmed rather than calm."
+    : total < 4
+      ? `Even a small record set sharpens the operating picture for ${name}. Treat the named locations as where to focus access, movement and security-coordination checks, while accepting that the broader pattern needs more reporting to firm up.`
+      : `The pattern is broad enough to act on. ${areaSentence ? `${areaSentence} ` : ""}Use it to prioritise journey management, site-access checks and pre-movement coordination in the affected sub-regions before broader posture changes.`;
+
+  // Implications for Business
   const implications = total === 0
-    ? "Maintain standing controls on staff movement, site access and journey management; revisit once fresh records land."
-    : "Hold journey management discipline on affected routes, keep site access controls under review and refresh staff briefings on the active incident types. Confirm escalation routes with the country lead.";
+    ? "Hold standing controls on staff movement, site access and journey management. Revisit posture as soon as fresh records land."
+    : `Keep journey management discipline on routes touching the affected areas, hold site-access controls under active review and refresh staff briefings on the live incident types. Confirm escalation routes with the in-country lead before any movement plan is locked in.`;
 
-  return { overview, trendSummary, implications };
+  // Watch Next — concrete, no "Watch for..." opener.
+  const watchNext = total === 0
+    ? "Track whether reporting volume recovers next cycle. A second quiet window would shift this from coverage gap to a substantive read."
+    : `Track whether the activity in ${leadArea || name} firms into a sustained pattern or fades back to baseline. The next cycle's reporting will decide whether posture needs to tighten or hold.`;
+
+  // Polestar View — short analyst judgement, not a count.
+  const polestarView = total === 0
+    ? `${name} reads as quiet for now, but the absence of records is the read worth challenging. Keep posture conservative until reporting returns.`
+    : `${name} warrants steady-state monitoring with a tighter brief for staff and contractors moving through the affected areas. Adjust posture if the next cycle escalates rather than easing.`;
+
+  return {
+    executiveSummary: total === 0
+      ? `${name} reporting is light across the weekly window. The page captures what is on file, but the gap itself is the most important read — coverage rather than calm.`
+      : `${name} reporting for the weekly window is shaped by ${types || "a mix of operational events"}.${areaSentence ? ` ${areaSentence}` : ""} The brief below covers the operating picture, what changed, why it matters and what to watch next.`,
+    whatMatters,
+    watchNext,
+    polestarView,
+    overview,
+    trendSummary,
+    implications,
+  };
 }

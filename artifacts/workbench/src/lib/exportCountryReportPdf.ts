@@ -5,21 +5,18 @@ import {
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, todayLabel, setRoboto, ensureRobotoLoaded,
-  NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
+  NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
-// Per-country cover photography is registered in coverImages.ts so the
-// on-screen preview and this exporter share one source of truth.
 import { COUNTRY_COVER_URLS } from "./coverImages";
-import {
-  resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
-} from "./reportWindow";
+import { relatedIncidentsLimit, resolveReportWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
-import { isCountryRelevant, sanitizeFactValue } from "./topicRelevance";
-
-// Country reports are weekly products. The "country" pseudo-topic resolves
-// to the weekly defaults (7-day default, 10-day cap) via reportWindow.ts.
-const COUNTRY_WINDOW_TOPIC = "country";
+import {
+  computeCountryFastFacts,
+  COUNTRY_WINDOW_TOPIC,
+  type CountryFastFactsIncident,
+  type CountryFactsBreakdown,
+} from "./countryFastFacts";
 
 export interface PdfIncident {
   id: number | string;
@@ -29,7 +26,8 @@ export interface PdfIncident {
   occurredAt: string;
   country?: string | null;
   location?: string | null;
-  // Used by the shared incident-type classifier — never displayed as a topic.
+  latitude?: number | null;
+  longitude?: number | null;
   summary?: string | null;
   source?: string | null;
   sourceUrl?: string | null;
@@ -44,174 +42,40 @@ export interface PdfCountry {
   keyNumbers?: { label: string; value: string; context?: string | null }[] | null;
 }
 
-const NOT_IDENTIFIED = "Not identified";
-
-interface DerivedFacts {
-  validDates: Date[];
-  earliest: Date | null;
-  latest: Date | null;
-  highestKey: string;
-  highestLabel: string;
-  topTypeLabel: string;
-  topTypeCount: number;
-  topAreaLabel: string;
-  topAreaCount: number;
-  severityCounts: Record<string, number>;
-  // Counts keyed by *derived* operational incident type, never by topic.
-  typeCounts: Map<string, number>;
+export interface CountryPdfExtras {
+  /** Auto-derived executive summary prose (natural, no banned openers). */
+  executiveSummary?: string;
+  /** Auto-derived "What Matters" prose. */
+  whatMatters?: string;
+  /** Optional "Watch Next" prose; rendered only if provided and non-empty. */
+  watchNext?: string;
+  /** Optional "Polestar View" prose; rendered only if provided and non-empty. */
+  polestarView?: string;
+  /** PNG data-URL of the rendered preview map. Optional. */
+  mapImage?: string;
 }
 
-function deriveFacts(
-  incidents: PdfIncident[],
-  _topicLabels: Record<string, string>,
-): DerivedFacts {
-  const validDates: Date[] = [];
-  for (const i of incidents) {
-    try {
-      const d = parseISO(i.occurredAt);
-      if (!isNaN(d.getTime())) validDates.push(d);
-    } catch { /* skip */ }
-  }
-  validDates.sort((a, b) => a.getTime() - b.getTime());
-  const earliest = validDates[0] ?? null;
-  const latest = validDates[validDates.length - 1] ?? null;
+const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
 
-  let highestKey = "";
-  let highestRank = 0;
-  const severityCounts: Record<string, number> = {
-    extreme: 0, high: 0, moderate: 0, low: 0, insignificant: 0,
-  };
-  for (const i of incidents) {
-    const k = sevKey(i.severity);
-    if (k in severityCounts) severityCounts[k] += 1;
-    const r = SEV_RANK[k] ?? 0;
-    if (r > highestRank) { highestRank = r; highestKey = k; }
-  }
-  const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : NOT_IDENTIFIED;
-
-  // Derive real operational incident types — never use topic/product names.
-  const typeCounts = new Map<string, number>();
-  for (const i of incidents) {
-    const type = classifyIncidentType(i);
-    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
-  }
-  let topTypeLabel = NOT_IDENTIFIED;
-  let topTypeCount = 0;
-  for (const [t, n] of typeCounts) {
-    if (n > topTypeCount) { topTypeCount = n; topTypeLabel = t; }
-  }
-
-  const areaCounts = new Map<string, number>();
-  for (const i of incidents) {
-    const loc = (i.location ?? "").trim();
-    if (!loc) continue;
-    if (/^unknown$/i.test(loc)) continue;
-    const first = loc.split(/[;,/]/)[0].trim();
-    if (!first) continue;
-    areaCounts.set(first, (areaCounts.get(first) ?? 0) + 1);
-  }
-  let topAreaLabel = NOT_IDENTIFIED;
-  let topAreaCount = 0;
-  for (const [a, n] of areaCounts) {
-    if (n > topAreaCount) { topAreaCount = n; topAreaLabel = a; }
-  }
-
-  return {
-    validDates, earliest, latest, highestKey, highestLabel,
-    topTypeLabel, topTypeCount, topAreaLabel, topAreaCount,
-    severityCounts, typeCounts,
-  };
-}
-
-function periodString(facts: DerivedFacts): string {
-  if (!facts.earliest || !facts.latest) return "No incidents on file";
-  if (facts.earliest.getTime() === facts.latest.getTime()) {
-    return format(facts.earliest, "dd MMM yyyy");
-  }
-  return `${format(facts.earliest, "dd MMM yyyy")} - ${format(facts.latest, "dd MMM yyyy")}`;
-}
-
-function buildKpiCards(
-  facts: DerivedFacts,
-  incidents: PdfIncident[],
-): KpiCardData[] {
-  const safeArea = sanitizeFactValue("country", facts.topAreaLabel === NOT_IDENTIFIED ? "" : facts.topAreaLabel);
-  const safeType = sanitizeFactValue("country", facts.topTypeLabel === NOT_IDENTIFIED ? "" : facts.topTypeLabel);
-  return [
-    { label: "Reporting Period", value: periodString(facts) },
-    { label: "Total Records", value: String(incidents.length), note: "Incidents on file for this country" },
-    {
-      label: "Highest Severity",
-      value: facts.highestLabel,
-      severity: facts.highestKey || undefined,
-      note: facts.highestKey ? "Worst rating in window" : undefined,
-    },
-    {
-      label: "Most Affected Area",
-      value: safeArea,
-      note: facts.topAreaCount > 0 && safeArea === facts.topAreaLabel
-        ? `${facts.topAreaCount} record${facts.topAreaCount === 1 ? "" : "s"}`
-        : "Coverage gap",
-    },
-    {
-      label: "Latest Incident",
-      value: facts.latest ? format(facts.latest, "dd MMM yyyy") : "Coverage gap",
-    },
-    {
-      label: "Main Issue Type",
-      value: safeType,
-      note: facts.topTypeCount > 0 && safeType === facts.topTypeLabel
-        ? `${facts.topTypeCount} record${facts.topTypeCount === 1 ? "" : "s"}`
-        : "Data quality issue",
-    },
-  ];
-}
-
-function buildExecutiveSummary(
-  country: PdfCountry,
-  facts: DerivedFacts,
-  incidents: PdfIncident[],
-): string {
-  if (incidents.length === 0) {
-    return `No incidents are currently on file for ${country.name}. This report will populate as records are added to the Polestar Workbench.`;
-  }
-  const parts: string[] = [];
-  parts.push(
-    `Polestar holds ${incidents.length} record${incidents.length === 1 ? "" : "s"} for ${country.name} (${country.region}) covering ${periodString(facts)}.`,
-  );
-  if (facts.topTypeCount > 0) {
-    parts.push(
-      `The main issue type is ${facts.topTypeLabel} with ${facts.topTypeCount} record${facts.topTypeCount === 1 ? "" : "s"}.`,
-    );
-  }
-  if (facts.highestKey) {
-    parts.push(`The highest severity recorded is ${facts.highestLabel}.`);
-  }
-  if (facts.topAreaCount > 0) {
-    parts.push(`The most affected area on file is ${facts.topAreaLabel}.`);
-  }
-  return parts.join(" ");
-}
-
-
-function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
-  const order = ["extreme", "high", "moderate", "low", "insignificant"] as const;
-  const total = order.reduce((s, k) => s + facts.severityCounts[k], 0);
-  if (total === 0) return;
-
+function drawSeverityChart(ctx: Ctx, facts: CountryFactsBreakdown) {
+  const total = SEV_ORDER.reduce((s, k) => s + facts.severityCounts[k], 0);
   drawSectionHeading(ctx, "Severity Distribution");
+  if (total === 0) {
+    renderProse(ctx, "No incidents in the weekly window to chart.");
+    return;
+  }
   const { pdf, MX, CW } = ctx;
   const rowH = 18;
   const labelW = 110;
   const countW = 36;
   const barAreaX = MX + labelW;
   const barAreaW = CW - labelW - countW - 8;
-  const chartH = order.length * rowH + 10;
+  const chartH = SEV_ORDER.length * rowH + 10;
   ensureSpace(ctx, chartH);
 
   setRoboto(pdf, "regular");
   pdf.setFontSize(9);
-  order.forEach((k, idx) => {
+  SEV_ORDER.forEach((k, idx) => {
     const ry = ctx.y + idx * rowH;
     setText(pdf, DUSK);
     pdf.text(sanitize(SEV_LABEL[k] ?? k), MX, ry + 12);
@@ -227,18 +91,20 @@ function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
   ctx.y += chartH + 18;
 }
 
-function drawTypeChart(ctx: Ctx, facts: DerivedFacts) {
+function drawTypeChart(ctx: Ctx, facts: CountryFactsBreakdown) {
   const data = Array.from(facts.typeCounts.entries())
     .map(([type, n]) => ({ label: type, n }))
     .sort((a, b) => b.n - a.n)
     .slice(0, 8);
-  if (data.length === 0) return;
-  const max = Math.max(...data.map((d) => d.n));
-
   drawSectionHeading(ctx, "Incident Breakdown by Type");
+  if (data.length === 0) {
+    renderProse(ctx, "No classifiable incident types in the weekly window.");
+    return;
+  }
+  const max = Math.max(...data.map((d) => d.n));
   const { pdf, MX, CW } = ctx;
   const rowH = 18;
-  const labelW = 150;
+  const labelW = 160;
   const countW = 36;
   const barAreaX = MX + labelW;
   const barAreaW = CW - labelW - countW - 8;
@@ -262,11 +128,44 @@ function drawTypeChart(ctx: Ctx, facts: DerivedFacts) {
   ctx.y += chartH + 18;
 }
 
-function drawIncidentTable(
-  ctx: Ctx,
-  incidents: PdfIncident[],
-  _topicLabels: Record<string, string>,
-) {
+function drawMapSection(ctx: Ctx, opts: { mapImage?: string; plottedCount: number; totalInWindow: number }) {
+  drawSectionHeading(ctx, "Map");
+  const { pdf, MX, CW } = ctx;
+  if (opts.mapImage) {
+    try {
+      const targetW = CW;
+      // Estimate the image's aspect ratio from the dataURL by drawing into
+      // a probe image element is not available in jsPDF here, so we fall
+      // back to the on-screen ratio used in the preview (1400×360 area).
+      const aspect = 360 / 1400;
+      const imgH = Math.min(targetW * aspect, 280);
+      ensureSpace(ctx, imgH + 12);
+      pdf.addImage(opts.mapImage, "PNG", MX, ctx.y, targetW, imgH, undefined, "FAST");
+      ctx.y += imgH + 6;
+    } catch (err) {
+      console.warn("[exportCountryReportPdf] embedding map image failed", err);
+    }
+  } else {
+    renderProse(
+      ctx,
+      "The interactive incident map is available in the Workbench preview. Records without coordinates are included in totals and tables but cannot be plotted.",
+    );
+  }
+  ensureSpace(ctx, 16);
+  setRoboto(pdf, "italic");
+  pdf.setFontSize(8);
+  setText(pdf, DUSK);
+  const note = opts.totalInWindow === 0
+    ? "No records in the weekly window to plot."
+    : opts.plottedCount === opts.totalInWindow
+      ? `All ${opts.plottedCount} record${opts.plottedCount === 1 ? "" : "s"} in the weekly window are plotted.`
+      : `${opts.plottedCount} of ${opts.totalInWindow} record${opts.totalInWindow === 1 ? "" : "s"} plotted; records without coordinates are excluded from the map.`;
+  pdf.text(sanitize(note), MX, ctx.y + 10);
+  setRoboto(pdf, "regular");
+  ctx.y += 18;
+}
+
+function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
   if (incidents.length === 0) return;
   drawSectionHeading(ctx, "Related Incidents");
   const { pdf, MX, CW } = ctx;
@@ -291,7 +190,6 @@ function drawIncidentTable(
     pdf.setFontSize(8);
   };
 
-  // Sort newest first, then limit to the weekly cap (10-15 rows).
   const sorted = [...incidents].sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
@@ -317,7 +215,6 @@ function drawIncidentTable(
     let dateStr = "";
     try { dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy"); } catch { dateStr = i.occurredAt; }
     pdf.text(dateStr, MX + 6, ctx.y + 12);
-    // Use the derived operational incident-type label, never the topic name.
     const incidentType = classifyIncidentType(i);
     const typeLines: string[] = pdf.splitTextToSize(sanitize(incidentType), colTypeW - 8);
     pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
@@ -348,61 +245,62 @@ function drawIncidentTable(
     pdf.setFontSize(8);
     pdf.text(
       sanitize(`Showing ${rows.length} latest of ${sorted.length} records in window. Older records remain available in the Workbench.`),
-      ctx.MX,
-      ctx.y + 10,
+      ctx.MX, ctx.y + 10,
     );
     setRoboto(pdf, "regular");
     ctx.y += 16;
   }
 }
 
-// Render a narrative section only when the source field is populated.
-// Empty sections are skipped entirely — no placeholder text per brand spec.
-function drawNarrativeIfPresent(ctx: Ctx, heading: string, body: string | null | undefined) {
+function drawNarrative(ctx: Ctx, heading: string, body: string | null | undefined, fallback?: string) {
   const trimmed = (body ?? "").trim();
-  if (!trimmed) return;
+  const text = trimmed || (fallback ?? "");
   drawSectionHeading(ctx, heading);
-  renderProse(ctx, trimmed);
+  // Country reports keep the full section spine even when a field is empty
+  // — a loud "Not populated" beats a silently missing section.
+  if (text) {
+    renderProse(ctx, text);
+  } else {
+    renderProse(ctx, "Not populated for this cycle.");
+  }
+}
+
+function buildKpiCards(facts: CountryFactsBreakdown): KpiCardData[] {
+  return facts.cards.map((c) => ({
+    label: c.label,
+    value: c.value,
+    note: c.note,
+    severity: c.severity,
+  }));
 }
 
 export async function exportCountryReportPdf(
   country: PdfCountry,
   incidents: PdfIncident[],
-  topicLabels: Record<string, string>,
+  _topicLabels: Record<string, string>,
   filename: string,
+  extras: CountryPdfExtras = {},
 ): Promise<void> {
   const issueDate = todayLabel();
   const ctx = createCtx({
     kind: `${country.name} Country Report`,
     issueDate,
   });
-  // Embed Roboto on this pdf instance before drawing any text. Without this,
-  // jsPDF silently falls back to Helvetica, which the brand spec forbids.
   await ensureRobotoLoaded(ctx.pdf);
 
-  // Enforce the weekly reporting window: records older than 10 days are
-  // excluded from every section of the country report.
   const todayIso = new Date().toISOString().slice(0, 10);
   const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, todayIso);
-  const rawWindowed = filterIncidentsToWindow(incidents, COUNTRY_WINDOW_TOPIC, todayIso);
-  // Strip live news blogs and other off-topic noise so Fast Facts, charts
-  // and the related incidents table only include operational records.
-  const windowedIncidents = rawWindowed.filter((i) =>
-    isCountryRelevant({
-      topic: i.topic,
-      title: i.title,
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-      sourceUrl: i.sourceUrl ?? null,
-      location: i.location ?? null,
-    }),
-  );
+  const facts = computeCountryFastFacts({
+    issueDate: todayIso,
+    incidents: incidents as CountryFastFactsIncident[],
+  });
+  const windowIncidents = facts.windowIncidents as PdfIncident[];
+  const plottedCount = windowIncidents.filter(
+    (i) => typeof i.latitude === "number" && typeof i.longitude === "number"
+      && !Number.isNaN(i.latitude) && !Number.isNaN(i.longitude),
+  ).length;
 
-  // Full-bleed Polestar cover (page 1) — title, subtitle, reporting period.
-  // Countries with a registered cover photo (see COUNTRY_COVER_URLS) get the
-  // same hero treatment as the shipping report; everything else falls back
-  // to the gradient hero. Image load is wrapped in try/catch so a missing
-  // asset never blocks PDF export.
+  // Polestar cover (page 1)
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   const countryCoverUrl = COUNTRY_COVER_URLS[country.name.trim().toLowerCase()];
   if (countryCoverUrl) {
@@ -410,7 +308,7 @@ export async function exportCountryReportPdf(
       const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
       coverImage = await prepareCoverImage(countryCoverUrl, ctx.W, heroH);
     } catch (err) {
-      console.warn(`[exportCountryReportPdf] cover image load failed for country ${country.name}, falling back to gradient hero`, err);
+      console.warn(`[exportCountryReportPdf] cover image load failed for country ${country.name}`, err);
     }
   }
   drawPolestarCover(ctx, {
@@ -421,33 +319,55 @@ export async function exportCountryReportPdf(
   });
   beginBodyPages(ctx);
 
-  const facts = deriveFacts(windowedIncidents, topicLabels);
-
-  // 1. Executive Summary (auto-derived from data — always populated honestly)
-  drawSectionHeading(ctx, "Executive Summary");
-  renderProse(ctx, buildExecutiveSummary(country, facts, windowedIncidents));
+  // 1. Executive Summary
+  drawNarrative(
+    ctx,
+    "Executive Summary",
+    extras.executiveSummary,
+    `Brief for ${country.name} covering the weekly reporting window. See the sections below for the operating picture, what changed, why it matters, implications and what to watch next.`,
+  );
 
   // 2. Fast Facts
   drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, buildKpiCards(facts, windowedIncidents));
+  drawFastFactsKpiCards(ctx, buildKpiCards(facts));
 
-  // 3. Narrative sections — empty sections are skipped (no placeholder text).
-  drawNarrativeIfPresent(ctx, "Situation", country.overview);
-  drawNarrativeIfPresent(ctx, "What Happened", country.trendSummary);
-  drawNarrativeIfPresent(ctx, "What Matters", null);
-  drawNarrativeIfPresent(ctx, "Implications for Business", country.implications);
-  drawNarrativeIfPresent(ctx, "Watch Next", null);
-  drawNarrativeIfPresent(ctx, "Polestar View", null);
+  // 3. Situation (overview)
+  drawNarrative(ctx, "Situation", country.overview);
 
-  // 4. Visuals — Incident Breakdown by Type uses derived operational labels.
+  // 4. What Happened (trendSummary)
+  drawNarrative(ctx, "What Happened", country.trendSummary);
+
+  // 5. What Matters (auto)
+  drawNarrative(ctx, "What Matters", extras.whatMatters);
+
+  // 6. Implications for Business (implications)
+  drawNarrative(ctx, "Implications for Business", country.implications);
+
+  // 7. Map
+  drawMapSection(ctx, {
+    mapImage: extras.mapImage,
+    plottedCount,
+    totalInWindow: windowIncidents.length,
+  });
+
+  // 8. Severity Distribution
   drawSeverityChart(ctx, facts);
+
+  // 9. Incident Breakdown by Type
   drawTypeChart(ctx, facts);
 
-  // 5. Related incidents — limited to the weekly window, newest first.
-  drawIncidentTable(ctx, windowedIncidents, topicLabels);
+  // 10. Related Incidents
+  drawIncidentTable(ctx, windowIncidents);
 
-  // 6. Source Notes / Disclaimer
+  // Watch Next + Polestar View — always rendered to match the preview.
+  // drawNarrative falls back to a loud "Not populated" note if absent.
+  drawNarrative(ctx, "Watch Next", extras.watchNext);
+  drawNarrative(ctx, "Polestar View", extras.polestarView);
+
+  // 11. Source Notes
   drawSourceNotes(ctx);
+
+  // 12. Disclaimer
   drawDisclaimer(ctx);
 
   drawFooters(ctx.pdf);
