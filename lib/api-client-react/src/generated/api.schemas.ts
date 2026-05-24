@@ -352,6 +352,20 @@ export interface KpiCard {
   context?: string;
 }
 
+export interface JetFuelPricePoint {
+  date: string;
+  value: number;
+  unit?: string;
+  label?: string;
+  annotation?: string;
+}
+
+export interface FuelHardNumbers {
+  cards?: KpiCard[];
+  jetFuelTrajectory?: JetFuelPricePoint[];
+  jetFuelBenchmarkLabel?: string;
+}
+
 export interface Report {
   id: number;
   title: string;
@@ -364,8 +378,7 @@ export interface Report {
   situation?: string | null;
   /** @nullable */
   whatHappened?: string | null;
-  /** @nullable */
-  hardNumbers?: KpiCard[] | null;
+  hardNumbers?: FuelHardNumbers | null;
   /** @nullable */
   whatMatters?: string | null;
   /** @nullable */
@@ -387,7 +400,7 @@ export interface ReportInput {
   issueDate: string;
   situation?: string;
   whatHappened?: string;
-  hardNumbers?: KpiCard[];
+  hardNumbers?: FuelHardNumbers;
   whatMatters?: string;
   implications?: string;
   polestarView?: string;
@@ -403,7 +416,7 @@ export interface ReportUpdate {
   issueDate?: string;
   situation?: string;
   whatHappened?: string;
-  hardNumbers?: KpiCard[];
+  hardNumbers?: FuelHardNumbers;
   whatMatters?: string;
   implications?: string;
   polestarView?: string;

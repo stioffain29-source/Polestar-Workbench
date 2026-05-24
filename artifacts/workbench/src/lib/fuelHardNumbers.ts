@@ -8,6 +8,11 @@
 import { format, parseISO, max as dateMax } from "date-fns";
 import { resolveReportWindow } from "./reportWindow";
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
+import {
+  latestJetFuelPoint,
+  jetFuelMovement,
+  jetFuelBenchmarkLabel,
+} from "./jetFuelTrajectory";
 
 export interface FuelHardNumberCard {
   label: string;
@@ -56,6 +61,8 @@ const CHOKEPOINT_RE = [
 export interface ComputeFuelHardNumbersOpts {
   issueDate: string;
   incidents: TopicFastFactsIncident[];
+  /** Raw report.hardNumbers payload. Used to surface jet fuel prices. */
+  hardNumbersRaw?: unknown;
 }
 
 /**
@@ -72,6 +79,24 @@ export function computeFuelHardNumbers(opts: ComputeFuelHardNumbersOpts): FuelHa
     { label: "Reporting Period", value: period },
     { label: "Fuel Incidents", value: String(window.length), note: window.length === 1 ? "record in window" : "records in window" },
   ];
+
+  // Singapore Jet Fuel — surfaced only when the report carries a real
+  // trajectory series. We never invent a price; if the series is absent
+  // or too short the card is simply omitted.
+  const latest = latestJetFuelPoint(opts.hardNumbersRaw);
+  if (latest) {
+    const unit = latest.unit ?? "";
+    const valueStr = `${latest.value.toFixed(latest.value >= 10 ? 1 : 2)}${unit ? ` ${unit}` : ""}`;
+    const move = jetFuelMovement(opts.hardNumbersRaw);
+    let note: string;
+    if (move) {
+      const arrow = move.direction === "up" ? "↑" : "↓";
+      note = `${arrow} ${Math.abs(move.delta).toFixed(2)}${unit ? ` ${unit}` : ""} (${move.pct >= 0 ? "+" : ""}${move.pct.toFixed(1)}%) vs start`;
+    } else {
+      note = jetFuelBenchmarkLabel(opts.hardNumbersRaw);
+    }
+    cards.push({ label: "Singapore Jet Fuel", value: valueStr, note });
+  }
 
   // Highest severity
   let highestKey = "";

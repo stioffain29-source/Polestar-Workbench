@@ -1,0 +1,137 @@
+Wire real Jet Fuel Price Trajectory data into Fuel Watch.
+
+Scope:
+Fuel Watch only.
+
+Current state:
+- JetFuelTrajectoryChart component exists.
+- Fuel Watch report section exists.
+- Empty-state card appears when no data is supplied.
+- There is no live jet fuel price series wired in yet.
+
+Task:
+Connect a real jet fuel price series into the Fuel Watch Jet Fuel Price Trajectory section.
+
+1. Find the data source options
+
+First check whether the Workbench already has any usable jet fuel / aviation fuel / Singapore benchmark data in:
+- database schema
+- seed data
+- incidents
+- hardNumbers jsonb
+- existing API routes
+- existing market indicator files
+- any fuel-related data helpers
+
+Search for:
+- jet fuel
+- aviation fuel
+- Singapore benchmark
+- Singapore jet
+- Platts
+- IATA
+- kerosene
+- fuel trajectory
+- price series
+- hardNumbers
+
+2. Preferred data path
+
+Preferred approach:
+Use the existing `hardNumbers` jsonb column if it is suitable.
+
+For Fuel Watch, allow `hardNumbers` to carry an optional jet fuel series such as:
+
+{
+  "jetFuelTrajectory": [
+    {
+      "date": "2026-04-25",
+      "value": 4.70,
+      "unit": "USD/gal",
+      "label": "Singapore jet fuel benchmark"
+    }
+  ]
+}
+
+Do not invent prices.
+Do not hardcode fake sample data.
+Do not reuse old report values unless they are already stored as real data for the report cycle.
+
+3. Data handling
+
+The Jet Fuel Price Trajectory chart should render only when a usable time series exists.
+
+Minimum requirements:
+- at least 2 dated points
+- numeric values
+- date field
+- unit label, preferably USD/gal or USD/bbl depending on source
+- clear benchmark label
+
+If fewer than 2 valid points exist, keep the current empty-state card:
+“Jet fuel trajectory data is not available for this reporting cycle.”
+
+4. Preview and PDF parity
+
+The same data must feed:
+- Fuel Watch preview
+- Fuel Watch PDF export
+
+Do not calculate or load one series for preview and a different one for PDF.
+
+Use a shared helper if needed, for example:
+- getFuelJetFuelTrajectory(report)
+- parseFuelHardNumbers(report.hardNumbers)
+- normaliseJetFuelSeries(...)
+
+5. Chart requirements
+
+When data exists, render:
+- title: Jet Fuel Price Trajectory
+- subtitle: Singapore jet fuel benchmark, last 30 days, if that is the benchmark
+- clean line chart
+- date axis
+- value axis
+- unit label
+- latest value marker if useful
+- optional annotations only if supplied by data
+
+Do not add fake annotations.
+Do not fabricate “blockade begins”, “Hormuz ultimatum”, or similar labels unless those annotations are supplied in the data.
+
+6. Hard Numbers link
+
+If the latest jet fuel value exists, surface it in Hard Numbers as a useful metric, for example:
+- Singapore Jet Fuel
+- latest value
+- unit
+- movement if available
+
+If movement is not available, show latest value only.
+Do not show a dash.
+
+7. No external live feed unless already available
+
+Do not add a new paid or fragile external dependency unless one already exists in the project.
+
+For now, acceptable sources are:
+- existing database records
+- report hardNumbers jsonb
+- existing internal API route
+- manually stored price series in the report record
+
+If no source exists, create the internal data structure and parser now, but keep the chart on the honest empty state until real data is added.
+
+8. Acceptance check
+
+Create or use a Fuel Watch draft with a valid jetFuelTrajectory array in hardNumbers.
+
+Confirm:
+- preview renders the Jet Fuel Price Trajectory chart
+- PDF renders the same chart
+- empty-state disappears when valid data exists
+- empty-state remains when data is missing
+- no fake data is generated
+- latest jet fuel value appears in Hard Numbers if available
+- typecheck passes
+- no changes to non-Fuel reports

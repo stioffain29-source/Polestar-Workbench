@@ -22,6 +22,12 @@ import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { computeTopicFastFacts } from "./topicFastFacts";
 import { computeFuelHardNumbers } from "./fuelHardNumbers";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "./fuelNarratives";
+import {
+  getFuelJetFuelTrajectory,
+  jetFuelBenchmarkLabel,
+  type JetFuelPricePoint,
+} from "./jetFuelTrajectory";
+import { ELECTRIC } from "./pdfChrome";
 
 export interface TopicReportData {
   title: string;

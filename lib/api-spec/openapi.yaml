@@ -834,8 +834,9 @@ components:
         situation: { type: ["string", "null"] }
         whatHappened: { type: ["string", "null"] }
         hardNumbers:
-          type: ["array", "null"]
-          items: { $ref: "#/components/schemas/KpiCard" }
+          oneOf:
+            - { $ref: "#/components/schemas/FuelHardNumbers" }
+            - type: "null"
         whatMatters: { type: ["string", "null"] }
         implications: { type: ["string", "null"] }
         polestarView: { type: ["string", "null"] }
@@ -852,6 +853,37 @@ components:
         accent: { type: string }
         context: { type: string }
 
+    # Jet fuel benchmark price point. Used by Fuel Watch's Jet Fuel Price
+    # Trajectory section. Value is the raw benchmark number, unit is the
+    # display unit (e.g. "USD/gal" or "USD/bbl"), label is the human
+    # benchmark name (e.g. "Singapore jet fuel benchmark"). Annotation
+    # is an optional short label rendered against the point when present.
+    JetFuelPricePoint:
+      type: object
+      required: [date, value]
+      properties:
+        date: { type: string, format: date }
+        value: { type: number }
+        unit: { type: string }
+        label: { type: string }
+        annotation: { type: string }
+
+    # Container shape for the report.hardNumbers jsonb column.
+    # `cards` (optional) carries the existing per-report KPI cards.
+    # `jetFuelTrajectory` (optional) carries a Fuel Watch jet fuel
+    # benchmark price series. Both are optional so legacy reports
+    # remain valid.
+    FuelHardNumbers:
+      type: object
+      properties:
+        cards:
+          type: array
+          items: { $ref: "#/components/schemas/KpiCard" }
+        jetFuelTrajectory:
+          type: array
+          items: { $ref: "#/components/schemas/JetFuelPricePoint" }
+        jetFuelBenchmarkLabel: { type: string }
+
     ReportInput:
       type: object
       required: [title, topic, status, issueDate]
@@ -864,8 +896,7 @@ components:
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:
-          type: array
-          items: { $ref: "#/components/schemas/KpiCard" }
+          $ref: "#/components/schemas/FuelHardNumbers"
         whatMatters: { type: string }
         implications: { type: string }
         polestarView: { type: string }
@@ -883,8 +914,7 @@ components:
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:
-          type: array
-          items: { $ref: "#/components/schemas/KpiCard" }
+          $ref: "#/components/schemas/FuelHardNumbers"
         whatMatters: { type: string }
         implications: { type: string }
         polestarView: { type: string }

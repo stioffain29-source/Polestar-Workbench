@@ -7,6 +7,27 @@ export type KpiCard = {
   context?: string;
 };
 
+/** Jet fuel benchmark price point. See openapi.yaml JetFuelPricePoint. */
+export type JetFuelPricePoint = {
+  date: string;
+  value: number;
+  unit?: string;
+  label?: string;
+  annotation?: string;
+};
+
+/**
+ * Container for the report.hardNumbers jsonb column. Fuel Watch uses
+ * `jetFuelTrajectory` to drive the Jet Fuel Price Trajectory chart.
+ * Both fields are optional so legacy reports with null hardNumbers
+ * stay valid, and reports that only carry cards stay valid too.
+ */
+export type FuelHardNumbers = {
+  cards?: KpiCard[];
+  jetFuelTrajectory?: JetFuelPricePoint[];
+  jetFuelBenchmarkLabel?: string;
+};
+
 export const reportsTable = pgTable("reports", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -16,7 +37,7 @@ export const reportsTable = pgTable("reports", {
   issueDate: date("issue_date").notNull(),
   situation: text("situation"),
   whatHappened: text("what_happened"),
-  hardNumbers: jsonb("hard_numbers").$type<KpiCard[]>(),
+  hardNumbers: jsonb("hard_numbers").$type<FuelHardNumbers>(),
   whatMatters: text("what_matters"),
   implications: text("implications"),
   polestarView: text("polestar_view"),

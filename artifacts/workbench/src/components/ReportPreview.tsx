@@ -7,6 +7,7 @@ import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicF
 import { computeFuelHardNumbers } from "@/lib/fuelHardNumbers";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "@/lib/fuelNarratives";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import { getFuelJetFuelTrajectory, jetFuelBenchmarkLabel } from "@/lib/jetFuelTrajectory";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0b0a3d";
@@ -35,6 +36,12 @@ export interface ReportPreviewData {
   implications?: string | null;
   polestarView?: string | null;
   watchNext?: string | null;
+  /**
+   * Raw jsonb from report.hardNumbers. Parsed by jetFuelTrajectory.ts.
+   * Typed as unknown because the column can legitimately carry several
+   * shapes (legacy KpiCard[] or the new FuelHardNumbers object).
+   */
+  hardNumbers?: unknown;
 }
 
 function Paragraphs({ text }: { text?: string | null }) {
@@ -161,8 +168,10 @@ export default function ReportPreview({
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
   const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
+  const jetFuelSeries = isFuel ? getFuelJetFuelTrajectory(report.hardNumbers) : null;
+  const jetFuelLabel = isFuel ? jetFuelBenchmarkLabel(report.hardNumbers) : undefined;
   const fuelHardNumbers = isFuel && report.issueDate
-    ? computeFuelHardNumbers({ issueDate: report.issueDate, incidents })
+    ? computeFuelHardNumbers({ issueDate: report.issueDate, incidents, hardNumbersRaw: report.hardNumbers })
     : [];
   const fuelRegionalHighlights = isFuel && report.issueDate
     ? buildFuelRegionalHighlights({ issueDate: report.issueDate, incidents })
@@ -304,7 +313,7 @@ export default function ReportPreview({
             </Section>
 
             <Section title="Jet Fuel Price Trajectory">
-              <JetFuelTrajectoryChart />
+              <JetFuelTrajectoryChart data={jetFuelSeries} benchmarkLabel={jetFuelLabel} />
             </Section>
 
             <NarrativeSection title="Situation" text={report.situation} />

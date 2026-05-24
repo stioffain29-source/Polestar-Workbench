@@ -5,7 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
-import type { KpiCard } from './kpiCard';
+import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { ReportStatus } from './reportStatus';
 import type { Topic } from './topic';
 
@@ -21,8 +21,7 @@ export interface Report {
   situation?: string | null;
   /** @nullable */
   whatHappened?: string | null;
-  /** @nullable */
-  hardNumbers?: KpiCard[] | null;
+  hardNumbers?: FuelHardNumbers | null;
   /** @nullable */
   whatMatters?: string | null;
   /** @nullable */

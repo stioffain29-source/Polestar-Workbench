@@ -80,12 +80,22 @@ export const GetDashboardOverviewResponse = zod.object({
   "issueDate": zod.coerce.date(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
-  "hardNumbers": zod.array(zod.object({
+  "hardNumbers": zod.union([zod.object({
+  "cards": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
-})).nullish(),
+})).optional(),
+  "jetFuelTrajectory": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+})).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional()
+}),zod.null()]).optional(),
   "whatMatters": zod.string().nullish(),
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
@@ -541,12 +551,22 @@ export const ListReportsResponseItem = zod.object({
   "issueDate": zod.coerce.date(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
-  "hardNumbers": zod.array(zod.object({
+  "hardNumbers": zod.union([zod.object({
+  "cards": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
-})).nullish(),
+})).optional(),
+  "jetFuelTrajectory": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+})).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional()
+}),zod.null()]).optional(),
   "whatMatters": zod.string().nullish(),
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
@@ -565,12 +585,22 @@ export const CreateReportBody = zod.object({
   "issueDate": zod.coerce.date(),
   "situation": zod.string().optional(),
   "whatHappened": zod.string().optional(),
-  "hardNumbers": zod.array(zod.object({
+  "hardNumbers": zod.object({
+  "cards": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
+  "jetFuelTrajectory": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+})).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional()
+}).optional(),
   "whatMatters": zod.string().optional(),
   "implications": zod.string().optional(),
   "polestarView": zod.string().optional(),
@@ -592,12 +622,22 @@ export const GetReportResponse = zod.object({
   "issueDate": zod.coerce.date(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
-  "hardNumbers": zod.array(zod.object({
+  "hardNumbers": zod.union([zod.object({
+  "cards": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
-})).nullish(),
+})).optional(),
+  "jetFuelTrajectory": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+})).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional()
+}),zod.null()]).optional(),
   "whatMatters": zod.string().nullish(),
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
@@ -619,12 +659,22 @@ export const UpdateReportBody = zod.object({
   "issueDate": zod.coerce.date().optional(),
   "situation": zod.string().optional(),
   "whatHappened": zod.string().optional(),
-  "hardNumbers": zod.array(zod.object({
+  "hardNumbers": zod.object({
+  "cards": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
+  "jetFuelTrajectory": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+})).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional()
+}).optional(),
   "whatMatters": zod.string().optional(),
   "implications": zod.string().optional(),
   "polestarView": zod.string().optional(),
@@ -641,12 +691,22 @@ export const UpdateReportResponse = zod.object({
   "issueDate": zod.coerce.date(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
-  "hardNumbers": zod.array(zod.object({
+  "hardNumbers": zod.union([zod.object({
+  "cards": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
-})).nullish(),
+})).optional(),
+  "jetFuelTrajectory": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+})).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional()
+}),zod.null()]).optional(),
   "whatMatters": zod.string().nullish(),
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
