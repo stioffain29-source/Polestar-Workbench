@@ -1,10 +1,10 @@
 import { format, parseISO, max as dateMax } from "date-fns";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
+  drawPolestarCover, beginBodyPages,
   setFill, setStroke, setText, sanitize,
-  NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
+  NAVY, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
 import {
@@ -102,62 +102,6 @@ function computeFastFacts(
     { label: "Most Affected Country", value: topCountry, note: topCountryN > 0 ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}` : undefined },
     { label: "Latest Incident", value: latest },
   ];
-}
-
-function drawCover(ctx: Ctx, data: TopicReportData, topicLabel: string) {
-  const { pdf, MX, CW } = ctx;
-  const heroH = 110;
-  setFill(pdf, NAVY);
-  pdf.rect(MX, ctx.y, CW, heroH, "F");
-  setFill(pdf, ELECTRIC);
-  pdf.rect(MX + CW - 5, ctx.y, 5, heroH, "F");
-  try {
-    pdf.addImage(polestarLogo, "PNG", MX + 22, ctx.y + 22, 140, 21, undefined, "FAST");
-  } catch { /* ignore */ }
-
-  const subhead = data.topic === "protests" ? "FLASHPOINT" : topicLabel.toUpperCase();
-  const tertiary = data.topic === "protests" ? "Activism, Protests & Civil Unrest" : "";
-
-  setText(pdf, WHITE);
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  pdf.text(sanitize(`POLESTAR INSIGHTS  ·  ${subhead}`), MX + 22, ctx.y + 60);
-
-  if (tertiary) {
-    pdf.setFontSize(7);
-    pdf.text(sanitize(tertiary), MX + 22, ctx.y + 70);
-  }
-
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(22);
-  const titleLines: string[] = pdf.splitTextToSize(sanitize(data.title || "Untitled report"), CW - 44);
-  pdf.text(titleLines.slice(0, 2), MX + 22, ctx.y + (tertiary ? 92 : 82));
-
-  let metaY = ctx.y + heroH - 14;
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  let issueDateText = data.issueDate;
-  try { issueDateText = format(parseISO(data.issueDate), "d MMMM yyyy"); } catch { /* keep raw */ }
-  const meta = [issueDateText, data.author].filter(Boolean).join("  ·  ");
-  pdf.text(sanitize(meta), MX + 22, metaY);
-
-  ctx.y += heroH + 20;
-}
-
-function drawReportingPeriodBanner(ctx: Ctx, label: string) {
-  const { pdf, MX, CW } = ctx;
-  const h = 22;
-  ensureSpace(ctx, h + 6);
-  setFill(pdf, POLAR);
-  pdf.rect(MX, ctx.y, CW, h, "F");
-  setFill(pdf, ELECTRIC);
-  pdf.rect(MX, ctx.y, 4, h, "F");
-  setText(pdf, NAVY);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.text(sanitize(label.toUpperCase()), MX + 12, ctx.y + 14);
-  pdf.setFont("helvetica", "normal");
-  ctx.y += h + 14;
 }
 
 function drawRelatedIncidents(
@@ -267,15 +211,23 @@ export async function exportTopicReportPdf(
   try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
 
   const ctx = createCtx({
-    kind: `${topicLabel} · ${cadence}`,
+    kind: data.title || `${topicLabel} ${cadence}`,
     issueDate: headerDate,
   });
 
-  drawCover(ctx, data, topicLabel);
-
-  // Reporting period banner — visible near the top of every report.
+  // Full-bleed Polestar cover (page 1).
   const win = resolveReportWindow(data.topic, data.issueDate);
-  drawReportingPeriodBanner(ctx, win.label);
+  const eyebrow = data.topic === "protests"
+    ? "FLASHPOINT · ACTIVISM, PROTESTS & CIVIL UNREST"
+    : `POLESTAR INSIGHTS · ${topicLabel.toUpperCase()}`;
+  drawPolestarCover(ctx, {
+    title: data.title || `${topicLabel} ${cadence}`,
+    subtitle: `${topicLabel} · ${cadence}`,
+    reportingPeriod: win.label,
+    eyebrow,
+  });
+  // Body pages start here, each with the gradient header band.
+  beginBodyPages(ctx);
 
   if (data.executiveSummary && data.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
@@ -306,9 +258,6 @@ export async function exportTopicReportPdf(
   drawSourceNotes(ctx);
   drawDisclaimer(ctx);
 
-  const reportDate = (() => {
-    try { return format(parseISO(data.issueDate), "dd MMM yyyy"); } catch { return data.issueDate; }
-  })();
-  drawFooters(ctx.pdf, reportDate);
+  drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }

@@ -1,14 +1,17 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
+import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
-export const NAVY = "#0B0B3D";
-export const ELECTRIC = "#4655FF";
-export const POLAR = "#E2E2E2";
-export const DUSK = "#303030";
+// Polestar core brand palette.
+export const NAVY = "#0B0A3D";       // Midnight Blue
+export const ELECTRIC = "#465BFF";   // Electric Blue
+export const POLAR = "#E2E2E2";      // Polar Gray
+export const DUSK = "#363636";       // Dusk Gray
 export const WHITE = "#FFFFFF";
 export const CARD_BG = "#FFFFFF";
 export const PAGE_BG = "#FFFFFF";
 
+// Risk palette — use only for severity/risk.
 export const SEV_COLOR: Record<string, string> = {
   extreme: "#800000",
   high: "#C0392B",
@@ -42,6 +45,9 @@ export const SOURCE_NOTES_TEXT =
   "Records without coordinates may appear in tables and counts but not maps. " +
   "Severity ratings follow the Polestar five-tier vocabulary: Insignificant, Low, Moderate, High, Extreme.";
 
+export const POLESTAR_URL = "polestar-advisory.com";
+export const POLESTAR_EMAIL = "info@polestar-advisory.com";
+
 /** Replace non-WinAnsi typographic characters so jsPDF Helvetica renders cleanly. */
 export function sanitize(s: string | null | undefined): string {
   if (!s) return "";
@@ -56,20 +62,52 @@ export function sanitize(s: string | null | undefined): string {
     .replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "");
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
 export function setFill(pdf: jsPDF, hex: string) {
-  pdf.setFillColor(parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16));
+  const [r, g, b] = hexToRgb(hex);
+  pdf.setFillColor(r, g, b);
 }
 export function setStroke(pdf: jsPDF, hex: string) {
-  pdf.setDrawColor(parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16));
+  const [r, g, b] = hexToRgb(hex);
+  pdf.setDrawColor(r, g, b);
 }
 export function setText(pdf: jsPDF, hex: string) {
-  pdf.setTextColor(parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16));
+  const [r, g, b] = hexToRgb(hex);
+  pdf.setTextColor(r, g, b);
+}
+
+/**
+ * Draw the Polestar blue gradient (navy -> electric) into a rectangle.
+ * Spec: linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%) — approximated
+ * here as a smooth horizontal navy-left to electric-right interpolation,
+ * which reads as the same brand band in print.
+ */
+export function drawBrandGradient(pdf: jsPDF, x: number, y: number, w: number, h: number) {
+  const [r1, g1, b1] = hexToRgb(NAVY);
+  const [r2, g2, b2] = hexToRgb(ELECTRIC);
+  const steps = Math.max(40, Math.ceil(w));
+  const stepW = w / steps;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+    pdf.setFillColor(r, g, b);
+    // Slight overlap removes hairline gaps between strips.
+    pdf.rect(x + i * stepW, y, stepW + 0.6, h, "F");
+  }
 }
 
 export interface HeaderOpts {
-  /** e.g. "FUEL · WEEKLY BRIEFING" or "PAPUA NEW GUINEA · COUNTRY REPORT" */
+  /** Report title shown right-aligned in the running page header. */
   kind: string;
-  /** YYYY-MM-DD or formatted date */
+  /** Formatted issue date (kept for footer-free callers that still want it elsewhere). */
   issueDate: string;
 }
 
@@ -83,45 +121,57 @@ export interface Ctx {
   CW: number;
   y: number;
   header: HeaderOpts;
+  /** Set to true while drawing a cover page so newPage() suppresses chrome. */
+  suppressHeader?: boolean;
 }
+
+// Header/footer band geometry — applied identically on every body page.
+export const HEADER_BAND_H = 46;
+export const FOOTER_BAND_H = 28;
 
 export function createCtx(header: HeaderOpts): Ctx {
   const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
-  const MX = 48;
-  const TOP = 70;
-  const BOTTOM = 58;
+  const MX = 40;
+  // TOP leaves clearance under the gradient header; BOTTOM clears the Polar footer.
+  const TOP = HEADER_BAND_H + 22;
+  const BOTTOM = FOOTER_BAND_H + 12;
   const ctx: Ctx = { pdf, W, H, MX, TOP, BOTTOM, CW: W - MX * 2, y: TOP, header };
-  drawRunningHeader(ctx);
   return ctx;
 }
 
-export function drawRunningHeader(ctx: Ctx) {
-  const { pdf, W, MX, header } = ctx;
-  setText(pdf, NAVY);
+/**
+ * Draw the full-width gradient page header. Logo left, report title right.
+ * Flush to the top edge — no white margin above, left or right.
+ */
+export function drawPageHeader(ctx: Ctx) {
+  const { pdf, W, header } = ctx;
+  drawBrandGradient(pdf, 0, 0, W, HEADER_BAND_H);
+  try {
+    // Logo height ~22, vertically centred in the band.
+    pdf.addImage(polestarLogo, "PNG", 18, (HEADER_BAND_H - 22) / 2, 132, 22, undefined, "FAST");
+  } catch { /* ignore */ }
+  setText(pdf, WHITE);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.text(sanitize("POLESTAR ADVISORY"), MX, 26);
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  setText(pdf, DUSK);
-  pdf.text(sanitize(`Issue date: ${header.issueDate}`), W - MX, 26, { align: "right" });
+  pdf.setFontSize(10);
+  pdf.text(sanitize(header.kind.toUpperCase()), W - 18, HEADER_BAND_H / 2 + 4, { align: "right" });
+}
 
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(7);
-  setText(pdf, ELECTRIC);
-  pdf.text(sanitize(header.kind.toUpperCase()), MX, 40);
-
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(0.5);
-  pdf.line(MX, 48, W - MX, 48);
+/**
+ * Start the first body page. Call this once after drawing a custom full-page
+ * cover so the body always begins on its own page with chrome applied.
+ */
+export function beginBodyPages(ctx: Ctx) {
+  ctx.pdf.addPage();
+  ctx.y = ctx.TOP;
+  drawPageHeader(ctx);
 }
 
 export function newPage(ctx: Ctx) {
   ctx.pdf.addPage();
   ctx.y = ctx.TOP;
-  drawRunningHeader(ctx);
+  if (!ctx.suppressHeader) drawPageHeader(ctx);
 }
 
 export function ensureSpace(ctx: Ctx, h: number) {
@@ -129,15 +179,16 @@ export function ensureSpace(ctx: Ctx, h: number) {
 }
 
 export function drawSectionHeading(ctx: Ctx, title: string) {
-  ensureSpace(ctx, 34);
+  ensureSpace(ctx, 36);
   const { pdf, MX, CW } = ctx;
   setText(pdf, NAVY);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(11);
+  pdf.setFontSize(12);
   pdf.text(sanitize(title.toUpperCase()), MX, ctx.y);
   ctx.y += 6;
+  // Thin blue divider line under the heading.
   setStroke(pdf, ELECTRIC);
-  pdf.setLineWidth(0.7);
+  pdf.setLineWidth(0.6);
   pdf.line(MX, ctx.y, MX + CW, ctx.y);
   ctx.y += 14;
 }
@@ -147,7 +198,7 @@ export function renderProse(ctx: Ctx, body: string) {
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
   setText(pdf, DUSK);
-  const lineH = 13;
+  const lineH = 14;
   const paragraphs = sanitize(body).split(/\n+/).map((p) => p.trim()).filter(Boolean);
   for (const p of paragraphs) {
     const lines: string[] = pdf.splitTextToSize(p, CW);
@@ -186,7 +237,7 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
   const cols = 3;
   const gap = 10;
   const cardW = (CW - gap * (cols - 1)) / cols;
-  const cardH = 64;
+  const cardH = 68;
   const rows = Math.ceil(cards.length / cols);
   const totalH = rows * cardH + (rows - 1) * gap;
   ensureSpace(ctx, totalH);
@@ -214,14 +265,14 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     setText(pdf, DUSK);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(7);
-    pdf.text(sanitize(c.label.toUpperCase()), x + 10, yy + 16);
+    pdf.text(sanitize(c.label.toUpperCase()), x + 10, yy + 18);
 
     // Value
     setText(pdf, NAVY);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
     const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), cardW - 20);
-    const baseY = yy + 36;
+    const baseY = yy + 38;
     pdf.text(valueLines.slice(0, 2), x + 10, baseY);
 
     // Note
@@ -246,25 +297,99 @@ export function drawSourceNotes(ctx: Ctx, extra?: string) {
   renderProse(ctx, extra ? `${SOURCE_NOTES_TEXT}\n\n${extra}` : SOURCE_NOTES_TEXT);
 }
 
-export function drawFooters(pdf: jsPDF, reportDate: string) {
+/**
+ * Draw the standard footer on every body page (skips page 1, which is the
+ * full-bleed cover). Polar Gray band, flush to the bottom edge.
+ * Contents: website left, email centre, "Page X of Y" right. Nothing else.
+ */
+export function drawFooters(pdf: jsPDF, _reportDate?: string) {
+  void _reportDate; // intentionally unused — date no longer in footer per brand spec
   const pageCount = pdf.getNumberOfPages();
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
-  for (let p = 1; p <= pageCount; p++) {
+  // Body pages are 2..N; page 1 is the cover.
+  for (let p = 2; p <= pageCount; p++) {
     pdf.setPage(p);
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.5);
-    pdf.line(48, H - 38, W - 48, H - 38);
+    setFill(pdf, POLAR);
+    pdf.rect(0, H - FOOTER_BAND_H, W, FOOTER_BAND_H, "F");
+    setText(pdf, DUSK);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8);
-    setText(pdf, DUSK);
-    pdf.text(
-      sanitize(`Polestar Advisory \u00B7 Confidential \u00B7 ${reportDate} \u00B7 Page ${p} of ${pageCount}`),
-      W / 2,
-      H - 22,
-      { align: "center" },
-    );
+    const ty = H - FOOTER_BAND_H / 2 + 3;
+    pdf.text(sanitize(POLESTAR_URL), 18, ty);
+    pdf.text(sanitize(POLESTAR_EMAIL), W / 2, ty, { align: "center" });
+    pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, { align: "right" });
   }
+}
+
+/**
+ * Full-bleed Polestar cover. Used by every report builder.
+ * - Top gradient band with the white logo
+ * - Tall centred gradient hero with title + subtitle + reporting period
+ * - Bottom gradient band with the website
+ * The whole page is gradient — no white showing on any edge.
+ */
+export interface CoverOpts {
+  /** Main report title (rendered large, white, uppercase). */
+  title: string;
+  /** Subtitle / report family (e.g. "Country Report", "Weekly Briefing"). */
+  subtitle: string;
+  /** Reporting-period line (e.g. "Reporting period: 1 May 2026 - 7 May 2026"). */
+  reportingPeriod: string;
+  /** Optional eyebrow line above the title (e.g. region or product family). */
+  eyebrow?: string;
+}
+export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
+  const { pdf, W, H } = ctx;
+  ctx.suppressHeader = true;
+  // Full-page gradient (no white margins anywhere).
+  drawBrandGradient(pdf, 0, 0, W, H);
+
+  // Logo top-left (in the natural header position).
+  try {
+    pdf.addImage(polestarLogo, "PNG", 32, 32, 160, 26, undefined, "FAST");
+  } catch { /* ignore */ }
+
+  // Eyebrow
+  setText(pdf, WHITE);
+  const centreY = H * 0.55;
+  if (opts.eyebrow) {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text(sanitize(opts.eyebrow.toUpperCase()), 40, centreY - 90, {
+      charSpace: 1.6,
+    });
+  }
+
+  // Title (very large, white, uppercase, may wrap to 3 lines)
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(34);
+  const titleLines: string[] = pdf.splitTextToSize(
+    sanitize((opts.title || "Untitled report").toUpperCase()),
+    W - 80,
+  );
+  let ty = centreY - 40;
+  for (const ln of titleLines.slice(0, 3)) {
+    pdf.text(ln, 40, ty);
+    ty += 38;
+  }
+
+  // Subtitle
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(13);
+  pdf.text(sanitize(opts.subtitle), 40, ty + 8);
+
+  // Reporting period
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  pdf.text(sanitize(opts.reportingPeriod), 40, ty + 28);
+
+  // Bottom: website (no other text per brand spec).
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(10);
+  pdf.text(sanitize(POLESTAR_URL), 40, H - 36);
+
+  ctx.suppressHeader = false;
 }
 
 export function todayLabel(): string {

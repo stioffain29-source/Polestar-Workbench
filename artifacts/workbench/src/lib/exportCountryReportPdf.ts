@@ -1,8 +1,8 @@
 import { format, parseISO } from "date-fns";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
+  drawPolestarCover, beginBodyPages,
   setFill, setStroke, setText, sanitize, todayLabel,
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
@@ -186,48 +186,6 @@ function buildExecutiveSummary(
   return parts.join(" ");
 }
 
-function drawCover(ctx: Ctx, country: PdfCountry, issueDate: string) {
-  const { pdf, MX, CW } = ctx;
-  const heroH = 130;
-
-  // Navy band
-  setFill(pdf, NAVY);
-  pdf.rect(MX, ctx.y, CW, heroH, "F");
-  // Electric blue accent strip (right)
-  setFill(pdf, ELECTRIC);
-  pdf.rect(MX + CW - 5, ctx.y, 5, heroH, "F");
-
-  // Logo
-  try {
-    pdf.addImage(polestarLogo, "PNG", MX + 22, ctx.y + 22, 140, 21, undefined, "FAST");
-  } catch { /* ignore */ }
-
-  // Right column block
-  const rightX = MX + CW - 20;
-
-  // "Country Report" eyebrow
-  setText(pdf, WHITE);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(8);
-  pdf.text(sanitize("COUNTRY REPORT"), rightX, ctx.y + 30, { align: "right" });
-
-  // Country name (large)
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(22);
-  pdf.text(sanitize(country.name.toUpperCase()), rightX, ctx.y + 58, { align: "right" });
-
-  // Region
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(9);
-  pdf.text(sanitize(country.region.toUpperCase()), rightX, ctx.y + 76, { align: "right" });
-
-  // Issue date row at bottom-left of band
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  pdf.text(sanitize(`POLESTAR ADVISORY  ·  ISSUE DATE ${issueDate.toUpperCase()}`), MX + 22, ctx.y + heroH - 18);
-
-  ctx.y += heroH + 20;
-}
 
 function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
   const order = ["extreme", "high", "moderate", "low", "insignificant"] as const;
@@ -391,20 +349,13 @@ function drawIncidentTable(
   }
 }
 
-function drawNarrativeOrPlaceholder(ctx: Ctx, heading: string, body: string | null | undefined) {
-  drawSectionHeading(ctx, heading);
+// Render a narrative section only when the source field is populated.
+// Empty sections are skipped entirely — no placeholder text per brand spec.
+function drawNarrativeIfPresent(ctx: Ctx, heading: string, body: string | null | undefined) {
   const trimmed = (body ?? "").trim();
-  if (trimmed) {
-    renderProse(ctx, trimmed);
-  } else {
-    const { pdf, MX } = ctx;
-    setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(9);
-    pdf.text(sanitize("Not on file. Edit this country report in the Workbench to populate this section."), MX, ctx.y + 10);
-    pdf.setFont("helvetica", "normal");
-    ctx.y += 22;
-  }
+  if (!trimmed) return;
+  drawSectionHeading(ctx, heading);
+  renderProse(ctx, trimmed);
 }
 
 export async function exportCountryReportPdf(
@@ -415,11 +366,9 @@ export async function exportCountryReportPdf(
 ): Promise<void> {
   const issueDate = todayLabel();
   const ctx = createCtx({
-    kind: `${country.name} · Country Report`,
+    kind: `${country.name} Country Report`,
     issueDate,
   });
-
-  drawCover(ctx, country, issueDate);
 
   // Enforce the weekly reporting window: records older than 10 days are
   // excluded from every section of the country report.
@@ -427,22 +376,14 @@ export async function exportCountryReportPdf(
   const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, todayIso);
   const windowedIncidents = filterIncidentsToWindow(incidents, COUNTRY_WINDOW_TOPIC, todayIso);
 
-  // Reporting period banner — visible near the top of every report.
-  {
-    const { pdf, MX, CW } = ctx;
-    const h = 22;
-    ensureSpace(ctx, h + 6);
-    setFill(pdf, POLAR);
-    pdf.rect(MX, ctx.y, CW, h, "F");
-    setFill(pdf, ELECTRIC);
-    pdf.rect(MX, ctx.y, 4, h, "F");
-    setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.text(sanitize(win.label.toUpperCase()), MX + 12, ctx.y + 14);
-    pdf.setFont("helvetica", "normal");
-    ctx.y += h + 14;
-  }
+  // Full-bleed Polestar cover (page 1) — title, subtitle, reporting period, website.
+  drawPolestarCover(ctx, {
+    title: country.name,
+    subtitle: `Country Report · ${country.region}`,
+    reportingPeriod: win.label,
+    eyebrow: "POLESTAR ADVISORY",
+  });
+  beginBodyPages(ctx);
 
   const facts = deriveFacts(windowedIncidents, topicLabels);
 
@@ -454,13 +395,13 @@ export async function exportCountryReportPdf(
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, buildKpiCards(facts, windowedIncidents));
 
-  // 3. Narrative sections — show placeholder when source field is empty
-  drawNarrativeOrPlaceholder(ctx, "Situation", country.overview);
-  drawNarrativeOrPlaceholder(ctx, "What Happened", country.trendSummary);
-  drawNarrativeOrPlaceholder(ctx, "What Matters", null);
-  drawNarrativeOrPlaceholder(ctx, "Implications for Business", country.implications);
-  drawNarrativeOrPlaceholder(ctx, "Watch Next", null);
-  drawNarrativeOrPlaceholder(ctx, "Polestar View", null);
+  // 3. Narrative sections — empty sections are skipped (no placeholder text).
+  drawNarrativeIfPresent(ctx, "Situation", country.overview);
+  drawNarrativeIfPresent(ctx, "What Happened", country.trendSummary);
+  drawNarrativeIfPresent(ctx, "What Matters", null);
+  drawNarrativeIfPresent(ctx, "Implications for Business", country.implications);
+  drawNarrativeIfPresent(ctx, "Watch Next", null);
+  drawNarrativeIfPresent(ctx, "Polestar View", null);
 
   // 4. Visuals — Incident Breakdown by Type uses derived operational labels.
   drawSeverityChart(ctx, facts);
@@ -473,6 +414,6 @@ export async function exportCountryReportPdf(
   drawSourceNotes(ctx);
   drawDisclaimer(ctx);
 
-  drawFooters(ctx.pdf, issueDate);
+  drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }

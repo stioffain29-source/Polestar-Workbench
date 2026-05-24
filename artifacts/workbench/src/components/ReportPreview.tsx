@@ -3,6 +3,12 @@ import { TOPIC_LABELS } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
+const NAVY = "#0B0A3D";
+const ELECTRIC = "#465BFF";
+const DUSK = "#363636";
+const POLAR = "#E2E2E2";
+const BRAND_GRADIENT = "linear-gradient(-130deg, #0B0A3D 0%, #465BFF 100%)";
+
 const SEV_COLOR: Record<string, string> = {
   Extreme: "#800000",
   High: "#C0392B",
@@ -26,12 +32,16 @@ export interface ReportPreviewData {
 }
 
 function Paragraphs({ text }: { text?: string | null }) {
-  if (!text) return <p className="text-sm italic" style={{ color: "#888" }}>No content yet.</p>;
+  if (!text) return null;
   const parts = text.split(/\n+/).filter(Boolean);
   return (
     <>
       {parts.map((p, i) => (
-        <p key={i} className="text-[14px] leading-[1.7] mb-3 font-light" style={{ color: "#222", fontFamily: "Roboto, sans-serif" }}>
+        <p
+          key={i}
+          className="text-[14px] leading-[1.7] mb-3 font-light"
+          style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+        >
           {p}
         </p>
       ))}
@@ -45,17 +55,29 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2
         className="uppercase pb-2 mb-4 tracking-wide"
         style={{
-          color: "#0B0B3D",
+          color: NAVY,
           fontFamily: "'Roboto Condensed', sans-serif",
           fontWeight: 700,
           fontSize: 18,
-          borderBottom: "2px solid #4655FF",
+          borderBottom: `2px solid ${ELECTRIC}`,
         }}
       >
         {title}
       </h2>
       {children}
     </div>
+  );
+}
+
+// Render the section only when its source field is populated — no
+// placeholder text per brand spec.
+function NarrativeSection({ title, text }: { title: string; text?: string | null }) {
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) return null;
+  return (
+    <Section title={title}>
+      <Paragraphs text={trimmed} />
+    </Section>
   );
 }
 
@@ -70,27 +92,27 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {cards.map((c, i) => {
-        const accent = c.severity && SEV_COLOR[c.severity] ? SEV_COLOR[c.severity] : "#4655FF";
+        const accent = c.severity && SEV_COLOR[c.severity] ? SEV_COLOR[c.severity] : ELECTRIC;
         return (
           <div
             key={i}
             className="bg-white border rounded-sm p-3 relative"
-            style={{ borderColor: "#E2E2E2" }}
+            style={{ borderColor: POLAR }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent }} />
             <div
               className="uppercase tracking-widest"
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 9, color: "#303030", marginTop: 4 }}
+              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 9, color: DUSK, marginTop: 4 }}
             >
               {c.label}
             </div>
             <div
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 20, color: "#0B0B3D", marginTop: 4, lineHeight: 1.1 }}
+              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 20, color: NAVY, marginTop: 4, lineHeight: 1.1 }}
             >
               {c.value}
             </div>
             {c.note && (
-              <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 10, color: "#303030", marginTop: 6 }}>
+              <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 10, color: DUSK, marginTop: 6 }}>
                 {c.note}
               </div>
             )}
@@ -102,7 +124,6 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
 }
 
 function computePreviewFastFacts(report: ReportPreviewData): KpiPreviewCard[] {
-  const topicLabel = report.topic ? TOPIC_LABELS[report.topic] ?? report.topic : "—";
   const period = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).shortLabel
     : "—";
@@ -110,9 +131,9 @@ function computePreviewFastFacts(report: ReportPreviewData): KpiPreviewCard[] {
     { label: "Reporting Period", value: period },
     { label: "Total Records", value: "—", note: "Computed at export from incidents on file" },
     { label: "Highest Severity", value: "—", note: "Computed at export" },
+    { label: "Top Issue Type", value: "—", note: "Derived from incidents at export" },
     { label: "Most Affected Country", value: "—", note: "Computed at export" },
     { label: "Latest Incident", value: "—", note: "Computed at export" },
-    { label: "Topic Coverage", value: topicLabel },
   ];
 }
 
@@ -133,21 +154,46 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
     : "";
 
   return (
-    <div className="print-report bg-white" style={{ color: "#0B0B3D", fontFamily: "Roboto, sans-serif" }}>
+    <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+      {/* Full-bleed gradient page header (logo left, title right) */}
       <div
-        className="report-hero px-10 py-10"
+        className="px-10 flex items-center justify-between"
         style={{
-          background: "linear-gradient(to right, #0B0B3D 0%, #0B0B3D 38%, #4655FF 100%)",
+          background: BRAND_GRADIENT,
           color: "#fff",
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
+          minHeight: 56,
         }}
       >
         <img
           src={polestarLogo}
           alt="Polestar Advisory"
-          style={{ height: 36, width: "auto", maxWidth: 240, marginBottom: 16, display: "block" }}
+          style={{ height: 26, width: "auto", maxWidth: 180, display: "block" }}
         />
+        <div
+          className="uppercase"
+          style={{
+            fontFamily: "'Roboto Condensed', sans-serif",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: "0.18em",
+          }}
+        >
+          {(report.title || `${topicLabel} ${cadence}`).toUpperCase()}
+        </div>
+      </div>
+
+      {/* Cover band — full-bleed gradient, title + subtitle + period + website */}
+      <div
+        className="px-10 py-12"
+        style={{
+          background: BRAND_GRADIENT,
+          color: "#fff",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
         <div
           className="uppercase mb-2"
           style={{
@@ -168,7 +214,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
               fontWeight: 400,
               fontSize: 9,
               letterSpacing: "0.25em",
-              color: "rgba(255,255,255,0.65)",
+              color: "rgba(255,255,255,0.7)",
             }}
           >
             {tertiary}
@@ -179,44 +225,45 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           style={{
             fontFamily: "'Roboto Condensed', sans-serif",
             fontWeight: 700,
-            fontSize: 30,
-            lineHeight: 1.1,
+            fontSize: 34,
+            lineHeight: 1.05,
             letterSpacing: "-0.01em",
+            textTransform: "uppercase",
           }}
         >
           {report.title || "Untitled report"}
         </h1>
-        <div className="flex items-center gap-4 uppercase" style={{
-          fontFamily: "'Roboto Condensed', sans-serif",
-          fontWeight: 500,
-          fontSize: 11,
-          letterSpacing: "0.15em",
-          color: "rgba(255,255,255,0.9)",
-        }}>
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 uppercase"
+          style={{
+            fontFamily: "'Roboto Condensed', sans-serif",
+            fontWeight: 500,
+            fontSize: 11,
+            letterSpacing: "0.15em",
+            color: "rgba(255,255,255,0.9)",
+          }}
+        >
           {issueDateText && <span>{issueDateText}</span>}
           {report.author && <span>·</span>}
           {report.author && <span>{report.author}</span>}
+          {periodLabel && <span>·</span>}
+          {periodLabel && <span>{periodLabel}</span>}
+        </div>
+        <div
+          className="mt-8 uppercase"
+          style={{
+            fontFamily: "'Roboto Condensed', sans-serif",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: "0.18em",
+            color: "rgba(255,255,255,0.95)",
+          }}
+        >
+          polestar-advisory.com
         </div>
       </div>
 
       <div className="px-10 py-10">
-        {periodLabel && (
-          <div
-            className="uppercase mb-6"
-            style={{
-              fontFamily: "'Roboto Condensed', sans-serif",
-              fontWeight: 700,
-              fontSize: 11,
-              letterSpacing: "0.18em",
-              color: "#0B0B3D",
-              borderLeft: "4px solid #4655FF",
-              background: "#E2E2E2",
-              padding: "8px 12px",
-            }}
-          >
-            {periodLabel}
-          </div>
-        )}
         {report.executiveSummary && report.executiveSummary.trim() && (
           <Section title="Executive Summary">
             <Paragraphs text={report.executiveSummary} />
@@ -227,50 +274,36 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           <FastFactsGrid cards={fastFacts} />
           <p
             className="mt-3"
-            style={{ fontSize: 10, color: "#888", fontFamily: "Roboto, sans-serif" }}
+            style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
           >
             Live values are calculated against incidents on file when the PDF is generated.
           </p>
         </Section>
 
-        <Section title="Situation">
-          <Paragraphs text={report.situation} />
-        </Section>
+        <NarrativeSection title="Situation" text={report.situation} />
+        <NarrativeSection title="What Happened" text={report.whatHappened} />
+        <NarrativeSection title="What Matters" text={report.whatMatters} />
+        <NarrativeSection title="Implications for Business" text={report.implications} />
+        <NarrativeSection title="Watch Next" text={report.watchNext} />
+        <NarrativeSection title="Polestar View" text={report.polestarView} />
+      </div>
 
-        <Section title="What Happened">
-          <Paragraphs text={report.whatHappened} />
-        </Section>
-
-        <Section title="What Matters">
-          <Paragraphs text={report.whatMatters} />
-        </Section>
-
-        <Section title="Implications for Business">
-          <Paragraphs text={report.implications} />
-        </Section>
-
-        <Section title="Watch Next">
-          <Paragraphs text={report.watchNext} />
-        </Section>
-
-        <Section title="Polestar View">
-          <Paragraphs text={report.polestarView} />
-        </Section>
-
-        <div
-          className="flex items-center justify-between border-t pt-6 mt-12 uppercase"
-          style={{
-            borderColor: "#E2E2E2",
-            fontFamily: "'Roboto Condensed', sans-serif",
-            fontWeight: 500,
-            fontSize: 10,
-            letterSpacing: "0.25em",
-            color: "#303030",
-          }}
-        >
-          <span>Polestar Advisory · Confidential</span>
-          <span>Preview — page numbers added at export</span>
-        </div>
+      {/* Full-bleed Polar Gray footer — website, email, page note */}
+      <div
+        className="px-10 flex items-center justify-between"
+        style={{
+          background: POLAR,
+          color: DUSK,
+          fontFamily: "Roboto, sans-serif",
+          fontSize: 11,
+          minHeight: 36,
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
+        <span>polestar-advisory.com</span>
+        <span>info@polestar-advisory.com</span>
+        <span style={{ opacity: 0.7 }}>Page numbers added at export</span>
       </div>
     </div>
   );

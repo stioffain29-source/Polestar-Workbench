@@ -1,0 +1,322 @@
+Apply the Polestar Advisory report branding standard.
+
+This applies to report pages and exported PDF reports only.
+
+Do not change:
+- database
+- imports
+- dashboard logic
+- data categories
+- tracker logic
+- Missile Strike Tracker report status
+
+Important:
+Missile Strike Tracker is not a report. It remains a tracker/dashboard only. Do not apply report cover templates or report builder export logic to Missile Strike Tracker unless explicitly instructed later.
+
+Brand fonts
+
+Use Roboto family.
+
+Use:
+- Roboto Condensed Bold for main report titles, major headings and callouts
+- Roboto Condensed Medium for subtitles, eyebrow text and section labels
+- Roboto Light / Roboto for body copy
+- Roboto regular/italic only where needed for supporting text or pull quotes
+
+Roboto Condensed is best for:
+- titles
+- callouts
+- section headings
+
+Roboto is best for:
+- body copy
+- supporting text
+- pull quotes
+
+Brand colours
+
+Use these core colours:
+
+Midnight Blue:
+#0b0a3d
+
+Electric Blue:
+#465bff
+
+Dusk Gray:
+#363636
+
+Polar Gray:
+#e2e2e2
+
+Blue gradient
+
+Use the Polestar blue gradient:
+
+linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)
+
+This is the standard gradient for:
+- report cover bands
+- report page headers
+- branded title panels
+
+Do not use random blues.
+
+Risk colours
+
+Use these only for severity/risk:
+
+Extreme:
+#800000
+
+High:
+#C0392B
+
+Moderate:
+#E67E22
+
+Low:
+#6FB872
+
+Insignificant:
+#B8C2CC
+
+For charts, use slight translucency with a darker edge:
+- fill opacity around 0.78
+- darker border/stroke
+- border/stroke around 1.5px to 2px
+
+Report cover standard
+
+All report covers should follow the Polestar cover convention.
+
+Applies to:
+- Country reports
+- Weekly Insights
+- Monthly reports
+- Fuel reports
+- Fertiliser reports
+- Civil Unrest / Flashpoint reports
+- Energy / Grid reports
+- Shipping reports
+- Cargo Watch reports
+- Papua / PNG reports
+
+Does not apply to:
+- Missile Strike Tracker
+
+Cover layout:
+
+1. Top header band
+- Full-width blue gradient
+- No white margins above, left or right
+- White Polestar Advisory logo on the left
+
+2. Hero image
+- Large full-width selected image
+- Image will be provided by the user
+- Do not choose random stock images
+- Do not use generic security imagery
+- If no image is provided, use a clean gradient-only cover
+
+3. Bottom title band
+- Full-width blue gradient
+- Large white uppercase report title
+- Smaller white report type/subtitle
+- Reporting period clearly shown
+- Website at bottom left:
+polestar-advisory.com
+
+Cover typography:
+- Main title: Roboto Condensed Bold
+- Subtitle/report type: Roboto Condensed Medium
+- Supporting text: Roboto Light / Roboto
+
+Cover style:
+- premium advisory report feel
+- clean and uncluttered
+- navy/electric blue identity
+- no orange
+- no dark cyber style
+- no generic SaaS styling
+
+Report page header standard
+
+Every report body page must use this header style.
+
+Header band:
+- full width of the page
+- flush to the top edge
+- no white showing above it
+- no white margin left or right
+- blue Polestar gradient only
+- no accent colours
+- no decorative lines
+- no extra shapes
+
+Header content:
+- white Polestar Advisory logo on the left
+- report title in white on the right
+
+Layout:
+Polestar Advisory logo left
+Report title right
+
+The header must sit flush to the page edges.
+
+Report footer standard
+
+Every report page must use this footer style.
+
+Footer band:
+- full width of the page
+- flush to the bottom edge
+- no white gap below it
+- background: Polar Gray #e2e2e2
+- no divider lines
+- no accent colours
+- no extra text
+
+Footer content only:
+- website on the left:
+polestar-advisory.com
+
+- email in the centre:
+info@polestar-advisory.com
+
+- page number on the right:
+Page X of Y
+
+Do not include:
+- Confidential
+- report date
+- disclaimers
+- extra branding text
+
+Report body style
+
+Use:
+- clean white body
+- dark navy headings
+- thin blue divider lines
+- generous spacing
+- readable body text
+- KPI cards for Fast Facts
+- restrained accent colours only where useful
+- severity colours only for severity/risk
+
+Do not use:
+- orange cover elements
+- stock security clichés
+- dark cyber dashboard style
+- generic SaaS styling
+- cluttered tables
+- repeated title clutter
+- placeholder text such as “Not on file. Edit this report…”
+
+Fast Facts standard
+
+Fast Facts must be KPI-style cards with accented styling.
+
+Use cards such as:
+- Reporting period
+- Total records
+- Highest severity
+- Most affected country/location
+- Latest incident
+- Main issue type
+
+Card style:
+- clean white card
+- thin border
+- small accent line or accent header
+- dark navy label
+- large value
+- small supporting note where useful
+
+Use severity colours only where the KPI relates to severity.
+
+Report headings
+
+Use these report headings:
+
+- Executive Summary
+- Fast Facts
+- Situation
+- What Happened
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Source Notes / Data Notes
+- Disclaimer
+
+Do not rename these to:
+- Outlook
+- Industry Impact
+- BLUF
+
+Use “Fast Facts”, not BLUF.
+
+Report content rules
+
+Reports must read like advisory products, not database exports.
+
+Rules:
+- do not dump every incident into the report
+- related incidents should be limited to the most relevant recent rows
+- weekly reports use maximum 10-day window
+- monthly reports use maximum 35-day window
+- date ranges must run oldest to newest
+- do not invent content
+- do not invent coordinates
+- do not invent sources
+- do not show “Unknown” as a country
+- use “Country not identified” only as a data-quality note, not as a main chart category
+
+Incident type rule
+
+Product names are not incident types.
+
+Do not use these as incident-type labels:
+- Flashpoint
+- Cargo Watch
+- Shipping
+- Fuel
+- Fertiliser
+- Energy / Grid
+- Civil Protests & Civil Unrest
+- Missile Strike Tracker
+
+Reports must describe what happened, not which product bucket the record came from.
+
+Use real incident types such as:
+- Armed robbery
+- Protest
+- Road disruption
+- Cargo theft / hijack
+- Vessel attack
+- Port disruption
+- Fuel shortage
+- Power outage
+- Drone attack
+- Missile attack
+- Other operational incident
+
+Product/topic names may be used for navigation and filtering only, not as chart labels or main issue types.
+
+Acceptance criteria
+
+- All report covers follow the Polestar cover convention.
+- Report body pages use the full-width gradient header.
+- No white margin appears above, left or right of the header.
+- Footer is Polar Gray, full width, and flush to the bottom.
+- Footer contains only website, email and page number.
+- Fonts follow the Roboto / Roboto Condensed hierarchy.
+- Fast Facts are KPI cards.
+- Reports use navy/white Polestar styling.
+- No orange.
+- No dark cyber dashboard style.
+- No placeholder text.
+- No repeated header clutter.
+- Missile Strike Tracker remains a tracker only, not a report.
