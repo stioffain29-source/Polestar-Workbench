@@ -17,10 +17,12 @@ import { classifyIncidentType } from "./incidentClassifier";
 // topics opt in by adding an entry to TOPIC_COVER_URLS below.
 import fertiliserCoverUrl from "@assets/image_1779624933984.png";
 import cargoWatchCoverUrl from "@assets/image_1779625099169.png";
+import energyCoverUrl from "@assets/severin-demchuk-60NulquhzoI-unsplash_1779625300436.jpg";
 
 const TOPIC_COVER_URLS: Record<string, string> = {
   fertiliser: fertiliserCoverUrl,
   cargo_watch: cargoWatchCoverUrl,
+  energy: energyCoverUrl,
 };
 import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
