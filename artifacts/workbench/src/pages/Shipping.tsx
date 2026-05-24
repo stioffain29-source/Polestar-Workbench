@@ -232,7 +232,11 @@ export default function Shipping() {
   const apCount = byRegion.find((r) => r.region === "APAC")?.count ?? 0;
 
   const mainRegion = useMemo(() => {
-    const ranked = [...byRegion].sort((a, b) => b.count - a.count);
+    // Only rank real regions — "Country not identified" is excluded because
+    // it tells the reader nothing about where the activity is occurring.
+    const ranked = byRegion
+      .filter((r) => r.region === "Middle East" || r.region === "APAC")
+      .sort((a, b) => b.count - a.count);
     const top = ranked[0];
     if (!top || top.count === 0) return null;
     return top;
