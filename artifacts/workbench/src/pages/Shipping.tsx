@@ -278,7 +278,7 @@ export default function Shipping() {
             label="Total Shipping Records"
             value={String(total)}
             note={`${last7} in the past 7 days · ${last30} in the past 30 days.`}
-            accent="#4655FF"
+            accent="#465bff"
           />
           <FastFactCard
             label="Highest Severity On File"
@@ -308,7 +308,7 @@ export default function Shipping() {
                 ? `${mainIssue.count} record${mainIssue.count === 1 ? "" : "s"} classified as ${mainIssue.issue.toLowerCase()}.`
                 : "No issue classification available."
             }
-            accent="#0B0B3D"
+            accent="#0b0a3d"
           />
           <FastFactCard
             label="Latest Significant Incident"
@@ -326,7 +326,7 @@ export default function Shipping() {
       {/* 3. Key Metrics */}
       <Section title="Key Metrics">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Kpi label="Records in Window" value={total} accent="#0B0B3D" />
+          <Kpi label="Records in Window" value={total} accent="#0b0a3d" />
           <Kpi
             label="Highest Severity"
             value={highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}
@@ -336,7 +336,7 @@ export default function Shipping() {
           <Kpi
             label="Main Affected Chokepoint"
             value={mainChokepoint ? mainChokepoint.key : (mainRegion?.region ?? "—")}
-            accent={mainChokepoint ? "#0B0B3D" : (mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC")}
+            accent={mainChokepoint ? "#0b0a3d" : (mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC")}
             small
           />
           <Kpi label="Vessel Attacks / Seizures" value={vesselAttackOrSeizureCount} accent="#C0392B" />
@@ -409,7 +409,7 @@ export default function Shipping() {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0B0B3D" />
+              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0b0a3d" />
               <Kpi label="Attacks" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} />
               <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} />
               <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} />
@@ -519,7 +519,7 @@ export default function Shipping() {
               <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
               <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
               <YAxis dataKey="issue" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={200} />
-              <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
                 {byIssue.map((_, idx) => {
                   const c = ISSUE_PALETTE[idx % ISSUE_PALETTE.length];
@@ -608,8 +608,8 @@ export default function Shipping() {
                   <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
                   <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} interval="preserveStartEnd" />
                   <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} allowDecimals={false} />
-                  <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
-                  <Line type="monotone" dataKey="count" stroke="#0B0B3D" strokeWidth={2} dot={{ r: 3, stroke: "#0B0B3D", strokeWidth: 1.5, fill: "#4655FF", fillOpacity: FILL_OPACITY }} />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Line type="monotone" dataKey="count" stroke="#0b0a3d" strokeWidth={2} dot={{ r: 3, stroke: "#0b0a3d", strokeWidth: 1.5, fill: "#465bff", fillOpacity: FILL_OPACITY }} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -621,7 +621,7 @@ export default function Shipping() {
                 <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
                 <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
                 <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={130} />
-                <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+                <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                 <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
                   {byRegion.map((d) => {
                     const c = REGION_COLOR[d.region as Region];
@@ -641,8 +641,8 @@ export default function Shipping() {
                   <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
                   <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
                   <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} allowDecimals={false} />
-                  <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
-                  <Bar dataKey="count" fill="#4655FF" stroke={darken("#4655FF")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY} />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -654,7 +654,7 @@ export default function Shipping() {
                 <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
                 <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+                <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                 <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
                   {bySeverity.map((d) => {
                     const c = ratingColor(d.severity);

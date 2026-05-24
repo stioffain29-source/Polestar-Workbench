@@ -42,7 +42,7 @@ export default function Topic() {
               <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
               <XAxis dataKey="severity" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
               <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count">
                 {severityData.map((d) => (
                   <Cell key={d.severity} fill={ratingColor(d.severity)} />

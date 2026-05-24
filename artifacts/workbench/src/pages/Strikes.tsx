@@ -147,7 +147,7 @@ const SUBTITLE: Record<"maritime_hormuz" | "land_gcc", string> = {
 // categories cycle through neutral non-risk hues so they do not collide with
 // risk-tier colours (Extreme/High/Moderate/Low/Insignificant) which remain
 // reserved for severity rendering elsewhere in the workbench.
-const CAT_PALETTE = ["#0B0B3D", "#2A9D8F", "#E67E22", "#C0392B", "#4655FF", "#F4D35E", "#6FB872", "#B8C2CC"];
+const CAT_PALETTE = ["#0b0a3d", "#2A9D8F", "#E67E22", "#C0392B", "#465bff", "#F4D35E", "#6FB872", "#B8C2CC"];
 
 // Standard chart styling: slight translucency + darker edge so bars read
 // crisply on the Polar Gray background. Matches the marker convention in
@@ -311,15 +311,15 @@ export default function Strikes() {
           <AreaChart data={timeline} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="strikeArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4655FF" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#4655FF" stopOpacity={0} />
+                <stop offset="0%" stopColor="#465bff" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="#465bff" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="date" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} interval="preserveStartEnd" />
             <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} />
-            <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
-            <Area type="monotone" dataKey="count" stroke={darken("#4655FF")} strokeWidth={CHART_STROKE_WIDTH} fill="url(#strikeArea)" fillOpacity={CHART_FILL_OPACITY} />
+            <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+            <Area type="monotone" dataKey="count" stroke={darken("#465bff")} strokeWidth={CHART_STROKE_WIDTH} fill="url(#strikeArea)" fillOpacity={CHART_FILL_OPACITY} />
           </AreaChart>
         </ResponsiveContainer>
       </Card>
@@ -474,7 +474,7 @@ function CatBar({ data, height = 240 }: { data: { key: string; count: number }[]
           height={data.length > 4 ? 50 : 30}
         />
         <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} />
-        <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+        <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
         <Bar dataKey="count">
           {data.map((_, i) => {
             const fill = CAT_PALETTE[i % CAT_PALETTE.length];
@@ -488,7 +488,7 @@ function CatBar({ data, height = 240 }: { data: { key: string; count: number }[]
               />
             );
           })}
-          <LabelList dataKey="count" position="top" fontSize={10} fill="#303030" />
+          <LabelList dataKey="count" position="top" fontSize={10} fill="#363636" />
         </Bar>
       </BarChart>
     </ResponsiveContainer>

@@ -171,8 +171,8 @@ export function classifyRegion(country: string | null | undefined): Region {
 }
 
 export const REGION_COLOR: Record<Region, string> = {
-  "Middle East": "#0B0B3D",
-  "APAC": "#4655FF",
+  "Middle East": "#0b0a3d",
+  "APAC": "#465bff",
   "Country not identified": "#7A8FA6",
   "Out of scope": "#B8C2CC",
 };
@@ -194,7 +194,7 @@ export const ISSUE_RULES: Array<{ label: string; pattern: RegExp }> = [
   { label: "Commercial shipping disruption", pattern: /\b(cargo (delay|disruption|halt|backlog|movement|flows?)|container (backlog|delay|handling)|supply chain disruption|liner service (suspension|cancell)|service suspension|sailing cancelled|blank sailing|export (halt|suspension)|import (halt|disruption)|market share|orderbook|newbuild|newbuilding|new entrant|charter (acquisition|deal|purchase|locks?|fix(ed|es)?)|locks first|fleet (acquisition|renewal|deal|strategy|exposure)|m&a|merger|joint venture|company of the year|banned from (australia|port)|unpaid crew wages|earnings|quarterly|annual report|first[- ]quarter|q1 (results?|performance)|volume growth|cooperation deal|logistics push|legal action|relocate headquarters|biomethanol|long[- ]term charter|long[- ]term deal|product tanker|crude carrier|vlcc (newbuild|owner|charter|trading|sanctions|supertanker))\b/i },
 ];
 
-export const ISSUE_PALETTE = ["#0B0B3D", "#4655FF", "#303030", "#7A8FA6", "#B8C2CC", "#6FB872", "#E67E22", "#C0392B", "#0B0B3D", "#4655FF"];
+export const ISSUE_PALETTE = ["#0b0a3d", "#465bff", "#363636", "#7A8FA6", "#B8C2CC", "#6FB872", "#E67E22", "#C0392B", "#0b0a3d", "#465bff"];
 
 // ---------------------------------------------------------------------------
 // Vessel Incident classification (strict hostile-only)
@@ -230,7 +230,7 @@ export function classifyVesselIncident(i: MaritimeRecordLike): VesselIncidentTyp
 export const VESSEL_ACCENT: Record<VesselIncidentType, string> = {
   Attack: "#C0392B",
   "Near miss": "#E67E22",
-  Seized: "#0B0B3D",
+  Seized: "#0b0a3d",
   Threat: "#7A8FA6",
 };
 

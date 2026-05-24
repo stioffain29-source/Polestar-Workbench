@@ -143,15 +143,15 @@ const VALUE_RE = /(rs\.?\s*\d|usd\s*\$?\d|\$\s*\d|€\s*\d|£\s*\d|\d+\s*(crore|
 const COMPANY_RE = /\b(ltd\.?|inc\.?|pvt\.?|corp\.?|llp|holdings|logistics|express|cargo co)\b/i;
 
 const REGION_COLOR: Record<Region, string> = {
-  "Middle East": "#0B0B3D",
-  "APAC": "#4655FF",
+  "Middle East": "#0b0a3d",
+  "APAC": "#465bff",
   "Country not identified": "#7A8FA6",
   "Out of scope": "#B8C2CC",
 };
 
 const NOT_IDENTIFIED = "Country not identified";
 
-const CAT_PALETTE = ["#0B0B3D", "#2A9D8F", "#E67E22", "#4655FF", "#F4D35E", "#6FB872", "#B8C2CC", "#303030", "#7A8FA6"];
+const CAT_PALETTE = ["#0b0a3d", "#2A9D8F", "#E67E22", "#465bff", "#F4D35E", "#6FB872", "#B8C2CC", "#363636", "#7A8FA6"];
 
 export default function CargoWatch() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "cargo_watch" });
@@ -293,7 +293,7 @@ export default function CargoWatch() {
               <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
               <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
               <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={120} />
-              <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count">
                 {byRegion.map((d) => <Cell key={d.region} fill={REGION_COLOR[d.region as Region]} />)}
               </Bar>
@@ -307,7 +307,7 @@ export default function CargoWatch() {
               <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
               <XAxis type="number" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
               <YAxis dataKey="category" type="category" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} width={120} />
-              <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Bar dataKey="count">
                 {byCategory.map((_, idx) => <Cell key={idx} fill={CAT_PALETTE[idx % CAT_PALETTE.length]} />)}
               </Bar>
@@ -321,8 +321,8 @@ export default function CargoWatch() {
               <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
               <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
               <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
-              <Bar dataKey="count" fill="#4655FF" />
+              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+              <Bar dataKey="count" fill="#465bff" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -333,7 +333,7 @@ export default function CargoWatch() {
               <CartesianGrid stroke="#E2E2E2" strokeDasharray="3 3" />
               <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
               <YAxis tickLine={false} axisLine={{ stroke: "#E2E2E2" }} fontSize={11} />
-              <Tooltip contentStyle={{ background: "#0B0B3D", border: "none", color: "#fff", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
               {allCategoriesForStack.map((cat, idx) => (
                 <Bar key={cat} dataKey={cat} stackId="cat" fill={CAT_PALETTE[idx % CAT_PALETTE.length]} />

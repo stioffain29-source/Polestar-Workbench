@@ -325,7 +325,7 @@ export function buildShippingReportDataset(
     countryMap.set(r.incidentCountry, (countryMap.get(r.incidentCountry) ?? 0) + 1);
   }
   const countryRows = Array.from(countryMap.entries())
-    .map(([label, value]) => ({ label, value, color: "#4655FF" }))
+    .map(([label, value]) => ({ label, value, color: "#465bff" }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 12);
 

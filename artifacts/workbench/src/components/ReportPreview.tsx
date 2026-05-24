@@ -4,11 +4,11 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
-const NAVY = "#0B0B3D";
-const ELECTRIC = "#4655FF";
-const DUSK = "#303030";
+const NAVY = "#0b0a3d";
+const ELECTRIC = "#465bff";
+const DUSK = "#363636";
 const POLAR = "#E2E2E2";
-const BRAND_GRADIENT = "linear-gradient(-130deg, #0B0B3D 0%, #4655FF 100%)";
+const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
 const SEV_COLOR: Record<string, string> = {
   Extreme: "#800000",

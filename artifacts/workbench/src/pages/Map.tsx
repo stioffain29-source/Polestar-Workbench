@@ -180,8 +180,8 @@ export default function MapPage() {
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#666" }}>
                         {p.category}
                       </div>
-                      <div style={{ fontWeight: 700, color: "#0B0B3D", marginTop: 2 }}>{p.title}</div>
-                      <div style={{ fontSize: 11, color: "#303030", marginTop: 4 }}>
+                      <div style={{ fontWeight: 700, color: "#0b0a3d", marginTop: 2 }}>{p.title}</div>
+                      <div style={{ fontSize: 11, color: "#363636", marginTop: 4 }}>
                         <div>
                           <strong>Country:</strong> {p.country}
                           {p.location ? ` · ${p.location}` : ""}
@@ -194,7 +194,7 @@ export default function MapPage() {
                         </div>
                       </div>
                       {p.summary && (
-                        <div style={{ fontSize: 11, color: "#303030", marginTop: 6, lineHeight: 1.35 }}>
+                        <div style={{ fontSize: 11, color: "#363636", marginTop: 6, lineHeight: 1.35 }}>
                           {p.summary.length > 220 ? `${p.summary.slice(0, 217)}…` : p.summary}
                         </div>
                       )}

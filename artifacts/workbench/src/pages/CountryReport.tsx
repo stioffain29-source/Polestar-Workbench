@@ -202,7 +202,7 @@ export default function CountryReport() {
       <div
         className="report-hero rounded-sm px-10 py-10 text-white flex items-center justify-between gap-10"
         style={{
-          background: "linear-gradient(to right, #0B0B3D 0%, #0B0B3D 38%, #4655FF 100%)",
+          background: "linear-gradient(to right, #0b0a3d 0%, #0b0a3d 38%, #465bff 100%)",
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
         }}

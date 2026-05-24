@@ -37,7 +37,7 @@ export const RATING_TEXT_COLORS: Record<string, string> = {
   high: "#FFFFFF",
   moderate: "#FFFFFF",
   low: "#FFFFFF",
-  insignificant: "#303030",
+  insignificant: "#363636",
 };
 
 export const MARKER_FILL_OPACITY = 0.78;

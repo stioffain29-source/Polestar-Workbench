@@ -77,9 +77,9 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* Midnight Blue: #0B0B3D -> 240 70% 14% */
-  /* Dusk Gray: #303030 -> 0 0% 19% */
-  /* Electric Blue: #4655FF -> 235 100% 64% */
+  /* Midnight Blue: #0b0a3d -> 240 70% 14% */
+  /* Dusk Gray: #363636 -> 0 0% 19% */
+  /* Electric Blue: #465bff -> 235 100% 64% */
   /* Polar Gray: #E2E2E2 -> 0 0% 89% */
 
   --background: 0 0% 98%;
