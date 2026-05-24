@@ -95,6 +95,9 @@ export default function ReportEditor() {
         implications: form.implications,
         watchNext: form.watchNext,
         polestarView: form.polestarView,
+        // Pass the raw jsonb through so the PDF exporter and the preview
+        // read from the same source for jet fuel trajectory + Hard Numbers.
+        hardNumbers: report?.hardNumbers,
       };
       const mappedIncidents = incidentsForExport.map((i) => ({
         id: i.id,
@@ -269,7 +272,10 @@ export default function ReportEditor() {
           {form.topic === "shipping" ? (
             <ShippingReportPreview report={form} incidents={incidentsForExport} />
           ) : (
-            <ReportPreview report={form} incidents={incidentsForExport} />
+            <ReportPreview
+              report={{ ...form, hardNumbers: report?.hardNumbers }}
+              incidents={incidentsForExport}
+            />
           )}
         </div>
       </div>

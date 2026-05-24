@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FuelHardNumbers } from './fuelHardNumbers';
+import type { KpiCard } from './kpiCard';
 import type { ReportStatus } from './reportStatus';
 import type { Topic } from './topic';
 
@@ -17,7 +18,7 @@ export interface ReportUpdate {
   issueDate?: Date;
   situation?: string;
   whatHappened?: string;
-  hardNumbers?: FuelHardNumbers;
+  hardNumbers?: FuelHardNumbers | KpiCard[];
   whatMatters?: string;
   implications?: string;
   polestarView?: string;

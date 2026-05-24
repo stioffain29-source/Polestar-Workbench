@@ -5,7 +5,7 @@ import {
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
-  NAVY, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
+  NAVY, POLAR, DUSK, WHITE, ELECTRIC, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
 import {
@@ -27,7 +27,6 @@ import {
   jetFuelBenchmarkLabel,
   type JetFuelPricePoint,
 } from "./jetFuelTrajectory";
-import { ELECTRIC } from "./pdfChrome";
 
 export interface TopicReportData {
   title: string;
@@ -41,6 +40,11 @@ export interface TopicReportData {
   implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
+  /**
+   * Raw report.hardNumbers jsonb. Parsed by jetFuelTrajectory.ts to drive
+   * the Jet Fuel Price Trajectory chart and the Singapore Jet Fuel card.
+   */
+  hardNumbers?: unknown;
 }
 
 export interface TopicReportIncident {
@@ -57,9 +61,129 @@ export interface TopicReportIncident {
   location?: string | null;
 }
 
-function drawJetFuelEmptyCard(ctx: Ctx) {
+function formatDateShortPdf(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${d.getUTCDate().toString().padStart(2, "0")} ${months[d.getUTCMonth()]}`;
+}
+
+/**
+ * Draw the Jet Fuel Price Trajectory chart in the PDF. Mirrors the SVG
+ * version in JetFuelTrajectoryChart.tsx (line plot, electric-blue
+ * trajectory, navy latest-value marker, polar-gray axes/gridlines,
+ * Roboto throughout). Annotations are drawn only when supplied by data.
+ */
+function drawJetFuelChart(ctx: Ctx, series: JetFuelPricePoint[], benchmark: string) {
+  const { pdf, MX, CW } = ctx;
+  const headerH = 18;
+  const chartH = 150;
+  const captionH = 14;
+  const totalH = headerH + chartH + captionH + 8;
+  ensureSpace(ctx, totalH + 10);
+
+  // Pick a display unit from the first point that has one.
+  let unit = "";
+  for (const p of series) { if (p.unit) { unit = p.unit; break; } }
+
+  // Header line: benchmark + unit on the left, latest value on the right.
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(10);
+  pdf.text(`${benchmark}${unit ? ` (${unit})` : ""}`, MX, ctx.y + 11);
+  const last = series[series.length - 1];
+  const span = Math.max(
+    Math.max(...series.map((p) => p.value)) - Math.min(...series.map((p) => p.value)),
+    Math.abs(Math.max(...series.map((p) => p.value))) * 0.02,
+    0.01,
+  );
+  const yDecimals = span >= 10 ? 0 : span >= 1 ? 1 : 2;
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  const latestStr = `Latest ${formatDateShortPdf(last.date)}: ${last.value.toFixed(yDecimals)}${unit ? ` ${unit}` : ""}`;
+  pdf.text(latestStr, MX + CW, ctx.y + 11, { align: "right" });
+
+  // Chart plot area.
+  const plotX0 = MX + 36;
+  const plotY0 = ctx.y + headerH;
+  const plotW = CW - 36 - 6;
+  const plotH = chartH - 18;
+  const xAxisY = plotY0 + plotH;
+  const minP = Math.min(...series.map((p) => p.value));
+  const maxP = Math.max(...series.map((p) => p.value));
+  const yMin = minP - span * 0.15;
+  const yMax = maxP + span * 0.15;
+  const xAt = (i: number) => plotX0 + (i / (series.length - 1)) * plotW;
+  const yAt = (v: number) => plotY0 + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  // Axes.
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(1);
+  pdf.line(plotX0, plotY0, plotX0, xAxisY);
+  pdf.line(plotX0, xAxisY, plotX0 + plotW, xAxisY);
+
+  // Y gridlines + labels.
+  const yTicks = [0, 1, 2, 3].map((k) => yMin + (k / 3) * (yMax - yMin));
+  pdf.setLineWidth(0.3);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  for (const v of yTicks) {
+    const y = yAt(v);
+    pdf.line(plotX0, y, plotX0 + plotW, y);
+    pdf.text(v.toFixed(yDecimals), plotX0 - 4, y + 3, { align: "right" });
+  }
+
+  // X tick labels.
+  const tickIdx = series.length <= 4
+    ? series.map((_, i) => i)
+    : [0, Math.floor((series.length - 1) / 3), Math.floor((2 * (series.length - 1)) / 3), series.length - 1];
+  for (const i of tickIdx) {
+    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, { align: "center" });
+  }
+
+  // Annotations (data-supplied only).
+  for (let i = 0; i < series.length; i++) {
+    const ann = series[i].annotation;
+    if (!ann) continue;
+    setStroke(pdf, DUSK);
+    pdf.setLineWidth(0.3);
+    pdf.setLineDashPattern([2, 2], 0);
+    pdf.line(xAt(i), plotY0, xAt(i), xAxisY);
+    pdf.setLineDashPattern([], 0);
+    setText(pdf, DUSK);
+    pdf.setFontSize(7);
+    pdf.text(ann, xAt(i) + 3, plotY0 + 8);
+    pdf.setFontSize(8);
+  }
+
+  // Trajectory line.
+  setStroke(pdf, ELECTRIC);
+  pdf.setLineWidth(1.2);
+  for (let i = 1; i < series.length; i++) {
+    pdf.line(xAt(i - 1), yAt(series[i - 1].value), xAt(i), yAt(series[i].value));
+  }
+
+  // Latest-value marker — flat circle.
+  setFill(pdf, NAVY);
+  pdf.circle(xAt(series.length - 1), yAt(last.value), 2.2, "F");
+
+  // Caption below.
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  const caption = `${benchmark}, ${series.length} observations from ${formatDateShortPdf(series[0].date)} to ${formatDateShortPdf(last.date)}.`;
+  pdf.text(caption, MX, plotY0 + plotH + 28);
+
+  ctx.y = plotY0 + plotH + 28 + 6;
+}
+
+function drawJetFuelEmptyCard(ctx: Ctx, benchmark: string) {
   // Bordered card matching JetFuelTrajectoryChart's preview empty-state:
   // Polar Gray 1pt border, Navy title, Dusk body, Roboto, no shadow.
+  // The benchmark label is supplied from the same parser the preview
+  // uses (jetFuelBenchmarkLabel) so the two empty-states match.
   const { pdf, MX, CW } = ctx;
   const titleH = 14;
   const bodyH = 18;
@@ -73,7 +197,7 @@ function drawJetFuelEmptyCard(ctx: Ctx) {
   setText(pdf, NAVY);
   setRoboto(pdf, "bold");
   pdf.setFontSize(10);
-  pdf.text("Singapore Jet Fuel Benchmark", MX + padX, ctx.y + padY + 10);
+  pdf.text(benchmark, MX + padX, ctx.y + padY + 10);
   setText(pdf, DUSK);
   setRoboto(pdf, "regular");
   pdf.setFontSize(9);
@@ -259,14 +383,24 @@ export async function exportTopicReportPdf(
     drawSectionHeading(ctx, "Hard Numbers");
     drawFastFactsKpiCards(
       ctx,
-      computeFuelHardNumbers({ issueDate: data.issueDate, incidents }) as KpiCardData[],
+      computeFuelHardNumbers({
+        issueDate: data.issueDate,
+        incidents,
+        hardNumbersRaw: data.hardNumbers,
+      }) as KpiCardData[],
     );
 
-    // Jet Fuel Price Trajectory — empty-state card mirroring the on-screen
-    // bordered panel from JetFuelTrajectoryChart. We never invent a chart
-    // from incident counts.
+    // Jet Fuel Price Trajectory — render the real chart only when the
+    // report carries a usable series (≥2 valid dated points). Otherwise
+    // fall back to the honest empty-state card. Preview and PDF use the
+    // same parser (getFuelJetFuelTrajectory) so they cannot drift.
     drawSectionHeading(ctx, "Jet Fuel Price Trajectory");
-    drawJetFuelEmptyCard(ctx);
+    const jetSeries = getFuelJetFuelTrajectory(data.hardNumbers);
+    if (jetSeries) {
+      drawJetFuelChart(ctx, jetSeries, jetFuelBenchmarkLabel(data.hardNumbers));
+    } else {
+      drawJetFuelEmptyCard(ctx, jetFuelBenchmarkLabel(data.hardNumbers));
+    }
 
     const regional = buildFuelRegionalHighlights({ issueDate: data.issueDate, incidents });
     const producerBuyer = buildFuelProducerBuyerActions({ issueDate: data.issueDate, incidents });

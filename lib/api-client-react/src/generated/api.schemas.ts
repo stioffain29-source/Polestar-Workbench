@@ -378,7 +378,7 @@ export interface Report {
   situation?: string | null;
   /** @nullable */
   whatHappened?: string | null;
-  hardNumbers?: FuelHardNumbers | null;
+  hardNumbers?: FuelHardNumbers | KpiCard[] | null;
   /** @nullable */
   whatMatters?: string | null;
   /** @nullable */
@@ -400,7 +400,7 @@ export interface ReportInput {
   issueDate: string;
   situation?: string;
   whatHappened?: string;
-  hardNumbers?: FuelHardNumbers;
+  hardNumbers?: FuelHardNumbers | KpiCard[];
   whatMatters?: string;
   implications?: string;
   polestarView?: string;
@@ -416,7 +416,7 @@ export interface ReportUpdate {
   issueDate?: string;
   situation?: string;
   whatHappened?: string;
-  hardNumbers?: FuelHardNumbers;
+  hardNumbers?: FuelHardNumbers | KpiCard[];
   whatMatters?: string;
   implications?: string;
   polestarView?: string;

@@ -834,8 +834,13 @@ components:
         situation: { type: ["string", "null"] }
         whatHappened: { type: ["string", "null"] }
         hardNumbers:
+          # Legacy reports were typed as KpiCard[]; new reports use the
+          # FuelHardNumbers object shape. Both remain valid so existing
+          # rows continue to deserialise without a migration.
           oneOf:
             - { $ref: "#/components/schemas/FuelHardNumbers" }
+            - type: array
+              items: { $ref: "#/components/schemas/KpiCard" }
             - type: "null"
         whatMatters: { type: ["string", "null"] }
         implications: { type: ["string", "null"] }
@@ -896,7 +901,10 @@ components:
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:
-          $ref: "#/components/schemas/FuelHardNumbers"
+          oneOf:
+            - { $ref: "#/components/schemas/FuelHardNumbers" }
+            - type: array
+              items: { $ref: "#/components/schemas/KpiCard" }
         whatMatters: { type: string }
         implications: { type: string }
         polestarView: { type: string }
@@ -914,7 +922,10 @@ components:
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:
-          $ref: "#/components/schemas/FuelHardNumbers"
+          oneOf:
+            - { $ref: "#/components/schemas/FuelHardNumbers" }
+            - type: array
+              items: { $ref: "#/components/schemas/KpiCard" }
         whatMatters: { type: string }
         implications: { type: string }
         polestarView: { type: string }
