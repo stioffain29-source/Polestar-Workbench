@@ -8,10 +8,12 @@ const REQUIRED_TOPIC_REPORTS: Array<{
   topic: string;
   title: string;
 }> = [
-  { topic: "fuel",        title: "APAC Fuel Theft & Diversion Outlook" },
-  { topic: "fertiliser",  title: "South Asia Fertiliser Supply Risk Brief" },
-  { topic: "cargo_watch", title: "APAC Cargo Theft & Hijack Monthly" },
   { topic: "energy",      title: "APAC Energy Watch" },
+  { topic: "fuel",        title: "APAC Fuel Watch" },
+  { topic: "fertiliser",  title: "South Asia Fertiliser Watch" },
+  { topic: "cargo_watch", title: "APAC Cargo Watch" },
+  { topic: "shipping",    title: "Hormuz Maritime Watch" },
+  { topic: "protests",    title: "APAC Flashpoint" },
 ];
 
 // Reports that were previously auto-seeded but have since been retired.
@@ -19,6 +21,12 @@ const REQUIRED_TOPIC_REPORTS: Array<{
 // requiring manual deletion in the UI.
 const RETIRED_REPORT_TITLES: string[] = [
   "Indo-Pacific Flashpoint Tracker",
+  "APAC Fuel Theft & Diversion Outlook",
+  "South Asia Fertiliser Supply Risk Brief",
+  "APAC Cargo Theft & Hijack Monthly",
+  "Weekly Energy Brief - GCC Grid Pressure",
+  "Hormuz Maritime Threat Update",
+  "PNG Election Cycle Risk Brief",
 ];
 
 /**
