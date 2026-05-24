@@ -13,9 +13,11 @@ import {
 // countries opt in by adding an entry to COUNTRY_COVER_URLS below, keyed
 // by the lower-cased country name.
 import papuaNewGuineaCoverUrl from "@assets/image_1779624991006.png";
+import papuaCoverUrl from "@assets/image_1779625036503.png";
 
 const COUNTRY_COVER_URLS: Record<string, string> = {
   "papua new guinea": papuaNewGuineaCoverUrl,
+  "papua": papuaCoverUrl,
 };
 import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
