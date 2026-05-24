@@ -388,7 +388,7 @@ export default function Shipping() {
                   <td className="p-2 text-xs text-foreground/80">
                     {row.count === 0
                       ? <span className="italic text-muted-foreground">No current records in selected window.</span>
-                      : `${row.count} record${row.count === 1 ? "" : "s"} on file. Most recent: ${row.latest!.title}.`}
+                      : `Latest item: ${row.latest!.title}. (${row.count} record${row.count === 1 ? "" : "s"} in window.)`}
                   </td>
                 </tr>
               ))}
@@ -538,7 +538,7 @@ export default function Shipping() {
             label="Chokepoint / Route Activity"
             body={
               transitRecords.length > 0
-                ? `${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} on file covering chokepoint risk, route diversion and maritime advisories. Most recent: ${transitRecords[0].title}.`
+                ? `Chokepoint reporting was led by ${transitRecords[0].title}, with the wider set covering chokepoint risk, route diversion and maritime advisories (${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} in window).`
                 : null
             }
           />
@@ -546,7 +546,7 @@ export default function Shipping() {
             label="Vessel Threat / Piracy"
             body={
               vesselIncidents.length + piracyIncidents.length > 0
-                ? `${vesselAttackOrSeizureCount} vessel attack/seizure record${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy/armed-robbery record${piracyIncidents.length === 1 ? "" : "s"} on file. Most recent vessel item: ${vesselIncidents[0]?.title ?? piracyIncidents[0]?.title ?? "—"}.`
+                ? `Hostile maritime activity was led by ${vesselIncidents[0]?.title ?? piracyIncidents[0]?.title ?? "—"}, split across ${vesselAttackOrSeizureCount} vessel attack or seizure record${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy or armed-robbery record${piracyIncidents.length === 1 ? "" : "s"}.`
                 : null
             }
           />
@@ -554,7 +554,7 @@ export default function Shipping() {
             label="Commercial Impact"
             body={
               commercialRecords.length > 0
-                ? `${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} on port disruption, freight or insurance pressure and commercial shipping disruption. Most recent: ${commercialRecords[0].title}.`
+                ? `Commercial pressure was led by ${commercialRecords[0].title}, covering port disruption, freight and insurance pressure and wider commercial shipping disruption (${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} in window).`
                 : null
             }
           />

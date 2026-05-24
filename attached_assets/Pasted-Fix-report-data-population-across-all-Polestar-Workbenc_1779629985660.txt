@@ -1,0 +1,104 @@
+Fix report data population across all Polestar Workbench reports.
+
+Problem:
+Reports are not consistently populating with data.
+
+In the report editor, the prose fields contain values, for example:
+- Energy Watch has 4 records, moderate severity, Pakistan and Sri Lanka references.
+- Fertiliser Watch has 11 records, extreme severity, India / Nepal / Japan references.
+
+But the report preview Fast Facts cards show dashes:
+- Total Records: —
+- Highest Severity: —
+- Top Issue Type: —
+- Most Affected Country: —
+- Latest Incident: —
+
+This means the prose is being generated from incident data, but the Fast Facts / report metrics are not being populated from the same data source.
+
+Scope:
+Apply the fix to all standard report types:
+- Fuel Watch
+- Fertiliser Watch
+- Cargo Watch
+- Shipping Watch
+- Flashpoint
+- Energy Watch
+
+Country reports are separate.
+
+Required fix:
+1. Trace the report data flow
+- Identify where report prose is generated.
+- Identify where Fast Facts / metric cards are generated.
+- Ensure both use the same incident dataset and report window.
+- Do not allow preview cards to remain on placeholder values when incident data exists.
+
+2. Fast Facts must populate from live report data
+
+For each report, populate:
+- Reporting Period
+- Total Records / Records in Window
+- Highest Severity
+- Top Issue Type
+- Most Affected Country
+- Latest Incident
+
+If a value genuinely cannot be calculated, show a clear reason or omit the card. Do not show placeholder dashes when data exists elsewhere in the same report.
+
+3. Preview and PDF must match
+- The report editor preview must show the same populated values as the exported PDF.
+- Do not calculate one set of values for the preview and a different set for PDF export.
+- Create a shared helper if needed so the preview and PDF use the same metric calculation.
+
+4. Do not rely on saved placeholder fields
+- Do not leave Fast Facts dependent on stale draft fields such as blank keyMetrics values.
+- If the report is generated from incidents, calculate metrics from incidents at render/export time or ensure the draft is hydrated before render.
+- Remove or bypass placeholder fallback values that produce “—” when records exist.
+
+5. Acceptance check using Energy Watch
+For Energy Watch with 4 records in the 17 May - 23 May 2026 window:
+- Total Records must show 4
+- Highest Severity must show Moderate
+- Most Affected Country must show Pakistan if that is the leading country
+- Top Issue Type must show Power supply disruption, or the correct normalised issue type
+- Latest Incident must show the correct latest incident date/title from the incident set
+- No Fast Facts card should show “—” unless there is genuinely no data
+
+6. Acceptance check using Fertiliser Watch
+For Fertiliser Watch with 11 records in the 18 May - 24 May 2026 window:
+- Total Records must show 11
+- Highest Severity must show Extreme
+- Most Affected Country must show India if that is the leading country
+- Top Issue Type must show the correct leading issue type
+- Latest Incident must show the latest incident date/title from the incident set
+- No Fast Facts card should show “—” unless there is genuinely no data
+
+7. Keep existing requirements
+Do not undo:
+- Roboto font requirement
+- Polestar brand colours
+- report cover structure
+- merged Fast Facts layout
+- improved chart styling
+- natural prose standard
+- Shipping Watch fixes
+
+Brand colours remain exactly:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+- #E2E2E2
+
+Final acceptance:
+- Open each of the six report types in preview.
+- Confirm Fast Facts cards are populated when the prose has data.
+- Export at least Energy Watch and Fertiliser Watch to PDF.
+- Confirm preview and PDF show the same metrics.
+- No visible “—” placeholder appears where incident data exists.

@@ -202,7 +202,7 @@ function drawRelatedIncidents(
   setRoboto(pdf, "italic");
   pdf.setFontSize(8);
   const note = truncated > 0
-    ? `Showing ${rows.length} most recent of ${sorted.length} records in window. Older records remain available in the Workbench.`
+    ? `Showing ${rows.length} latest of ${sorted.length} records in window. Older records remain available in the Workbench.`
     : `Older records remain available in the Workbench.`;
   pdf.text(sanitize(note), ctx.MX, ctx.y + 10);
   setRoboto(pdf, "regular");

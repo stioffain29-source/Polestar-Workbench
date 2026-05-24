@@ -347,7 +347,7 @@ function drawIncidentTable(
     setRoboto(pdf, "italic");
     pdf.setFontSize(8);
     pdf.text(
-      sanitize(`Showing ${rows.length} most recent of ${sorted.length} records in window. Older records remain available in the Workbench.`),
+      sanitize(`Showing ${rows.length} latest of ${sorted.length} records in window. Older records remain available in the Workbench.`),
       ctx.MX,
       ctx.y + 10,
     );

@@ -266,7 +266,7 @@ function IncidentTable<T extends EnrichedIncident>({ rows, emptyMessage, actLabe
       ))}
       {rows.length > limited.length && (
         <div style={{ padding: "8px 10px", borderTop: `1px solid ${POLAR}`, fontSize: 11, fontStyle: "italic", color: DUSK }}>
-          Showing {limited.length} most recent of {rows.length} records in window. Older records remain available in the Workbench.
+          Showing {limited.length} latest of {rows.length} records in window. Older records remain available in the Workbench.
         </div>
       )}
     </div>

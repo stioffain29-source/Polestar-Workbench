@@ -234,7 +234,7 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
     setText(pdf, DUSK);
     setRoboto(pdf, "italic");
     pdf.setFontSize(8);
-    pdf.text(sanitize(`Showing ${limited.length} most recent of ${rows.length} records in window. Older records remain available in the Workbench.`), MX, ctx.y + 12);
+    pdf.text(sanitize(`Showing ${limited.length} latest of ${rows.length} records in window. Older records remain available in the Workbench.`), MX, ctx.y + 12);
     setRoboto(pdf, "regular");
     ctx.y += 16;
   }
