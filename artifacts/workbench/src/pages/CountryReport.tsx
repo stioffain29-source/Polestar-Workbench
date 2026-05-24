@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
   useGetCountryReport,
@@ -31,17 +31,23 @@ export default function CountryReport() {
   const slug = params?.slug ?? "";
   const qc = useQueryClient();
   const { data: country, isLoading } = useGetCountryReport(slug);
-  const { data: incidents = [] } = useListIncidents(country ? { country: country.name } : {}, {
+  const { data: incidentsData } = useListIncidents(country ? { country: country.name } : {}, {
     query: { enabled: !!country },
   } as never);
+  const incidents = incidentsData ?? [];
   const update = useUpdateCountryReport();
 
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const seededForSlug = useRef<string | null>(null);
 
   useEffect(() => {
     if (!country) return;
+    // Wait for incidents to arrive before seeding; seed once per country.
+    if (!incidentsData) return;
+    if (seededForSlug.current === slug) return;
+    seededForSlug.current = slug;
     // Seed empty narrative fields with an operational draft so the editor
     // opens with usable prose rather than writing prompts. Saved content
     // always wins.
@@ -72,7 +78,13 @@ export default function CountryReport() {
       trendSummary: pick(country.trendSummary, drafted.trendSummary),
       implications: pick(country.implications, drafted.implications),
     });
-  }, [country, incidents]);
+  }, [country, incidentsData, slug]);
+
+  useEffect(() => {
+    if (seededForSlug.current !== null && seededForSlug.current !== slug) {
+      seededForSlug.current = null;
+    }
+  }, [slug]);
 
   const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));

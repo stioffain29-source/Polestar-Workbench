@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
   useGetReport, useUpdateReport, useListIncidents,
@@ -72,7 +72,10 @@ export default function ReportEditor() {
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [exporting, setExporting] = useState(false);
-  const { data: incidents = [] } = useListIncidents({});
+  const { data: incidents } = useListIncidents({});
+  const seededForId = useRef<number | null>(null);
+
+  const incidentsForExport = incidents ?? [];
 
   const downloadPdf = async () => {
     setExporting(true);
@@ -91,7 +94,7 @@ export default function ReportEditor() {
           watchNext: form.watchNext,
           polestarView: form.polestarView,
         },
-        incidents.map((i) => ({
+        incidentsForExport.map((i) => ({
           id: i.id,
           title: i.title,
           topic: i.topic,
@@ -113,6 +116,11 @@ export default function ReportEditor() {
 
   useEffect(() => {
     if (!report) return;
+    // Wait until incidents have loaded before seeding so the draft prose is
+    // built from the actual window. Seed exactly once per report id.
+    if (!incidents) return;
+    if (seededForId.current === report.id) return;
+    seededForId.current = report.id;
     let exec = "";
     try {
       exec = (typeof window !== "undefined" && window.localStorage)
@@ -125,7 +133,7 @@ export default function ReportEditor() {
     // report opens with usable prose rather than writing prompts.
     const topic = report.topic ?? "fuel";
     const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
-    const inputs: DraftableIncident[] = incidents.map((i) => ({
+    const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       topic: i.topic,
       title: i.title,
       summary: i.summary,
@@ -157,6 +165,13 @@ export default function ReportEditor() {
       author: report.author ?? "",
     });
   }, [report, incidents]);
+
+  // Reset the seed guard if the route id changes.
+  useEffect(() => {
+    if (seededForId.current !== null && seededForId.current !== id) {
+      seededForId.current = null;
+    }
+  }, [id]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
