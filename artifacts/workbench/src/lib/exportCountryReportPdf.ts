@@ -2,11 +2,21 @@ import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages,
+  drawPolestarCover, beginBodyPages, prepareCoverImage,
+  COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, todayLabel,
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
+// Per-country cover photography. Mirrors the shipping / fertiliser wiring:
+// a full-bleed hero image sits behind the top band and bottom block. New
+// countries opt in by adding an entry to COUNTRY_COVER_URLS below, keyed
+// by the lower-cased country name.
+import papuaNewGuineaCoverUrl from "@assets/image_1779624991006.png";
+
+const COUNTRY_COVER_URLS: Record<string, string> = {
+  "papua new guinea": papuaNewGuineaCoverUrl,
+};
 import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
 } from "./reportWindow";
@@ -391,11 +401,24 @@ export async function exportCountryReportPdf(
     }),
   );
 
-  // Full-bleed Polestar cover (page 1) — title, subtitle, reporting period, website.
+  // Full-bleed Polestar cover (page 1) — title, subtitle, reporting period.
+  // Countries with a registered cover photo (see COUNTRY_COVER_URLS) get the
+  // same hero treatment as the shipping report; everything else falls back
+  // to the gradient hero. Image load is wrapped in try/catch so a missing
+  // asset never blocks PDF export.
+  let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
+  const countryCoverUrl = COUNTRY_COVER_URLS[country.name.trim().toLowerCase()];
+  if (countryCoverUrl) {
+    try {
+      const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
+      coverImage = await prepareCoverImage(countryCoverUrl, ctx.W, heroH);
+    } catch { /* fall back to gradient hero */ }
+  }
   drawPolestarCover(ctx, {
     title: country.name,
     subtitle: "POLESTAR INSIGHTS",
     reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
+    coverImage,
   });
   beginBodyPages(ctx);
 
