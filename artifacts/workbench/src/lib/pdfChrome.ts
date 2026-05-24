@@ -3,10 +3,10 @@ import { format } from "date-fns";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 // Polestar core brand palette.
-export const NAVY = "#0b0a3d";       // Midnight Blue
-export const ELECTRIC = "#465bff";   // Electric Blue
+export const NAVY = "#0B0B3D";       // Midnight Blue
+export const ELECTRIC = "#4655FF";   // Electric Blue
 export const POLAR = "#e2e2e2";      // Polar Gray
-export const DUSK = "#363636";       // Dusk Gray
+export const DUSK = "#303030";       // Dusk Gray
 export const WHITE = "#FFFFFF";
 export const CARD_BG = "#FFFFFF";
 export const PAGE_BG = "#FFFFFF";
@@ -84,7 +84,7 @@ export function setText(pdf: jsPDF, hex: string) {
 
 /**
  * Draw the Polestar blue gradient (navy -> electric) into a rectangle.
- * Spec: linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%) — approximated
+ * Spec: linear-gradient(-130deg, #0B0B3D 0%, #4655FF 100%) — approximated
  * here as a smooth horizontal navy-left to electric-right interpolation,
  * which reads as the same brand band in print.
  */

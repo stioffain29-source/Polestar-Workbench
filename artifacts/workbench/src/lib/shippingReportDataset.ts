@@ -1,4 +1,4 @@
-import { format, parseISO, max as dateMax, startOfDay } from "date-fns";
+import { format, parseISO, max as dateMax, startOfDay, subDays } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import {
@@ -62,12 +62,17 @@ export interface TimelinePoint { date: string; label: string; count: number }
 export interface ShippingReportDataset {
   reportingPeriodShort: string;
   reportingPeriodLong: string;
+  /** Short label for the rolling 30-day window used by Chokepoint / Vessel / Piracy. */
+  thirtyDayShortLabel: string;
   enriched: EnrichedIncident[];
   outOfScopeCount: number;
   fastFacts: KpiCard[];
   keyMetrics: KpiCard[];
+  /** Chokepoint Watch over the last 30 days (not the weekly window). */
   chokepointRows: ChokepointRow[];
+  /** Vessel attacks over the last 30 days. */
   vesselRows: VesselRow[];
+  /** Piracy / armed robbery over the last 30 days. */
   piracyRows: PiracyRow[];
   issueRows: BarRow[];
   dailyIntelLines: string[];
@@ -134,7 +139,7 @@ export function buildShippingReportDataset(
   // Same scope filter as the Shipping dashboard: shipping topic only, strip
   // off-topic noise, then drop records that classify outside APAC + ME.
   const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
-  const windowed = rawWindow.filter((i) =>
+  const passesShipping = (i: ShippingReportIncident) =>
     isTopicRelevant(topic, {
       topic: i.topic,
       title: i.title,
@@ -142,19 +147,43 @@ export function buildShippingReportDataset(
       source: i.source ?? null,
       sourceUrl: i.sourceUrl ?? null,
       location: i.location ?? null,
-    }),
-  );
+    });
+  const windowed = rawWindow.filter(passesShipping);
   const enrichedAll = sortByDateDesc(enrich(windowed));
   const enriched = enrichedAll.filter((r) => r.region !== "Out of scope");
   const outOfScopeCount = enrichedAll.length - enriched.length;
 
-  // Chokepoint counts
+  // Rolling 30-day window for Chokepoint Watch, Vessel Attacks and
+  // Piracy / Armed Robbery. These sections look back further than the
+  // weekly briefing window so the reader has a fuller picture of
+  // hostile maritime activity even on quiet weeks.
+  let endDate: Date;
+  try { endDate = parseISO(issueDate); } catch { endDate = new Date(); }
+  if (isNaN(endDate.getTime())) endDate = new Date();
+  const start30 = subDays(endDate, 29);
+  const start30Ms = start30.getTime();
+  const end30Ms = endDate.getTime();
+  const raw30 = incidents.filter((i) => {
+    if (i.topic !== topic) return false;
+    try {
+      const d = parseISO(i.occurredAt);
+      if (isNaN(d.getTime())) return false;
+      const ms = d.getTime();
+      return ms >= start30Ms && ms <= end30Ms;
+    } catch { return false; }
+  });
+  const windowed30 = raw30.filter(passesShipping);
+  const enriched30 = sortByDateDesc(enrich(windowed30)).filter((r) => r.region !== "Out of scope");
+  const thirtyDayShortLabel = `${format(start30, "d MMM")} - ${format(endDate, "d MMM yyyy")}`;
+
+  // Chokepoint counts — derived from the 30-day window so the headline
+  // "Main Affected Chokepoint" matches the Chokepoint Watch table below.
   const cpCounts = new Map<ChokepointKey, number>();
-  for (const r of enriched) for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
+  for (const r of enriched30) for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
   let topCp: ChokepointKey | "" = "", topCpN = 0;
   for (const [k, v] of cpCounts) if (v > topCpN) { topCpN = v; topCp = k; }
 
-  // Region counts
+  // Region counts (weekly window — drives Regional and Country View charts)
   const regionCounts = new Map<Region, number>();
   for (const r of enriched) regionCounts.set(r.region, (regionCounts.get(r.region) ?? 0) + 1);
   let topRegion: Region | "" = "", topRegionN = 0;
@@ -163,12 +192,24 @@ export function buildShippingReportDataset(
     if (v > topRegionN) { topRegionN = v; topRegion = k; }
   }
 
-  // Vessel / piracy
-  const vesselRows: VesselRow[] = enriched
+  // Vessel / piracy — 30-day window so the dedicated sections show a
+  // meaningful operational picture even on a quiet weekly cycle.
+  const vesselRows: VesselRow[] = enriched30
     .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
     .filter((r): r is VesselRow => r.vesselType !== null);
   const vAttackSeize = vesselRows.filter((r) => r.vesselType === "Attack" || r.vesselType === "Seized").length;
-  const piracyRows: PiracyRow[] = enriched
+  const piracyRows: PiracyRow[] = enriched30
+    .map((r) => ({ ...r, act: classifyPiracy(r) }))
+    .filter((r): r is PiracyRow => r.act !== null);
+
+  // Weekly-window vessel/piracy counts (used only by the Daily Intelligence
+  // Summary line, which describes the weekly briefing window itself).
+  const vesselRowsWeekly = enriched
+    .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
+    .filter((r): r is VesselRow => r.vesselType !== null);
+  const vAttackSeizeWeekly = vesselRowsWeekly
+    .filter((r) => r.vesselType === "Attack" || r.vesselType === "Seized").length;
+  const piracyRowsWeekly = enriched
     .map((r) => ({ ...r, act: classifyPiracy(r) }))
     .filter((r): r is PiracyRow => r.act !== null);
 
@@ -187,9 +228,9 @@ export function buildShippingReportDataset(
       value: topCp || "—",
       note: topCpN > 0 ? `${topCpN} record${topCpN === 1 ? "" : "s"}` : "No chokepoint mention in window",
     },
-    { label: "Vessel Attacks / Seizures", value: String(vAttackSeize) },
+    { label: "Vessel Attacks / Seizures (30d)", value: String(vAttackSeize) },
     {
-      label: "Piracy / Armed Robbery",
+      label: "Piracy / Armed Robbery (30d)",
       value: String(piracyRows.length),
       note: `Latest record: ${latestDate ? format(latestDate, "dd MMM yyyy") : "—"}`,
     },
@@ -199,14 +240,14 @@ export function buildShippingReportDataset(
     { label: "Records In Window", value: String(enriched.length) },
     { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
     {
-      label: "Main Affected Chokepoint",
+      label: "Main Affected Chokepoint (30d)",
       value: topCp || (topRegion || "—"),
       note: topCpN > 0
         ? `${topCpN} record${topCpN === 1 ? "" : "s"}`
         : (topRegion ? `Fallback to region: ${topRegionN} record${topRegionN === 1 ? "" : "s"}` : "No chokepoint or region data"),
     },
-    { label: "Vessel Attacks / Seizures", value: String(vAttackSeize) },
-    { label: "Piracy / Armed Robbery", value: String(piracyRows.length) },
+    { label: "Vessel Attacks / Seizures (30d)", value: String(vAttackSeize) },
+    { label: "Piracy / Armed Robbery (30d)", value: String(piracyRows.length) },
     {
       label: "Latest Significant Incident",
       value: latestSig ? format(latestSig.date, "dd MMM yyyy") : "—",
@@ -215,13 +256,13 @@ export function buildShippingReportDataset(
     },
   ];
 
-  // Chokepoint Watch rows
+  // Chokepoint Watch rows — 30-day window.
   const chokepointRows: ChokepointRow[] = CHOKEPOINTS.map((cp) => {
-    const records = enriched.filter((r) => detectChokepoints(r).includes(cp));
+    const records = enriched30.filter((r) => detectChokepoints(r).includes(cp));
     const hs = highestSeverity(records);
     const latest = sortByDateDesc(records)[0] ?? null;
     const readText = records.length === 0
-      ? "No current records in selected window."
+      ? "No records in the last 30 days."
       : `${records.length} record${records.length === 1 ? "" : "s"} on file. Most recent: ${latest!.title}.`;
     return {
       name: cp,
@@ -254,13 +295,13 @@ export function buildShippingReportDataset(
   } else {
     dailyIntelLines.push("Chokepoint and Route Activity: no matching records in the current window.");
   }
-  if (vesselRows.length + piracyRows.length > 0) {
-    const latestVessel = vesselRows[0]?.title ?? piracyRows[0]?.title ?? "no recent title on file";
+  if (vesselRowsWeekly.length + piracyRowsWeekly.length > 0) {
+    const latestVessel = vesselRowsWeekly[0]?.title ?? piracyRowsWeekly[0]?.title ?? "no recent title on file";
     dailyIntelLines.push(
-      `Vessel Threat and Piracy: ${vAttackSeize} vessel attack/seizure record${vAttackSeize === 1 ? "" : "s"} and ${piracyRows.length} piracy or armed-robbery record${piracyRows.length === 1 ? "" : "s"} on file. Most recent vessel item: ${latestVessel}.`,
+      `Vessel Threat and Piracy: ${vAttackSeizeWeekly} vessel attack/seizure record${vAttackSeizeWeekly === 1 ? "" : "s"} and ${piracyRowsWeekly.length} piracy or armed-robbery record${piracyRowsWeekly.length === 1 ? "" : "s"} on file in the weekly window. Most recent vessel item: ${latestVessel}.`,
     );
   } else {
-    dailyIntelLines.push("Vessel Threat and Piracy: no hostile vessel or piracy records in the current window.");
+    dailyIntelLines.push("Vessel Threat and Piracy: no hostile vessel or piracy records in the current weekly window.");
   }
   if (commercialRecords.length > 0) {
     dailyIntelLines.push(
@@ -284,7 +325,7 @@ export function buildShippingReportDataset(
     countryMap.set(r.incidentCountry, (countryMap.get(r.incidentCountry) ?? 0) + 1);
   }
   const countryRows = Array.from(countryMap.entries())
-    .map(([label, value]) => ({ label, value, color: "#465bff" }))
+    .map(([label, value]) => ({ label, value, color: "#4655FF" }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 12);
 
@@ -315,6 +356,7 @@ export function buildShippingReportDataset(
   return {
     reportingPeriodShort: win.shortLabel,
     reportingPeriodLong: win.label,
+    thirtyDayShortLabel,
     enriched,
     outOfScopeCount,
     fastFacts,

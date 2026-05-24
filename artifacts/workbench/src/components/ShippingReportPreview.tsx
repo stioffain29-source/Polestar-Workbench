@@ -20,11 +20,11 @@ import {
 // (buildShippingReportDataset). Anything that draws in the PDF should
 // appear here so the editor preview and the export never disagree.
 
-const NAVY = "#0B0A3D";
-const ELECTRIC = "#465BFF";
-const DUSK = "#363636";
+const NAVY = "#0B0B3D";
+const ELECTRIC = "#4655FF";
+const DUSK = "#303030";
 const POLAR = "#E2E2E2";
-const BRAND_GRADIENT = "linear-gradient(-130deg, #0B0A3D 0%, #465BFF 100%)";
+const BRAND_GRADIENT = "linear-gradient(-130deg, #0B0B3D 0%, #4655FF 100%)";
 
 export interface ShippingPreviewReport {
   title?: string;
@@ -254,6 +254,20 @@ function IncidentTable<T extends EnrichedIncident>({ rows, emptyMessage, actLabe
   );
 }
 
+function niceScale(rawMax: number): { max: number; step: number } {
+  if (rawMax <= 1) return { max: 1, step: 1 };
+  const pow10 = Math.pow(10, Math.floor(Math.log10(rawMax)));
+  const norm = rawMax / pow10;
+  let niceNorm: number;
+  if (norm <= 1) niceNorm = 1;
+  else if (norm <= 2) niceNorm = 2;
+  else if (norm <= 5) niceNorm = 5;
+  else niceNorm = 10;
+  const max = niceNorm * pow10;
+  const step = (niceNorm <= 2 ? niceNorm / 2 : niceNorm / 5) * pow10;
+  return { max, step: Math.max(step, 1) };
+}
+
 function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow[]; labelW?: number; emptyMessage?: string }) {
   if (rows.length === 0) {
     return (
@@ -262,21 +276,56 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
       </p>
     );
   }
-  const max = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
+  const rawMax = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
+  const { max, step } = niceScale(rawMax);
+  const ticks: number[] = [];
+  for (let v = 0; v <= max; v += step) ticks.push(v);
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       {rows.map((r, i) => {
         const pct = (r.value / max) * 100;
         return (
           <div key={i} className="flex items-center gap-3" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: NAVY }}>
-            <div style={{ width: labelW, flexShrink: 0 }}>{r.label}</div>
-            <div className="flex-1 relative" style={{ background: POLAR, height: 14 }}>
-              <div style={{ width: `${pct}%`, height: "100%", background: r.color ?? ELECTRIC }} />
+            <div style={{ width: labelW, flexShrink: 0, fontWeight: 700 }}>{r.label}</div>
+            <div className="flex-1 relative" style={{ background: "#F3F4F8", height: 18 }}>
+              {ticks.map((v) => (
+                <div
+                  key={v}
+                  style={{
+                    position: "absolute",
+                    left: `${(v / max) * 100}%`,
+                    top: 0,
+                    bottom: 0,
+                    width: 1,
+                    background: POLAR,
+                  }}
+                />
+              ))}
+              <div style={{ width: `${pct}%`, height: "100%", background: r.color ?? ELECTRIC, position: "relative" }} />
             </div>
-            <div style={{ width: 30, textAlign: "right", color: DUSK, fontWeight: 700 }}>{r.value}</div>
+            <div style={{ width: 34, textAlign: "right", color: NAVY, fontWeight: 700 }}>{r.value}</div>
           </div>
         );
       })}
+      <div className="flex items-center gap-3" style={{ fontFamily: "Roboto, sans-serif", fontSize: 10, color: DUSK }}>
+        <div style={{ width: labelW, flexShrink: 0 }} />
+        <div className="flex-1 relative" style={{ height: 14, borderTop: `1px solid ${POLAR}` }}>
+          {ticks.map((v) => (
+            <span
+              key={v}
+              style={{
+                position: "absolute",
+                left: `${(v / max) * 100}%`,
+                top: 2,
+                transform: "translateX(-50%)",
+              }}
+            >
+              {v}
+            </span>
+          ))}
+        </div>
+        <div style={{ width: 34 }} />
+      </div>
     </div>
   );
 }
@@ -289,22 +338,54 @@ function TimelineChart({ series, peak }: { series: { date: string; label: string
       </p>
     );
   }
-  const max = series.reduce((m, s) => Math.max(m, s.count), 0) || 1;
+  const rawMax = series.reduce((m, s) => Math.max(m, s.count), 0) || 1;
+  const { max, step } = niceScale(rawMax);
+  const ticks: number[] = [];
+  for (let v = 0; v <= max; v += step) ticks.push(v);
   const tickIdx = [0, Math.floor(series.length / 2), series.length - 1].filter((v, i, a) => a.indexOf(v) === i);
+  const chartH = 140;
+  const peakIdx = peak ? series.findIndex((s) => s.label === peak.label && s.count === peak.count) : -1;
   return (
     <div>
-      <div
-        className="flex items-end gap-[2px] border-b"
-        style={{ height: 120, borderColor: POLAR, paddingTop: 4 }}
-      >
-        {series.map((s, i) => {
-          const h = Math.max(2, (s.count / max) * 110);
-          return (
-            <div key={i} className="flex-1" style={{ background: NAVY, height: h, minWidth: 2 }} title={`${s.label}: ${s.count}`} />
-          );
-        })}
+      <div className="flex" style={{ height: chartH }}>
+        <div
+          className="flex flex-col-reverse justify-between"
+          style={{ width: 28, paddingRight: 4, fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif", textAlign: "right" }}
+        >
+          {ticks.map((v) => (
+            <span key={v} style={{ lineHeight: 1 }}>{v}</span>
+          ))}
+        </div>
+        <div className="flex-1 relative" style={{ borderBottom: `1px solid ${DUSK}` }}>
+          {ticks.map((v) => (
+            <div
+              key={v}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: `${(v / max) * 100}%`,
+                height: 1,
+                background: POLAR,
+              }}
+            />
+          ))}
+          <div className="absolute inset-0 flex items-end gap-[2px]" style={{ paddingTop: 4 }}>
+            {series.map((s, i) => {
+              const h = Math.max(2, (s.count / max) * (chartH - 6));
+              return (
+                <div
+                  key={i}
+                  className="flex-1"
+                  style={{ background: i === peakIdx ? ELECTRIC : NAVY, height: h, minWidth: 2 }}
+                  title={`${s.label}: ${s.count}`}
+                />
+              );
+            })}
+          </div>
+        </div>
       </div>
-      <div className="flex justify-between mt-2" style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+      <div className="flex justify-between mt-1" style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif", paddingLeft: 28 }}>
         {tickIdx.map((idx) => (
           <span key={idx}>{series[idx].label}</span>
         ))}
@@ -400,7 +481,7 @@ export default function ShippingReportPreview({
             color: "rgba(255,255,255,0.92)",
           }}
         >
-          REPORTING PERIOD: {ds.reportingPeriodLong.toUpperCase()}
+          {ds.reportingPeriodLong.toUpperCase()}
         </div>
         <div
           className="uppercase"
@@ -431,25 +512,25 @@ export default function ShippingReportPreview({
           <KpiGrid cards={ds.keyMetrics} />
         </Section>
 
-        <Section title="Chokepoint Watch">
+        <Section title={`Chokepoint Watch, last 30 days (${ds.thirtyDayShortLabel})`}>
           <ChokepointTable rows={ds.chokepointRows} />
         </Section>
 
-        <Section title="Vessel Attacks">
+        <Section title={`Vessel Attacks, last 30 days (${ds.thirtyDayShortLabel})`}>
           <IncidentTable
             rows={ds.vesselRows}
             actLabel="Act"
             actFor={(r) => r.vesselType}
-            emptyMessage="No hostile vessel incidents on file in the selected window."
+            emptyMessage="No hostile vessel incidents on file in the last 30 days."
           />
         </Section>
 
-        <Section title="Piracy and Armed Robbery">
+        <Section title={`Piracy and Armed Robbery, last 30 days (${ds.thirtyDayShortLabel})`}>
           <IncidentTable
             rows={ds.piracyRows}
             actLabel="Act"
             actFor={(r) => r.act}
-            emptyMessage="No current piracy or armed-robbery records in the selected window."
+            emptyMessage="No piracy or armed-robbery records in the last 30 days."
           />
         </Section>
 
@@ -486,12 +567,18 @@ export default function ShippingReportPreview({
           <HorizontalBarChart rows={ds.severityRows} labelW={140} />
         </Section>
 
-        <Section title="Commercial Impact">
+        <Section title="Commercial Impact on Shipping">
+          <p
+            className="mb-3"
+            style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, fontStyle: "italic", color: DUSK, lineHeight: 1.6 }}
+          >
+            Shipping-side commercial impact only: port disruption, commercial shipping disruption, and insurance or freight pressure that affects vessel transit or cargo flow. Market commentary without a shipping linkage is excluded.
+          </p>
           <IncidentTable
             rows={ds.commercialRows}
             actLabel="Issue"
             actFor={(r) => r.issue}
-            emptyMessage="No commercial shipping or freight/insurance records in the selected window."
+            emptyMessage="No port, freight, insurance or commercial-shipping disruption records in the weekly window."
           />
         </Section>
 

@@ -38,6 +38,22 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\brecipe\b/,
 ];
 
+// Shipping-specific exclusions. Food-price commentary, airline fuel cost
+// stories and food-security analysis must never lead a Shipping report,
+// even when the text mentions a chokepoint or freight word in passing.
+// These records may discuss shipping in macro terms but they are not
+// operational maritime incidents.
+const SHIPPING_EXCLUDE: RegExp[] = [
+  /\bfao\b/,
+  /\bfood price (index|inflation|increase|rise|surge)/,
+  /\bfood (prices|inflation|security|crisis|insecurity)\b/,
+  /\b(world food (program|programme)|wfp)\b/,
+  /\bairline (fuel|jet fuel) (cost|price|prices|surcharge)/,
+  /\bjet fuel (cost|price|prices|surcharge)/,
+  /\b(grain|wheat|rice|corn|soybean|edible oil) (price|prices|market|outlook)\b/,
+  /\bcommodity price index\b/,
+];
+
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
     /\bfuel (shortage|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
@@ -119,6 +135,11 @@ export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
   const text = haystack(i);
   for (const re of EXCLUDE_PHRASES) {
     if (re.test(text)) return false;
+  }
+  if (topic === "shipping") {
+    for (const re of SHIPPING_EXCLUDE) {
+      if (re.test(text)) return false;
+    }
   }
   const required = REQUIRED[topic];
   if (!required || required.length === 0) return true;

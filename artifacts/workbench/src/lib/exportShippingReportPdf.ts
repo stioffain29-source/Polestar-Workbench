@@ -53,8 +53,8 @@ export type { ShippingReportIncident };
 
 // Chokepoint Watch -----------------------------------------------------------
 
-function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[]) {
-  drawSectionHeading(ctx, "Chokepoint Watch");
+function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[], windowLabel: string) {
+  drawSectionHeading(ctx, `Chokepoint Watch, last 30 days (${windowLabel})`);
   const { pdf, MX, CW } = ctx;
   const colNameW = 130;
   const colCountW = 50;
@@ -220,6 +220,22 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
 
 // Hand-drawn horizontal bar chart -------------------------------------------
 
+// Pick a "nice" rounded scale max + tick step (1/2/5 * 10^k) so the
+// gridlines land on round numbers (e.g. 0, 5, 10 rather than 0, 4.5).
+function niceScale(rawMax: number): { max: number; step: number } {
+  if (rawMax <= 1) return { max: 1, step: 1 };
+  const pow10 = Math.pow(10, Math.floor(Math.log10(rawMax)));
+  const norm = rawMax / pow10;
+  let niceNorm: number;
+  if (norm <= 1) niceNorm = 1;
+  else if (norm <= 2) niceNorm = 2;
+  else if (norm <= 5) niceNorm = 5;
+  else niceNorm = 10;
+  const max = niceNorm * pow10;
+  const step = (niceNorm <= 2 ? niceNorm / 2 : niceNorm / 5) * pow10;
+  return { max, step: Math.max(step, 1) };
+}
+
 function drawHorizontalBarChart(
   ctx: Ctx,
   heading: string,
@@ -238,39 +254,66 @@ function drawHorizontalBarChart(
     return;
   }
   const labelW = opts.labelW ?? 160;
-  const valueW = 30;
+  const valueW = 34;
   const trackX = MX + labelW + 6;
   const trackW = CW - labelW - 6 - valueW - 6;
-  const rowH = 16;
-  const gap = 4;
-  const totalH = rows.length * (rowH + gap);
+  const rowH = 20;
+  const gap = 5;
+  const axisH = 14;
+  const totalH = rows.length * (rowH + gap) + axisH;
   ensureSpace(ctx, totalH + 6);
 
-  const max = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
+  const rawMax = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
+  const { max, step } = niceScale(rawMax);
+
+  // Faint vertical gridlines at every step on the track, behind the bars.
+  const gridTop = ctx.y + 2;
+  const gridBottom = ctx.y + rows.length * (rowH + gap) - gap + 2;
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.4);
+  for (let v = 0; v <= max; v += step) {
+    const gx = trackX + (v / max) * trackW;
+    pdf.line(gx, gridTop, gx, gridBottom);
+  }
 
   for (const r of rows) {
     const y = ctx.y;
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8.5);
     const labelLines: string[] = pdf.splitTextToSize(sanitize(r.label), labelW - 4);
-    pdf.text(labelLines.slice(0, 1), MX, y + rowH - 5);
+    pdf.text(labelLines.slice(0, 1), MX, y + rowH - 7);
 
-    setFill(pdf, POLAR);
-    pdf.rect(trackX, y + 3, trackW, rowH - 6, "F");
+    // Track background.
+    setFill(pdf, "#F3F4F8");
+    pdf.rect(trackX, y + 4, trackW, rowH - 8, "F");
 
     const w = (r.value / max) * trackW;
     setFill(pdf, r.color ?? opts.barColor ?? ELECTRIC);
-    if (w > 0) pdf.rect(trackX, y + 3, w, rowH - 6, "F");
+    if (w > 0) pdf.rect(trackX, y + 4, w, rowH - 8, "F");
 
-    setText(pdf, DUSK);
+    setText(pdf, NAVY);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(8);
-    pdf.text(String(r.value), trackX + trackW + 6, y + rowH - 5);
+    pdf.setFontSize(9);
+    pdf.text(String(r.value), trackX + trackW + 6, y + rowH - 7);
     pdf.setFont("helvetica", "normal");
 
     ctx.y += rowH + gap;
   }
+
+  // Axis tick row with numeric scale.
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.6);
+  pdf.line(trackX, ctx.y + 2, trackX + trackW, ctx.y + 2);
+  setText(pdf, DUSK);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7);
+  for (let v = 0; v <= max; v += step) {
+    const gx = trackX + (v / max) * trackW;
+    pdf.line(gx, ctx.y + 2, gx, ctx.y + 5);
+    pdf.text(String(v), gx, ctx.y + 12, { align: "center" });
+  }
+  ctx.y += axisH;
   ctx.y += 6;
 }
 
@@ -288,33 +331,51 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
     ctx.y += 22;
     return;
   }
-  const chartH = 110;
-  const labelStripH = 12;
-  const valueStripH = 10;
-  const totalH = chartH + labelStripH + valueStripH + 12;
+  const chartH = 130;
+  const labelStripH = 14;
+  const footerH = 16;
+  const yAxisW = 22;
+  const totalH = chartH + labelStripH + footerH + 6;
   ensureSpace(ctx, totalH);
 
-  const x0 = MX + 6;
-  const w = CW - 12;
+  const x0 = MX + yAxisW;
+  const w = CW - yAxisW - 6;
   const y0 = ctx.y;
   const y1 = y0 + chartH;
 
+  const rawMax = series.reduce((mx, s) => Math.max(mx, s.count), 0) || 1;
+  const { max, step } = niceScale(rawMax);
+
+  // Horizontal gridlines + y-axis numeric ticks.
   setStroke(pdf, POLAR);
-  pdf.setLineWidth(0.5);
+  pdf.setLineWidth(0.4);
+  setText(pdf, DUSK);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7);
+  for (let v = 0; v <= max; v += step) {
+    const gy = y1 - (v / max) * (chartH - 8);
+    pdf.line(x0, gy, x0 + w, gy);
+    pdf.text(String(v), x0 - 4, gy + 2, { align: "right" });
+  }
+
+  // Baseline.
+  setStroke(pdf, DUSK);
+  pdf.setLineWidth(0.6);
   pdf.line(x0, y1, x0 + w, y1);
 
-  const max = series.reduce((mx, s) => Math.max(mx, s.count), 0) || 1;
+  // Bars + peak highlight.
   const barW = Math.max(2, Math.min(14, (w - (series.length - 1) * 2) / Math.max(series.length, 1)));
   const stride = series.length > 1 ? (w - barW) / (series.length - 1) : 0;
-
+  const peakIdx = peak ? series.findIndex((s) => s.date === peak.date) : -1;
   for (let i = 0; i < series.length; i++) {
     const s = series[i];
     const bx = x0 + i * stride;
     const bh = (s.count / max) * (chartH - 8);
-    setFill(pdf, NAVY);
-    pdf.rect(bx, y1 - bh, barW, bh, "F");
+    setFill(pdf, i === peakIdx ? ELECTRIC : NAVY);
+    if (bh > 0) pdf.rect(bx, y1 - bh, barW, bh, "F");
   }
 
+  // Date axis labels (first, middle, last).
   setText(pdf, DUSK);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(7);
@@ -327,11 +388,12 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
     pdf.text(sanitize(s.label), bx, y1 + 10, { align: "center" });
   }
 
+  // Peak readout.
   if (peak) {
     setText(pdf, NAVY);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(8);
-    pdf.text(sanitize(`Peak: ${peak.count} on ${peak.label}`), x0, y1 + labelStripH + valueStripH + 6);
+    pdf.text(sanitize(`Peak: ${peak.count} on ${peak.label}`), x0, y1 + labelStripH + footerH);
     pdf.setFont("helvetica", "normal");
   }
 
@@ -361,7 +423,10 @@ export async function exportShippingReportPdf(
   drawPolestarCover(ctx, {
     title: resolvedTitle,
     subtitle: "POLESTAR INSIGHTS",
-    reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
+    // win.label is already "Reporting period: ..." — upper-case it and
+    // pass it through verbatim. Do NOT prefix another "REPORTING PERIOD:"
+    // here or the cover will read it twice.
+    reportingPeriod: win.label.toUpperCase(),
     coverImage,
   });
   void cadence;
@@ -380,18 +445,18 @@ export async function exportShippingReportPdf(
   drawSectionHeading(ctx, "Key Metrics");
   drawFastFactsKpiCards(ctx, ds.keyMetrics);
 
-  drawChokepointWatch(ctx, ds.chokepointRows);
+  drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
 
-  drawIncidentTable<VesselRow>(ctx, "Vessel Attacks", ds.vesselRows, {
+  drawIncidentTable<VesselRow>(ctx, `Vessel Attacks, last 30 days (${ds.thirtyDayShortLabel})`, ds.vesselRows, {
     showActColumn: true,
     actFor: (r) => r.vesselType,
-    emptyMessage: "No hostile vessel incidents on file in the selected window.",
+    emptyMessage: "No hostile vessel incidents on file in the last 30 days.",
   });
 
-  drawIncidentTable<PiracyRow>(ctx, "Piracy and Armed Robbery", ds.piracyRows, {
+  drawIncidentTable<PiracyRow>(ctx, `Piracy and Armed Robbery, last 30 days (${ds.thirtyDayShortLabel})`, ds.piracyRows, {
     showActColumn: true,
     actFor: (r) => r.act,
-    emptyMessage: "No current piracy or armed-robbery records in the selected window.",
+    emptyMessage: "No piracy or armed-robbery records in the last 30 days.",
   });
 
   drawHorizontalBarChart(ctx, "Issue Type Breakdown", ds.issueRows, {
@@ -415,10 +480,22 @@ export async function exportShippingReportPdf(
 
   drawHorizontalBarChart(ctx, "Severity Distribution", ds.severityRows, { labelW: 120 });
 
-  drawIncidentTable<EnrichedIncident>(ctx, "Commercial Impact", ds.commercialRows, {
+  drawSectionHeading(ctx, "Commercial Impact on Shipping");
+  {
+    const { pdf, MX, CW } = ctx;
+    setText(pdf, DUSK);
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(9);
+    const intro = "Shipping-side commercial impact only: port disruption, commercial shipping disruption, and insurance or freight pressure that affects vessel transit or cargo flow. Market commentary without a shipping linkage is excluded.";
+    const lines: string[] = pdf.splitTextToSize(sanitize(intro), CW);
+    pdf.text(lines, MX, ctx.y + 10);
+    ctx.y += lines.length * 11 + 8;
+    pdf.setFont("helvetica", "normal");
+  }
+  drawIncidentTable<EnrichedIncident>(ctx, "Records", ds.commercialRows, {
     showActColumn: true,
     actFor: (r) => r.issue,
-    emptyMessage: "No commercial shipping or freight/insurance records in the selected window.",
+    emptyMessage: "No port, freight, insurance or commercial-shipping disruption records in the weekly window.",
   });
 
   if (data.watchNext && data.watchNext.trim()) {

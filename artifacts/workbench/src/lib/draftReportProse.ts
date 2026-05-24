@@ -63,11 +63,28 @@ function joinList(parts: string[]): string {
   return `${clean.slice(0, -1).join(", ")} and ${clean[clean.length - 1]}`;
 }
 
+// Some records carry multi-country strings ("South Korea; Iran",
+// "China, Iran"). Splitting on ; , and / lets each country score
+// individually so the prose never reads "concentrates in South Korea;
+// Iran (6)". Empty fragments and the literal "Unknown" bucket are
+// dropped so we do not surface placeholder values.
+function expandCountries(raw: string | null | undefined): string[] {
+  const v = (raw ?? "").trim();
+  if (!v) return [];
+  return v
+    .split(/[;,/]+/)
+    .map((s) => s.trim())
+    .filter((s) => s && !/^unknown$/i.test(s));
+}
+
 function topCountriesText(rows: DraftableIncident[]): string {
-  // Drop empty country fields and the literal "Unknown" bucket so the
-  // prose never reads "concentrates in ... Unknown (6)".
-  const counts = countBy(rows, (r) => (r.country ?? "").trim())
-    .filter(([k]) => k && !/^unknown$/i.test(k));
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    for (const c of expandCountries(r.country)) {
+      m.set(c, (m.get(c) ?? 0) + 1);
+    }
+  }
+  const counts = Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   if (counts.length === 0) return "";
   const top = counts.slice(0, 3).map(([c, n]) => `${c} (${n})`);
   return joinList(top);

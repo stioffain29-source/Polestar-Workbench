@@ -231,9 +231,9 @@ export default function ReportEditor() {
           {scope && (
             <div
               className="text-[12px] leading-snug p-3 rounded-sm border"
-              style={{ background: "#F3F4FA", borderColor: "#465BFF", color: "#0B0A3D", fontFamily: "Roboto, sans-serif" }}
+              style={{ background: "#F3F4FA", borderColor: "#4655FF", color: "#0B0B3D", fontFamily: "Roboto, sans-serif" }}
             >
-              <div className="uppercase tracking-widest font-bold text-[10px] mb-1" style={{ color: "#465BFF" }}>
+              <div className="uppercase tracking-widest font-bold text-[10px] mb-1" style={{ color: "#4655FF" }}>
                 {TOPIC_LABELS[form.topic]} scope
               </div>
               {scope}
