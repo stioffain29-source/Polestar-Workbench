@@ -1,0 +1,158 @@
+Add Transit and Destination data to Shipping.
+
+This is Shipping only.
+
+Do not change:
+- Cargo Watch
+- Fuel
+- Missile Strike Tracker
+- database imports
+- other topic pages
+- report builder logic outside Shipping
+
+This data is not incident data.
+
+It is shipping movement / transit / AIS style data.
+
+Add a new Shipping section called:
+
+Transit and Destination Watch
+
+Place it after Fleet Composition and before Chokepoint Watch.
+
+Include these visual blocks if data exists:
+
+1. Inbound and Outbound Transits
+
+Show two side by side panels:
+
+Inbound
+Outbound
+
+Each panel should show:
+- total transits
+- AIS visible count
+- dark / no AIS count
+- vessel class mix
+- corridor type if known
+- recent vessel list if available
+
+Example fields:
+- vessel name
+- flag
+- vessel type
+- AIS / dark status
+- route corridor
+- risk level if available
+
+Do not invent vessel names, flags, AIS status, route corridor or risk level.
+
+2. Crossings Trend
+
+Add a chart for:
+
+Hormuz Crossings
+
+Show:
+- inbound
+- outbound
+- dark / no AIS
+
+Use the available date series only.
+
+If no time series exists, show:
+
+Transit time series not currently available.
+
+Do not create synthetic trend data.
+
+3. Top Destinations
+
+Add a destination breakdown chart or table.
+
+Show:
+- destination / linked destination
+- percentage or count
+- timeframe
+
+Example labels from source:
+- China
+- Russia linked
+- Iran linked
+- Singapore
+- South Korea
+- Other
+
+Use only available data.
+
+Do not infer destination from article text.
+
+4. Data source rules
+
+Before populating, identify the data source.
+
+Accepted sources:
+- existing Workbench vessel movement dataset
+- user uploaded CSV / JSON
+- manually entered static dataset
+- future AIS / maritime data provider feed
+
+Do not scrape or infer this from normal incident headlines.
+
+Do not mix this into the incident counts.
+
+5. Shipping report
+
+If this data exists, add it to the Shipping Watch report.
+
+Report section order should become:
+
+- Cover
+- Executive Summary
+- Fast Facts
+- Key Metrics
+- Fleet Composition
+- Transit and Destination Watch
+- Chokepoint Watch
+- Vessel Attacks
+- Piracy and Armed Robbery
+- Issue Type Breakdown
+- Daily Intelligence Summary
+- Regional and Country View
+- Incident Timeline
+- Severity Distribution
+- Commercial Impact
+- Watch Next
+- Polestar View
+- Source Notes / Data Notes
+- Disclaimer
+
+6. Empty state
+
+If no transit dataset exists, show:
+
+Transit and destination data not currently available.
+
+Do not show zero unless the data source genuinely reports zero.
+
+7. Visual style
+
+Use Polestar styling:
+- clean white report cards
+- navy labels
+- subtle borders
+- clear charts
+- no dark cyber styling
+- no copied Windward look
+- no random colours
+- no fake AIS data
+
+8. Acceptance criteria
+
+- Shipping page has a Transit and Destination Watch section.
+- It is clearly separate from incidents.
+- Shipping report includes the section if data exists.
+- No invented AIS, dark activity, vessel or destination data.
+- Empty state appears if no dataset exists.
+- No database changes unless specifically approved.
+- No unrelated page changes.
