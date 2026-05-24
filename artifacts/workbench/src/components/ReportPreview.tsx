@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
+import { topicCoverUrl } from "@/lib/coverImages";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0b0a3d";
@@ -148,6 +149,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
   const periodLabel = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).label
     : "";
+  const coverUrl = topicCoverUrl(report.topic);
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -171,7 +173,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
         />
       </div>
 
-      {/* 2. Hero band — gradient fallback when no report image is configured. */}
+      {/* 2. Hero band — cover photo when registered for the topic, otherwise gradient. */}
       <div
         style={{
           width: "100%",
@@ -179,8 +181,17 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           background: BRAND_GRADIENT,
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
+          overflow: "hidden",
         }}
-      />
+      >
+        {coverUrl && (
+          <img
+            src={coverUrl}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        )}
+      </div>
 
       {/* 3. Bottom gradient title block — title, subtitle, period, website. */}
       <div

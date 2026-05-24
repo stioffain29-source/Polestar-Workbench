@@ -12,26 +12,9 @@ import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
-// Per-topic cover photography. Mirrors the shipping cover wiring: a
-// full-bleed hero image sits behind the top band and bottom block. New
-// topics opt in by adding an entry to TOPIC_COVER_URLS below.
-import fertiliserCoverUrl from "@assets/image_1779624933984.png";
-import cargoWatchCoverUrl from "@assets/image_1779625099169.png";
-import energyCoverUrl from "@assets/severin-demchuk-60NulquhzoI-unsplash_1779625300436.jpg";
-import fuelCoverUrl from "@assets/image_1779625662270.png";
-import flashpointCoverUrl from "@assets/image_1779625725916.png";
-
-const TOPIC_COVER_URLS: Record<string, string> = {
-  fertiliser: fertiliserCoverUrl,
-  cargo_watch: cargoWatchCoverUrl,
-  energy: energyCoverUrl,
-  fuel: fuelCoverUrl,
-  // Both topic keys resolve to the same Flashpoint report in reportNaming.ts,
-  // so register both so the cover applies regardless of which key the editor
-  // saved.
-  flashpoint: flashpointCoverUrl,
-  protests: flashpointCoverUrl,
-};
+// Per-topic cover photography is registered in coverImages.ts so the
+// on-screen ReportPreview and this exporter share one source of truth.
+import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 

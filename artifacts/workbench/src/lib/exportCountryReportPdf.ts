@@ -8,17 +8,9 @@ import {
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
-// Per-country cover photography. Mirrors the shipping / fertiliser wiring:
-// a full-bleed hero image sits behind the top band and bottom block. New
-// countries opt in by adding an entry to COUNTRY_COVER_URLS below, keyed
-// by the lower-cased country name.
-import papuaNewGuineaCoverUrl from "@assets/image_1779624991006.png";
-import papuaCoverUrl from "@assets/image_1779625036503.png";
-
-const COUNTRY_COVER_URLS: Record<string, string> = {
-  "papua new guinea": papuaNewGuineaCoverUrl,
-  "papua": papuaCoverUrl,
-};
+// Per-country cover photography is registered in coverImages.ts so the
+// on-screen preview and this exporter share one source of truth.
+import { COUNTRY_COVER_URLS } from "./coverImages";
 import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
 } from "./reportWindow";
