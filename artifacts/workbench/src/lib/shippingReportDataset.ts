@@ -67,7 +67,8 @@ export interface ShippingReportDataset {
   enriched: EnrichedIncident[];
   outOfScopeCount: number;
   fastFacts: KpiCard[];
-  keyMetrics: KpiCard[];
+  /** Count of records in the weekly window whose incident location could not be identified. */
+  locationNotIdentifiedCount: number;
   /** Chokepoint Watch over the last 30 days (not the weekly window). */
   chokepointRows: ChokepointRow[];
   /** Vessel attacks over the last 30 days. */
@@ -219,35 +220,24 @@ export function buildShippingReportDataset(
     ?? sortByDateDesc(enriched)[0]
     ?? null;
 
+  // Single, deduplicated Fast Facts grid (7 cards).
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
     { label: "Records In Window", value: String(enriched.length) },
     { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
     {
-      label: "Main Affected Chokepoint",
+      label: "Main Affected Chokepoint (30d)",
       value: topCp || "—",
-      note: topCpN > 0 ? `${topCpN} record${topCpN === 1 ? "" : "s"}` : "No chokepoint mention in window",
+      note: topCpN > 0
+        ? `${topCpN} record${topCpN === 1 ? "" : "s"}`
+        : (topRegion ? `Fallback to region: ${topRegion} (${topRegionN})` : "No chokepoint mention in last 30 days"),
     },
     { label: "Vessel Attacks / Seizures (30d)", value: String(vAttackSeize) },
     {
       label: "Piracy / Armed Robbery (30d)",
       value: String(piracyRows.length),
-      note: `Latest record: ${latestDate ? format(latestDate, "dd MMM yyyy") : "—"}`,
+      note: `Latest record in window: ${latestDate ? format(latestDate, "dd MMM yyyy") : "—"}`,
     },
-  ];
-
-  const keyMetrics: KpiCard[] = [
-    { label: "Records In Window", value: String(enriched.length) },
-    { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
-    {
-      label: "Main Affected Chokepoint (30d)",
-      value: topCp || (topRegion || "—"),
-      note: topCpN > 0
-        ? `${topCpN} record${topCpN === 1 ? "" : "s"}`
-        : (topRegion ? `Fallback to region: ${topRegionN} record${topRegionN === 1 ? "" : "s"}` : "No chokepoint or region data"),
-    },
-    { label: "Vessel Attacks / Seizures (30d)", value: String(vAttackSeize) },
-    { label: "Piracy / Armed Robbery (30d)", value: String(piracyRows.length) },
     {
       label: "Latest Significant Incident",
       value: latestSig ? format(latestSig.date, "dd MMM yyyy") : "—",
@@ -275,9 +265,13 @@ export function buildShippingReportDataset(
     };
   });
 
-  // Issue rows
+  // Issue rows — "Unclassified maritime record" is excluded from the chart;
+  // unclassifiable records remain in totals but never appear as a chart bar.
   const issueMap = new Map<string, number>();
-  for (const r of enriched) issueMap.set(r.issue, (issueMap.get(r.issue) ?? 0) + 1);
+  for (const r of enriched) {
+    if (r.issue === "Unclassified maritime record") continue;
+    issueMap.set(r.issue, (issueMap.get(r.issue) ?? 0) + 1);
+  }
   const issueRows: BarRow[] = Array.from(issueMap.entries())
     .map(([label, value], idx) => ({ label, value, color: ISSUE_PALETTE[idx % ISSUE_PALETTE.length] }))
     .sort((a, b) => b.value - a.value);
@@ -311,8 +305,12 @@ export function buildShippingReportDataset(
     dailyIntelLines.push("Commercial Impact: no matching records in the current window.");
   }
 
-  // Region rows in fixed order
-  const regionRows: BarRow[] = (["Middle East", "APAC", "Country not identified"] as Region[]).map((region) => ({
+  // Region rows in fixed order — "Country not identified" is intentionally
+  // excluded from the regional comparison chart so location-unknown records
+  // do not dominate it. The count is surfaced separately in the data note
+  // and via locationNotIdentifiedCount on the dataset.
+  const locationNotIdentifiedCount = regionCounts.get("Country not identified" as Region) ?? 0;
+  const regionRows: BarRow[] = (["Middle East", "APAC"] as Region[]).map((region) => ({
     label: region,
     value: regionCounts.get(region) ?? 0,
     color: REGION_COLOR[region],
@@ -349,9 +347,10 @@ export function buildShippingReportDataset(
     color: SEV_COLOR[key],
   }));
 
+  const locNote = `Records with no identifiable incident location (${locationNotIdentifiedCount} in window) are included in total counts but excluded from the country and regional comparison charts and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted as incident country.`;
   const dataNote = outOfScopeCount > 0
-    ? `${outOfScopeCount} shipping record${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East were excluded from this view, matching the Shipping dashboard scope. Records with no identifiable incident location are kept in totals and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted in country charts.`
-    : `Records with no identifiable incident location are kept in totals and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted in country charts.`;
+    ? `${outOfScopeCount} shipping record${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East were excluded from this view, matching the Shipping dashboard scope. ${locNote}`
+    : locNote;
 
   return {
     reportingPeriodShort: win.shortLabel,
@@ -360,7 +359,7 @@ export function buildShippingReportDataset(
     enriched,
     outOfScopeCount,
     fastFacts,
-    keyMetrics,
+    locationNotIdentifiedCount,
     chokepointRows,
     vesselRows,
     piracyRows,

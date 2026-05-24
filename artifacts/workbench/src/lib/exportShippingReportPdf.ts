@@ -442,9 +442,6 @@ export async function exportShippingReportPdf(
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);
 
-  drawSectionHeading(ctx, "Key Metrics");
-  drawFastFactsKpiCards(ctx, ds.keyMetrics);
-
   drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
 
   drawIncidentTable<VesselRow>(ctx, `Vessel Attacks, last 30 days (${ds.thirtyDayShortLabel})`, ds.vesselRows, {
@@ -471,10 +468,15 @@ export async function exportShippingReportPdf(
     labelW: 160,
     emptyMessage: "No regional classifications in window.",
   });
-  drawHorizontalBarChart(ctx, "Incidents by Country (Top 12)", ds.countryRows, {
-    labelW: 160,
-    emptyMessage: "No identified incident countries in window.",
-  });
+  drawHorizontalBarChart(
+    ctx,
+    ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country",
+    ds.countryRows,
+    {
+      labelW: 160,
+      emptyMessage: "No identified incident countries in window.",
+    },
+  );
 
   drawTimelineChart(ctx, "Incident Timeline", ds.timelineSeries, ds.timelinePeak);
 

@@ -508,10 +508,6 @@ export default function ShippingReportPreview({
           <KpiGrid cards={ds.fastFacts} />
         </Section>
 
-        <Section title="Key Metrics">
-          <KpiGrid cards={ds.keyMetrics} />
-        </Section>
-
         <Section title={`Chokepoint Watch, last 30 days (${ds.thirtyDayShortLabel})`}>
           <ChokepointTable rows={ds.chokepointRows} />
         </Section>
@@ -554,7 +550,7 @@ export default function ShippingReportPreview({
             className="uppercase mb-2"
             style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
           >
-            Incidents by Country (Top 12)
+            {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
           </div>
           <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries in window." />
         </Section>

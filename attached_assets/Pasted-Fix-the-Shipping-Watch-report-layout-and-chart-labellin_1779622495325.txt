@@ -1,0 +1,78 @@
+Fix the Shipping Watch report layout and chart labelling.
+
+Scope: Shipping Watch only.
+
+1. Amalgamate Fast Facts and Key Metrics
+- Remove the separate KEY METRICS section completely.
+- Keep one section only: FAST FACTS.
+- Keep unique cards only. Do not repeat the same metric twice.
+
+The FAST FACTS cards should be:
+- Reporting Period
+- Records in Window
+- Highest Severity
+- Main Affected Chokepoint (30D)
+- Vessel Attacks / Seizures (30D)
+- Piracy / Armed Robbery (30D)
+- Latest Significant Incident
+
+Use a clean 3-column card grid if space allows.
+If seven cards causes awkward spacing, use:
+- first row: Reporting Period / Records in Window / Highest Severity
+- second row: Main Affected Chokepoint / Vessel Attacks-Seizures / Piracy-Armed Robbery
+- third row: Latest Significant Incident spanning the full row or two columns.
+
+2. Remove duplicate metrics
+- Do not show Records in Window twice.
+- Do not show Highest Severity twice.
+- Do not show Main Affected Chokepoint twice.
+- Do not show Vessel Attacks / Seizures twice.
+- Do not show Piracy / Armed Robbery twice.
+
+3. Remove weak category label
+- Delete the chart category “Unclassified maritime record”.
+- Do not replace it with another vague label.
+- If records cannot be classified into a meaningful shipping issue type, exclude them from the Issue Type Breakdown chart.
+- They may still remain in total record counts if they are valid Shipping Watch records.
+
+4. Fix country chart title
+- Rename “INCIDENTS BY COUNTRY (TOP 12)” to “INCIDENTS BY COUNTRY”.
+- Only use “Top 12” if the chart actually renders up to 12 countries.
+- If only 3 countries are present, the title must not say Top 12.
+
+5. Treat unidentified locations properly
+- Do not let “Country not identified” dominate the Regional and Country View chart.
+- Rename it to “Location not identified”.
+- Prefer moving it out of the main regional comparison chart and into a small data quality note or metric.
+- Keep the note clear: records without a clear incident location are included in totals but excluded from country charts.
+- Vessel flag state must not be counted as incident country.
+
+6. Keep the current improvements
+Do not undo:
+- the improved Shipping Watch cover
+- the 30-day Chokepoint Watch
+- the 30-day Vessel Attacks / Seizures
+- the 30-day Piracy / Armed Robbery
+- the removal of FAO food price items as lead Shipping incidents
+- the fixed country string handling
+- the Polestar brand colours
+
+7. Brand colours must remain exactly:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+
+Acceptance check:
+- The PDF has one FAST FACTS section only.
+- There is no KEY METRICS section.
+- No duplicate metric cards appear.
+- “Unclassified maritime record” does not appear in the Issue Type Breakdown.
+- “INCIDENTS BY COUNTRY (TOP 12)” no longer appears unless 12 countries are actually shown.
+- “Country not identified” is not treated as a country.
+- Shipping Watch remains focused on shipping-side operational and commercial impact only.

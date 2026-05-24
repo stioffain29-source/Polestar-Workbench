@@ -1,0 +1,64 @@
+Improve the Shipping Watch prose so it reads like an analyst-written report, not repeated dashboard text.
+
+Scope: Shipping Watch report prose only.
+
+Fix these sections:
+- Executive Summary
+- Daily Intelligence Summary
+- Watch Next
+- Polestar View
+- Commercial Impact on Shipping intro text
+- Operational Read text in Chokepoint Watch if generated from templates
+
+Problem:
+The current prose starts too many sentences in the same way, especially:
+- “[number] records...”
+- “Most recent...”
+- “Activity concentrates...”
+- “The usable signal is...”
+
+Required change:
+Vary sentence structure and make the prose more natural, concise and operationally useful.
+
+Do not use repeated formula sentences like:
+- “X records on file covering...”
+- “Most recent: ...”
+- “The usable signal is...”
+- “Activity concentrates in...”
+unless there is no better alternative.
+
+Preferred style:
+- Start with the operational meaning, not the record count.
+- Use record counts as supporting evidence, not as the sentence opener every time.
+- Combine short repetitive lines into stronger prose.
+- Keep it concise. No long essays.
+- Avoid hype, dramatic language or generic intelligence filler.
+
+Example rewrite pattern:
+
+Instead of:
+“Chokepoint and Route Activity: 6 records on file covering chokepoint risk, route diversion and maritime advisories. Most recent: Iran proposes permanent toll for Strait of Hormuz shipping.”
+
+Use:
+“Chokepoint reporting was led by Hormuz-related disruption, with six relevant records covering toll proposals, route risk and maritime advisories.”
+
+Instead of:
+“Commercial Impact: 6 records on port disruption, freight or insurance pressure and commercial shipping disruption. Most recent: Drewry: World Container Index Up 6%.”
+
+Use:
+“Commercial impact reporting was driven by freight-rate movement and shipping disruption, rather than direct port closure or vessel loss.”
+
+Instead of:
+“The usable signal is chokepoint risk, insurance and freight pressure and commercial disruption, with the load on Iran, China and South Korea.”
+
+Use:
+“The week’s strongest signal is continued pressure around Hormuz, supported by freight and insurance movement. The country picture remains uneven, with Iran carrying most of the identifiable reporting and several records lacking a precise incident location.”
+
+Apply this style across the report.
+
+Acceptance check:
+- No paragraph should have multiple consecutive sentences starting with the same structure.
+- “Most recent:” should not appear repeatedly as a default sentence pattern.
+- Record counts should support the analysis, not lead every paragraph.
+- The prose should read like a short Polestar analyst brief.
+- Keep the tone plain, operational and business-relevant.
