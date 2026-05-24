@@ -10,6 +10,7 @@ import {
 import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
 } from "./reportWindow";
+import { classifyIncidentType } from "./incidentClassifier";
 
 export interface TopicReportData {
   title: string;
@@ -32,6 +33,11 @@ export interface TopicReportIncident {
   severity: string;
   occurredAt: string;
   country?: string | null;
+  // Used by the shared incident-type classifier — never displayed as a topic.
+  summary?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
+  location?: string | null;
 }
 
 function computeFastFacts(
@@ -72,13 +78,29 @@ function computeFastFacts(
 
   const topicLabel = topicLabels[data.topic] ?? data.topic;
 
+  // Derive real operational incident types — never use topic/product names.
+  const typeCounts = new Map<string, number>();
+  for (const i of windowIncidents) {
+    const type = classifyIncidentType(i);
+    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
+  }
+  let topTypeLabel = "—";
+  let topTypeN = 0;
+  for (const [t, n] of typeCounts) {
+    if (n > topTypeN) { topTypeN = n; topTypeLabel = t; }
+  }
+
   return [
     { label: "Reporting Period", value: reportingPeriod },
     { label: "Total Records", value: String(windowIncidents.length), note: `${topicLabel} in window` },
     { label: "Highest Severity", value: highestLabel, severity: highestKey || undefined, note: highestKey ? "Worst rating in window" : undefined },
+    {
+      label: "Top Issue Type",
+      value: topTypeLabel,
+      note: topTypeN > 0 ? `${topTypeN} record${topTypeN === 1 ? "" : "s"}` : undefined,
+    },
     { label: "Most Affected Country", value: topCountry, note: topCountryN > 0 ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}` : undefined },
     { label: "Latest Incident", value: latest },
-    { label: "Topic Coverage", value: topicLabel },
   ];
 }
 
@@ -142,7 +164,7 @@ function drawRelatedIncidents(
   ctx: Ctx,
   windowIncidents: TopicReportIncident[],
   topic: string,
-  topicLabels: Record<string, string>,
+  _topicLabels: Record<string, string>,
 ) {
   if (windowIncidents.length === 0) return;
   const { max } = relatedIncidentsLimit(topic);
@@ -156,9 +178,9 @@ function drawRelatedIncidents(
 
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
-  const colTopicW = 92;
+  const colTypeW = 120;
   const colSevW = 64;
-  const colTitleW = CW - colDateW - colTopicW - colSevW - 6;
+  const colTitleW = CW - colDateW - colTypeW - colSevW - 6;
   const rowH = 18;
 
   const drawHeader = () => {
@@ -168,9 +190,9 @@ function drawRelatedIncidents(
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(8);
     pdf.text("DATE", MX + 6, ctx.y + 12);
-    pdf.text("TOPIC", MX + colDateW + 6, ctx.y + 12);
-    pdf.text("TITLE", MX + colDateW + colTopicW + 6, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colDateW + colTopicW + colTitleW + 6, ctx.y + 12);
+    pdf.text("TYPE", MX + colDateW + 6, ctx.y + 12);
+    pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 12);
+    pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 12);
     ctx.y += rowH;
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8);
@@ -194,14 +216,17 @@ function drawRelatedIncidents(
     let dateStr = "";
     try { dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy"); } catch { dateStr = i.occurredAt; }
     pdf.text(dateStr, MX + 6, ctx.y + 12);
-    pdf.text(sanitize(topicLabels[i.topic] ?? i.topic), MX + colDateW + 6, ctx.y + 12);
+    // Use the derived operational incident-type label, never the topic name.
+    const incidentType = classifyIncidentType(i);
+    const typeLines: string[] = pdf.splitTextToSize(sanitize(incidentType), colTypeW - 8);
+    pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colTopicW + 6, ctx.y + 12);
+    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
 
     const sk = sevKey(i.severity);
     const sevColor = SEV_COLOR[sk] ?? "#999999";
     setFill(pdf, sevColor);
-    const chipX = MX + colDateW + colTopicW + colTitleW + 6;
+    const chipX = MX + colDateW + colTypeW + colTitleW + 6;
     pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
     setText(pdf, WHITE);
     pdf.setFont("helvetica", "bold");

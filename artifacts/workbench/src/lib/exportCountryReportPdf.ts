@@ -10,6 +10,7 @@ import {
 import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
 } from "./reportWindow";
+import { classifyIncidentType } from "./incidentClassifier";
 
 // Country reports are weekly products. The "country" pseudo-topic resolves
 // to the weekly defaults (7-day default, 10-day cap) via reportWindow.ts.
@@ -23,6 +24,10 @@ export interface PdfIncident {
   occurredAt: string;
   country?: string | null;
   location?: string | null;
+  // Used by the shared incident-type classifier — never displayed as a topic.
+  summary?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
 }
 
 export interface PdfCountry {
@@ -42,17 +47,18 @@ interface DerivedFacts {
   latest: Date | null;
   highestKey: string;
   highestLabel: string;
-  topTopicLabel: string;
-  topTopicCount: number;
+  topTypeLabel: string;
+  topTypeCount: number;
   topAreaLabel: string;
   topAreaCount: number;
   severityCounts: Record<string, number>;
-  topicCounts: Map<string, number>;
+  // Counts keyed by *derived* operational incident type, never by topic.
+  typeCounts: Map<string, number>;
 }
 
 function deriveFacts(
   incidents: PdfIncident[],
-  topicLabels: Record<string, string>,
+  _topicLabels: Record<string, string>,
 ): DerivedFacts {
   const validDates: Date[] = [];
   for (const i of incidents) {
@@ -78,12 +84,16 @@ function deriveFacts(
   }
   const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : NOT_IDENTIFIED;
 
-  const topicCounts = new Map<string, number>();
-  for (const i of incidents) topicCounts.set(i.topic, (topicCounts.get(i.topic) ?? 0) + 1);
-  let topTopicLabel = NOT_IDENTIFIED;
-  let topTopicCount = 0;
-  for (const [t, n] of topicCounts) {
-    if (n > topTopicCount) { topTopicCount = n; topTopicLabel = topicLabels[t] ?? t; }
+  // Derive real operational incident types — never use topic/product names.
+  const typeCounts = new Map<string, number>();
+  for (const i of incidents) {
+    const type = classifyIncidentType(i);
+    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
+  }
+  let topTypeLabel = NOT_IDENTIFIED;
+  let topTypeCount = 0;
+  for (const [t, n] of typeCounts) {
+    if (n > topTypeCount) { topTypeCount = n; topTypeLabel = t; }
   }
 
   const areaCounts = new Map<string, number>();
@@ -103,8 +113,8 @@ function deriveFacts(
 
   return {
     validDates, earliest, latest, highestKey, highestLabel,
-    topTopicLabel, topTopicCount, topAreaLabel, topAreaCount,
-    severityCounts, topicCounts,
+    topTypeLabel, topTypeCount, topAreaLabel, topAreaCount,
+    severityCounts, typeCounts,
   };
 }
 
@@ -142,9 +152,9 @@ function buildKpiCards(
     },
     {
       label: "Main Issue Type",
-      value: facts.topTopicLabel,
-      note: facts.topTopicCount > 0
-        ? `${facts.topTopicCount} record${facts.topTopicCount === 1 ? "" : "s"}`
+      value: facts.topTypeLabel,
+      note: facts.topTypeCount > 0
+        ? `${facts.topTypeCount} record${facts.topTypeCount === 1 ? "" : "s"}`
         : undefined,
     },
   ];
@@ -162,9 +172,9 @@ function buildExecutiveSummary(
   parts.push(
     `Polestar holds ${incidents.length} record${incidents.length === 1 ? "" : "s"} for ${country.name} (${country.region}) covering ${periodString(facts)}.`,
   );
-  if (facts.topTopicCount > 0) {
+  if (facts.topTypeCount > 0) {
     parts.push(
-      `The main issue type is ${facts.topTopicLabel} with ${facts.topTopicCount} record${facts.topTopicCount === 1 ? "" : "s"}.`,
+      `The main issue type is ${facts.topTypeLabel} with ${facts.topTypeCount} record${facts.topTypeCount === 1 ? "" : "s"}.`,
     );
   }
   if (facts.highestKey) {
@@ -252,9 +262,9 @@ function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
   ctx.y += chartH + 18;
 }
 
-function drawTopicChart(ctx: Ctx, facts: DerivedFacts, topicLabels: Record<string, string>) {
-  const data = Array.from(facts.topicCounts.entries())
-    .map(([topic, n]) => ({ label: topicLabels[topic] ?? topic, n }))
+function drawTypeChart(ctx: Ctx, facts: DerivedFacts) {
+  const data = Array.from(facts.typeCounts.entries())
+    .map(([type, n]) => ({ label: type, n }))
     .sort((a, b) => b.n - a.n)
     .slice(0, 8);
   if (data.length === 0) return;
@@ -290,15 +300,15 @@ function drawTopicChart(ctx: Ctx, facts: DerivedFacts, topicLabels: Record<strin
 function drawIncidentTable(
   ctx: Ctx,
   incidents: PdfIncident[],
-  topicLabels: Record<string, string>,
+  _topicLabels: Record<string, string>,
 ) {
   if (incidents.length === 0) return;
   drawSectionHeading(ctx, "Related Incidents");
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
-  const colTopicW = 92;
+  const colTypeW = 120;
   const colSevW = 64;
-  const colTitleW = CW - colDateW - colTopicW - colSevW - 6;
+  const colTitleW = CW - colDateW - colTypeW - colSevW - 6;
   const rowH = 18;
 
   const drawHeader = () => {
@@ -308,9 +318,9 @@ function drawIncidentTable(
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(8);
     pdf.text("DATE", MX + 6, ctx.y + 12);
-    pdf.text("TOPIC", MX + colDateW + 6, ctx.y + 12);
-    pdf.text("TITLE", MX + colDateW + colTopicW + 6, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colDateW + colTopicW + colTitleW + 6, ctx.y + 12);
+    pdf.text("TYPE", MX + colDateW + 6, ctx.y + 12);
+    pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 12);
+    pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 12);
     ctx.y += rowH;
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8);
@@ -342,14 +352,17 @@ function drawIncidentTable(
     let dateStr = "";
     try { dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy"); } catch { dateStr = i.occurredAt; }
     pdf.text(dateStr, MX + 6, ctx.y + 12);
-    pdf.text(sanitize(topicLabels[i.topic] ?? i.topic), MX + colDateW + 6, ctx.y + 12);
+    // Use the derived operational incident-type label, never the topic name.
+    const incidentType = classifyIncidentType(i);
+    const typeLines: string[] = pdf.splitTextToSize(sanitize(incidentType), colTypeW - 8);
+    pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colTopicW + 6, ctx.y + 12);
+    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
 
     const sk = sevKey(i.severity);
     const sevColor = SEV_COLOR[sk] ?? "#999999";
     setFill(pdf, sevColor);
-    const chipX = MX + colDateW + colTopicW + colTitleW + 6;
+    const chipX = MX + colDateW + colTypeW + colTitleW + 6;
     pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
     setText(pdf, WHITE);
     pdf.setFont("helvetica", "bold");
@@ -449,9 +462,9 @@ export async function exportCountryReportPdf(
   drawNarrativeOrPlaceholder(ctx, "Watch Next", null);
   drawNarrativeOrPlaceholder(ctx, "Polestar View", null);
 
-  // 4. Visuals
+  // 4. Visuals — Incident Breakdown by Type uses derived operational labels.
   drawSeverityChart(ctx, facts);
-  drawTopicChart(ctx, facts, topicLabels);
+  drawTypeChart(ctx, facts);
 
   // 5. Related incidents — limited to the weekly window, newest first.
   drawIncidentTable(ctx, windowedIncidents, topicLabels);
