@@ -80,7 +80,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         className="uppercase pb-2 mb-4 tracking-wide"
         style={{
           color: NAVY,
-          fontFamily: "'Roboto Condensed', sans-serif",
+          fontFamily: "Roboto, sans-serif",
           fontWeight: 700,
           fontSize: 18,
           borderBottom: `2px solid ${ELECTRIC}`,
@@ -108,12 +108,12 @@ function KpiGrid({ cards }: { cards: KpiCard[] }) {
             <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 4, background: accent }} />
             <div
               className="uppercase tracking-widest"
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 9, color: DUSK }}
+              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, color: DUSK }}
             >
               {c.label}
             </div>
             <div
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 20, color: NAVY, marginTop: 4, lineHeight: 1.15 }}
+              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 20, color: NAVY, marginTop: 4, lineHeight: 1.15 }}
             >
               {c.value}
             </div>
@@ -138,7 +138,7 @@ function SeverityChip({ sevKey: k, label }: { sevKey: string; label: string }) {
       style={{
         background: bg,
         color: "#fff",
-        fontFamily: "'Roboto Condensed', sans-serif",
+        fontFamily: "Roboto, sans-serif",
         fontWeight: 700,
         fontSize: 9,
         letterSpacing: "0.06em",
@@ -160,7 +160,7 @@ function ChokepointTable({ rows }: { rows: ChokepointRow[] }) {
           gridTemplateColumns: "1.3fr 0.5fr 0.8fr 0.8fr 2.2fr",
           background: NAVY,
           color: "#fff",
-          fontFamily: "'Roboto Condensed', sans-serif",
+          fontFamily: "Roboto, sans-serif",
           fontWeight: 700,
           fontSize: 10,
           padding: "8px 10px",
@@ -188,7 +188,7 @@ function ChokepointTable({ rows }: { rows: ChokepointRow[] }) {
             alignItems: "center",
           }}
         >
-          <div style={{ color: NAVY, fontWeight: 700, fontFamily: "'Roboto Condensed', sans-serif" }}>{r.name}</div>
+          <div style={{ color: NAVY, fontWeight: 700, fontFamily: "Roboto, sans-serif" }}>{r.name}</div>
           <div>{r.count}</div>
           <div><SeverityChip sevKey={r.highestSeverityKey} label={r.highestSeverityLabel} /></div>
           <div>{r.latestDate ? format(r.latestDate, "dd MMM yyyy") : "—"}</div>
@@ -226,7 +226,7 @@ function IncidentTable<T extends EnrichedIncident>({ rows, emptyMessage, actLabe
           gridTemplateColumns: cols,
           background: NAVY,
           color: "#fff",
-          fontFamily: "'Roboto Condensed', sans-serif",
+          fontFamily: "Roboto, sans-serif",
           fontWeight: 700,
           fontSize: 10,
           padding: "8px 10px",
@@ -425,7 +425,7 @@ function TimelineChart({ series, peak }: { series: { date: string; label: string
         ))}
       </div>
       {peak && (
-        <div className="mt-2" style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 12, color: NAVY }}>
+        <div className="mt-2" style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 12, color: NAVY }}>
           Peak: {peak.count} on {peak.label}
         </div>
       )}
@@ -483,7 +483,7 @@ export default function ShippingReportPreview({
         <h1
           className="mb-4"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 700,
             fontSize: 44,
             lineHeight: 1.05,
@@ -496,7 +496,7 @@ export default function ShippingReportPreview({
         <div
           className="uppercase"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 700,
             fontSize: 13,
             letterSpacing: "0.22em",
@@ -508,7 +508,7 @@ export default function ShippingReportPreview({
         <div
           className="uppercase"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 400,
             fontSize: 12,
             letterSpacing: "0.18em",
@@ -520,7 +520,7 @@ export default function ShippingReportPreview({
         <div
           className="uppercase"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 700,
             fontSize: 11,
             letterSpacing: "0.18em",
@@ -582,7 +582,7 @@ export default function ShippingReportPreview({
           </div>
           <div
             className="uppercase mb-2"
-            style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+            style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
           >
             {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
           </div>

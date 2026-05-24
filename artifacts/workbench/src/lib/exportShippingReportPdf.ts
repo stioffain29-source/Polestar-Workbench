@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import {
-  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
+  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, setRoboto, ensureRobotoLoaded,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
@@ -90,7 +90,7 @@ function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[], windowLabel: strin
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text("CHOKEPOINT", MX + 6, ctx.y + 12);
     pdf.text("RECORDS", MX + colNameW + 6, ctx.y + 12);
@@ -98,7 +98,7 @@ function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[], windowLabel: strin
     pdf.text("LATEST", MX + colNameW + colCountW + colSevW + 6, ctx.y + 12);
     pdf.text("OPERATIONAL READ", MX + colNameW + colCountW + colSevW + colDateW + 6, ctx.y + 12);
     ctx.y += rowH;
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
   };
 
@@ -114,10 +114,10 @@ function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[], windowLabel: strin
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
 
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text(sanitize(row.name), MX + 6, ctx.y + 12);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     setText(pdf, DUSK);
     pdf.text(String(row.count), MX + colNameW + 6, ctx.y + 12);
 
@@ -125,10 +125,10 @@ function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[], windowLabel: strin
       setFill(pdf, SEV_COLOR[row.highestSeverityKey] ?? "#999999");
       pdf.rect(MX + colNameW + colCountW + 6, ctx.y + 5, 56, 10, "F");
       setText(pdf, WHITE);
-      pdf.setFont("helvetica", "bold");
+      setRoboto(pdf, "bold");
       pdf.setFontSize(7);
       pdf.text(sanitize(row.highestSeverityLabel.toUpperCase()), MX + colNameW + colCountW + 6 + 28, ctx.y + 12, { align: "center" });
-      pdf.setFont("helvetica", "normal");
+      setRoboto(pdf, "regular");
       pdf.setFontSize(8);
     } else {
       setText(pdf, DUSK);
@@ -158,10 +158,10 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
   if (rows.length === 0) {
     const { pdf, MX } = ctx;
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
+    setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     pdf.text(sanitize(opts.emptyMessage), MX, ctx.y + 10);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     ctx.y += 22;
     return;
   }
@@ -176,7 +176,7 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text("DATE", MX + 6, ctx.y + 12);
     let cursor = MX + colDateW + 6;
@@ -187,7 +187,7 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
     pdf.text("TITLE", cursor, ctx.y + 12);
     pdf.text("SEVERITY", MX + colDateW + colActW + colTitleW + 6, ctx.y + 12);
     ctx.y += rowH;
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
   };
 
@@ -220,10 +220,10 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
     const chipX = MX + colDateW + colActW + colTitleW + 6;
     pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(7);
     pdf.text(sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
 
     ctx.y += rh;
@@ -232,10 +232,10 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
   if (rows.length > limited.length) {
     ensureSpace(ctx, 16);
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
+    setRoboto(pdf, "italic");
     pdf.setFontSize(8);
     pdf.text(sanitize(`Showing ${limited.length} most recent of ${rows.length} records in window. Older records remain available in the Workbench.`), MX, ctx.y + 12);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     ctx.y += 16;
   }
   ctx.y += 8;
@@ -269,10 +269,10 @@ function drawHorizontalBarChart(
   const { pdf, MX, CW } = ctx;
   if (rows.length === 0) {
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
+    setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     pdf.text(sanitize(opts.emptyMessage ?? "No data in window."), MX, ctx.y + 10);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     ctx.y += 22;
     return;
   }
@@ -302,7 +302,7 @@ function drawHorizontalBarChart(
   for (const r of rows) {
     const y = ctx.y;
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8.5);
     const labelLines: string[] = pdf.splitTextToSize(sanitize(r.label), labelW - 4);
     pdf.text(labelLines.slice(0, 1), MX, y + rowH - 7);
@@ -321,10 +321,10 @@ function drawHorizontalBarChart(
     }
 
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(9);
     pdf.text(String(r.value), trackX + trackW + 6, y + rowH - 7);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
 
     ctx.y += rowH + gap;
   }
@@ -334,7 +334,7 @@ function drawHorizontalBarChart(
   pdf.setLineWidth(0.6);
   pdf.line(trackX, ctx.y + 2, trackX + trackW, ctx.y + 2);
   setText(pdf, DUSK);
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(7);
   for (let v = 0; v <= max; v += step) {
     const gx = trackX + (v / max) * trackW;
@@ -352,10 +352,10 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
   const { pdf, MX, CW } = ctx;
   if (series.length === 0) {
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
+    setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     pdf.text("No timeline data available.", MX, ctx.y + 10);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     ctx.y += 22;
     return;
   }
@@ -378,7 +378,7 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
   setStroke(pdf, POLAR);
   pdf.setLineWidth(0.4);
   setText(pdf, DUSK);
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(7);
   for (let v = 0; v <= max; v += step) {
     const gy = y1 - (v / max) * (chartH - 8);
@@ -410,7 +410,7 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
 
   // Date axis labels (first, middle, last).
   setText(pdf, DUSK);
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(7);
   const tickIdx = [0, Math.floor(series.length / 2), series.length - 1].filter(
     (v, i, a) => a.indexOf(v) === i,
@@ -424,10 +424,10 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
   // Peak readout.
   if (peak) {
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text(sanitize(`Peak: ${peak.count} on ${peak.label}`), x0, y1 + labelStripH + footerH);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
   }
 
   ctx.y += totalH;
@@ -447,6 +447,9 @@ export async function exportShippingReportPdf(
   try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
+  // Embed Roboto on this pdf instance before drawing any text. Without this,
+  // jsPDF silently falls back to Helvetica, which the brand spec forbids.
+  await ensureRobotoLoaded(ctx.pdf);
   const win = resolveReportWindow(data.topic, data.issueDate);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   try {
@@ -521,13 +524,13 @@ export async function exportShippingReportPdf(
   {
     const { pdf, MX, CW } = ctx;
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
+    setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     const intro = "Scope here is shipping-side commercial pressure: port disruption, freight or insurance movement, and commercial shipping disruption with a direct vessel or cargo linkage. Pure market commentary without an operational shipping connection is excluded.";
     const lines: string[] = pdf.splitTextToSize(sanitize(intro), CW);
     pdf.text(lines, MX, ctx.y + 10);
     ctx.y += lines.length * 11 + 8;
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
   }
   drawIncidentTable<EnrichedIncident>(ctx, "Records", ds.commercialRows, {
     showActColumn: true,

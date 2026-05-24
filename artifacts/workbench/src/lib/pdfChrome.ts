@@ -1,6 +1,8 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import { setRoboto, ensureRobotoLoaded } from "./pdfFonts";
+export { setRoboto, ensureRobotoLoaded } from "./pdfFonts";
 
 // Polestar core brand palette.
 export const NAVY = "#0b0a3d";       // Midnight Blue
@@ -153,7 +155,7 @@ export function drawPageHeader(ctx: Ctx) {
     pdf.addImage(polestarLogo, "PNG", 18, (HEADER_BAND_H - 22) / 2, 132, 22, undefined, "FAST");
   } catch { /* ignore */ }
   setText(pdf, WHITE);
-  pdf.setFont("helvetica", "bold");
+  setRoboto(pdf, "bold");
   pdf.setFontSize(10);
   pdf.text(sanitize(header.kind.toUpperCase()), W - 18, HEADER_BAND_H / 2 + 4, { align: "right" });
 }
@@ -187,7 +189,7 @@ export function drawSectionHeading(ctx: Ctx, title: string) {
   if (ctx.y > ctx.TOP + 4) ctx.y += 10;
   const { pdf, MX, CW } = ctx;
   setText(pdf, NAVY);
-  pdf.setFont("helvetica", "bold");
+  setRoboto(pdf, "bold");
   pdf.setFontSize(12);
   pdf.text(sanitize(title.toUpperCase()), MX, ctx.y);
   ctx.y += 6;
@@ -200,7 +202,7 @@ export function drawSectionHeading(ctx: Ctx, title: string) {
 
 export function renderProse(ctx: Ctx, body: string) {
   const { pdf, MX, CW } = ctx;
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(10);
   setText(pdf, DUSK);
   const lineH = 14;
@@ -270,13 +272,13 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
 
     // Label
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(7);
     pdf.text(sanitize(c.label.toUpperCase()), x + PAD_L, yy + 16);
 
     // Value
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(15);
     const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), cardW - PAD_L - 10);
     const baseY = yy + 36;
@@ -285,7 +287,7 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     // Note
     if (c.note) {
       setText(pdf, DUSK);
-      pdf.setFont("helvetica", "normal");
+      setRoboto(pdf, "regular");
       pdf.setFontSize(7);
       const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), cardW - PAD_L - 10);
       pdf.text(noteLines.slice(0, 2), x + PAD_L, yy + cardH - 10);
@@ -330,7 +332,7 @@ export function drawFooters(pdf: jsPDF, _reportDate?: string) {
     setFill(pdf, POLAR);
     pdf.rect(0, H - FOOTER_BAND_H, W, FOOTER_BAND_H, "F");
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
     const ty = H - FOOTER_BAND_H / 2 + 3;
     pdf.text(sanitize(POLESTAR_URL), 18, ty);
@@ -406,7 +408,7 @@ export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   setText(pdf, WHITE);
 
   // Title — large, white, uppercase, up to 2 lines.
-  pdf.setFont("helvetica", "bold");
+  setRoboto(pdf, "bold");
   pdf.setFontSize(38);
   const titleLines: string[] = pdf.splitTextToSize(
     sanitize((opts.title || "Untitled report").toUpperCase()),
@@ -421,17 +423,17 @@ export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   }
 
   // Subtitle (e.g. POLESTAR INSIGHTS).
-  pdf.setFont("helvetica", "bold");
+  setRoboto(pdf, "bold");
   pdf.setFontSize(12);
   pdf.text(sanitize(opts.subtitle.toUpperCase()), padL, ty + 6, { charSpace: 1.6 });
 
   // Reporting period.
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(11);
   pdf.text(sanitize(opts.reportingPeriod.toUpperCase()), padL, ty + 28, { charSpace: 1.2 });
 
   // Website at bottom left, flush above the bottom edge.
-  pdf.setFont("helvetica", "bold");
+  setRoboto(pdf, "bold");
   pdf.setFontSize(10);
   pdf.text(sanitize(POLESTAR_URL), padL, H - 24, { charSpace: 1.2 });
 

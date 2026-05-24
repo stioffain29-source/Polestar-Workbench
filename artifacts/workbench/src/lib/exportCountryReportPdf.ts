@@ -4,7 +4,7 @@ import {
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
-  setFill, setStroke, setText, sanitize, todayLabel,
+  setFill, setStroke, setText, sanitize, todayLabel, setRoboto, ensureRobotoLoaded,
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
@@ -209,7 +209,7 @@ function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
   const chartH = order.length * rowH + 10;
   ensureSpace(ctx, chartH);
 
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(9);
   order.forEach((k, idx) => {
     const ry = ctx.y + idx * rowH;
@@ -220,9 +220,9 @@ function drawSeverityChart(ctx: Ctx, facts: DerivedFacts) {
     setFill(pdf, SEV_COLOR[k] ?? POLAR);
     pdf.rect(barAreaX, ry + 4, w, 10, "F");
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.text(String(n), barAreaX + barAreaW + 6, ry + 12);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
   });
   ctx.y += chartH + 18;
 }
@@ -245,7 +245,7 @@ function drawTypeChart(ctx: Ctx, facts: DerivedFacts) {
   const chartH = data.length * rowH + 10;
   ensureSpace(ctx, chartH);
 
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(9);
   data.forEach((d, idx) => {
     const ry = ctx.y + idx * rowH;
@@ -255,9 +255,9 @@ function drawTypeChart(ctx: Ctx, facts: DerivedFacts) {
     setFill(pdf, ELECTRIC);
     pdf.rect(barAreaX, ry + 4, w, 10, "F");
     setText(pdf, NAVY);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.text(String(d.n), barAreaX + barAreaW + 6, ry + 12);
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
   });
   ctx.y += chartH + 18;
 }
@@ -280,14 +280,14 @@ function drawIncidentTable(
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text("DATE", MX + 6, ctx.y + 12);
     pdf.text("TYPE", MX + colDateW + 6, ctx.y + 12);
     pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 12);
     pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 12);
     ctx.y += rowH;
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
   };
 
@@ -330,11 +330,11 @@ function drawIncidentTable(
     const chipX = MX + colDateW + colTypeW + colTitleW + 6;
     pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(7);
     const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
     pdf.text(sanitize(sevDisplay.toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
 
     ctx.y += rh;
@@ -344,14 +344,14 @@ function drawIncidentTable(
   if (truncated > 0) {
     ensureSpace(ctx, 16);
     setText(pdf, DUSK);
-    pdf.setFont("helvetica", "italic");
+    setRoboto(pdf, "italic");
     pdf.setFontSize(8);
     pdf.text(
       sanitize(`Showing ${rows.length} most recent of ${sorted.length} records in window. Older records remain available in the Workbench.`),
       ctx.MX,
       ctx.y + 10,
     );
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     ctx.y += 16;
   }
 }
@@ -376,6 +376,9 @@ export async function exportCountryReportPdf(
     kind: `${country.name} Country Report`,
     issueDate,
   });
+  // Embed Roboto on this pdf instance before drawing any text. Without this,
+  // jsPDF silently falls back to Helvetica, which the brand spec forbids.
+  await ensureRobotoLoaded(ctx.pdf);
 
   // Enforce the weekly reporting window: records older than 10 days are
   // excluded from every section of the country report.

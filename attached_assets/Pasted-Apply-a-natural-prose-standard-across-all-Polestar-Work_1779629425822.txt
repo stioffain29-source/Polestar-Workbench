@@ -1,0 +1,223 @@
+Apply a natural prose standard across all Polestar Workbench reports.
+
+Scope:
+Apply to all report previews and PDF exports:
+- Fuel Watch
+- Fertiliser Watch
+- Cargo Watch
+- Shipping Watch
+- Flashpoint
+- Energy Watch
+
+Purpose:
+The reports must read like short analyst briefs, not dashboard-generated text. The prose should be natural, varied, concise and operationally useful.
+
+Do not fix this one report at a time. Create or update the shared prose generation rules/helpers/templates used across all reports so the same standard applies everywhere.
+
+1. Remove dashboard-style prose
+
+Do not use repeated template wording such as:
+- “X records sit in the window”
+- “Activity concentrates in...”
+- “The leading patterns are...”
+- “The usable signal is...”
+- “Most recent...”
+- “Records on file covering...”
+- “The reporting window is noisy”
+- “Detail sits in the related incidents table below”
+- “The most serious entry reaches...”
+- “The load is on...”
+- “This cycle’s read...”
+
+These phrases make the reports sound machine-generated.
+
+2. Start with meaning, not counts
+
+Do not open paragraphs with record counts unless the count itself is the point.
+
+Bad:
+“47 records sit in the 18 May - 24 May window.”
+
+Better:
+“Fuel pressure during the week was driven by price movement, shortage reporting and transport disruption, with Iran carrying the clearest country signal.”
+
+Record counts should support the analysis, not lead every section.
+
+3. Vary sentence structure
+
+Adjacent paragraphs and sections must not start the same way.
+
+Avoid repeated openers such as:
+- “The week...”
+- “This cycle...”
+- “Reporting...”
+- “Activity...”
+- “Records...”
+
+Before export, scan the generated prose and ensure consecutive sections do not have the same rhythm.
+
+4. Plain analyst style
+
+Use this tone:
+- plain
+- direct
+- business-relevant
+- operational
+- concise
+- calm
+
+Avoid:
+- hype
+- dramatic wording
+- generic intelligence filler
+- fake certainty
+- long abstract sentences
+- consultant waffle
+
+The report should sound like a competent analyst writing for a business leader.
+
+5. Section-by-section prose rules
+
+Executive Summary:
+- Give the main operational meaning first.
+- Then add the key geography, issue type and severity.
+- Mention noisy or excluded records only if necessary, and keep it short.
+- Avoid repeating the same wording used later in the report.
+
+Situation:
+- Explain the operating picture in one or two natural sentences.
+- Do not simply restate the top issue types.
+
+What Happened:
+- Summarise what changed or was reported.
+- Use counts only where they help.
+- Do not say “detail sits in the table below.”
+
+What Matters:
+- Explain why the issue matters to business operations.
+- Link to movement of goods, people, site continuity, cost, access, safety, reputation or disruption.
+
+Implications for Business:
+- Keep practical.
+- Focus on what a business may need to review, monitor or prepare.
+- Do not overstate risk.
+
+Watch Next:
+- List concrete triggers to monitor.
+- Do not start every Watch Next with “Watch for...”
+- Vary the structure naturally.
+
+Polestar View:
+- This must be an analyst judgement, not a metric summary.
+- Do not use “The usable signal is...”
+- Do not just repeat the Executive Summary.
+- Keep it short and confident.
+
+6. Example rewrites
+
+Fuel Watch bad:
+“47 records sit in the window. Most activity is in Iran, India and Pakistan. The recurring incident types are price increase, shortage and transport disruption.”
+
+Fuel Watch better:
+“Fuel pressure was driven by price movement, shortage reporting and transport disruption. Iran produced the clearest country signal, with further reporting from India and Pakistan.”
+
+Shipping Watch bad:
+“Chokepoint and Route Activity: 6 records on file covering chokepoint risk, route diversion and maritime advisories. Most recent: Iran proposes permanent toll for Strait of Hormuz shipping.”
+
+Shipping Watch better:
+“Chokepoint reporting was led by Hormuz-related disruption, with relevant records covering toll proposals, route risk and maritime advisories.”
+
+Polestar View bad:
+“The usable signal in this window is price increase, shortage and transport disruption, with the load on Iran, India and Pakistan.”
+
+Polestar View better:
+“The main business concern is not the number of fuel stories, but the combination of price movement, shortage indicators and transport disruption. Iran remains the clearest pressure point, while India and Pakistan add regional context.”
+
+7. Use report-specific language
+
+Do not use one generic paragraph pattern for every report.
+
+Fuel Watch should refer to:
+- fuel prices
+- shortages
+- subsidy changes
+- tanker/forecourt disruption
+- generator supply
+- transport cost
+- business continuity
+
+Fertiliser Watch should refer to:
+- fertiliser pricing
+- export controls
+- production disruption
+- farmer access
+- planting cycles
+- food price pressure
+- agricultural supply chains
+
+Cargo Watch should refer to:
+- theft
+- pilferage
+- warehouse disruption
+- cargo security
+- ports
+- trucking
+- logistics nodes
+- supply chain loss
+
+Shipping Watch should refer to:
+- chokepoints
+- vessel attacks/seizures
+- piracy and armed robbery
+- port disruption
+- route diversion
+- insurance and freight pressure
+- cargo flow
+
+Flashpoint should refer to:
+- activism
+- protests
+- civil unrest
+- strike action
+- public order
+- road access
+- site disruption
+- staff movement
+
+Energy Watch should refer to:
+- grid reliability
+- power cuts
+- generation disruption
+- transmission issues
+- fuel supply to power generation
+- industrial continuity
+- critical infrastructure
+
+8. Avoid overclaiming
+
+If the data is thin, say so plainly.
+
+Use:
+- “Reporting is limited.”
+- “The signal is weak.”
+- “The country picture is uneven.”
+- “This should be treated as a coverage gap, not proof of calm.”
+
+Do not invent confidence where the data does not support it.
+
+9. Final acceptance check
+
+Before completing the task, check all six report types.
+
+For each report:
+- Executive Summary reads naturally.
+- Situation reads naturally.
+- What Happened reads naturally.
+- What Matters reads naturally.
+- Implications for Business reads naturally.
+- Watch Next reads naturally.
+- Polestar View reads naturally.
+- No paragraph starts with a repeated dashboard formula.
+- No adjacent sections start with the same rhythm.
+- Counts support the prose but do not dominate it.
+- The report reads like an analyst brief, not generated dashboard output.

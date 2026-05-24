@@ -78,6 +78,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@expo-google-fonts/roboto": "^0.4.3",
     "leaflet": "^1.9.4",
     "react-leaflet": "^5.0.0"
   }

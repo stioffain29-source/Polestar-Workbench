@@ -58,7 +58,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         className="uppercase pb-2 mb-4 tracking-wide"
         style={{
           color: NAVY,
-          fontFamily: "'Roboto Condensed', sans-serif",
+          fontFamily: "Roboto, sans-serif",
           fontWeight: 700,
           fontSize: 18,
           borderBottom: `2px solid ${ELECTRIC}`,
@@ -105,12 +105,12 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
             <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 4, background: accent }} />
             <div
               className="uppercase tracking-widest"
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 9, color: DUSK }}
+              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, color: DUSK }}
             >
               {c.label}
             </div>
             <div
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 20, color: NAVY, marginTop: 4, lineHeight: 1.1 }}
+              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 20, color: NAVY, marginTop: 4, lineHeight: 1.1 }}
             >
               {c.value}
             </div>
@@ -209,7 +209,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
         <h1
           className="mb-4"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 700,
             fontSize: 44,
             lineHeight: 1.05,
@@ -222,7 +222,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
         <div
           className="uppercase"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 700,
             fontSize: 13,
             letterSpacing: "0.22em",
@@ -235,7 +235,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
           <div
             className="uppercase"
             style={{
-              fontFamily: "'Roboto Condensed', sans-serif",
+              fontFamily: "Roboto, sans-serif",
               fontWeight: 400,
               fontSize: 12,
               letterSpacing: "0.18em",
@@ -248,7 +248,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
         <div
           className="uppercase"
           style={{
-            fontFamily: "'Roboto Condensed', sans-serif",
+            fontFamily: "Roboto, sans-serif",
             fontWeight: 700,
             fontSize: 11,
             letterSpacing: "0.18em",

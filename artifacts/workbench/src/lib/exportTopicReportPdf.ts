@@ -4,7 +4,7 @@ import {
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
-  setFill, setStroke, setText, sanitize,
+  setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
   NAVY, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
@@ -144,14 +144,14 @@ function drawRelatedIncidents(
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text("DATE", MX + 6, ctx.y + 12);
     pdf.text("TYPE", MX + colDateW + 6, ctx.y + 12);
     pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 12);
     pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 12);
     ctx.y += rowH;
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
   };
 
@@ -186,11 +186,11 @@ function drawRelatedIncidents(
     const chipX = MX + colDateW + colTypeW + colTitleW + 6;
     pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
     setText(pdf, WHITE);
-    pdf.setFont("helvetica", "bold");
+    setRoboto(pdf, "bold");
     pdf.setFontSize(7);
     const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
     pdf.text(sanitize(sevDisplay.toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
-    pdf.setFont("helvetica", "normal");
+    setRoboto(pdf, "regular");
     pdf.setFontSize(8);
 
     ctx.y += rh;
@@ -199,13 +199,13 @@ function drawRelatedIncidents(
 
   ensureSpace(ctx, 16);
   setText(pdf, DUSK);
-  pdf.setFont("helvetica", "italic");
+  setRoboto(pdf, "italic");
   pdf.setFontSize(8);
   const note = truncated > 0
     ? `Showing ${rows.length} most recent of ${sorted.length} records in window. Older records remain available in the Workbench.`
     : `Older records remain available in the Workbench.`;
   pdf.text(sanitize(note), ctx.MX, ctx.y + 10);
-  pdf.setFont("helvetica", "normal");
+  setRoboto(pdf, "regular");
   ctx.y += 16;
   // Touch the cadence helper so removing it would not silently regress —
   // and to make the per-cadence behaviour obvious to readers of this code.
@@ -231,6 +231,9 @@ export async function exportTopicReportPdf(
     kind: resolvedTitle,
     issueDate: headerDate,
   });
+  // Embed Roboto on this pdf instance before drawing any text. Without this,
+  // jsPDF silently falls back to Helvetica, which the brand spec forbids.
+  await ensureRobotoLoaded(ctx.pdf);
 
   // Full-bleed Polestar cover (page 1). For topics with a registered cover
   // photo (see TOPIC_COVER_URLS), prepare the hero image the same way the
