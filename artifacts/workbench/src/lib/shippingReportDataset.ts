@@ -130,6 +130,33 @@ function sortByDateDesc<T extends { date: Date }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
+// --- Source-credibility helpers --------------------------------------------
+// Used to keep social-media-style and pure shipping-market items out of the
+// surfaces where they would otherwise drive the analyst narrative
+// (chokepoint operational read; Commercial Impact on Shipping).
+
+const SOCIAL_SOURCE_RE = /\b(twitter|x\.com|t\.co|instagram|tiktok|facebook|threads|youtube|reddit|telegram|t\.me|mastodon|truth\s*social|weibo|social\s*media)\b/i;
+const HANDLE_TITLE_RE = /^\s*[@#]/;
+
+function isLowCredibilitySource(r: ShippingReportIncident): boolean {
+  if (HANDLE_TITLE_RE.test(r.title ?? "")) return true;
+  const src = (r.source ?? "") + " " + (r.sourceUrl ?? "");
+  return SOCIAL_SOURCE_RE.test(src);
+}
+
+// Pure shipping-market / corporate-finance items with no operational hook
+// (vessel S&P stories, newbuild orders, earnings, fleet finance, etc.).
+// These get filtered out of the Commercial Impact table unless the title or
+// summary also carries an operational/insurance/freight-pressure signal.
+const MARKET_ONLY_RE = /\b(newbuild|newbuilds|orderbook|order\s*book|sale\s*and\s*purchase|s\s*&\s*p\b|secondhand|second-hand|cashes?\s*in|cashed\s*in|lands?\s*\$|raises?\s*\$|secures?\s*\$|earnings|q[1-4]\s*results|annual\s*results|profit|ipo\b|listing|share\s*price|stock\s*price|shareholder|dividend|acquisition|acquires?|merger|takeover|bondholder|fleet\s*sale|fleet\s*purchase|scrapping|demolition|recycling|sells|bought|buys|charter\s*rate|time-?charter|fixture|tonnage\s*deal|suezmax\s*pair|vlcc\s*pair)\b/i;
+const OPERATIONAL_HOOK_RE = /\b(port|strike|closure|closes?|closed|delay|delayed|diversion|diverted|detain|detained|seizure|seized|attack|attacked|hijack|piracy|advisory|advisories|war[\s-]?risk|insurance|premium|premiums|sanction|sanctions|disruption|congest|congestion|backlog|blocked|blockade|terminal|berth|cargo\s*flow|chokepoint|hormuz|red\s*sea|bab[\s-]?el[\s-]?mandeb|suez|malacca|hostilit|crew\s*change|missile|drone|houthi|ukmtu|ukmto|imb|p&i|protection\s*and\s*indemnity)\b/i;
+
+function isShippingMarketOnly(r: ShippingReportIncident): boolean {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  if (!MARKET_ONLY_RE.test(text)) return false;
+  return !OPERATIONAL_HOOK_RE.test(text);
+}
+
 export function buildShippingReportDataset(
   incidents: ShippingReportIncident[],
   topic: string,
@@ -247,15 +274,30 @@ export function buildShippingReportDataset(
   ];
 
   // Chokepoint Watch rows — 30-day window.
+  // The lead "operational read" must come from a credible maritime / security /
+  // industry / news source. Social-media-style records (e.g. titles starting
+  // with "@" or sources matching twitter/x.com/instagram/etc.) may still sit
+  // in the underlying count, but they are not allowed to drive the narrative.
+  // If only low-credibility records exist for a chokepoint, fall back to a
+  // low-confidence note instead of quoting them.
   const chokepointRows: ChokepointRow[] = CHOKEPOINTS.map((cp) => {
     const records = enriched30.filter((r) => detectChokepoints(r).includes(cp));
+    const credible = records.filter((r) => !isLowCredibilitySource(r));
     const hs = highestSeverity(records);
-    const latest = sortByDateDesc(records)[0] ?? null;
-    const readText = records.length === 0
-      ? "Quiet over the last 30 days; no qualifying activity on file."
-      : records.length === 1
-        ? `Activity here was anchored by a single entry, "${latest!.title}", over the last 30 days.`
-        : `Reporting was led by "${latest!.title}", with ${records.length} qualifying records over the last 30 days.`;
+    const sorted = sortByDateDesc(records);
+    const credibleSorted = sortByDateDesc(credible);
+    const latest = sorted[0] ?? null;
+    const credibleLatest = credibleSorted[0] ?? null;
+    let readText: string;
+    if (records.length === 0) {
+      readText = "Quiet over the last 30 days; no qualifying activity on file.";
+    } else if (credibleLatest === null) {
+      readText = "Low-confidence reporting only; no validated maritime advisory or credible operational incident identified in the last 30 days.";
+    } else if (records.length === 1) {
+      readText = `Activity here was anchored by a single entry, "${credibleLatest.title}", over the last 30 days.`;
+    } else {
+      readText = `Reporting was led by "${credibleLatest.title}", with ${records.length} qualifying records over the last 30 days.`;
+    }
     return {
       name: cp,
       count: records.length,
@@ -282,7 +324,15 @@ export function buildShippingReportDataset(
   const transitRecords = enriched.filter(
     (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   );
-  const commercialRecords = enriched.filter((r) => COMMERCIAL_ISSUES.has(r.issue));
+  // Commercial Impact must stay focused on operational and commercial risk
+  // to shipping (port disruption, freight/insurance pressure with an
+  // operational hook, war-risk, route disruption, etc.). Pure shipping-market
+  // items — vessel S&P, newbuild orders, fleet finance, earnings, share-price
+  // moves — are filtered out unless the title or summary also carries an
+  // operational signal.
+  const commercialRecords = enriched
+    .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
+    .filter((r) => !isShippingMarketOnly(r));
   // Daily Intelligence Summary — analyst-style prose. Each line opens with
   // the operational read, not the count. Counts and example titles are used
   // as supporting evidence, with the sentence pattern varied across lines.

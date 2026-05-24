@@ -2,7 +2,8 @@ import { format, parseISO, max as dateMax } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages,
+  drawPolestarCover, beginBodyPages, prepareCoverImage,
+  COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize,
   NAVY, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
@@ -11,6 +12,14 @@ import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
+// Per-topic cover photography. Mirrors the shipping cover wiring: a
+// full-bleed hero image sits behind the top band and bottom block. New
+// topics opt in by adding an entry to TOPIC_COVER_URLS below.
+import fertiliserCoverUrl from "@assets/image_1779624933984.png";
+
+const TOPIC_COVER_URLS: Record<string, string> = {
+  fertiliser: fertiliserCoverUrl,
+};
 import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 
@@ -228,12 +237,25 @@ export async function exportTopicReportPdf(
     issueDate: headerDate,
   });
 
-  // Full-bleed Polestar cover (page 1).
+  // Full-bleed Polestar cover (page 1). For topics with a registered cover
+  // photo (see TOPIC_COVER_URLS), prepare the hero image the same way the
+  // shipping report does and pass it through; otherwise fall back to the
+  // gradient hero. The image load is wrapped in try/catch so a missing or
+  // unreadable asset never blocks PDF export.
   const win = resolveReportWindow(data.topic, data.issueDate);
+  let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
+  const topicCoverUrl = TOPIC_COVER_URLS[data.topic];
+  if (topicCoverUrl) {
+    try {
+      const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
+      coverImage = await prepareCoverImage(topicCoverUrl, ctx.W, heroH);
+    } catch { /* fall back to gradient hero */ }
+  }
   drawPolestarCover(ctx, {
     title: resolvedTitle,
     subtitle: "POLESTAR INSIGHTS",
     reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
+    coverImage,
   });
   void topicLabel;
   void canon;

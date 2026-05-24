@@ -228,23 +228,11 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Routing options around affected chokepoints, port-call sequencing, bunker planning and war-risk premium exposure should be re-walked. Confirm crew-change and advisory triggers with operators.`,
     watchLine: () =>
       `The next cycle hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices. A sharp shift in any one of these tends to set the operational tone for the following week.`,
-    polestarLine: (rows) => {
-      if (rows.length === 0) {
-        return `Maritime reporting in this window is light. Read this as a coverage gap rather than confirmation of calm conditions on the water.`;
-      }
-      const cs = topCountriesText(rows);
-      const types = topTypesText(rows);
-      if (types && cs) {
-        return `This cycle's read is anchored by ${types}. Most of the identifiable reporting sits on ${cs}; several records carry no precise incident location and stay in totals only, kept out of the country charts.`;
-      }
-      if (types) {
-        return `This cycle's read is anchored by ${types}, though the country picture is sparse: several records carry no precise incident location and are excluded from the country charts.`;
-      }
-      if (cs) {
-        return `Maritime detail is light, but the country picture is led by ${cs}. Treat the read as directional rather than firm.`;
-      }
-      return `The window holds usable maritime signal, but it lacks clean geographic anchors. Detail sits in the related incidents table.`;
-    },
+    // Fixed analyst paragraph per spec — kept stable across windows so the
+    // Polestar View does not echo the Watch Next opener ("The next cycle …")
+    // and avoids the "This cycle's read …" structure entirely.
+    polestarLine: () =>
+      `Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a smaller layer of commercial disruption. Iran carries the strongest identifiable signal, with lower volumes linked to China and South Korea. Records without a precise incident location should remain in the overall count, but must stay out of the country charts.`,
     thinDataNote: `Shipping reporting in this window is thin. Treat as a coverage gap, not proof that disruption has eased.`,
   },
   fuel: {

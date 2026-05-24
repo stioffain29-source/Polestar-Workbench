@@ -1,0 +1,111 @@
+Fix the remaining Shipping Watch report issues from the latest PDF export.
+
+Scope: Shipping Watch only.
+
+The latest PDF is much closer. Do not rebuild the report. Make only the targeted fixes below.
+
+1. Replace the Polestar View wording
+
+Current problem:
+The Polestar View still starts with:
+“This cycle's read is anchored...”
+
+This must be removed because the previous Watch Next section already starts with:
+“The next cycle...”
+
+That creates repetitive sentence structure across adjacent sections.
+
+Replace the Shipping Watch Polestar View paragraph with this exact wording:
+
+“Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a smaller layer of commercial disruption. Iran carries the strongest identifiable signal, with lower volumes linked to China and South Korea. Records without a precise incident location should remain in the overall count, but must stay out of the country charts.”
+
+Rules:
+- Do not use “This cycle’s read”.
+- Do not use “The week’s strongest signal”.
+- Do not use “sits on”.
+- Do not start Watch Next and Polestar View with the same structure.
+- Keep the Polestar View short, plain and analyst-led.
+
+2. Tighten Chokepoint Watch source quality
+
+Problem:
+The Bab el-Mandeb operational read is currently led by a social media-style item beginning with a handle:
+“@cookwithmrz...”
+
+That should not be used as the lead operational read in a Shipping Watch report.
+
+Fix:
+- Do not allow social media handle-style records to become the lead operational read for chokepoints.
+- If a chokepoint has only social media/noisy records, do not present them as the leading operational read.
+- Use a fallback line such as:
+  “Low-confidence reporting only; no validated maritime advisory or credible operational incident identified in the last 30 days.”
+- Prefer credible maritime, security, port, government, insurer, P&I, UKMTO, IMB, shipping industry, or established news sources for chokepoint operational reads.
+- Social media may remain in the database if required, but should not drive the report narrative unless validated.
+
+3. Tighten Commercial Impact on Shipping filtering
+
+Problem:
+Some Commercial Impact records are shipping industry finance or fleet-market items rather than operational shipping impact, for example:
+- “Frontline cashes in on ageing suezmax pair”
+- “Dynacom lands $65m for ageing suezmax”
+- “Ibaizabal heads back to suezmax newbuilds”
+
+These weaken the report. They are shipping market news, not operational impact.
+
+Fix:
+Commercial Impact on Shipping should only include items with direct operational or cargo-flow relevance, such as:
+- port disruption
+- port closure
+- strike action affecting shipping/cargo movement
+- vessel delay or diversion
+- route disruption
+- war-risk premium changes
+- freight rate movement directly linked to operational conditions
+- insurance pressure linked to chokepoint, conflict, piracy, sanctions or vessel security risk
+- cargo flow disruption
+
+Exclude from Commercial Impact unless directly linked to operational risk:
+- vessel sale and purchase stories
+- fleet finance
+- newbuild orders
+- company earnings
+- general shipping market commentary
+- pure freight market commentary with no operational shipping linkage
+- commercial stories about shipowners unless they affect cargo movement, routing, insurance, port access or vessel security
+
+4. Keep what is now working
+
+Do not undo these improvements:
+- Cover layout
+- One merged Fast Facts section
+- No Key Metrics duplicate section
+- No “Unclassified maritime record” in Issue Type Breakdown
+- “Incidents by Country” title
+- “Location not identified” excluded from country charts
+- Improved chart bar styling with subtle translucent fill and darker edge
+- 30-day Chokepoint Watch
+- 30-day Vessel Attacks / Seizures
+- 30-day Piracy / Armed Robbery
+- Correct brand colours
+
+5. Brand colours must remain exactly
+
+Use:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+- #E2E2E2
+
+Acceptance check:
+- Polestar View no longer starts with “This cycle”.
+- Watch Next and Polestar View do not start with similar sentence structures.
+- Bab el-Mandeb is not led by a social media handle-style item.
+- Chokepoint operational reads are led by credible maritime/security/industry sources or use a low-confidence fallback.
+- Commercial Impact does not include vessel finance, newbuild, fleet sale, or general shipowner market stories unless there is a direct operational shipping impact.
+- Shipping Watch remains focused on operational and commercial risk to shipping, not generic shipping industry news.
