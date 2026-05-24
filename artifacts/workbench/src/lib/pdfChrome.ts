@@ -3,10 +3,10 @@ import { format } from "date-fns";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 // Polestar core brand palette.
-export const NAVY = "#0B0A3D";       // Midnight Blue
-export const ELECTRIC = "#465BFF";   // Electric Blue
-export const POLAR = "#E2E2E2";      // Polar Gray
-export const DUSK = "#363636";       // Dusk Gray
+export const NAVY = "#0B0B3D";       // Midnight Blue (brand spec)
+export const ELECTRIC = "#4655FF";   // Electric Blue (brand spec)
+export const POLAR = "#E2E2E2";      // Polar Gray (brand spec)
+export const DUSK = "#303030";       // Dusk Gray (brand spec)
 export const WHITE = "#FFFFFF";
 export const CARD_BG = "#FFFFFF";
 export const PAGE_BG = "#FFFFFF";

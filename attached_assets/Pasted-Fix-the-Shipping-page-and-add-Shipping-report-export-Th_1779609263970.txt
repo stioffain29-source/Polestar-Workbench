@@ -1,0 +1,205 @@
+Fix the Shipping page and add Shipping report export.
+
+This is Shipping only.
+
+Do not change:
+- Cargo Watch
+- Fuel
+- report builder for other topics
+- database
+- imports
+- Missile Strike Tracker
+
+Problem:
+The Shipping page has too many meaningless numbers. It shows data, but not enough operational judgement.
+
+The page needs to support a downloadable Shipping report.
+
+Shipping coverage must include:
+- Strait of Hormuz
+- Gulf of Oman
+- Arabian Gulf / Persian Gulf
+- Red Sea
+- Bab el Mandeb
+- Malacca Strait
+- Gulf maritime activity
+- piracy and armed robbery at sea
+- vessel attacks
+- vessel seizure
+- maritime advisories
+- chokepoint risk
+- port disruption
+- route diversion
+- insurance / freight pressure
+
+Dashboard changes:
+
+1. Remove or reduce weak numbers
+
+Do not show KPI cards that do not help decision making.
+
+Remove or downgrade:
+- records with source link
+- with coordinates
+- raw total numbers that repeat elsewhere
+- Country not identified as a headline metric
+
+Keep only useful high level indicators:
+- total shipping records in selected window
+- highest severity
+- main affected chokepoint / region
+- vessel attack / seizure count
+- piracy / armed robbery count
+- latest significant incident
+
+2. Add Chokepoint Watch
+
+Add a section called:
+
+Chokepoint Watch
+
+Include rows/cards for:
+- Strait of Hormuz
+- Gulf of Oman
+- Arabian Gulf / Persian Gulf
+- Red Sea
+- Bab el Mandeb
+- Malacca Strait
+
+Each row/card should show:
+- incident count
+- highest severity
+- latest incident
+- short operational read
+
+If no data exists for a chokepoint, show:
+No current records in selected window
+
+Do not invent records.
+
+3. Add Piracy and Armed Robbery section
+
+Add a section called:
+
+Piracy and Armed Robbery
+
+Include incidents involving:
+- piracy
+- armed robbery at sea
+- boarding
+- attempted boarding
+- suspicious approach
+- small craft approach
+- hijacking
+- crew threat
+- theft from vessel at anchorage
+
+Do not include land cargo theft. That belongs in Cargo Watch.
+
+Show:
+- total piracy / armed robbery records
+- affected area
+- highest severity
+- latest incident
+- recent incident cards or compact table
+
+4. Vessel Attacks carousel
+
+Keep Vessel Attacks as a horizontal carousel.
+
+It should only include hostile vessel incidents:
+- attack
+- fired upon
+- missile or drone strike affecting vessel
+- seizure
+- boarding by hostile or unauthorised personnel
+- near miss
+- credible threat to vessel
+
+Do not include general shipping news.
+
+5. Issue Type Breakdown
+
+Replace vague “Other Maritime” where possible.
+
+Use:
+- Vessel attack
+- Vessel seizure
+- Piracy / armed robbery
+- Chokepoint risk
+- Port disruption
+- Route diversion
+- Maritime advisory
+- Insurance / freight pressure
+- Commercial shipping disruption
+- Unclassified maritime record
+
+Use Unclassified maritime record only when no better label can be derived.
+
+6. Country and location logic
+
+Incidents by country must mean where the incident happened.
+
+Do not use vessel flag state as the incident country.
+
+If location is not clear, keep it out of the country chart and show only in a data quality note.
+
+7. Daily Intelligence Summary
+
+Make this useful.
+
+Use three cards:
+- Chokepoint and route activity
+- Vessel threat and piracy
+- Commercial impact
+
+Each should be short, operational and based on current records.
+
+No generic filler.
+
+8. Downloadable Shipping report
+
+Add a Shipping report export/download.
+
+The report should use current Shipping page data and selected window.
+
+Report structure:
+- cover page using Polestar cover convention
+- Fast Facts
+- Chokepoint Watch
+- Vessel Attacks
+- Piracy and Armed Robbery
+- Port and Route Disruption
+- Commercial Impact
+- Watch Next
+- Polestar View
+- Source Notes / Data Notes
+
+Do not include Missile Strike Tracker.
+
+Do not include Cargo Watch cargo theft unless directly linked to maritime movement disruption.
+
+9. Report content rules
+
+Report must be prose plus useful tables/charts, not a dashboard screenshot.
+
+Use plain operational writing.
+
+No AI filler.
+No hype.
+No em dashes.
+No “dynamic threat landscape”.
+No generic maritime waffle.
+
+10. Acceptance criteria
+
+- Shipping page has fewer meaningless numbers.
+- Malacca Strait is included in chokepoint coverage.
+- Gulf / Gulf of Oman / Arabian Gulf are included.
+- Piracy and armed robbery has its own section.
+- Vessel Attacks remains a carousel.
+- “Other Maritime” is reduced.
+- Country means incident location, not flag state.
+- A downloadable Shipping report is available.
+- No database changes.
+- No unrelated page changes.

@@ -15,6 +15,7 @@ import ReportPreview from "@/components/ReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
+import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 
 const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
@@ -80,35 +81,40 @@ export default function ReportEditor() {
   const downloadPdf = async () => {
     setExporting(true);
     try {
-      await exportTopicReportPdf(
-        {
-          title: form.title,
-          topic: form.topic,
-          issueDate: form.issueDate,
-          author: form.author,
-          executiveSummary: form.executiveSummary,
-          situation: form.situation,
-          whatHappened: form.whatHappened,
-          whatMatters: form.whatMatters,
-          implications: form.implications,
-          watchNext: form.watchNext,
-          polestarView: form.polestarView,
-        },
-        incidentsForExport.map((i) => ({
-          id: i.id,
-          title: i.title,
-          topic: i.topic,
-          severity: i.severity,
-          occurredAt: i.occurredAt,
-          country: i.country,
-          summary: i.summary,
-          source: i.source,
-          sourceUrl: i.sourceUrl,
-          location: i.location,
-        })),
-        TOPIC_LABELS,
-        `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`,
-      );
+      const reportData = {
+        title: form.title,
+        topic: form.topic,
+        issueDate: form.issueDate,
+        author: form.author,
+        executiveSummary: form.executiveSummary,
+        situation: form.situation,
+        whatHappened: form.whatHappened,
+        whatMatters: form.whatMatters,
+        implications: form.implications,
+        watchNext: form.watchNext,
+        polestarView: form.polestarView,
+      };
+      const mappedIncidents = incidentsForExport.map((i) => ({
+        id: i.id,
+        title: i.title,
+        topic: i.topic,
+        severity: i.severity,
+        occurredAt: i.occurredAt,
+        country: i.country,
+        summary: i.summary,
+        source: i.source,
+        sourceUrl: i.sourceUrl,
+        location: i.location,
+      }));
+      const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
+      // Shipping uses a bespoke section layout (Chokepoint Watch, Vessel
+      // Attacks, Piracy, Port/Route Disruption, Commercial Impact) so it
+      // does not run through the generic topic exporter.
+      if (form.topic === "shipping") {
+        await exportShippingReportPdf(reportData, mappedIncidents, filename);
+      } else {
+        await exportTopicReportPdf(reportData, mappedIncidents, TOPIC_LABELS, filename);
+      }
     } finally {
       setExporting(false);
     }

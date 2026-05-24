@@ -10,6 +10,10 @@ import {
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { deriveIncidentCountry, deriveFlagState, LOCATION_NOT_IDENTIFIED } from "@/lib/shippingCountry";
+import {
+  CHOKEPOINTS, detectChokepoints, classifyPiracy,
+  type PiracyAct,
+} from "@/lib/shippingAnalysis";
 import { ExternalLink } from "lucide-react";
 
 const MIDDLE_EAST = new Set([
@@ -44,12 +48,12 @@ const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
 // is also an attack); attack beats chokepoint (a Hormuz hit is an attack on
 // a vessel, not just a chokepoint mention).
 const ISSUE_RULES: Array<{ label: string; pattern: RegExp }> = [
-  { label: "Vessel seizure", pattern: /\b(vessel seiz|ship seiz|tanker seiz|seized .{0,30}(ship|tanker|vessel|dhow|carrier|cargo)|seizure of .{0,20}(ship|tanker|vessel|dhow|carrier)|hijack(ed)?|boarded by|armed robbers? boarded?|armed (men |gang )?boarded?|robbers? board(ed)?|commandeered|detained .{0,20}(vessel|tanker|ship|crew|cargo)|stopped in iranian waters|bulk carrier stopped|us[- ]seized vessels?|iran seized|seized two .{0,20}ships?|seized .{0,5}foreign|forced (sale|transfer))\b/i },
-  { label: "Vessel attack", pattern: /\b(vessel attack|tanker attack|ship attack|attack(ed|s)? .{0,30}(ship|tanker|vessel|carrier|dhow|cargo|bulk carrier|container ship)|attack(ed)? by (multiple )?(small (craft|boats?)|skiffs?|iranian)|attack on (a |the )?(ship|tanker|vessel|carrier|dhow|cargo|hmm)|missile .{0,20}(ship|tanker|vessel|carrier|hmm|cargo)|drone .{0,20}(ship|tanker|vessel|carrier|cargo)|fired (upon|at|on)|fired on by|tanker (fired upon|hit|struck|set ablaze|ablaze|on fire)|(ship|vessel|carrier|cargo ship|bulk carrier|container ship|tanker) .{0,20}(hit|struck|set ablaze|ablaze|on fire|catches fire|caught fire|attacked|ablaze)|hit by (gunfire|projectile|projectiles|unknown projectile|unknown projectiles|small craft)|three (vessels|ships|container ships) (hit|targeted|attacked)|gunfire (hit|near|in|in strait)|fire (aboard|on board|aboard a|aboard the|breaks out on|happened at|extinguished on)|fire breaks out on .{0,20}vessels?|external strike|came under fire|comes under fire|targeted by .{0,30}(vessel|ship|iranian|missile|drone)|skiff (attack|with|carrying)|approached by a skiff|houthi attack|iranian (attack|strike|vessel)|repel(led)? drone|targeted .{0,20}iranian|ship attack debris|attack debris)\b/i },
-  { label: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near|missile alert|suspicious approach|approached by .{0,20}skiff)\b/i },
+  { label: "Piracy / armed robbery", pattern: /\b(piracy|pirat(e|es)|armed robbery (against|at sea|on board|in port|at anchorage)|robbery (against|at sea) (a |the )?(ship|vessel|tanker)|robbery on board|attempted boarding|boarded by (pirates|robbers|armed (men|gang|gunmen))|pirates? boarded|robbers? boarded|armed (men|gang|gunmen) boarded|suspicious approach|small craft approach|approached by (a )?skiffs?|skiff (sighted|approach)|crew (kidnap|abduct|held hostage|taken hostage)|theft from vessel|petty theft .{0,15}(anchorage|vessel|ship)|theft .{0,15}anchorage)\b/i },
+  { label: "Vessel seizure", pattern: /\b(vessel seiz|ship seiz|tanker seiz|seized .{0,30}(ship|tanker|vessel|dhow|carrier|cargo)|seizure of .{0,20}(ship|tanker|vessel|dhow|carrier)|hijack(ed)?|commandeered|detained .{0,20}(vessel|tanker|ship|crew|cargo)|stopped in iranian waters|bulk carrier stopped|us[- ]seized vessels?|iran seized|seized two .{0,20}ships?|seized .{0,5}foreign|forced (sale|transfer))\b/i },
+  { label: "Vessel attack", pattern: /\b(vessel attack|tanker attack|ship attack|attack(ed|s)? .{0,30}(ship|tanker|vessel|carrier|dhow|cargo|bulk carrier|container ship)|attack(ed)? by (multiple )?(small (craft|boats?)|skiffs?|iranian)|attack on (a |the )?(ship|tanker|vessel|carrier|dhow|cargo|hmm)|missile .{0,20}(ship|tanker|vessel|carrier|hmm|cargo)|drone .{0,20}(ship|tanker|vessel|carrier|cargo)|fired (upon|at|on)|fired on by|tanker (fired upon|hit|struck|set ablaze|ablaze|on fire)|(ship|vessel|carrier|cargo ship|bulk carrier|container ship|tanker) .{0,20}(hit|struck|set ablaze|ablaze|on fire|catches fire|caught fire|attacked|ablaze)|hit by (gunfire|projectile|projectiles|unknown projectile|unknown projectiles|small craft)|three (vessels|ships|container ships) (hit|targeted|attacked)|gunfire (hit|near|in|in strait)|fire (aboard|on board|aboard a|aboard the|breaks out on|happened at|extinguished on)|fire breaks out on .{0,20}vessels?|external strike|came under fire|comes under fire|targeted by .{0,30}(vessel|ship|iranian|missile|drone)|skiff attack|houthi attack|iranian (attack|strike|vessel)|repel(led)? drone|targeted .{0,20}iranian|ship attack debris|attack debris|near miss|warning shot|narrowly (missed|avoided)|missile (fell|landed) near|drone (fell|landed) near|intercepted near|missile alert)\b/i },
   { label: "Maritime advisory", pattern: /\b(ukmto (reports?|warns?|warning|advisory|alert|issues warning|says)|ukmto:|naval (advisory|patrol|escort|operation|protection)|coast guard advisory|imo advisory|maritime (warning|advisory|alert|security (crisis|threat))|nav warning|notice to mariners|navy assists|under (u\.s\.|us|american) (military )?(protection|escort)|project freedom|operation freedom|us warship escort|escort (foreign|mission)|escorted to|escorted by|pentagon statement|force protection|navy (assists|monitors))\b/i },
-  { label: "Chokepoint risk", pattern: /\b(strait of hormuz|hormuz strait|bab[- ]el[- ]mandeb|suez canal|panama canal|malacca|lombok strait|singapore strait|gibraltar|chokepoint|transit risk|transit volume|tanker traffic|patrol zones?|red sea (route|risk|transit)|gulf of oman|persian gulf|arabian gulf|hormuz (closure|transit|risk|exit|won't go back|shut)|clears strait|piracy)\b/i },
-  { label: "Vessel movement disruption", pattern: /\b(reroute|re[- ]routing|diverted?|diverting|divert(ed)? (away|around)|cape of good hope|avoiding (hormuz|red sea|gulf|strait)|vessel delay|transit delay|schedule disruption|shipping delay|delivery delay|delayed (shipment|cargo)|adrift|collision|grounded|crew (repatriated|safe|evacuated|stranded)|vessel (stranded|passed through|relocate|repositioning)|first .{0,30}transits?|traffic shifts? away|ghost tanker|bypassed .{0,20}sanctions|slipped past|moving .{0,20}barrels|ship-to-ship transfers?|sanctions enforcement|sanctions dragnet|sanctions threats?|breaks through sanctions)\b/i },
+  { label: "Chokepoint risk", pattern: /\b(strait of hormuz|hormuz strait|bab[- ]el[- ]mandeb|suez canal|panama canal|malacca|lombok strait|singapore strait|gibraltar|chokepoint|transit risk|transit volume|tanker traffic|patrol zones?|red sea (route|risk|transit)|gulf of oman|persian gulf|arabian gulf|hormuz (closure|transit|risk|exit|won't go back|shut)|clears strait)\b/i },
+  { label: "Route diversion", pattern: /\b(reroute|re[- ]routing|diverted?|diverting|divert(ed)? (away|around)|cape of good hope|avoiding (hormuz|red sea|gulf|strait)|vessel delay|transit delay|schedule disruption|shipping delay|delivery delay|delayed (shipment|cargo)|adrift|collision|grounded|crew (repatriated|safe|evacuated|stranded)|vessel (stranded|passed through|relocate|repositioning)|first .{0,30}transits?|traffic shifts? away|ghost tanker|bypassed .{0,20}sanctions|slipped past|moving .{0,20}barrels|ship-to-ship transfers?|sanctions enforcement|sanctions dragnet|sanctions threats?|breaks through sanctions)\b/i },
   { label: "Port disruption", pattern: /\b(port (workers? )?strike|dock(workers?| strike)|stevedore strike|labour (dispute|stoppage|action)|union (walkout|strike)|port (closure|closed|shutdown|halted|suspended|disruption|congestion)|terminal (closed|shut|congestion)|congestion at (the )?port|berth (closure|delay|congestion)|harbou?r (closure|disruption)|panama canal congestion|canal congestion|maintenance work .{0,20}(canal|port)|port of darwin|port incident|incident at .{0,20}port)\b/i },
   { label: "Insurance / freight pressure", pattern: /\b(war risk (premium|insurance|zone)|insurance (premium|surcharge|cost)|freight rate|bunker surcharge|p&i club|hull premium|baltic (dry|exchange) index|world container index|new contex|container ship time charter|spot rate(s)?|charter rate|charter assessment|aframax prices|tanker prices|vlcc (market|prices?|freight)|vlgc (freight )?rates?|tankers?: vlcc|freight (rates? (rising|recovery|up|down|surge|soaring)|recovery|soaring)|rates soaring|shipping rates (have )?(shot up|rose|rising|surge)|cheap spot rates|peak season|ws[0-9]+|tce down|tce up|mediterranean\/east index)\b/i },
   { label: "Commercial shipping disruption", pattern: /\b(cargo (delay|disruption|halt|backlog|movement|flows?)|container (backlog|delay|handling)|supply chain disruption|liner service (suspension|cancell)|service suspension|sailing cancelled|blank sailing|export (halt|suspension)|import (halt|disruption)|market share|orderbook|newbuild|newbuilding|new entrant|charter (acquisition|deal|purchase|locks?|fix(ed|es)?)|locks first|fleet (acquisition|renewal|deal|strategy|exposure)|m&a|merger|joint venture|company of the year|banned from (australia|port)|unpaid crew wages|earnings|quarterly|annual report|first[- ]quarter|q1 (results?|performance)|volume growth|cooperation deal|logistics push|legal action|relocate headquarters|biomethanol|long[- ]term charter|long[- ]term deal|product tanker|crude carrier|vlcc (newbuild|owner|charter|trading|sanctions|supertanker))\b/i },
@@ -217,7 +221,6 @@ export default function Shipping() {
   })), [enriched]);
 
   const withCoords = enriched.filter((i) => i.latitude != null && i.longitude != null);
-  const withSource = enriched.filter((i) => i.sourceUrl).length;
 
   // Timeline — bucket by day for the last 30 days that have records, fall back
   // to grouping the whole dataset by day if there aren't enough recent rows.
@@ -270,14 +273,6 @@ export default function Shipping() {
     return sorted.find((i) => i.severity === "extreme" || i.severity === "high") ?? sorted[0] ?? null;
   }, [enriched]);
 
-  // Daily Intelligence Summary buckets — sorted newest-first so "Most recent" copy is honest.
-  const recent7 = useMemo(() => {
-    const now = new Date();
-    return enriched
-      .filter((i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= 7)
-      .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
-  }, [enriched]);
-
   // Vessels Attacked — derive from the already-scoped `enriched` list so this
   // section honours the same APAC + Middle East filter as the rest of the page.
   const vesselIncidents = useMemo(() => {
@@ -307,34 +302,60 @@ export default function Shipping() {
   );
 
   // Labels here MUST match the 10-label vocabulary emitted by ISSUE_RULES.
+  // Used for Daily Intelligence Summary card 1 (chokepoint / route activity).
   const TRANSIT_ISSUES = new Set([
-    "Vessel attack",
-    "Vessel seizure",
-    "Near miss",
-    "Vessel movement disruption",
     "Chokepoint risk",
+    "Route diversion",
     "Maritime advisory",
   ]);
-  // Waterways / chokepoints + port-side keywords. We text-match across the
-  // location, title and summary so chokepoint references that were classified
-  // under another issue label (e.g. a vessel attack in the Strait of Hormuz)
-  // still surface under Port and Chokepoint Watch.
-  const PORT_CHOKEPOINT_RE =
-    /\b(strait of hormuz|bab[- ]el[- ]mandeb|red sea|gulf of oman|arabian gulf|persian gulf|suez canal|malacca|chokepoint|port of |port strike|port congestion|berth congestion|container backlog|harbou?r)\b/i;
-  const PORT_ISSUES = new Set([
+  const COMMERCIAL_ISSUES = new Set([
     "Port disruption",
     "Commercial shipping disruption",
-    "Chokepoint risk",
     "Insurance / freight pressure",
   ]);
 
-  const transitRecords = sortedEnriched.filter((i) => TRANSIT_ISSUES.has(i.issue));
-  const portRecords = sortedEnriched.filter((i) => {
-    if (PORT_ISSUES.has(i.issue)) return true;
-    const blob = `${i.title} ${i.summary ?? ""} ${i.location ?? ""}`;
-    return PORT_CHOKEPOINT_RE.test(blob);
-  });
-  const intelRecord = latestSignificant;
+  const transitRecords = sortedEnriched.filter(
+    (i) => TRANSIT_ISSUES.has(i.issue) || detectChokepoints(i).length > 0,
+  );
+  const commercialRecords = sortedEnriched.filter((i) => COMMERCIAL_ISSUES.has(i.issue));
+
+  // --- Chokepoint Watch ---------------------------------------------------
+  // For each chokepoint: count, highest severity, latest incident, short
+  // operational read. We do NOT invent rows — if a chokepoint has nothing on
+  // file in the window the row reads "No current records in selected window".
+  const chokepointRows = useMemo(() => {
+    return CHOKEPOINTS.map((cp) => {
+      const records = sortedEnriched.filter((i) => detectChokepoints(i).includes(cp));
+      if (records.length === 0) {
+        return { key: cp, count: 0, highestSev: "", latest: null as typeof records[0] | null, records };
+      }
+      let hk = "";
+      let hr = 0;
+      records.forEach((r) => {
+        const rank = SEV_RANK[r.severity] ?? 0;
+        if (rank > hr) { hr = rank; hk = r.severity; }
+      });
+      return { key: cp, count: records.length, highestSev: hk, latest: records[0], records };
+    });
+  }, [sortedEnriched]);
+
+  const mainChokepoint = useMemo(() => {
+    const ranked = chokepointRows.filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
+    return ranked[0] ?? null;
+  }, [chokepointRows]);
+
+  // --- Piracy and Armed Robbery -------------------------------------------
+  const piracyIncidents = useMemo(() => {
+    return sortedEnriched
+      .map((i) => ({ ...i, piracyAct: classifyPiracy(i) }))
+      .filter((i): i is typeof i & { piracyAct: PiracyAct } => i.piracyAct !== null);
+  }, [sortedEnriched]);
+
+  // Vessel attack / seizure count (excludes piracy — that has its own count).
+  const vesselAttackOrSeizureCount = useMemo(
+    () => vesselIncidents.filter((v) => v.vesselType === "Attack" || v.vesselType === "Seized").length,
+    [vesselIncidents],
+  );
 
   // Page render
   return (
@@ -408,14 +429,75 @@ export default function Shipping() {
 
       {/* 3. Key Metrics */}
       <Section title="Key Metrics">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <Kpi label="Total Shipping Incidents" value={total} accent="#0B0B3D" />
-          <Kpi label="Incidents (7d)" value={last7} accent="#4655FF" />
-          <Kpi label="Incidents (30d)" value={last30} accent="#4655FF" />
-          <Kpi label="Highest Severity" value={highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"} accent={highestSev ? ratingColor(highestSev) : "#B8C2CC"} small />
-          <Kpi label="Main Affected Region" value={mainRegion?.region ?? "—"} accent={mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC"} small />
-          <Kpi label="With Source Link" value={withSource} accent="#303030" />
-          <Kpi label="With Coordinates" value={withCoords.length} accent="#303030" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Kpi label="Records in Window" value={total} accent="#0B0B3D" />
+          <Kpi
+            label="Highest Severity"
+            value={highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}
+            accent={highestSev ? ratingColor(highestSev) : "#B8C2CC"}
+            small
+          />
+          <Kpi
+            label="Main Affected Chokepoint"
+            value={mainChokepoint ? mainChokepoint.key : (mainRegion?.region ?? "—")}
+            accent={mainChokepoint ? "#0B0B3D" : (mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC")}
+            small
+          />
+          <Kpi label="Vessel Attacks / Seizures" value={vesselAttackOrSeizureCount} accent="#C0392B" />
+          <Kpi label="Piracy / Armed Robbery" value={piracyIncidents.length} accent="#E67E22" />
+          <Kpi
+            label="Latest Significant Incident"
+            value={latestSignificant ? format(latestSignificant.occurredDate, "dd MMM yyyy") : "—"}
+            accent={latestSignificant ? ratingColor(latestSignificant.severity) : "#B8C2CC"}
+            small
+          />
+        </div>
+      </Section>
+
+      {/* 3a. Chokepoint Watch */}
+      <Section title="Chokepoint Watch">
+        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
+          Operational read by chokepoint. Counts, highest severity and latest record are derived directly from the loaded shipping window. Rows with nothing on file are marked plainly and not invented.
+        </p>
+        <div className="bg-white border border-border rounded-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-2 font-sans font-medium w-[200px]">Chokepoint</th>
+                <th className="text-left p-2 font-sans font-medium w-[80px]">Records</th>
+                <th className="text-left p-2 font-sans font-medium w-[120px]">Highest Severity</th>
+                <th className="text-left p-2 font-sans font-medium w-[140px]">Latest</th>
+                <th className="text-left p-2 font-sans font-medium">Operational Read</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {chokepointRows.map((row) => (
+                <tr key={row.key} className="hover:bg-muted/30 align-top">
+                  <td className="p-2 font-serif font-bold text-primary">{row.key}</td>
+                  <td className="p-2 font-mono">{row.count}</td>
+                  <td className="p-2">
+                    {row.highestSev ? (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(row.highestSev)}>
+                        {SEVERITY_LABELS[row.highestSev] ?? row.highestSev}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="p-2 text-xs font-mono whitespace-nowrap">
+                    {row.latest && !isNaN(row.latest.occurredDate.getTime())
+                      ? format(row.latest.occurredDate, "dd MMM yyyy")
+                      : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="p-2 text-xs text-foreground/80">
+                    {row.count === 0
+                      ? <span className="italic text-muted-foreground">No current records in selected window.</span>
+                      : `${row.count} record${row.count === 1 ? "" : "s"} on file. Most recent: ${row.latest!.title}.`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </Section>
 
@@ -468,6 +550,57 @@ export default function Shipping() {
         )}
       </Section>
 
+      {/* 3c. Piracy and Armed Robbery */}
+      <Section title="Piracy and Armed Robbery">
+        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
+          Hostile activity directed at vessels and crew: piracy, armed robbery at sea, boarding, attempted boarding, suspicious approach, small craft approach, hijacking, crew threat and theft from a vessel at anchorage. Land cargo theft remains under Cargo Watch.
+        </p>
+        {piracyIncidents.length === 0 ? (
+          <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
+            No current piracy or armed-robbery records in the selected window.
+          </div>
+        ) : (
+          <div className="bg-white border border-border rounded-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2 font-sans font-medium w-[130px]">Date</th>
+                  <th className="text-left p-2 font-sans font-medium w-[180px]">Act</th>
+                  <th className="text-left p-2 font-sans font-medium">Title</th>
+                  <th className="text-left p-2 font-sans font-medium w-[150px]">Location</th>
+                  <th className="text-left p-2 font-sans font-medium w-[100px]">Severity</th>
+                  <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {piracyIncidents.slice(0, 30).map((i) => (
+                  <tr key={i.id} className="hover:bg-muted/30">
+                    <td className="p-2 font-mono text-xs whitespace-nowrap">
+                      {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
+                    </td>
+                    <td className="p-2 text-xs uppercase tracking-wider font-sans text-primary">{i.piracyAct}</td>
+                    <td className="p-2 font-medium">{i.title}</td>
+                    <td className="p-2 text-xs">{i.incidentCountry ?? NOT_IDENTIFIED}</td>
+                    <td className="p-2">
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
+                        {SEVERITY_LABELS[i.severity] ?? i.severity}
+                      </span>
+                    </td>
+                    <td className="p-2">
+                      {i.sourceUrl ? (
+                        <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
       {/* 4. Regional Split */}
       <Section title="Regional Split">
         <div className="bg-white border border-border rounded-sm p-4">
@@ -506,26 +639,26 @@ export default function Shipping() {
       <Section title="Daily Intelligence Summary">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <IntelCard
-            label="Transit / Route Activity"
+            label="Chokepoint / Route Activity"
             body={
               transitRecords.length > 0
-                ? `${transitRecords.length} transit-related record${transitRecords.length === 1 ? "" : "s"} on file, covering vessel attacks, route diversion, chokepoint risk, naval advisories, port disruption and shipping delays. Most recent: ${transitRecords[0].title}.`
+                ? `${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} on file covering chokepoint risk, route diversion and maritime advisories. Most recent: ${transitRecords[0].title}.`
                 : null
             }
           />
           <IntelCard
-            label="Port and Chokepoint Watch"
+            label="Vessel Threat / Piracy"
             body={
-              portRecords.length > 0
-                ? `${portRecords.length} port and chokepoint record${portRecords.length === 1 ? "" : "s"} on file across the Strait of Hormuz, Bab el-Mandeb, Red Sea, Gulf of Oman, Arabian Gulf and regional ports. Most recent: ${portRecords[0].title}.`
+              vesselIncidents.length + piracyIncidents.length > 0
+                ? `${vesselAttackOrSeizureCount} vessel attack/seizure record${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy/armed-robbery record${piracyIncidents.length === 1 ? "" : "s"} on file. Most recent vessel item: ${vesselIncidents[0]?.title ?? piracyIncidents[0]?.title ?? "—"}.`
                 : null
             }
           />
           <IntelCard
-            label="Key Intelligence Note"
+            label="Commercial Impact"
             body={
-              intelRecord
-                ? `${intelRecord.title} — rated ${SEVERITY_LABELS[intelRecord.severity] ?? intelRecord.severity} (${intelRecord.incidentCountry ?? NOT_IDENTIFIED}, ${format(intelRecord.occurredDate, "dd MMM yyyy")}). Issue type: ${intelRecord.issue}.`
+              commercialRecords.length > 0
+                ? `${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} on port disruption, freight or insurance pressure and commercial shipping disruption. Most recent: ${commercialRecords[0].title}.`
                 : null
             }
           />
