@@ -59,9 +59,30 @@ const ISSUE_RULES: Array<{ label: string; pattern: RegExp }> = [
   { label: "Commercial shipping disruption", pattern: /\b(cargo (delay|disruption|halt|backlog|movement|flows?)|container (backlog|delay|handling)|supply chain disruption|liner service (suspension|cancell)|service suspension|sailing cancelled|blank sailing|export (halt|suspension)|import (halt|disruption)|market share|orderbook|newbuild|newbuilding|new entrant|charter (acquisition|deal|purchase|locks?|fix(ed|es)?)|locks first|fleet (acquisition|renewal|deal|strategy|exposure)|m&a|merger|joint venture|company of the year|banned from (australia|port)|unpaid crew wages|earnings|quarterly|annual report|first[- ]quarter|q1 (results?|performance)|volume growth|cooperation deal|logistics push|legal action|relocate headquarters|biomethanol|long[- ]term charter|long[- ]term deal|product tanker|crude carrier|vlcc (newbuild|owner|charter|trading|sanctions|supertanker))\b/i },
 ];
 
+// Issue Type chart vocabulary. We deliberately reuse the strict hostile-vessel
+// classifier (`classifyVesselIncident`) for the Vessel attack / Vessel seizure
+// labels so the chart aligns with the Vessel Attacks carousel. Without this,
+// the broad ISSUE_RULES regex matched diplomatic follow-up stories ("probe
+// into Hormuz vessel attack", "discussions regarding recent vessel attack",
+// etc.) and inflated Vessel attack by roughly 4x.
 function classifyIssue(i: Incident): string {
   const text = `${i.title} ${i.summary ?? ""}`;
-  for (const r of ISSUE_RULES) if (r.pattern.test(text)) return r.label;
+  // Piracy / armed robbery wins first (Somali-style boarding is also an attack).
+  if (ISSUE_RULES[0].pattern.test(text)) return ISSUE_RULES[0].label;
+  // Hostile vessel incident — strict.
+  const v = classifyVesselIncident(i);
+  if (v === "Attack" || v === "Near miss") return "Vessel attack";
+  if (v === "Seized") return "Vessel seizure";
+  // Fall through to the remaining buckets, skipping the three labels handled
+  // above (Piracy/armed robbery at index 0, Vessel seizure at 1, Vessel attack
+  // at 2). Anything matching seizure/attack regex that classifyVesselIncident
+  // rejected (diplomatic follow-up, commercial commentary, etc.) is intentionally
+  // allowed to fall into Maritime advisory / Chokepoint risk / Route diversion /
+  // Port disruption / Insurance / Commercial / Unclassified — wherever its
+  // operational meaning actually fits.
+  for (let k = 3; k < ISSUE_RULES.length; k++) {
+    if (ISSUE_RULES[k].pattern.test(text)) return ISSUE_RULES[k].label;
+  }
   return "Unclassified maritime record";
 }
 
@@ -84,6 +105,18 @@ type VesselIncidentType = "Attack" | "Near miss" | "Seized" | "Threat";
 const COMMERCIAL_RE =
   /\b(orderbook|newbuild|newbuilds|charter (rate|assessment|index)|time charter|freight rate|spot rate|baltic dry|world container index|earnings|profit|results|acquisition|fleet renewal|partnership|deal|merger|joint venture|sold|sale of|orders?\b|quarterly|annual report|lng (application|approval|terminal application)|payment dispute|invoice|tariff dispute|port congestion|berth congestion|container backlog|shipping finance|bond issu|equity raise|ipo)\b/i;
 
+// Diplomatic follow-up, investigations, statements and commentary that
+// reference a previous vessel attack are NOT new hostile incidents and
+// must not inflate the Vessel attack count. The Vessel Attacks carousel
+// already relied on COMMERCIAL_RE only; that left diplomacy in. This
+// exclusion brings the issue chart and the carousel into alignment.
+// Every alternate must bind to a prior-incident cue (vessel/tanker/ship/
+// attack/seizure/hijacking) so that fresh hostile reporting which happens
+// to mention a press briefing or an investigation is not suppressed. No
+// standalone generic phrases.
+const DIPLOMATIC_FOLLOWUP_RE =
+  /\b(diplomatic (offensive|response|push|protest|demarche) .{0,60}(vessel|tanker|ship|attack|seizure|hijack)|probe (into|of) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|additional probe .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|investigation (into|of|update) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|discussions? (regarding|about|on) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|talks (about|regarding|on) .{0,40}(vessel|tanker|ship|attack|seizure|hijack)|actor behind .{0,40}(attack|vessel|tanker|seizure|hijack)|condemn(s|ed|ation) .{0,40}(attack|vessel|tanker|seizure|hijack)|aftermath of .{0,40}(attack|vessel|tanker|seizure|hijack)|foreign ministry .{0,60}(vessel|tanker|attack|seizure|hijack)|statement (on|about|regarding) .{0,40}(vessel|tanker|attack|seizure|hijack)|response to .{0,40}(vessel|tanker|attack|seizure|hijack)|recent (vessel|tanker|ship) attack|previous (attack|incident|seizure|hijack)|will take .{0,30}(diplomatic|response) .{0,40}(vessel|tanker|attack|seizure|hijack)|to conduct .{0,30}(probe|investigation) .{0,40}(vessel|tanker|attack|seizure|hijack))\b/i;
+
 const VESSEL_RULES: Array<{ type: VesselIncidentType; pattern: RegExp }> = [
   { type: "Seized", pattern: /\b(seized|seizure|boarded by|hijack(ed)?|detained .*(vessel|ship|tanker|crew)|commandeered|vessel (taken|captured))\b/i },
   { type: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near|shot down near (a |the )?(vessel|tanker|ship))\b/i },
@@ -94,8 +127,11 @@ const VESSEL_RULES: Array<{ type: VesselIncidentType; pattern: RegExp }> = [
 function classifyVesselIncident(i: Incident): VesselIncidentType | null {
   const text = `${i.title} ${i.summary ?? ""}`;
   // Hard exclusion first — commercial / finance / congestion / regulatory news
-  // is never a hostile vessel incident regardless of stray keywords.
+  // is never a hostile vessel incident regardless of stray keywords. Diplomatic
+  // follow-up, probes, statements and commentary about a previous attack also
+  // do not represent a new hostile incident and must be excluded.
   if (COMMERCIAL_RE.test(text)) return null;
+  if (DIPLOMATIC_FOLLOWUP_RE.test(text)) return null;
   for (const r of VESSEL_RULES) {
     if (r.pattern.test(text)) return r.type;
   }

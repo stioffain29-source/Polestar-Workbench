@@ -19,15 +19,32 @@ export const CHOKEPOINTS: ChokepointKey[] = [
   "Malacca Strait",
 ];
 
-const CHOKEPOINT_RULES: Array<{ key: ChokepointKey; pattern: RegExp }> = [
-  // Match the strait labels first so a generic "hormuz" reference is captured
-  // even when the surrounding text also mentions the wider gulf.
-  { key: "Strait of Hormuz", pattern: /\b(strait of hormuz|hormuz strait|hormuz)\b/i },
-  { key: "Gulf of Oman", pattern: /\bgulf of oman\b/i },
-  { key: "Bab el-Mandeb", pattern: /\bbab[- ]?(el|al)[- ]?mande[bn]\b/i },
-  { key: "Red Sea", pattern: /\bred sea\b/i },
-  { key: "Malacca Strait", pattern: /\b(strait of malacca|malacca strait|malacca)\b/i },
-  { key: "Arabian / Persian Gulf", pattern: /\b(arabian gulf|persian gulf)\b/i },
+// Operational-context test for Hormuz. A bare "Hormuz" reference (FAO food
+// price commentary, Wood Mackenzie supply-shock note, "permanent toll" policy
+// proposals, etc) must NOT count as a Strait of Hormuz chokepoint record.
+// We require the text to also contain an operational maritime term once the
+// Hormuz phrase itself is removed — otherwise a self-referential mention
+// like "Strait of Hormuz closure could trigger food crisis" would pass on
+// the word "strait" alone.
+const HORMUZ_TOKEN_RE = /\b(strait of hormuz|hormuz strait|hormuz)\b/i;
+const HORMUZ_STRIP_RE = /\b(strait of hormuz|hormuz strait|hormuz)\b/gi;
+const HORMUZ_OPS_RE = /\b(vessels?|tankers?|ships?|transits?|chokepoints?|attacks?|seizures?|seized|ukmto|routes?|shipping|maritime|ports?|gulf of oman|drones?|missiles?|hijack(ed|ing)?|boarding|carriers?|dhows?|bulk carriers?|container ships?|crude carriers?|vlccs?|vlgcs?|aframax|coast guard|navy|escorts?|warships?|gunfire|fired (upon|at|on)|under fire|projectiles?|strikes?|struck|hit)\b/i;
+function matchesHormuz(text: string): boolean {
+  if (!HORMUZ_TOKEN_RE.test(text)) return false;
+  const stripped = text.replace(HORMUZ_STRIP_RE, " ");
+  return HORMUZ_OPS_RE.test(stripped);
+}
+
+// Each rule is either a plain regex or a custom matcher. Hormuz uses the
+// matcher above; everything else stays on a simple regex.
+type CpRule = { key: ChokepointKey; match: (text: string) => boolean };
+const CHOKEPOINT_RULES: CpRule[] = [
+  { key: "Strait of Hormuz", match: matchesHormuz },
+  { key: "Gulf of Oman", match: (t) => /\bgulf of oman\b/i.test(t) },
+  { key: "Bab el-Mandeb", match: (t) => /\bbab[- ]?(el|al)[- ]?mande[bn]\b/i.test(t) },
+  { key: "Red Sea", match: (t) => /\bred sea\b/i.test(t) },
+  { key: "Malacca Strait", match: (t) => /\b(strait of malacca|malacca strait|malacca)\b/i.test(t) },
+  { key: "Arabian / Persian Gulf", match: (t) => /\b(arabian gulf|persian gulf)\b/i.test(t) },
 ];
 
 export interface MaritimeRecordLike {
@@ -49,7 +66,7 @@ export function detectChokepoints(i: MaritimeRecordLike): ChokepointKey[] {
   const text = blob(i);
   const hits: ChokepointKey[] = [];
   for (const r of CHOKEPOINT_RULES) {
-    if (r.pattern.test(text)) hits.push(r.key);
+    if (r.match(text)) hits.push(r.key);
   }
   return hits;
 }

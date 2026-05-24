@@ -1,0 +1,80 @@
+Fix Shipping data quality only.
+
+Do not redesign the page.
+Do not change the database.
+Do not re-import.
+Do not touch Cargo Watch, Fuel, Reports or PDF export yet.
+
+Apply these three fixes only:
+
+1. Fix inflated Hormuz counts
+
+Problem:
+Chokepoint Watch is over-counting Hormuz because it matches any bare “Hormuz” reference, including commentary and market notes.
+
+Fix:
+Only count a record under Strait of Hormuz if the text links Hormuz to an operational maritime event.
+
+Require Hormuz plus at least one operational maritime term such as:
+- vessel
+- tanker
+- ship
+- transit
+- strait
+- chokepoint
+- attack
+- seizure
+- UKMTO
+- route
+- shipping
+- maritime
+- port
+- Gulf of Oman
+- drone
+- missile
+
+Do not count general commentary, food price reports, policy proposals or market notes just because they mention Hormuz.
+
+2. Fix inflated Vessel attack issue chart
+
+Problem:
+The Vessel Attacks carousel is clean, but the Issue Type chart shows “Vessel attack” at 199 because it includes diplomatic follow-up stories and commentary about attacks.
+
+Fix:
+Use the same stricter vessel attack classifier for the Issue Type chart that is already used by the Vessel Attacks carousel.
+
+Only count as Vessel attack if the record describes an actual hostile vessel incident:
+- vessel attacked
+- vessel hit
+- fired upon
+- missile or drone strike affecting a vessel
+- small craft attack
+- boarding
+- seizure
+- near miss
+- credible threat to a vessel
+
+Do not count:
+- diplomatic follow-up
+- talks about a previous vessel attack
+- investigation update with no new incident
+- general commentary about attacks
+
+3. Keep location logic strict
+
+Do not relax the country/location cross-check.
+
+Location not identified is high because the upstream location field is empty. That is a data quality issue, not a chart bug.
+
+Keep:
+Location not identified
+
+Do not use flag state, diplomatic origin or reporting country as incident location.
+
+Acceptance criteria:
+- Hormuz count drops to records with real maritime operational relevance.
+- Vessel attack issue chart aligns with the cleaner Vessel Attacks carousel.
+- Location not identified remains honest and is not papered over.
+- No database changes.
+- No re-import.
+- No unrelated changes.
