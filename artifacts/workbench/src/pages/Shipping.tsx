@@ -9,11 +9,13 @@ import {
   LineChart, Line,
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
+import { deriveIncidentCountry, deriveFlagState, LOCATION_NOT_IDENTIFIED } from "@/lib/shippingCountry";
 import { ExternalLink } from "lucide-react";
 
 const MIDDLE_EAST = new Set([
   "Saudi Arabia","UAE","United Arab Emirates","Oman","Qatar","Bahrain","Kuwait",
   "Jordan","Iraq","Yemen","Israel","Lebanon","Syria","Turkey","Turkiye","Türkiye",
+  "Iran",
 ]);
 const APAC = new Set([
   "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","Cambodia","Laos","Myanmar",
@@ -33,36 +35,30 @@ function classifyRegion(country: string | null | undefined): Region {
   return "Out of scope";
 }
 
-const NOT_IDENTIFIED = "Country not identified";
+const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
 
-function identifyCountry(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const first = raw.split(/[;,]/)[0].trim();
-  if (!first) return null;
-  if (/^unknown$/i.test(first)) return null;
-  return first;
-}
-
-// Shipping issue types — movement, ports, routes, vessels, chokepoints, maritime
-// disruption. Theft / pilferage / hijack belong to Cargo Watch and are NOT
-// classified here; if a shipping record mentions theft only, it falls to
-// "Other Maritime".
+// Shipping issue types — most-specific rule first. "Unclassified maritime
+// record" is reserved for records where no other rule fits, so the chart no
+// longer drowns in a vague "Other Maritime" bucket.
+// Order matters — most-specific rule first. Seizure beats attack (a seizure
+// is also an attack); attack beats chokepoint (a Hormuz hit is an attack on
+// a vessel, not just a chokepoint mention).
 const ISSUE_RULES: Array<{ label: string; pattern: RegExp }> = [
-  { label: "Vessel Attack", pattern: /\b(vessel attack|attack on (a |the )?(ship|tanker|vessel|carrier)|missile (struck|hit) (a |the )?(ship|tanker|vessel)|drone (hit|struck) (a |the )?(ship|tanker|vessel)|houthi attack)\b/i },
-  { label: "Chokepoint Risk", pattern: /\b(strait of hormuz|bab[- ]el[- ]mandeb|suez canal|malacca|gibraltar|panama canal|chokepoint|transit risk)\b/i },
-  { label: "Route Diversion", pattern: /\b(reroute|re[- ]routing|diverted|divert(ing|ed)? (away|around)|cape of good hope|avoiding)\b/i },
-  { label: "Port Strike / Labour", pattern: /\b(port (workers? )?strike|dock(workers?| strike)|stevedore strike|labour (dispute|stoppage|action)|union (walkout|strike))\b/i },
-  { label: "Port Disruption", pattern: /\b(port (closure|closed|shutdown|halted|suspended)|terminal (closed|shut|congestion)|congestion at (the )?port|berth (closure|delay))\b/i },
-  { label: "Shipping Delay", pattern: /\b(shipping delay|vessel delay|delivery delay|delayed (shipment|cargo)|backlog|schedule disruption|transit delay)\b/i },
-  { label: "Insurance / Freight Pressure", pattern: /\b(war risk (premium|insurance)|insurance (premium|surcharge|cost)|freight rate|bunker surcharge|war risk zone)\b/i },
-  { label: "Naval / Maritime Advisory", pattern: /\b(naval (advisory|patrol|escort)|coast guard advisory|imo advisory|ukmto|maritime warning|nav warning|maritime advisory)\b/i },
-  { label: "Cargo Movement Disruption", pattern: /\b(cargo (delay|disruption|halt|backlog|movement)|container (backlog|delay)|supply chain disruption)\b/i },
+  { label: "Vessel seizure", pattern: /\b(vessel seiz|ship seiz|tanker seiz|seized .{0,30}(ship|tanker|vessel|dhow|carrier|cargo)|seizure of .{0,20}(ship|tanker|vessel|dhow|carrier)|hijack(ed)?|boarded by|armed robbers? boarded?|armed (men |gang )?boarded?|robbers? board(ed)?|commandeered|detained .{0,20}(vessel|tanker|ship|crew|cargo)|stopped in iranian waters|bulk carrier stopped|us[- ]seized vessels?|iran seized|seized two .{0,20}ships?|seized .{0,5}foreign|forced (sale|transfer))\b/i },
+  { label: "Vessel attack", pattern: /\b(vessel attack|tanker attack|ship attack|attack(ed|s)? .{0,30}(ship|tanker|vessel|carrier|dhow|cargo|bulk carrier|container ship)|attack(ed)? by (multiple )?(small (craft|boats?)|skiffs?|iranian)|attack on (a |the )?(ship|tanker|vessel|carrier|dhow|cargo|hmm)|missile .{0,20}(ship|tanker|vessel|carrier|hmm|cargo)|drone .{0,20}(ship|tanker|vessel|carrier|cargo)|fired (upon|at|on)|fired on by|tanker (fired upon|hit|struck|set ablaze|ablaze|on fire)|(ship|vessel|carrier|cargo ship|bulk carrier|container ship|tanker) .{0,20}(hit|struck|set ablaze|ablaze|on fire|catches fire|caught fire|attacked|ablaze)|hit by (gunfire|projectile|projectiles|unknown projectile|unknown projectiles|small craft)|three (vessels|ships|container ships) (hit|targeted|attacked)|gunfire (hit|near|in|in strait)|fire (aboard|on board|aboard a|aboard the|breaks out on|happened at|extinguished on)|fire breaks out on .{0,20}vessels?|external strike|came under fire|comes under fire|targeted by .{0,30}(vessel|ship|iranian|missile|drone)|skiff (attack|with|carrying)|approached by a skiff|houthi attack|iranian (attack|strike|vessel)|repel(led)? drone|targeted .{0,20}iranian|ship attack debris|attack debris)\b/i },
+  { label: "Near miss", pattern: /\b(near miss|narrowly (missed|avoided)|warning shot|missile (fell|landed) near|drone (fell|landed) near|missed (a |the )?(vessel|tanker|ship)|intercepted near|missile alert|suspicious approach|approached by .{0,20}skiff)\b/i },
+  { label: "Maritime advisory", pattern: /\b(ukmto (reports?|warns?|warning|advisory|alert|issues warning|says)|ukmto:|naval (advisory|patrol|escort|operation|protection)|coast guard advisory|imo advisory|maritime (warning|advisory|alert|security (crisis|threat))|nav warning|notice to mariners|navy assists|under (u\.s\.|us|american) (military )?(protection|escort)|project freedom|operation freedom|us warship escort|escort (foreign|mission)|escorted to|escorted by|pentagon statement|force protection|navy (assists|monitors))\b/i },
+  { label: "Chokepoint risk", pattern: /\b(strait of hormuz|hormuz strait|bab[- ]el[- ]mandeb|suez canal|panama canal|malacca|lombok strait|singapore strait|gibraltar|chokepoint|transit risk|transit volume|tanker traffic|patrol zones?|red sea (route|risk|transit)|gulf of oman|persian gulf|arabian gulf|hormuz (closure|transit|risk|exit|won't go back|shut)|clears strait|piracy)\b/i },
+  { label: "Vessel movement disruption", pattern: /\b(reroute|re[- ]routing|diverted?|diverting|divert(ed)? (away|around)|cape of good hope|avoiding (hormuz|red sea|gulf|strait)|vessel delay|transit delay|schedule disruption|shipping delay|delivery delay|delayed (shipment|cargo)|adrift|collision|grounded|crew (repatriated|safe|evacuated|stranded)|vessel (stranded|passed through|relocate|repositioning)|first .{0,30}transits?|traffic shifts? away|ghost tanker|bypassed .{0,20}sanctions|slipped past|moving .{0,20}barrels|ship-to-ship transfers?|sanctions enforcement|sanctions dragnet|sanctions threats?|breaks through sanctions)\b/i },
+  { label: "Port disruption", pattern: /\b(port (workers? )?strike|dock(workers?| strike)|stevedore strike|labour (dispute|stoppage|action)|union (walkout|strike)|port (closure|closed|shutdown|halted|suspended|disruption|congestion)|terminal (closed|shut|congestion)|congestion at (the )?port|berth (closure|delay|congestion)|harbou?r (closure|disruption)|panama canal congestion|canal congestion|maintenance work .{0,20}(canal|port)|port of darwin|port incident|incident at .{0,20}port)\b/i },
+  { label: "Insurance / freight pressure", pattern: /\b(war risk (premium|insurance|zone)|insurance (premium|surcharge|cost)|freight rate|bunker surcharge|p&i club|hull premium|baltic (dry|exchange) index|world container index|new contex|container ship time charter|spot rate(s)?|charter rate|charter assessment|aframax prices|tanker prices|vlcc (market|prices?|freight)|vlgc (freight )?rates?|tankers?: vlcc|freight (rates? (rising|recovery|up|down|surge|soaring)|recovery|soaring)|rates soaring|shipping rates (have )?(shot up|rose|rising|surge)|cheap spot rates|peak season|ws[0-9]+|tce down|tce up|mediterranean\/east index)\b/i },
+  { label: "Commercial shipping disruption", pattern: /\b(cargo (delay|disruption|halt|backlog|movement|flows?)|container (backlog|delay|handling)|supply chain disruption|liner service (suspension|cancell)|service suspension|sailing cancelled|blank sailing|export (halt|suspension)|import (halt|disruption)|market share|orderbook|newbuild|newbuilding|new entrant|charter (acquisition|deal|purchase|locks?|fix(ed|es)?)|locks first|fleet (acquisition|renewal|deal|strategy|exposure)|m&a|merger|joint venture|company of the year|banned from (australia|port)|unpaid crew wages|earnings|quarterly|annual report|first[- ]quarter|q1 (results?|performance)|volume growth|cooperation deal|logistics push|legal action|relocate headquarters|biomethanol|long[- ]term charter|long[- ]term deal|product tanker|crude carrier|vlcc (newbuild|owner|charter|trading|sanctions|supertanker))\b/i },
 ];
 
 function classifyIssue(i: Incident): string {
   const text = `${i.title} ${i.summary ?? ""}`;
   for (const r of ISSUE_RULES) if (r.pattern.test(text)) return r.label;
-  return "Other Maritime";
+  return "Unclassified maritime record";
 }
 
 // ---------------------------------------------------------------------------
@@ -141,12 +137,21 @@ export default function Shipping() {
   // those regions are dropped from this view. Records with no identifiable
   // country are kept and surfaced as "Country not identified".
   const allEnriched = useMemo(
-    () => incidents.map((i) => ({
-      ...i,
-      region: classifyRegion(i.country),
-      issue: classifyIssue(i),
-      occurredDate: (() => { try { return parseISO(i.occurredAt); } catch { return new Date(NaN); } })(),
-    })),
+    () => incidents.map((i) => {
+      const incidentCountry = deriveIncidentCountry(i);
+      const flagState = deriveFlagState(i);
+      return {
+        ...i,
+        incidentCountry,
+        flagState,
+        // Region is classified from the *incident* country, not from the raw
+        // `country` field, so flag-state-only records do not get bucketed into
+        // the wrong region.
+        region: classifyRegion(incidentCountry),
+        issue: classifyIssue(i),
+        occurredDate: (() => { try { return parseISO(i.occurredAt); } catch { return new Date(NaN); } })(),
+      };
+    }),
     [incidents],
   );
   const outOfScopeCount = allEnriched.filter((i) => i.region === "Out of scope").length;
@@ -186,16 +191,18 @@ export default function Shipping() {
   }, [enriched]);
 
   const notIdentifiedCount = useMemo(
-    () => enriched.filter((i) => identifyCountry(i.country) === null).length,
+    () => enriched.filter((i) => i.incidentCountry === null).length,
     [enriched],
   );
 
   const byCountry = useMemo(() => {
+    // Uses the incident-location country only. Flag state is never counted
+    // here — that would mis-attribute a Greek-flagged tanker hit in the Gulf
+    // of Oman to Greece.
     const m = new Map<string, number>();
     enriched.forEach((i) => {
-      const c = identifyCountry(i.country);
-      if (c === null) return;
-      m.set(c, (m.get(c) ?? 0) + 1);
+      if (i.incidentCountry === null) return;
+      m.set(i.incidentCountry, (m.get(i.incidentCountry) ?? 0) + 1);
     });
     return Array.from(m.entries())
       .map(([country, count]) => ({ country, count }))
@@ -299,13 +306,14 @@ export default function Shipping() {
     [enriched],
   );
 
+  // Labels here MUST match the 10-label vocabulary emitted by ISSUE_RULES.
   const TRANSIT_ISSUES = new Set([
-    "Vessel Attack",
-    "Route Diversion",
-    "Chokepoint Risk",
-    "Naval / Maritime Advisory",
-    "Port Disruption",
-    "Shipping Delay",
+    "Vessel attack",
+    "Vessel seizure",
+    "Near miss",
+    "Vessel movement disruption",
+    "Chokepoint risk",
+    "Maritime advisory",
   ]);
   // Waterways / chokepoints + port-side keywords. We text-match across the
   // location, title and summary so chokepoint references that were classified
@@ -314,11 +322,10 @@ export default function Shipping() {
   const PORT_CHOKEPOINT_RE =
     /\b(strait of hormuz|bab[- ]el[- ]mandeb|red sea|gulf of oman|arabian gulf|persian gulf|suez canal|malacca|chokepoint|port of |port strike|port congestion|berth congestion|container backlog|harbou?r)\b/i;
   const PORT_ISSUES = new Set([
-    "Port Disruption",
-    "Port Strike / Labour",
-    "Cargo Movement Disruption",
-    "Shipping Delay",
-    "Chokepoint Risk",
+    "Port disruption",
+    "Commercial shipping disruption",
+    "Chokepoint risk",
+    "Insurance / freight pressure",
   ]);
 
   const transitRecords = sortedEnriched.filter((i) => TRANSIT_ISSUES.has(i.issue));
@@ -391,7 +398,7 @@ export default function Shipping() {
             value={latestSignificant ? format(latestSignificant.occurredDate, "dd MMM yyyy") : "—"}
             note={
               latestSignificant
-                ? `${latestSignificant.title} (${identifyCountry(latestSignificant.country) ?? NOT_IDENTIFIED}).`
+                ? `${latestSignificant.title} (${latestSignificant.incidentCountry ?? NOT_IDENTIFIED}).`
                 : "No significant shipping incident on record."
             }
             accent={latestSignificant ? ratingColor(latestSignificant.severity) : "#B8C2CC"}
@@ -443,7 +450,8 @@ export default function Shipping() {
                   <VesselCard
                     title={v.title}
                     date={isNaN(v.occurredDate.getTime()) ? null : format(v.occurredDate, "dd MMM yyyy")}
-                    country={identifyCountry(v.country)}
+                    country={v.incidentCountry}
+                    flagState={v.flagState}
                     location={v.location && !/^unknown$/i.test(v.location.trim()) ? v.location : null}
                     severity={v.severity}
                     type={v.vesselType}
@@ -469,7 +477,7 @@ export default function Shipping() {
             <RegionRow label={NOT_IDENTIFIED} count={notIdentifiedCount} total={total} accent={REGION_COLOR["Country not identified"]} />
           </div>
           <p className="text-[11px] text-muted-foreground mt-3">
-            Records with country not identified are kept in totals but separated from the country charts. Records outside APAC and the Middle East are excluded entirely.
+            Country reflects where the incident occurred, derived from the event location text. Vessel flag state is shown separately on vessel cards and is never counted in the country charts. Records with no identifiable incident location are kept in totals but separated from the country charts. Records outside APAC and the Middle East are excluded entirely.
           </p>
         </div>
       </Section>
@@ -517,7 +525,7 @@ export default function Shipping() {
             label="Key Intelligence Note"
             body={
               intelRecord
-                ? `${intelRecord.title} — rated ${SEVERITY_LABELS[intelRecord.severity] ?? intelRecord.severity} (${identifyCountry(intelRecord.country) ?? NOT_IDENTIFIED}, ${format(intelRecord.occurredDate, "dd MMM yyyy")}). Issue type: ${intelRecord.issue}.`
+                ? `${intelRecord.title} — rated ${SEVERITY_LABELS[intelRecord.severity] ?? intelRecord.severity} (${intelRecord.incidentCountry ?? NOT_IDENTIFIED}, ${format(intelRecord.occurredDate, "dd MMM yyyy")}). Issue type: ${intelRecord.issue}.`
                 : null
             }
           />
@@ -547,7 +555,7 @@ export default function Shipping() {
                       <LeafletTooltip>
                         <div className="text-xs">
                           <div className="font-bold">{i.title}</div>
-                          <div>{identifyCountry(i.country) ?? NOT_IDENTIFIED} · {i.region} · {i.issue}</div>
+                          <div>{i.incidentCountry ?? NOT_IDENTIFIED} · {i.region} · {i.issue}</div>
                         </div>
                       </LeafletTooltip>
                     </CircleMarker>
@@ -656,7 +664,7 @@ export default function Shipping() {
                     .slice()
                     .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime())
                     .map((i) => {
-                      const countryDisplay = identifyCountry(i.country) ?? NOT_IDENTIFIED;
+                      const countryDisplay = i.incidentCountry ?? NOT_IDENTIFIED;
                       return (
                         <tr key={i.id} className="hover:bg-muted/30">
                           <td className="p-2 font-mono text-xs whitespace-nowrap">
@@ -695,11 +703,11 @@ export default function Shipping() {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">Data Quality</div>
           <div className="text-sm text-primary font-sans mt-1">
-            Records with country not identified: <span className="font-bold">{notIdentifiedCount}</span>
+            Records with incident location not identified: <span className="font-bold">{notIdentifiedCount}</span>
           </div>
         </div>
         <div className="text-[11px] text-muted-foreground max-w-md text-right">
-          Kept in totals; excluded from country-level charts. Source records show <span className="font-semibold">Country not identified</span> in place of "Unknown".
+          Kept in totals; excluded from country-level charts. Source records show <span className="font-semibold">{LOCATION_NOT_IDENTIFIED}</span> when no event-country can be derived. Vessel flag state, when present, is surfaced on vessel cards only.
         </div>
       </div>
     </div>
@@ -776,11 +784,12 @@ function ChartCard({ title, children, height = 288 }: { title: string; children:
 }
 
 function VesselCard({
-  title, date, country, location, severity, type, summary, sourceUrl,
+  title, date, country, flagState, location, severity, type, summary, sourceUrl,
 }: {
   title: string;
   date: string | null;
   country: string | null;
+  flagState: string | null;
   location: string | null;
   severity: string;
   type: VesselIncidentType;
@@ -807,6 +816,11 @@ function VesselCard({
       <div className="pl-2 text-[11px] text-muted-foreground font-sans flex flex-wrap gap-x-3 gap-y-0.5">
         {date && <span className="font-mono">{date}</span>}
         {where && <span>{where}</span>}
+        {flagState && (
+          <span className="text-[10px] uppercase tracking-wider">
+            Flag state: <span className="font-semibold text-primary normal-case tracking-normal">{flagState}</span>
+          </span>
+        )}
       </div>
       {summary && (
         <p className="pl-2 text-xs text-foreground/80 font-sans leading-snug line-clamp-3">{summary}</p>
