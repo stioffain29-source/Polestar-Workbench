@@ -11,6 +11,7 @@ import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
+import { isCountryRelevant, sanitizeFactValue } from "./topicRelevance";
 
 // Country reports are weekly products. The "country" pseudo-topic resolves
 // to the weekly defaults (7-day default, 10-day cap) via reportWindow.ts.
@@ -130,6 +131,8 @@ function buildKpiCards(
   facts: DerivedFacts,
   incidents: PdfIncident[],
 ): KpiCardData[] {
+  const safeArea = sanitizeFactValue("country", facts.topAreaLabel === NOT_IDENTIFIED ? "" : facts.topAreaLabel);
+  const safeType = sanitizeFactValue("country", facts.topTypeLabel === NOT_IDENTIFIED ? "" : facts.topTypeLabel);
   return [
     { label: "Reporting Period", value: periodString(facts) },
     { label: "Total Records", value: String(incidents.length), note: "Incidents on file for this country" },
@@ -141,21 +144,21 @@ function buildKpiCards(
     },
     {
       label: "Most Affected Area",
-      value: facts.topAreaLabel,
-      note: facts.topAreaCount > 0
+      value: safeArea,
+      note: facts.topAreaCount > 0 && safeArea === facts.topAreaLabel
         ? `${facts.topAreaCount} record${facts.topAreaCount === 1 ? "" : "s"}`
-        : "No location field populated",
+        : "Coverage gap",
     },
     {
       label: "Latest Incident",
-      value: facts.latest ? format(facts.latest, "dd MMM yyyy") : NOT_IDENTIFIED,
+      value: facts.latest ? format(facts.latest, "dd MMM yyyy") : "Coverage gap",
     },
     {
       label: "Main Issue Type",
-      value: facts.topTypeLabel,
-      note: facts.topTypeCount > 0
+      value: safeType,
+      note: facts.topTypeCount > 0 && safeType === facts.topTypeLabel
         ? `${facts.topTypeCount} record${facts.topTypeCount === 1 ? "" : "s"}`
-        : undefined,
+        : "Data quality issue",
     },
   ];
 }
@@ -374,7 +377,19 @@ export async function exportCountryReportPdf(
   // excluded from every section of the country report.
   const todayIso = new Date().toISOString().slice(0, 10);
   const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, todayIso);
-  const windowedIncidents = filterIncidentsToWindow(incidents, COUNTRY_WINDOW_TOPIC, todayIso);
+  const rawWindowed = filterIncidentsToWindow(incidents, COUNTRY_WINDOW_TOPIC, todayIso);
+  // Strip live news blogs and other off-topic noise so Fast Facts, charts
+  // and the related incidents table only include operational records.
+  const windowedIncidents = rawWindowed.filter((i) =>
+    isCountryRelevant({
+      topic: i.topic,
+      title: i.title,
+      summary: i.summary ?? null,
+      source: i.source ?? null,
+      sourceUrl: i.sourceUrl ?? null,
+      location: i.location ?? null,
+    }),
+  );
 
   // Full-bleed Polestar cover (page 1) — title, subtitle, reporting period, website.
   drawPolestarCover(ctx, {

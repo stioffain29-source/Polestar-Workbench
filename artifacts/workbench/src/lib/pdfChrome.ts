@@ -179,7 +179,12 @@ export function ensureSpace(ctx: Ctx, h: number) {
 }
 
 export function drawSectionHeading(ctx: Ctx, title: string) {
-  ensureSpace(ctx, 36);
+  // Reserve enough vertical room for the heading itself plus a couple of
+  // lines of body so we never leave an orphan heading at the page foot.
+  ensureSpace(ctx, 64);
+  // Breathing room above the heading when it follows other content on the
+  // same page — prevents the previous section colliding with this one.
+  if (ctx.y > ctx.TOP + 4) ctx.y += 10;
   const { pdf, MX, CW } = ctx;
   setText(pdf, NAVY);
   pdf.setFont("helvetica", "bold");
@@ -257,42 +262,54 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     pdf.setLineWidth(0.6);
     pdf.rect(x, yy, cardW, cardH, "FD");
 
-    // Accent strip (top)
+    // Vertical accent strip on the left of the card (no horizontal top bar).
+    const STRIP_W = 4;
     setFill(pdf, accent);
-    pdf.rect(x, yy, cardW, 3, "F");
+    pdf.rect(x, yy, STRIP_W, cardH, "F");
+    const PAD_L = STRIP_W + 10;
 
     // Label
     setText(pdf, DUSK);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(7);
-    pdf.text(sanitize(c.label.toUpperCase()), x + 10, yy + 18);
+    pdf.text(sanitize(c.label.toUpperCase()), x + PAD_L, yy + 16);
 
     // Value
     setText(pdf, NAVY);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
-    const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), cardW - 20);
-    const baseY = yy + 38;
-    pdf.text(valueLines.slice(0, 2), x + 10, baseY);
+    const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), cardW - PAD_L - 10);
+    const baseY = yy + 36;
+    pdf.text(valueLines.slice(0, 2), x + PAD_L, baseY);
 
     // Note
     if (c.note) {
       setText(pdf, DUSK);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(7);
-      const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), cardW - 20);
-      pdf.text(noteLines.slice(0, 2), x + 10, yy + cardH - 10);
+      const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), cardW - PAD_L - 10);
+      pdf.text(noteLines.slice(0, 2), x + PAD_L, yy + cardH - 10);
     }
   }
   ctx.y += totalH + 18;
 }
 
 export function drawDisclaimer(ctx: Ctx) {
+  // Make sure the Disclaimer has room for the heading plus the body block
+  // before drawing; otherwise push it to a fresh page.
+  const need = 36 + 14 * 6;
+  if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
+  else ctx.y += 8;
   drawSectionHeading(ctx, "Disclaimer");
   renderProse(ctx, DISCLAIMER_TEXT);
 }
 
 export function drawSourceNotes(ctx: Ctx, extra?: string) {
+  // Same guard: keep the heading and the source notes block together so the
+  // notes never collide with the previous section's table or italic note.
+  const need = 36 + 14 * 6 + (extra ? 14 * 4 : 0);
+  if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
+  else ctx.y += 14;
   drawSectionHeading(ctx, "Source Notes / Data Notes");
   renderProse(ctx, extra ? `${SOURCE_NOTES_TEXT}\n\n${extra}` : SOURCE_NOTES_TEXT);
 }

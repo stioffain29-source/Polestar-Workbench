@@ -11,6 +11,7 @@ import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
+import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
 
 export interface TopicReportData {
   title: string;
@@ -90,16 +91,23 @@ function computeFastFacts(
     if (n > topTypeN) { topTypeN = n; topTypeLabel = t; }
   }
 
+  const safeType = sanitizeFactValue(data.topic, topTypeLabel);
+  const safeCountry = topCountry === "—" ? "Country not identified" : sanitizeFactValue(data.topic, topCountry);
+
   return [
     { label: "Reporting Period", value: reportingPeriod },
     { label: "Total Records", value: String(windowIncidents.length), note: `${topicLabel} in window` },
     { label: "Highest Severity", value: highestLabel, severity: highestKey || undefined, note: highestKey ? "Worst rating in window" : undefined },
     {
       label: "Top Issue Type",
-      value: topTypeLabel,
-      note: topTypeN > 0 ? `${topTypeN} record${topTypeN === 1 ? "" : "s"}` : undefined,
+      value: safeType,
+      note: topTypeN > 0 && safeType === topTypeLabel ? `${topTypeN} record${topTypeN === 1 ? "" : "s"}` : "Data quality issue",
     },
-    { label: "Most Affected Country", value: topCountry, note: topCountryN > 0 ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}` : undefined },
+    {
+      label: "Most Affected Country",
+      value: safeCountry,
+      note: topCountryN > 0 && safeCountry === topCountry ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}` : "Coverage gap",
+    },
     { label: "Latest Incident", value: latest },
   ];
 }
@@ -234,7 +242,20 @@ export async function exportTopicReportPdf(
     renderProse(ctx, data.executiveSummary);
   }
 
-  const windowIncidents = filterIncidentsToWindow(incidents, data.topic, data.issueDate, { byTopic: true });
+  const rawWindow = filterIncidentsToWindow(incidents, data.topic, data.issueDate, { byTopic: true });
+  // Strip records that match the topic field but are not operationally on
+  // topic (e.g. hiking obituary that happens to mention "fuel"). The filter
+  // is applied once and used for Fast Facts, prose data and the table.
+  const windowIncidents = rawWindow.filter((i) =>
+    isTopicRelevant(data.topic, {
+      topic: i.topic,
+      title: i.title,
+      summary: i.summary ?? null,
+      source: i.source ?? null,
+      sourceUrl: i.sourceUrl ?? null,
+      location: i.location ?? null,
+    }),
+  );
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, computeFastFacts(data, windowIncidents, topicLabels));
 

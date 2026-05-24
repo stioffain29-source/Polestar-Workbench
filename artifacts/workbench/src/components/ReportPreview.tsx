@@ -96,13 +96,14 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
         return (
           <div
             key={i}
-            className="bg-white border rounded-sm p-3 relative"
-            style={{ borderColor: POLAR }}
+            className="bg-white border rounded-sm relative"
+            style={{ borderColor: POLAR, paddingLeft: 14, paddingRight: 12, paddingTop: 10, paddingBottom: 10 }}
           >
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent }} />
+            {/* Vertical accent strip on the left edge — no horizontal top bar. */}
+            <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 4, background: accent }} />
             <div
               className="uppercase tracking-widest"
-              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 9, color: DUSK, marginTop: 4 }}
+              style={{ fontFamily: "'Roboto Condensed', sans-serif", fontWeight: 700, fontSize: 9, color: DUSK }}
             >
               {c.label}
             </div>

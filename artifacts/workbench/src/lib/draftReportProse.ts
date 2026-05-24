@@ -17,6 +17,7 @@
 
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
+import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
 
 export interface DraftableIncident extends ClassifiableIncident {
   severity: string;
@@ -63,7 +64,10 @@ function joinList(parts: string[]): string {
 }
 
 function topCountriesText(rows: DraftableIncident[]): string {
-  const counts = countBy(rows, (r) => (r.country ?? "").trim()).filter(([k]) => k);
+  // Drop empty country fields and the literal "Unknown" bucket so the
+  // prose never reads "concentrates in ... Unknown (6)".
+  const counts = countBy(rows, (r) => (r.country ?? "").trim())
+    .filter(([k]) => k && !/^unknown$/i.test(k));
   if (counts.length === 0) return "";
   const top = counts.slice(0, 3).map(([c, n]) => `${c} (${n})`);
   return joinList(top);
@@ -180,7 +184,12 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Watch for copycat incidents on the same corridor within two weeks of any reported loss, fresh arrests or recoveries, and route shifts that quietly push volume through weaker depots.`,
     polestarLine: (rows) => {
       if (rows.length === 0) return `Coverage in the window is thin. Treat this as a reporting gap, not as confirmation that activity has dropped.`;
-      return `The window reads as continued operational pressure rather than a step change. The pattern is consistent with previous cycles.`;
+      const cs = topCountriesText(rows);
+      const types = topTypesText(rows);
+      const parts: string[] = [];
+      if (types) parts.push(`The usable signal is ${types}`);
+      if (cs) parts.push(`with the load on ${cs}`);
+      return parts.length ? `${parts.join(", ")}.` : `The window holds usable cargo signal. Detail sits in the related incidents table.`;
     },
     thinDataNote: `Cargo reporting in this window is thin. That should be treated as a coverage gap, not proof that the problem is absent.`,
   },
@@ -204,7 +213,12 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Watch for further port closures or strikes, naval movement near chokepoints, fresh maritime advisories and any move in war risk rates.`,
     polestarLine: (rows) => {
       if (rows.length === 0) return `Maritime reporting in this window is light. Treat that as a coverage gap rather than calm conditions.`;
-      return `The window is consistent with the wider pattern of intermittent disruption. No structural shift on routing in the data.`;
+      const cs = topCountriesText(rows);
+      const types = topTypesText(rows);
+      const parts: string[] = [];
+      if (types) parts.push(`The usable signal is ${types}`);
+      if (cs) parts.push(`with the load on ${cs}`);
+      return parts.length ? `${parts.join(", ")}.` : `The window holds usable maritime signal. Detail sits in the related incidents table.`;
     },
     thinDataNote: `Shipping reporting in this window is thin. Treat as a coverage gap, not proof that disruption has eased.`,
   },
@@ -226,10 +240,15 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Review fuel stocks at site, generator cover, route planning for fuel runs, contract pricing on bulk supply and contingency for forecourt closures.`,
     watchLine: () =>
       `Watch for subsidy announcements, refinery maintenance windows, tanker driver action and any move in pump prices in capital cities.`,
-    polestarLine: (rows) =>
-      rows.length === 0
-        ? `Fuel reporting in the window is thin. That is a coverage gap, not a sign that pressure has eased.`
-        : `Pressure remains operational rather than acute. The pattern matches recent cycles.`,
+    polestarLine: (rows) => {
+      if (rows.length === 0) return `Fuel reporting in the window is thin. That is a coverage gap, not a sign that pressure has eased.`;
+      const cs = topCountriesText(rows);
+      const types = topTypesText(rows);
+      const parts: string[] = [];
+      if (types) parts.push(`The usable signal in this window is ${types}`);
+      if (cs) parts.push(`with the load on ${cs}`);
+      return parts.length ? `${parts.join(", ")}.` : `The window holds usable fuel signal. Detail sits in the related incidents table.`;
+    },
     thinDataNote: `Fuel reporting in this window is thin. Treat as a coverage gap, not as evidence that supply has stabilised.`,
   },
   fertiliser: {
@@ -250,10 +269,15 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Review supplier diversification, forward stock cover, exposure to single source urea and potash, and contingency for export ban announcements.`,
     watchLine: () =>
       `Watch for export restrictions, plant maintenance and outage announcements, farmer protest activity and any government subsidy moves.`,
-    polestarLine: (rows) =>
-      rows.length === 0
-        ? `Fertiliser reporting in the window is thin. Treat as a coverage gap rather than market calm.`
-        : `Activity is consistent with the wider supply pressure cycle. No structural break in the data.`,
+    polestarLine: (rows) => {
+      if (rows.length === 0) return `Fertiliser reporting in the window is thin. Treat as a coverage gap rather than market calm.`;
+      const cs = topCountriesText(rows);
+      const types = topTypesText(rows);
+      const parts: string[] = [];
+      if (types) parts.push(`The usable signal is ${types}`);
+      if (cs) parts.push(`with the load on ${cs}`);
+      return parts.length ? `${parts.join(", ")}.` : `The window holds usable fertiliser signal. Detail sits in the related incidents table.`;
+    },
     thinDataNote: `Fertiliser reporting in this window is thin. Treat as a coverage gap, not as proof of supply stability.`,
   },
   energy: {
@@ -274,10 +298,15 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Review backup generator cover, fuel stock for extended outage, UPS run time on critical sites and any single source dependency on the public grid.`,
     watchLine: () =>
       `Watch for fresh load shedding schedules, substation incidents, fuel to power supply moves and weather events that pressure peak demand.`,
-    polestarLine: (rows) =>
-      rows.length === 0
-        ? `Energy reporting in the window is thin. Treat as a coverage gap rather than grid stability.`
-        : `Pressure remains chronic rather than acute. The pattern is consistent with recent reporting.`,
+    polestarLine: (rows) => {
+      if (rows.length === 0) return `Energy reporting in the window is thin. Treat as a coverage gap rather than grid stability.`;
+      const cs = topCountriesText(rows);
+      const types = topTypesText(rows);
+      const parts: string[] = [];
+      if (types) parts.push(`The window reads as ${types}`);
+      if (cs) parts.push(`concentrated in ${cs}`);
+      return parts.length ? `${parts.join(", ")}.` : `The window holds usable grid signal. Detail sits in the related incidents table.`;
+    },
     thinDataNote: `Energy reporting in this window is thin. Treat as a coverage gap, not as proof that the grid is stable.`,
   },
   protests: {
@@ -298,10 +327,15 @@ const FRAMINGS: Record<string, TopicFraming> = {
       `Review staff movement plans, journey management for affected cities, site access controls and standing crisis communication triggers.`,
     watchLine: () =>
       `Watch for planned protest dates, university and union calls to action, police deployment notices and any escalation in arrest numbers.`,
-    polestarLine: (rows) =>
-      rows.length === 0
-        ? `Public order reporting in the window is thin. Treat as a coverage gap rather than calm streets.`
-        : `Activity is consistent with the seasonal pattern. No clear sign of a sharper escalation in the data.`,
+    polestarLine: (rows) => {
+      if (rows.length === 0) return `Public order reporting in the window is thin. Treat as a coverage gap rather than calm streets.`;
+      const cs = topCountriesText(rows);
+      const types = topTypesText(rows);
+      const parts: string[] = [];
+      if (types) parts.push(`The window centres on ${types}`);
+      if (cs) parts.push(`with the load on ${cs}`);
+      return parts.length ? `${parts.join(", ")}.` : `The window holds usable public order signal. Detail sits in the related incidents table.`;
+    },
     thinDataNote: `Public order reporting in this window is thin. Treat as a coverage gap, not as proof of calm.`,
   },
   flashpoint: {
@@ -344,7 +378,21 @@ export function draftTopicReportProse(opts: {
   incidents: DraftableIncident[];
 }): TopicReportProse {
   const { topic, issueDate, incidents } = opts;
-  const inWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
+  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
+  // Strip records that match the topic field but are not operationally
+  // about it (e.g. a hiking obituary that happens to tag "fuel").
+  const inWindow = rawWindow.filter((i) =>
+    isTopicRelevant(topic, {
+      topic: i.topic,
+      title: i.title ?? "",
+      summary: i.summary ?? null,
+      source: i.source ?? null,
+      sourceUrl: null,
+      location: null,
+    }),
+  );
+  const dropped = rawWindow.length - inWindow.length;
+  const noisy = rawWindow.length >= 6 && dropped / rawWindow.length >= 0.35;
   const f = framingFor(topic);
   const period = periodPhrase(topic, issueDate);
   const cadence = cadenceWord(topic);
@@ -362,13 +410,16 @@ export function draftTopicReportProse(opts: {
   const execTail = thinData && total > 0
     ? ` Volume is light, so the read is directional rather than firm.`
     : ``;
+  const noisyNote = noisy
+    ? ` The reporting window is noisy. ${dropped} record${dropped === 1 ? "" : "s"} were market commentary or off topic items and have been excluded from the table and the read.`
+    : ``;
 
   const whatHappened = total === 0
     ? `No records were captured in the window. ${f.thinDataNote}`
     : `${total} records sit in the window.${countries ? ` Most activity is in ${countries}.` : ""}${types ? ` The recurring incident types are ${types}.` : ""}${sev ? ` The most serious entry reaches ${sev} severity.` : ""} Detail sits in the related incidents table below.`;
 
   return {
-    executiveSummary: `${execLead}${execTail}`,
+    executiveSummary: `${execLead}${execTail}${noisyNote}`,
     situation: f.situationLine(inWindow),
     whatHappened,
     whatMatters: f.mattersLine(inWindow),
@@ -392,7 +443,15 @@ export function draftCountryReportProse(opts: {
   const region = opts.region || "the region";
   // Country reports follow the weekly window cap.
   const issueDate = opts.issueDate ?? new Date().toISOString().slice(0, 10);
-  const inWindow = filterIncidentsToWindow(opts.incidents, "protests", issueDate);
+  const rawWindow = filterIncidentsToWindow(opts.incidents, "protests", issueDate);
+  const inWindow = rawWindow.filter((i) =>
+    isCountryRelevant({
+      topic: i.topic,
+      title: i.title ?? "",
+      summary: i.summary ?? null,
+      source: i.source ?? null,
+    }),
+  );
   const period = periodPhrase("protests", issueDate);
   const total = inWindow.length;
   const types = topTypesText(inWindow);
@@ -400,11 +459,11 @@ export function draftCountryReportProse(opts: {
 
   const overview = total === 0
     ? `${name} in ${region}. No records sit in the ${period} weekly window. Treat that as a coverage gap rather than confirmation that the operating picture is quiet.`
-    : `${name} in ${region}. ${total} records sit in the ${period} weekly window.${types ? ` The recurring patterns are ${types}.` : ""} The picture is operational rather than acute.`;
+    : `${name} in ${region}. ${total} records sit in the ${period} weekly window.${types ? ` The recurring patterns are ${types}.` : ""} Detail sits in the related incidents table.`;
 
   const trendSummary = total === 0
     ? `Window volume is too thin for a firm trend read. Hold the prior cycle assessment until further records land.`
-    : `Activity is ${total < 4 ? "light but useable" : "running at normal cycle volume"}.${types ? ` The lead types are ${types}.` : ""}${sev ? ` Severity peaks at ${sev}.` : ""} No structural shift in the window relative to recent cycles.`;
+    : `Activity is ${total < 4 ? "light but useable" : "running at normal cycle volume"}.${types ? ` The lead types are ${types}.` : ""}${sev ? ` Severity peaks at ${sev}.` : ""} Detail sits in the related incidents table.`;
 
   const implications = total === 0
     ? `Maintain standing controls on staff movement, site access and journey management. Re visit once fresh records land.`

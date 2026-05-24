@@ -1,0 +1,136 @@
+Fix the report builder output across all reports.
+
+Apply this to every report type:
+- Fuel
+- Fertiliser
+- Civil Protests and Civil Unrest
+- Energy and Grid
+- Shipping
+- Cargo Watch
+- Flashpoint
+- Papua and PNG country reports
+
+Do not change the database.
+Do not re-import data.
+Do not redesign dashboard pages.
+Do not change report windows.
+
+Problems to fix:
+
+1. Remove irrelevant records from report tables
+
+The Fuel report included a hiking story:
+“News live: Australian tourist who died hiking Inca Trail identified…”
+
+That is not a fuel incident.
+
+Report tables must exclude irrelevant articles, even if they contain a fuel keyword somewhere in the headline or summary.
+
+For Fuel reports, include only records about:
+- fuel price changes
+- fuel shortages
+- refinery disruption
+- depot disruption
+- fuel transport disruption
+- fuel protests
+- tanker or fuel supply disruption
+- oil or fuel market movement with operational relevance
+
+Exclude:
+- general news live blogs
+- unrelated death or travel stories
+- articles where fuel is only a secondary passing mention
+- general politics unless directly linked to fuel supply, price, subsidy or disruption
+
+Apply the same principle across all reports:
+only include records that match the report topic and operational purpose.
+
+2. Improve prose quality
+
+The prose is not good enough.
+
+Stop generating generic filler such as:
+- “Pressure remains operational rather than acute”
+- “The pattern matches recent cycles”
+- vague AI style phrasing
+
+Use plain operational prose.
+
+No hype.
+No consultancy waffle.
+No five word influencer sentences.
+No em dashes.
+No irrelevant filler.
+No weak generic closing lines.
+
+The prose should read like a practical security lead writing for a leadership team.
+
+If the dataset is noisy or thin, say so directly.
+
+Example:
+“The reporting window is noisy. Several records are market commentary rather than direct operational disruption. The usable signal is fuel price pressure, Hormuz related supply concern and local pump price movement in India and Iran.”
+
+3. Fix overlapping sections
+
+The report currently has text overlapping or being written too close together.
+
+Fix PDF pagination and spacing so:
+- table notes do not collide with Source Notes
+- section headings never overlap previous content
+- each section has enough vertical spacing before it starts
+- Source Notes / Data Notes always starts cleanly on its own line
+- Disclaimer starts cleanly after Source Notes
+- if there is not enough room, move the next section to the next page
+
+4. Fast Facts card styling
+
+Fast Facts cards must use a vertical accent strip, not a horizontal top strip.
+
+Card style:
+- white card
+- thin grey border
+- vertical accent strip on the left
+- dark navy label
+- large value
+- smaller supporting note
+
+Do not use horizontal highlight bars across the top of the card.
+
+Apply this to all report PDFs.
+
+5. Fast Facts content quality
+
+Do not show:
+- Unknown as most affected country
+- Other fuel incident as top issue type if it is just a fallback bucket
+
+If the value is weak, use:
+- Country not identified
+- Mixed fuel reporting
+- Data quality issue
+- Coverage gap
+
+But do not let fallback labels dominate the report.
+
+6. Related incidents table
+
+The related incidents table must contain only relevant records.
+
+Limit to:
+- 10 to 15 rows
+- sorted newest first
+- inside the report window
+- relevant to the report topic
+
+Do not include noisy records just because they match one keyword.
+
+7. Acceptance criteria
+
+- No irrelevant hiking or unrelated general news stories in Fuel reports.
+- Prose reads like a practical operational brief.
+- No text overlaps.
+- Source Notes and Disclaimer are spaced properly.
+- Fast Facts cards use vertical accent strips.
+- No horizontal card highlight bars.
+- Changes apply to all report outputs.
+- No database or import changes.

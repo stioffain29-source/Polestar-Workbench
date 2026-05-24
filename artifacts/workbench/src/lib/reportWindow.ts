@@ -26,8 +26,10 @@ export function reportWindowMaxDays(topic: string): number {
 }
 
 // Related-incidents table row limits.
-export function relatedIncidentsLimit(topic: string): { min: number; max: number } {
-  return reportCadence(topic) === "monthly" ? { min: 15, max: 25 } : { min: 10, max: 15 };
+// Spec: every report shows 10-15 rows, newest first. Monthly products keep
+// the same 15-row cap (older detail remains available in the Workbench).
+export function relatedIncidentsLimit(_topic: string): { min: number; max: number } {
+  return { min: 10, max: 15 };
 }
 
 export interface ReportWindow {
