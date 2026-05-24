@@ -17,6 +17,7 @@ import { slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
+import { resolveReportTitle } from "@/lib/reportNaming";
 
 const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
 
@@ -156,8 +157,11 @@ export default function ReportEditor() {
       return s ? (saved as string) : drafted;
     };
 
+    // Replace empty titles and the well-known old regional defaults (e.g.
+    // "APAC Fuel Watch", "Hormuz Maritime Watch") with the canonical title.
+    // Any other stored title is treated as a manual edit and preserved.
     setForm({
-      title: report.title ?? "",
+      title: resolveReportTitle(topic, report.title),
       topic,
       status: report.status ?? "draft",
       issueDate,

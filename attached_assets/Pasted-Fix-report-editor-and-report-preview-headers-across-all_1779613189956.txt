@@ -1,0 +1,88 @@
+Fix report editor and report preview headers across all reports.
+
+Do not change the database.
+Do not change report content.
+Do not change dashboards.
+Do not change country reports.
+Do not change PDF export logic beyond the displayed header/title text.
+
+Problem:
+The Reports page card naming has been cleaned up, but inside the report editor and preview the old titles still appear.
+
+Example:
+Shipping still shows:
+Hormuz Maritime Watch
+
+This is wrong.
+
+The report editor header, title field, preview header and PDF title must use the same canonical naming as the Reports page.
+
+Canonical topic titles:
+
+Fuel:
+Fuel Watch
+
+Fertiliser:
+Fertiliser Watch
+
+Cargo Watch:
+Cargo Watch
+
+Shipping:
+Shipping Watch
+
+Energy / Grid:
+Energy Watch
+
+Flashpoint:
+Flashpoint
+
+Flashpoint subtitle/scope:
+Activism, Protests & Civil Unrest
+
+Do not use these as default report titles:
+APAC Fuel Watch
+APAC Cargo Watch
+APAC Energy Watch
+South Asia Fertiliser Watch
+Hormuz Maritime Watch
+APAC Flashpoint
+
+Shipping rule:
+Shipping title must be:
+Shipping Watch
+
+Hormuz is a chokepoint section inside Shipping. It is not the default Shipping report title.
+
+Regional scope:
+If a report has a selected region or chokepoint, show it separately as a scope line, not inside the main title.
+
+Example:
+Title: Shipping Watch
+Scope: Strait of Hormuz
+
+But do not make the title:
+Hormuz Maritime Watch
+
+Apply this consistently to:
+- Reports page cards
+- Report editor page heading
+- Title input default value
+- Report preview header
+- PDF cover title
+- PDF running header
+
+Do not overwrite manually edited titles unless the current stored title is one of the old default titles.
+
+Acceptance criteria:
+- Shipping report editor shows Shipping Watch, not Hormuz Maritime Watch.
+- Preview shows Shipping Watch.
+- PDF title shows Shipping Watch.
+- Fuel shows Fuel Watch.
+- Fertiliser shows Fertiliser Watch.
+- Cargo Watch shows Cargo Watch.
+- Energy shows Energy Watch.
+- Flashpoint shows Flashpoint with Activism, Protests & Civil Unrest as scope/subtitle.
+- Regional words appear only as scope, not default title.
+- No database changes.
+- No report content changes.

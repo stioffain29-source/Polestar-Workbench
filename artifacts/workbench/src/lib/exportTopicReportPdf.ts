@@ -12,6 +12,7 @@ import {
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
+import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 
 export interface TopicReportData {
   title: string;
@@ -214,26 +215,31 @@ export async function exportTopicReportPdf(
   filename: string,
 ): Promise<void> {
   const topicLabel = topicLabels[data.topic] ?? data.topic;
-  const cadence = data.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing";
+  // Canonical naming: cover title, running header and subtitle use the
+  // canonical topic name. Regional words live in scope, not the title.
+  const canon = canonicalTopic(data.topic);
+  const resolvedTitle = resolveReportTitle(data.topic, data.title);
+  const cadence = `${canon.cadence} Briefing`;
   let headerDate = data.issueDate;
   try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
 
   const ctx = createCtx({
-    kind: data.title || `${topicLabel} ${cadence}`,
+    kind: resolvedTitle,
     issueDate: headerDate,
   });
 
   // Full-bleed Polestar cover (page 1).
   const win = resolveReportWindow(data.topic, data.issueDate);
-  const eyebrow = data.topic === "protests"
-    ? "FLASHPOINT · ACTIVISM, PROTESTS & CIVIL UNREST"
-    : `POLESTAR INSIGHTS · ${topicLabel.toUpperCase()}`;
+  const eyebrow = canon.subtitle
+    ? `${canon.topicLine.toUpperCase()} · ${canon.subtitle.toUpperCase()}`
+    : `POLESTAR INSIGHTS · ${canon.topicLine.toUpperCase()}`;
   drawPolestarCover(ctx, {
-    title: data.title || `${topicLabel} ${cadence}`,
-    subtitle: `${topicLabel} · ${cadence}`,
+    title: resolvedTitle,
+    subtitle: `${canon.topicLine} · ${cadence}`,
     reportingPeriod: win.label,
     eyebrow,
   });
+  void topicLabel;
   // Body pages start here, each with the gradient header band.
   beginBodyPages(ctx);
 

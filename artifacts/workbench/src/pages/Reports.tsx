@@ -14,26 +14,7 @@ import { TOPICS, TOPIC_LABELS, REPORT_STATUSES, reportStatusClass } from "@/lib/
 import { format } from "date-fns";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Canonical card labels for the topic reports. The Reports page must show
-// these consistently regardless of any regional prefix in the stored title
-// (e.g. "APAC Fuel Watch", "South Asia Fertiliser Watch", "Hormuz Maritime
-// Watch"). Regional scope is a separate concept — it only appears as a
-// scope label when the user selects one inside the report itself. Country
-// Reports are not topic reports, they live on /countries and are unaffected.
-type TopicCard = { topicLine: string; cadence: "Weekly" | "Monthly"; title: string };
-const TOPIC_CARD: Record<string, TopicCard> = {
-  fuel:        { topicLine: "Fuel",          cadence: "Weekly",  title: "Fuel Watch" },
-  shipping:    { topicLine: "Shipping",      cadence: "Weekly",  title: "Shipping Watch" },
-  cargo_watch: { topicLine: "Cargo Watch",   cadence: "Monthly", title: "Cargo Watch" },
-  flashpoint:  { topicLine: "Flashpoint",    cadence: "Weekly",  title: "Flashpoint" },
-  protests:    { topicLine: "Flashpoint",    cadence: "Weekly",  title: "Flashpoint" },
-  energy:      { topicLine: "Energy / Grid", cadence: "Weekly",  title: "Energy Watch" },
-  fertiliser:  { topicLine: "Fertiliser",    cadence: "Weekly",  title: "Fertiliser Watch" },
-};
-function topicCard(topic: string): TopicCard {
-  return TOPIC_CARD[topic] ?? { topicLine: TOPIC_LABELS[topic] ?? topic, cadence: "Weekly", title: TOPIC_LABELS[topic] ?? topic };
-}
+import { canonicalTopic } from "@/lib/reportNaming";
 
 export default function Reports() {
   const qc = useQueryClient();
@@ -130,16 +111,15 @@ export default function Reports() {
               <button onClick={() => { if (confirm("Delete report?")) del.mutate({ id: r.id }, { onSuccess: () => { qc.invalidateQueries({ queryKey: getListReportsQueryKey() }); qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }); } }); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
             {(() => {
-              const card = topicCard(r.topic);
-              const isFlashpoint = r.topic === "protests" || r.topic === "flashpoint";
+              const card = canonicalTopic(r.topic);
               return (
                 <Link href={`/reports/${r.id}`} className="block mt-3">
                   <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Polestar Insights</div>
                   <div className="text-[11px] font-sans uppercase tracking-wider text-primary mt-0.5">
                     {card.topicLine} · {card.cadence}
                   </div>
-                  {isFlashpoint && (
-                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-0.5">Activism, Protests &amp; Civil Unrest</div>
+                  {card.subtitle && (
+                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-0.5">{card.subtitle}</div>
                   )}
                   <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors mt-1.5">{card.title}</h2>
                 </Link>

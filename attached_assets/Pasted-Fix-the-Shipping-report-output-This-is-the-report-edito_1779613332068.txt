@@ -1,0 +1,165 @@
+Fix the Shipping report output.
+
+This is the report editor and PDF/report preview for Shipping.
+
+Do not change the Shipping dashboard page.
+Do not change the database.
+Do not re-import.
+Do not touch Cargo Watch, Fuel or Missile Strike Tracker.
+
+Problem:
+The Shipping page now has useful visual intelligence:
+- Fast Facts
+- Key Metrics
+- Chokepoint Watch
+- Vessel Attacks
+- Piracy and Armed Robbery
+- Regional Split
+- Issue Type Breakdown
+- Daily Intelligence Summary
+- Incident Timeline
+- Incidents by Region
+- Incidents by Country
+- Severity Distribution
+
+But the Shipping report preview is not translating those visuals and tables into the report.
+
+It is still showing a generic text-heavy report and the old title.
+
+Fix the Shipping report so it uses the same analysed Shipping dataset and visual sections from the Shipping page.
+
+1. Rename report title
+
+Default title must be:
+
+Shipping Watch
+
+Not:
+Hormuz Maritime Watch
+
+Hormuz is a chokepoint section, not the report title.
+
+2. Report must include Shipping page data
+
+Add these sections into the Shipping report:
+
+- Fast Facts
+- Key Metrics
+- Chokepoint Watch
+- Vessel Attacks
+- Piracy and Armed Robbery
+- Issue Type Breakdown
+- Daily Intelligence Summary
+- Regional and Country View
+- Incident Timeline
+- Severity Distribution
+- Source Notes / Data Notes
+
+3. Chokepoint Watch
+
+Include a table or clear visual block for:
+
+- Strait of Hormuz
+- Gulf of Oman
+- Arabian / Persian Gulf
+- Red Sea
+- Bab el Mandeb
+- Malacca Strait
+
+For each show:
+- records
+- highest severity
+- latest incident
+- short operational read
+
+4. Vessel Attacks
+
+Include the same strict Vessel Attacks subset used on the Shipping page.
+
+Show:
+- total vessel incidents
+- attacks
+- near miss
+- seized
+- recent hostile vessel incidents
+
+Do not include diplomatic follow-up or general shipping news.
+
+5. Piracy and Armed Robbery
+
+Include a separate section.
+
+Show:
+- total piracy / armed robbery records
+- incident type
+- location if known
+- severity
+- recent records
+
+Do not include land cargo theft.
+
+6. Charts and diagrams
+
+Add report-ready charts for:
+- Issue Type Breakdown
+- Incident Timeline
+- Incidents by Region
+- Incidents by Country
+- Severity Distribution
+
+These should be proper report charts, not screenshots of the dashboard.
+
+7. Daily Intelligence Summary
+
+Translate the three dashboard cards into short report prose:
+
+- Chokepoint and route activity
+- Vessel threat and piracy
+- Commercial impact
+
+Keep it short and operational.
+
+8. Data consistency
+
+Use the same classifiers and derived fields as the Shipping page.
+
+The report must not have separate logic that drifts from the dashboard.
+
+If the Shipping page classifies something as Chokepoint risk, the report should use the same label.
+
+If the Shipping page excludes Cargo Watch theft, the report must also exclude it.
+
+9. Report structure
+
+Use this structure:
+
+- Cover page
+- Executive Summary
+- Fast Facts
+- Key Metrics
+- Chokepoint Watch
+- Vessel Attacks
+- Piracy and Armed Robbery
+- Issue Type Breakdown
+- Regional and Country View
+- Incident Timeline
+- Severity Distribution
+- Commercial Impact
+- Watch Next
+- Polestar View
+- Source Notes / Data Notes
+- Disclaimer
+
+10. Acceptance criteria
+
+- Shipping report title is Shipping Watch.
+- Report includes diagrams/charts from the Shipping page logic.
+- Chokepoint Watch appears in the report.
+- Vessel Attacks appears in the report.
+- Piracy and Armed Robbery appears in the report.
+- Issue Type, Region, Country, Timeline and Severity charts appear in the report.
+- Report uses Shipping page classifiers.
+- No Cargo Watch theft is pulled in.
+- No Missile Strike Tracker report is created.
+- No database changes.
+- No unrelated changes.

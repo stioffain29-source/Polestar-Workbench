@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
+import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0B0A3D";
@@ -145,10 +146,16 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
         catch { return report.issueDate; }
       })()
     : "";
-  const topicLabel = report.topic ? TOPIC_LABELS[report.topic] ?? report.topic : "";
-  const subhead = report.topic === "protests" ? "Flashpoint" : topicLabel;
-  const tertiary = report.topic === "protests" ? "Activism, Protests & Civil Unrest" : "";
-  const cadence = report.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing";
+  // Canonical naming applies everywhere on the cover and running header.
+  // TOPIC_LABELS is still imported for any non-canonical fallback elsewhere.
+  void TOPIC_LABELS;
+  const canon = report.topic ? canonicalTopic(report.topic) : null;
+  const subhead = canon ? canon.topicLine : "";
+  const tertiary = canon?.subtitle ?? "";
+  const cadence = canon ? `${canon.cadence} Briefing` : "Weekly Briefing";
+  const resolvedTitle = report.topic
+    ? resolveReportTitle(report.topic, report.title)
+    : (report.title ?? "");
   const fastFacts = computePreviewFastFacts(report);
   const periodLabel = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).label
@@ -181,7 +188,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
             letterSpacing: "0.18em",
           }}
         >
-          {(report.title || `${topicLabel} ${cadence}`).toUpperCase()}
+          {(resolvedTitle || `${subhead} ${cadence}`).toUpperCase()}
         </div>
       </div>
 
@@ -232,7 +239,7 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
             textTransform: "uppercase",
           }}
         >
-          {report.title || "Untitled report"}
+          {resolvedTitle || "Untitled report"}
         </h1>
         <div
           className="flex flex-wrap items-center gap-x-4 gap-y-1 uppercase"

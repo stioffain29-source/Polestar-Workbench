@@ -9,6 +9,7 @@ import {
 } from "./pdfChrome";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
+import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { classifyIncidentType } from "./incidentClassifier";
 import {
   CHOKEPOINTS, detectChokepoints, classifyPiracy,
@@ -322,21 +323,25 @@ export async function exportShippingReportPdf(
   incidents: ShippingReportIncident[],
   filename: string,
 ): Promise<void> {
-  const cadence = "Weekly Briefing";
+  // Canonical naming: the default Shipping title is "Shipping Watch".
+  // Hormuz is a chokepoint section inside the report, not a title.
+  const canon = canonicalTopic(data.topic);
+  const resolvedTitle = resolveReportTitle(data.topic, data.title);
+  const cadence = `${canon.cadence} Briefing`;
   let headerDate = data.issueDate;
   try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
 
   const ctx = createCtx({
-    kind: data.title || `Shipping ${cadence}`,
+    kind: resolvedTitle,
     issueDate: headerDate,
   });
 
   const win = resolveReportWindow(data.topic, data.issueDate);
   drawPolestarCover(ctx, {
-    title: data.title || `Shipping ${cadence}`,
-    subtitle: `Shipping · ${cadence}`,
+    title: resolvedTitle,
+    subtitle: `${canon.topicLine} · ${cadence}`,
     reportingPeriod: win.label,
-    eyebrow: "POLESTAR INSIGHTS · SHIPPING",
+    eyebrow: `POLESTAR INSIGHTS · ${canon.topicLine.toUpperCase()}`,
   });
   beginBodyPages(ctx);
 
