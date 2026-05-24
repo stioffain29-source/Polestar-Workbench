@@ -308,9 +308,10 @@ export function buildShippingReportDataset(
     color: SEV_COLOR[key],
   }));
 
-  const dataNote = outOfScopeCount > 0
+  const scopeNote = outOfScopeCount > 0
     ? `${outOfScopeCount} shipping record${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East were excluded from this view, matching the Shipping dashboard scope. Records with no identifiable incident location are kept in totals and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted in country charts.`
     : `Records with no identifiable incident location are kept in totals and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted in country charts.`;
+  const dataNote = `${scopeNote}\n\nFleet composition, AIS transit and destination analysis are not currently included because no validated vessel movement dataset is connected.`;
 
   return {
     reportingPeriodShort: win.shortLabel,
