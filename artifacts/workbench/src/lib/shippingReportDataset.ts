@@ -252,8 +252,10 @@ export function buildShippingReportDataset(
     const hs = highestSeverity(records);
     const latest = sortByDateDesc(records)[0] ?? null;
     const readText = records.length === 0
-      ? "No records in the last 30 days."
-      : `${records.length} record${records.length === 1 ? "" : "s"} on file. Most recent: ${latest!.title}.`;
+      ? "Quiet over the last 30 days; no qualifying activity on file."
+      : records.length === 1
+        ? `Activity here was anchored by a single entry, "${latest!.title}", over the last 30 days.`
+        : `Reporting was led by "${latest!.title}", with ${records.length} qualifying records over the last 30 days.`;
     return {
       name: cp,
       count: records.length,
@@ -281,28 +283,47 @@ export function buildShippingReportDataset(
     (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   );
   const commercialRecords = enriched.filter((r) => COMMERCIAL_ISSUES.has(r.issue));
+  // Daily Intelligence Summary — analyst-style prose. Each line opens with
+  // the operational read, not the count. Counts and example titles are used
+  // as supporting evidence, with the sentence pattern varied across lines.
   const dailyIntelLines: string[] = [];
   if (transitRecords.length > 0) {
+    const n = transitRecords.length;
     dailyIntelLines.push(
-      `Chokepoint and Route Activity: ${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} on file covering chokepoint risk, route diversion and maritime advisories. Most recent: ${transitRecords[0].title}.`,
+      `Chokepoint and Route Activity: maritime advisories and transit diversion shaped the week, drawn from ${n} relevant record${n === 1 ? "" : "s"}. The most prominent was "${transitRecords[0].title}".`,
     );
   } else {
-    dailyIntelLines.push("Chokepoint and Route Activity: no matching records in the current window.");
+    dailyIntelLines.push(
+      "Chokepoint and Route Activity: no qualifying chokepoint, advisory or diversion records landed this cycle. Treat as a coverage gap, not as confirmation that pressure has eased.",
+    );
   }
   if (vesselRowsWeekly.length + piracyRowsWeekly.length > 0) {
-    const latestVessel = vesselRowsWeekly[0]?.title ?? piracyRowsWeekly[0]?.title ?? "no recent title on file";
+    const v = vAttackSeizeWeekly;
+    const p = piracyRowsWeekly.length;
+    const vTxt = v === 0
+      ? "no vessel attack or seizure records"
+      : `${v} vessel attack-or-seizure record${v === 1 ? "" : "s"}`;
+    const pTxt = p === 0
+      ? "no piracy or armed-robbery entries"
+      : `${p} piracy or armed-robbery record${p === 1 ? "" : "s"}`;
+    const headline = vesselRowsWeekly[0]?.title ?? piracyRowsWeekly[0]?.title ?? "no recent title on file";
     dailyIntelLines.push(
-      `Vessel Threat and Piracy: ${vAttackSeizeWeekly} vessel attack/seizure record${vAttackSeizeWeekly === 1 ? "" : "s"} and ${piracyRowsWeekly.length} piracy or armed-robbery record${piracyRowsWeekly.length === 1 ? "" : "s"} on file in the weekly window. Most recent vessel item: ${latestVessel}.`,
+      `Vessel Threat and Piracy: hostile maritime activity in the weekly window ran to ${vTxt} alongside ${pTxt}. "${headline}" was the most visible vessel-side entry.`,
     );
   } else {
-    dailyIntelLines.push("Vessel Threat and Piracy: no hostile vessel or piracy records in the current weekly window.");
+    dailyIntelLines.push(
+      "Vessel Threat and Piracy: the weekly window carries no hostile vessel or piracy records on file. Read as a coverage gap rather than calm waters.",
+    );
   }
   if (commercialRecords.length > 0) {
+    const n = commercialRecords.length;
     dailyIntelLines.push(
-      `Commercial Impact: ${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} on port disruption, freight or insurance pressure and commercial shipping disruption. Most recent: ${commercialRecords[0].title}.`,
+      `Commercial Impact: freight rates, insurance pressure and port-side disruption drove the commercial read this week; ${n} record${n === 1 ? "" : "s"} sit in window, anchored by "${commercialRecords[0].title}".`,
     );
   } else {
-    dailyIntelLines.push("Commercial Impact: no matching records in the current window.");
+    dailyIntelLines.push(
+      "Commercial Impact: no port, freight or insurance-pressure records on file for the week. Market commentary without an operational shipping linkage is not included.",
+    );
   }
 
   // Region rows in fixed order — "Country not identified" is intentionally

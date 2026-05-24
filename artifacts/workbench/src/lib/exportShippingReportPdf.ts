@@ -488,7 +488,7 @@ export async function exportShippingReportPdf(
     setText(pdf, DUSK);
     pdf.setFont("helvetica", "italic");
     pdf.setFontSize(9);
-    const intro = "Shipping-side commercial impact only: port disruption, commercial shipping disruption, and insurance or freight pressure that affects vessel transit or cargo flow. Market commentary without a shipping linkage is excluded.";
+    const intro = "Scope here is shipping-side commercial pressure: port disruption, freight or insurance movement, and commercial shipping disruption with a direct vessel or cargo linkage. Pure market commentary without an operational shipping connection is excluded.";
     const lines: string[] = pdf.splitTextToSize(sanitize(intro), CW);
     pdf.text(lines, MX, ctx.y + 10);
     ctx.y += lines.length * 11 + 8;

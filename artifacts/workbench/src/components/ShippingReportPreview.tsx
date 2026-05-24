@@ -568,7 +568,7 @@ export default function ShippingReportPreview({
             className="mb-3"
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, fontStyle: "italic", color: DUSK, lineHeight: 1.6 }}
           >
-            Shipping-side commercial impact only: port disruption, commercial shipping disruption, and insurance or freight pressure that affects vessel transit or cargo flow. Market commentary without a shipping linkage is excluded.
+            Scope here is shipping-side commercial pressure: port disruption, freight or insurance movement, and commercial shipping disruption with a direct vessel or cargo linkage. Pure market commentary without an operational shipping connection is excluded.
           </p>
           <IncidentTable
             rows={ds.commercialRows}

@@ -215,27 +215,35 @@ const FRAMINGS: Record<string, TopicFraming> = {
     situationLine: (rows) => {
       const types = topTypesText(rows);
       return types
-        ? `Activity in the window centres on ${types}. Chokepoints and major ports remain the pressure points for any client moving cargo by sea.`
-        : `Sea movement through APAC and the Middle East remains exposed to vessel attack, port disruption and chokepoint risk.`;
+        ? `Maritime activity this cycle centres on ${types}, with chokepoints and major ports as the standing pressure points for cargo moving by sea.`
+        : `Sea movement through APAC and the Middle East remains exposed to vessel attack, port disruption and chokepoint risk, even on a quiet reporting week.`;
     },
     mattersLine: (rows) => {
       const cs = topCountriesText(rows);
       return cs
-        ? `Concentration in ${cs} drives transit time, freight cost and insurance exposure across the wider region.`
-        : `Even a quiet window does not remove the underlying pressure on transit times, freight cost and war risk premiums.`;
+        ? `Geography matters here: ${cs} carry most of the identifiable reporting, which feeds directly into transit time, freight cost and insurance exposure across the wider region.`
+        : `Underlying pressure on transit times, freight cost and war-risk premiums persists regardless of how thin the reporting week looks.`;
     },
     implicationsLine: () =>
-      `Review routing options around affected chokepoints, port call sequencing, fuel and bunker planning, and war risk premium exposure. Confirm crew change and advisory triggers with operators.`,
+      `Routing options around affected chokepoints, port-call sequencing, bunker planning and war-risk premium exposure should be re-walked. Confirm crew-change and advisory triggers with operators.`,
     watchLine: () =>
-      `Watch for further port closures or strikes, naval movement near chokepoints, fresh maritime advisories and any move in war risk rates.`,
+      `The next cycle hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices. A sharp shift in any one of these tends to set the operational tone for the following week.`,
     polestarLine: (rows) => {
-      if (rows.length === 0) return `Maritime reporting in this window is light. Treat that as a coverage gap rather than calm conditions.`;
+      if (rows.length === 0) {
+        return `Maritime reporting in this window is light. Read this as a coverage gap rather than confirmation of calm conditions on the water.`;
+      }
       const cs = topCountriesText(rows);
       const types = topTypesText(rows);
-      const parts: string[] = [];
-      if (types) parts.push(`The usable signal is ${types}`);
-      if (cs) parts.push(`with the load on ${cs}`);
-      return parts.length ? `${parts.join(", ")}.` : `The window holds usable maritime signal. Detail sits in the related incidents table.`;
+      if (types && cs) {
+        return `This cycle's read is anchored by ${types}. Most of the identifiable reporting sits on ${cs}; several records carry no precise incident location and stay in totals only, kept out of the country charts.`;
+      }
+      if (types) {
+        return `This cycle's read is anchored by ${types}, though the country picture is sparse: several records carry no precise incident location and are excluded from the country charts.`;
+      }
+      if (cs) {
+        return `Maritime detail is light, but the country picture is led by ${cs}. Treat the read as directional rather than firm.`;
+      }
+      return `The window holds usable maritime signal, but it lacks clean geographic anchors. Detail sits in the related incidents table.`;
     },
     thinDataNote: `Shipping reporting in this window is thin. Treat as a coverage gap, not proof that disruption has eased.`,
   },
@@ -385,6 +393,46 @@ function framingFor(topic: string): TopicFraming {
   return FRAMINGS[topic] ?? FRAMINGS.protests;
 }
 
+// Shipping-specific executive summary lead. Leads with the operational read
+// rather than the record count, and absorbs counts as supporting evidence.
+function buildShippingExecLead(ctx: {
+  period: string;
+  countries: string;
+  types: string;
+  sev: string;
+  total: number;
+}): string {
+  const { period, countries, types, sev, total } = ctx;
+  const lead = types
+    ? `Maritime reporting this ${period} weekly window centred on ${types}, with chokepoints and freight-side pressure as the recurring threads.`
+    : `Maritime reporting this ${period} weekly window stayed light on classifiable activity, though chokepoint, vessel and freight-side risk remained the standing exposure.`;
+  const country = countries
+    ? ` The country picture was led by ${countries}; records without a precise incident location sit in the totals but are kept out of the country charts.`
+    : ` The country picture is sparse, with several records lacking a precise incident location.`;
+  const sevPart = sev ? ` Severity peaked at ${sev}.` : "";
+  return `${lead}${country}${sevPart} Qualifying records in window: ${total}.`;
+}
+
+// Shipping-specific What Happened paragraph. Same intent: lead with meaning,
+// use counts as supporting evidence, vary sentence structure.
+function buildShippingWhatHappened(ctx: {
+  countries: string;
+  types: string;
+  sev: string;
+  total: number;
+}): string {
+  const { countries, types, sev, total } = ctx;
+  const lead = types
+    ? `The week's maritime read was shaped by ${types}.`
+    : `Maritime activity this week was light on classifiable detail, leaving the read directional rather than firm.`;
+  const country = countries
+    ? ` Identifiable reporting concentrated on ${countries}, with the remainder spread across records that carry no precise incident location.`
+    : ` Few records carried a precise incident location, so country-level patterns are limited.`;
+  const sevPart = sev ? ` Highest severity reached ${sev}.` : "";
+  const tail = ` Total qualifying records in window: ${total}. Detail sits in the related incidents table below.`;
+  return `${lead}${country}${sevPart}${tail}`;
+}
+
 // ---------------------------------------------------------------------------
 // Topic report draft
 // ---------------------------------------------------------------------------
@@ -422,7 +470,9 @@ export function draftTopicReportProse(opts: {
 
   const execLead = total === 0
     ? `${f.thinDataNote} The ${period} ${cadence} carried no records on file at time of writing.`
-    : `${total} records sit in the ${period} ${cadence}.${countries ? ` Activity concentrates in ${countries}.` : ""}${types ? ` The leading patterns are ${types}.` : ""}${sev ? ` Highest severity in the window is ${sev}.` : ""}`;
+    : topic === "shipping"
+      ? buildShippingExecLead({ period, countries, types, sev, total })
+      : `${total} records sit in the ${period} ${cadence}.${countries ? ` Activity concentrates in ${countries}.` : ""}${types ? ` The leading patterns are ${types}.` : ""}${sev ? ` Highest severity in the window is ${sev}.` : ""}`;
 
   const execTail = thinData && total > 0
     ? ` Volume is light, so the read is directional rather than firm.`
@@ -433,7 +483,9 @@ export function draftTopicReportProse(opts: {
 
   const whatHappened = total === 0
     ? `No records were captured in the window. ${f.thinDataNote}`
-    : `${total} records sit in the window.${countries ? ` Most activity is in ${countries}.` : ""}${types ? ` The recurring incident types are ${types}.` : ""}${sev ? ` The most serious entry reaches ${sev} severity.` : ""} Detail sits in the related incidents table below.`;
+    : topic === "shipping"
+      ? buildShippingWhatHappened({ countries, types, sev, total })
+      : `${total} records sit in the window.${countries ? ` Most activity is in ${countries}.` : ""}${types ? ` The recurring incident types are ${types}.` : ""}${sev ? ` The most serious entry reaches ${sev} severity.` : ""} Detail sits in the related incidents table below.`;
 
   return {
     executiveSummary: `${execLead}${execTail}${noisyNote}`,
