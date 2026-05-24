@@ -1,11 +1,11 @@
-import { format, parseISO, max as dateMax } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
-  NAVY, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
+  NAVY, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
 import {
@@ -15,8 +15,11 @@ import { classifyIncidentType } from "./incidentClassifier";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
-import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
+import { isTopicRelevant } from "./topicRelevance";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+// Single source of truth for the Fast Facts cards so the on-screen
+// preview and this PDF exporter cannot drift.
+import { computeTopicFastFacts } from "./topicFastFacts";
 
 export interface TopicReportData {
   title: string;
@@ -44,77 +47,6 @@ export interface TopicReportIncident {
   source?: string | null;
   sourceUrl?: string | null;
   location?: string | null;
-}
-
-function computeFastFacts(
-  data: TopicReportData,
-  windowIncidents: TopicReportIncident[],
-  topicLabels: Record<string, string>,
-): KpiCardData[] {
-  const reportingPeriod = resolveReportWindow(data.topic, data.issueDate).shortLabel;
-
-  let highestKey = "";
-  let highestRank = 0;
-  for (const i of windowIncidents) {
-    const k = sevKey(i.severity);
-    const r = SEV_RANK[k] ?? 0;
-    if (r > highestRank) { highestRank = r; highestKey = k; }
-  }
-  const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : "—";
-
-  const countryCount = new Map<string, number>();
-  for (const i of windowIncidents) {
-    const c = (i.country ?? "").trim();
-    if (!c) continue;
-    countryCount.set(c, (countryCount.get(c) ?? 0) + 1);
-  }
-  let topCountry = "—";
-  let topCountryN = 0;
-  for (const [c, n] of countryCount) {
-    if (n > topCountryN) { topCountryN = n; topCountry = c; }
-  }
-
-  let latest = "—";
-  if (windowIncidents.length > 0) {
-    const dates = windowIncidents
-      .map((i) => { try { return parseISO(i.occurredAt); } catch { return null; } })
-      .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
-    if (dates.length > 0) latest = format(dateMax(dates), "dd MMM yyyy");
-  }
-
-  const topicLabel = topicLabels[data.topic] ?? data.topic;
-
-  // Derive real operational incident types — never use topic/product names.
-  const typeCounts = new Map<string, number>();
-  for (const i of windowIncidents) {
-    const type = classifyIncidentType(i);
-    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
-  }
-  let topTypeLabel = "—";
-  let topTypeN = 0;
-  for (const [t, n] of typeCounts) {
-    if (n > topTypeN) { topTypeN = n; topTypeLabel = t; }
-  }
-
-  const safeType = sanitizeFactValue(data.topic, topTypeLabel);
-  const safeCountry = topCountry === "—" ? "Country not identified" : sanitizeFactValue(data.topic, topCountry);
-
-  return [
-    { label: "Reporting Period", value: reportingPeriod },
-    { label: "Total Records", value: String(windowIncidents.length), note: `${topicLabel} in window` },
-    { label: "Highest Severity", value: highestLabel, severity: highestKey || undefined, note: highestKey ? "Worst rating in window" : undefined },
-    {
-      label: "Top Issue Type",
-      value: safeType,
-      note: topTypeN > 0 && safeType === topTypeLabel ? `${topTypeN} record${topTypeN === 1 ? "" : "s"}` : "Data quality issue",
-    },
-    {
-      label: "Most Affected Country",
-      value: safeCountry,
-      note: topCountryN > 0 && safeCountry === topCountry ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}` : "Coverage gap",
-    },
-    { label: "Latest Incident", value: latest },
-  ];
 }
 
 function drawRelatedIncidents(
@@ -283,7 +215,15 @@ export async function exportTopicReportPdf(
     }),
   );
   drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, computeFastFacts(data, windowIncidents, topicLabels));
+  drawFastFactsKpiCards(
+    ctx,
+    computeTopicFastFacts({
+      topic: data.topic,
+      issueDate: data.issueDate,
+      incidents,
+      topicLabel: topicLabels[data.topic] ?? data.topic,
+    }) as KpiCardData[],
+  );
 
   const sections: [string, string | null | undefined][] = [
     ["Situation", data.situation],

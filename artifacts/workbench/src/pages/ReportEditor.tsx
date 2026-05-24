@@ -269,7 +269,7 @@ export default function ReportEditor() {
           {form.topic === "shipping" ? (
             <ShippingReportPreview report={form} incidents={incidentsForExport} />
           ) : (
-            <ReportPreview report={form} />
+            <ReportPreview report={form} incidents={incidentsForExport} />
           )}
         </div>
       </div>

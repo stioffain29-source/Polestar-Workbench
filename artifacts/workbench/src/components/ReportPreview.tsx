@@ -3,6 +3,7 @@ import { TOPIC_LABELS } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
+import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0b0a3d";
@@ -126,26 +127,36 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
   );
 }
 
-function computePreviewFastFacts(report: ReportPreviewData): KpiPreviewCard[] {
-  const period = report.topic && report.issueDate
-    ? resolveReportWindow(report.topic, report.issueDate).shortLabel
-    : "—";
-  return [
-    { label: "Reporting Period", value: period },
-    { label: "Total Records", value: "—", note: "Computed at export from incidents on file" },
-    { label: "Highest Severity", value: "—", note: "Computed at export" },
-    { label: "Top Issue Type", value: "—", note: "Derived from incidents at export" },
-    { label: "Most Affected Country", value: "—", note: "Computed at export" },
-    { label: "Latest Incident", value: "—", note: "Computed at export" },
-  ];
+function computePreviewFastFacts(
+  report: ReportPreviewData,
+  incidents: TopicFastFactsIncident[],
+): KpiPreviewCard[] {
+  if (!report.topic || !report.issueDate) {
+    return [
+      { label: "Reporting Period", value: "—" },
+    ];
+  }
+  const topicLabel = TOPIC_LABELS[report.topic] ?? report.topic;
+  return computeTopicFastFacts({
+    topic: report.topic,
+    issueDate: report.issueDate,
+    incidents,
+    topicLabel,
+  });
 }
 
-export default function ReportPreview({ report }: { report: ReportPreviewData }) {
-  void TOPIC_LABELS; void canonicalTopic; void format; void parseISO;
+export default function ReportPreview({
+  report,
+  incidents = [],
+}: {
+  report: ReportPreviewData;
+  incidents?: TopicFastFactsIncident[];
+}) {
+  void canonicalTopic; void format; void parseISO;
   const resolvedTitle = report.topic
     ? resolveReportTitle(report.topic, report.title)
     : (report.title ?? "");
-  const fastFacts = computePreviewFastFacts(report);
+  const fastFacts = computePreviewFastFacts(report, incidents);
   const periodLabel = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).label
     : "";
