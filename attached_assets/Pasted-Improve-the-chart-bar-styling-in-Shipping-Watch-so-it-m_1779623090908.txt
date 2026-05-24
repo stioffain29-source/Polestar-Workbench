@@ -1,0 +1,65 @@
+Improve the chart bar styling in Shipping Watch so it matches the more premium look seen in the Issue Type Breakdown chart.
+
+Scope: Shipping Watch report charts only.
+
+Problem:
+The bars in the report look too flat and bland. The better look is:
+- slightly translucent fill
+- slightly darker edge or stroke
+- cleaner, more premium visual finish
+- still restrained and professional, not glossy or flashy
+
+Required styling change:
+1. Apply this treatment to report bar charts:
+- horizontal bar charts
+- country charts
+- issue type charts
+- severity distribution
+- timeline bars if visually compatible
+
+2. Bar appearance:
+- Use a solid base colour from the existing Polestar palette
+- Apply slight translucency to the fill so the bars do not look blocky or cheap
+- Add a slightly darker border or edge stroke around each bar
+- Border should be subtle, not heavy
+- Keep corners clean and slightly softened only if already supported by the chart library
+- Do not use gradients, shadows, gloss, or overly decorative effects
+
+3. Visual intent:
+- Premium and restrained
+- Cleaner than flat default bars
+- More polished than plain solid rectangles
+- Consistent across the full report
+
+4. Colour rules:
+Keep brand colours exactly:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+
+5. Suggested implementation approach:
+- Fill opacity slightly below full solid
+- Border/stroke in a darker tone of the same fill colour
+- Keep the background tracks light and unobtrusive
+- Keep gridlines faint
+- Ensure label readability remains strong
+
+6. Apply especially to:
+- Issue Type Breakdown
+- Regional and Country View
+- Incidents by Country
+- Severity Distribution
+- Any other report bar charts using the old flat style
+
+Acceptance check:
+- Bars no longer look flat and bland
+- Bars have subtle translucency and a slightly darker edge
+- The report charts look more polished and premium
+- Styling remains consistent with the Polestar visual identity
+- No gradients, shiny effects, or decorative clutter

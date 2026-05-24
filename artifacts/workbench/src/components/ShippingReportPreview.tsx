@@ -24,6 +24,25 @@ const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#E2E2E2";
+
+// Subtle bar styling helpers. Keep effects restrained: a touch of fill
+// translucency and a slightly darker stroke on the same hue. No gradients,
+// no shadows, no glow.
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+}
+function rgba(hex: string, alpha: number): string {
+  const [r, g, b] = parseHex(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+function darken(hex: string, amount: number): string {
+  const [r, g, b] = parseHex(hex);
+  const f = 1 - amount;
+  const to = (n: number) => Math.max(0, Math.min(255, Math.round(n * f)));
+  return `rgb(${to(r)}, ${to(g)}, ${to(b)})`;
+}
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
 export interface ShippingPreviewReport {
@@ -301,7 +320,16 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
                   }}
                 />
               ))}
-              <div style={{ width: `${pct}%`, height: "100%", background: r.color ?? ELECTRIC, position: "relative" }} />
+              <div
+                style={{
+                  width: `${pct}%`,
+                  height: "100%",
+                  background: rgba(r.color ?? ELECTRIC, 0.85),
+                  border: `1px solid ${darken(r.color ?? ELECTRIC, 0.25)}`,
+                  boxSizing: "border-box",
+                  position: "relative",
+                }}
+              />
             </div>
             <div style={{ width: 34, textAlign: "right", color: NAVY, fontWeight: 700 }}>{r.value}</div>
           </div>
@@ -377,7 +405,13 @@ function TimelineChart({ series, peak }: { series: { date: string; label: string
                 <div
                   key={i}
                   className="flex-1"
-                  style={{ background: i === peakIdx ? ELECTRIC : NAVY, height: h, minWidth: 2 }}
+                  style={{
+                    background: rgba(i === peakIdx ? ELECTRIC : NAVY, 0.85),
+                    border: `1px solid ${darken(i === peakIdx ? ELECTRIC : NAVY, 0.25)}`,
+                    boxSizing: "border-box",
+                    height: h,
+                    minWidth: 2,
+                  }}
                   title={`${s.label}: ${s.count}`}
                 />
               );

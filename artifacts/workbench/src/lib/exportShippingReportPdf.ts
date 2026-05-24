@@ -25,6 +25,29 @@ import {
 
 void _LOCATION_NOT_IDENTIFIED;
 
+// Subtle bar styling helpers. jspdf does not expose CSS rgba directly, so we
+// approximate translucency by lightening the fill toward white (the bars sit
+// on a near-white track) and pair it with a slightly darker stroke in the
+// same hue. Keeps the look premium and restrained, no gradients or shadows.
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+}
+function toHex(r: number, g: number, b: number): string {
+  const c = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+function lightenHex(hex: string, amount: number): string {
+  const [r, g, b] = parseHex(hex);
+  return toHex(r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount);
+}
+function darkenHex(hex: string, amount: number): string {
+  const [r, g, b] = parseHex(hex);
+  const f = 1 - amount;
+  return toHex(r * f, g * f, b * f);
+}
+
 // Shipping report PDF. Section order (per spec):
 //   Cover -> Executive Summary -> Fast Facts -> Key Metrics ->
 //   Chokepoint Watch -> Vessel Attacks -> Piracy and Armed Robbery ->
@@ -289,8 +312,13 @@ function drawHorizontalBarChart(
     pdf.rect(trackX, y + 4, trackW, rowH - 8, "F");
 
     const w = (r.value / max) * trackW;
-    setFill(pdf, r.color ?? opts.barColor ?? ELECTRIC);
-    if (w > 0) pdf.rect(trackX, y + 4, w, rowH - 8, "F");
+    const baseColor = r.color ?? opts.barColor ?? ELECTRIC;
+    if (w > 0) {
+      setFill(pdf, lightenHex(baseColor, 0.12));
+      setStroke(pdf, darkenHex(baseColor, 0.22));
+      pdf.setLineWidth(0.5);
+      pdf.rect(trackX, y + 4, w, rowH - 8, "FD");
+    }
 
     setText(pdf, NAVY);
     pdf.setFont("helvetica", "bold");
@@ -371,8 +399,13 @@ function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], p
     const s = series[i];
     const bx = x0 + i * stride;
     const bh = (s.count / max) * (chartH - 8);
-    setFill(pdf, i === peakIdx ? ELECTRIC : NAVY);
-    if (bh > 0) pdf.rect(bx, y1 - bh, barW, bh, "F");
+    const base = i === peakIdx ? ELECTRIC : NAVY;
+    if (bh > 0) {
+      setFill(pdf, lightenHex(base, 0.12));
+      setStroke(pdf, darkenHex(base, 0.22));
+      pdf.setLineWidth(0.4);
+      pdf.rect(bx, y1 - bh, barW, bh, "FD");
+    }
   }
 
   // Date axis labels (first, middle, last).
