@@ -450,40 +450,54 @@ export async function prepareCoverImage(
   outW: number,
   outH: number,
 ): Promise<{ dataUrl: string; format: "JPEG" | "PNG" }> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const i = new Image();
-    i.crossOrigin = "anonymous";
-    i.onload = () => resolve(i);
-    i.onerror = () => reject(new Error("Failed to load cover image"));
-    i.src = src;
-  });
-  // Render at 2x for crisp print output.
-  const scale = 2;
-  const cw = Math.round(outW * scale);
-  const ch = Math.round(outH * scale);
-  const canvas = document.createElement("canvas");
-  canvas.width = cw;
-  canvas.height = ch;
-  const g = canvas.getContext("2d");
-  if (!g) throw new Error("Canvas 2D context unavailable");
-  // Cover-fit: scale source so it fully covers the slot, centre-crop overflow.
-  const srcRatio = img.naturalWidth / img.naturalHeight;
-  const dstRatio = cw / ch;
-  let sx = 0;
-  let sy = 0;
-  let sw = img.naturalWidth;
-  let sh = img.naturalHeight;
-  if (srcRatio > dstRatio) {
-    // Source is wider than slot — crop sides.
-    sw = Math.round(img.naturalHeight * dstRatio);
-    sx = Math.round((img.naturalWidth - sw) / 2);
-  } else if (srcRatio < dstRatio) {
-    // Source is taller than slot — crop top/bottom.
-    sh = Math.round(img.naturalWidth / dstRatio);
-    sy = Math.round((img.naturalHeight - sh) / 2);
+  // Load via fetch -> blob -> object URL rather than setting `crossOrigin`
+  // on an <img>. Under the Replit dev proxy the crossOrigin handshake can
+  // reject same-origin asset loads, which then silently tainted every PDF
+  // cover and forced the gradient fallback. Object URLs are always same-
+  // origin and never taint the canvas, so toDataURL is safe afterwards.
+  const res = await fetch(src);
+  if (!res.ok) {
+    throw new Error(`prepareCoverImage: fetch ${res.status} for ${src}`);
   }
-  g.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
-  return { dataUrl: canvas.toDataURL("image/jpeg", 0.9), format: "JPEG" };
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error(`prepareCoverImage: decode failed for ${src}`));
+      i.src = blobUrl;
+    });
+    // Render at 2x for crisp print output.
+    const scale = 2;
+    const cw = Math.round(outW * scale);
+    const ch = Math.round(outH * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    const g = canvas.getContext("2d");
+    if (!g) throw new Error("Canvas 2D context unavailable");
+    // Cover-fit: scale source so it fully covers the slot, centre-crop overflow.
+    const srcRatio = img.naturalWidth / img.naturalHeight;
+    const dstRatio = cw / ch;
+    let sx = 0;
+    let sy = 0;
+    let sw = img.naturalWidth;
+    let sh = img.naturalHeight;
+    if (srcRatio > dstRatio) {
+      // Source is wider than slot — crop sides.
+      sw = Math.round(img.naturalHeight * dstRatio);
+      sx = Math.round((img.naturalWidth - sw) / 2);
+    } else if (srcRatio < dstRatio) {
+      // Source is taller than slot — crop top/bottom.
+      sh = Math.round(img.naturalWidth / dstRatio);
+      sy = Math.round((img.naturalHeight - sh) / 2);
+    }
+    g.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.9), format: "JPEG" };
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 export function todayLabel(): string {

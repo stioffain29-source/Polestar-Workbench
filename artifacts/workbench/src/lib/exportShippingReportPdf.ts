@@ -452,7 +452,9 @@ export async function exportShippingReportPdf(
   try {
     const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
     coverImage = await prepareCoverImage(shippingCoverUrl, ctx.W, heroH);
-  } catch { /* fall back to gradient hero */ }
+  } catch (err) {
+    console.warn("[exportShippingReportPdf] cover image load failed, falling back to gradient hero", err);
+  }
   drawPolestarCover(ctx, {
     title: resolvedTitle,
     subtitle: "POLESTAR INSIGHTS",

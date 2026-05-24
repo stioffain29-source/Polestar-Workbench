@@ -261,7 +261,9 @@ export async function exportTopicReportPdf(
     try {
       const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
       coverImage = await prepareCoverImage(topicCoverUrl, ctx.W, heroH);
-    } catch { /* fall back to gradient hero */ }
+    } catch (err) {
+      console.warn(`[exportTopicReportPdf] cover image load failed for topic ${data.topic}, falling back to gradient hero`, err);
+    }
   }
   drawPolestarCover(ctx, {
     title: resolvedTitle,

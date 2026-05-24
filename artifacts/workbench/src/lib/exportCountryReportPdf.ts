@@ -414,7 +414,9 @@ export async function exportCountryReportPdf(
     try {
       const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
       coverImage = await prepareCoverImage(countryCoverUrl, ctx.W, heroH);
-    } catch { /* fall back to gradient hero */ }
+    } catch (err) {
+      console.warn(`[exportCountryReportPdf] cover image load failed for country ${country.name}, falling back to gradient hero`, err);
+    }
   }
   drawPolestarCover(ctx, {
     title: country.name,
