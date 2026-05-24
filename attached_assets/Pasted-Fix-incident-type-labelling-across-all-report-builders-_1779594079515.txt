@@ -1,0 +1,239 @@
+Fix incident type labelling across all report builders.
+
+This applies to every report output, not just the PNG country report.
+
+Apply to:
+- Country reports
+- Weekly reports
+- Monthly reports
+- Fuel reports
+- Fertiliser reports
+- Civil Protests & Civil Unrest reports
+- Energy / Grid reports
+- Shipping reports
+- Cargo Watch reports
+- Flashpoint reports
+- Missile Strike Tracker reports
+- Papua / PNG reports
+
+Problem
+
+Reports are using product/topic names as incident types.
+
+This is wrong.
+
+Examples of bad output:
+- Incident Breakdown by Type: Flashpoint
+- Incident Breakdown by Type: Cargo Watch
+- Main issue type: Flashpoint
+- Main issue type: Cargo Watch
+- Main issue type: Protests & Civil Unrest
+
+Flashpoint is a product/report name.
+Cargo Watch is a product/report name.
+Shipping, Fuel, Fertiliser, Energy/Grid and Civil Protests & Civil Unrest are topic/report families.
+
+They are not incident types.
+
+Rule
+
+Reports must describe what happened, not which product bucket the record came from.
+
+Use product/topic names only for:
+- filtering
+- routing records to the right page
+- choosing the report family
+- internal grouping where needed
+
+Do not use product/topic names as:
+- incident types
+- issue types
+- chart labels
+- main issue type values
+- Fast Facts issue values
+- incident breakdown labels
+
+Required fix
+
+Create or update a shared report incident-type classifier.
+
+All report builders must use the same derived incident-type labels.
+
+Do not create separate logic for PNG only.
+
+The classifier should derive the incident type from:
+- title
+- summary
+- source text
+- existing category details
+- existing fields where available
+
+Do not change the database.
+Do not re-import data.
+Do not redesign the dashboard.
+Do not change report structure unless needed to fix the label.
+
+Use these practical incident-type labels.
+
+Security / unrest:
+- Protest
+- Strike / labour action
+- Riot / public disorder
+- Armed robbery
+- Tribal violence
+- Armed group activity
+- Security force operation
+- Roadblock / access disruption
+- Crime / public safety
+- Political unrest
+- Airport / port access issue
+- Mining / contractor disruption
+- Other operational incident
+
+Cargo:
+- Truck hijack
+- Warehouse theft
+- Depot theft
+- Container theft
+- Cargo pilferage
+- Seal tampering
+- Insider-enabled theft
+- Cargo theft / loss
+- Logistics crime
+- Other cargo incident
+
+Shipping:
+- Vessel attack
+- Vessel seizure
+- Near miss
+- Port disruption
+- Chokepoint risk
+- Route diversion
+- Naval / maritime advisory
+- Insurance / freight pressure
+- Other maritime incident
+
+Fuel:
+- Fuel shortage
+- Fuel price increase
+- Depot disruption
+- Refinery disruption
+- Transport disruption
+- Fuel protest
+- Supply interruption
+- Other fuel incident
+
+Fertiliser:
+- Fertiliser shortage
+- Price increase
+- Export restriction
+- Import disruption
+- Production disruption
+- Farmer protest
+- Supply chain disruption
+- Other fertiliser incident
+
+Energy / Grid:
+- Power outage
+- Load shedding
+- Grid disruption
+- Substation incident
+- Generation shortfall
+- Energy infrastructure incident
+- Fuel-to-power disruption
+- Other energy incident
+
+Missile / strike trackers:
+- Drone attack
+- Missile attack
+- Rocket / projectile attack
+- Interception
+- Vessel strike
+- Land strike
+- Near miss
+- Seizure
+- Other strike incident
+
+Fallback
+
+If the incident type cannot be confidently derived, use:
+
+Other operational incident
+
+Do not use:
+
+Unknown
+
+PNG / Papua country report fix
+
+For PNG and Papua country reports, the Incident Breakdown by Type should use real operational incident types such as:
+- Armed robbery
+- Tribal violence
+- Civil unrest / protest
+- Road disruption
+- Cargo theft / hijack
+- Warehouse / depot theft
+- Armed group activity
+- Security force operation
+- Mining / contractor disruption
+- Fuel disruption
+- Airport / port access issue
+- Crime / public safety
+- Other operational incident
+
+It must not show:
+- Flashpoint
+- Cargo Watch
+- Protests & Civil Unrest
+
+Related incidents table
+
+The related incidents table may still show source topic if needed, but it must also show the derived incident type.
+
+If there is only one column available, show the derived incident type, not the product/topic name.
+
+Fast Facts
+
+Fast Facts must use real incident-type labels.
+
+Do not allow:
+- Main issue type: Flashpoint
+- Main issue type: Cargo Watch
+- Main issue type: Shipping
+- Main issue type: Fuel
+- Main issue type: Fertiliser
+- Main issue type: Energy / Grid
+- Main issue type: Civil Protests & Civil Unrest
+
+Use:
+- Main issue type: Armed robbery
+- Main issue type: Cargo theft / hijack
+- Main issue type: Vessel attack
+- Main issue type: Fuel shortage
+- etc.
+
+Charts
+
+All report charts labelled:
+- Incident Breakdown by Type
+- Issue Type Breakdown
+- Main Issue Type
+- Incident Type
+
+must use the derived incident-type classifier.
+
+No product/report names should appear in those charts.
+
+Acceptance criteria
+
+- No report chart shows Flashpoint as an incident type.
+- No report chart shows Cargo Watch as an incident type.
+- No report chart shows topic/product names as incident types.
+- PNG country report shows real operational incident types.
+- Fast Facts show real incident types.
+- Related incident tables show real incident types.
+- Product/topic names remain available only for navigation, filtering and report family selection.
+- No database changes.
+- No re-import.
+- No dashboard redesign.
+- All report builders use the same shared incident-type classifier.

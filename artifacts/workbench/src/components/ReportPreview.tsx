@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS } from "@/lib/topics";
+import { resolveReportWindow } from "@/lib/reportWindow";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const SEV_COLOR: Record<string, string> = {
@@ -102,17 +103,9 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
 
 function computePreviewFastFacts(report: ReportPreviewData): KpiPreviewCard[] {
   const topicLabel = report.topic ? TOPIC_LABELS[report.topic] ?? report.topic : "—";
-  let period = "Last 30 days";
-  try {
-    if (report.issueDate) {
-      const end = parseISO(report.issueDate);
-      if (!isNaN(end.getTime())) {
-        const start = new Date(end);
-        start.setDate(start.getDate() - 30);
-        period = `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
-      }
-    }
-  } catch { /* fallback */ }
+  const period = report.topic && report.issueDate
+    ? resolveReportWindow(report.topic, report.issueDate).shortLabel
+    : "—";
   return [
     { label: "Reporting Period", value: period },
     { label: "Total Records", value: "—", note: "Computed at export from incidents on file" },
@@ -135,6 +128,9 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
   const tertiary = report.topic === "protests" ? "Activism, Protests & Civil Unrest" : "";
   const cadence = report.topic === "cargo_watch" ? "Monthly Briefing" : "Weekly Briefing";
   const fastFacts = computePreviewFastFacts(report);
+  const periodLabel = report.topic && report.issueDate
+    ? resolveReportWindow(report.topic, report.issueDate).label
+    : "";
 
   return (
     <div className="print-report bg-white" style={{ color: "#0B0B3D", fontFamily: "Roboto, sans-serif" }}>
@@ -204,6 +200,23 @@ export default function ReportPreview({ report }: { report: ReportPreviewData })
       </div>
 
       <div className="px-10 py-10">
+        {periodLabel && (
+          <div
+            className="uppercase mb-6"
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: "0.18em",
+              color: "#0B0B3D",
+              borderLeft: "4px solid #4655FF",
+              background: "#E2E2E2",
+              padding: "8px 12px",
+            }}
+          >
+            {periodLabel}
+          </div>
+        )}
         {report.executiveSummary && report.executiveSummary.trim() && (
           <Section title="Executive Summary">
             <Paragraphs text={report.executiveSummary} />

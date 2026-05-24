@@ -1,0 +1,91 @@
+Fix report date windows across all report builders.
+
+This applies to all report types and all topics.
+
+Do not change the database.
+Do not delete records.
+Do not re-import data.
+Do not change dashboard/archive pages.
+
+Rules:
+
+1. Weekly reports
+
+All Weekly Brief / Weekly Report outputs must use a maximum 10-day reporting window.
+
+Default:
+- last 7 days
+
+Maximum allowed:
+- 10 days
+
+Do not include records older than 10 days in weekly reports.
+
+This applies to:
+- PNG country report
+- Papua country report
+- Fuel
+- Fertiliser
+- Civil Protests & Civil Unrest
+- Energy / Grid
+- Shipping
+- Cargo Watch
+- Flashpoint
+- Missile Strike Tracker reports
+
+2. Monthly reports
+
+All Monthly Report outputs must use a maximum 35-day reporting window.
+
+Default:
+- last 30 days
+
+Maximum allowed:
+- 35 days
+
+Do not include records older than 35 days in monthly reports.
+
+3. Related incidents tables
+
+For weekly reports:
+- only show records inside the selected weekly window
+- maximum 10 to 15 rows
+- sorted newest first
+
+For monthly reports:
+- only show records inside the selected monthly window
+- maximum 15 to 25 rows
+- sorted newest first
+
+4. Reporting period
+
+Show the reporting period clearly near the top of every report.
+
+Examples:
+Weekly: Reporting period: 14 May 2026 - 23 May 2026
+Monthly: Reporting period: 19 April 2026 - 23 May 2026
+
+Date ranges must run oldest to newest.
+
+5. Older records
+
+Do not include older records in the report table.
+
+Add a note where useful:
+“Older records remain available in the Workbench.”
+
+6. Do not affect
+
+Do not apply these caps to:
+- dashboard topic pages
+- incident archive pages
+- country archive views
+- map views
+- full database views
+
+Acceptance criteria:
+- Weekly reports never show more than 10 days of records.
+- Monthly reports never show more than 35 days of records.
+- Related incident tables obey the selected report window.
+- Historical dumps disappear from weekly reports.
+- Dashboard and archive views remain unchanged.

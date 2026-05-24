@@ -7,6 +7,13 @@ import {
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
+import {
+  resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit,
+} from "./reportWindow";
+
+// Country reports are weekly products. The "country" pseudo-topic resolves
+// to the weekly defaults (7-day default, 10-day cap) via reportWindow.ts.
+const COUNTRY_WINDOW_TOPIC = "country";
 
 export interface PdfIncident {
   id: number | string;
@@ -28,7 +35,6 @@ export interface PdfCountry {
 }
 
 const NOT_IDENTIFIED = "Not identified";
-const TABLE_ROW_LIMIT = 12;
 
 interface DerivedFacts {
   validDates: Date[];
@@ -310,11 +316,12 @@ function drawIncidentTable(
     pdf.setFontSize(8);
   };
 
-  // Sort newest first, then limit
+  // Sort newest first, then limit to the weekly cap (10-15 rows).
   const sorted = [...incidents].sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
-  const rows = sorted.slice(0, TABLE_ROW_LIMIT);
+  const { max: ROW_MAX } = relatedIncidentsLimit(COUNTRY_WINDOW_TOPIC);
+  const rows = sorted.slice(0, ROW_MAX);
   const truncated = sorted.length - rows.length;
 
   ensureSpace(ctx, rowH + 4);
@@ -362,7 +369,7 @@ function drawIncidentTable(
     pdf.setFont("helvetica", "italic");
     pdf.setFontSize(8);
     pdf.text(
-      sanitize(`Showing ${rows.length} most recent of ${sorted.length} records. Additional records remain available in the Workbench.`),
+      sanitize(`Showing ${rows.length} most recent of ${sorted.length} records in window. Older records remain available in the Workbench.`),
       ctx.MX,
       ctx.y + 10,
     );
@@ -401,15 +408,38 @@ export async function exportCountryReportPdf(
 
   drawCover(ctx, country, issueDate);
 
-  const facts = deriveFacts(incidents, topicLabels);
+  // Enforce the weekly reporting window: records older than 10 days are
+  // excluded from every section of the country report.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, todayIso);
+  const windowedIncidents = filterIncidentsToWindow(incidents, COUNTRY_WINDOW_TOPIC, todayIso);
+
+  // Reporting period banner — visible near the top of every report.
+  {
+    const { pdf, MX, CW } = ctx;
+    const h = 22;
+    ensureSpace(ctx, h + 6);
+    setFill(pdf, POLAR);
+    pdf.rect(MX, ctx.y, CW, h, "F");
+    setFill(pdf, ELECTRIC);
+    pdf.rect(MX, ctx.y, 4, h, "F");
+    setText(pdf, NAVY);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text(sanitize(win.label.toUpperCase()), MX + 12, ctx.y + 14);
+    pdf.setFont("helvetica", "normal");
+    ctx.y += h + 14;
+  }
+
+  const facts = deriveFacts(windowedIncidents, topicLabels);
 
   // 1. Executive Summary (auto-derived from data — always populated honestly)
   drawSectionHeading(ctx, "Executive Summary");
-  renderProse(ctx, buildExecutiveSummary(country, facts, incidents));
+  renderProse(ctx, buildExecutiveSummary(country, facts, windowedIncidents));
 
   // 2. Fast Facts
   drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, buildKpiCards(facts, incidents));
+  drawFastFactsKpiCards(ctx, buildKpiCards(facts, windowedIncidents));
 
   // 3. Narrative sections — show placeholder when source field is empty
   drawNarrativeOrPlaceholder(ctx, "Situation", country.overview);
@@ -423,8 +453,8 @@ export async function exportCountryReportPdf(
   drawSeverityChart(ctx, facts);
   drawTopicChart(ctx, facts, topicLabels);
 
-  // 5. Related incidents — limited
-  drawIncidentTable(ctx, incidents, topicLabels);
+  // 5. Related incidents — limited to the weekly window, newest first.
+  drawIncidentTable(ctx, windowedIncidents, topicLabels);
 
   // 6. Source Notes / Disclaimer
   drawSourceNotes(ctx);

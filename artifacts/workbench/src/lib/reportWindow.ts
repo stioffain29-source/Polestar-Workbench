@@ -1,0 +1,79 @@
+import { format, parseISO, subDays } from "date-fns";
+
+// Central window rules for every report builder (topic reports + country reports).
+// Dashboard pages, archive views, map views and the full database are NOT subject
+// to these caps — only report OUTPUTS (in-app preview + PDF export).
+
+export type Cadence = "weekly" | "monthly";
+
+export function reportCadence(topic: string): Cadence {
+  // Cargo Watch is the only monthly product; everything else is weekly.
+  return topic === "cargo_watch" ? "monthly" : "weekly";
+}
+
+// Default report window.
+//   weekly  → last 7 days
+//   monthly → last 30 days
+export function reportWindowDefaultDays(topic: string): number {
+  return reportCadence(topic) === "monthly" ? 30 : 7;
+}
+
+// Hard cap. Reports must never include records older than this.
+//   weekly  → 10 days
+//   monthly → 35 days
+export function reportWindowMaxDays(topic: string): number {
+  return reportCadence(topic) === "monthly" ? 35 : 10;
+}
+
+// Related-incidents table row limits.
+export function relatedIncidentsLimit(topic: string): { min: number; max: number } {
+  return reportCadence(topic) === "monthly" ? { min: 15, max: 25 } : { min: 10, max: 15 };
+}
+
+export interface ReportWindow {
+  start: Date;
+  end: Date;
+  days: number;
+  cadence: Cadence;
+  // "Reporting period: 14 May 2026 - 23 May 2026"
+  label: string;
+  // "14 May - 23 May 2026"
+  shortLabel: string;
+}
+
+export function resolveReportWindow(topic: string, issueDate: string): ReportWindow {
+  let end: Date;
+  try { end = parseISO(issueDate); } catch { end = new Date(); }
+  if (isNaN(end.getTime())) end = new Date();
+  const days = reportWindowDefaultDays(topic);
+  // Inclusive window: a 7-day report covers the issue date and the 6 prior days,
+  // so the start is `days - 1` before the end. Without this, the inclusive
+  // filter below would silently widen the window to `days + 1` records.
+  const start = subDays(end, days - 1);
+  return {
+    start, end, days,
+    cadence: reportCadence(topic),
+    label: `Reporting period: ${format(start, "d MMMM yyyy")} - ${format(end, "d MMMM yyyy")}`,
+    shortLabel: `${format(start, "d MMM")} - ${format(end, "d MMM yyyy")}`,
+  };
+}
+
+export function filterIncidentsToWindow<T extends { occurredAt: string; topic?: string }>(
+  incidents: T[],
+  topic: string,
+  issueDate: string,
+  opts: { byTopic?: boolean } = {},
+): T[] {
+  const { start, end } = resolveReportWindow(topic, issueDate);
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  return incidents.filter((i) => {
+    if (opts.byTopic && i.topic !== topic) return false;
+    try {
+      const d = parseISO(i.occurredAt);
+      if (isNaN(d.getTime())) return false;
+      const ms = d.getTime();
+      return ms >= startMs && ms <= endMs;
+    } catch { return false; }
+  });
+}

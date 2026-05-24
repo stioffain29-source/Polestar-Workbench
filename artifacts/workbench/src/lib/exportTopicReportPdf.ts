@@ -1,12 +1,15 @@
-import { format, parseISO, subDays, isWithinInterval, max as dateMax } from "date-fns";
+import { format, parseISO, max as dateMax } from "date-fns";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import {
-  createCtx, drawSectionHeading, renderProse,
+  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
-  setFill, setText, sanitize,
-  NAVY, ELECTRIC, WHITE, SEV_RANK, SEV_LABEL, sevKey,
+  setFill, setStroke, setText, sanitize,
+  NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_RANK, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
+import {
+  resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
+} from "./reportWindow";
 
 export interface TopicReportData {
   title: string;
@@ -31,38 +34,12 @@ export interface TopicReportIncident {
   country?: string | null;
 }
 
-function topicWindowIncidents(
-  incidents: TopicReportIncident[],
-  topic: string,
-  issueDate: string,
-): TopicReportIncident[] {
-  let endDate: Date;
-  try { endDate = parseISO(issueDate); } catch { endDate = new Date(); }
-  if (isNaN(endDate.getTime())) endDate = new Date();
-  const startDate = subDays(endDate, 30);
-  return incidents.filter((i) => {
-    if (i.topic !== topic) return false;
-    try {
-      const d = parseISO(i.occurredAt);
-      if (isNaN(d.getTime())) return false;
-      return isWithinInterval(d, { start: startDate, end: endDate });
-    } catch { return false; }
-  });
-}
-
 function computeFastFacts(
   data: TopicReportData,
   windowIncidents: TopicReportIncident[],
   topicLabels: Record<string, string>,
 ): KpiCardData[] {
-  let reportingPeriod = "Last 30 days";
-  try {
-    const end = parseISO(data.issueDate);
-    if (!isNaN(end.getTime())) {
-      const start = subDays(end, 30);
-      reportingPeriod = `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
-    }
-  } catch { /* fallback */ }
+  const reportingPeriod = resolveReportWindow(data.topic, data.issueDate).shortLabel;
 
   let highestKey = "";
   let highestRank = 0;
@@ -145,6 +122,114 @@ function drawCover(ctx: Ctx, data: TopicReportData, topicLabel: string) {
   ctx.y += heroH + 20;
 }
 
+function drawReportingPeriodBanner(ctx: Ctx, label: string) {
+  const { pdf, MX, CW } = ctx;
+  const h = 22;
+  ensureSpace(ctx, h + 6);
+  setFill(pdf, POLAR);
+  pdf.rect(MX, ctx.y, CW, h, "F");
+  setFill(pdf, ELECTRIC);
+  pdf.rect(MX, ctx.y, 4, h, "F");
+  setText(pdf, NAVY);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.text(sanitize(label.toUpperCase()), MX + 12, ctx.y + 14);
+  pdf.setFont("helvetica", "normal");
+  ctx.y += h + 14;
+}
+
+function drawRelatedIncidents(
+  ctx: Ctx,
+  windowIncidents: TopicReportIncident[],
+  topic: string,
+  topicLabels: Record<string, string>,
+) {
+  if (windowIncidents.length === 0) return;
+  const { max } = relatedIncidentsLimit(topic);
+  const sorted = [...windowIncidents].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+  );
+  const rows = sorted.slice(0, max);
+  const truncated = sorted.length - rows.length;
+
+  drawSectionHeading(ctx, "Related Incidents");
+
+  const { pdf, MX, CW } = ctx;
+  const colDateW = 86;
+  const colTopicW = 92;
+  const colSevW = 64;
+  const colTitleW = CW - colDateW - colTopicW - colSevW - 6;
+  const rowH = 18;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.text("DATE", MX + 6, ctx.y + 12);
+    pdf.text("TOPIC", MX + colDateW + 6, ctx.y + 12);
+    pdf.text("TITLE", MX + colDateW + colTopicW + 6, ctx.y + 12);
+    pdf.text("SEVERITY", MX + colDateW + colTopicW + colTitleW + 6, ctx.y + 12);
+    ctx.y += rowH;
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+  };
+
+  ensureSpace(ctx, rowH + 4);
+  drawHeader();
+
+  for (const i of rows) {
+    const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
+    const rh = Math.max(rowH, titleLines.length * 11 + 8);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    setText(pdf, DUSK);
+    let dateStr = "";
+    try { dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy"); } catch { dateStr = i.occurredAt; }
+    pdf.text(dateStr, MX + 6, ctx.y + 12);
+    pdf.text(sanitize(topicLabels[i.topic] ?? i.topic), MX + colDateW + 6, ctx.y + 12);
+    setText(pdf, NAVY);
+    pdf.text(titleLines, MX + colDateW + colTopicW + 6, ctx.y + 12);
+
+    const sk = sevKey(i.severity);
+    const sevColor = SEV_COLOR[sk] ?? "#999999";
+    setFill(pdf, sevColor);
+    const chipX = MX + colDateW + colTopicW + colTitleW + 6;
+    pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+    setText(pdf, WHITE);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(7);
+    const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
+    pdf.text(sanitize(sevDisplay.toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+
+  ensureSpace(ctx, 16);
+  setText(pdf, DUSK);
+  pdf.setFont("helvetica", "italic");
+  pdf.setFontSize(8);
+  const note = truncated > 0
+    ? `Showing ${rows.length} most recent of ${sorted.length} records in window. Older records remain available in the Workbench.`
+    : `Older records remain available in the Workbench.`;
+  pdf.text(sanitize(note), ctx.MX, ctx.y + 10);
+  pdf.setFont("helvetica", "normal");
+  ctx.y += 16;
+  // Touch the cadence helper so removing it would not silently regress —
+  // and to make the per-cadence behaviour obvious to readers of this code.
+  void reportCadence(topic);
+}
+
 export async function exportTopicReportPdf(
   data: TopicReportData,
   incidents: TopicReportIncident[],
@@ -163,12 +248,16 @@ export async function exportTopicReportPdf(
 
   drawCover(ctx, data, topicLabel);
 
+  // Reporting period banner — visible near the top of every report.
+  const win = resolveReportWindow(data.topic, data.issueDate);
+  drawReportingPeriodBanner(ctx, win.label);
+
   if (data.executiveSummary && data.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, data.executiveSummary);
   }
 
-  const windowIncidents = topicWindowIncidents(incidents, data.topic, data.issueDate);
+  const windowIncidents = filterIncidentsToWindow(incidents, data.topic, data.issueDate, { byTopic: true });
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, computeFastFacts(data, windowIncidents, topicLabels));
 
@@ -186,6 +275,8 @@ export async function exportTopicReportPdf(
       renderProse(ctx, body);
     }
   }
+
+  drawRelatedIncidents(ctx, windowIncidents, data.topic, topicLabels);
 
   drawSourceNotes(ctx);
   drawDisclaimer(ctx);
