@@ -1,0 +1,104 @@
+Fix report naming on the Reports page.
+
+Do not change report content.
+Do not change PDFs.
+Do not change the database.
+Do not change dashboards.
+Do not change country report logic.
+
+Problem:
+The report cards use inconsistent names and regional titles by default.
+
+Use consistent report naming.
+
+Main topic reports:
+
+Fuel
+Title: Fuel Watch
+
+Fertiliser
+Title: Fertiliser Watch
+
+Cargo Watch
+Title: Cargo Watch
+
+Shipping
+Title: Shipping Watch
+
+Energy / Grid
+Title: Energy Watch
+
+Flashpoint
+Title: Flashpoint
+Description/scope: Activism, Protests and Civil Unrest
+
+Do not rename Flashpoint to Civil Protests and Civil Unrest.
+Flashpoint is the product name for activism, protests and civil unrest.
+
+Country Reports:
+
+Country Reports must remain separate from the topic report cards.
+
+Do not mix Country Reports into the same naming rule as Fuel, Shipping, Cargo Watch, etc.
+
+Country Report titles should remain country based, for example:
+Papua New Guinea Country Report
+Indonesia Papua Country Report
+
+Reports page display rule:
+
+For topic cards, show:
+
+POLESTAR INSIGHTS
+
+Topic line:
+FUEL · WEEKLY
+SHIPPING · WEEKLY
+CARGO WATCH · MONTHLY
+FLASHPOINT · WEEKLY
+ENERGY / GRID · WEEKLY
+FERTILISER · WEEKLY
+
+Title:
+Fuel Watch
+Shipping Watch
+Cargo Watch
+Flashpoint
+Energy Watch
+Fertiliser Watch
+
+Do not use these default titles:
+APAC Fuel Watch
+APAC Cargo Watch
+APAC Energy Watch
+South Asia Fertiliser Watch
+Hormuz Maritime Watch
+
+Regional references such as APAC, South Asia, Gulf, Hormuz and Malacca should only appear as scope labels where the user has selected a specific scope.
+
+Example:
+Scope: APAC
+Scope: Gulf
+Scope: Strait of Hormuz
+
+Shipping rule:
+Default Shipping title is Shipping Watch.
+Hormuz is a chokepoint section inside Shipping, not the default Shipping report title.
+
+Flashpoint rule:
+Flashpoint remains Flashpoint.
+It is the product name for activism, protests and civil unrest.
+
+Country Report rule:
+Country Reports are separate and should not be altered by this topic naming cleanup.
+
+Acceptance criteria:
+- Fuel card says Fuel Watch.
+- Shipping card says Shipping Watch.
+- Cargo card says Cargo Watch.
+- Energy card says Energy Watch.
+- Fertiliser card says Fertiliser Watch.
+- Flashpoint card says Flashpoint and has scope Activism, Protests and Civil Unrest.
+- Country Reports remain in their own section / logic.
+- No database changes.
+- No report content changes.
