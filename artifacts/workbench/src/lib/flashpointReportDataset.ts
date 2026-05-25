@@ -44,6 +44,12 @@ export interface BarRow {
   color?: string;
 }
 
+export interface ForecastFutureRow {
+  country: string;
+  signal: string;
+  meaning: string;
+}
+
 export interface FlashpointReportDataset {
   reportingPeriodShort: string;
   reportingPeriodLong: string;
@@ -55,6 +61,7 @@ export interface FlashpointReportDataset {
   activismRead: string;
   civilUnrestRead: string;
   forecastRead: string;
+  forecastFuture: ForecastFutureRow[];
   regionalCountryRead: string;
   relatedIncidents: EnrichedIncident[];
   autoWhatMatters: string;
@@ -418,13 +425,32 @@ export function buildFlashpointReportDataset(
   // --- Reads ---------------------------------------------------------------
   const activismRead = buildActivismRead(activismRows, win.shortLabel);
   const civilUnrestRead = buildCivilUnrestRead(unrestRows, win.shortLabel);
-  const forecastRead = buildForecastRead({ activismRows, unrestRows, countryRows });
+  // Forward-looking items rendered as a structured Country / Signal /
+  // Operational meaning table rather than a quoted paragraph dump.
+  const futureRaw = extractFutureSignals([...activismRows, ...unrestRows])
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
+  const forecastFuture: ForecastFutureRow[] = dedupeByTitle(futureRaw)
+    .slice(0, 6)
+    .map((r) => ({
+      country: r.country?.trim() || "—",
+      signal: shortSignalLabel(r),
+      meaning: forecastMeaningFor(r),
+    }));
+  const forecastRead = buildForecastRead({
+    activismRows,
+    unrestRows,
+    countryRows,
+    hasFutureTable: forecastFuture.length > 0,
+  });
   const regionalCountryRead = buildRegionalCountryRead({
     enriched,
     countryRows,
   });
 
-  // Related Incidents — prioritise activism + unrest, drop "Other" / weak buckets.
+  // Related Incidents — prioritise activism + unrest, drop "Other" / weak
+  // buckets, and seed with the strongest political-mobilisation record so
+  // the centre-of-gravity geography (Pakistan / PTI / Section 144) leads
+  // ahead of generic sectoral entries.
   const relatedIncidents = prioritiseRelated(enriched);
 
   // Auto-prose for the closing analyst sections.
@@ -467,6 +493,7 @@ export function buildFlashpointReportDataset(
     activismRead,
     civilUnrestRead,
     forecastRead,
+    forecastFuture,
     regionalCountryRead,
     relatedIncidents,
     autoWhatMatters,
@@ -485,6 +512,12 @@ export function buildFlashpointReportDataset(
 // ("likely", "possible", "watch for", "risk increases if",
 // "risk eases if").
 
+// Political-mobilisation signal — named opposition movements, marquee
+// figures, statutory assembly-ban orders. When a strong record carrying
+// one of these cues is on file, it must lead over generic sectoral
+// strike commentary even when severities tie.
+const POLITICAL_MOBILISATION_RE = /\b(pti|imran|adiala|tehreek|ttap|section\s*144|opposition|movement|countrywide protest)\b/i;
+
 function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
   // Strict lead: credible AND not novelty/parody AND has an actual
   // mobilisation signal in the TITLE (not just summary), then pick
@@ -500,7 +533,14 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
     if (sb !== sa) return sb - sa;
     return b.date.getTime() - a.date.getTime();
   });
-  if (strong.length > 0) return sortBySevThenDate(strong)[0];
+  if (strong.length > 0) {
+    // Prefer political-mobilisation records inside the strong+credible
+    // pool. Pakistan's PTI / Section 144 cycle, for example, must lead
+    // a same-severity Indian sectoral strike.
+    const political = strong.filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
+    if (political.length > 0) return sortBySevThenDate(political)[0];
+    return sortBySevThenDate(strong)[0];
+  }
   if (credible.length > 0) return sortBySevThenDate(credible)[0];
   const safe = rows.filter((r) => !isWeakNovelty(r));
   return safe[0] ?? rows[0] ?? null;
@@ -548,18 +588,16 @@ function buildForecastRead(opts: {
   activismRows: EnrichedIncident[];
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
+  hasFutureTable: boolean;
 }): string {
-  const { activismRows, unrestRows, countryRows } = opts;
+  const { activismRows, unrestRows, countryRows, hasFutureTable } = opts;
   const lead = countryRows[0];
   const total = activismRows.length + unrestRows.length;
-  // Lead the forecast with any explicitly future-dated items in the
-  // file. If none exist, say so plainly rather than dressing up
-  // generic indicators as a forecast.
-  const future = extractFutureSignals([...activismRows, ...unrestRows])
-    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
-    .slice(0, 6);
-  const futureBlock = future.length > 0
-    ? `Confirmed forward-looking items in the file: ${future.map((r) => `"${r.title}"${r.country ? ` (${r.country})` : ""}`).join("; ")}. These are the dated protest, strike, hearing or mobilisation calls already on the record and should be the first reference points for the next 7-14 days.`
+  // The structured forward-looking table is rendered above this prose
+  // by the exporter when at least one credible future-dated record is
+  // present. Prose then carries trajectory commentary only.
+  const futureBlock = hasFutureTable
+    ? `Confirmed forward-looking items are listed in the table above and should be the first reference points for the next 7-14 days. The trajectory commentary below sits behind that scheduled calendar.`
     : `No confirmed future-dated protest calls, strike notices or scheduled hearings were identified in the current file. The forecast below is therefore an assessment of likely trajectory based on current mobilisation patterns rather than a list of scheduled events.`;
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
@@ -695,6 +733,26 @@ function buildRegionalCountryRead(opts: {
   return blocks.join("\n\n");
 }
 
+// Surface the strongest political-mobilisation record (PTI / Imran /
+// Section 144 / named opposition movement) to seed Related Incidents.
+// Pakistan's centre-of-gravity cycle must lead over generic sectoral
+// strike entries even when severities tie.
+function pickPoliticalSeed(rows: EnrichedIncident[]): EnrichedIncident | null {
+  const ACTION_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|clash|fatalit)\b/i;
+  const candidates = rows
+    .filter((r) => r.bucket === "activism" || r.bucket === "unrest")
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
+    .filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
+    .filter((r) => ACTION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((a, b) => {
+    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+    if (sb !== sa) return sb - sa;
+    return b.date.getTime() - a.date.getTime();
+  })[0];
+}
+
 function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
   // Hard-exclude armed-conflict / crime / robbery and novelty/parody
   // items. Then rank what remains by operational usefulness:
@@ -725,7 +783,17 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
     if (ds !== 0) return ds;
     return b.date.getTime() - a.date.getTime();
   });
-  const ordered = dedupeByTitle(ranked);
+  // Seed the lead row with the strongest political-mobilisation record
+  // (PTI / Imran / Section 144) ahead of dedupe so the centre-of-gravity
+  // geography is the first thing the reader sees.
+  const politicalSeed = pickPoliticalSeed(rows);
+  const seeded = politicalSeed
+    ? [politicalSeed, ...ranked.filter((r) => r.id !== politicalSeed.id)]
+    : ranked;
+  const ordered = dedupeByTitle(seeded);
+  // Cap at 6 rows so the Related table plus Disclaimer can fit on the
+  // same final page rather than orphaning the disclaimer.
+  const CAP = 6;
   // Guarantee top-severity inclusion.
   const top = eligible.reduce<EnrichedIncident | null>((best, r) => {
     if (!best) return r;
@@ -733,9 +801,9 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
     const sr = SEV_RANK[sevKey(r.severity)] ?? 0;
     return sr > sb ? r : best;
   }, null);
-  let out = ordered.slice(0, 8);
+  let out = ordered.slice(0, CAP);
   if (top && !out.some((r) => r.id === top.id)) {
-    out = [top, ...out.filter((r) => r.id !== top.id)].slice(0, 8);
+    out = [out[0], top, ...out.slice(1).filter((r) => r.id !== top.id)].slice(0, CAP);
   }
   return out;
 }
@@ -823,10 +891,53 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
+// Clean, content-based signal labels for Watch Next and the Forecast
+// table. Never returns a mid-word truncation with an ellipsis; for
+// records that do not match a known cue, falls back to a whole-word
+// clip on a sentence-friendly boundary.
 function shortSignalLabel(r: EnrichedIncident): string {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
+  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) {
+    if (/\bsection\s*144\b|\bdefy/.test(text)) return "PTI protest defying Section 144";
+    if (/release|imprisonment|bail|adiala/.test(text)) return "PTI mobilisation for Imran's release";
+    if (/case|court|cjp|hearing|trial/.test(text)) return "PTI court-hearing pressure";
+    if (/countrywide|nationwide|across.*cities/.test(text)) return "PTI countrywide protest call";
+    return "PTI protest mobilisation";
+  }
+  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Section 144 / curfew order";
+  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Chemists' strike notice";
+  if (/(union|labour|labor).*(injunct|strike|walkout)|injunct.*(union|strike|labour|labor)/.test(text)) return "Union injunction ruling";
+  if (/\b(metro bus|salaries|salary|pay|wages?|unpaid)\b/.test(text)) return "Sectoral pay protest";
+  if (/\b(teacher|faculty|abduction|vc|university|campus|student union)\b/.test(text)) return "Faculty / campus protest";
+  if (/\b(dowry|kin|family|relatives).*(protest|sit|demand)|protest.*(family|kin)/.test(text)) return "Family-led protest";
+  if (/\b(petroleum|fuel|levy|tariff|tax|price)\b/.test(text)) return "Fuel / levy challenge";
+  if (/\bhearing|court|trial|bail|verdict|indictment\b/.test(text)) return "Court hearing";
+  if (/\bblockade|roadblock|highway|motorway|sit[- ]?in\b/.test(text)) return "Road blockade / sit-in";
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Strike notice";
+  if (/\brally|march|protest|demonstration\b/.test(text)) return "Protest mobilisation";
+  // Last-resort: clean clip on a word boundary, no ellipsis.
   const t = (r.title ?? "").trim();
-  if (t.length <= 60) return t;
-  return t.slice(0, 57).trimEnd() + "...";
+  if (t.length <= 48) return t;
+  const slice = t.slice(0, 48);
+  const cut = slice.lastIndexOf(" ");
+  return cut > 20 ? slice.slice(0, cut).trim() : slice.trim();
+}
+
+// Forecast-table operational meaning — short, decision-grade phrase
+// keyed off content. Kept distinct from the Watch Next bullet line.
+function forecastMeaningFor(r: EnrichedIncident): string {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
+  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Road closures and venue-access friction around party HQs, court complexes and city centres.";
+  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Trigger WFH and close public-facing sites in the affected area.";
+  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Pharmacy supply disruption 24-72h ahead; brief procurement and customer-care.";
+  if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Sectoral disruption pending court ruling; pre-position contingency supply.";
+  if (/\b(metro bus|salaries|salary|wages|pay)\b/.test(text)) return "Sectoral walkout risk; brief logistics and field operations on local delays.";
+  if (/\b(teacher|faculty|campus|university|student)\b/.test(text)) return "Campus action seeds city-centre protests within a week; expect adjoining-road disruption.";
+  if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security and visitor management.";
+  if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "Adverse ruling converts into same-day rallies near the court complex.";
+  if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Validate against logistics corridor; pre-position alternative routings.";
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Supply-chain friction and sectoral closures 24-72h ahead.";
+  return "Treat as leading indicator; confirm operating impact inside 24-48h.";
 }
 
 function operationalMeaningFor(r: EnrichedIncident): string {

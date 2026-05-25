@@ -133,6 +133,10 @@ const TYPE_REMAP: Record<string, string> = {
 function cleanTypeLabel(raw: string): string {
   let s = raw.toLowerCase().trim();
   if (/^other .* incident$/.test(s)) return "";
+  // Drop armed-conflict / kinetic labels entirely — these are excluded
+  // from the protests/flashpoint dataset by design, so they must not
+  // surface in the Executive Summary "driver" sentence.
+  if (/\b(armed group|armed[- ]?conflict|militant|insurgent|terror|kinetic|drone|missile|airstrike|air[- ]?strike|shelling|ambush|ied|suicide|car bomb|jihadist|ttp|isis|baloch liberation|bla)\b/.test(s)) return "";
   s = s.replace(PRODUCT_WORDS, " ");
   s = s.replace(/\s*\/\s*/g, " / ");
   s = s.replace(/\s+/g, " ").trim();

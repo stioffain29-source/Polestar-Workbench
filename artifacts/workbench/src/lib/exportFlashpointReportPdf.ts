@@ -17,6 +17,7 @@ import {
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
+  type ForecastFutureRow,
 } from "./flashpointReportDataset";
 
 // Flashpoint PDF. Section order (per final spec):
@@ -243,6 +244,57 @@ function drawHorizontalBarChart(
   ctx.y += 6;
 }
 
+// --- Forecast: Country / Signal / Operational meaning table ----------------
+function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
+  if (rows.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  const rowH = 18;
+  const colCountryW = 100;
+  const colSignalW = 160;
+  const colMeaningW = CW - colCountryW - colSignalW;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    pdf.text("COUNTRY", MX + 6, ctx.y + 12);
+    pdf.text("SIGNAL", MX + colCountryW + 6, ctx.y + 12);
+    pdf.text("OPERATIONAL MEANING", MX + colCountryW + colSignalW + 6, ctx.y + 12);
+    ctx.y += rowH;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+  };
+
+  ensureSpace(ctx, rowH * 2);
+  drawHeader();
+
+  for (const r of rows) {
+    const signalLines: string[] = pdf.splitTextToSize(sanitize(r.signal), colSignalW - 8);
+    const meaningLines: string[] = pdf.splitTextToSize(sanitize(r.meaning), colMeaningW - 8);
+    const countryLines: string[] = pdf.splitTextToSize(sanitize(r.country), colCountryW - 8);
+    const lines = Math.max(countryLines.length, signalLines.length, meaningLines.length);
+    const rh = Math.max(rowH, lines * 11 + 8);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) { newPage(ctx); drawHeader(); }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8.5);
+    pdf.text(countryLines, MX + 6, ctx.y + 12);
+    setRoboto(pdf, "regular");
+    setText(pdf, NAVY);
+    pdf.text(signalLines, MX + colCountryW + 6, ctx.y + 12);
+    setText(pdf, DUSK);
+    pdf.text(meaningLines, MX + colCountryW + colSignalW + 6, ctx.y + 12);
+    ctx.y += rh;
+  }
+  ctx.y += 10;
+}
+
 // --- Related Incidents -----------------------------------------------------
 function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   ensureSpace(ctx, 24 + 18 + 40);
@@ -382,8 +434,14 @@ export async function exportFlashpointReportPdf(
     "No qualifying civil-unrest records in the briefing window.",
   );
 
-  // Forecast — analyst prose only, cautious vocabulary.
-  drawSectionWithProse(ctx, "Forecast: Next 7\u201314 Days", ds.forecastRead);
+  // Forecast — structured Country / Signal / Operational meaning table
+  // (when future-dated items are present) followed by analyst
+  // trajectory prose with cautious vocabulary.
+  drawSectionHeading(ctx, "Forecast: Next 7\u201314 Days");
+  if (ds.forecastFuture.length > 0) {
+    drawForecastFutureTable(ctx, ds.forecastFuture);
+  }
+  renderProse(ctx, ds.forecastRead);
 
   // Regional and Country View — prose leads the country bar chart.
   drawSectionWithProse(ctx, "Regional and Country View", ds.regionalCountryRead);
