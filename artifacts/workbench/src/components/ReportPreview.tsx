@@ -138,9 +138,14 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
                 {c.note}
               </div>
             )}
-            {(c.asOf || c.source) && (
+            {c.source && (
               <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 9, color: DUSK, marginTop: 4, opacity: 0.85 }}>
-                {[c.asOf ? `As of ${c.asOf}` : null, c.source].filter(Boolean).join(" · ")}
+                {c.source}
+              </div>
+            )}
+            {c.asOf && (
+              <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 9, color: DUSK, marginTop: 2, opacity: 0.85 }}>
+                As of {c.asOf}
               </div>
             )}
           </div>

@@ -47,6 +47,19 @@ const FUEL_EXCLUDE: RegExp[] = [
   /\b(oil futures|crude futures|brent futures|wti futures|futures contract|options trading|hedge fund|speculat(or|ors|ion|ive))/,
   /\b(analyst (note|target|forecast)|broker (note|target)|price target|sell[- ]side|buy[- ]side rating|upgrade rating|downgrade rating)/,
   /\b(oil (price|prices) (forecast|outlook|view|prediction|projection) (for|to))/,
+  // Bank/research-house price-call commentary on crude / Brent / WTI.
+  // These read as market projections, not fuel-operational incidents,
+  // and were polluting Related Incidents (e.g. "Citi forecasts Brent
+  // crude to reach $120 per barrel"). Match any "<verb> <oil/crude>
+  // (… to reach|hit|climb|fall|drop|surge|… per barrel|… per bbl|…
+  // \$NN)" pattern, plus an explicit list of bank/research names.
+  /\b(forecasts?|projects?|projecting|predicts?|predicting|expects?|expecting|sees|seeing|targets?|targeting|raises?|raising|lowers?|lowering|cuts?|cutting|hikes?|hiking) (its )?(brent|wti|crude|oil) .{0,40}(to (reach|hit|rise|climb|fall|drop|surge|touch|near|trade)|at \$|near \$|above \$|below \$|per barrel|per bbl)/,
+  // Bank/research-house headlines that are explicitly price-call
+  // commentary. We require BOTH a forecast-style verb AND a price-call
+  // context word (brent|wti|crude|oil|price|target|per barrel|$NN) in
+  // the same headline so we do not suppress legitimate operational
+  // headlines such as "Citi raises concerns about refinery outage".
+  /\b(citi|citigroup|goldman( sachs)?|jpmorgan|jp morgan|morgan stanley|hsbc|barclays|ubs|deutsche bank|standard chartered|bank of america|baml|wood ?mac(kenzie)?|rystad|argus|s&p global|platts|sp global) (forecasts?|projects?|sees|expects?|predicts?|targets?|raises?|lowers?|cuts?|hikes?) .{0,60}(brent|wti|crude|oil|price target|per barrel|per bbl|\$\d)/,
   // Generic "petrol prices today / diesel rates today" headlines with no
   // change indicator. These read as live-blog tickers, not operational
   // fuel signal, and dilute the Related Incidents table.

@@ -319,17 +319,28 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     const baseY = yy + 36;
     pdf.text(valueLines.slice(0, 2), x + PAD_L, baseY);
 
-    // Note / change line.
+    // Bottom-anchored caption block. Three optional lines, bottom up,
+    // each on its own row so the jet card reads:
+    //   "As of 15 May 2026"
+    //   "US Gulf Coast kerosene-type · EIA / FRED"
+    //   "+2.5% 7d"
+    // (with the value above). Asof/source are no longer merged into
+    // one cramped subline.
     let captionY = yy + cardH - 10;
-    const capParts: string[] = [];
-    if (c.asOf) capParts.push(`As of ${c.asOf}`);
-    if (c.source) capParts.push(c.source);
-    if (capParts.length > 0) {
+    if (c.asOf) {
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
       pdf.setFontSize(6.5);
-      const capLines: string[] = pdf.splitTextToSize(sanitize(capParts.join(" · ")), cardW - PAD_L - 10);
-      pdf.text(capLines.slice(0, 1), x + PAD_L, captionY);
+      const asOfLines: string[] = pdf.splitTextToSize(sanitize(`As of ${c.asOf}`), cardW - PAD_L - 10);
+      pdf.text(asOfLines.slice(0, 1), x + PAD_L, captionY);
+      captionY -= 9;
+    }
+    if (c.source) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(6.5);
+      const srcLines: string[] = pdf.splitTextToSize(sanitize(c.source), cardW - PAD_L - 10);
+      pdf.text(srcLines.slice(0, 1), x + PAD_L, captionY);
       captionY -= 9;
     }
     if (c.note) {

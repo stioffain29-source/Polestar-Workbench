@@ -192,8 +192,16 @@ export function buildFuelWatchReportData(
 
   // The trajectory chart minimum-data contract is unchanged: at least
   // two dated points. Fewer than that and the series is empty.
+  // Project the container's unit onto each point that is missing one
+  // so the chart's "Latest …" label always shows the unit (e.g.
+  // "Latest 15 May: 4.15 USD/gal") rather than dropping it.
+  const containerUnit = parsed.jetFuelTrajectory.unit;
   const trajectoryPoints =
-    parsed.jetFuelTrajectory.points.length >= 2 ? parsed.jetFuelTrajectory.points : [];
+    parsed.jetFuelTrajectory.points.length >= 2
+      ? parsed.jetFuelTrajectory.points.map((p) =>
+          p.unit || !containerUnit ? p : { ...p, unit: containerUnit },
+        )
+      : [];
   const jetFuelBenchmarkLabel = resolveBenchmark(report.hardNumbers);
 
   // Fast Facts order: Brent, WTI, jet fuel, any other price cards
@@ -454,12 +462,17 @@ export interface RenderableFuelCard {
 }
 export function toRenderableCard(c: FuelDataCard): RenderableFuelCard {
   const out: RenderableFuelCard = { label: c.label, value: formatFuelCardValue(c.value, c.unit) };
-  const noteParts: string[] = [];
-  if (c.change) noteParts.push(c.change);
-  if (c.note) noteParts.push(c.note);
-  if (noteParts.length) out.note = noteParts.join(" · ");
+  // Card layout (top to bottom): label, value, change line, benchmark
+  // + source line, "As of <date>" line. Keeping the benchmark with the
+  // source on its own line gives the jet card room to breathe rather
+  // than collapsing "+2.5% 7d · US Gulf Coast kerosene-type" into a
+  // single cramped subline above the asOf/source caption.
+  if (c.change) out.note = c.change;
+  const tail: string[] = [];
+  if (c.note) tail.push(c.note);
+  if (c.source) tail.push(c.source);
+  if (tail.length) out.source = tail.join(" · ");
   if (c.asOf) out.asOf = formatAsOfDate(c.asOf);
-  if (c.source) out.source = c.source;
   return out;
 }
 
