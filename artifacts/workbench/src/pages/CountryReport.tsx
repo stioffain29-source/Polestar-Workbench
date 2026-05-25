@@ -19,6 +19,8 @@ import { exportCountryReportPdf } from "@/lib/exportCountryReportPdf";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
+import { getCountryBaseline, type CountryBaseline } from "@/lib/countryBaselines";
+import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, type WatchlistRow, type CountryLayerBuckets } from "@/lib/countryReportLayers";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -58,7 +60,10 @@ export default function CountryReport() {
   const slug = params?.slug ?? "";
   const qc = useQueryClient();
   const { data: country, isLoading } = useGetCountryReport(slug);
-  const { data: incidentsData } = useListIncidents(country ? { country: country.name } : {}, {
+  // Country reports must not depend only on the 7-day window. Pull a
+  // 90-day backstop so the report can layer current / 30-day / 90-day
+  // context even when the current window is thin.
+  const { data: incidentsData } = useListIncidents(country ? { country: country.name, days: 90 } : {}, {
     query: { enabled: !!country },
   } as never);
   const incidents = useMemo(() => incidentsData ?? [], [incidentsData]);
@@ -79,6 +84,28 @@ export default function CountryReport() {
       incidents: incidents as CountryFastFactsIncident[],
     }),
     [incidents, issueDate],
+  );
+
+  // Country baseline + lookback layers. The baseline is editorial
+  // reference content that does not depend on the incident feed; the
+  // layers partition the 90-day pull into current / 30 / 90 buckets so
+  // the report carries proper context even when the current window is
+  // thin.
+  const baseline: CountryBaseline | null = useMemo(
+    () => getCountryBaseline(country?.name),
+    [country?.name],
+  );
+  const layers: CountryLayerBuckets = useMemo(
+    () => buildCountryLayers(incidents as CountryFastFactsIncident[], issueDate),
+    [incidents, issueDate],
+  );
+  const watchlist: WatchlistRow[] = useMemo(
+    () => (baseline ? buildWatchlistBreakdown(baseline, layers) : []),
+    [baseline, layers],
+  );
+  const lookback = useMemo(
+    () => summariseLookback(layers, baseline, country?.name ?? ""),
+    [layers, baseline, country?.name],
   );
 
   // Auto-derived prose (executiveSummary, whatMatters, watchNext, polestarView).
@@ -169,6 +196,14 @@ export default function CountryReport() {
           watchNext: draftedProse.watchNext,
           polestarView: draftedProse.polestarView,
           mapImage,
+          baseline,
+          watchlist,
+          lookback,
+          layerCounts: {
+            current: layers.current.length,
+            thirtyDay: layers.thirtyDay.length,
+            ninetyDay: layers.ninetyDay.length,
+          },
         },
       );
     } finally {
@@ -385,10 +420,38 @@ export default function CountryReport() {
         onChange={(v) => setField("implications", v)}
       />
 
+      {/* 6a. Country Baseline (only when a baseline is curated for this country) */}
+      {baseline && (
+        <Section title="Country Baseline">
+          <BaselineBlock baseline={baseline} />
+        </Section>
+      )}
+
+      {/* 6b. Location Watchlist (only when a baseline is curated) */}
+      {baseline && watchlist.length > 0 && (
+        <Section title="Location Watchlist">
+          <WatchlistTable rows={watchlist} />
+        </Section>
+      )}
+
+      {/* 6c. 30-Day Context */}
+      <Section title="30-Day Context">
+        <Prose text={lookback.thirtyDay} />
+      </Section>
+
+      {/* 6d. Background Operating Picture (90-day) — always rendered so
+          the report carries the deeper backdrop even in busy cycles. */}
+      <Section title="Background Operating Picture">
+        <Prose text={lookback.ninetyDay} />
+      </Section>
+
       {/* 7. Map */}
       <Section title="Map">
         <div ref={mapRef}>
           <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" />
+        </div>
+        <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
+          The map reflects current-window records only ({layers.current.length} record{layers.current.length === 1 ? "" : "s"} across the 7-day cycle). It is not the full risk picture — read it alongside the Country Baseline and the 30 / 90-day context sections above.
         </div>
       </Section>
 
@@ -489,10 +552,42 @@ export default function CountryReport() {
       <Section title="Source Notes">
         <Prose text={[
           `Records sourced from the Polestar Workbench incident database for ${effective.name}.`,
-          `Reporting window is the rolling 7-day weekly cycle, capped at 10 days for late-landing records.`,
-          `Locations are shown as reported and may use local-language spellings; coordinates, where present, are sourced with the record.`,
+          `Current window is the rolling 7-day cycle, capped at 10 days for late-landing records. The 30-day and 90-day context sections widen the lookback to size the background operating picture without changing the current-window count.`,
+          `Locations are shown as reported and may use local-language spellings; coordinates, where present, are sourced with the record. The map plots current-window records only.`,
         ].join("\n\n")} />
       </Section>
+
+      {/* Internal Source Coverage — screen-only, never in the PDF.
+          Surfaces the layer counts and any thin-data signal for the
+          analyst working in the Workbench, so they can decide whether
+          to dispatch a stringer or widen the source set on the Sources
+          page. Not for the client-facing report. */}
+      <div className="no-print" style={{
+        marginTop: 12,
+        border: `1px dashed ${POLAR}`,
+        background: "#fafafa",
+        padding: "12px 14px",
+        borderRadius: 2,
+      }}>
+        <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
+          Internal · Source coverage (not in PDF)
+        </div>
+        <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
+          <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
+          <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
+          <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>
+          {layers.current.length < 3 && (
+            <li style={{ color: "#A33232" }}>
+              Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
+            </li>
+          )}
+          {!baseline && (
+            <li style={{ color: "#A33232" }}>
+              No country baseline curated for {effective.name}. The report falls back to live data only; add a baseline entry in <code>countryBaselines.ts</code> for the full operating picture.
+            </li>
+          )}
+        </ul>
+      </div>
 
       {/* 12. Disclaimer */}
       <Section title="Disclaimer">
@@ -578,6 +673,80 @@ function FastFactsGrid({ cards }: { cards: CountryFastFactCard[] }) {
                 {c.note}
               </div>
             )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BaselineBlock({ baseline }: { baseline: CountryBaseline }) {
+  const Row = ({ label, text }: { label: string; text: string }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.55, color: DUSK }}>{text}</div>
+    </div>
+  );
+  const List = ({ label, items }: { label: string; items: string[] }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
+        {label}
+      </div>
+      <ul style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}>
+        {items.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
+      </ul>
+    </div>
+  );
+  return (
+    <div>
+      <Row label="Operating Environment" text={baseline.operatingEnvironment} />
+      <Row label="Security Context" text={baseline.securityContext} />
+      <List label="Known Risk Areas" items={baseline.knownRiskAreas} />
+      <List label="Key Cities / Provinces" items={baseline.keyCitiesProvinces} />
+      <Row label="Movement Constraints" text={baseline.movementConstraints} />
+      <Row label="Infrastructure Limits" text={baseline.infrastructureLimits} />
+      <Row label="Medical / Evacuation" text={baseline.medicalEvac} />
+      <Row label="Resource-Sector Exposure" text={baseline.resourceSectorExposure} />
+    </div>
+  );
+}
+
+function WatchlistTable({ rows }: { rows: WatchlistRow[] }) {
+  return (
+    <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
+      <div className="grid" style={{ gridTemplateColumns: "200px 1fr 70px 70px 70px 110px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+        <div className="p-2.5">Location</div>
+        <div className="p-2.5">Note</div>
+        <div className="p-2.5" style={{ textAlign: "right" }}>7d</div>
+        <div className="p-2.5" style={{ textAlign: "right" }}>30d</div>
+        <div className="p-2.5" style={{ textAlign: "right" }}>90d</div>
+        <div className="p-2.5">Worst (90d)</div>
+      </div>
+      {rows.map((r) => {
+        const sk = (r.worstSeverity ?? "").toLowerCase();
+        const sevColor = SEV_COLOR[sk] ?? "#999";
+        return (
+          <div key={r.label} className="grid items-center" style={{ gridTemplateColumns: "200px 1fr 70px 70px 70px 110px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
+            <div className="p-2.5" style={{ fontWeight: 600, color: NAVY }}>{r.label}</div>
+            <div className="p-2.5" style={{ fontSize: 11 }}>{r.note}</div>
+            <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.currentCount}</div>
+            <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.thirtyDayCount}</div>
+            <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.ninetyDayCount}</div>
+            <div className="p-2.5">
+              {r.worstSeverity ? (
+                <span style={{
+                  background: sevColor, color: "#fff", padding: "2px 8px",
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                  textTransform: "uppercase", borderRadius: 2, display: "inline-block",
+                }}>
+                  {r.worstSeverityLabel}
+                </span>
+              ) : (
+                <span style={{ fontStyle: "italic", color: DUSK, fontSize: 11 }}>No records</span>
+              )}
+            </div>
           </div>
         );
       })}

@@ -17,6 +17,8 @@ import {
   type CountryFastFactsIncident,
   type CountryFactsBreakdown,
 } from "./countryFastFacts";
+import type { CountryBaseline } from "./countryBaselines";
+import type { WatchlistRow } from "./countryReportLayers";
 
 export interface PdfIncident {
   id: number | string;
@@ -53,6 +55,18 @@ export interface CountryPdfExtras {
   polestarView?: string;
   /** PNG data-URL of the rendered preview map. Optional. */
   mapImage?: string;
+  /** Curated country baseline (operating environment, security context,
+   *  risk areas, key cities, infrastructure, medical / evac, resource
+   *  exposure). When absent the baseline section is skipped. */
+  baseline?: CountryBaseline | null;
+  /** Watchlist breakdown — per-location 7d / 30d / 90d counts plus the
+   *  worst severity observed across the 90-day lookback. Empty when
+   *  no baseline is curated. */
+  watchlist?: WatchlistRow[];
+  /** Client-safe 30-day and 90-day context paragraphs. */
+  lookback?: { thirtyDay: string; ninetyDay: string };
+  /** Bucket sizes so the PDF can word the map caption honestly. */
+  layerCounts?: { current: number; thirtyDay: number; ninetyDay: number };
 }
 
 const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
@@ -244,6 +258,144 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
   void sorted;
 }
 
+function drawBaselineSection(ctx: Ctx, baseline: CountryBaseline) {
+  drawSectionHeading(ctx, "Country Baseline");
+  const labelled = (label: string, text: string) => {
+    ensureSpace(ctx, 28);
+    const { pdf, MX, CW } = ctx;
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    setText(pdf, NAVY);
+    pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 9);
+    ctx.y += 12;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(10);
+    setText(pdf, DUSK);
+    const lines: string[] = pdf.splitTextToSize(sanitize(text), CW);
+    for (const line of lines) {
+      ensureSpace(ctx, 13);
+      pdf.text(line, ctx.MX, ctx.y + 10);
+      ctx.y += 13;
+    }
+    ctx.y += 6;
+  };
+  const bullets = (label: string, items: string[]) => {
+    ensureSpace(ctx, 28);
+    const { pdf, MX, CW } = ctx;
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    setText(pdf, NAVY);
+    pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 9);
+    ctx.y += 12;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(10);
+    setText(pdf, DUSK);
+    for (const item of items) {
+      const lines: string[] = pdf.splitTextToSize(sanitize(`• ${item}`), CW - 6);
+      for (const line of lines) {
+        ensureSpace(ctx, 13);
+        pdf.text(line, MX + 6, ctx.y + 10);
+        ctx.y += 13;
+      }
+    }
+    ctx.y += 6;
+  };
+
+  labelled("Operating Environment", baseline.operatingEnvironment);
+  labelled("Security Context", baseline.securityContext);
+  bullets("Known Risk Areas", baseline.knownRiskAreas);
+  bullets("Key Cities / Provinces", baseline.keyCitiesProvinces);
+  labelled("Movement Constraints", baseline.movementConstraints);
+  labelled("Infrastructure Limits", baseline.infrastructureLimits);
+  labelled("Medical / Evacuation", baseline.medicalEvac);
+  labelled("Resource-Sector Exposure", baseline.resourceSectorExposure);
+}
+
+function drawWatchlistTable(ctx: Ctx, rows: WatchlistRow[]) {
+  if (rows.length === 0) return;
+  drawSectionHeading(ctx, "Location Watchlist");
+  const { pdf, MX, CW } = ctx;
+  const colLabelW = 130;
+  const col7W = 32;
+  const col30W = 32;
+  const col90W = 32;
+  const colSevW = 70;
+  const colNoteW = CW - colLabelW - col7W - col30W - col90W - colSevW - 6;
+  const rowH = 18;
+
+  const header = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("LOCATION", MX + 6, ctx.y + 12);
+    pdf.text("NOTE", MX + colLabelW + 6, ctx.y + 12);
+    pdf.text("7D", MX + colLabelW + colNoteW + col7W - 4, ctx.y + 12, { align: "right" });
+    pdf.text("30D", MX + colLabelW + colNoteW + col7W + col30W - 4, ctx.y + 12, { align: "right" });
+    pdf.text("90D", MX + colLabelW + colNoteW + col7W + col30W + col90W - 4, ctx.y + 12, { align: "right" });
+    pdf.text("WORST (90D)", MX + colLabelW + colNoteW + col7W + col30W + col90W + 6, ctx.y + 12);
+    ctx.y += rowH;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+  };
+
+  ensureSpace(ctx, rowH * 3);
+  header();
+
+  for (const r of rows) {
+    const labelLines: string[] = pdf.splitTextToSize(sanitize(r.label), colLabelW - 8);
+    const noteLines: string[] = pdf.splitTextToSize(sanitize(r.note), colNoteW - 8);
+    const rh = Math.max(rowH, labelLines.length * 11 + 8, noteLines.length * 10 + 8);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      header();
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    pdf.text(labelLines, MX + 6, ctx.y + 12);
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.setFontSize(8);
+    pdf.text(noteLines, MX + colLabelW + 6, ctx.y + 12);
+
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.text(String(r.currentCount), MX + colLabelW + colNoteW + col7W - 4, ctx.y + 12, { align: "right" });
+    pdf.text(String(r.thirtyDayCount), MX + colLabelW + colNoteW + col7W + col30W - 4, ctx.y + 12, { align: "right" });
+    pdf.text(String(r.ninetyDayCount), MX + colLabelW + colNoteW + col7W + col30W + col90W - 4, ctx.y + 12, { align: "right" });
+    setRoboto(pdf, "regular");
+
+    const sk = sevKey(r.worstSeverity);
+    if (r.worstSeverity) {
+      const sevColor = SEV_COLOR[sk] ?? "#999999";
+      setFill(pdf, sevColor);
+      const chipX = MX + colLabelW + colNoteW + col7W + col30W + col90W + 6;
+      pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+      setText(pdf, WHITE);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(7);
+      pdf.text(sanitize((SEV_LABEL[sk] ?? r.worstSeverity).toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8);
+    } else {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "italic");
+      pdf.setFontSize(8);
+      pdf.text("No records", MX + colLabelW + colNoteW + col7W + col30W + col90W + 6, ctx.y + 12);
+      setRoboto(pdf, "regular");
+    }
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+}
+
 function drawNarrative(ctx: Ctx, heading: string, body: string | null | undefined, fallback?: string) {
   const trimmed = (body ?? "").trim();
   const text = trimmed || (fallback ?? "");
@@ -335,12 +487,53 @@ export async function exportCountryReportPdf(
   // 6. Implications for Business (implications)
   drawNarrative(ctx, "Implications for Business", country.implications);
 
+  // 6a. Country Baseline (only if curated)
+  if (extras.baseline) {
+    drawBaselineSection(ctx, extras.baseline);
+  }
+
+  // 6b. Location Watchlist (only if curated baseline carries one)
+  if (extras.watchlist && extras.watchlist.length > 0) {
+    drawWatchlistTable(ctx, extras.watchlist);
+  }
+
+  // 6c. 30-Day Context
+  drawNarrative(
+    ctx,
+    "30-Day Context",
+    extras.lookback?.thirtyDay,
+    `No 30-day lookback computed for ${country.name}.`,
+  );
+
+  // 6d. Background Operating Picture (90-day)
+  drawNarrative(
+    ctx,
+    "Background Operating Picture",
+    extras.lookback?.ninetyDay,
+    `No 90-day lookback computed for ${country.name}.`,
+  );
+
   // 7. Map
   drawMapSection(ctx, {
     mapImage: extras.mapImage,
     plottedCount,
     totalInWindow: windowIncidents.length,
   });
+  // Honest caption so the map is never read as the full risk picture.
+  {
+    const { pdf, MX } = ctx;
+    ensureSpace(ctx, 14);
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(8);
+    setText(pdf, DUSK);
+    pdf.text(
+      sanitize("The map reflects current-window records only. The Country Baseline, Location Watchlist and 30 / 90-day context sections above carry the standing operating picture."),
+      MX,
+      ctx.y + 10,
+    );
+    setRoboto(pdf, "regular");
+    ctx.y += 16;
+  }
 
   // 8. Severity Distribution
   drawSeverityChart(ctx, facts);
@@ -348,13 +541,13 @@ export async function exportCountryReportPdf(
   // 9. Incident Breakdown by Type
   drawTypeChart(ctx, facts);
 
-  // 10. Related Incidents
-  drawIncidentTable(ctx, windowIncidents);
-
-  // Watch Next + Polestar View — always rendered to match the preview.
-  // drawNarrative falls back to a loud "Not populated" note if absent.
+  // 9a / 9b. Watch Next + Polestar View — rendered before Related
+  // Incidents to mirror the preview's section order exactly.
   drawNarrative(ctx, "Watch Next", extras.watchNext);
   drawNarrative(ctx, "Polestar View", extras.polestarView);
+
+  // 10. Related Incidents
+  drawIncidentTable(ctx, windowIncidents);
 
 
   // 12. Disclaimer
