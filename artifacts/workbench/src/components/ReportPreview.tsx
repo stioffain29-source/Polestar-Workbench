@@ -4,7 +4,7 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
-import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "@/lib/fuelNarratives";
+import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
   buildFuelWatchReportData,
   toRenderableCard,
@@ -19,12 +19,15 @@ const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
+// Brand-aligned severity palette. The subdued red #a33232 is reserved for
+// Extreme; other tiers use grayscale + electric blue so the only red on
+// the page is the highest tier.
 const SEV_COLOR: Record<string, string> = {
-  Extreme: "#800000",
-  High: "#C0392B",
-  Moderate: "#E67E22",
-  Low: "#6FB872",
-  Insignificant: "#B8C2CC",
+  Extreme: "#a33232",
+  High: "#363636",
+  Moderate: "#465bff",
+  Low: "#6fb872",
+  Insignificant: "#e2e2e2",
 };
 
 export interface ReportPreviewData {
@@ -147,6 +150,58 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
   );
 }
 
+function ProducerActionsTable({ rows }: { rows: ProducerBuyerActionRow[] }) {
+  const th: React.CSSProperties = {
+    background: NAVY,
+    color: "#fff",
+    fontFamily: "Roboto, sans-serif",
+    fontWeight: 700,
+    fontSize: 10,
+    textAlign: "left",
+    padding: "8px 10px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  };
+  const td: React.CSSProperties = {
+    fontFamily: "Roboto, sans-serif",
+    fontSize: 12,
+    color: DUSK,
+    padding: "10px",
+    verticalAlign: "top",
+    borderBottom: `1px solid ${POLAR}`,
+    lineHeight: 1.45,
+  };
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${POLAR}` }}>
+      <thead>
+        <tr>
+          <th style={{ ...th, width: "16%" }}>Actor</th>
+          <th style={{ ...th, width: "18%" }}>Category</th>
+          <th style={{ ...th, width: "36%" }}>Action</th>
+          <th style={{ ...th, width: "30%" }}>Operational Read</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td style={{ ...td, color: NAVY, fontWeight: 700 }}>{r.actor}</td>
+            <td style={td}>{r.category}</td>
+            <td style={td}>
+              {r.action}
+              {r.date && (
+                <div style={{ fontSize: 10, opacity: 0.75, marginTop: 3 }}>{r.date}</div>
+              )}
+            </td>
+            <td style={td}>{r.operationalRead}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function computePreviewFastFacts(
   report: ReportPreviewData,
   incidents: TopicFastFactsIncident[],
@@ -197,7 +252,6 @@ export default function ReportPreview({
         incidents,
       )
     : null;
-  void buildFuelRegionalHighlights; void buildFuelProducerBuyerActions;
   const periodLabel = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).label
     : "";
@@ -361,10 +415,16 @@ export default function ReportPreview({
               />
             </Section>
 
+            <NarrativeSection title="Market Read" text={fuelData.marketData.marketRead} />
             <NarrativeSection title="Situation" text={report.situation} />
             <NarrativeSection title="What Happened" text={report.whatHappened} />
+            <NarrativeSection title="Operational Read" text={fuelData.incidentData.operationalRead} />
             <NarrativeSection title="Regional Highlights" text={fuelData.incidentData.regionalHighlights} />
-            <NarrativeSection title="Producer and Buyer Actions" text={fuelData.incidentData.producerBuyerActions} />
+            {fuelData.incidentData.producerBuyerActions.length > 0 && (
+              <Section title="Producer and Buyer Actions">
+                <ProducerActionsTable rows={fuelData.incidentData.producerBuyerActions} />
+              </Section>
+            )}
             <NarrativeSection title="What Matters" text={report.whatMatters} />
             <NarrativeSection title="Implications for Business" text={report.implications} />
             <NarrativeSection title="Watch Next" text={report.watchNext} />

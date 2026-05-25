@@ -25,6 +25,7 @@ import {
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
+import type { ProducerBuyerActionRow } from "./fuelNarratives";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -227,6 +228,77 @@ function drawJetFuelEmptyCard(ctx: Ctx, benchmark: string) {
     ctx.y + padY + titleH + 12,
   );
   ctx.y += cardH + 10;
+}
+
+/**
+ * Producer and Buyer Actions table. 4-column layout matching the
+ * on-screen preview: Actor / Category / Action (with date) / Operational
+ * Read. Header bar in Navy with white text; rows separated by a thin
+ * Polar Gray rule. Each row's height is the tallest wrapped cell.
+ */
+function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[]) {
+  if (rows.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  const colActorW = Math.round(CW * 0.16);
+  const colCatW = Math.round(CW * 0.18);
+  const colReadW = Math.round(CW * 0.30);
+  const colActionW = CW - colActorW - colCatW - colReadW;
+  const headerH = 18;
+  const padX = 6;
+  const lineH = 11;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, headerH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    pdf.text("ACTOR", MX + padX, ctx.y + 12);
+    pdf.text("CATEGORY", MX + colActorW + padX, ctx.y + 12);
+    pdf.text("ACTION", MX + colActorW + colCatW + padX, ctx.y + 12);
+    pdf.text("OPERATIONAL READ", MX + colActorW + colCatW + colActionW + padX, ctx.y + 12);
+    ctx.y += headerH;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+  };
+
+  ensureSpace(ctx, headerH + 30);
+  drawHeader();
+
+  for (const r of rows) {
+    const actionText = r.date ? `${r.action}\n${r.date}` : r.action;
+    const actorLines: string[] = pdf.splitTextToSize(sanitize(r.actor), colActorW - padX * 2);
+    const catLines: string[] = pdf.splitTextToSize(sanitize(r.category), colCatW - padX * 2);
+    const actionLines: string[] = pdf.splitTextToSize(sanitize(actionText), colActionW - padX * 2);
+    const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
+    const maxLines = Math.max(actorLines.length, catLines.length, actionLines.length, readLines.length);
+    const rh = Math.max(20, maxLines * lineH + 8);
+
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+    }
+
+    // Row separator at the bottom of the row.
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    pdf.text(actorLines, MX + padX, ctx.y + 12);
+
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+    pdf.text(catLines, MX + colActorW + padX, ctx.y + 12);
+    pdf.text(actionLines, MX + colActorW + colCatW + padX, ctx.y + 12);
+    pdf.text(readLines, MX + colActorW + colCatW + colActionW + padX, ctx.y + 12);
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
 }
 
 function drawRelatedIncidents(
@@ -446,22 +518,34 @@ export async function exportTopicReportPdf(
       drawJetFuelEmptyCard(ctx, fuelData.marketData.jetFuelBenchmarkLabel);
     }
 
-    const fuelSections: [string, string | null | undefined][] = [
-      ["Situation", data.situation],
-      ["What Happened", data.whatHappened],
-      ["Regional Highlights", fuelData.incidentData.regionalHighlights],
-      ["Producer and Buyer Actions", fuelData.incidentData.producerBuyerActions],
-      ["What Matters", data.whatMatters],
-      ["Implications for Business", data.implications],
-      ["Watch Next", data.watchNext],
-      ["Polestar View", data.polestarView],
-    ];
-    for (const [label, body] of fuelSections) {
+    // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
+    // Operational Read, Regional Highlights, Producer and Buyer Actions)
+    // sit alongside the editor-authored prose so the report reads 60%
+    // analysis / 40% data rather than dashboard-style cards.
+    const renderProseSection = (label: string, body: string | null | undefined) => {
       if (body && body.trim()) {
         drawSectionHeading(ctx, label);
         renderProse(ctx, body);
       }
+    };
+
+    renderProseSection("Market Read", fuelData.marketData.marketRead);
+    renderProseSection("Situation", data.situation);
+    renderProseSection("What Happened", data.whatHappened);
+    renderProseSection("Operational Read", fuelData.incidentData.operationalRead);
+    renderProseSection("Regional Highlights", fuelData.incidentData.regionalHighlights);
+    if (fuelData.incidentData.producerBuyerActions.length > 0) {
+      // Guard against an orphaned section heading: if there isn't room
+      // for the heading + table header + a couple of rows, push the
+      // whole block to the next page before drawing the heading.
+      ensureSpace(ctx, 24 + 18 + 60);
+      drawSectionHeading(ctx, "Producer and Buyer Actions");
+      drawProducerBuyerActionsTable(ctx, fuelData.incidentData.producerBuyerActions);
     }
+    renderProseSection("What Matters", data.whatMatters);
+    renderProseSection("Implications for Business", data.implications);
+    renderProseSection("Watch Next", data.watchNext);
+    renderProseSection("Polestar View", data.polestarView);
   } else {
     drawSectionHeading(ctx, "Fast Facts");
     drawFastFactsKpiCards(

@@ -228,12 +228,17 @@ function thinTail(thin: boolean, total: number): string {
 // Fuel Watch
 // ---------------------------------------------------------------------------
 const FUEL: ReportPack = {
+  // Executive Summary: 3 short paragraphs covering the headline judgement,
+  // what the incident reporting adds, and the business meaning.
   exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
     const driver = types || "price movement, shortage reporting and transport disruption";
     const geo = lead
       ? ` ${lead} produced the clearest country signal${countries && countries !== lead ? `, with further reporting from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Fuel pressure across the ${cadence} window was driven by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    const para1 = `Fuel risk this ${cadence} cycle reads as a cost-and-continuity issue rather than a single dramatic event. Pressure across the window was driven by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    const para2 = `The market indicators in the Fast Facts and the Jet Fuel Price Trajectory are the cost floor for the read; the incident picture below adds the operational colour — shortages, forecourt disruption, subsidy moves and route pressure where they appear. The Market Read and Operational Read sections that follow translate those two layers into a working view.`;
+    const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types, lead }) => {
     const focus = types ? `Shortage and price signals dominate, with ${types} the recurring threads.` : "Shortage and price signals dominate, with downstream transport and forecourt risk close behind.";
@@ -247,25 +252,44 @@ const FUEL: ReportPack = {
     const geo = countries ? ` Identifiable activity tracked back to ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
+  // What Matters: two analytical paragraphs connecting prices, jet movement,
+  // shortage / route pressure and business continuity.
   whatMatters: ({ lead }) => {
-    const where = lead ? ` Operators with exposure to ${lead} should treat this as the live pressure point.` : "";
-    return `The combination of price movement and shortage signal feeds straight into transport cost, generator dependence and continuity at fuel-heavy sites.${where}`;
+    const where = lead ? ` Exposure to ${lead} is the live pressure point for fleet, generator and field operations.` : "";
+    const para1 = `Elevated crude and a jet fuel series that is not retreating tell the cost side of the story: fuel-linked invoices stay heavy. The incident layer then tells the availability side: shortages, rationing and route pressure are the points where price stops being the only problem and physical access becomes the issue.${where}`;
+    const para2 = `Where the two reinforce each other — high prices meeting tight supply or chokepoint disruption — the operational impact compounds. Freight rates lift, surcharge clauses fire, generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against this cycle.`;
+    return `${para1}\n\n${para2}`;
   },
-  implications: () =>
-    "Review fuel stocks at site, generator cover, route planning for fuel runs, contract pricing on bulk supply and contingency for forecourt closures.",
-  watchNext: () =>
-    "Triggers to monitor: subsidy announcements, refinery maintenance windows, tanker driver action and any move in pump prices in capital cities.",
+  // Implications for Business: practical and client-useful, explaining why
+  // each action matters rather than listing a generic checklist.
+  implications: () => {
+    const para1 = `On the cost side, revisit contract pricing on bulk fuel and any surcharge pass-through clauses in freight and logistics agreements — elevated indicators usually mean the next invoice cycle reflects this, not the current one. Forward-cover the bulk and aviation lines you depend on rather than waiting for the spot move to be confirmed.`;
+    const para2 = `On the continuity side, check fuel stock at site, generator runtime assumptions and the fuel routes you rely on for resupply. Rationing reports and forecourt disruption should pull commercial-allocation conversations forward with suppliers, and escalation triggers (queues, allocation cuts, station closures) should be agreed in advance so they fire automatically rather than after the fact. Where Gulf or Red Sea routing matters, treat route diversification as a live mitigation, not a future option.`;
+    return `${para1}\n\n${para2}`;
+  },
+  // Watch Next: 3-5 forward-looking indicators, one short sentence each.
+  watchNext: () => {
+    const lines = [
+      "Subsidy or levy decisions — a single gazette notice can reset pump price and contract economics overnight.",
+      "Rationing or forecourt disruption — queue formation, allocation cuts or station closures are the fastest operational tells.",
+      "Refinery or supply interruption — outages and force-majeure declarations usually feed into crack spreads and downstream pricing within days.",
+      "Jet fuel price movement — sustained moves in the trajectory flow through to aviation surcharges and bunker-adjacent costs.",
+      "Gulf and Hormuz route pressure — fresh advisories, naval movement or vessel reroutes shift war-risk premium and transit time.",
+    ];
+    return lines.join("\n");
+  },
+  // Polestar View: the clearest "so what" judgement in the report.
   polestarView: ({ lead, countries }) => {
     const pressure = lead
-      ? `${lead} remains the clearest pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
-      : "No single country carries the read this cycle.";
-    return `The business concern is not the count of fuel stories but the mix of price movement, shortage indicators and transport disruption. ${pressure}`;
+      ? ` ${lead} is the clearest country pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      : " No single country carries the read this cycle.";
+    return `Fuel Watch is flagging a cost-and-continuity risk this cycle, not simply a rise in fuel headlines. The market indicators show elevated fuel costs holding rather than easing, while the incident picture shows operational stress around shortages, route pressure and policy intervention. For business users, the priority is to protect movement, backup power and fuel-dependent operations from short-notice price or availability shocks.${pressure}`;
   },
-  zeroExec: "Fuel reporting was quiet this cycle. Treat that as a coverage gap rather than evidence that supply has stabilised.",
+  zeroExec: "Fuel reporting was quiet this cycle. Treat that as a coverage gap rather than evidence that supply has stabilised. The market indicators in the Fast Facts and Jet Fuel Price Trajectory still carry the cost-side read; the incident layer simply has less to say this window. For business users, the standing exposures — fuel stock cover, generator runtime, road transport exposure and supplier resilience — remain the operational focus until fresh reporting lands.",
   zeroSituation: "Underlying exposure to shortage, subsidy change and refinery disruption remains, even on a quiet reporting cycle.",
   zeroWhatHappened: "Nothing classifiable on fuel landed in the window, so any read is inferred from the prior cycle rather than fresh evidence.",
-  zeroWhatMatters: "Transport cost, generator reliance and continuity at high-fuel-use sites stay the standing concern regardless of headline volume.",
-  zeroPolestar: "No usable fuel signal landed in the window. Hold the prior cycle assessment and watch the next batch of reporting.",
+  zeroWhatMatters: "Transport cost, generator reliance and continuity at high-fuel-use sites stay the standing concern regardless of headline volume. With no fresh incident reporting this cycle, the market indicators above carry the read on their own; treat them as the cost floor for any forward planning.",
+  zeroPolestar: "No usable fuel signal landed in the incident window this cycle, so the read leans on the market indicators above. Hold the prior cycle assessment, keep standing fuel-resilience measures live, and revisit the picture once the next batch of reporting arrives.",
   thinNote: "Fuel reporting in this window is thin. Treat as a coverage gap, not as evidence that supply has stabilised.",
 };
 

@@ -1,10 +1,10 @@
 // Fuel Watch auto-derived narrative blocks.
 //
-// Regional Highlights and Producer and Buyer Actions are derived from
-// the in-window incident set. Outputs read like analyst prose — never
-// raw headline dumps and never weak "Unknown" rows. The helpers return
-// null when there is no usable signal so the caller can omit the
-// section instead of padding it.
+// Regional Highlights, Producer/Buyer Actions and the Operational Read
+// are derived from the in-window incident set. Outputs read like
+// analyst prose — never raw headline dumps and never weak "Unknown"
+// rows. Helpers return null / empty so the caller can omit a section
+// instead of padding it.
 
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
 
@@ -40,62 +40,96 @@ function normaliseCountry(c: string | null | undefined): string | null {
   return null;
 }
 
-// Operational issue families, in priority order. The first family that
-// matches the country's most-severe incident becomes the headline phrase
-// for the country paragraph.
+// Operational issue families, in priority order. Each family carries:
+//   phrase: short label for the signal
+//   why:    one-line business reason it matters
+//   watch:  one-line "what should business users watch for"
+//   key:    stable identifier used by the Operational Read aggregation
 interface IssueFamily {
+  key:
+    | "chokepoint"
+    | "refinery"
+    | "shortage"
+    | "tanker"
+    | "policy"
+    | "pricing"
+    | "crude";
   test: RegExp[];
   phrase: string;
+  why: string;
+  watch: string;
 }
 const ISSUE_FAMILIES: IssueFamily[] = [
   {
+    key: "chokepoint",
     test: [/\b(strait of hormuz|hormuz)\b/, /\bbab[- ]el[- ]mandeb\b/, /\bred sea\b/, /\bmalacca\b/, /\bsuez\b/],
     phrase: "chokepoint pressure and tanker-route disruption",
+    why: "Route pressure on Hormuz, Bab-el-Mandeb or the Red Sea feeds straight into bunker cost, transit time and war-risk premium.",
+    watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
   },
   {
+    key: "refinery",
     test: [/\b(refinery|refineries) (outage|disruption|fire|attack|halt|maintenance|shutdown|closure)/],
     phrase: "refinery disruption and supply-side outage",
+    why: "Refinery outage typically tightens regional crack spreads and pushes downstream pump and bunker prices up within days.",
+    watch: "Watch for restart timelines, force-majeure declarations and follow-on import announcements.",
   },
   {
+    key: "shortage",
     test: [/\b(fuel|petrol|diesel|lpg|kerosene|jet fuel) (shortage|stockout|rationing|queue|queues)/, /\bforecourt (closure|shut|queue|disruption)/],
     phrase: "shortages, rationing and forecourt disruption",
+    why: "Forecourt shortages put road transport, staff movement and generator runtime under immediate continuity pressure.",
+    watch: "Watch for rationing rules, allocation cuts to commercial users and convoy or queue management announcements.",
   },
   {
+    key: "tanker",
     test: [/\btanker (driver|drivers|strike|shortage|attack|blockade|convoy)/, /\b(fuel|tanker) (convoy|hijack|seizure)/],
     phrase: "tanker and fuel-transport disruption",
+    why: "Tanker driver action or convoy disruption usually shows up as delivery delays at depots and forecourts inside a few days.",
+    watch: "Watch for negotiation outcomes, military or police escort decisions and downstream depot-stock levels.",
   },
   {
+    key: "policy",
     test: [
       /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene)/,
       /\b(price control|price cap|price freeze|export ban|import ban)/,
     ],
     phrase: "policy and subsidy / levy moves",
+    why: "Policy moves on subsidies, levies or price controls reset operating cost assumptions and contract pass-through clauses.",
+    watch: "Watch for gazette dates, ministerial statements and any contract-renegotiation triggers from suppliers.",
   },
   {
+    key: "pricing",
     test: [/\b(pump price|petrol price|diesel price|fuel price) (hike|rise|increase|cut|drop|fall|change)/, /\bfuel surcharge\b/],
     phrase: "pump and surcharge pricing pressure",
+    why: "Pump and surcharge moves flow through fleet cost, freight rates and supplier invoices within the next billing cycle.",
+    watch: "Watch for surcharge revisions on freight contracts and any government push-back against price rises.",
   },
   {
+    key: "crude",
     test: [/\b(oil|crude) (export ban|export halt|embargo|sanctions|sabotage|attack|spill)/],
     phrase: "crude supply-chain and sanctions pressure",
+    why: "Crude-side disruption rolls into bunker, jet and downstream pricing on a 1-2 week lag and is hard to hedge away cleanly.",
+    watch: "Watch for OPEC+ commentary, sanctions enforcement signals and any retaliation in shipping lanes.",
   },
 ];
 
-function issuePhrase(items: TopicFastFactsIncident[]): string {
-  // Find the first family that any item in the country's set hits.
+function familyFor(items: TopicFastFactsIncident[]): IssueFamily | null {
   for (const fam of ISSUE_FAMILIES) {
     for (const i of items) {
       const t = haystack(i);
-      if (fam.test.some((re) => re.test(t))) return fam.phrase;
+      if (fam.test.some((re) => re.test(t))) return fam;
     }
   }
-  return "fuel-operational reporting";
+  return null;
 }
 
 /**
- * Country-level Fuel Watch highlights as analyst prose. Drops records
- * without a usable country attribution and never emits "Unknown" as a
- * row. Returns null when there is nothing usable to say.
+ * Country-level Fuel Watch highlights as proper analyst paragraphs.
+ * Each country answers three questions: what is the signal, why does
+ * it matter, what should the reader watch. Records without a usable
+ * country attribution are dropped and "Unknown" is never emitted.
+ * Returns null when there is nothing usable to say.
  */
 export function buildFuelRegionalHighlights(opts: {
   issueDate: string;
@@ -118,28 +152,30 @@ export function buildFuelRegionalHighlights(opts: {
   const lead = ranked.slice(0, 3);
 
   const paragraphs: string[] = [];
-  const leadCountry = lead[0]?.[0];
   for (let idx = 0; idx < lead.length; idx++) {
     const [country, items] = lead[idx];
-    const phrase = issuePhrase(items);
+    const fam = familyFor(items);
+    const phrase = fam?.phrase ?? "fuel-operational reporting";
+    const why = fam?.why ?? "These records signal underlying pressure on local fuel availability and cost.";
+    const watch = fam?.watch ?? "Watch the next reporting cycle to confirm whether the pattern persists or eases.";
     const n = items.length;
+    const recordsClause = n === 1 ? "A single record this cycle points to" : `${n} records this cycle point to`;
     let opener: string;
-    if (idx === 0 && country === leadCountry) {
-      opener = `${titleCase(country)} remains the main pressure point in this window`;
+    if (idx === 0) {
+      opener = `${titleCase(country)} is the clearest pressure point in this window.`;
     } else if (idx === 1) {
-      opener = `${titleCase(country)} also carries fuel signal`;
+      opener = `${titleCase(country)} carries a secondary but credible signal.`;
     } else {
-      opener = `${titleCase(country)} adds further weight`;
+      opener = `${titleCase(country)} adds further weight to the picture.`;
     }
-    const recordsClause = n === 1 ? "a single record" : `${n} records`;
-    paragraphs.push(`${opener}, with ${recordsClause} tied to ${phrase}.`);
+    paragraphs.push(`${opener} ${recordsClause} ${phrase}. ${why} ${watch}`);
   }
   return paragraphs.join("\n\n");
 }
 
 // Producer/buyer/government/infrastructure/market classification rules.
 // Order matters: a record is assigned to the first matching category.
-type Category =
+export type FuelActionCategory =
   | "Producer action"
   | "Buyer action"
   | "Government / policy action"
@@ -147,7 +183,7 @@ type Category =
   | "Market / supply signal";
 
 interface CategoryRule {
-  category: Category;
+  category: FuelActionCategory;
   test: RegExp[];
 }
 
@@ -200,12 +236,27 @@ const CATEGORY_RULES: CategoryRule[] = [
   },
 ];
 
-function classifyCategory(t: string): Category | null {
+function classifyCategory(t: string): FuelActionCategory | null {
   for (const rule of CATEGORY_RULES) {
     if (rule.test.some((re) => re.test(t))) return rule.category;
   }
   return null;
 }
+
+// Category → "Operational Read" template. Kept generic so it reads as
+// analyst judgement, not a headline restatement.
+const OPERATIONAL_READ_BY_CATEGORY: Record<FuelActionCategory, string> = {
+  "Producer action":
+    "Supply-side move: expect knock-on impact on bunker, jet and downstream pricing if the action sustains.",
+  "Buyer action":
+    "Buyer-side hedging or sourcing pressure; spot and contract pricing on similar grades is likely to follow.",
+  "Government / policy action":
+    "Policy moves reset pump price and subsidy exposure; review contract pass-through and surcharge clauses.",
+  "Infrastructure / routing action":
+    "Route diversification remains a live mitigation theme for Gulf-linked and Red Sea fuel movement.",
+  "Market / supply signal":
+    "Reinforces the cost-pressure picture in the market indicators; treat as confirming, not new, evidence.",
+};
 
 function fmtDate(iso: string): string {
   try {
@@ -215,7 +266,7 @@ function fmtDate(iso: string): string {
   } catch { return ""; }
 }
 
-function pickActor(i: TopicFastFactsIncident, category: Category): string {
+function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): string {
   const t = haystack(i);
   const ACTORS = [
     "OPEC+", "OPEC", "Saudi Aramco", "ADNOC", "QatarEnergy", "Petrobras",
@@ -232,64 +283,119 @@ function pickActor(i: TopicFastFactsIncident, category: Category): string {
   return "—";
 }
 
-interface ClassifiedAction {
+export interface ProducerBuyerActionRow {
   actor: string;
-  category: Category;
+  category: FuelActionCategory;
   action: string;
+  operationalRead: string;
   date: string;
 }
 
 /**
  * Classified producer / buyer / government / infrastructure / market
- * actions referenced in the window. Returns a clean table-style block
- * or null when nothing matches.
+ * actions referenced in the window. Returns ordered table rows or an
+ * empty array when nothing matches.
  */
 export function buildFuelProducerBuyerActions(opts: {
   issueDate: string;
   incidents: TopicFastFactsIncident[];
-}): string | null {
+}): ProducerBuyerActionRow[] {
   const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
-  if (window.length === 0) return null;
+  if (window.length === 0) return [];
 
-  const rows: ClassifiedAction[] = [];
+  const raw: ProducerBuyerActionRow[] = [];
   for (const i of window) {
     const t = haystack(i);
     const category = classifyCategory(t);
     if (!category) continue;
-    rows.push({
+    raw.push({
       actor: pickActor(i, category),
       category,
       action: i.title.trim().replace(/\.$/, ""),
+      operationalRead: OPERATIONAL_READ_BY_CATEGORY[category],
       date: fmtDate(i.occurredAt),
     });
   }
-  if (rows.length === 0) return null;
+  if (raw.length === 0) return [];
 
-  // Group by category so the block reads cleanly and the strongest
-  // signals (Producer / Buyer / Government) lead.
-  const ORDER: Category[] = [
+  // Group by category in the priority order so the strongest signals
+  // (Producer / Buyer / Government) lead the table.
+  const ORDER: FuelActionCategory[] = [
     "Producer action",
     "Buyer action",
     "Government / policy action",
     "Infrastructure / routing action",
     "Market / supply signal",
   ];
-  const byCategory = new Map<Category, ClassifiedAction[]>();
-  for (const r of rows) {
-    const arr = byCategory.get(r.category) ?? [];
-    arr.push(r);
-    byCategory.set(r.category, arr);
+  const out: ProducerBuyerActionRow[] = [];
+  for (const cat of ORDER) {
+    const items = raw.filter((r) => r.category === cat).slice(0, 4);
+    out.push(...items);
+  }
+  return out;
+}
+
+/**
+ * Operational Read — translates the in-window incident picture into a
+ * short prose section (1-2 paragraphs). Aggregates by issue family so
+ * the section never repeats the Related Incidents table.
+ */
+export function buildFuelOperationalRead(opts: {
+  issueDate: string;
+  incidents: TopicFastFactsIncident[];
+}): string | null {
+  const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
+  if (window.length === 0) return null;
+
+  const counts = new Map<IssueFamily["key"], { fam: IssueFamily; items: TopicFastFactsIncident[] }>();
+  for (const i of window) {
+    const t = haystack(i);
+    for (const fam of ISSUE_FAMILIES) {
+      if (fam.test.some((re) => re.test(t))) {
+        const slot = counts.get(fam.key) ?? { fam, items: [] };
+        slot.items.push(i);
+        counts.set(fam.key, slot);
+        break;
+      }
+    }
+  }
+  if (counts.size === 0) {
+    // We have window items but none mapped to a recognised family. Say
+    // so plainly rather than padding with generic language.
+    return `The window carries ${window.length} fuel-relevant record${window.length === 1 ? "" : "s"} that do not group into a single dominant operational theme this cycle. Treat the read as directional and rely on the related-incidents table below for the detail.`;
   }
 
-  const blocks: string[] = [];
-  for (const cat of ORDER) {
-    const items = byCategory.get(cat);
-    if (!items || items.length === 0) continue;
-    const lines = items.slice(0, 4).map((r) => {
-      const datePart = r.date ? ` (${r.date})` : "";
-      return `• ${r.actor} — ${r.action}${datePart}`;
-    });
-    blocks.push(`${cat}\n${lines.join("\n")}`);
+  // Country roll-up for the closing line ("strongest operational signal").
+  const byCountry = new Map<string, number>();
+  for (const i of window) {
+    const k = normaliseCountry(i.country);
+    if (!k) continue;
+    byCountry.set(k, (byCountry.get(k) ?? 0) + 1);
   }
-  return blocks.join("\n\n");
+  const topCountries = Array.from(byCountry.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+  const ordered = Array.from(counts.values()).sort((a, b) => b.items.length - a.items.length);
+
+  const themeLine = ordered
+    .slice(0, 3)
+    .map(({ fam, items }) => {
+      const n = items.length;
+      return `${fam.phrase} (${n} record${n === 1 ? "" : "s"})`;
+    })
+    .join("; ");
+
+  const lead = ordered[0];
+  const driverPara = `The dominant operational themes in this window are ${themeLine}. ${lead.fam.why}`;
+
+  const watchLines: string[] = [];
+  for (const { fam } of ordered.slice(0, 2)) watchLines.push(fam.watch);
+
+  const where =
+    topCountries.length > 0
+      ? ` ${topCountries.map(([c]) => titleCase(c)).join(", ")} carr${topCountries.length === 1 ? "ies" : "y"} the strongest operational signal this cycle.`
+      : "";
+
+  const closingPara = `${watchLines.join(" ")}${where}`.trim();
+
+  return `${driverPara}\n\n${closingPara}`;
 }

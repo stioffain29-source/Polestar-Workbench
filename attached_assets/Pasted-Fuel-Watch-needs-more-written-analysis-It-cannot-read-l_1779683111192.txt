@@ -1,0 +1,167 @@
+Fuel Watch needs more written analysis. It cannot read like a glorified infographic.
+
+Scope:
+Fuel Watch content structure and prose only.
+
+Do not change:
+- market data plumbing
+- Fast Facts data model
+- Jet Fuel chart data
+- save/reload flow
+- PDF export plumbing
+- fonts
+- branding
+
+Problem:
+The current Fuel Watch has useful data, but the written sections are too thin. A paid report needs interpretation, context and operational meaning. The Fast Facts and chart should support the written analysis, not replace it.
+
+Required change:
+Expand Fuel Watch into a proper short analytical report.
+
+1. Executive Summary
+
+Make this 2 to 3 concise paragraphs, not one generic paragraph.
+
+It should cover:
+- the main fuel risk judgement
+- what the price indicators show
+- what the incident reporting adds
+- what this means for business operations
+
+Do not just list the top issue types.
+
+2. Add a section after Jet Fuel Price Trajectory
+
+Add a written section called:
+
+MARKET READ
+
+Purpose:
+Explain what Brent, WTI and jet fuel are telling the reader.
+
+This section should explain:
+- whether prices are elevated, stable, rising or easing
+- what the jet fuel trajectory suggests
+- why this matters for transport, aviation, freight, generator fuel or operating cost
+- whether market indicators reinforce or contradict the incident picture
+
+Example tone:
+“Fuel market indicators point to sustained cost pressure rather than a short-lived spike. Brent and WTI remain elevated, while the jet fuel series shows aviation fuel holding above the start of the period. That matters for businesses because fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing.”
+
+3. Add a section called:
+
+OPERATIONAL READ
+
+Purpose:
+Translate the incident picture into business risk.
+
+This should cover:
+- shortages and rationing
+- subsidy / levy movement
+- forecourt disruption
+- route or chokepoint pressure
+- countries carrying the strongest operational signal
+
+This should not repeat the Related Incidents table.
+
+4. Improve Regional Highlights
+
+Regional Highlights should be written as short analytical paragraphs or a table with meaningful “read” text.
+
+Each country should answer:
+- what is the signal?
+- why does it matter?
+- what should business users watch?
+
+Do not use raw headlines.
+Do not rely on “X records” as the main point.
+
+5. Improve Producer and Buyer Actions
+
+This section needs to justify its place.
+
+Use a table:
+- Actor
+- Category
+- Action
+- Operational Read
+
+Operational Read is mandatory.
+
+Example:
+Actor: ADNOC
+Category: Infrastructure / routing action
+Action: Pipeline bypassing Hormuz reported as 50% complete
+Operational Read: Route diversification remains a live mitigation theme for Gulf-linked fuel movement.
+
+6. Expand What Matters
+
+This should be a proper analytical section, around 2 paragraphs.
+
+It should connect:
+- elevated crude prices
+- jet fuel movement
+- shortage / rationing reports
+- route pressure
+- business continuity
+
+7. Expand Implications for Business
+
+This should be practical and client-useful.
+
+Cover:
+- fuel stock levels
+- generator runtime assumptions
+- road transport exposure
+- supplier resilience
+- contract pricing
+- fuel delivery routes
+- escalation triggers
+- forecourt disruption
+- rationing indicators
+
+Do not make it a generic checklist. Explain why these actions matter.
+
+8. Watch Next
+
+Make this a proper forward-looking section, not one sentence.
+
+Use 3 to 5 watch indicators with one sentence each:
+- subsidy / levy decisions
+- rationing or forecourt disruption
+- refinery or supply interruption
+- jet fuel price movement
+- Gulf / Hormuz route pressure
+- diesel or petrol pump-price movement
+
+9. Polestar View
+
+This should be the clearest judgement in the report.
+
+It should answer:
+“So what?”
+
+Example:
+“Fuel Watch is flagging a cost-and-continuity risk, not simply a rise in fuel headlines. The market indicators show elevated fuel costs, while the incident picture shows operational stress around shortages, route pressure and policy intervention. For business users, the priority is to protect movement, backup power and fuel-dependent operations from short-notice price or availability shocks.”
+
+10. Report balance
+
+The final report should feel like:
+- 40 percent data/charts/tables
+- 60 percent written analysis
+
+Not:
+- mostly cards, charts and incident tables
+
+11. Acceptance check
+
+Export a fresh Fuel Watch PDF and confirm:
+- the report has enough written analysis to justify being a paid product
+- Fast Facts and chart support the prose, not replace it
+- Market Read exists
+- Operational Read exists
+- Regional Highlights contain actual insight
+- Producer and Buyer Actions include operational read
+- What Matters and Implications are fuller and more useful
+- Polestar View gives a clear judgement
+- report no longer feels like a glorified infographic

@@ -26,9 +26,11 @@ import {
 import {
   buildFuelRegionalHighlights,
   buildFuelProducerBuyerActions,
+  buildFuelOperationalRead,
+  type ProducerBuyerActionRow,
 } from "./fuelNarratives";
 
-export type { FuelDataCard, JetFuelPricePoint };
+export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
 
 export const FUEL_MISSING_REQUIRED_NOTE =
   "Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.";
@@ -89,12 +91,19 @@ export interface FuelMarketData {
   /** The ordered Fast Facts grid. Built from marketData only — never
    *  back-filled from incident counts. */
   fastFactsCards: FuelDataCard[];
+  /** Auto-derived 2-paragraph Market Read prose. Null when no market
+   *  data is available (caller renders nothing). */
+  marketRead: string | null;
 }
 
 export interface FuelIncidentData {
   fuelIncidents: TopicFastFactsIncident[];
   regionalHighlights: string | null;
-  producerBuyerActions: string | null;
+  producerBuyerActions: ProducerBuyerActionRow[];
+  /** Auto-derived 1-2 paragraph operational read of the incident set.
+   *  Never repeats the Related Incidents table. Null when the window
+   *  carries no usable fuel-relevant records. */
+  operationalRead: string | null;
 }
 
 export interface FuelNarrativeData {
@@ -210,6 +219,10 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     incidents,
   });
+  const operationalRead = buildFuelOperationalRead({
+    issueDate: report.issueDate,
+    incidents,
+  });
 
   // Validation. The fail-closed export gate is keyed on market data
   // only: Brent, WTI and jet fuel are the required indicators. Other
@@ -264,11 +277,18 @@ export function buildFuelWatchReportData(
       policyIndicators: parsed.policy,
       routeIndicators: parsed.routes,
       fastFactsCards,
+      marketRead: buildFuelMarketRead({
+        brent,
+        wti,
+        jetFuel,
+        trajectory: trajectoryPoints,
+      }),
     },
     incidentData: {
       fuelIncidents,
       regionalHighlights,
       producerBuyerActions,
+      operationalRead,
     },
     narrativeData: {
       executiveSummary: report.executiveSummary,
@@ -294,6 +314,70 @@ export function buildFuelWatchReportData(
       warnings,
     },
   };
+}
+
+/**
+ * Build the 2-paragraph "Market Read" prose from the parsed market
+ * data. Lives here (next to the rest of the canonical builder) so
+ * preview and PDF can never drift.
+ *
+ * Para 1: where Brent / WTI sit and what the jet trajectory shows.
+ * Para 2: what the combined picture means for fuel-linked costs.
+ */
+function levelWord(v: number): string {
+  if (v >= 100) return "elevated";
+  if (v >= 80) return "firm";
+  if (v >= 60) return "steady";
+  return "softer";
+}
+function numVal(c: FuelDataCard | null): number | null {
+  if (!c) return null;
+  return typeof c.value === "number" ? c.value : Number(c.value);
+}
+export function buildFuelMarketRead(opts: {
+  brent: FuelDataCard | null;
+  wti: FuelDataCard | null;
+  jetFuel: FuelDataCard | null;
+  trajectory: JetFuelPricePoint[];
+}): string | null {
+  const { brent, wti, jetFuel, trajectory } = opts;
+  if (!brent && !wti && !jetFuel) return null;
+  const b = numVal(brent);
+  const w = numVal(wti);
+  const parts: string[] = [];
+  if (b !== null && !Number.isNaN(b) && w !== null && !Number.isNaN(w)) {
+    parts.push(
+      `Brent is sitting around ${b.toFixed(2)} ${brent?.unit ?? "USD/bbl"} and WTI around ${w.toFixed(2)} ${wti?.unit ?? "USD/bbl"}, which puts the crude complex in ${levelWord((b + w) / 2)} territory rather than a transient spike.`,
+    );
+  } else if (b !== null && !Number.isNaN(b)) {
+    parts.push(`Brent is sitting around ${b.toFixed(2)} ${brent?.unit ?? "USD/bbl"}, placing crude in ${levelWord(b)} territory.`);
+  } else if (w !== null && !Number.isNaN(w)) {
+    parts.push(`WTI is sitting around ${w.toFixed(2)} ${wti?.unit ?? "USD/bbl"}, placing crude in ${levelWord(w)} territory.`);
+  }
+
+  if (jetFuel && trajectory.length >= 2) {
+    const first = trajectory[0].value;
+    const last = trajectory[trajectory.length - 1].value;
+    const pct = first !== 0 ? ((last - first) / first) * 100 : 0;
+    let dir: string;
+    if (pct >= 3) dir = "rising over the period";
+    else if (pct <= -3) dir = "easing over the period";
+    else dir = "holding above the start of the period";
+    const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
+    parts.push(
+      `The jet fuel series is ${dir}, with the latest read at ${last.toFixed(3)} ${jetUnit} versus ${first.toFixed(3)} at the start (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
+    );
+  } else if (jetFuel) {
+    const jv = numVal(jetFuel);
+    if (jv !== null && !Number.isNaN(jv)) {
+      parts.push(`Jet fuel is printing at ${jv.toFixed(3)} ${jetFuel.unit ?? "USD/gal"}, anchoring the aviation-linked cost line.`);
+    }
+  }
+
+  const para1 = parts.join(" ");
+  const para2 =
+    "The combined read points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so the market indicators here should be treated as the cost-floor for any decisions further down the report.";
+  return para1 ? `${para1}\n\n${para2}` : para2;
 }
 
 /**
