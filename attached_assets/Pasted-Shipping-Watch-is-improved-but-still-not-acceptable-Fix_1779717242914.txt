@@ -1,0 +1,52 @@
+Shipping Watch is improved but still not acceptable.
+
+Fix only these issues.
+
+1. Fix Vessel Threat contradiction
+Current text says:
+“Hostile activity against vessels over the last 30 days runs to 12 records, of which 26 are an attack or seizure...”
+
+That is mathematically wrong.
+
+Make the prose distinguish between:
+- total 30-day vessel threat count
+- deduped table count
+- attack/seizure count
+
+Do not mix capped display rows with underlying total counts in the same sentence.
+
+2. Strengthen vessel dedupe/filtering
+The Vessel Attacks table still shows multiple versions of the same UAE / Hormuz seizure event.
+Collapse syndicated versions into one clean row per actual event.
+
+3. Remove weak/noisy vessel records
+Do not include as vessel threat records:
+- repatriation / crew return stories
+- speculative claims such as “Iran claims missile strike...”
+- weak syndicated repeats
+- generic commentary
+
+Use credible operational maritime/security/advisory records only.
+
+4. Commercial Impact consistency
+If Commercial Impact says no qualifying commercial-shipping disruption records reached the file, then Related Incidents must not include freight-market commentary such as:
+“Freight rate recovery ‘more about demand than blanked sailings’”
+
+Either it qualifies operationally or it does not. Do not let it appear in Related Incidents if it has been excluded from Commercial Impact.
+
+5. Strengthen Polestar View
+Expand Polestar View to a proper judgement, not one generic paragraph.
+It should cover:
+- Hormuz as the dominant pressure point
+- 30-day vessel threat context
+- low fresh weekly vessel-side activity
+- insurance / war-risk / routing implications
+- what business users should actually do with the read
+
+Keep it concise, but make it useful.
+
+6. Fix final page waste
+Do not leave one Related Incident row stranded on the final page with the disclaimer.
+Reduce Related Incidents by one row or keep the table together so the final page is not wasted.
+
+Do not change fonts, colours, cover, Fast Facts or branding.
