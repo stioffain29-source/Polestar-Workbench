@@ -423,12 +423,28 @@ const SHIPPING: ReportPack = {
 // Flashpoint
 // ---------------------------------------------------------------------------
 const FLASHPOINT: ReportPack = {
+  // Executive Summary: three short analyst paragraphs covering the
+  // headline judgement, what the reporting adds and the business
+  // meaning. No dashboard tells like "drew the most consistent
+  // reporting" or "Severity peaked at extreme."
   exec: ({ types, lead, countries, sev, thin, total }) => {
     const driver = types || "protest activity, civil unrest and public-order disruption";
-    const geo = lead
-      ? ` ${lead} held the live operational pressure${countries && countries !== lead ? `, with secondary activity in ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+    const secondaries = countries && lead && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
-    return `Flashpoint activity through the window was driven by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    const geoLead = lead
+      ? `${lead} is where the operational pressure sits this cycle${secondaries ? `, with the recurring picture filled in by ${secondaries}` : ""}`
+      : "no single country carries the read this cycle";
+    const sevClause = sev
+      ? ` Worst-case reporting reached the ${sev.toLowerCase()} tier, so the cycle cannot be read as routine.`
+      : "";
+    const thinClause = thin && total > 0
+      ? " Volume is light, so the read is directional rather than firm."
+      : "";
+    const para1 = `Flashpoint risk this cycle reads as an operational-tempo issue rather than a single headline event. The window was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
+    const para2 = `What the incident layer adds is speed: these events move from notice to road closure, transport halt or site-access disruption inside a working day. The pattern is short-cycle escalation against a standing baseline, not isolated flare-ups.`;
+    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Standing readiness — refreshed journey-management, agreed escalation triggers and live country-lead routing — does more work this cycle than headline-severity tracking.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Short-cycle events on streets, transport hubs and central business districts shape the picture, with ${types} the visible drivers.` : "Short-cycle events on streets, transport hubs and central business districts shape the picture, with rapid escalation the standing risk.";
@@ -505,12 +521,29 @@ const ENERGY: ReportPack = {
 // across reports does not converge.
 // ---------------------------------------------------------------------------
 const PROTESTS: ReportPack = {
+  // Executive Summary: three short analyst paragraphs — headline
+  // judgement, what the reporting adds, and the business meaning.
+  // Avoids dashboard wording ("drew the most consistent reporting",
+  // "Severity peaked at extreme") and never quotes internal filter
+  // counts to the client.
   exec: ({ types, lead, countries, sev, thin, total }) => {
     const driver = types || "protest action, strike activity and public-order disruption";
-    const geo = lead
-      ? ` ${lead} drew the most consistent reporting${countries && countries !== lead ? `, with further activity in ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+    const secondaries = countries && lead && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
-    return `Public-order activity across the window was shaped by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    const geoLead = lead
+      ? `${lead} is where the operational pressure sits this cycle${secondaries ? `, with the recurring picture filled in by ${secondaries}` : ""}`
+      : "no single country carries the read this cycle";
+    const sevClause = sev
+      ? ` Worst-case reporting reached the ${sev.toLowerCase()} tier, so the cycle cannot be read as routine.`
+      : "";
+    const thinClause = thin && total > 0
+      ? " Volume is light, so the read is directional rather than firm."
+      : "";
+    const para1 = `Public-order risk this cycle reads as an operational-tempo issue rather than a single headline event. The window was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
+    const para2 = `What the incident layer adds is speed: these events move from notice to road closure, transit halt or site-access disruption inside a working day. The pattern is short-cycle escalation against a standing baseline of unrest, not isolated flare-ups.`;
+    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Refreshed journey-management plans, agreed escalation triggers and live country-lead routing do more work this cycle than headline-severity tracking.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Most events touch transport, access and central business districts, with ${types} the active patterns.` : "Most events touch transport, access and central business districts, with rapid disruption the standing risk.";
@@ -576,8 +609,11 @@ export function draftTopicReportProse(opts: {
       location: null,
     }),
   );
-  const dropped = rawWindow.length - inWindow.length;
-  const noisy = rawWindow.length >= 6 && dropped / rawWindow.length >= 0.35;
+  // Off-topic filter counts are internal Workbench bookkeeping and must
+  // never surface to the client. The executive summary is a judgement
+  // for the reader; "N off-topic records were filtered out before this
+  // read" is meta-commentary about the build pipeline.
+  void (rawWindow.length - inWindow.length);
   const pack = packFor(topic);
   const total = inWindow.length;
   const ctx: BuildCtx = {
@@ -591,14 +627,7 @@ export function draftTopicReportProse(opts: {
     thin: total > 0 && total < 3,
   };
 
-  // Noisy-record note: kept short, no "reporting window is noisy" wording.
-  const noisyNote = noisy
-    ? ` ${dropped} off-topic record${dropped === 1 ? " was" : "s were"} filtered out before this read.`
-    : "";
-
-  const executiveSummary = total === 0
-    ? pack.zeroExec
-    : `${pack.exec(ctx)}${noisyNote}`;
+  const executiveSummary = total === 0 ? pack.zeroExec : pack.exec(ctx);
 
   const polestarView = total === 0 ? pack.zeroPolestar : pack.polestarView(ctx);
 
