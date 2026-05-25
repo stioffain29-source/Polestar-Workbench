@@ -160,6 +160,11 @@ export function drawPageHeader(ctx: Ctx) {
   setRoboto(pdf, "bold");
   pdf.setFontSize(10);
   pdf.text(sanitize(header.kind.toUpperCase()), W - 18, HEADER_BAND_H / 2 + 4, { align: "right" });
+  // Reset fill/text color to body defaults so any prose drawn immediately
+  // after a page break does not inherit the white header color.
+  setText(pdf, DUSK);
+  setFill(pdf, NAVY);
+  setRoboto(pdf, "regular");
 }
 
 /**
