@@ -229,15 +229,8 @@ function drawIncidentTable<T extends EnrichedIncident>(ctx: Ctx, heading: string
     ctx.y += rh;
   }
 
-  if (rows.length > limited.length) {
-    ensureSpace(ctx, 16);
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(8);
-    pdf.text(sanitize(`Showing ${limited.length} latest of ${rows.length} records in window. Older records remain available in the Workbench.`), MX, ctx.y + 12);
-    setRoboto(pdf, "regular");
-    ctx.y += 16;
-  }
+  // Client-facing reports intentionally omit the "Showing N latest of M"
+  // notice. The table cap is internal Workbench logic.
   ctx.y += 8;
 }
 

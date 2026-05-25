@@ -238,18 +238,10 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
   }
   ctx.y += 8;
 
-  if (truncated > 0) {
-    ensureSpace(ctx, 16);
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(8);
-    pdf.text(
-      sanitize(`Showing ${rows.length} latest of ${sorted.length} records in window. Older records remain available in the Workbench.`),
-      ctx.MX, ctx.y + 10,
-    );
-    setRoboto(pdf, "regular");
-    ctx.y += 16;
-  }
+  // Client-facing reports intentionally omit the "Showing N latest of M"
+  // notice. The table cap is internal Workbench logic.
+  void truncated;
+  void sorted;
 }
 
 function drawNarrative(ctx: Ctx, heading: string, body: string | null | undefined, fallback?: string) {

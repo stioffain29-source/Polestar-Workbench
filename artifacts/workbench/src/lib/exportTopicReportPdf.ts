@@ -289,16 +289,11 @@ function drawRelatedIncidents(
   }
   ctx.y += 8;
 
-  ensureSpace(ctx, 16);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "italic");
-  pdf.setFontSize(8);
-  const note = truncated > 0
-    ? `Showing ${rows.length} latest of ${sorted.length} records in window. Older records remain available in the Workbench.`
-    : `Older records remain available in the Workbench.`;
-  pdf.text(sanitize(note), ctx.MX, ctx.y + 10);
-  setRoboto(pdf, "regular");
-  ctx.y += 16;
+  // Client-facing reports intentionally omit the "Showing N latest of M"
+  // notice. The table cap is internal Workbench logic and surfacing it
+  // weakens the PDF.
+  void truncated;
+  void sorted;
   // Touch the cadence helper so removing it would not silently regress —
   // and to make the per-cadence behaviour obvious to readers of this code.
   void reportCadence(topic);
