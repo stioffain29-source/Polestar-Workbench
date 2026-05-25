@@ -264,30 +264,54 @@ export default function ReportEditor() {
       setShowFuelJson(false);
       setAllowMissingExport(false);
       setExportError(null);
+      setSampleAutoSeeded(false);
     }
   }, [id]);
+
+  // Tracks whether the current in-memory market data came from the
+  // auto-seed (no persisted hardNumbers) vs. the saved DB row. Drives
+  // the "unsaved sample data" banner so authors aren't misled into
+  // thinking placeholder values are real.
+  const [sampleAutoSeeded, setSampleAutoSeeded] = useState(false);
 
   // Seed both the form-based panel and the JSON advanced view from the
   // persisted payload once per report. Round-tripping through the
   // canonical builder guarantees the form shows exactly what the
   // preview/PDF will read on the next render.
+  //
+  // Fuel Watch UX rule: opening a report with no persisted market data
+  // must NOT leave the editor blocked behind a red banner. Auto-seed
+  // FUEL_MARKET_DATA_SAMPLE into the in-memory form so the preview and
+  // PDF are immediately usable. The sample stays in-memory only — it
+  // is not written back to the DB unless the author clicks Save.
   useEffect(() => {
     if (!report) return;
     if (hardNumbersSeededForId.current === report.id) return;
     hardNumbersSeededForId.current = report.id;
+    const topic = report.topic ?? "fuel";
+    const isFuel = topic === "fuel";
+    const hasPersisted = report.hardNumbers != null;
+    const effectiveHardNumbers = hasPersisted
+      ? report.hardNumbers
+      : (isFuel ? FUEL_MARKET_DATA_SAMPLE : null);
     setHardNumbersText(
-      report.hardNumbers ? JSON.stringify(report.hardNumbers, null, 2) : "",
+      effectiveHardNumbers ? JSON.stringify(effectiveHardNumbers, null, 2) : "",
     );
     setHardNumbersError(null);
-    setHardNumbersEdited(undefined);
+    // For a fuel report with no saved payload, push the sample into the
+    // live editor buffer so preview and PDF see it without requiring
+    // any click. For saved reports, leave the buffer undefined so the
+    // canonical view reads from `report.hardNumbers` directly.
+    setHardNumbersEdited(isFuel && !hasPersisted ? FUEL_MARKET_DATA_SAMPLE : undefined);
     const seeded = buildFuelWatchReportData(
-      { issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10), hardNumbers: report.hardNumbers },
+      { issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10), hardNumbers: effectiveHardNumbers },
       [],
     );
     setFuelForm(fuelMarketFormFromData(seeded));
     setFuelFormErrors([]);
     setAllowMissingExport(false);
     setExportError(null);
+    setSampleAutoSeeded(isFuel && !hasPersisted);
   }, [report]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -349,6 +373,7 @@ export default function ReportEditor() {
         // form should show what was just written.
         hardNumbersSeededForId.current = null;
         setHardNumbersEdited(undefined);
+        setSampleAutoSeeded(false);
       },
     });
   };
@@ -363,6 +388,7 @@ export default function ReportEditor() {
     setFuelForm(next);
     setAllowMissingExport(false);
     setExportError(null);
+    setSampleAutoSeeded(false);
     const built = buildHardNumbersFromForm(next);
     setFuelFormErrors(built.errors);
     const prior =
@@ -392,6 +418,7 @@ export default function ReportEditor() {
     setHardNumbersText(text);
     setHardNumbersError(null);
     setHardNumbersEdited(FUEL_MARKET_DATA_SAMPLE);
+    setSampleAutoSeeded(false);
     // Reseed the form so the user can edit individual fields next.
     const seeded = buildFuelWatchReportData(
       { issueDate: form.issueDate, hardNumbers: FUEL_MARKET_DATA_SAMPLE },
@@ -412,6 +439,7 @@ export default function ReportEditor() {
     }
     setHardNumbersError(null);
     setHardNumbersEdited(v.value);
+    setSampleAutoSeeded(false);
     // Sync the form from the validated JSON so switching back to the
     // form view doesn't silently discard the edit.
     const seeded = buildFuelWatchReportData(
@@ -520,6 +548,15 @@ export default function ReportEditor() {
 
           {form.topic === "fuel" && (
             <div className="border-t border-border pt-4 mt-2 space-y-3">
+              {sampleAutoSeeded && (
+                <div
+                  className="text-[11px] leading-snug p-2 rounded-sm border"
+                  style={{ background: "#f3f4fa", borderColor: "#465bff", color: "#0b0a3d", fontFamily: "Roboto, sans-serif" }}
+                >
+                  <span className="font-bold uppercase tracking-widest text-[10px] mr-2" style={{ color: "#465bff" }}>Sample data</span>
+                  This report has no saved market data, so sample values are loaded in the form and preview. Edit the fields below and click Save to persist your own numbers, or Save as-is to keep the sample.
+                </div>
+              )}
               <div className="flex items-end justify-between gap-2">
                 <div>
                   <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
@@ -640,6 +677,7 @@ export default function ReportEditor() {
                       setHardNumbersText(e.target.value);
                       setHardNumbersError(null);
                       setHardNumbersEdited(undefined);
+                      setSampleAutoSeeded(false);
                     }}
                     className="rounded-sm font-mono text-[11px]"
                   />
