@@ -200,6 +200,37 @@ export function drawSectionHeading(ctx: Ctx, title: string) {
   ctx.y += 14;
 }
 
+/**
+ * Atomic "section heading + body" renderer. Measures the heading PLUS
+ * the first paragraph of the body together; if they will not fit on
+ * the current page, pushes the whole section to a fresh page before
+ * drawing the heading. This is the orphan-protection contract for
+ * Fuel Watch — used so a heading like "POLESTAR VIEW" can never sit
+ * alone at the foot of a page while its body lands on the next one.
+ */
+export function drawSectionWithProse(ctx: Ctx, title: string, body: string) {
+  const { pdf, CW } = ctx;
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(10);
+  const lineH = 14;
+  const paragraphs = sanitize(body).split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length === 0) {
+    drawSectionHeading(ctx, title);
+    return;
+  }
+  const firstParaLines: string[] = pdf.splitTextToSize(paragraphs[0], CW);
+  // Heading block ≈ 6 (text) + 14 (gap to body) + small lead-in.
+  // The body block we want to keep together = first paragraph lines.
+  const headingBlockH = 6 + 14 + 8;
+  const firstParaH = firstParaLines.length * lineH + 6;
+  // Match the lead-in spacing drawSectionHeading adds when it is not
+  // at the top of the page (10pt). Conservative: always include it.
+  const need = headingBlockH + firstParaH + 10;
+  if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
+  drawSectionHeading(ctx, title);
+  renderProse(ctx, body);
+}
+
 export function renderProse(ctx: Ctx, body: string) {
   const { pdf, MX, CW } = ctx;
   setRoboto(pdf, "regular");

@@ -1,0 +1,113 @@
+Fuel Watch final correction. Get this right in one pass.
+
+Scope:
+Fuel Watch PDF export and preview only.
+
+Do not rebuild the report.
+Do not touch market data plumbing.
+Do not touch Fast Facts data.
+Do not touch Jet Fuel chart data.
+Do not touch branding, fonts, schema, save/reload, or editor state.
+
+Current problems:
+1. Polestar View heading appears, but the Polestar View body is separated onto the next page. In the visible report flow it looks like there is no Polestar View.
+2. Section heading orphan protection is not working.
+3. Executive Summary still contains meta-report wording.
+4. Situation / What Happened still overlap with Market Read and Operational Read.
+5. Regional Highlights repeat route-pressure language.
+
+Required fixes:
+
+1. Fix Polestar View pagination properly
+
+The Polestar View heading and its first paragraph must stay together.
+
+If there is not enough space on the current page for:
+- the Polestar View heading
+- the underline/rule
+- at least the first paragraph
+
+then move the whole Polestar View section to the next page.
+
+Do not allow this:
+
+Page 3:
+POLESTAR VIEW
+
+Page 4:
+Fuel Watch is flagging...
+
+That is unacceptable.
+
+Apply the same orphan protection to all Fuel Watch section headings.
+
+2. Ensure Polestar View is always rendered
+
+Polestar View must appear as a complete section in the exported PDF.
+
+It must include both:
+- heading
+- body text
+
+Do not silently drop it.
+Do not render only the heading.
+Do not split heading from body.
+
+3. Remove meta-report wording from Executive Summary
+
+Remove this kind of text:
+
+“The Market Read and Operational Read sections that follow translate those two layers into a working view.”
+
+A client does not need the report structure explained.
+
+Executive Summary should give the read, not explain the document.
+
+4. Tighten Situation and What Happened
+
+Keep both sections short.
+
+Situation:
+- current operating picture
+- why the cycle matters
+
+What Happened:
+- what changed or was reported
+- no repetition of Market Read or Operational Read
+- no “the table below” language
+
+5. Vary Regional Highlights
+
+Iran and Pakistan currently repeat similar route-pressure wording.
+
+Keep Iran as the main chokepoint / Hormuz pressure point.
+
+Make India and Pakistan distinct:
+- India: pump price, forecourt, transport cost, local movement
+- Pakistan: availability, pricing, power resilience, operational exposure
+
+Do not reuse the same sentence in multiple country reads.
+
+6. Keep what is working
+
+Do not change:
+- Fast Facts
+- Jet Fuel Price Trajectory
+- Market Read
+- Operational Read
+- Producer and Buyer Actions table
+- Related Incidents filtering
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View wording except where needed for pagination
+
+Acceptance check:
+Export a fresh Fuel Watch PDF and confirm:
+
+- Polestar View heading and body appear together.
+- No section heading is stranded at the bottom of a page.
+- Executive Summary no longer contains meta-report wording.
+- Situation and What Happened are short and useful.
+- Regional Highlights do not repeat the same route-pressure sentence.
+- Report remains clean and does not lose the improved written analysis.

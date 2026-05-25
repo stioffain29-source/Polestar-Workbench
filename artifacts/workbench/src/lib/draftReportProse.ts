@@ -236,30 +236,30 @@ const FUEL: ReportPack = {
       ? ` ${lead} produced the clearest country signal${countries && countries !== lead ? `, with further reporting from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
     const para1 = `Fuel risk this ${cadence} cycle reads as a cost-and-continuity issue rather than a single dramatic event. Pressure across the window was driven by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
-    const para2 = `The market indicators in the Fast Facts and the Jet Fuel Price Trajectory are the cost floor for the read; the incident picture below adds the operational colour — shortages, forecourt disruption, subsidy moves and route pressure where they appear. The Market Read and Operational Read sections that follow translate those two layers into a working view.`;
+    const para2 = `Cost indicators are holding above easy-budget levels, and the incident picture adds operational stress — shortages, forecourt disruption, subsidy moves and route pressure where they appear — rather than relief.`;
     const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
-  // Situation: standing fuel exposure plus current market posture, not
-  // a one-line headline restatement. Two sentences.
-  situation: ({ types, lead }) => {
-    const standing = `Fuel exposure for this cycle sits across three layers: a crude and jet cost floor visible in the Fast Facts, a downstream availability picture shaped by shortages, route pressure and policy moves, and a contract-economics layer where subsidy, levy and surcharge clauses do the actual financial damage.`;
-    const focus = types
-      ? ` ${types.charAt(0).toUpperCase() + types.slice(1)} are the recurring threads this window, which is what makes the read a continuity question rather than a passing price story.`
-      : ` The incident layer is light this window, so the read leans on the market indicators and on standing exposures rather than fresh operational evidence.`;
+  // Situation: short — current operating picture, why the cycle
+  // matters. No section cross-references, no meta-report wording.
+  situation: ({ lead }) => {
     const where = lead ? ` ${lead} is the country carrying the most weight.` : "";
-    return `${standing}${focus}${where}`;
+    return `Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream. The cycle matters because the cost shock and the access shock are arriving together, which is when contract economics and operational continuity stop being separate problems.${where}`;
   },
-  // What Happened: concrete pattern from the incident set, tied to the
-  // operational consequence — never a generic "reporting was shaped by"
-  // sentence on its own.
+  // What Happened: short — what changed or was reported. No
+  // cross-references to Market Read / Operational Read, no "table
+  // below" language.
   whatHappened: ({ types, countries, sev, lead }) => {
     if (!types) {
-      return `Classifiable fuel reporting was light this cycle, with no single pattern dominating the window.${sevTail(sev)} The market indicators in the Fast Facts carry the bulk of the read; the incident layer adds little new colour, which is itself worth noting.`;
+      return `Classifiable fuel reporting was light this cycle, with no single pattern dominating the window.${sevTail(sev)}`;
     }
-    const para1 = `The pattern this cycle was ${types}${lead ? ` concentrated on ${lead}` : ""}${countries && countries !== lead ? `, with secondary reporting from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.${sevTail(sev)}`;
-    const para2 = `The operational read of that pattern is in the Operational Read section below; the table that follows lists the underlying records so each line in this section is traceable to source.`;
-    return `${para1}\n\n${para2}`;
+    const secondaries = countries && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` concentrated on ${lead}${secondaries ? `, with secondary reporting from ${secondaries}` : ""}`
+      : "";
+    return `Reporting this cycle was led by ${types}${geo}.${sevTail(sev)}`;
   },
   // What Matters: two analytical paragraphs connecting prices, jet movement,
   // shortage / route pressure and business continuity.

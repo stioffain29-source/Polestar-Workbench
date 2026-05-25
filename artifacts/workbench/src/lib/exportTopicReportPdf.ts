@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import {
-  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
+  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
@@ -542,11 +542,11 @@ export async function exportTopicReportPdf(
     // Operational Read, Regional Highlights, Producer and Buyer Actions)
     // sit alongside the editor-authored prose so the report reads 60%
     // analysis / 40% data rather than dashboard-style cards.
+    // Use the atomic heading+first-paragraph renderer for every Fuel
+    // Watch section so a heading is never stranded at the foot of a
+    // page while its body lands on the next one.
     const renderProseSection = (label: string, body: string | null | undefined) => {
-      if (body && body.trim()) {
-        drawSectionHeading(ctx, label);
-        renderProse(ctx, body);
-      }
+      if (body && body.trim()) drawSectionWithProse(ctx, label, body);
     };
 
     renderProseSection("Market Read", fuelData.marketData.marketRead);

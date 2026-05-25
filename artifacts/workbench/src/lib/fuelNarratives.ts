@@ -162,13 +162,38 @@ export function buildFuelRegionalHighlights(opts: {
   const ranked = Array.from(byCountry.entries()).sort((a, b) => b[1].length - a[1].length);
   const lead = ranked.slice(0, 3);
 
+  // Country-specific overlays so secondary countries never reuse the
+  // chokepoint / Hormuz / war-risk sentence that belongs with Iran.
+  // Iran retains the chokepoint family; India and Pakistan get
+  // distinct framings emphasising pump-price/forecourt and
+  // availability/power-resilience respectively. The overlay applies
+  // to the `why` line only; `phrase` and `watch` still come from the
+  // matched family so the records-clause stays honest to the data.
+  interface CountryOverlay { why: string; watch?: string }
+  const COUNTRY_OVERLAY: Record<string, CountryOverlay> = {
+    india: {
+      why: "Pump-price moves, forecourt disruption and transport cost are where this lands first; local movement and distribution economics absorb the shock before the published headline catches up.",
+      watch: "Watch for state-level fuel-tax changes, fresh forecourt or rationing reports and any operator-side surcharge announcements on road and rail.",
+    },
+    pakistan: {
+      why: "Availability, pricing and power resilience are the operational pressure points here; fuel for generators, freight and field operations is where the cycle hurts before it shows up in macro data.",
+      watch: "Watch for load-shedding patterns, depot-stock advisories and any government action on fuel pricing or commercial allocation.",
+    },
+  };
   const paragraphs: string[] = [];
   for (let idx = 0; idx < lead.length; idx++) {
     const [country, items] = lead[idx];
     const fam = familyFor(items);
     const phrase = fam?.phrase ?? "fuel-operational reporting";
-    const why = fam?.why ?? "These records signal underlying pressure on local fuel availability and cost.";
-    const watch = fam?.watch ?? "Watch the next reporting cycle to confirm whether the pattern persists or eases.";
+    // normaliseCountry() preserves original case ("India", "Pakistan");
+    // overlay keys are lowercase, so lookup must lowercase the country.
+    const overlay = COUNTRY_OVERLAY[country.toLowerCase()];
+    const why = overlay?.why
+      ?? fam?.why
+      ?? "These records signal underlying pressure on local fuel availability and cost.";
+    const watch = overlay?.watch
+      ?? fam?.watch
+      ?? "Watch the next reporting cycle to confirm whether the pattern persists or eases.";
     const n = items.length;
     const recordsClause = n === 1 ? "A single record this cycle points to" : `${n} records this cycle point to`;
     let opener: string;
