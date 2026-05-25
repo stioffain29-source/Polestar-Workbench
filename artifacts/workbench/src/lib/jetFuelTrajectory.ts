@@ -106,13 +106,18 @@ function parseLegacyCard(v: unknown) {
 
 function parseDataCard(v: unknown): FuelDataCard | null {
   if (!isRecord(v)) return null;
-  const label = str(v.label);
-  if (!label) return null;
+  const baseLabel = str(v.label);
+  if (!baseLabel) return null;
   const rawValue = v.value;
   let value: number | string;
   if (typeof rawValue === "number" && Number.isFinite(rawValue)) value = rawValue;
   else if (typeof rawValue === "string" && rawValue.trim()) value = rawValue.trim();
   else return null;
+  // Allow a `benchmark` field on price cards (e.g. for jet fuel entries
+  // inside the prices array). It becomes part of the label so the
+  // benchmark name renders without a separate column.
+  const benchmark = str(v.benchmark);
+  const label = benchmark ? `${baseLabel} — ${benchmark}` : baseLabel;
   const out: FuelDataCard = { label, value };
   const unit = str(v.unit); if (unit) out.unit = unit;
   const change = str(v.change); if (change) out.change = change;
@@ -198,10 +203,14 @@ export function parseFuelHardNumbers(raw: unknown): ParsedFuelHardNumbers {
         .filter((c): c is NonNullable<ReturnType<typeof parseLegacyCard>> => c !== null)
     : [];
 
-  const prices = parseCardArray(raw.prices);
-  const supply = parseCardArray(raw.supply);
-  const policy = parseCardArray(raw.policy);
-  const routes = parseCardArray(raw.routes);
+  // Top-level fields are the canonical home for the v2 shape, but the
+  // jsonb may also wrap them in a `fastFacts` container. Merge both so
+  // either layout works without authors having to choose.
+  const ff = isRecord(raw.fastFacts) ? raw.fastFacts : {};
+  const prices = [...parseCardArray(raw.prices), ...parseCardArray(ff.prices)];
+  const supply = [...parseCardArray(raw.supply), ...parseCardArray(ff.supply)];
+  const policy = [...parseCardArray(raw.policy), ...parseCardArray(ff.policy)];
+  const routes = [...parseCardArray(raw.routes), ...parseCardArray(ff.routes)];
   const jetFuel = parseJetFuelSnapshot(raw.jetFuel);
   const trajectory = parseTrajectoryContainer(raw.jetFuelTrajectory);
 

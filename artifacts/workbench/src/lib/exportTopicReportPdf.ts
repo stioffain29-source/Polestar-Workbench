@@ -371,11 +371,9 @@ export async function exportTopicReportPdf(
   );
   const isFuel = data.topic === "fuel";
   if (isFuel) {
-    // Fuel Watch uses Hard Numbers in the slot Fast Facts occupies for
-    // other topics. The cards are derived from incidents on file —
-    // market-price cards are omitted entirely until a verified source
-    // is wired in (no invented prices).
-    drawSectionHeading(ctx, "Hard Numbers");
+    // Fuel Watch's Fast Facts is a fuel-market block (prices / jet fuel
+    // / supply / policy / routes), not a generic incident counter.
+    drawSectionHeading(ctx, "Fast Facts");
     const fuelCards = computeFuelHardNumbers({
       issueDate: data.issueDate,
       incidents,

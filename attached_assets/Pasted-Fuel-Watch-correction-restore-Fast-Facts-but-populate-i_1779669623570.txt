@@ -1,0 +1,209 @@
+Fuel Watch correction: restore Fast Facts, but populate it with real hard numbers.
+
+Scope:
+Fuel Watch only.
+
+Problem:
+The report changed “Fast Facts” to “Hard Numbers”, but that is not what was wanted.
+
+Required:
+The section should be called:
+
+FAST FACTS
+
+But the contents of Fast Facts should be hard numbers: fuel prices, jet fuel, supply indicators and policy/cost indicators.
+
+Do not call the section “Hard Numbers”.
+Do not use generic incident-count cards as the main content.
+Do not show an empty jet fuel section if a usable jet fuel benchmark can be wired in.
+
+1. Rename section back to FAST FACTS
+
+Current:
+HARD NUMBERS
+
+Required:
+FAST FACTS
+
+But the cards inside Fast Facts must be stronger fuel indicators, not weak generic report metrics.
+
+2. Fast Facts must contain hard numbers
+
+Fast Facts should prioritise:
+
+Price indicators:
+- Brent crude price
+- WTI crude price
+- jet fuel price
+- diesel price movement
+- petrol price movement
+- pump price movement where available
+
+Supply indicators:
+- refinery outages
+- fuel shortages / rationing
+- forecourt disruption
+- tanker / fuel transport disruption
+- generator fuel exposure
+
+Policy / cost indicators:
+- subsidy moves
+- fuel levy moves
+- fuel tax / excise / duty changes
+- price controls
+- import/export restrictions affecting fuel
+
+Route / chokepoint indicators:
+- fuel-relevant Hormuz / Red Sea / Malacca disruption
+- fuel cargo delays
+- tanker route disruption
+- war-risk or insurance pressure affecting fuel movement
+
+Incident counts may appear only as supporting cards. They must not dominate Fast Facts.
+
+3. Jet fuel must be wired in
+
+Jet fuel must appear in Fast Facts when data exists.
+
+Do not hardcode Singapore as the only acceptable benchmark.
+
+Acceptable jet fuel benchmarks include:
+- Asia jet fuel benchmark
+- Singapore jet fuel benchmark
+- global jet fuel benchmark
+- IATA / Platts Jet Fuel Price Monitor if available and usable
+- US Gulf Coast kerosene-type jet fuel
+- EIA / FRED jet fuel series
+- manually entered jet fuel series in hardNumbers jsonb
+
+Do not scrape paid Platts data.
+Do not fake jet fuel prices.
+
+If no automatic source exists yet, support manual jet fuel entry through hardNumbers jsonb so the report can still be populated.
+
+4. Fast Facts data structure
+
+Support manual or stored values such as:
+
+{
+  "fastFacts": {
+    "prices": [
+      {
+        "label": "Brent crude",
+        "value": 109.26,
+        "unit": "USD/bbl",
+        "change": "+7.9% 7d",
+        "asOf": "2026-05-15",
+        "source": "Manual"
+      },
+      {
+        "label": "WTI crude",
+        "value": 101.02,
+        "unit": "USD/bbl",
+        "change": "+10.5% 7d",
+        "asOf": "2026-05-15",
+        "source": "Manual"
+      },
+      {
+        "label": "Jet fuel",
+        "benchmark": "US Gulf Coast kerosene-type jet fuel",
+        "value": 4.152,
+        "unit": "USD/gal",
+        "change": "+2.5% 7d",
+        "asOf": "2026-05-15",
+        "source": "EIA / FRED"
+      }
+    ],
+    "supply": [
+      {
+        "label": "Fuel shortages / rationing",
+        "value": 5,
+        "unit": "events",
+        "note": "reporting window"
+      }
+    ],
+    "policy": [
+      {
+        "label": "Subsidy / levy moves",
+        "value": 1,
+        "unit": "policy event",
+        "note": "reporting window"
+      }
+    ],
+    "routes": [
+      {
+        "label": "Fuel-relevant chokepoint pressure",
+        "value": 15,
+        "unit": "records",
+        "note": "Hormuz / route disruption"
+      }
+    ]
+  },
+  "jetFuelTrajectory": {
+    "benchmark": "US Gulf Coast kerosene-type jet fuel",
+    "source": "EIA / FRED",
+    "unit": "USD/gal",
+    "period": "last 30 days",
+    "points": [
+      { "date": "2026-04-17", "value": 3.709 },
+      { "date": "2026-04-24", "value": 3.906 },
+      { "date": "2026-05-01", "value": 4.160 },
+      { "date": "2026-05-08", "value": 4.049 },
+      { "date": "2026-05-15", "value": 4.152 }
+    ]
+  }
+}
+
+The numbers above are example structure only. Do not hardcode them unless deliberately loaded as real report-cycle data.
+
+5. Jet Fuel Price Trajectory
+
+The Jet Fuel Price Trajectory section should use the same jetFuelTrajectory data.
+
+Rules:
+- render the chart when at least 2 valid dated points exist
+- label the benchmark accurately
+- do not call it Singapore unless it is Singapore
+- preview and PDF must match
+- no fake data
+- if no usable data exists, show the empty state
+
+6. Remove the Workbench table notice
+
+Remove this line from Fuel Watch reports:
+
+“Showing 15 latest of X records in window. Older records remain available in the Workbench.”
+
+It is not needed in client-facing reports.
+
+Remove from:
+- preview
+- PDF export
+
+Do not replace it with another note.
+
+7. Fix Regional Highlights country handling
+
+The latest export shows:
+
+“United Arab Emirates; Iran”
+
+That broken combined country string must not appear.
+
+Split countries cleanly.
+If a record has multiple countries, handle them separately or choose the incident location country.
+Do not output semicolon-combined country strings as a country label.
+
+8. Acceptance check
+
+Export a fresh Fuel Watch PDF and confirm:
+
+- Section title is FAST FACTS, not HARD NUMBERS.
+- Fast Facts contains fuel price/supply/policy indicators.
+- Jet fuel appears in Fast Facts when data exists.
+- Jet Fuel Price Trajectory renders when valid data exists.
+- If jet fuel data is missing, the empty state appears honestly.
+- The “Showing 15 latest...” Workbench line is gone.
+- No “United Arab Emirates; Iran” style broken country strings.
+- Fast Facts does not become a generic incident-count block.
+- Preview and PDF match.

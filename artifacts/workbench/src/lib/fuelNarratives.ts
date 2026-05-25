@@ -20,13 +20,24 @@ function haystack(i: TopicFastFactsIncident): string {
   return [i.title ?? "", i.summary ?? ""].join(" ").toLowerCase();
 }
 
-function hasUsableCountry(c: string | null | undefined): c is string {
-  if (!c) return false;
-  const trimmed = c.trim();
-  if (!trimmed) return false;
-  const lc = trimmed.toLowerCase();
-  if (lc === "unknown" || lc === "n/a" || lc === "global" || lc === "international") return false;
-  return true;
+/**
+ * Normalise a raw country field for use as a regional-highlight key.
+ * Some upstream records carry combined values like "United Arab
+ * Emirates; Iran" or "Saudi Arabia / Yemen"; we split on `;` / `/` /
+ * `,` / `&` and pick the first usable country so the highlight row
+ * is anchored on one place. Returns null when nothing usable remains.
+ */
+function normaliseCountry(c: string | null | undefined): string | null {
+  if (!c) return null;
+  const parts = c.split(/\s*[;/,&]\s*|\s+\bvs?\.?\b\s+/i);
+  for (const raw of parts) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const lc = trimmed.toLowerCase();
+    if (lc === "unknown" || lc === "n/a" || lc === "global" || lc === "international") continue;
+    return trimmed;
+  }
+  return null;
 }
 
 // Operational issue families, in priority order. The first family that
@@ -95,8 +106,8 @@ export function buildFuelRegionalHighlights(opts: {
 
   const byCountry = new Map<string, TopicFastFactsIncident[]>();
   for (const i of window) {
-    if (!hasUsableCountry(i.country)) continue;
-    const key = i.country!.trim();
+    const key = normaliseCountry(i.country);
+    if (!key) continue;
     const arr = byCountry.get(key) ?? [];
     arr.push(i);
     byCountry.set(key, arr);

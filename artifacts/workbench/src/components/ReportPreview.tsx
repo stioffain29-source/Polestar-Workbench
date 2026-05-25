@@ -308,7 +308,7 @@ export default function ReportPreview({
 
         {isFuel ? (
           <>
-            <Section title="Hard Numbers">
+            <Section title="Fast Facts">
               {fuelHardNumbers.length > 0 ? (
                 <>
                   <FastFactsGrid cards={fuelHardNumbers} />
