@@ -12,22 +12,85 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES, sourceStatusClass } from "@/lib/topics";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+// Operational-impact playbook for non-operational sources. Each entry
+// gives operations staff a clear issue / impact / required-action read
+// without forcing them to interpret raw status enums or error blobs.
+interface ActionPlaybook {
+  issue: string;
+  impact: string;
+  action: string;
+}
+const ACTION_PLAYBOOK: Record<string, ActionPlaybook> = {
+  failing: {
+    issue: "Source is returning errors on collection.",
+    impact: "Topic feed is degraded — backfill missing for the affected window.",
+    action: "Investigate the upstream error, restore credentials or scraper, and replay the missing window.",
+  },
+  blocked: {
+    issue: "Source is actively blocking the collector (rate-limit, IP ban, CAPTCHA, or paywall).",
+    impact: "No new records on this source until access is restored.",
+    action: "Rotate credentials / IP, negotiate access with the publisher, or replace the source with an equivalent.",
+  },
+  stale: {
+    issue: "No fresh records inside the staleness window.",
+    impact: "Topic feed has a coverage gap that may not be obvious in the dashboard.",
+    action: "Confirm upstream cadence, refresh credentials, and verify the parser still matches the source schema.",
+  },
+  delayed: {
+    issue: "Records are arriving later than the published SLA.",
+    impact: "Reports built late in the cycle may miss the latest items from this source.",
+    action: "Contact upstream provider to confirm SLA; treat the source as advisory until cadence recovers.",
+  },
+  not_configured: {
+    issue: "Source has been listed but never wired up.",
+    impact: "Source contributes zero records — onboarding is the bottleneck.",
+    action: "Complete onboarding (credentials, parser, manual workflow) or remove from the source list.",
+  },
+};
+function playbookFor(status: string): ActionPlaybook | null {
+  return ACTION_PLAYBOOK[status] ?? null;
+}
 
 export default function Sources() {
   const qc = useQueryClient();
   const [topic, setTopic] = useState("");
   const [status, setStatus] = useState("");
-  const params: Record<string, unknown> = {};
-  if (topic) params.topic = topic;
-  if (status) params.status = status;
-  const { data: sources = [] } = useListSources(params);
+  // Fetch the full source list once, then derive both the filtered
+  // table view and the (unfiltered) Action Required panel from the
+  // same dataset. This avoids a duplicate `/api/sources` round trip.
+  const { data: allSources = [] } = useListSources();
   const { data: health } = useGetSourceHealth();
   const [editing, setEditing] = useState<Source | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const del = useDeleteSource();
+
+  const sources = useMemo(
+    () =>
+      allSources.filter(
+        (s) => (!topic || s.topic === topic) && (!status || s.status === status),
+      ),
+    [allSources, topic, status],
+  );
+
+  const actionItems = useMemo(
+    () =>
+      allSources
+        .filter((s) => s.status !== "operational")
+        .sort((a, b) => {
+          const order: Record<string, number> = {
+            failing: 0, blocked: 1, stale: 2, not_configured: 3, delayed: 4,
+          };
+          const oa = order[a.status] ?? 9;
+          const ob = order[b.status] ?? 9;
+          if (oa !== ob) return oa - ob;
+          return a.name.localeCompare(b.name);
+        }),
+    [allSources],
+  );
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getListSourcesQueryKey() });
@@ -62,6 +125,61 @@ export default function Sources() {
           return <Kpi key={s} label={s.replace(/_/g, " ")} value={c} />;
         })}
       </div>
+
+      {actionItems.length > 0 && (
+        <div className="bg-card border border-border rounded-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-destructive/5">
+            <AlertTriangle className="w-4 h-4 text-destructive" />
+            <div className="text-sm font-serif font-bold uppercase tracking-wide text-destructive">
+              Action Required
+            </div>
+            <div className="text-xs text-muted-foreground ml-1">
+              {actionItems.length} source{actionItems.length === 1 ? "" : "s"} need operations follow-up
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {actionItems.map((s) => {
+              const pb = playbookFor(s.status);
+              if (!pb) return null;
+              const issueText = s.errorMessage?.trim() || pb.issue;
+              return (
+                <div key={s.id} className="px-4 py-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_1fr] gap-3 text-sm">
+                  <div>
+                    <div className="font-serif font-bold text-primary">{s.name}</div>
+                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-1">
+                      {TOPIC_LABELS[s.topic] ?? s.topic}
+                    </div>
+                    <div className="mt-1">
+                      <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusClass(s.status))}>
+                        {s.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Issue</div>
+                    <div className="text-foreground">{issueText}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Impact: {pb.impact}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Required Action</div>
+                    <div className="text-foreground">{pb.action}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Owner / Status</div>
+                    <div className="text-foreground">{s.notes?.trim() || "Unassigned — assign an owner in source notes."}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Last success: {s.lastSuccessAt ? format(new Date(s.lastSuccessAt), "dd MMM HH:mm") : "—"}
+                      {s.lastFailureAt ? ` · Last failure: ${format(new Date(s.lastFailureAt), "dd MMM HH:mm")}` : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="bg-card border border-border rounded-sm p-3 flex gap-2">
         <Select value={topic || "all"} onValueChange={(v) => setTopic(v === "all" ? "" : v)}>

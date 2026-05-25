@@ -724,12 +724,16 @@ function buildRegionalCountryRead(opts: {
       absent.push(c);
     }
   }
-  const coverageBits: string[] = [];
-  if (present.length > 0) coverageBits.push(`${joinList(present)} on file this cycle.`);
-  if (absent.length > 0) coverageBits.push(`${joinList(absent)}: no qualifying records (checked, not omitted).`);
-  const coverage = coverageBits.length > 0 ? `Coverage check — ${coverageBits.join(" ")}` : "";
+  // Source-coverage diagnostics ("Coverage check — Nepal on file this
+  // cycle. Australia ... no qualifying records (checked, not omitted)")
+  // are an internal Source Health concern and must not appear in
+  // client-facing PDFs. The Sources page surfaces the same information
+  // to operations staff. Suppress here. Reference the present/absent
+  // arrays so the static-analysis linter does not flag them while the
+  // logic stays in place for any future internal use.
+  void present;
+  void absent;
   const blocks = [headline, ...countryParas, reach];
-  if (coverage) blocks.push(coverage);
   return blocks.join("\n\n");
 }
 
