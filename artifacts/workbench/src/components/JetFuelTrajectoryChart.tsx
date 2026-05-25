@@ -43,7 +43,9 @@ function pickUnit(series: JetFuelPricePoint[]): string {
 }
 
 export default function JetFuelTrajectoryChart({ data, benchmarkLabel }: JetFuelTrajectoryChartProps) {
-  const benchmark = benchmarkLabel ?? "Singapore jet fuel benchmark";
+  // Never assume Singapore. When no label is supplied, fall back to a
+  // neutral phrase so the chart subtitle reads honestly.
+  const benchmark = benchmarkLabel?.trim() || "Jet fuel benchmark";
 
   if (!data || data.length < 2) {
     return (

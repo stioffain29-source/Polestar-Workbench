@@ -20,7 +20,7 @@ import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import { computeTopicFastFacts } from "./topicFastFacts";
-import { computeFuelHardNumbers } from "./fuelHardNumbers";
+import { computeFuelHardNumbers, fuelHasNoPriceIndicators, FUEL_NO_PRICE_NOTE } from "./fuelHardNumbers";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "./fuelNarratives";
 import {
   getFuelJetFuelTrajectory,
@@ -42,7 +42,7 @@ export interface TopicReportData {
   polestarView?: string | null;
   /**
    * Raw report.hardNumbers jsonb. Parsed by jetFuelTrajectory.ts to drive
-   * the Jet Fuel Price Trajectory chart and the Singapore Jet Fuel card.
+   * the Jet Fuel Price Trajectory chart and the jet fuel hard-number card.
    */
   hardNumbers?: unknown;
 }
@@ -381,14 +381,19 @@ export async function exportTopicReportPdf(
     // market-price cards are omitted entirely until a verified source
     // is wired in (no invented prices).
     drawSectionHeading(ctx, "Hard Numbers");
-    drawFastFactsKpiCards(
-      ctx,
-      computeFuelHardNumbers({
-        issueDate: data.issueDate,
-        incidents,
-        hardNumbersRaw: data.hardNumbers,
-      }) as KpiCardData[],
-    );
+    const fuelCards = computeFuelHardNumbers({
+      issueDate: data.issueDate,
+      incidents,
+      hardNumbersRaw: data.hardNumbers,
+    }) as KpiCardData[];
+    if (fuelCards.length === 0) {
+      renderProse(ctx, FUEL_NO_PRICE_NOTE);
+    } else {
+      drawFastFactsKpiCards(ctx, fuelCards);
+      if (fuelHasNoPriceIndicators(data.hardNumbers)) {
+        renderProse(ctx, FUEL_NO_PRICE_NOTE);
+      }
+    }
 
     // Jet Fuel Price Trajectory — render the real chart only when the
     // report carries a usable series (≥2 valid dated points). Otherwise

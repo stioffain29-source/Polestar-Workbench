@@ -1,9 +1,10 @@
 // Fuel Watch auto-derived narrative blocks.
 //
 // Regional Highlights and Producer and Buyer Actions are derived from
-// the in-window incident set. If there is no signal, the helper returns
-// null and the caller must omit the section — the brand spec forbids
-// padding empty sections with generic prose.
+// the in-window incident set. Outputs read like analyst prose — never
+// raw headline dumps and never weak "Unknown" rows. The helpers return
+// null when there is no usable signal so the caller can omit the
+// section instead of padding it.
 
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
 
@@ -19,10 +20,71 @@ function haystack(i: TopicFastFactsIncident): string {
   return [i.title ?? "", i.summary ?? ""].join(" ").toLowerCase();
 }
 
+function hasUsableCountry(c: string | null | undefined): c is string {
+  if (!c) return false;
+  const trimmed = c.trim();
+  if (!trimmed) return false;
+  const lc = trimmed.toLowerCase();
+  if (lc === "unknown" || lc === "n/a" || lc === "global" || lc === "international") return false;
+  return true;
+}
+
+// Operational issue families, in priority order. The first family that
+// matches the country's most-severe incident becomes the headline phrase
+// for the country paragraph.
+interface IssueFamily {
+  test: RegExp[];
+  phrase: string;
+}
+const ISSUE_FAMILIES: IssueFamily[] = [
+  {
+    test: [/\b(strait of hormuz|hormuz)\b/, /\bbab[- ]el[- ]mandeb\b/, /\bred sea\b/, /\bmalacca\b/, /\bsuez\b/],
+    phrase: "chokepoint pressure and tanker-route disruption",
+  },
+  {
+    test: [/\b(refinery|refineries) (outage|disruption|fire|attack|halt|maintenance|shutdown|closure)/],
+    phrase: "refinery disruption and supply-side outage",
+  },
+  {
+    test: [/\b(fuel|petrol|diesel|lpg|kerosene|jet fuel) (shortage|stockout|rationing|queue|queues)/, /\bforecourt (closure|shut|queue|disruption)/],
+    phrase: "shortages, rationing and forecourt disruption",
+  },
+  {
+    test: [/\btanker (driver|drivers|strike|shortage|attack|blockade|convoy)/, /\b(fuel|tanker) (convoy|hijack|seizure)/],
+    phrase: "tanker and fuel-transport disruption",
+  },
+  {
+    test: [
+      /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene)/,
+      /\b(price control|price cap|price freeze|export ban|import ban)/,
+    ],
+    phrase: "policy and subsidy / levy moves",
+  },
+  {
+    test: [/\b(pump price|petrol price|diesel price|fuel price) (hike|rise|increase|cut|drop|fall|change)/, /\bfuel surcharge\b/],
+    phrase: "pump and surcharge pricing pressure",
+  },
+  {
+    test: [/\b(oil|crude) (export ban|export halt|embargo|sanctions|sabotage|attack|spill)/],
+    phrase: "crude supply-chain and sanctions pressure",
+  },
+];
+
+function issuePhrase(items: TopicFastFactsIncident[]): string {
+  // Find the first family that any item in the country's set hits.
+  for (const fam of ISSUE_FAMILIES) {
+    for (const i of items) {
+      const t = haystack(i);
+      if (fam.test.some((re) => re.test(t))) return fam.phrase;
+    }
+  }
+  return "fuel-operational reporting";
+}
+
 /**
- * Group in-window incidents by country and describe the top 2-3 with
- * the leading operational issue type. Returns null when nothing useful
- * can be said (no country attribution or only one weak record).
+ * Country-level Fuel Watch highlights as analyst prose. Drops records
+ * without a usable country attribution and never emits "Unknown" as a
+ * row. Returns null when there is nothing usable to say.
  */
 export function buildFuelRegionalHighlights(opts: {
   issueDate: string;
@@ -33,11 +95,11 @@ export function buildFuelRegionalHighlights(opts: {
 
   const byCountry = new Map<string, TopicFastFactsIncident[]>();
   for (const i of window) {
-    const c = (i.country ?? "").trim();
-    if (!c) continue;
-    const arr = byCountry.get(c) ?? [];
+    if (!hasUsableCountry(i.country)) continue;
+    const key = i.country!.trim();
+    const arr = byCountry.get(key) ?? [];
     arr.push(i);
-    byCountry.set(c, arr);
+    byCountry.set(key, arr);
   }
   if (byCountry.size === 0) return null;
 
@@ -45,39 +107,131 @@ export function buildFuelRegionalHighlights(opts: {
   const lead = ranked.slice(0, 3);
 
   const paragraphs: string[] = [];
-  for (const [country, items] of lead) {
-    // Pick the most distinctive incident for the country — prefer the
-    // highest-severity record so the narrative anchors on the worst case.
-    const rank: Record<string, number> = { insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5 };
-    const sorted = [...items].sort((a, b) => (rank[(b.severity ?? "").toLowerCase()] ?? 0) - (rank[(a.severity ?? "").toLowerCase()] ?? 0));
-    const anchor = sorted[0];
+  const leadCountry = lead[0]?.[0];
+  for (let idx = 0; idx < lead.length; idx++) {
+    const [country, items] = lead[idx];
+    const phrase = issuePhrase(items);
     const n = items.length;
-    const countLabel = n === 1 ? "1 record" : `${n} records`;
-    const sentence = `${titleCase(country)}: ${countLabel} in window. ${anchor.title.trim().replace(/\.$/, "")}.`;
-    paragraphs.push(sentence);
+    let opener: string;
+    if (idx === 0 && country === leadCountry) {
+      opener = `${titleCase(country)} remains the main pressure point in this window`;
+    } else if (idx === 1) {
+      opener = `${titleCase(country)} also carries fuel signal`;
+    } else {
+      opener = `${titleCase(country)} adds further weight`;
+    }
+    const recordsClause = n === 1 ? "a single record" : `${n} records`;
+    paragraphs.push(`${opener}, with ${recordsClause} tied to ${phrase}.`);
   }
-
   return paragraphs.join("\n\n");
 }
 
-const PRODUCER_RE: RegExp[] = [
-  /\b(opec\+?|saudi aramco|adnoc|qatarenergy|petrobras|rosneft|gazprom|sinopec|cnpc|cnooc|reliance|indian oil|bharat petroleum|hindustan petroleum|ongc|pertamina|petronas)\b/,
-  /\b(refinery|refiner|refining) .{0,30}(announce|cut|raise|expand|restart|shut|maintenance|outage)/,
-  /\b(production|output) (cut|hike|increase|reduce|boost|target)/,
-  /\b(export|import) (quota|ban|restriction|deal|agreement|cap|tariff)/,
-  /\b(supply (contract|deal|agreement|swap)|long[- ]term contract)/,
-];
-const BUYER_RE: RegExp[] = [
-  /\b(airline|carrier) .{0,30}(surcharge|fuel hedge|hedging|capacity (cut|reduction))/,
-  /\b(buyer|importer|trading house|trader) .{0,30}(switch|diversif|cancel|defer|stockpile)/,
-  /\b(strategic reserve|spr|stockpile|inventory) (release|draw|build|tap)/,
-  /\b(fuel hedging|jet fuel hedging|bunker hedging)/,
-  /\b(fleet|logistics operator|trucking firm) .{0,30}(fuel|diesel) (cost|pass[- ]through|surcharge)/,
+// Producer/buyer/government/infrastructure/market classification rules.
+// Order matters: a record is assigned to the first matching category.
+type Category =
+  | "Producer action"
+  | "Buyer action"
+  | "Government / policy action"
+  | "Infrastructure / routing action"
+  | "Market / supply signal";
+
+interface CategoryRule {
+  category: Category;
+  test: RegExp[];
+}
+
+const CATEGORY_RULES: CategoryRule[] = [
+  {
+    category: "Government / policy action",
+    test: [
+      /\b(government|ministry|parliament|cabinet|regulator|state[- ]owned|caucus)\b/,
+      /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene)/,
+      /\b(fuel|petrol|diesel) .{0,20}(subsidy|levy|duty|excise|tax) (cut|hike|raise|removal|removed|reform|reintroduce)/,
+      /\b(price control|price cap|price freeze|export ban|import ban|export quota|import quota)/,
+    ],
+  },
+  {
+    category: "Infrastructure / routing action",
+    test: [
+      /\b(pipeline|terminal|jetty|loading|berth) .{0,30}(bypass|reroute|open|close|shut|expand|sabotage|attack)/,
+      /\b(bypass(?:ing)? hormuz|red sea bypass|alternative route|reroute|rerouting)/,
+      /\b(adnoc|ila|aramco) .{0,30}(pipeline|bypass)/,
+      /\b(storage|stockpile|reserve) (build|release|expand|tap)/,
+    ],
+  },
+  {
+    category: "Buyer action",
+    test: [
+      /\b(airline|carrier) .{0,30}(surcharge|fuel hedge|hedging|capacity (cut|reduction))/,
+      /\b(indian oil|bharat petroleum|hindustan petroleum|sinopec|cnpc) .{0,30}(spot purchase|tender|cargo|import|buy)/,
+      /\b(buyer|importer|trading house|trader|refiner) .{0,30}(switch|diversif|cancel|defer|stockpile|spot purchase|tender)/,
+      /\b(strategic reserve|spr) (release|draw|tap)/,
+      /\b(fuel hedging|jet fuel hedging|bunker hedging)/,
+    ],
+  },
+  {
+    category: "Producer action",
+    test: [
+      /\b(opec\+?|saudi aramco|adnoc|qatarenergy|petrobras|rosneft|gazprom|cnooc|pertamina|petronas|reliance|ongc)\b/,
+      /\b(production|output) (cut|hike|increase|reduce|boost|target|guidance)/,
+      /\b(refinery|refiner|refining) .{0,30}(announce|cut|raise|expand|restart|shut|maintenance|outage)/,
+      /\b(supply (contract|deal|agreement|swap)|long[- ]term contract)/,
+    ],
+  },
+  {
+    category: "Market / supply signal",
+    test: [
+      /\b(brent|wti|crude|oil) (price|prices) (rise|fall|climb|drop|surge|slide|jump|plunge|hit|reach|break)/,
+      /\b(jet fuel|diesel|petrol|gasoline|kerosene) (price|prices) (rise|fall|climb|drop|surge|slide|hit|break)/,
+      /\b(supply (tighten|tightens|squeeze)|demand (jump|rise|fall|drop)|inventory (build|draw))/,
+      /\b(refinery margin|crack spread)/,
+    ],
+  },
 ];
 
+function classifyCategory(t: string): Category | null {
+  for (const rule of CATEGORY_RULES) {
+    if (rule.test.some((re) => re.test(t))) return rule.category;
+  }
+  return null;
+}
+
+function fmtDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  } catch { return ""; }
+}
+
+function pickActor(i: TopicFastFactsIncident, category: Category): string {
+  const t = haystack(i);
+  const ACTORS = [
+    "OPEC+", "OPEC", "Saudi Aramco", "ADNOC", "QatarEnergy", "Petrobras",
+    "Rosneft", "Gazprom", "Sinopec", "CNPC", "CNOOC", "Reliance",
+    "Indian Oil", "Bharat Petroleum", "Hindustan Petroleum", "ONGC",
+    "Pertamina", "Petronas",
+  ];
+  for (const a of ACTORS) {
+    if (t.includes(a.toLowerCase())) return a;
+  }
+  if (category === "Government / policy action") return "Government / policy";
+  if (category === "Infrastructure / routing action") return "Infrastructure operator";
+  if (category === "Market / supply signal") return "Market";
+  return "—";
+}
+
+interface ClassifiedAction {
+  actor: string;
+  category: Category;
+  action: string;
+  date: string;
+}
+
 /**
- * Producer / buyer-side actions referenced in the window. Returns a
- * short bulleted prose block, or null when nothing matches.
+ * Classified producer / buyer / government / infrastructure / market
+ * actions referenced in the window. Returns a clean table-style block
+ * or null when nothing matches.
  */
 export function buildFuelProducerBuyerActions(opts: {
   issueDate: string;
@@ -86,23 +240,45 @@ export function buildFuelProducerBuyerActions(opts: {
   const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
   if (window.length === 0) return null;
 
-  const producers: string[] = [];
-  const buyers: string[] = [];
+  const rows: ClassifiedAction[] = [];
   for (const i of window) {
     const t = haystack(i);
-    if (PRODUCER_RE.some((re) => re.test(t))) producers.push(i.title.trim().replace(/\.$/, ""));
-    if (BUYER_RE.some((re) => re.test(t))) buyers.push(i.title.trim().replace(/\.$/, ""));
+    const category = classifyCategory(t);
+    if (!category) continue;
+    rows.push({
+      actor: pickActor(i, category),
+      category,
+      action: i.title.trim().replace(/\.$/, ""),
+      date: fmtDate(i.occurredAt),
+    });
   }
-  if (producers.length === 0 && buyers.length === 0) return null;
+  if (rows.length === 0) return null;
 
-  const out: string[] = [];
-  if (producers.length > 0) {
-    const shown = producers.slice(0, 4).map((s) => `• Producer: ${s}.`).join("\n");
-    out.push(shown);
+  // Group by category so the block reads cleanly and the strongest
+  // signals (Producer / Buyer / Government) lead.
+  const ORDER: Category[] = [
+    "Producer action",
+    "Buyer action",
+    "Government / policy action",
+    "Infrastructure / routing action",
+    "Market / supply signal",
+  ];
+  const byCategory = new Map<Category, ClassifiedAction[]>();
+  for (const r of rows) {
+    const arr = byCategory.get(r.category) ?? [];
+    arr.push(r);
+    byCategory.set(r.category, arr);
   }
-  if (buyers.length > 0) {
-    const shown = buyers.slice(0, 4).map((s) => `• Buyer: ${s}.`).join("\n");
-    out.push(shown);
+
+  const blocks: string[] = [];
+  for (const cat of ORDER) {
+    const items = byCategory.get(cat);
+    if (!items || items.length === 0) continue;
+    const lines = items.slice(0, 4).map((r) => {
+      const datePart = r.date ? ` (${r.date})` : "";
+      return `• ${r.actor} — ${r.action}${datePart}`;
+    });
+    blocks.push(`${cat}\n${lines.join("\n")}`);
   }
-  return out.join("\n\n");
+  return blocks.join("\n\n");
 }

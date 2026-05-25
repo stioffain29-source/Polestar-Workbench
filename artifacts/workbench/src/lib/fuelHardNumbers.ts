@@ -1,32 +1,50 @@
 // Fuel Watch "Hard Numbers" cards.
 //
-// Replaces the generic Fast Facts block for Fuel Watch only. Every value
-// is derived from incidents on file — no live market prices are invented.
-// Cards that have no data are omitted from the grid rather than padded
-// with dashes or weak placeholders.
+// Hard Numbers is a fuel-market block, not a renamed Fast Facts panel.
+// The required render order is:
+//
+//   1. Price cards         (Brent / WTI / pump / surcharge)
+//   2. Jet fuel card       (latest value, change, source)
+//   3. Supply cards        (refinery outages, shortages, rationing)
+//   4. Policy cards        (subsidy / levy / duty changes)
+//   5. Route cards         (Hormuz / Red Sea / Malacca pressure)
+//
+// Sources, in priority order:
+//   a. Anything supplied in the report's `hardNumbers` jsonb. This is the
+//      authoritative source — we never override a manually-entered price.
+//   b. Incident-derived counters for supply / policy / route tiers. These
+//      back-fill from the in-window incident set so the section is not
+//      empty when manual data is missing. They are never used to fake
+//      price data.
+//
+// We never invent values. Cards with zero signal are omitted. If no
+// price data is supplied at all, the renderer surfaces a single honest
+// note instead of a wall of incident counts.
 
-import { format, parseISO, max as dateMax } from "date-fns";
-import { resolveReportWindow } from "./reportWindow";
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
 import {
+  parseFuelHardNumbers,
   latestJetFuelPoint,
   jetFuelMovement,
   jetFuelBenchmarkLabel,
+  type FuelDataCard,
 } from "./jetFuelTrajectory";
 
 export interface FuelHardNumberCard {
   label: string;
   value: string;
+  /** Short note: change, source or context line. */
   note?: string;
+  /** Severity key, only used for the (rare) severity-tinted accent. */
   severity?: string;
+  /** Optional as-of date, rendered as a small caption. */
+  asOf?: string;
+  /** Optional source attribution, rendered as a small caption. */
+  source?: string;
 }
 
-const SEV_RANK: Record<string, number> = {
-  insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
-};
-const SEV_LABEL: Record<string, string> = {
-  insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme",
-};
+export const FUEL_NO_PRICE_NOTE =
+  "Fuel price indicators are not available for this reporting cycle.";
 
 function matchAny(text: string, patterns: RegExp[]): boolean {
   for (const re of patterns) if (re.test(text)) return true;
@@ -58,123 +76,195 @@ const CHOKEPOINT_RE = [
   /\bchokepoint\b/,
 ];
 
+function formatValue(value: number | string, unit?: string): string {
+  if (typeof value === "string") return unit ? `${value} ${unit}` : value;
+  const formatted = Number.isInteger(value)
+    ? value.toString()
+    : value.toFixed(value >= 100 ? 1 : Math.abs(value) >= 10 ? 2 : 3);
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+function dataCardToHardNumber(c: FuelDataCard): FuelHardNumberCard {
+  const out: FuelHardNumberCard = {
+    label: c.label,
+    value: formatValue(c.value, c.unit),
+  };
+  // Note line carries the change first (most useful signal), then the
+  // free-form note. Source/asOf are surfaced separately as captions.
+  const noteParts: string[] = [];
+  if (c.change) noteParts.push(c.change);
+  if (c.note) noteParts.push(c.note);
+  if (noteParts.length > 0) out.note = noteParts.join(" · ");
+  if (c.asOf) out.asOf = c.asOf;
+  if (c.source) out.source = c.source;
+  return out;
+}
+
 export interface ComputeFuelHardNumbersOpts {
   issueDate: string;
   incidents: TopicFastFactsIncident[];
-  /** Raw report.hardNumbers payload. Used to surface jet fuel prices. */
+  /** Raw report.hardNumbers payload (object or legacy array). */
   hardNumbersRaw?: unknown;
 }
 
 /**
- * Compute the Fuel Watch Hard Numbers cards from in-window incidents.
- * Cards with zero signal are omitted. The first three cards
- * (reporting period, total, highest severity, latest) always render
- * so the section is never empty for a populated report.
+ * Compute the Fuel Watch Hard Numbers cards in the required order.
+ * Returns an empty array when the report carries no price, supply,
+ * policy, route or jet-fuel data — the caller is expected to render
+ * the FUEL_NO_PRICE_NOTE when that happens.
  */
-export function computeFuelHardNumbers(opts: ComputeFuelHardNumbersOpts): FuelHardNumberCard[] {
+export function computeFuelHardNumbers(
+  opts: ComputeFuelHardNumbersOpts,
+): FuelHardNumberCard[] {
   const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
-  const period = resolveReportWindow("fuel", opts.issueDate).shortLabel;
+  const parsed = parseFuelHardNumbers(opts.hardNumbersRaw);
 
-  const cards: FuelHardNumberCard[] = [
-    { label: "Reporting Period", value: period },
-    { label: "Fuel Incidents", value: String(window.length), note: window.length === 1 ? "record in window" : "records in window" },
-  ];
+  const cards: FuelHardNumberCard[] = [];
 
-  // Singapore Jet Fuel — surfaced only when the report carries a real
-  // trajectory series. We never invent a price; if the series is absent
-  // or too short the card is simply omitted.
-  const latest = latestJetFuelPoint(opts.hardNumbersRaw);
-  if (latest) {
-    const unit = latest.unit ?? "";
-    const valueStr = `${latest.value.toFixed(latest.value >= 10 ? 1 : 2)}${unit ? ` ${unit}` : ""}`;
-    const move = jetFuelMovement(opts.hardNumbersRaw);
-    let note: string;
-    if (move) {
-      const arrow = move.direction === "up" ? "↑" : "↓";
-      note = `${arrow} ${Math.abs(move.delta).toFixed(2)}${unit ? ` ${unit}` : ""} (${move.pct >= 0 ? "+" : ""}${move.pct.toFixed(1)}%) vs start`;
-    } else {
-      note = jetFuelBenchmarkLabel(opts.hardNumbersRaw);
+  // 0. Legacy KpiCard[] payloads. Older reports stored hardNumbers as a
+  //    free-form `[{label,value,...}]` array (or as `{cards:[...]}` on the
+  //    v1 object). We render those verbatim at the top of Hard Numbers so
+  //    pre-migration reports keep their manually-authored cards instead of
+  //    silently disappearing when the v2 fields are absent.
+  const hasV2Data =
+    parsed.prices.length > 0 ||
+    parsed.supply.length > 0 ||
+    parsed.policy.length > 0 ||
+    parsed.routes.length > 0 ||
+    parsed.jetFuel !== undefined ||
+    parsed.jetFuelTrajectory.points.length > 0;
+  if (!hasV2Data && parsed.legacyCards.length > 0) {
+    for (const c of parsed.legacyCards) {
+      const card: FuelHardNumberCard = { label: c.label, value: c.value };
+      if (c.context) card.note = c.context;
+      if (c.accent) card.severity = c.accent;
+      cards.push(card);
     }
-    cards.push({ label: "Singapore Jet Fuel", value: valueStr, note });
   }
 
-  // Highest severity
-  let highestKey = "";
-  let highestRank = 0;
-  for (const i of window) {
-    const k = (i.severity ?? "").toLowerCase();
-    const r = SEV_RANK[k] ?? 0;
-    if (r > highestRank) { highestRank = r; highestKey = k; }
-  }
-  if (highestKey) {
-    cards.push({
-      label: "Highest Severity",
-      value: SEV_LABEL[highestKey] ?? highestKey,
-      severity: highestKey,
-      note: "Worst rating in window",
-    });
-  }
+  // 1. Price cards (manual jsonb only — we never fabricate prices).
+  for (const p of parsed.prices) cards.push(dataCardToHardNumber(p));
 
-  // Latest incident date
-  if (window.length > 0) {
-    const dates = window
-      .map((i) => { try { return parseISO(i.occurredAt); } catch { return null; } })
-      .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
-    if (dates.length > 0) {
+  // 2. Jet fuel card. Prefer the explicit snapshot; otherwise derive
+  //    from the trajectory when one is supplied. The label is taken
+  //    from whichever benchmark the data names — never hard-coded.
+  const jfCard = buildJetFuelCard(opts.hardNumbersRaw, parsed.jetFuel);
+  if (jfCard) cards.push(jfCard);
+
+  // 3. Supply cards. Manual data wins; otherwise derive from incidents.
+  if (parsed.supply.length > 0) {
+    for (const s of parsed.supply) cards.push(dataCardToHardNumber(s));
+  } else {
+    let refinery = 0, shortage = 0, tanker = 0;
+    for (const i of window) {
+      const t = haystack(i);
+      if (matchAny(t, REFINERY_RE)) refinery++;
+      if (matchAny(t, SHORTAGE_RE)) shortage++;
+      if (matchAny(t, TANKER_RE)) tanker++;
+    }
+    if (refinery > 0) {
       cards.push({
-        label: "Latest Incident",
-        value: format(dateMax(dates), "dd MMM yyyy"),
+        label: "Refinery disruption",
+        value: String(refinery),
+        note: refinery === 1 ? "1 event in window" : `${refinery} events in window`,
+      });
+    }
+    if (shortage > 0) {
+      cards.push({
+        label: "Shortages / rationing",
+        value: String(shortage),
+        note: shortage === 1 ? "1 event in window" : `${shortage} events in window`,
+      });
+    }
+    if (tanker > 0) {
+      cards.push({
+        label: "Tanker / forecourt disruption",
+        value: String(tanker),
+        note: tanker === 1 ? "1 event in window" : `${tanker} events in window`,
       });
     }
   }
 
-  // Operational signal counters — only rendered when present.
-  let refinery = 0, shortage = 0, subsidy = 0, tanker = 0, chokepoint = 0;
-  for (const i of window) {
-    const t = haystack(i);
-    if (matchAny(t, REFINERY_RE)) refinery++;
-    if (matchAny(t, SHORTAGE_RE)) shortage++;
-    if (matchAny(t, SUBSIDY_RE)) subsidy++;
-    if (matchAny(t, TANKER_RE)) tanker++;
-    if (matchAny(t, CHOKEPOINT_RE)) chokepoint++;
-  }
-
-  if (refinery > 0) {
-    cards.push({ label: "Refinery Disruption", value: String(refinery), note: refinery === 1 ? "incident" : "incidents" });
-  }
-  if (shortage > 0) {
-    cards.push({ label: "Shortages / Rationing", value: String(shortage), note: shortage === 1 ? "incident" : "incidents" });
-  }
-  if (subsidy > 0) {
-    cards.push({ label: "Subsidy / Levy Moves", value: String(subsidy), note: subsidy === 1 ? "policy event" : "policy events" });
-  }
-  if (tanker > 0) {
-    cards.push({ label: "Tanker / Forecourt", value: String(tanker), note: tanker === 1 ? "incident" : "incidents" });
-  }
-  if (chokepoint > 0) {
-    cards.push({ label: "Chokepoint Pressure", value: String(chokepoint), note: chokepoint === 1 ? "fuel-relevant flag" : "fuel-relevant flags" });
-  }
-
-  // Most-affected country — only when there is a clear leader (>1 record
-  // and a non-trivial gap). We never crown a country off a single record.
-  const countryCount = new Map<string, number>();
-  for (const i of window) {
-    const c = (i.country ?? "").trim();
-    if (!c) continue;
-    countryCount.set(c, (countryCount.get(c) ?? 0) + 1);
-  }
-  const ranked = Array.from(countryCount.entries()).sort((a, b) => b[1] - a[1]);
-  if (ranked.length > 0 && ranked[0][1] >= 2) {
-    const [country, n] = ranked[0];
-    const tied = ranked.filter(([, c]) => c === n).length;
-    if (tied === 1) {
+  // 4. Policy cards.
+  if (parsed.policy.length > 0) {
+    for (const p of parsed.policy) cards.push(dataCardToHardNumber(p));
+  } else {
+    let subsidy = 0;
+    for (const i of window) if (matchAny(haystack(i), SUBSIDY_RE)) subsidy++;
+    if (subsidy > 0) {
       cards.push({
-        label: "Most Affected Country",
-        value: country,
-        note: `${n} records`,
+        label: "Subsidy / levy moves",
+        value: String(subsidy),
+        note: subsidy === 1 ? "1 policy event" : `${subsidy} policy events`,
+      });
+    }
+  }
+
+  // 5. Route / chokepoint pressure cards.
+  if (parsed.routes.length > 0) {
+    for (const r of parsed.routes) cards.push(dataCardToHardNumber(r));
+  } else {
+    let chokepoint = 0;
+    for (const i of window) if (matchAny(haystack(i), CHOKEPOINT_RE)) chokepoint++;
+    if (chokepoint > 0) {
+      cards.push({
+        label: "Fuel-relevant chokepoint pressure",
+        value: String(chokepoint),
+        note: chokepoint === 1 ? "1 fuel-relevant flag" : `${chokepoint} fuel-relevant flags`,
       });
     }
   }
 
   return cards;
+}
+
+function buildJetFuelCard(
+  raw: unknown,
+  snapshot: ReturnType<typeof parseFuelHardNumbers>["jetFuel"],
+): FuelHardNumberCard | null {
+  const benchmark = jetFuelBenchmarkLabel(raw);
+  // Prefer the explicit jetFuel snapshot's latestValue.
+  if (snapshot?.latestValue !== undefined) {
+    const value = formatValue(snapshot.latestValue, snapshot.unit);
+    const note = snapshot.change || undefined;
+    const out: FuelHardNumberCard = {
+      label: benchmark,
+      value,
+    };
+    if (note) out.note = note;
+    if (snapshot.asOf) out.asOf = snapshot.asOf;
+    if (snapshot.source) out.source = snapshot.source;
+    return out;
+  }
+  // Otherwise derive from the trajectory series.
+  const latest = latestJetFuelPoint(raw);
+  if (!latest) return null;
+  const value = formatValue(latest.value, latest.unit);
+  const move = jetFuelMovement(raw);
+  let note: string | undefined;
+  if (move) {
+    const arrow = move.direction === "up" ? "↑" : "↓";
+    const unit = latest.unit ? ` ${latest.unit}` : "";
+    note = `${arrow} ${Math.abs(move.delta).toFixed(2)}${unit} (${move.pct >= 0 ? "+" : ""}${move.pct.toFixed(1)}%) vs start`;
+  }
+  const out: FuelHardNumberCard = { label: benchmark, value };
+  if (note) out.note = note;
+  return out;
+}
+
+/**
+ * True when the report carries no manually-supplied price indicators
+ * (Brent/WTI/jet/pump/etc.). The caller should surface FUEL_NO_PRICE_NOTE
+ * when this is true, instead of padding with incident counts.
+ */
+export function fuelHasNoPriceIndicators(raw: unknown): boolean {
+  const parsed = parseFuelHardNumbers(raw);
+  if (parsed.prices.length > 0) return false;
+  if (parsed.jetFuel?.latestValue !== undefined) return false;
+  if (parsed.jetFuelTrajectory.points.length >= 2) return false;
+  // Legacy v1 cards may carry a manually-authored Brent/WTI/jet card.
+  // Treat any legacy payload as price indicators present so the
+  // "no price data" note is not surfaced on top of real cards.
+  if (parsed.legacyCards.length > 0) return false;
+  return true;
 }

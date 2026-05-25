@@ -37,7 +37,9 @@ export interface ReportWindow {
   end: Date;
   days: number;
   cadence: Cadence;
-  // "Reporting period: 14 May 2026 - 23 May 2026"
+  // Bare date range, e.g. "14 May 2026 - 23 May 2026". Callers prepend
+  // their own "Reporting period: " / "REPORTING PERIOD: " prefix so the
+  // label is never duplicated on the cover or in preview chrome.
   label: string;
   // "14 May - 23 May 2026"
   shortLabel: string;
@@ -55,7 +57,7 @@ export function resolveReportWindow(topic: string, issueDate: string): ReportWin
   return {
     start, end, days,
     cadence: reportCadence(topic),
-    label: `Reporting period: ${format(start, "d MMMM yyyy")} - ${format(end, "d MMMM yyyy")}`,
+    label: `${format(start, "d MMMM yyyy")} - ${format(end, "d MMMM yyyy")}`,
     shortLabel: `${format(start, "d MMM")} - ${format(end, "d MMM yyyy")}`,
   };
 }

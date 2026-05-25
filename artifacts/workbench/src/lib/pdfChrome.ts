@@ -236,6 +236,10 @@ export interface KpiCardData {
   note?: string;
   /** Severity key (lowercase) to colour the accent strip from SEV_COLOR. */
   severity?: string;
+  /** Optional as-of date rendered as a small caption beneath the note. */
+  asOf?: string;
+  /** Optional source attribution rendered as a small caption. */
+  source?: string;
 }
 
 export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
@@ -244,7 +248,7 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
   const cols = 3;
   const gap = 10;
   const cardW = (CW - gap * (cols - 1)) / cols;
-  const cardH = 68;
+  const cardH = 82;
   const rows = Math.ceil(cards.length / cols);
   const totalH = rows * cardH + (rows - 1) * gap;
   ensureSpace(ctx, totalH);
@@ -284,13 +288,25 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     const baseY = yy + 36;
     pdf.text(valueLines.slice(0, 2), x + PAD_L, baseY);
 
-    // Note
+    // Note / change line.
+    let captionY = yy + cardH - 10;
+    const capParts: string[] = [];
+    if (c.asOf) capParts.push(`As of ${c.asOf}`);
+    if (c.source) capParts.push(c.source);
+    if (capParts.length > 0) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(6.5);
+      const capLines: string[] = pdf.splitTextToSize(sanitize(capParts.join(" · ")), cardW - PAD_L - 10);
+      pdf.text(capLines.slice(0, 1), x + PAD_L, captionY);
+      captionY -= 9;
+    }
     if (c.note) {
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
       pdf.setFontSize(7);
       const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), cardW - PAD_L - 10);
-      pdf.text(noteLines.slice(0, 2), x + PAD_L, yy + cardH - 10);
+      pdf.text(noteLines.slice(0, 2), x + PAD_L, captionY);
     }
   }
   ctx.y += totalH + 18;

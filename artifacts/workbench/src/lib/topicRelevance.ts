@@ -47,6 +47,15 @@ const FUEL_EXCLUDE: RegExp[] = [
   /\b(oil futures|crude futures|brent futures|wti futures|futures contract|options trading|hedge fund|speculat(or|ors|ion|ive))/,
   /\b(analyst (note|target|forecast)|broker (note|target)|price target|sell[- ]side|buy[- ]side rating|upgrade rating|downgrade rating)/,
   /\b(oil (price|prices) (forecast|outlook|view|prediction|projection) (for|to))/,
+  // Generic "petrol prices today / diesel rates today" headlines with no
+  // change indicator. These read as live-blog tickers, not operational
+  // fuel signal, and dilute the Related Incidents table.
+  /\b(petrol|diesel|fuel) (price|prices|rate|rates) today\b/,
+  /\b(today'?s (petrol|diesel|fuel) (price|prices|rate|rates))/,
+  // Records that the upstream classifier dropped into the catch-all
+  // "Other fuel incident" bucket carry no operational signal and must
+  // not lead a Fuel Watch.
+  /^other fuel incident$/i,
 ];
 
 // Shipping-specific exclusions. Food-price commentary, airline fuel cost

@@ -425,7 +425,7 @@ export function buildShippingReportDataset(
 
   return {
     reportingPeriodShort: win.shortLabel,
-    reportingPeriodLong: win.label,
+    reportingPeriodLong: `Reporting period: ${win.label}`,
     thirtyDayShortLabel,
     enriched,
     outOfScopeCount,

@@ -1,12 +1,29 @@
-// Jet Fuel Price Trajectory — single source of truth for parsing the
-// report.hardNumbers jsonb column. Both the Fuel Watch preview and the
-// PDF exporter call into this so they cannot read different series.
+// Fuel Watch hard-numbers / jet-fuel data parser.
 //
-// The parser is intentionally tolerant: it accepts the modern
-// FuelHardNumbers object shape ({ cards?, jetFuelTrajectory?, … }) as
-// well as the legacy KpiCard[] shape (treated as cards only, no
-// trajectory). Anything else returns null so the chart falls back to
-// the honest empty state.
+// Single source of truth for parsing the report.hardNumbers jsonb column.
+// Both the preview and the PDF exporter call into this so they cannot
+// read different series or different headline numbers.
+//
+// The parser is intentionally tolerant. It accepts:
+//
+//   1. The flexible FuelHardNumbers v2 object:
+//        {
+//          prices?:  PriceCard[],
+//          supply?:  SupplyCard[],
+//          policy?:  PolicyCard[],
+//          routes?:  RouteCard[],
+//          jetFuel?: JetFuelSnapshot,
+//          jetFuelTrajectory?: { benchmark?, source?, unit?, period?, points: Point[] }
+//                              | Point[]   // legacy array shape
+//        }
+//
+//   2. The original v1 object: { cards?: KpiCard[], jetFuelTrajectory?: Point[],
+//        jetFuelBenchmarkLabel?: string }
+//
+//   3. The legacy KpiCard[] array.
+//
+// Anything else returns an empty container so callers render the honest
+// empty-state, not a dash-filled placeholder grid.
 
 export interface JetFuelPricePoint {
   date: string;
@@ -16,72 +33,194 @@ export interface JetFuelPricePoint {
   annotation?: string;
 }
 
-export interface ParsedFuelHardNumbers {
-  cards: Array<{ label: string; value: string; accent?: string; context?: string }>;
-  jetFuelTrajectory: JetFuelPricePoint[];
-  jetFuelBenchmarkLabel?: string;
+export interface FuelDataCard {
+  label: string;
+  /** Numeric or string value. Numbers are formatted at render time. */
+  value: number | string;
+  unit?: string;
+  change?: string;
+  asOf?: string;
+  source?: string;
+  note?: string;
 }
 
-const EMPTY: ParsedFuelHardNumbers = { cards: [], jetFuelTrajectory: [] };
+export interface JetFuelSnapshot {
+  benchmark?: string;
+  source?: string;
+  unit?: string;
+  latestValue?: number;
+  asOf?: string;
+  change?: string;
+}
+
+export interface JetFuelTrajectoryContainer {
+  benchmark?: string;
+  source?: string;
+  unit?: string;
+  period?: string;
+  points: JetFuelPricePoint[];
+}
+
+export interface ParsedFuelHardNumbers {
+  /** Legacy free-form cards (v1 shape). Preserved verbatim. */
+  legacyCards: Array<{ label: string; value: string; accent?: string; context?: string }>;
+  prices: FuelDataCard[];
+  supply: FuelDataCard[];
+  policy: FuelDataCard[];
+  routes: FuelDataCard[];
+  jetFuel?: JetFuelSnapshot;
+  jetFuelTrajectory: JetFuelTrajectoryContainer;
+}
+
+const EMPTY: ParsedFuelHardNumbers = {
+  legacyCards: [],
+  prices: [],
+  supply: [],
+  policy: [],
+  routes: [],
+  jetFuelTrajectory: { points: [] },
+};
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function parseCard(v: unknown) {
+function str(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+function num(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+function parseLegacyCard(v: unknown) {
   if (!isRecord(v)) return null;
-  const label = typeof v.label === "string" ? v.label : null;
+  const label = str(v.label);
   const value = typeof v.value === "string" ? v.value : null;
   if (!label || !value) return null;
   const out: { label: string; value: string; accent?: string; context?: string } = { label, value };
-  if (typeof v.accent === "string") out.accent = v.accent;
-  if (typeof v.context === "string") out.context = v.context;
+  const accent = str(v.accent); if (accent) out.accent = accent;
+  const context = str(v.context); if (context) out.context = context;
+  return out;
+}
+
+function parseDataCard(v: unknown): FuelDataCard | null {
+  if (!isRecord(v)) return null;
+  const label = str(v.label);
+  if (!label) return null;
+  const rawValue = v.value;
+  let value: number | string;
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) value = rawValue;
+  else if (typeof rawValue === "string" && rawValue.trim()) value = rawValue.trim();
+  else return null;
+  const out: FuelDataCard = { label, value };
+  const unit = str(v.unit); if (unit) out.unit = unit;
+  const change = str(v.change); if (change) out.change = change;
+  const asOf = str(v.asOf); if (asOf) out.asOf = asOf;
+  const source = str(v.source); if (source) out.source = source;
+  const note = str(v.note); if (note) out.note = note;
   return out;
 }
 
 function parsePoint(v: unknown): JetFuelPricePoint | null {
   if (!isRecord(v)) return null;
   const date = typeof v.date === "string" ? v.date.trim() : "";
-  const value = typeof v.value === "number" && Number.isFinite(v.value) ? v.value : null;
-  if (!date || value === null) return null;
-  // Reject obviously malformed dates so the chart never plots garbage.
+  const value = num(v.value);
+  if (!date || value === undefined) return null;
   const parsed = new Date(date);
   if (isNaN(parsed.getTime())) return null;
   const out: JetFuelPricePoint = { date, value };
-  if (typeof v.unit === "string" && v.unit.trim()) out.unit = v.unit.trim();
-  if (typeof v.label === "string" && v.label.trim()) out.label = v.label.trim();
-  if (typeof v.annotation === "string" && v.annotation.trim()) out.annotation = v.annotation.trim();
+  const unit = str(v.unit); if (unit) out.unit = unit;
+  const label = str(v.label); if (label) out.label = label;
+  const annotation = str(v.annotation); if (annotation) out.annotation = annotation;
+  return out;
+}
+
+function parseCardArray(v: unknown): FuelDataCard[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map(parseDataCard)
+    .filter((c): c is FuelDataCard => c !== null);
+}
+
+function parseJetFuelSnapshot(v: unknown): JetFuelSnapshot | undefined {
+  if (!isRecord(v)) return undefined;
+  const out: JetFuelSnapshot = {};
+  const benchmark = str(v.benchmark); if (benchmark) out.benchmark = benchmark;
+  const source = str(v.source); if (source) out.source = source;
+  const unit = str(v.unit); if (unit) out.unit = unit;
+  const latest = num(v.latestValue); if (latest !== undefined) out.latestValue = latest;
+  const asOf = str(v.asOf); if (asOf) out.asOf = asOf;
+  const change = str(v.change); if (change) out.change = change;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function parseTrajectoryContainer(v: unknown): JetFuelTrajectoryContainer {
+  if (Array.isArray(v)) {
+    const points = v
+      .map(parsePoint)
+      .filter((p): p is JetFuelPricePoint => p !== null)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return { points };
+  }
+  if (!isRecord(v)) return { points: [] };
+  const arr = Array.isArray(v.points) ? v.points : [];
+  const points = arr
+    .map(parsePoint)
+    .filter((p): p is JetFuelPricePoint => p !== null)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const out: JetFuelTrajectoryContainer = { points };
+  const benchmark = str(v.benchmark); if (benchmark) out.benchmark = benchmark;
+  const source = str(v.source); if (source) out.source = source;
+  const unit = str(v.unit); if (unit) out.unit = unit;
+  const period = str(v.period); if (period) out.period = period;
   return out;
 }
 
 /**
  * Parse the raw jsonb payload from report.hardNumbers into a normalised
- * shape. Returns an empty container (no cards, no series) when the
- * payload is null, malformed, or carries no recognised data.
+ * structure. Returns the EMPTY container when the payload is null,
+ * malformed, or carries no recognised data.
  */
 export function parseFuelHardNumbers(raw: unknown): ParsedFuelHardNumbers {
   if (raw == null) return EMPTY;
-  // Legacy: array of KpiCard. No trajectory, just cards.
   if (Array.isArray(raw)) {
-    const cards = raw.map(parseCard).filter((c): c is NonNullable<typeof c> => c !== null);
-    return { cards, jetFuelTrajectory: [] };
+    const legacyCards = raw
+      .map(parseLegacyCard)
+      .filter((c): c is NonNullable<ReturnType<typeof parseLegacyCard>> => c !== null);
+    return { ...EMPTY, legacyCards };
   }
   if (!isRecord(raw)) return EMPTY;
-  const cardsArr = Array.isArray(raw.cards) ? raw.cards : [];
-  const trajArr = Array.isArray(raw.jetFuelTrajectory) ? raw.jetFuelTrajectory : [];
-  const points = trajArr
-    .map(parsePoint)
-    .filter((p): p is JetFuelPricePoint => p !== null)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const benchmark = typeof raw.jetFuelBenchmarkLabel === "string" && raw.jetFuelBenchmarkLabel.trim()
-    ? raw.jetFuelBenchmarkLabel.trim()
-    : undefined;
-  const out: ParsedFuelHardNumbers = {
-    cards: cardsArr.map(parseCard).filter((c): c is NonNullable<ReturnType<typeof parseCard>> => c !== null),
-    jetFuelTrajectory: points,
+
+  const legacyCards = Array.isArray(raw.cards)
+    ? raw.cards
+        .map(parseLegacyCard)
+        .filter((c): c is NonNullable<ReturnType<typeof parseLegacyCard>> => c !== null)
+    : [];
+
+  const prices = parseCardArray(raw.prices);
+  const supply = parseCardArray(raw.supply);
+  const policy = parseCardArray(raw.policy);
+  const routes = parseCardArray(raw.routes);
+  const jetFuel = parseJetFuelSnapshot(raw.jetFuel);
+  const trajectory = parseTrajectoryContainer(raw.jetFuelTrajectory);
+
+  // Back-compat: the v1 shape carried jetFuelBenchmarkLabel at the top
+  // level. Promote it to the trajectory container when one wasn't set.
+  if (!trajectory.benchmark) {
+    const legacyBenchmark = str(raw.jetFuelBenchmarkLabel);
+    if (legacyBenchmark) trajectory.benchmark = legacyBenchmark;
+  }
+
+  return {
+    legacyCards,
+    prices,
+    supply,
+    policy,
+    routes,
+    ...(jetFuel ? { jetFuel } : {}),
+    jetFuelTrajectory: trajectory,
   };
-  if (benchmark) out.jetFuelBenchmarkLabel = benchmark;
-  return out;
 }
 
 /**
@@ -91,7 +230,7 @@ export function parseFuelHardNumbers(raw: unknown): ParsedFuelHardNumbers {
  */
 export function getFuelJetFuelTrajectory(raw: unknown): JetFuelPricePoint[] | null {
   const { jetFuelTrajectory } = parseFuelHardNumbers(raw);
-  return jetFuelTrajectory.length >= 2 ? jetFuelTrajectory : null;
+  return jetFuelTrajectory.points.length >= 2 ? jetFuelTrajectory.points : null;
 }
 
 /** Latest (most recent) point in the series, or null if none. */
@@ -104,7 +243,9 @@ export function latestJetFuelPoint(raw: unknown): JetFuelPricePoint | null {
  * Movement direction between the first and last point in the series.
  * Returns null when the series is too short or values are equal.
  */
-export function jetFuelMovement(raw: unknown): { direction: "up" | "down"; delta: number; pct: number } | null {
+export function jetFuelMovement(
+  raw: unknown,
+): { direction: "up" | "down"; delta: number; pct: number } | null {
   const series = getFuelJetFuelTrajectory(raw);
   if (!series || series.length < 2) return null;
   const first = series[0].value;
@@ -115,11 +256,17 @@ export function jetFuelMovement(raw: unknown): { direction: "up" | "down"; delta
   return { direction: delta > 0 ? "up" : "down", delta, pct };
 }
 
+/**
+ * Best-effort benchmark label. Prefers the explicit container/snapshot
+ * benchmark name; falls back to the first point's `label`. Returns a
+ * neutral "Jet fuel benchmark" only when nothing else is supplied — we
+ * never assume Singapore.
+ */
 export function jetFuelBenchmarkLabel(raw: unknown): string {
   const parsed = parseFuelHardNumbers(raw);
-  if (parsed.jetFuelBenchmarkLabel) return parsed.jetFuelBenchmarkLabel;
-  // Fall back to the first point's label if the container did not set one.
-  const first = parsed.jetFuelTrajectory[0];
+  if (parsed.jetFuelTrajectory.benchmark) return parsed.jetFuelTrajectory.benchmark;
+  if (parsed.jetFuel?.benchmark) return parsed.jetFuel.benchmark;
+  const first = parsed.jetFuelTrajectory.points[0];
   if (first?.label) return first.label;
-  return "Singapore jet fuel benchmark";
+  return "Jet fuel benchmark";
 }

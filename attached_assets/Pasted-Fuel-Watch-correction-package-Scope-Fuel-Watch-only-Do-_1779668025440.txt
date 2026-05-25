@@ -1,0 +1,404 @@
+Fuel Watch correction package.
+
+Scope:
+Fuel Watch only.
+
+Do not move on to Fertiliser, Energy, Cargo, Flashpoint or Country Reports yet. Fuel Watch is the benchmark. Get this right first.
+
+The current Fuel Watch is still not near the previous APAC Fuel Risk Report standard. It has improved structure, but the content is still too incident-count driven and not enough like a fuel market and operational risk product.
+
+Use the previous APAC Fuel Risk Report as the analytical benchmark, but keep the newer Polestar Watch cover, branding and layout convention.
+
+1. Fix the cover reporting period duplication
+
+The latest export still shows:
+
+REPORTING PERIOD: REPORTING PERIOD: 18 MAY 2026 - 24 MAY 2026
+
+This must be fixed.
+
+Required:
+
+REPORTING PERIOD: 18 MAY 2026 - 24 MAY 2026
+
+Find the duplicated label source in the cover renderer/exporter and fix it properly. Do not patch only the visible string if the underlying formatter is still wrong.
+
+Acceptance:
+- Preview does not duplicate Reporting Period.
+- PDF does not duplicate Reporting Period.
+- Cover and metadata use the same clean reporting period string.
+
+2. Hard Numbers must be about fuel prices, supply and market pressure
+
+Hard Numbers must not be a renamed Fast Facts block.
+
+The current Hard Numbers section is still too incident-count based. For Fuel Watch, Hard Numbers must primarily show actual fuel price, supply and cost-pressure indicators.
+
+Hard Numbers should answer:
+
+“What are the actual fuel price and supply-pressure indicators this week?”
+
+Prioritise:
+
+Price indicators:
+- Brent crude price
+- WTI crude price
+- jet fuel price
+- diesel price movement
+- petrol price movement
+- pump price changes by country where available
+- fuel surcharge movement where available
+
+Supply indicators:
+- refinery outages
+- fuel shortages
+- rationing events
+- forecourt disruption
+- tanker / fuel transport disruption
+- generator fuel exposure
+- stockpile / reserve movement where available
+
+Policy and cost indicators:
+- subsidy changes
+- fuel levy changes
+- excise / duty / tax changes
+- government price controls
+- import/export restrictions affecting fuel
+
+Route and chokepoint indicators:
+- Hormuz / Red Sea / Malacca fuel-relevant disruption
+- fuel cargo delays
+- tanker route disruption
+- war-risk or insurance pressure affecting fuel movement
+
+Incident counts may appear, but only as supporting metrics. They must not dominate Hard Numbers.
+
+Do not use Hard Numbers for weak cards such as:
+- Fuel Incidents
+- Most Affected Country
+- Latest Incident
+
+Those belong elsewhere if needed.
+
+If price data is not available from a live feed, support manual entry through hardNumbers jsonb.
+
+Omit metrics with no data. Do not show dashes. Do not invent values.
+
+3. Jet fuel must be included
+
+Jet fuel is a core Fuel Watch indicator.
+
+It must appear:
+- in Hard Numbers, when a latest value exists
+- in the Jet Fuel Price Trajectory chart, when a valid time series exists
+
+Do not assume the benchmark must be Singapore.
+
+Acceptable benchmark options include:
+- IATA / Platts Jet Fuel Price Monitor if available and usable
+- regional jet fuel benchmark
+- global jet fuel benchmark
+- Asia jet fuel benchmark
+- Singapore jet fuel benchmark
+- US Gulf Coast kerosene-type jet fuel
+- EIA / FRED jet fuel series
+- manually entered jet fuel series stored in hardNumbers jsonb
+
+Source preference:
+1. Existing internal project data if already available
+2. hardNumbers jsonb manual series
+3. public structured source such as EIA / FRED
+4. IATA / Platts summary data only if usable without breaching licensing or scraping restrictions
+
+Do not scrape paid Platts data.
+Do not fake jet fuel prices.
+Do not use old values unless they are deliberately stored as the report cycle’s data.
+
+4. Flexible hardNumbers jsonb structure
+
+Support a structure like this, or an equivalent clean schema:
+
+{
+  "prices": [
+    {
+      "label": "Brent crude",
+      "value": 109.26,
+      "unit": "USD/bbl",
+      "change": "+7.9% 7d",
+      "asOf": "2026-05-15",
+      "source": "Manual"
+    },
+    {
+      "label": "WTI crude",
+      "value": 101.02,
+      "unit": "USD/bbl",
+      "change": "+10.5% 7d",
+      "asOf": "2026-05-15",
+      "source": "Manual"
+    },
+    {
+      "label": "US Gulf Coast Jet Fuel",
+      "value": 4.152,
+      "unit": "USD/gal",
+      "change": "+2.5% 7d",
+      "asOf": "2026-05-15",
+      "source": "EIA / FRED"
+    }
+  ],
+  "supply": [
+    {
+      "label": "Refinery outages",
+      "value": 2,
+      "unit": "events",
+      "note": "past 14 days"
+    },
+    {
+      "label": "Fuel shortages / rationing",
+      "value": 5,
+      "unit": "events",
+      "note": "reporting window"
+    }
+  ],
+  "policy": [
+    {
+      "label": "Subsidy / levy moves",
+      "value": 1,
+      "unit": "policy event",
+      "note": "reporting window"
+    }
+  ],
+  "routes": [
+    {
+      "label": "Fuel-relevant chokepoint pressure",
+      "value": 15,
+      "unit": "records",
+      "note": "Hormuz / route disruption"
+    }
+  ],
+  "jetFuel": {
+    "benchmark": "US Gulf Coast kerosene-type jet fuel",
+    "source": "EIA / FRED",
+    "unit": "USD/gal",
+    "latestValue": 4.152,
+    "asOf": "2026-05-15",
+    "change": "+2.5% 7d"
+  },
+  "jetFuelTrajectory": {
+    "benchmark": "US Gulf Coast kerosene-type jet fuel",
+    "source": "EIA / FRED",
+    "unit": "USD/gal",
+    "period": "last 30 days",
+    "points": [
+      { "date": "2026-04-17", "value": 3.709 },
+      { "date": "2026-04-24", "value": 3.906 },
+      { "date": "2026-05-01", "value": 4.160 },
+      { "date": "2026-05-08", "value": 4.049 },
+      { "date": "2026-05-15", "value": 4.152 }
+    ]
+  }
+}
+
+The numbers above are example structure only. Do not hardcode them unless they are being deliberately loaded as real source data for that report cycle.
+
+5. Hard Numbers rendering rules
+
+Render Hard Numbers in this order:
+1. Price cards
+2. Jet fuel card
+3. Supply cards
+4. Policy cards
+5. Route / chokepoint pressure cards
+
+Hard Numbers must show:
+- label
+- value
+- unit
+- change where available
+- as-of date where available
+- source where useful
+
+Do not show:
+- dashes
+- empty cards
+- latest incident as a headline hard number
+- most affected country as a headline hard number
+- generic total records as a headline hard number
+- weak “Fuel Incidents” count as the dominant metric
+
+If no price data exists, show a clear note:
+“Fuel price indicators are not available for this reporting cycle.”
+
+Do not fill the section with incident counts just because price data is missing.
+
+6. Jet Fuel Price Trajectory chart
+
+The chart must render when there are at least two valid dated jet fuel points.
+
+Requirements:
+- title: Jet Fuel Price Trajectory
+- subtitle names the benchmark actually used
+- do not call it Singapore if it is not Singapore
+- date axis
+- value axis
+- unit label
+- clean Polestar chart style
+- same data in preview and PDF
+- no fake annotations
+- no fake data
+
+If no usable series exists, show:
+“Jet fuel trajectory data is not available for this reporting cycle.”
+
+The empty state is acceptable only when there is genuinely no usable series.
+
+7. Fuel Watch section order
+
+Use this order:
+
+- Cover
+- Executive Summary
+- Hard Numbers
+- Jet Fuel Price Trajectory
+- Situation
+- What Happened
+- Regional Highlights
+- Producer and Buyer Actions
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Related Incidents
+- Source Notes / Data Notes
+- Disclaimer
+
+8. Regional Highlights must be analyst prose
+
+Do not output raw headline dumps.
+
+Current weak style:
+“Iran: 9 records in window. StanChart Says Record SPR Withdrawals…”
+
+That is not a regional highlight.
+
+Use analyst prose:
+“Iran remains the main pressure point, with reporting tied to Hormuz disruption, pricing pressure and supply-risk narratives.”
+
+Rules:
+- Do not show “Unknown” as a regional highlight.
+- Records without clear location stay in totals and source notes only.
+- Country highlights should explain the fuel signal, not paste article headlines.
+- Use concise country-level paragraphs or a clean table.
+
+9. Producer and Buyer Actions need proper classification
+
+Do not label everything as “Producer”.
+
+Use categories:
+- Producer action
+- Buyer action
+- Government / policy action
+- Infrastructure / routing action
+- Market / supply signal
+
+Examples:
+- “Parliamentary caucus warns against using fuel levy…” = Government / policy action
+- “ADNOC pipeline bypassing Hormuz…” = Infrastructure / routing action
+- “Indian Oil increasing spot purchases…” = Buyer action
+- “Saudi Aramco maintaining export volumes…” = Producer action
+
+Render as a table if possible:
+Actor / Category / Action / Date
+
+If actor is unknown, use:
+Government / policy signal
+or omit actor.
+
+Do not output a loose bullet list of weakly classified headlines.
+
+10. Related Incidents filtering
+
+Related Incidents must support the analysis.
+
+Prioritise:
+- pump price changes
+- fuel shortages
+- rationing
+- refinery disruption
+- fuel levy / subsidy / tax decisions
+- forecourt disruption
+- tanker or fuel transport disruption
+- generator fuel exposure
+- route disruption affecting fuel
+- direct business continuity impact
+
+Demote or exclude:
+- generic “petrol prices today” articles where there is no change
+- generic oil price commentary
+- pure market speculation
+- duplicate headlines
+- equity / earnings stories
+- analyst forecasts with no operational fuel relevance
+- “Other fuel incident” records with no clear operational relevance
+
+11. Prose standard
+
+Fuel Watch must read like an analyst brief, not a dashboard dump.
+
+Remove wording such as:
+- “X records sit...”
+- “Activity concentrates...”
+- “The leading patterns are...”
+- “The usable signal is...”
+- “Detail sits...”
+- “The most serious entry reaches...”
+- “The reporting window is noisy...”
+
+Use Fuel Watch vocabulary:
+- fuel prices
+- shortages
+- rationing
+- subsidy changes
+- levy / duty / tax changes
+- tanker disruption
+- forecourt disruption
+- refinery disruption
+- generator fuel
+- transport cost
+- business continuity
+- route pressure
+- buyer and producer actions
+
+12. Branding and font rules
+
+Roboto is mandatory in preview and PDF.
+
+Use only:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+- #E2E2E2
+
+13. Acceptance check
+
+Export a fresh Fuel Watch PDF and confirm:
+
+- cover reporting period is not duplicated
+- Hard Numbers appears immediately after Executive Summary
+- Hard Numbers is mainly price, supply and policy indicators
+- incident counts do not dominate Hard Numbers
+- jet fuel appears in Hard Numbers when a latest value exists
+- Jet Fuel Price Trajectory renders when a valid series exists
+- chart benchmark is clearly named and not hardcoded to Singapore
+- if no series exists, the empty state appears honestly
+- Regional Highlights are analyst prose, not headline dumps
+- Unknown does not appear as a regional highlight
+- Producer and Buyer Actions are classified properly
+- Related Incidents are operationally relevant
+- report feels closer to the previous APAC Fuel Risk Report in substance
+- preview and PDF match

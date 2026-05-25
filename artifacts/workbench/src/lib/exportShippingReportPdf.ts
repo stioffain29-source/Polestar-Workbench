@@ -461,10 +461,10 @@ export async function exportShippingReportPdf(
   drawPolestarCover(ctx, {
     title: resolvedTitle,
     subtitle: "POLESTAR INSIGHTS",
-    // win.label is already "Reporting period: ..." — upper-case it and
-    // pass it through verbatim. Do NOT prefix another "REPORTING PERIOD:"
-    // here or the cover will read it twice.
-    reportingPeriod: win.label.toUpperCase(),
+    // win.label is just the date range. The cover renderer expects the
+    // full "REPORTING PERIOD: ..." string — every caller prepends its own
+    // prefix so the label never reads twice.
+    reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
     coverImage,
   });
   void cadence;

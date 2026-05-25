@@ -4,7 +4,7 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
-import { computeFuelHardNumbers } from "@/lib/fuelHardNumbers";
+import { computeFuelHardNumbers, fuelHasNoPriceIndicators, FUEL_NO_PRICE_NOTE } from "@/lib/fuelHardNumbers";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "@/lib/fuelNarratives";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { getFuelJetFuelTrajectory, jetFuelBenchmarkLabel } from "@/lib/jetFuelTrajectory";
@@ -99,6 +99,8 @@ interface KpiPreviewCard {
   value: string;
   note?: string;
   severity?: string;
+  asOf?: string;
+  source?: string;
 }
 
 function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
@@ -128,6 +130,11 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
             {c.note && (
               <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 10, color: DUSK, marginTop: 6 }}>
                 {c.note}
+              </div>
+            )}
+            {(c.asOf || c.source) && (
+              <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 9, color: DUSK, marginTop: 4, opacity: 0.85 }}>
+                {[c.asOf ? `As of ${c.asOf}` : null, c.source].filter(Boolean).join(" · ")}
               </div>
             )}
           </div>
@@ -275,7 +282,7 @@ export default function ReportPreview({
               color: "rgba(255,255,255,0.92)",
             }}
           >
-            REPORTING PERIOD: {periodLabel.toUpperCase()}
+            REPORTING PERIOD: {periodLabel.replace(/^reporting period:\s*/i, "").toUpperCase()}
           </div>
         )}
         <div
@@ -302,14 +309,32 @@ export default function ReportPreview({
         {isFuel ? (
           <>
             <Section title="Hard Numbers">
-              <FastFactsGrid cards={fuelHardNumbers} />
-              <p
-                className="mt-3"
-                style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
-              >
-                Counts derived from incidents on file in the reporting window. Market price
-                indicators are shown only when a verified source is wired in.
-              </p>
+              {fuelHardNumbers.length > 0 ? (
+                <>
+                  <FastFactsGrid cards={fuelHardNumbers} />
+                  {fuelHasNoPriceIndicators(report.hardNumbers) && (
+                    <p
+                      className="mt-3"
+                      style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
+                    >
+                      {FUEL_NO_PRICE_NOTE}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: DUSK,
+                    fontFamily: "Roboto, sans-serif",
+                    padding: 16,
+                    background: "#f7f7f7",
+                    border: `1px solid ${POLAR}`,
+                  }}
+                >
+                  {FUEL_NO_PRICE_NOTE}
+                </p>
+              )}
             </Section>
 
             <Section title="Jet Fuel Price Trajectory">
