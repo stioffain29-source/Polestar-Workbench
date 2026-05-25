@@ -94,6 +94,13 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
 // with protesters).
 const KINETIC_ONLY_RE = /\b(drone[- ]?strike|drone[- ]?attack|quadcopter|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|bomb[- ]?blast|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike|gun down)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid)|claims? responsibility for (the |a )?(attack|blast|bomb|strike|killing)|tehrik[- ]?i[- ]?taliban|\bttp\b|isis|islamic state|baloch (liberation|raj)|bla\b)\b/i;
 
+// Hard-kinetic vocabulary: military / militant violence that is NEVER
+// a protest, regardless of any "protest" mentions in the summary.
+// Quadcopter attacks, drone strikes, missile strikes, bombings,
+// suicide bombings, militant raids on civilians and named militant
+// groups all sit here. The PROTEST_HOOK_RE escape does not apply.
+const HARD_KINETIC_RE = /\b(drone[- ]?strike|drone[- ]?attack|quadcopter|missile[- ]?strike|air[- ]?strike|airstrike|artillery (strike|shelling|fire)|\bshelling\b|\bied\b|bomb (attack|blast|kills|detonat)|bomb[- ]?blast|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike|gun down|killed)|insurgents? (kill|attack|target|ambush|killed)|jihadist|terror(ist)?s? (attack|killed|gunned down|neutralis(ed|ed)|kill(ed)?)|armed group (attack|kill|raid)|claims? responsibility for (the |a )?(attack|blast|bomb|strike|killing)|tehrik[- ]?i[- ]?taliban|\bttp\b|isis|islamic state|baloch (liberation|raj)|\bbla\b|(killed|neutralis(ed|ed)|gunned down) (during|in) (an? )?(operation|action|encounter|raid|gun[- ]?battle|search[- ]?operation)|security forces (kill|killed|engage|target|neutralis(e|ed))|counter[- ]?terror(ism)? (operation|action|raid)|encounter (kills|leaves|left)|\d+\s+(terrorists?|militants?|insurgents?)\s+killed)\b/i;
+
 // Tight protest / public-order cue list. Deliberately excludes ambiguous
 // tokens like "strike", "walkout", "stoppage" and bare "clash" because
 // they collide with kinetic vocabulary ("drone strike", "militants clash
@@ -103,6 +110,11 @@ const PROTEST_HOOK_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|riot|pu
 
 function isKineticOnly(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  // Hard-kinetic terms (quadcopter, drone strike, bomb blast, militant
+  // attack on civilians, named militant groups) are excluded
+  // unconditionally — a passing "protest" mention in the summary does
+  // not make a school bombing a protest event.
+  if (HARD_KINETIC_RE.test(text)) return true;
   if (!KINETIC_ONLY_RE.test(text)) return false;
   return !PROTEST_HOOK_RE.test(text);
 }
@@ -475,13 +487,23 @@ export function buildFlashpointReportDataset(
 
 function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
   // Strict lead: credible AND not novelty/parody AND has an actual
-  // mobilisation signal (announced protest, strike, arrest, road
-  // disruption, Section 144). This keeps Cockroach Janta Party and
-  // similar weak items off the lead line.
+  // mobilisation signal in the TITLE (not just summary), then pick
+  // the highest severity among those — not the first by date. This
+  // keeps weak commentary / court-process items off the lead line
+  // when a stronger HIGH/EXTREME protest record sits in the file.
   const STRONG_LEAD_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|mobilisation|mobilization)\b/i;
-  const ranked = rows.filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
-  const strong = ranked.find((r) => STRONG_LEAD_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
-  return strong ?? ranked[0] ?? rows.find((r) => !isWeakNovelty(r)) ?? rows[0] ?? null;
+  const credible = rows.filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
+  const strong = credible.filter((r) => STRONG_LEAD_RE.test(r.title ?? ""));
+  const sortBySevThenDate = (arr: EnrichedIncident[]) => [...arr].sort((a, b) => {
+    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+    if (sb !== sa) return sb - sa;
+    return b.date.getTime() - a.date.getTime();
+  });
+  if (strong.length > 0) return sortBySevThenDate(strong)[0];
+  if (credible.length > 0) return sortBySevThenDate(credible)[0];
+  const safe = rows.filter((r) => !isWeakNovelty(r));
+  return safe[0] ?? rows[0] ?? null;
 }
 
 function buildActivismRead(rows: EnrichedIncident[], windowLabel: string): string {

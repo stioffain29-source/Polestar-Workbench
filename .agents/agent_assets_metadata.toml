@@ -1,0 +1,38 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "aG0_NFVvJ-AacOw78yV51"
+uri = "file://screenshots/flashpoint_preview_final.jpg"
+type = "image"
+title = "Flashpoint preview (after fix) — lead is now 'Chemists strike', no quadcopter rows, Highest Severity = High"
+
+[[outputs]]
+id = "Jh-UsUrCoAUQJnJyhpXyZ"
+uri = "file://screenshots/flashpoint_report.pdf"
+type = "pdf"
+title = "Flashpoint PDF (regenerated from same dataset) — full 6-page export"
+
+[[outputs]]
+id = "1bpbjgaacJbESepk4MAgK"
+uri = "file://screenshots/flashpoint_pdf_page-1.jpg"
+type = "image"
+title = "PDF page 1 — Executive Summary, Fast Facts, Activism table (no quadcopter, no Quetta militant kill)"
+
+[[outputs]]
+id = "NauV3FEWTY0xNaFdEOD47"
+uri = "file://screenshots/flashpoint_pdf_page-2.jpg"
+type = "image"
+title = "PDF page 2 — Civil Unrest, Forecast, Regional & Country View (single-country labels)"
+
+[[outputs]]
+id = "v5Ml9-rY81L8IgrBEGu1V"
+uri = "file://screenshots/flashpoint_pdf_page-3.jpg"
+type = "image"
+title = "PDF page 3 — Coverage check naming Nepal present and Australia/PNG/Indonesia/Philippines/Japan absent; country chart"
+
+[[outputs]]
+id = "-JfdczopEk9yuvtsq8JRX"
+uri = "file://screenshots/flashpoint_pdf_page-4.jpg"
+type = "image"
+title = "PDF page 4 — Implications and Watch Next (dated, specific, not generic)"
