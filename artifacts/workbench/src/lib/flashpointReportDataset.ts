@@ -134,6 +134,64 @@ function isLowCredibility(r: FlashpointReportIncident): boolean {
   return false;
 }
 
+// Novelty / parody / soft political commentary filter. These items
+// (cockroach janta party, viral meme parties, "founder responds" pieces,
+// satirical commentary) routinely surface in Flashpoint feeds but carry
+// no mobilisation signal and make a serious brief look unserious if used
+// as a lead. They are excluded from leads and from Related Incidents and
+// only kept in the broader file so counts remain honest.
+const NOVELTY_RE = /\b(cockroach|parody party|joke party|meme party|viral (post|meme|reel|tweet|video)|going viral|founder responds?|spokesperson responds?|satir(e|ical|ised|ized)|spoof|prank|publicity stunt|fan club|tongue[- ]in[- ]cheek)\b/i;
+function isWeakNovelty(r: FlashpointReportIncident): boolean {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  if (!NOVELTY_RE.test(text)) return false;
+  // If the same headline still carries a concrete mobilisation hook
+  // (announced protest, strike, arrest, Section 144), keep it.
+  return !PROTEST_HOOK_RE.test(text);
+}
+
+// --- Country normalisation -------------------------------------------------
+// Upstream feeds frequently deliver multi-country strings such as
+// "Pakistan; India", "India; Bangladesh; Sri Lanka; Nepal" or
+// "Pakistan; United Arab Emirates; Saudi". Rendering those as a single
+// country bar is wrong and embarrassing. Split on the standard
+// delimiters and keep the first non-empty token as the primary country.
+const COUNTRY_SPLIT_RE = /[;/,&]| vs | and /i;
+const COUNTRY_FIX_MAP: Record<string, string> = {
+  "saudi": "Saudi Arabia",
+  "uae": "United Arab Emirates",
+  "u.a.e.": "United Arab Emirates",
+  "u.a.e": "United Arab Emirates",
+  "ksa": "Saudi Arabia",
+  "pak": "Pakistan",
+  "png": "Papua New Guinea",
+  "philippines / manila": "Philippines",
+  "indonesian papua": "Indonesia",
+  "west papua": "Indonesia",
+};
+function primaryCountry(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "";
+  const first = s.split(COUNTRY_SPLIT_RE)[0]?.trim() ?? "";
+  if (!first) return "";
+  const lc = first.toLowerCase();
+  return COUNTRY_FIX_MAP[lc] ?? first;
+}
+
+// --- Future-protest extractor ----------------------------------------------
+// Pulls forward-looking signals out of the file: dated protest calls,
+// announced strikes, scheduled court hearings, named mobilisation dates.
+// Used to populate Forecast: Next 7-14 Days and Watch Next so those
+// sections quote actual upcoming activity rather than generic advice.
+const FUTURE_LANG_RE = /\b(next week|next month|tomorrow|tonight|this (weekend|friday|saturday|sunday|monday|tuesday|wednesday|thursday)|on (monday|tuesday|wednesday|thursday|friday|saturday|sunday)|planned (protest|strike|rally|march|blockade|mobilisation|mobilization|walkout|shutdown)|announced (protest|strike|rally|march|mobilisation|mobilization)|to (protest|march|rally|stage|hold|begin|launch|stage a (protest|sit[- ]in|march|rally))|will (protest|march|rally|stage|hold|begin|launch|strike)|call(ed|s)? for (a )?(protest|strike|rally|march|sit[- ]in|shutdown|boycott|walkout)|strike on |rally on |march on |union calls|students? to (protest|march|rally)|scheduled (hearing|sitting|vote|session)|court date|anniversary (of|protest|march|rally)|set for |upcoming (protest|strike|rally|march|hearing|vote)|to commence|to begin)\b/i;
+const COVERAGE_COUNTRIES = ["Australia", "Papua New Guinea", "Indonesia", "Philippines", "Japan", "Nepal"] as const;
+const COVERAGE_CITY_RE = /\b(sydney|melbourne|canberra|brisbane|port moresby|jayapura|manila|quezon city|tokyo|osaka|kathmandu|pokhara)\b/i;
+function extractFutureSignals(rows: EnrichedIncident[]): EnrichedIncident[] {
+  return rows.filter((r) => {
+    const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+    return FUTURE_LANG_RE.test(text);
+  });
+}
+
 // --- Dedupe helpers --------------------------------------------------------
 function normaliseTitle(s: string): string {
   return (s ?? "")
@@ -236,7 +294,10 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
         sourceUrl: r.sourceUrl ?? null,
         location: r.location ?? null,
       });
-      return { ...r, date, issue, bucket: bucketFor(issue) };
+      // Normalise multi-country strings down to the primary country so
+      // combined labels like "Pakistan; India" never reach the chart.
+      const country = primaryCountry(r.country);
+      return { ...r, country, date, issue, bucket: bucketFor(issue) };
     })
     .filter((r) => !isNaN(r.date.getTime()));
 }
@@ -354,7 +415,11 @@ export function buildFlashpointReportDataset(
   const autoCtx = { activismRows, unrestRows, countryRows, enriched };
   const autoWhatMatters = buildWhatMatters(autoCtx);
   const autoImplications = buildImplications(autoCtx);
-  const autoWatchNext = buildWatchNext(autoCtx);
+  // Watch Next is built from actual upcoming signals in the file
+  // wherever available, with a clear fallback note when no future-dated
+  // items were identified.
+  const autoWatchNext = buildWatchNextFromSignals(autoCtx);
+  void buildWatchNext;
   const autoPolestarView = buildPolestarView(autoCtx);
 
   // Data note. Mirrors shipping's compact note: surface filter counts so
@@ -405,8 +470,14 @@ export function buildFlashpointReportDataset(
 // "risk eases if").
 
 function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
-  const credible = rows.find((r) => !isLowCredibility(r));
-  return credible ?? rows[0] ?? null;
+  // Strict lead: credible AND not novelty/parody AND has an actual
+  // mobilisation signal (announced protest, strike, arrest, road
+  // disruption, Section 144). This keeps Cockroach Janta Party and
+  // similar weak items off the lead line.
+  const STRONG_LEAD_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|mobilisation|mobilization)\b/i;
+  const ranked = rows.filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
+  const strong = ranked.find((r) => STRONG_LEAD_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
+  return strong ?? ranked[0] ?? rows.find((r) => !isWeakNovelty(r)) ?? rows[0] ?? null;
 }
 
 function buildActivismRead(rows: EnrichedIncident[], windowLabel: string): string {
@@ -455,11 +526,21 @@ function buildForecastRead(opts: {
   const { activismRows, unrestRows, countryRows } = opts;
   const lead = countryRows[0];
   const total = activismRows.length + unrestRows.length;
+  // Lead the forecast with any explicitly future-dated items in the
+  // file. If none exist, say so plainly rather than dressing up
+  // generic indicators as a forecast.
+  const future = extractFutureSignals([...activismRows, ...unrestRows])
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
+    .slice(0, 6);
+  const futureBlock = future.length > 0
+    ? `Confirmed forward-looking items in the file: ${future.map((r) => `"${r.title}"${r.country ? ` (${r.country})` : ""}`).join("; ")}. These are the dated protest, strike, hearing or mobilisation calls already on the record and should be the first reference points for the next 7-14 days.`
+    : `No confirmed future-dated protest calls, strike notices or scheduled hearings were identified in the current file. The forecast below is therefore an assessment of likely trajectory based on current mobilisation patterns rather than a list of scheduled events.`;
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
-  const lines: string[] = [];
+  const lines: string[] = [futureBlock];
   if (total === 0) {
-    return `Forecast for the next 7-14 days is for a continued thin reporting cycle, with limited fresh activism or civil-unrest reporting expected on current signals. The risk increases if a policy trigger lands (court ruling, fuel-price decision, election-calendar event) or a named opposition movement publishes a fresh protest schedule. The risk eases if political calendars stay quiet and sectoral chambers remain unmobilised.`;
+    lines.push(`Forecast for the next 7-14 days is for a continued thin reporting cycle, with limited fresh activism or civil-unrest reporting expected on current signals. The risk increases if a policy trigger lands (court ruling, fuel-price decision, election-calendar event) or a named opposition movement publishes a fresh protest schedule. The risk eases if political calendars stay quiet and sectoral chambers remain unmobilised.`);
+    return lines.join("\n\n");
   }
   if (lead) {
     lines.push(
@@ -553,24 +634,86 @@ function buildRegionalCountryRead(opts: {
   const reach = countryRows.length > 3
     ? `A further ${countryRows.length - 3} countr${countryRows.length - 3 === 1 ? "y" : "ies"} carry single-figure or low-volume entries this cycle; treat them as background signal that can firm up quickly if a regional trigger crosses borders. The full distribution is in the chart below.`
     : `The chart below shows the full distribution.`;
+  // Coverage callouts. The product needs to be visibly checking the
+  // recurring Asia-Pacific protest environments — Australia, Papua /
+  // PNG / Indonesian Papua, Philippines / Manila, Japan / Tokyo,
+  // Nepal — even when records are absent. Surface presence by country
+  // or city mention so a quiet cycle reads as "checked and clear",
+  // not "missed".
+  const haystack = enriched.map((r) => `${r.title ?? ""} ${r.summary ?? ""} ${r.country ?? ""} ${r.location ?? ""}`).join(" \u2014 ");
+  const present: string[] = [];
+  const absent: string[] = [];
+  for (const c of COVERAGE_COUNTRIES) {
+    const present1 = countryRows.some((cr) => cr.label.toLowerCase().includes(c.toLowerCase()));
+    const cityHit = COVERAGE_CITY_RE.test(haystack);
+    const named = new RegExp(`\\b${c}\\b`, "i").test(haystack);
+    if (present1 || named || cityHit && (
+      (c === "Australia" && /\b(sydney|melbourne|canberra|brisbane)\b/i.test(haystack)) ||
+      (c === "Papua New Guinea" && /\bport moresby\b/i.test(haystack)) ||
+      (c === "Indonesia" && /\bjayapura\b/i.test(haystack)) ||
+      (c === "Philippines" && /\b(manila|quezon city)\b/i.test(haystack)) ||
+      (c === "Japan" && /\b(tokyo|osaka)\b/i.test(haystack)) ||
+      (c === "Nepal" && /\b(kathmandu|pokhara)\b/i.test(haystack))
+    )) {
+      present.push(c);
+    } else {
+      absent.push(c);
+    }
+  }
+  const coverageBits: string[] = [];
+  if (present.length > 0) coverageBits.push(`${joinList(present)} ${present.length === 1 ? "is" : "are"} on file this cycle and should be tracked alongside the primary countries above.`);
+  if (absent.length > 0) coverageBits.push(`No qualifying ${joinList(absent)} protest records were present in this reporting window — checked, not silently omitted. A blank cycle in these geographies is unusual rather than reassuring, and the next political trigger usually repopulates them inside a week.`);
+  const coverage = coverageBits.length > 0 ? `Coverage check (recurring Asia-Pacific protest environments). ${coverageBits.join(" ")}` : "";
   const watch = `Watch for opposition political-calendar moves, sectoral chamber notifications (chemists, transporters, lawyers, traders), student-body statements, and district-administration orders under Section 144 or equivalent public-order legislation — those move ahead of street-level disruption and provide the cleanest leading signal that the country-level picture is firming.`;
-  return [headline, ...countryParas, reach, watch].join("\n\n");
+  const blocks = [headline, ...countryParas, reach];
+  if (coverage) blocks.push(coverage);
+  blocks.push(watch);
+  return blocks.join("\n\n");
 }
 
 function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
-  // Strong: activism + civil unrest buckets. Weak: "Other / Crime / Armed
-  // group / Robbery" — kept only if there's headroom after strong rows.
-  // Hard-exclude armed-robbery / crime / armed-group activity (drone /
-  // militant items already filtered out of the dataset upstream).
-  const strong: EnrichedIncident[] = [];
-  const rest: EnrichedIncident[] = [];
-  for (const r of rows) {
-    if (r.issue === "Armed robbery" || r.issue === "Crime / public safety" || r.issue === "Armed group activity") continue;
-    if (r.bucket === "activism" || r.bucket === "unrest") strong.push(r);
-    else rest.push(r);
+  // Hard-exclude armed-conflict / crime / robbery and novelty/parody
+  // items. Then rank what remains by operational usefulness:
+  //   1. highest severity wins (Extreme > High > Moderate > ...)
+  //   2. actual protest events / strikes / public-order restrictions
+  //      / arrests / road disruption are preferred over generic
+  //      activism commentary
+  //   3. credibility / non-novelty
+  //   4. recency
+  // Finally, GUARANTEE that the top-severity qualifying record from
+  // the activism+unrest mix is present in the output so Fast Facts
+  // (Highest Severity) and Related Incidents cannot contradict.
+  const ACTION_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|clash|fatalit)\b/i;
+  const eligible = rows.filter((r) => {
+    if (r.issue === "Armed robbery" || r.issue === "Crime / public safety" || r.issue === "Armed group activity") return false;
+    if (isWeakNovelty(r)) return false;
+    return r.bucket === "activism" || r.bucket === "unrest";
+  });
+  const score = (r: EnrichedIncident): number => {
+    const sev = SEV_RANK[sevKey(r.severity)] ?? 0;
+    const action = ACTION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`) ? 1 : 0;
+    const cred = isLowCredibility(r) ? 0 : 1;
+    // sev dominates, then action, then credibility; recency is the tiebreaker.
+    return sev * 1000 + action * 50 + cred * 10;
+  };
+  const ranked = [...eligible].sort((a, b) => {
+    const ds = score(b) - score(a);
+    if (ds !== 0) return ds;
+    return b.date.getTime() - a.date.getTime();
+  });
+  const ordered = dedupeByTitle(ranked);
+  // Guarantee top-severity inclusion.
+  const top = eligible.reduce<EnrichedIncident | null>((best, r) => {
+    if (!best) return r;
+    const sb = SEV_RANK[sevKey(best.severity)] ?? 0;
+    const sr = SEV_RANK[sevKey(r.severity)] ?? 0;
+    return sr > sb ? r : best;
+  }, null);
+  let out = ordered.slice(0, 8);
+  if (top && !out.some((r) => r.id === top.id)) {
+    out = [top, ...out.filter((r) => r.id !== top.id)].slice(0, 8);
   }
-  const ordered = dedupeByTitle([...strong, ...rest]);
-  return ordered.slice(0, 8);
+  return out;
 }
 
 interface AutoCtx {
@@ -630,6 +773,47 @@ function buildImplications(ctx: AutoCtx): string {
     );
   }
   return parts.join("\n\n");
+}
+
+// Build Watch Next from actual future-looking signals in the file
+// rather than generic risk-flag boilerplate. If no future-dated items
+// are present, say so plainly and fall back to indicator vocabulary
+// keyed off the current cycle's enforcement signals.
+function buildWatchNextFromSignals(ctx: AutoCtx): string {
+  const all = [...ctx.activismRows, ...ctx.unrestRows];
+  const future = extractFutureSignals(all)
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
+    .slice(0, 8);
+  const intro = `Watch Next is built from actual upcoming or announced activity in the current file where data exists. Each item is paired with its operational meaning so the response can be planned, not improvised.`;
+  if (future.length === 0) {
+    const fallback = `No confirmed future-dated protest calls, strike notices or scheduled mobilisation events were identified in the current Flashpoint dataset. Watch indicators below are therefore based on current mobilisation patterns and standing enforcement triggers rather than scheduled events, and should not be treated as a forecast.`;
+    const indicators: string[] = [
+      `Fresh opposition political-calendar calls, named protest schedules and union or chamber statements naming a date.`,
+      `Section 144 / curfew impositions, assembly bans and any geographical expansion of public-order restrictions.`,
+      `Arrests, injuries or confirmed fatalities in a protest or unrest context — the single clearest signal that the cycle will firm up.`,
+      `Court hearings, bail rulings and detention triggers involving political figures, activists or movement leaders.`,
+      `Sectoral chamber notifications (chemists, transporters, lawyers, traders) and student-union calls — 24-72 hour lead indicators.`,
+      `Internet-shutdown notices and military-aid-to-civil-power references — markers that the state response has crossed the threshold of measured policing.`,
+    ];
+    return `${intro}\n\n${fallback}\n\n${indicators.map((l) => `\u2022 ${l}`).join("\n\n")}`;
+  }
+  const lines = future.map((r) => {
+    const country = r.country ? ` (${r.country})` : "";
+    const dateStr = format(r.date, "dd MMM yyyy");
+    return `${dateStr}${country} — "${r.title}". Operational meaning: ${operationalMeaningFor(r)}`;
+  });
+  const tail = `Treat any of the above moving from announced to executed as the trigger to escalate the standing response (staff-movement restrictions, branch closures, customer comms, perimeter posture). Monitor for fresh entries to this list daily through the next reporting window.`;
+  return `${intro}\n\n${lines.map((l) => `\u2022 ${l}`).join("\n\n")}\n\n${tail}`;
+}
+
+function operationalMeaningFor(r: EnrichedIncident): string {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
+  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "expect supply-chain friction, sectoral closures and customer-service degradation 24-72 hours ahead of the named date.";
+  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "expect road closures, transport disruption and venue-access friction around the named location; brief drivers and customer-facing teams in advance.";
+  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "an adverse ruling typically converts into same-day rallies and route closures around the court complex; pre-cleared customer-comms templates should be ready.";
+  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate the named route against the company's logistics corridor and pre-position alternative routings.";
+  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger work-from-home protocol, suspend non-essential staff movement and close public-facing sites in the affected geography.";
+  return "treat as a leading indicator and monitor for confirmation in the next 24-48 hours.";
 }
 
 function buildWatchNext(ctx: AutoCtx): string {

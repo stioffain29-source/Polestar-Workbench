@@ -1,0 +1,183 @@
+Flashpoint is still not acceptable. Fix the content logic, not the layout.
+
+Scope:
+Flashpoint only.
+
+Do not touch Fuel, Shipping or Cargo.
+
+Current problems in the exported Flashpoint PDF:
+1. The “Cockroach Janta Party” item is being used as a lead activism reference. That is weak and makes the report look unserious.
+2. Highest Severity in Fast Facts is Extreme, but no Extreme incident appears in Related Incidents. If Fast Facts says Extreme, the incident driving that severity must be visible in the table or clearly explained.
+3. Watch Next is still generic advice. It must reference actual upcoming protest, strike or mobilisation items where data exists.
+4. Australia is missing despite being a recurring protest environment.
+5. Papua and Manila / Philippines are missing from the watch logic.
+6. Country handling is still broken. The chart shows combined strings like:
+   - Pakistan; India
+   - India; Bangladesh; Sri Lanka; Nepal
+   - Pakistan; United Arab Emirates; Saudi
+   These must not appear as country labels.
+7. Drone / armed-conflict records still appear as Protest records.
+8. Related Incidents still includes weak/parody items ahead of more operationally useful records.
+
+Required fixes:
+
+1. Lead item logic
+
+Do not use novelty, parody or soft political commentary as the lead activism record.
+
+Demote or exclude weak items containing:
+- cockroach
+- parody party
+- founder responds
+- meme / viral / social-media novelty
+- commentary without actual mobilisation
+
+Lead records should prioritise:
+- announced protests
+- actual demonstrations
+- strikes
+- labour action
+- student mobilisation
+- police bans / Section 144
+- arrests linked to protest
+- public-order disruption
+- confirmed road / site / city disruption
+
+2. Highest Severity consistency
+
+If Fast Facts says Highest Severity = Extreme:
+- include the Extreme record in Related Incidents, or
+- add a note explaining that the Extreme record was excluded and why.
+
+Preferred:
+Related Incidents must always include the top severity qualifying Flashpoint record unless it is excluded for a clear reason.
+
+Do not allow Fast Facts and Related Incidents to contradict each other.
+
+3. Watch Next must use actual future signals
+
+Watch Next should not be generic advice.
+
+It should identify actual upcoming or announced activity from the dataset where available, for example:
+- strike next week in Nepal
+- protest in Tokyo
+- planned union action
+- announced mobilisation date
+- court hearing / detention trigger
+- election / parliamentary / budget trigger
+- police ban / permit decision
+- student mobilisation date
+- known anniversary or campaign date
+
+If no actual future-dated items exist, then say:
+“No confirmed future-dated protest calls were identified in the current dataset. Watch indicators are therefore based on current mobilisation patterns rather than scheduled events.”
+
+But do not pretend generic indicators are a forecast.
+
+4. Add future-protest extraction
+
+Create a forecast extractor that searches Flashpoint records for future-looking language:
+- next week
+- tomorrow
+- Friday / Monday / named weekdays
+- planned protest
+- announced protest
+- strike on
+- rally on
+- march on
+- union calls
+- students to protest
+- planned blockade
+- scheduled hearing
+- court date
+- anniversary protest
+- Tokyo
+- Manila
+- Papua
+- Australia
+- Nepal
+
+Use this to populate Forecast: Next 7–14 Days and Watch Next.
+
+5. Australia / Papua / Manila coverage
+
+Ensure Flashpoint watches for relevant protest and civil-unrest records in:
+- Australia
+- Papua / Papua New Guinea / Indonesian Papua
+- Philippines / Manila
+- Japan / Tokyo
+- Nepal
+
+If records are present, they must appear in Regional and Country View or Watch Next.
+If records are not present, do not invent them, but add a clear note:
+“No qualifying Australia / Papua / Manila protest records were present in this reporting window.”
+
+6. Country normalisation
+
+Do not render semicolon-combined country strings.
+
+Split country fields on:
+- ;
+- /
+- ,
+- &
+- “and”
+- “vs”
+
+Then either:
+- choose the incident location country, or
+- count each country separately only if the record genuinely spans multiple countries.
+
+Do not show:
+- Pakistan; India
+- India; Bangladesh; Sri Lanka; Nepal
+- Pakistan; United Arab Emirates; Saudi
+
+7. Classification fixes
+
+Drone strikes, militant attacks and armed conflict must not be classified as Protest.
+
+Exclude them from Flashpoint unless there is a direct public-order / protest hook.
+
+Examples to exclude:
+- quadcopter attack
+- drone strike
+- militant attack
+- armed group attack
+- battlefield incident
+
+PTI / Imran Khan / Section 144 / protest drive records should be:
+- Protest
+- Political mobilisation
+- Public-order risk
+
+not Tribal violence.
+
+8. Related Incidents priority
+
+Related Incidents should prioritise:
+- highest severity qualifying item
+- actual protest events
+- planned protest dates
+- strike/labour action
+- public-order restrictions
+- arrests / clashes linked to protest
+- road or city disruption
+
+Demote:
+- parody / novelty political items
+- generic commentary
+- court process with no mobilisation
+- duplicated headlines
+- armed conflict without public-order hook
+
+9. Acceptance check
+
+Export a fresh Flashpoint PDF and confirm:
+- no cockroach/parody item is used as the lead activism read
+- if Fast Facts says Extreme, an Extreme qualifying incident appears in Related Incidents
+- Watch Next includes actual upcoming protest/strike/mobilisation items where available
+- Australia, Papua, Manila/Philippines, Tokyo/Japan and Nepal are checked and surfaced if records exist
+- no combined country strings appear in charts or prose
+- drone/militant records are excluded unless directly protest-related
+- Flashpoint reads like a protest and activism forecast product, not a generic public-order digest
