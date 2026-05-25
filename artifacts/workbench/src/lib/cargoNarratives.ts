@@ -5,8 +5,8 @@
 //
 //   1. Cargo Security Read — hijack, truck/container theft, raid,
 //      pilferage and route-side cargo loss.
-//   2. Logistics Node Read — warehouse, depot, terminal, yard, customs
-//      bond store and similar fixed-node incidents.
+//   2. Logistics Hub Read — warehouse, depot, terminal, yard, customs
+//      bond store and similar logistics-hub incidents.
 //
 // Forbidden idioms (also banned from Fuel and Shipping prose):
 //   - "X records sit in window"
@@ -35,7 +35,7 @@ export interface CargoNarrativeIncident {
 }
 
 const CARGO_SECURITY_RE = /\b(hijack|hijacked|hijacking|truck (theft|robbery|raid|hijack)|container (theft|stolen|raid)|cargo (theft|loss|robbery|stolen)|convoy (attack|raid|hit)|pilferage|seal (broken|tamper|tampering)|in[- ]transit (theft|loss|robbery))\b/i;
-const LOGISTICS_NODE_RE = /\b(warehouse|depot|distribution centre|distribution center|fulfilment centre|fulfillment center|yard|terminal|customs bond|bonded warehouse|freight (terminal|yard)|inland container depot|icd|cold[- ]chain (facility|warehouse))\b/i;
+const LOGISTICS_HUB_RE = /\b(warehouse|depot|distribution centre|distribution center|fulfilment centre|fulfillment center|yard|terminal|customs bond|bonded warehouse|freight (terminal|yard)|inland container depot|icd|cold[- ]chain (facility|warehouse))\b/i;
 
 function recordDate(i: CargoNarrativeIncident): Date | null {
   try {
@@ -108,28 +108,28 @@ export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]
 interface CargoAutoCtx {
   windowIncidents: CargoNarrativeIncident[];
   securityMatches: CargoNarrativeIncident[];
-  nodeMatches: CargoNarrativeIncident[];
+  hubMatches: CargoNarrativeIncident[];
 }
 
 function buildCargoAutoCtx(windowIncidents: CargoNarrativeIncident[]): CargoAutoCtx {
   const securityMatches = windowIncidents.filter((i) =>
     CARGO_SECURITY_RE.test(`${i.title} ${i.summary ?? ""}`),
   );
-  const nodeMatches = windowIncidents.filter((i) =>
-    LOGISTICS_NODE_RE.test(`${i.title} ${i.summary ?? ""}`),
+  const hubMatches = windowIncidents.filter((i) =>
+    LOGISTICS_HUB_RE.test(`${i.title} ${i.summary ?? ""}`),
   );
-  return { windowIncidents, securityMatches, nodeMatches };
+  return { windowIncidents, securityMatches, hubMatches };
 }
 
 export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
   const countries = topCountries(ctx.windowIncidents, 3);
   const parts: string[] = [];
-  if (ctx.securityMatches.length === 0 && ctx.nodeMatches.length === 0) {
-    return `No qualifying truck-hijack, container theft, in-transit loss or fixed-node logistics incident reached the file this cycle. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or depot-side risk has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean cycles in a row.`;
+  if (ctx.securityMatches.length === 0 && ctx.hubMatches.length === 0) {
+    return `No qualifying truck-hijack, container theft, in-transit loss or logistics-hub logistics incident reached the file this cycle. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or depot-side risk has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean cycles in a row.`;
   }
   parts.push(
-    `What this cycle changes for cargo owners and operators is concentrated in two places: route-side incidents (${ctx.securityMatches.length} qualifying record${ctx.securityMatches.length === 1 ? "" : "s"}) that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and fixed-node losses (${ctx.nodeMatches.length} qualifying record${ctx.nodeMatches.length === 1 ? "" : "s"}) that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
+    `What this cycle changes for cargo owners and operators is concentrated in two places: route-side incidents (${ctx.securityMatches.length} qualifying record${ctx.securityMatches.length === 1 ? "" : "s"}) that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses (${ctx.hubMatches.length} qualifying record${ctx.hubMatches.length === 1 ? "" : "s"}) that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
   );
   if (countries.length > 0) {
     parts.push(
@@ -153,9 +153,9 @@ export function buildCargoImplications(windowIncidents: CargoNarrativeIncident[]
       `For hauliers and 3PL operators the route-side picture argues for tightening driver and crew vetting on the affected corridors, reviewing rest-stop and refuelling discipline, and instituting hard rules on convoying or escorts for high-value loads. A single insider-enabled loss is enough to invalidate an entire route-security posture, so the controls have to assume the threat is internal as well as external.`,
     );
   }
-  if (ctx.nodeMatches.length > 0) {
+  if (ctx.hubMatches.length > 0) {
     parts.push(
-      `For warehouse and depot operators the fixed-node picture argues for an immediate review of perimeter controls, after-hours staffing, CCTV coverage at known blind spots, and seal-and-lock integrity at every handover. Yard-staff vetting and visitor controls are the lowest-cost wins and tend to be the first thing to slip during operator turnover.`,
+      `For warehouse and depot operators the logistics-hub picture argues for an immediate review of perimeter controls, after-hours staffing, CCTV coverage at known blind spots, and seal-and-lock integrity at every handover. Yard-staff vetting and visitor controls are the lowest-cost wins and tend to be the first thing to slip during operator turnover.`,
     );
   }
   parts.push(
@@ -176,9 +176,9 @@ export function buildCargoWatchNext(windowIncidents: CargoNarrativeIncident[]): 
   lines.push(
     `Monitor insurance underwriter bulletins, transport-association advisories, police-alert circulars and any operator announcements on route displacement. Displacement of loads from a controlled depot to a weaker one — usually under cost pressure — is a common precursor to a fresh loss cycle. Premium movement on the affected lanes is the cleanest lagging confirmation that the operational signal has firmed into a commercial one.`,
   );
-  if (ctx.nodeMatches.length > 0) {
+  if (ctx.hubMatches.length > 0) {
     lines.push(
-      `On fixed-node risk specifically: watch for facility-access incidents, perimeter breaches, after-hours staffing changes and any escalation from pilferage to organised raiding at the same facility.`,
+      `On logistics-hub risk specifically: watch for facility-access incidents, perimeter breaches, after-hours staffing changes and any escalation from pilferage to organised raiding at the same facility.`,
     );
   }
   return lines.join("\n\n");
@@ -191,9 +191,9 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
     `Our read on cargo risk this cycle is that the underlying loss picture remains structurally elevated even when the weekly file is quiet. Cargo-crime reporting under-counts the true loss rate; what reaches the public file is typically the subset that produced a police report, an insurance claim large enough to trigger underwriter contact, or a media-worthy hijack. Operational losses on smaller corridors continue between cycles.`,
   );
   parts.push(
-    `Practically, that means cargo owners should plan against a baseline of route-side and node-side loss exposure rather than treat quiet cycles as a green light. Convoying or escort for high-value moves, seal-and-lock integrity at every handover, driver and yard-staff vetting on contracted hauliers, and depot perimeter discipline are the controls that hold up across cycles.`,
+    `Practically, that means cargo owners should plan against a baseline of route-side and hub-side loss exposure rather than treat quiet cycles as a green light. Convoying or escort for high-value moves, seal-and-lock integrity at every handover, driver and yard-staff vetting on contracted hauliers, and depot perimeter discipline are the controls that hold up across cycles.`,
   );
-  if (ctx.securityMatches.length + ctx.nodeMatches.length > 0) {
+  if (ctx.securityMatches.length + ctx.hubMatches.length > 0) {
     parts.push(
       `We expect the same corridors and facility types to set the tempo through the next reporting window. A return to elevated public reporting is usually visible first in insurance underwriter circulars and transport-association advisories — that is the signal to tighten posture, not the headline-loss event itself.`,
     );
@@ -201,13 +201,13 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
   return parts.join("\n\n");
 }
 
-export function buildLogisticsNodeRead(windowIncidents: CargoNarrativeIncident[]): string {
+export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[]): string {
   const matches = windowIncidents.filter((i) => {
     const text = `${i.title} ${i.summary ?? ""}`;
-    return LOGISTICS_NODE_RE.test(text);
+    return LOGISTICS_HUB_RE.test(text);
   });
   if (matches.length === 0) {
-    return `No qualifying warehouse, depot, terminal or yard incidents reached the file in this cycle. Fixed-node losses often go unreported until insurance claims are filed, so a blank window does not redefine the underlying picture on storage and last-mile facilities.\n\nKeep tracking facility-security bulletins, insurer loss notices and any operator commentary on staffing or perimeter changes. Those are the early indicators that node-side risk is firming on a specific corridor.`;
+    return `No qualifying warehouse, depot, terminal or yard incidents reached the file in this cycle. Logistics-hub losses often go unreported until insurance claims are filed, so a blank window does not redefine the underlying picture on storage and last-mile facilities.\n\nKeep tracking facility-security bulletins, insurer loss notices and any operator commentary on staffing or perimeter changes. Those are the early indicators that hub-side risk is firming on a specific corridor.`;
   }
   const lead = leadEntry(matches)!;
   const leadDate = recordDate(lead);
@@ -215,7 +215,7 @@ export function buildLogisticsNodeRead(windowIncidents: CargoNarrativeIncident[]
   const countryLine = countries.length > 0
     ? `The country picture in this cycle is led by ${joinCountries(countries)}.`
     : `Country attribution is sparse this cycle and limits the geographic read.`;
-  const intro = `Fixed-node logistics risk — warehouses, depots, distribution centres, terminals and bonded storage — shows up across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
-  const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Node-side losses typically precede a hardening of underwriting terms by one to two cycles.`;
+  const intro = `Logistics-hub logistics risk — warehouses, depots, distribution centres, terminals and bonded storage — shows up across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
+  const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two cycles.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }

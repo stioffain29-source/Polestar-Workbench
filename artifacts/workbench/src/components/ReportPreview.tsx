@@ -6,7 +6,7 @@ import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import {
   buildCargoSecurityRead,
-  buildLogisticsNodeRead,
+  buildLogisticsHubRead,
   buildCargoWhatMatters,
   buildCargoImplications,
   buildCargoWatchNext,
@@ -474,8 +474,8 @@ export default function ReportPreview({
                         text={buildCargoSecurityRead(cargoWindow)}
                       />
                       <NarrativeSection
-                        title="Logistics Node Read"
-                        text={buildLogisticsNodeRead(cargoWindow)}
+                        title="Logistics Hub Read"
+                        text={buildLogisticsHubRead(cargoWindow)}
                       />
                     </>
                   )}

@@ -29,7 +29,7 @@ import type { ProducerBuyerActionRow } from "./fuelNarratives";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 import {
   buildCargoSecurityRead,
-  buildLogisticsNodeRead,
+  buildLogisticsHubRead,
   buildCargoWhatMatters,
   buildCargoImplications,
   buildCargoWatchNext,
@@ -646,13 +646,13 @@ export async function exportTopicReportPdf(
 
     if (isCargo) {
       const cargoSecurity = buildCargoSecurityRead(windowIncidents);
-      const cargoNode = buildLogisticsNodeRead(windowIncidents);
+      const cargoNode = buildLogisticsHubRead(windowIncidents);
       // Editor text always wins on the four standard analyst sections;
       // auto-prose fills in when the editor leaves a field blank so the
       // cargo report reads at Fuel-Watch substance out of the box.
       const cargoSections: [string, string][] = [
         ["Cargo Security Read", cargoSecurity],
-        ["Logistics Node Read", cargoNode],
+        ["Logistics Hub Read", cargoNode],
         ["Situation", (data.situation ?? "").trim()],
         ["What Happened", (data.whatHappened ?? "").trim()],
         ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],
