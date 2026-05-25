@@ -93,11 +93,10 @@ const SEV_RANK: Record<string, number> = {
 const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme",
 };
-// Brand-aligned severity palette. #a33232 is reserved for Extreme only;
-// other tiers use the core Polestar colours so the only red on a page
-// is the highest tier.
+// Five-tier severity palette. Kept separate from the Polestar brand
+// colours so the tiers remain visually distinguishable.
 const SEV_COLOR: Record<string, string> = {
-  insignificant: "#e2e2e2", low: "#6fb872", moderate: "#465bff", high: "#363636", extreme: "#a33232",
+  insignificant: "#B8C2CC", low: "#6FB872", moderate: "#E67E22", high: "#C0392B", extreme: "#800000",
 };
 
 function sevKey(s: string | null | undefined): string {

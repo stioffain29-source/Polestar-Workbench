@@ -13,16 +13,15 @@ export const WHITE = "#FFFFFF";
 export const CARD_BG = "#FFFFFF";
 export const PAGE_BG = "#FFFFFF";
 
-// Risk palette — brand-aligned. #a33232 is reserved for Extreme only;
-// every other tier uses the core Polestar palette (Dusk Gray, Electric
-// Blue, Polar Gray) with a single subdued green for Low so the chart
-// chips stay legible without introducing additional reds.
+// Risk palette — use only for severity/risk. Severity colours are
+// intentionally separate from the Polestar brand palette so the five
+// tiers stay distinguishable on charts and chips.
 export const SEV_COLOR: Record<string, string> = {
-  extreme: "#a33232",
-  high: "#363636",
-  moderate: "#465bff",
-  low: "#6fb872",
-  insignificant: "#e2e2e2",
+  extreme: "#800000",
+  high: "#C0392B",
+  moderate: "#E67E22",
+  low: "#6FB872",
+  insignificant: "#B8C2CC",
 };
 export const SEV_RANK: Record<string, number> = {
   insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
