@@ -1,0 +1,41 @@
+POLESTAR PDF FONT AUDIT
+============================================================
+
+Acceptance: Roboto embedded; no visible text in
+Helvetica / Times / Courier / Symbol / ZapfDingbats.
+
+--- fuel.pdf (3 pages) ---
+  Embedded fonts:           ['/Roboto']
+  Fonts USED by text:       ['/Roboto']
+  Forbidden fonts used:     NONE
+  PASS: embedded=Roboto only, used=Roboto only, forbidden=NONE
+
+--- shipping.pdf (6 pages) ---
+  Embedded fonts:           ['/Roboto']
+  Fonts USED by text:       ['/Roboto']
+  Forbidden fonts used:     NONE
+  PASS: embedded=Roboto only, used=Roboto only, forbidden=NONE
+
+--- cargo.pdf (4 pages) ---
+  Embedded fonts:           ['/Roboto']
+  Fonts USED by text:       ['/Roboto']
+  Forbidden fonts used:     NONE
+  PASS: embedded=Roboto only, used=Roboto only, forbidden=NONE
+
+--- flashpoint.pdf (7 pages) ---
+  Embedded fonts:           ['/Roboto']
+  Fonts USED by text:       ['/Roboto']
+  Forbidden fonts used:     NONE
+  PASS: embedded=Roboto only, used=Roboto only, forbidden=NONE
+
+Documented limitation
+------------------------------------------------------------
+jsPDF auto-registers the 14 PDF standard fonts (Helvetica,
+Times, Courier, Symbol, ZapfDingbats) in the PDF font
+dictionary at constructor time. They are NOT embedded and
+NOT selected by any content-stream Tf operator. Every text
+draw in the codebase is routed through setRoboto(), which
+calls pdf.setFont('Roboto', ...). Removing the standard
+fonts from the dictionary is not exposed by jsPDF's public
+API; the safe proof is the per-page Tf inventory above,
+which shows /Roboto is the sole font ever activated.

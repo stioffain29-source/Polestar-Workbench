@@ -39,7 +39,9 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- All PDF text MUST go through `setRoboto(pdf, "regular"|"medium"|"bold"|"italic")` from `src/lib/pdfFonts.ts`. `pdf.setFont("helvetica", ...)` or any direct `setFont` call to a standard PDF base font is forbidden. `ensureRobotoLoaded(pdf)` must be awaited once per jsPDF instance before any `pdf.text(...)` call.
+- jsPDF auto-registers the 14 standard PDF fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) in the font dictionary at construction time. They appear in `pdffonts` output but are NOT embedded and NOT selected by any content-stream `Tf` operator. Removing them is not exposed by jsPDF's public API. The only safe acceptance check is the per-page `Tf` inventory in `screenshots/font_proof/FONT_AUDIT.txt` — only `/Roboto` may appear as USED.
+- Headless PDF export for font auditing: `cd artifacts/workbench && REPORT_ID=<id> TOPIC=<fuel|shipping|cargo_watch|flashpoint> OUT_PATH=<abs.pdf> npx tsx --import ./scripts/registerLoader.mjs scripts/exportReportPdfHeadless.ts`. The loader resolves `.ttf?url` imports to real on-disk paths in `node_modules/@expo-google-fonts/roboto/*`; the wrapper patches `fetch` for `file://` URLs. Do NOT re-stub `pdfFonts.ts` in the loader — that silently drops embedded Roboto and falls back to Helvetica.
 
 ## Pointers
 

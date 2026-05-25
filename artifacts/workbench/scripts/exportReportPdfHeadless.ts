@@ -1,0 +1,99 @@
+// Headless PDF exporter used to produce real Roboto-embedded PDFs for font
+// auditing. Routes to the same per-topic exporter the browser uses, so the
+// output is byte-equivalent in terms of font registration.
+//
+// Usage:
+//   REPORT_ID=13 TOPIC=flashpoint OUT_PATH=/abs/out.pdf tsx --import ./scripts/registerLoader.mjs scripts/exportReportPdfHeadless.ts
+import { writeFileSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { resolve as resolvePath } from "node:path";
+import { jsPDF } from "jspdf";
+
+// Patch fetch to read file:// URLs from disk. The loader rewrites .ttf?url
+// imports to file:// URLs that point at the real Roboto TTFs in node_modules,
+// and pdfFonts.ts then fetches them — so we must serve those bytes here.
+const origFetch = globalThis.fetch;
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  if (url && url.startsWith("file://")) {
+    const path = fileURLToPath(url);
+    const buf = readFileSync(path);
+    // Return a Response with the raw bytes so pdfFonts' `await res.arrayBuffer()`
+    // gets the exact TTF content.
+    return new Response(buf, {
+      status: 200,
+      headers: { "content-type": "font/ttf" },
+    });
+  }
+  if (!url || url.startsWith("data:text/javascript")) {
+    return new Response(new ArrayBuffer(0), { status: 200 });
+  }
+  return origFetch(input as RequestInfo, init);
+}) as typeof fetch;
+
+const REPORT_ID = Number(process.env.REPORT_ID ?? "13");
+const TOPIC = (process.env.TOPIC ?? "flashpoint").toLowerCase();
+const API = process.env.API_BASE ?? "http://localhost:80";
+const OUT = resolvePath(process.cwd(), process.env.OUT_PATH ?? `screenshots/${TOPIC}_report.pdf`);
+
+// Intercept pdf.save() across every exporter and divert to writeFileSync.
+(jsPDF.prototype as unknown as { save: (filename: string) => jsPDF }).save = function (this: jsPDF) {
+  const buf = this.output("arraybuffer") as ArrayBuffer;
+  writeFileSync(OUT, Buffer.from(buf));
+  return this;
+};
+
+interface AnyReport {
+  title: string;
+  topic: string;
+  issueDate: string;
+  author: string;
+  executiveSummary?: string | null;
+  situation?: string | null;
+  whatHappened?: string | null;
+  whatMatters?: string | null;
+  implications?: string | null;
+  watchNext?: string | null;
+  polestarView?: string | null;
+  hardNumbers?: unknown;
+}
+
+async function main() {
+  const report = (await fetch(`${API}/api/reports/${REPORT_ID}`).then((r) => r.json())) as AnyReport;
+  const incidents = (await fetch(`${API}/api/incidents?limit=500`).then((r) => r.json())) as unknown[];
+  const data = {
+    title: report.title,
+    topic: report.topic,
+    issueDate: report.issueDate,
+    author: report.author,
+    executiveSummary: report.executiveSummary ?? report.situation,
+    situation: report.situation,
+    whatHappened: report.whatHappened,
+    whatMatters: report.whatMatters,
+    implications: report.implications,
+    watchNext: report.watchNext,
+    polestarView: report.polestarView,
+    hardNumbers: report.hardNumbers,
+  };
+
+  if (TOPIC === "shipping") {
+    const { exportShippingReportPdf } = await import("../src/lib/exportShippingReportPdf");
+    await exportShippingReportPdf(data as Parameters<typeof exportShippingReportPdf>[0], incidents as Parameters<typeof exportShippingReportPdf>[1], OUT);
+  } else if (TOPIC === "flashpoint" || TOPIC === "protests") {
+    const { exportFlashpointReportPdf } = await import("../src/lib/exportFlashpointReportPdf");
+    await exportFlashpointReportPdf(data as Parameters<typeof exportFlashpointReportPdf>[0], incidents as Parameters<typeof exportFlashpointReportPdf>[1], OUT);
+  } else {
+    const { exportTopicReportPdf } = await import("../src/lib/exportTopicReportPdf");
+    const { TOPIC_LABELS } = await import("../src/lib/topics");
+    await exportTopicReportPdf(
+      data as Parameters<typeof exportTopicReportPdf>[0],
+      incidents as Parameters<typeof exportTopicReportPdf>[1],
+      TOPIC_LABELS,
+      OUT,
+      { allowMissingMarketData: true },
+    );
+  }
+  console.log(`Wrote ${OUT}`);
+}
+
+main().catch((err) => { console.error(err); process.exit(1); });

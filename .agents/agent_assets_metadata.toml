@@ -36,3 +36,33 @@ id = "-JfdczopEk9yuvtsq8JRX"
 uri = "file://screenshots/flashpoint_pdf_page-4.jpg"
 type = "image"
 title = "PDF page 4 — Implications and Watch Next (dated, specific, not generic)"
+
+[[outputs]]
+id = "XE68T058PR1m7Ina6dsDr"
+uri = "file://screenshots/font_proof/FONT_AUDIT.txt"
+type = "text"
+title = "Font audit — Roboto-only proof for all 4 topics"
+
+[[outputs]]
+id = "VEUzfqRgOU-zPRWzMV6w-"
+uri = "file://screenshots/font_proof/fuel.pdf"
+type = "pdf"
+title = "Fuel PDF (fresh export, Roboto embedded)"
+
+[[outputs]]
+id = "Dqcr4P91yNqCNM0VQfdeB"
+uri = "file://screenshots/font_proof/shipping.pdf"
+type = "pdf"
+title = "Shipping PDF (fresh export, Roboto embedded)"
+
+[[outputs]]
+id = "oJgIMrv0Z5_fZewLRziUm"
+uri = "file://screenshots/font_proof/cargo.pdf"
+type = "pdf"
+title = "Cargo PDF (fresh export, Roboto embedded)"
+
+[[outputs]]
+id = "KepINUFMTpMJRiWR2pOl-"
+uri = "file://screenshots/font_proof/flashpoint.pdf"
+type = "pdf"
+title = "Flashpoint PDF (fresh export, Roboto embedded)"
