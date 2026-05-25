@@ -242,9 +242,22 @@ function drawHorizontalBarChart(
 
 // --- Related Incidents -----------------------------------------------------
 function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
-  if (rows.length === 0) return;
   ensureSpace(ctx, 24 + 18 + 40);
   drawSectionHeading(ctx, "Related Incidents");
+  if (rows.length === 0) {
+    const { pdf, MX } = ctx;
+    setText(pdf, DUSK);
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(9);
+    pdf.text(
+      sanitize("No qualifying related incidents in the briefing window. Treat the quiet cycle as a reporting gap rather than a sustained easing."),
+      MX,
+      ctx.y + 10,
+    );
+    setRoboto(pdf, "regular");
+    ctx.y += 22;
+    return;
+  }
 
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
@@ -335,10 +348,13 @@ export async function exportFlashpointReportPdf(
   void cadence;
   beginBodyPages(ctx);
 
-  if (data.executiveSummary && data.executiveSummary.trim()) {
-    drawSectionHeading(ctx, "Executive Summary");
-    renderProse(ctx, data.executiveSummary);
-  }
+  drawSectionHeading(ctx, "Executive Summary");
+  const execText = (data.executiveSummary ?? "").trim();
+  renderProse(
+    ctx,
+    execText ||
+      `This briefing covers the activism, protest and civil-unrest picture across ${win.label}. The detailed operational read, country breakdown, forecast and analyst sections follow below.`,
+  );
 
   const ds = buildFlashpointReportDataset(incidents, data.topic, data.issueDate);
 
@@ -364,7 +380,7 @@ export async function exportFlashpointReportPdf(
   );
 
   // Forecast — analyst prose only, cautious vocabulary.
-  drawSectionWithProse(ctx, "Forecast 7-14 Days", ds.forecastRead);
+  drawSectionWithProse(ctx, "Forecast: Next 7\u201314 Days", ds.forecastRead);
 
   // Regional and Country View — prose leads the country bar chart.
   drawSectionWithProse(ctx, "Regional and Country View", ds.regionalCountryRead);
@@ -387,7 +403,7 @@ export async function exportFlashpointReportPdf(
     return `${t}\n\n${auto}`;
   };
   drawSectionWithProse(ctx, "What Matters", pickProse(data.whatMatters, ds.autoWhatMatters));
-  drawSectionWithProse(ctx, "Implications", pickProse(data.implications, ds.autoImplications));
+  drawSectionWithProse(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));
   drawSectionWithProse(ctx, "Watch Next", pickProse(data.watchNext, ds.autoWatchNext));
   drawSectionWithProse(ctx, "Polestar View", pickProse(data.polestarView, ds.autoPolestarView));
 

@@ -490,10 +490,10 @@ function buildRegionalCountryRead(opts: {
 }): string {
   const { enriched, countryRows } = opts;
   if (enriched.length === 0) {
-    return `No qualifying flashpoint records were tied to a country in the briefing window, so the geographic picture is empty this cycle. A blank cycle is unusual rather than reassuring across the covered geographies.`;
+    return `No qualifying flashpoint records were tied to a country in the briefing window, so the geographic picture is empty this cycle. Across the covered geographies a blank cycle is unusual rather than reassuring: opposition political calendars, sectoral chambers and student bodies typically repopulate the file inside a single news cycle once a policy trigger or anniversary lands.\n\nFor business users the practical read is that standing readiness on the historically affected city-centre commercial districts, transport hubs and government precincts should not be drawn down on the strength of one thin reporting cycle.`;
   }
   if (countryRows.length === 0) {
-    return `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file even where the operational signal is present.`;
+    return `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file even where the operational signal is present. That usually reflects upstream source coverage rather than a real absence of street-level activity.\n\nBusiness users with footprint in the historically affected geographies should keep crisis-comms cascade lists and staff-movement plans on a live footing until the next cycle either confirms or reverses the apparent quiet.`;
   }
   const lead = countryRows[0];
   const second = countryRows[1];
@@ -501,10 +501,55 @@ function buildRegionalCountryRead(opts: {
   const headline = second
     ? `Across the briefing window the file leans on ${lead.label} with ${lead.value} record${lead.value === 1 ? "" : "s"} against ${second.value} for ${second.label}${third ? ` and ${third.value} for ${third.label}` : ""}.`
     : `Across the briefing window the file is concentrated on ${lead.label} with ${lead.value} record${lead.value === 1 ? "" : "s"}.`;
+  // Per-country operational breakdown using the dataset's own bucket
+  // tags. This gives the reader a genuine country-level read on what
+  // is driving mobilisation, what form activity is likely to take and
+  // where the disruption will land — not just count narration.
+  const byCountry = new Map<string, EnrichedIncident[]>();
+  for (const r of enriched) {
+    const c = (r.country ?? "").trim();
+    if (!c) continue;
+    const arr = byCountry.get(c) ?? [];
+    arr.push(r);
+    byCountry.set(c, arr);
+  }
+  const driverFor = (rows: EnrichedIncident[]): string => {
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(r.issue, (counts.get(r.issue) ?? 0) + 1);
+    const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+    if (ranked.length === 0) return "mixed activism and civil-unrest signal";
+    if (ranked.length === 1) return ranked[0][0].toLowerCase();
+    return `${ranked[0][0].toLowerCase()} alongside ${ranked[1][0].toLowerCase()}`;
+  };
+  const formFor = (rows: EnrichedIncident[]): string => {
+    const a = rows.filter((r) => r.bucket === "activism").length;
+    const u = rows.filter((r) => r.bucket === "unrest").length;
+    if (a > 0 && u > 0) return "announced rallies and sectoral walkouts that routinely draw a visible enforcement response";
+    if (a >= u) return "announced rallies, sectoral walkouts and student-body actions converting into rolling road closures";
+    return "visible state enforcement — curfew orders, mass arrests and security-force operations around named flashpoints";
+  };
+  const lociFor = (rows: EnrichedIncident[]): string => {
+    const issues = new Set(rows.map((r) => r.issue));
+    if (issues.has("Crackdown") || issues.has("Curfew / emergency order")) return "city-centre commercial districts, government precincts and university campuses";
+    if (issues.has("Strike / labour action")) return "wholesale markets, transport corridors and sectoral premises (pharmacies, courts, hauliers)";
+    if (issues.has("Student activism")) return "university campuses, adjoining road networks and exam-board administrative offices";
+    if (issues.has("Roadblock / access disruption")) return "named intercity highways, ring-roads and last-mile delivery corridors";
+    return "city-centre commercial districts, transport hubs and government precincts";
+  };
+  const topThree = countryRows.slice(0, 3);
+  const countryParas: string[] = [];
+  for (const cr of topThree) {
+    const rows = byCountry.get(cr.label) ?? [];
+    if (rows.length === 0) continue;
+    countryParas.push(
+      `${cr.label} — ${cr.value} record${cr.value === 1 ? "" : "s"} this cycle, driven by ${driverFor(rows)}. The likely form of mobilisation is ${formFor(rows)}; the principal disruption loci are ${lociFor(rows)}. Business users with on-the-ground exposure should keep staff-movement and venue-access plans on a live footing and treat any opposition political-calendar event in the next 7-14 days as a potential accelerant.`,
+    );
+  }
   const reach = countryRows.length > 3
-    ? `A further ${countryRows.length - 3} countr${countryRows.length - 3 === 1 ? "y" : "ies"} carry single-figure or low-volume entries; the full distribution is in the chart below.`
+    ? `A further ${countryRows.length - 3} countr${countryRows.length - 3 === 1 ? "y" : "ies"} carry single-figure or low-volume entries this cycle; treat them as background signal that can firm up quickly if a regional trigger crosses borders. The full distribution is in the chart below.`
     : `The chart below shows the full distribution.`;
-  return `${headline} ${reach}`;
+  const watch = `Watch for opposition political-calendar moves, sectoral chamber notifications (chemists, transporters, lawyers, traders), student-body statements, and district-administration orders under Section 144 or equivalent public-order legislation — those move ahead of street-level disruption and provide the cleanest leading signal that the country-level picture is firming.`;
+  return [headline, ...countryParas, reach, watch].join("\n\n");
 }
 
 function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
