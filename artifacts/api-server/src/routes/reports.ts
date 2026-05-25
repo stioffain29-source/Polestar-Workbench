@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, reportsTable } from "@workspace/db";
+import type { FuelHardNumbers, InsertReport } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import {
   CreateReportBody,
@@ -13,6 +14,30 @@ function parseId(raw: string | string[] | undefined): number {
   const v = Array.isArray(raw) ? raw[0] : raw;
   const n = parseInt(v ?? "", 10);
   return Number.isNaN(n) ? -1 : n;
+}
+
+/**
+ * The orval-generated types use `Date` for `format: date` / `date-time`
+ * fields (because `useDates: true` in orval.config.ts). The DB stores
+ * those as strings (postgres `date` column for `issueDate`; ISO strings
+ * inside the `hardNumbers` jsonb column for `JetFuelPricePoint.date`).
+ * These helpers normalize at the API boundary so the insert/update
+ * shape matches the Drizzle column types.
+ */
+function dateToYmd(d: Date | string): string {
+  return d instanceof Date ? d.toISOString().slice(0, 10) : d;
+}
+
+/**
+ * JSON-roundtrip the hardNumbers payload so any nested `Date` instances
+ * (e.g. `JetFuelPricePoint.date`) become ISO strings — Date.toJSON()
+ * returns the ISO-8601 string, which matches the DB-side
+ * FuelHardNumbers shape (date: string). Safe for KpiCard[] and
+ * FuelHardNumbers alike since both are pure-data structures.
+ */
+function normalizeHardNumbers(value: unknown): FuelHardNumbers | undefined {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value)) as FuelHardNumbers;
 }
 
 router.get("/reports", async (req, res): Promise<void> => {
@@ -49,17 +74,13 @@ router.post("/reports", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const data = parsed.data;
-  const [row] = await db
-    .insert(reportsTable)
-    .values({
-      ...data,
-      issueDate:
-        data.issueDate instanceof Date
-          ? data.issueDate.toISOString().slice(0, 10)
-          : data.issueDate,
-    })
-    .returning();
+  const { issueDate, hardNumbers, ...rest } = parsed.data;
+  const insertValues: InsertReport = {
+    ...rest,
+    issueDate: dateToYmd(issueDate),
+    hardNumbers: normalizeHardNumbers(hardNumbers),
+  };
+  const [row] = await db.insert(reportsTable).values(insertValues).returning();
   res.status(201).json(row);
 });
 
@@ -70,13 +91,13 @@ router.patch("/reports/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const data = parsed.data;
-  const updateData: Record<string, unknown> = { ...data };
-  if (data.issueDate !== undefined) {
-    updateData.issueDate =
-      data.issueDate instanceof Date
-        ? data.issueDate.toISOString().slice(0, 10)
-        : data.issueDate;
+  const { issueDate, hardNumbers, ...rest } = parsed.data;
+  const updateData: Partial<InsertReport> = { ...rest };
+  if (issueDate !== undefined) {
+    updateData.issueDate = dateToYmd(issueDate);
+  }
+  if (hardNumbers !== undefined) {
+    updateData.hardNumbers = normalizeHardNumbers(hardNumbers);
   }
   const [row] = await db
     .update(reportsTable)
