@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TOPICS, TOPIC_LABELS, REPORT_STATUSES } from "@/lib/topics";
 import ReportPreview from "@/components/ReportPreview";
 import ShippingReportPreview from "@/components/ShippingReportPreview";
+import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
@@ -782,6 +783,8 @@ export default function ReportEditor() {
         <div className="bg-white border border-border rounded-sm overflow-hidden">
           {form.topic === "shipping" ? (
             <ShippingReportPreview report={form} incidents={incidentsForExport} />
+          ) : (form.topic === "flashpoint" || form.topic === "protests") ? (
+            <FlashpointReportPreview report={form} incidents={incidentsForExport} />
           ) : (
             <ReportPreview
               report={{ ...form, hardNumbers: hardNumbersEdited ?? report?.hardNumbers }}
