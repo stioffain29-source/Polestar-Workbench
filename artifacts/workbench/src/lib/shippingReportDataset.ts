@@ -238,6 +238,55 @@ function topicSignature(title: string, date: Date): string {
   return `${bucket}|${top.join(" ")}`;
 }
 
+// Event-key dedupe for vessel rows. The same UAE/Hormuz seizure routinely
+// shows up under five or six rewrites on the same day with different
+// noun ordering ("Vessel seized off UAE coast", "UKMTO says vessel
+// seized off UAE", "Honduran-flagged vessel seized by Iran near UAE",
+// "Hormuz Crisis: Vessel Seized Off UAE Heading to Iran") — `dedupeByTitle`
+// keeps them apart because the first 6 significant words diverge. This
+// pass collapses anything sharing the same {day, act, chokepoint/country
+// anchor} so the table shows one clean row per actual incident.
+function vesselEventKey<T extends { title: string; date: Date; vesselType: VesselIncidentType }>(r: T): string {
+  const day = r.date.toISOString().slice(0, 10);
+  const text = (r.title ?? "").toLowerCase();
+  const anchors: string[] = [];
+  const anchorTests: [RegExp, string][] = [
+    [/\bhormuz\b/, "hormuz"],
+    [/\bbab[\s-]?el[\s-]?mandeb\b/, "bab"],
+    [/\bred\s*sea\b/, "redsea"],
+    [/\bgulf\s+of\s+oman\b/, "gulfoman"],
+    [/\bpersian\s+gulf|arabian\s+gulf\b/, "persiangulf"],
+    [/\bsuez\b/, "suez"],
+    [/\bmalacca\b/, "malacca"],
+    [/\bsingapore\s+strait\b/, "sgstrait"],
+    [/\buae|emirates|abu\s+dhabi|dubai|fujairah\b/, "uae"],
+    [/\biran(ian)?\b/, "iran"],
+    [/\bsomalia(n)?\b/, "somalia"],
+    [/\byemen|houthi\b/, "yemen"],
+  ];
+  for (const [re, tag] of anchorTests) if (re.test(text)) anchors.push(tag);
+  const act = r.vesselType.toLowerCase();
+  return `${day}|${act}|${anchors.sort().join(",")}`;
+}
+function dedupeByEventKey<T extends { title: string; date: Date; severity: string; vesselType: VesselIncidentType }>(rows: T[]): T[] {
+  const better = (a: T, b: T) => {
+    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+    if (sa !== sb) return sa > sb;
+    return a.date.getTime() >= b.date.getTime();
+  };
+  const out = new Map<string, T>();
+  for (const r of rows) {
+    const k = vesselEventKey(r);
+    // Empty-anchor rows shouldn't collapse together — keep them distinct
+    // unless their title also collides.
+    if (k.endsWith("|")) { out.set(`__${r.title}|${k}`, r); continue; }
+    const prev = out.get(k);
+    if (!prev || better(r, prev)) out.set(k, r);
+  }
+  return Array.from(out.values());
+}
+
 function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
   // Two-pass: exact-title-key dedupe (catches direct republishing), then
   // date+nouns signature dedupe (catches reworded syndication). Keeps
@@ -363,9 +412,13 @@ export function buildShippingReportDataset(
   const vesselAll: VesselRow[] = sortByDateDesc(
     enriched30
       .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
-      .filter((r): r is VesselRow => r.vesselType !== null),
+      .filter((r): r is VesselRow => r.vesselType !== null)
+      // Drop repatriation / crew-return human-interest items, speculative
+      // "X claims missile strike" rumour traffic, generic commentary and
+      // social/handle sources before they reach the table or the prose.
+      .filter((r) => !isLowCredibilitySource(r)),
   );
-  const vesselDeduped = dedupeByTitle(vesselAll);
+  const vesselDeduped = dedupeByEventKey(dedupeByTitle(vesselAll));
   const vesselHostile = vesselDeduped.filter(
     (r) => r.vesselType === "Attack" || r.vesselType === "Seized",
   );
@@ -396,11 +449,17 @@ export function buildShippingReportDataset(
   const PIRACY_TABLE_CAP = 12;
   const piracyRows: PiracyRow[] = dedupeByTitle(piracyAll).slice(0, PIRACY_TABLE_CAP);
 
-  // Weekly-window vessel/piracy counts (used only by the Daily Intelligence
-  // Summary line, which describes the weekly briefing window itself).
-  const vesselRowsWeekly = enriched
-    .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
-    .filter((r): r is VesselRow => r.vesselType !== null);
+  // Weekly-window vessel/piracy counts. Same credibility / dedupe rules
+  // as the 30-day pipeline so the prose cannot quote a weekly figure
+  // that includes records the table has filtered out.
+  const vesselRowsWeekly = dedupeByEventKey(
+    dedupeByTitle(
+      enriched
+        .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
+        .filter((r): r is VesselRow => r.vesselType !== null)
+        .filter((r) => !isLowCredibilitySource(r)),
+    ),
+  );
   const vAttackSeizeWeekly = vesselRowsWeekly
     .filter((r) => r.vesselType === "Attack" || r.vesselType === "Seized").length;
   const piracyRowsWeekly = enriched
@@ -509,7 +568,12 @@ export function buildShippingReportDataset(
 
   // Vessel Threat and Piracy Read — built from the 30-day vessel and
   // piracy classifications plus the weekly window for cycle context.
+  // Three counts feed in separately so the prose cannot mix capped
+  // display rows with underlying totals: vessel-threat total (deduped,
+  // uncapped), displayed table rows (capped), and attack/seizure count.
   const vesselPiracyRead = buildVesselPiracyRead({
+    vesselThreat30Total: vesselDeduped.length,
+    vesselTableShown: vesselRows.length,
     vesselRows30: vesselRows,
     piracyRows30: piracyRows,
     vesselRowsWeekly,
@@ -728,16 +792,40 @@ function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
 function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
   const region = [...ctx.regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+  const vesselThreat = ctx.vesselHostile.length + ctx.piracyRows.length;
   const lead: string[] = [];
+
+  // 1. Dominant pressure point on the trailing 30 days.
   lead.push(
-    `Our read on the cycle is that the underlying maritime security picture remains structurally elevated even when the weekly file looks quieter than the trailing 30 days. ${cp ? `${cp.name} continues to set the tempo` : `No single chokepoint dominated this week, but the regional baseline has not reset`}, and operators should be planning against a "quiet weeks, sharp incidents" cadence rather than a sustained easing.`,
+    cp
+      ? `${cp.name} is the dominant pressure point on the trailing 30-day file with ${cp.count} qualifying record${cp.count === 1 ? "" : "s"}, and that is where the structural risk sits regardless of the weekly cadence.`
+      : `No single chokepoint dominated the trailing 30 days, but the regional baseline on Hormuz, the Red Sea and Bab-el-Mandeb has not reset — treat the absence of a clear lead as a coverage gap, not a structural easing.`,
   );
+
+  // 2. 30-day vessel-threat context against thin weekly cadence.
+  if (vesselThreat > 0) {
+    lead.push(
+      `Vessel-threat reporting on the same 30-day window carries ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"}, against ${ctx.weeklyCount} record${ctx.weeklyCount === 1 ? "" : "s"} in the weekly window. A thin week against a heavier month is the normal pattern in this geography and should be read as cycle noise rather than a sustained easing.`,
+    );
+  } else {
+    lead.push(
+      `Weekly vessel-side activity is light against a structurally heavier 30-day backdrop. A quiet week here is normal cycle noise rather than a benign trend; the same lanes have not been clean for long.`,
+    );
+  }
+
+  // 3. Insurance / war-risk / routing implications.
   lead.push(
-    `For commercial decisions, the practical implication is that routing, port-call sequencing and crew-change planning should be treated as live risk decisions every cycle — not annual reviews. War-risk and P&I premium movement remains the cleanest single signal that the operational picture is firming; reliability indices and headline freight rates lag it.`,
+    `Insurance and routing implications follow directly: war-risk and P&I premium reviews on Hormuz, Red Sea and adjacent lanes should be treated as live, not annual. Premium adjustments typically firm one to two cycles after the operational signal, so the moment to size exposure is now — not after the next visible event.`,
   );
+
+  // 4. What business users should actually do with the read.
+  lead.push(
+    `For business users the practical actions are: keep routing and port-call sequencing under live review on ${cp ? cp.name : "the affected corridors"}; price war-risk and P&I uplift into near-term lifting contracts and add flexibility clauses on diversion or skip-call; brief commercial teams that schedule reliability — not headline freight rates — is the cleanest signal of when this cycle will hit cargo flow.`,
+  );
+
   if (region) {
     lead.push(
-      `Geographically the pressure this cycle sat with ${region.label}. We expect the same lanes and corridors to set the tempo through the next reporting window unless a fresh naval-force posture change or a credible diplomatic move on the underlying conflicts disrupts the pattern.`,
+      `Geographically the weekly pressure sat with ${region.label}; we expect the same lanes to set the tempo through the next reporting window unless a naval-force posture change or a credible diplomatic move on the underlying conflicts disrupts the pattern.`,
     );
   }
   return lead.join("\n\n");
@@ -787,6 +875,8 @@ function buildChokepointRouteRead(opts: {
 }
 
 function buildVesselPiracyRead(opts: {
+  vesselThreat30Total: number;
+  vesselTableShown: number;
   vesselRows30: VesselRow[];
   piracyRows30: PiracyRow[];
   vesselRowsWeekly: VesselRow[];
@@ -795,19 +885,25 @@ function buildVesselPiracyRead(opts: {
   vAttackSeizeWeekly: number;
   thirtyDayLabel: string;
 }): string {
-  const { vesselRows30, piracyRows30, vesselRowsWeekly, piracyRowsWeekly, vAttackSeize30, vAttackSeizeWeekly, thirtyDayLabel } = opts;
-  if (vesselRows30.length + piracyRows30.length === 0) {
+  const { vesselThreat30Total, vesselTableShown, vesselRows30, piracyRows30, vesselRowsWeekly, piracyRowsWeekly, vAttackSeize30, vAttackSeizeWeekly, thirtyDayLabel } = opts;
+  if (vesselThreat30Total + piracyRows30.length === 0) {
     return `Nothing hostile against vessels and no piracy or armed-robbery records reached the file over the last 30 days (${thirtyDayLabel}). The underlying threat picture in the region has not been benign for long, so treat the quiet cycle as a reporting gap and keep crew-change, advisory and naval-patrol signals on the watchlist.\n\nA return to hostile activity is usually announced first by naval forces, then by maritime risk bulletins, before it shows up in P&I or war-risk premium movement.`;
   }
   // Lead-title quotes must come from a credible maritime / security /
-  // industry / news source — never from social-media handles, low-credibility
-  // sources, repatriation or human-interest items, or speculative "X claims
-  // missile strike" headlines. Falls back to a counts-only sentence when no
-  // credible lead exists.
-  const vesselLead = vesselRows30.find((r) => !isLowCredibilitySource(r));
+  // industry / news source. The vessel pipeline is already filtered for
+  // social, repatriation and speculative items, so the first deduped
+  // row is a safe pick.
+  const vesselLead = vesselRows30[0] ?? null;
   const piracyLead = piracyRows30.find((r) => !isLowCredibilitySource(r));
-  const vesselSegment = vesselRows30.length > 0
-    ? `Hostile activity against vessels over the last 30 days runs to ${vesselRows30.length} record${vesselRows30.length === 1 ? "" : "s"}, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ` Available headlines on the file are dominated by low-credibility or speculative reporting, so no validated lead entry is quoted here.`}`
+  // Three distinct counts kept separate so the prose cannot contradict
+  // itself: (1) total vessel-threat events on the 30-day file after
+  // dedupe and credibility filtering, (2) the attack/seizure subset of
+  // that total, (3) the capped row count shown in the table below.
+  const capNote = vesselTableShown < vesselThreat30Total
+    ? ` The table below shows the top ${vesselTableShown} of these, prioritising attack and seizure events.`
+    : "";
+  const vesselSegment = vesselThreat30Total > 0
+    ? `Vessel-threat reporting over the last 30 days carries ${vesselThreat30Total} qualifying event${vesselThreat30Total === 1 ? "" : "s"} after dedupe, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${capNote}${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ""}`
     : `No vessel-attack or seizure records landed in the 30-day window, even with piracy activity still on the file.`;
   const piracySegment = piracyRows30.length > 0
     ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window${piracyLead ? `, with "${piracyLead.title}" as the lead entry.` : `; no credible single lead is quoted as the file leans on low-credibility or speculative reporting.`}`
@@ -873,7 +969,14 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
   const rest: EnrichedIncident[] = [];
   for (const r of rows) {
     if (isShippingMarketOnly(r)) continue;
-    const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
+    // Mirror the Commercial Impact gate: pure freight-market / rate-tracker
+    // commentary (Drewry, WCI, BDI, "freight rate recovery") must not
+    // appear here either. If Commercial Impact excludes it, Related
+    // Incidents excludes it.
+    const text2 = `${r.title ?? ""} ${r.summary ?? ""}`;
+    if (FREIGHT_MARKET_INDEX_RE.test(text2) && !COMMERCIAL_OPERATIONAL_RE.test(text2)) continue;
+    if (isLowCredibilitySource(r)) continue;
+    const text = text2.toLowerCase();
     const isVesselHostile = OPERATIONAL_HOOK_RE.test(text) && /\b(attack|attacked|hijack|piracy|seized|missile|drone|hostilit)\b/.test(text);
     const isPortRouteOrChoke = /\b(port|terminal|berth|chokepoint|hormuz|red\s*sea|bab[\s-]?el[\s-]?mandeb|suez|malacca|reroute|diversion|advisory|war[\s-]?risk|insurance|premium)\b/.test(text);
     const isWeakBucket = r.issue === "Unclassified maritime record" || /^other\s.+/i.test(r.issue);
@@ -883,7 +986,7 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
   const ordered = dedupeByTitle([...strong, ...rest]);
   // Cap tight so the Source Notes / Disclaimer block can be pulled back
   // onto the same page rather than orphaned on a near-empty final page.
-  return ordered.slice(0, 8);
+  return ordered.slice(0, 6);
 }
 
 export const SHIPPING_SEV_LABEL = SEV_LABEL;

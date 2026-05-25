@@ -34,6 +34,7 @@ import {
   buildCargoImplications,
   buildCargoWatchNext,
   buildCargoPolestarView,
+  buildCargoSituation,
 } from "./cargoNarratives";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -332,9 +333,17 @@ function drawRelatedIncidents(
   // so the table prefers named-place / named-corridor / named-cargo
   // records when they exist.
   function isGenericCargoTitle(title: string): boolean {
-    return /\b(warehouse|container|cargo|truck|depot)\s+theft\s+-\s+(other|unknown|misc|miscellaneous|general|electronics|goods|items|various|assorted)\s*$/i.test(
-      (title ?? "").trim(),
-    );
+    const t = (title ?? "").trim();
+    // Generic synthetic titles take the shape
+    //   "<bucket> theft <dash> <single category word>"
+    // where <dash> can be ASCII hyphen, en-dash or em-dash, and the
+    // category word carries no place, route or modus operandi signal.
+    // We treat any single trailing token after a dash as generic; only
+    // titles that add a named place / corridor / operator survive.
+    return /\b(warehouse|container|cargo|truck|depot)\s+(theft|hijack|hijacking|robbery|loss|raid)\s+[-\u2013\u2014]\s+\S+\s*$/i.test(t)
+      // Also drop the matching "Other land-based cargo theft - <word>"
+      // pattern surfaced by the classifier's fallback bucket.
+      || /^other\s+land[- ]based\s+cargo\s+theft\s+[-\u2013\u2014]\s+\S+\s*$/i.test(t);
   }
   // Title-based dedupe: collapse syndicated / repeated rows so the
   // Related Incidents table does not list the same loss four times.
@@ -657,7 +666,7 @@ export async function exportTopicReportPdf(
       const proseSections: [string, string][] = [
         ["Cargo Security Read", cargoSecurity],
         ["Logistics Hub Read", cargoNode],
-        ["Situation", (data.situation ?? "").trim()],
+        ["Situation", pickProse(data.situation, buildCargoSituation(windowIncidents))],
         ["What Happened", (data.whatHappened ?? "").trim()],
         ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],
       ];

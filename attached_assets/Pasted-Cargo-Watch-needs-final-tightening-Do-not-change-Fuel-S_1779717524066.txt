@@ -1,0 +1,90 @@
+Cargo Watch needs final tightening.
+
+Do not change Fuel, Shipping or Flashpoint.
+
+Fix only Cargo Watch.
+
+1. Fix clumsy wording
+
+Current:
+“Logistics-hub logistics risk...”
+
+Replace with:
+“Logistics hub risk across warehouses, depots, distribution centres, terminals and bonded storage appears across 23 qualifying records this cycle.”
+
+Use “Logistics Hub Read”, not “Logistics Node”.
+
+2. Fix country consistency
+
+Fast Facts says Most Affected Country is Papua New Guinea.
+Situation says Indonesia sits at the centre of the recurring geography.
+
+Do not contradict the report.
+
+Either:
+- make Papua New Guinea the main affected country in the prose, or
+- explain clearly that Papua New Guinea leads total records while Indonesia leads logistics hub / warehouse risk.
+
+3. Expand Implications for Business into bullets
+
+Current section has one long bullet. Replace with 5–7 short practical bullets.
+
+Cover:
+- route review for repeat corridors
+- escort use on high-value moves
+- depot and warehouse access control
+- driver and yard staff vetting
+- seal / lock checks at handover
+- insurance cover for repeat corridors
+- incident reporting and recovery procedures
+
+4. Expand Watch Next into bullets
+
+Current section has one long bullet. Replace with 5–8 short watch indicators.
+
+Cover:
+- repeat losses on same corridor
+- copycat theft within two weeks
+- insider involvement
+- depot access failures
+- seal / lock failures
+- fresh arrests or recoveries
+- route displacement to weaker depots
+- insurance or police alerts
+
+5. Tighten Related Incidents
+
+Remove generic / synthetic-looking rows:
+- Warehouse theft - Electronics
+- Container theft - Electronics
+- Container theft - Other
+- Warehouse theft - Other
+
+Prioritise records with:
+- named place
+- named route or corridor
+- clear cargo type
+- clear modus operandi
+- clear operational relevance
+
+6. Strengthen Polestar View
+
+Current Polestar View is too thin.
+
+Make it a proper judgement:
+- larger cargo losses are being driven by route familiarity and likely insider knowledge
+- Papua New Guinea, Indonesia and Vietnam are the main operating geographies
+- route-side hijack risk and logistics hub theft should be treated as linked, not separate
+- business users should focus on handover controls, driver vetting, depot discipline and repeat-corridor routing
+
+Keep it concise, but useful.
+
+7. Acceptance
+
+Export Cargo Watch again and confirm:
+- no “Logistics-hub logistics risk” wording
+- no country contradiction
+- Implications has 5–7 useful bullets
+- Watch Next has 5–8 useful bullets
+- generic incident rows are gone
+- Polestar View gives a clear judgement

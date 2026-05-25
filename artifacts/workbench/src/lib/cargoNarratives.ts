@@ -142,68 +142,114 @@ export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[])
   return parts.join("\n\n");
 }
 
-export function buildCargoImplications(windowIncidents: CargoNarrativeIncident[]): string {
-  const ctx = buildCargoAutoCtx(windowIncidents);
+export function buildCargoImplications(_windowIncidents: CargoNarrativeIncident[]): string {
+  // Fixed-shape bullet set covering route review, escort use, depot
+  // and warehouse access control, driver and yard-staff vetting,
+  // seal / lock checks at handover, insurance cover on repeat
+  // corridors and incident reporting / recovery procedures. Order
+  // runs from operational (route, escort) through facility controls
+  // (depot, vetting, seals) to commercial / process (insurance,
+  // reporting).
+  void _windowIncidents;
   const bullets: string[] = [
-    `Treat affected corridors as live inventory-loss exposure and order re-supply against lost stock without delay.`,
-    `Expect underwriter response within one to two cycles — deductibles, route exclusions or premium moves on lanes with repeat activity.`,
+    `Run a fresh route review on repeat-loss corridors and re-baseline expected transit risk before the next high-value move.`,
+    `Use escort or convoy cover on high-value loads through known-hot lanes; the cost only looks high until a single loss prices it in.`,
+    `Tighten depot and warehouse access control — visitor logs, after-hours staffing, CCTV blind spots and perimeter integrity at named hubs.`,
+    `Re-baseline driver and yard-staff vetting on contracted hauliers; insider involvement is the consistent thread behind larger losses.`,
+    `Enforce seal and lock checks at every handover, with photographic evidence captured and matched at origin and destination.`,
+    `Review insurance cover and deductibles on repeat corridors; expect underwriter response within one to two cycles on lanes with recurring activity.`,
+    `Confirm incident-reporting and recovery procedures end-to-end — police notification, insurer notification, internal escalation and stock-recovery actions — so the response is rehearsed, not improvised.`,
   ];
-  if (ctx.securityMatches.length > 0) {
-    bullets.push(
-      `Tighten driver and crew vetting on affected corridors and enforce convoy or escort rules on high-value loads.`,
-    );
-    bullets.push(
-      `Review rest-stop, refuelling and handover discipline; assume the threat is insider as well as external.`,
-    );
-  }
-  if (ctx.hubMatches.length > 0) {
-    bullets.push(
-      `Review depot perimeter, after-hours staffing, CCTV blind spots and seal-and-lock integrity at every handover.`,
-    );
-    bullets.push(
-      `Re-baseline yard-staff vetting and visitor controls — lowest-cost wins and first to slip during operator turnover.`,
-    );
-  }
-  bullets.push(
-    `Write loss-mitigation clauses into near-term freight and insurance contracts rather than rely on standard cover.`,
-  );
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
-export function buildCargoWatchNext(windowIncidents: CargoNarrativeIncident[]): string {
-  const ctx = buildCargoAutoCtx(windowIncidents);
+export function buildCargoWatchNext(_windowIncidents: CargoNarrativeIncident[]): string {
+  // Fixed-shape watch indicators per spec: repeat losses on the same
+  // corridor, copycat theft within two weeks, insider involvement,
+  // depot access failures, seal / lock failures, fresh arrests or
+  // recoveries, route displacement to weaker depots, and insurance
+  // or police alerts.
+  void _windowIncidents;
   const bullets: string[] = [
-    `Repeat losses on the same corridor across consecutive cycles: clearest sign an organised crew is working a specific lane.`,
-    `Copycat theft after a publicised hijack: one event often draws three or four imitators within a fortnight.`,
-    `Insider tells — out-of-hours loading, driver or yard-staff turnover coinciding with a loss, seal or lock failures: trigger handover audit.`,
-    `Depot access failures, broken seals and CCTV outages on the same shift: signal organised facility-side activity, not pilferage.`,
-    `Insurance underwriter bulletins, transport-association advisories and police-alert circulars: leading market signal.`,
-    `Operator route displacement under cost pressure (controlled depot to weaker one): common precursor to a fresh loss cycle.`,
-    `Premium movement on affected lanes: cleanest lagging confirmation the operational signal has firmed commercially.`,
+    `Repeat losses on the same corridor across consecutive cycles — clearest sign an organised crew is working a specific lane.`,
+    `Copycat theft within two weeks of a publicised hijack — one event commonly draws three or four imitators.`,
+    `Insider involvement signals — out-of-hours loading, driver or yard-staff turnover coinciding with a loss, seal or lock anomalies.`,
+    `Depot access failures, after-hours entries and CCTV outages on the same shift — facility-side organisation rather than opportunistic pilferage.`,
+    `Seal or lock failures at handover — leading indicator of a compromised driver, agent or yard handler.`,
+    `Fresh arrests, recoveries or charge-sheet filings on prior losses — tells you whether the law-enforcement response is firming or stalling.`,
+    `Route displacement away from controlled depots toward weaker ones under cost pressure — common precursor to a fresh loss cycle.`,
+    `Insurance underwriter bulletins, transport-association advisories and police-alert circulars on affected corridors — the cleanest market-side signal.`,
   ];
-  if (ctx.hubMatches.length > 0) {
-    bullets.push(
-      `Facility-access incidents and perimeter breaches at named hubs: watch for escalation from pilferage to organised raiding.`,
-    );
-  }
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
+  // Country picture is split deliberately: overall total leader (drives
+  // the Fast Facts "Most Affected Country" card) vs the logistics-hub
+  // leader. If they differ, the prose calls that out instead of letting
+  // the report appear self-contradictory.
+  const overallTop = topCountries(ctx.windowIncidents, 3);
+  const hubTop = topCountries(ctx.hubMatches, 1);
+  const securityTop = topCountries(ctx.securityMatches, 1);
   const parts: string[] = [];
+
+  // 1. Judgement: larger losses driven by route familiarity and
+  // likely insider knowledge.
   parts.push(
-    `Our read on cargo risk this cycle is that the underlying loss picture remains structurally elevated even when the weekly file is quiet. Cargo-crime reporting under-counts the true loss rate; what reaches the public file is typically the subset that produced a police report, an insurance claim large enough to trigger underwriter contact, or a media-worthy hijack. Operational losses on smaller corridors continue between cycles.`,
+    `Our read on the cycle is that the larger cargo losses on the file are being driven by route familiarity and likely insider knowledge rather than opportunistic crime. The pattern across hijack reports, depot raids and seal-failure entries is too consistent to read as chance — repeat corridors, named depots and the same modus operandi recur.`,
   );
-  parts.push(
-    `Practically, that means cargo owners should plan against a baseline of route-side and hub-side loss exposure rather than treat quiet cycles as a green light. Convoying or escort for high-value moves, seal-and-lock integrity at every handover, driver and yard-staff vetting on contracted hauliers, and depot perimeter discipline are the controls that hold up across cycles.`,
-  );
-  if (ctx.securityMatches.length + ctx.hubMatches.length > 0) {
+
+  // 2. Country split: name the main operating geographies and
+  // distinguish total-record leader from logistics-hub leader if they
+  // differ, so the Fast Facts card and the prose do not contradict.
+  if (overallTop.length > 0) {
+    const overallList = joinCountries(overallTop);
+    const hub = hubTop[0]?.country ?? null;
+    const sec = securityTop[0]?.country ?? null;
+    const split = hub && sec && hub !== sec
+      ? ` ${sec} leads route-side cargo-security reporting on the file while ${hub} leads logistics-hub and warehouse exposure — different lanes of the same problem, not separate issues.`
+      : "";
     parts.push(
-      `We expect the same corridors and facility types to set the tempo through the next reporting window. A return to elevated public reporting is usually visible first in insurance underwriter circulars and transport-association advisories — that is the signal to tighten posture, not the headline-loss event itself.`,
+      `The main operating geographies this cycle are ${overallList}.${split}`,
     );
   }
+
+  // 3. Route-side and hub-side risk are linked — treat them as one
+  // exposure picture, not two separate buckets.
+  parts.push(
+    `Route-side hijack risk and logistics-hub theft should be treated as linked exposures rather than separate problems. Inventory that survives the road can still be lost at the depot, and crews working a corridor are often the same crews working a yard at the other end of it.`,
+  );
+
+  // 4. Where business users should actually focus.
+  parts.push(
+    `For business users the focus should sit on four controls: handover discipline (seals, locks, photographic evidence at origin and destination); driver and yard-staff vetting on contracted hauliers; depot discipline on access, staffing and after-hours integrity; and routing that treats repeat-loss corridors as live exposure rather than a default lane choice. These are the controls that hold up across cycles regardless of how loud or quiet any single week looks.`,
+  );
+
   return parts.join("\n\n");
+}
+
+// Auto-prose for the Situation section. The Fast Facts "Most Affected
+// Country" card uses a raw total-records leader; this builder mirrors
+// the same logic so the headline figure and the prose cannot disagree.
+// When the logistics-hub leader differs from the overall leader, both
+// are named so the country split is explicit, not contradictory.
+export function buildCargoSituation(windowIncidents: CargoNarrativeIncident[]): string {
+  const ctx = buildCargoAutoCtx(windowIncidents);
+  if (ctx.windowIncidents.length === 0) {
+    return `Warehouse, depot and road-corridor exposure persists regardless of how quiet the reporting window looks. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap, not confirmation that route-side or hub-side risk has eased.`;
+  }
+  const overallTop = topCountries(ctx.windowIncidents, 1);
+  const hubTop = topCountries(ctx.hubMatches, 1);
+  const overall = overallTop[0]?.country ?? null;
+  const hub = hubTop[0]?.country ?? null;
+  const focus = `Warehouse, depot and road corridors hold the live exposure this cycle, with route familiarity and insider risk as the persistent drivers.`;
+  const where = overall && hub && overall !== hub
+    ? ` ${overall} leads total reporting on the file, while ${hub} leads logistics-hub and warehouse risk — both sit inside the same operating picture.`
+    : overall
+      ? ` ${overall} sits at the centre of the recurring geography on this cycle.`
+      : "";
+  return `${focus}${where}`;
 }
 
 export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[]): string {
@@ -220,7 +266,7 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
   const countryLine = countries.length > 0
     ? `The country picture in this cycle is led by ${joinCountries(countries)}.`
     : `Country attribution is sparse this cycle and limits the geographic read.`;
-  const intro = `Logistics-hub logistics risk — warehouses, depots, distribution centres, terminals and bonded storage — shows up across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
+  const intro = `Logistics hub risk across warehouses, depots, distribution centres, terminals and bonded storage appears across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
   const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two cycles.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }
