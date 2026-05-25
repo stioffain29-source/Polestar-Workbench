@@ -38,6 +38,24 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\brecipe\b/,
 ];
 
+// Cargo-specific exclusions. Cargo Watch covers operational cargo and
+// logistics-node crime: hijack, truck/container theft, warehouse and
+// depot pilferage, broken seals and logistics-crime stories. Pure
+// retail-theft tickers, shoplifting, vehicle break-ins, residential
+// burglary and stock-price commentary on logistics groups are not the
+// same risk picture and must not pollute the report.
+const CARGO_EXCLUDE: RegExp[] = [
+  /\b(shoplift|shoplifting|shoplifter)/,
+  /\b(retail (theft|crime) (index|tracker|ticker|wave))/,
+  /\bsmash[- ]and[- ]grab\b/,
+  /\bporch (pirate|theft)/,
+  /\b(car|vehicle) (theft|break[- ]in)\b/,
+  /\bcatalytic converter (theft|stolen)/,
+  /\b(home|house|residential) (burglary|invasion)/,
+  /\b(share price|stock price|equity|earnings|quarterly (result|results)|dividend|buyback|ipo|market cap) .{0,40}(logistics|freight|transport|shipping|cargo)/,
+  /^other cargo incident$/i,
+];
+
 // Fuel-specific exclusions. Pure market speculation, equity/finance news
 // and broad oil-price commentary with no operational signal must never
 // lead a Fuel Watch. These records may mention "oil" or "fuel" but they
@@ -182,6 +200,11 @@ export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
   }
   if (topic === "fuel") {
     for (const re of FUEL_EXCLUDE) {
+      if (re.test(text)) return false;
+    }
+  }
+  if (topic === "cargo_watch") {
+    for (const re of CARGO_EXCLUDE) {
       if (re.test(text)) return false;
     }
   }

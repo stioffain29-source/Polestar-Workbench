@@ -1,10 +1,10 @@
-import { format, parseISO, max as dateMax, startOfDay, subDays } from "date-fns";
+import { format, parseISO, max as dateMax, subDays } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import {
   CHOKEPOINTS, detectChokepoints, classifyPiracy,
   classifyVesselIncident, type VesselIncidentType,
-  classifyIssue, ISSUE_PALETTE,
+  classifyIssue,
   classifyRegion, REGION_COLOR, type Region,
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
   type ChokepointKey,
@@ -57,7 +57,6 @@ export interface ChokepointRow {
 }
 
 export interface BarRow { label: string; value: number; color?: string }
-export interface TimelinePoint { date: string; label: string; count: number }
 
 export interface ShippingReportDataset {
   reportingPeriodShort: string;
@@ -75,14 +74,16 @@ export interface ShippingReportDataset {
   vesselRows: VesselRow[];
   /** Piracy / armed robbery over the last 30 days. */
   piracyRows: PiracyRow[];
-  issueRows: BarRow[];
-  dailyIntelLines: string[];
   regionRows: BarRow[];
   countryRows: BarRow[];
-  timelineSeries: TimelinePoint[];
-  timelinePeak: TimelinePoint | null;
-  severityRows: BarRow[];
   commercialRows: EnrichedIncident[];
+  /** Analyst-prose reads. Each one introduces the data that follows it. */
+  chokepointRouteRead: string;
+  vesselPiracyRead: string;
+  commercialImpactRead: string;
+  regionalCountryRead: string;
+  /** Prioritised in-window operational incidents for the closing table. */
+  relatedIncidents: EnrichedIncident[];
   dataNote: string;
 }
 
@@ -92,8 +93,11 @@ const SEV_RANK: Record<string, number> = {
 const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme",
 };
+// Brand-aligned severity palette. #a33232 is reserved for Extreme only;
+// other tiers use the core Polestar colours so the only red on a page
+// is the highest tier.
 const SEV_COLOR: Record<string, string> = {
-  insignificant: "#B8C2CC", low: "#6FB872", moderate: "#E67E22", high: "#C0392B", extreme: "#800000",
+  insignificant: "#e2e2e2", low: "#6fb872", moderate: "#465bff", high: "#363636", extreme: "#a33232",
 };
 
 function sevKey(s: string | null | undefined): string {
@@ -309,21 +313,6 @@ export function buildShippingReportDataset(
     };
   });
 
-  // Issue rows — "Unclassified maritime record" is excluded from the chart;
-  // unclassifiable records remain in totals but never appear as a chart bar.
-  const issueMap = new Map<string, number>();
-  for (const r of enriched) {
-    if (r.issue === "Unclassified maritime record") continue;
-    issueMap.set(r.issue, (issueMap.get(r.issue) ?? 0) + 1);
-  }
-  const issueRows: BarRow[] = Array.from(issueMap.entries())
-    .map(([label, value], idx) => ({ label, value, color: ISSUE_PALETTE[idx % ISSUE_PALETTE.length] }))
-    .sort((a, b) => b.value - a.value);
-
-  // Daily Intelligence Summary — same vocabularies as the dashboard cards.
-  const transitRecords = enriched.filter(
-    (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
-  );
   // Commercial Impact must stay focused on operational and commercial risk
   // to shipping (port disruption, freight/insurance pressure with an
   // operational hook, war-risk, route disruption, etc.). Pure shipping-market
@@ -333,48 +322,39 @@ export function buildShippingReportDataset(
   const commercialRecords = enriched
     .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
     .filter((r) => !isShippingMarketOnly(r));
-  // Daily Intelligence Summary — analyst-style prose. Each line opens with
-  // the operational read, not the count. Counts and example titles are used
-  // as supporting evidence, with the sentence pattern varied across lines.
-  const dailyIntelLines: string[] = [];
-  if (transitRecords.length > 0) {
-    const n = transitRecords.length;
-    dailyIntelLines.push(
-      `Chokepoint and Route Activity: maritime advisories and transit diversion shaped the week, drawn from ${n} relevant record${n === 1 ? "" : "s"}. The most prominent was "${transitRecords[0].title}".`,
-    );
-  } else {
-    dailyIntelLines.push(
-      "Chokepoint and Route Activity: no qualifying chokepoint, advisory or diversion records landed this cycle. Treat as a coverage gap, not as confirmation that pressure has eased.",
-    );
-  }
-  if (vesselRowsWeekly.length + piracyRowsWeekly.length > 0) {
-    const v = vAttackSeizeWeekly;
-    const p = piracyRowsWeekly.length;
-    const vTxt = v === 0
-      ? "no vessel attack or seizure records"
-      : `${v} vessel attack-or-seizure record${v === 1 ? "" : "s"}`;
-    const pTxt = p === 0
-      ? "no piracy or armed-robbery entries"
-      : `${p} piracy or armed-robbery record${p === 1 ? "" : "s"}`;
-    const headline = vesselRowsWeekly[0]?.title ?? piracyRowsWeekly[0]?.title ?? "no recent title on file";
-    dailyIntelLines.push(
-      `Vessel Threat and Piracy: hostile maritime activity in the weekly window ran to ${vTxt} alongside ${pTxt}. "${headline}" was the most visible vessel-side entry.`,
-    );
-  } else {
-    dailyIntelLines.push(
-      "Vessel Threat and Piracy: the weekly window carries no hostile vessel or piracy records on file. Read as a coverage gap rather than calm waters.",
-    );
-  }
-  if (commercialRecords.length > 0) {
-    const n = commercialRecords.length;
-    dailyIntelLines.push(
-      `Commercial Impact: freight rates, insurance pressure and port-side disruption drove the commercial read this week; ${n} record${n === 1 ? "" : "s"} sit in window, anchored by "${commercialRecords[0].title}".`,
-    );
-  } else {
-    dailyIntelLines.push(
-      "Commercial Impact: no port, freight or insurance-pressure records on file for the week. Market commentary without an operational shipping linkage is not included.",
-    );
-  }
+
+  const transitRecords = enriched.filter(
+    (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
+  );
+
+  // Chokepoint / Route Read — analyst prose over the 30-day chokepoint
+  // picture, with the weekly transit signal as colour. Avoids stock
+  // filler ("X records sit in window", "Activity concentrates", "Most
+  // recent", "The leading patterns are") and answers what changed,
+  // where the pressure is heaviest and what the reader should track.
+  const cpRanked = [...chokepointRows].filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
+  const chokepointRouteRead = buildChokepointRouteRead({
+    cpRanked,
+    transitRecords,
+    weeklyEnriched: enriched,
+    thirtyDayLabel: thirtyDayShortLabel,
+  });
+
+  // Vessel Threat and Piracy Read — built from the 30-day vessel and
+  // piracy classifications plus the weekly window for cycle context.
+  const vesselPiracyRead = buildVesselPiracyRead({
+    vesselRows30: vesselRows,
+    piracyRows30: piracyRows,
+    vesselRowsWeekly,
+    piracyRowsWeekly,
+    vAttackSeize30: vAttackSeize,
+    vAttackSeizeWeekly,
+    thirtyDayLabel: thirtyDayShortLabel,
+  });
+
+  // Commercial Impact Read — leads with the operational reason the
+  // commercial pressure shows up, before the table of records.
+  const commercialImpactRead = buildCommercialImpactRead(commercialRecords);
 
   // Region rows in fixed order — "Country not identified" is intentionally
   // excluded from the regional comparison chart so location-unknown records
@@ -398,25 +378,20 @@ export function buildShippingReportDataset(
     .sort((a, b) => b.value - a.value)
     .slice(0, 12);
 
-  // Timeline
-  const tMap = new Map<string, number>();
-  for (const r of enriched) {
-    const k = format(startOfDay(r.date), "yyyy-MM-dd");
-    tMap.set(k, (tMap.get(k) ?? 0) + 1);
-  }
-  const timelineSeries: TimelinePoint[] = Array.from(tMap.entries())
-    .map(([d, c]) => ({ date: d, label: format(parseISO(d), "dd MMM"), count: c }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const timelinePeak = timelineSeries.length > 0
-    ? timelineSeries.reduce((p, s) => (s.count > p.count ? s : p), timelineSeries[0])
-    : null;
+  // Regional and Country View prose — describes where the weekly
+  // operational pressure landed, anchored on the bar chart that follows.
+  const regionalCountryRead = buildRegionalCountryRead({
+    regionRows,
+    countryRows,
+    weeklyCount: enriched.length,
+    locationNotIdentifiedCount,
+  });
 
-  // Severity rows in fixed brand order
-  const severityRows: BarRow[] = ["insignificant", "low", "moderate", "high", "extreme"].map((key) => ({
-    label: SEV_LABEL[key] ?? key,
-    value: enriched.filter((r) => sevKey(r.severity) === key).length,
-    color: SEV_COLOR[key],
-  }));
+  // Related Incidents — prioritised operational records for the closing
+  // table. Vessel and piracy hits lead, then port / chokepoint / route /
+  // war-risk records, then the rest of the weekly window. Pure shipping-
+  // market items are dropped entirely.
+  const relatedIncidents = prioritiseRelated(enriched);
 
   const locNote = `Records with no identifiable incident location (${locationNotIdentifiedCount} in window) are included in total counts but excluded from the country and regional comparison charts and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted as incident country.`;
   const dataNote = outOfScopeCount > 0
@@ -434,16 +409,149 @@ export function buildShippingReportDataset(
     chokepointRows,
     vesselRows,
     piracyRows,
-    issueRows,
-    dailyIntelLines,
     regionRows,
     countryRows,
-    timelineSeries,
-    timelinePeak,
-    severityRows,
     commercialRows: commercialRecords,
+    chokepointRouteRead,
+    vesselPiracyRead,
+    commercialImpactRead,
+    regionalCountryRead,
+    relatedIncidents,
     dataNote,
   };
+}
+
+// --- Prose builders --------------------------------------------------------
+// Analyst-style prose, never count-led. Forbidden idioms include
+// "X records sit in window", "Activity concentrates", "Most recent",
+// "The leading patterns are", "The usable signal is", "Detail sits",
+// "The reporting window is noisy". Each builder returns a self-
+// contained paragraph block ready to feed straight into renderProse.
+
+function joinList(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+function buildChokepointRouteRead(opts: {
+  cpRanked: ChokepointRow[];
+  transitRecords: EnrichedIncident[];
+  weeklyEnriched: EnrichedIncident[];
+  thirtyDayLabel: string;
+}): string {
+  const { cpRanked, transitRecords, weeklyEnriched, thirtyDayLabel } = opts;
+  if (cpRanked.length === 0 && transitRecords.length === 0) {
+    return `No qualifying chokepoint or route-disruption records reached the file over the last 30 days (${thirtyDayLabel}). Read this as a coverage gap rather than confirmation that pressure has eased — chokepoint advisories tend to be lumpy and a quiet cycle does not redefine the underlying risk picture on Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep tracking maritime advisories, naval movement and any operator decisions on routing or war-risk premium. A return of activity is usually visible in advisory traffic before it shows up in commercial freight rates.`;
+  }
+  const lead = cpRanked[0];
+  const second = cpRanked[1];
+  const cpPhrase = lead
+    ? `The 30-day picture is led by ${lead.name}, which carries ${lead.count} qualifying record${lead.count === 1 ? "" : "s"}${lead.highestSeverityKey ? ` and a highest severity of ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} follows with ${second.count} record${second.count === 1 ? "" : "s"}.` : ""}`
+    : "Chokepoint coverage is thin this cycle but transit-side activity still warrants attention.";
+  const weeklyTransit = weeklyEnriched.filter((r) =>
+    TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
+  ).length;
+  const transitLine = weeklyTransit > 0
+    ? `Inside the weekly briefing window, ${weeklyTransit} record${weeklyTransit === 1 ? "" : "s"} pointed at transit, diversion or advisory pressure — a tighter view of what shippers actually felt across the cycle.`
+    : `Inside the weekly briefing window itself, no fresh transit-side advisories landed, so the cycle leans on the trailing 30-day picture for context.`;
+  const watch = lead
+    ? `Watch for new naval advisories on ${lead.name}, any war-risk premium adjustments and operator commentary on rerouting. Those are the early indicators of escalation; commercial freight rates lag them by days.`
+    : `Watch for fresh advisory traffic and any operator decisions on diversion — those move ahead of headline freight rates and signal where pressure is building.`;
+  return `${cpPhrase}\n\n${transitLine}\n\n${watch}`;
+}
+
+function buildVesselPiracyRead(opts: {
+  vesselRows30: VesselRow[];
+  piracyRows30: PiracyRow[];
+  vesselRowsWeekly: VesselRow[];
+  piracyRowsWeekly: PiracyRow[];
+  vAttackSeize30: number;
+  vAttackSeizeWeekly: number;
+  thirtyDayLabel: string;
+}): string {
+  const { vesselRows30, piracyRows30, vesselRowsWeekly, piracyRowsWeekly, vAttackSeize30, vAttackSeizeWeekly, thirtyDayLabel } = opts;
+  if (vesselRows30.length + piracyRows30.length === 0) {
+    return `Nothing hostile against vessels and no piracy or armed-robbery records reached the file over the last 30 days (${thirtyDayLabel}). The underlying threat picture in the region has not been benign for long, so treat the quiet cycle as a reporting gap and keep crew-change, advisory and naval-patrol signals on the watchlist.\n\nA return to hostile activity is usually announced first by naval forces, then by maritime risk bulletins, before it shows up in P&I or war-risk premium movement.`;
+  }
+  const vesselSegment = vesselRows30.length > 0
+    ? `Hostile activity against vessels over the last 30 days runs to ${vesselRows30.length} record${vesselRows30.length === 1 ? "" : "s"}, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach. The lead entry is "${vesselRows30[0].title}".`
+    : `No vessel-attack or seizure records landed in the 30-day window, even with piracy activity still on the file.`;
+  const piracySegment = piracyRows30.length > 0
+    ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window, with "${piracyRows30[0].title}" as the lead entry.`
+    : `Piracy and armed-robbery reporting is empty across the 30-day window, which is unusual rather than reassuring for this geography.`;
+  const weeklyV = vesselRowsWeekly.length;
+  const weeklyP = piracyRowsWeekly.length;
+  const weeklySegment = (weeklyV + weeklyP) > 0
+    ? `Inside the weekly briefing cycle, ${weeklyV} vessel-side record${weeklyV === 1 ? "" : "s"} (${vAttackSeizeWeekly} attack or seizure) and ${weeklyP} piracy or armed-robbery entr${weeklyP === 1 ? "y" : "ies"} were filed — useful for sizing momentum against the trailing month.`
+    : `Inside the weekly briefing cycle itself, no fresh vessel-side or piracy records were filed; the read leans on the trailing 30-day picture.`;
+  const watch = `Track maritime advisories, naval-force statements and any movement in war-risk or P&I premiums on affected routes. Those are the cleanest early indicators that hostile activity is firming or easing.`;
+  return `${vesselSegment} ${piracySegment}\n\n${weeklySegment}\n\n${watch}`;
+}
+
+function buildCommercialImpactRead(commercialRecords: EnrichedIncident[]): string {
+  if (commercialRecords.length === 0) {
+    return `No port, freight, insurance or commercial-shipping disruption records reached the file in the weekly window. Pure market commentary — newbuild orders, vessel S&P, fleet finance, earnings, share-price moves — is intentionally excluded from this section, so a blank cycle here means the operational disruption signal was genuinely quiet rather than under-reported.\n\nWatch for fresh port advisories, schedule slippage out of the major box and tanker hubs, and any insurance-premium adjustments tied to specific routes. Those are the next signals that operational commercial pressure is firming.`;
+  }
+  const n = commercialRecords.length;
+  const lead = commercialRecords[0];
+  const second = commercialRecords[1];
+  const intro = `Operational commercial pressure on shipping in the weekly window centres on port disruption, freight or insurance movement with an operational hook, and commercial-shipping disruption tied directly to vessel or cargo flows. The cycle carries ${n} qualifying record${n === 1 ? "" : "s"} on this definition.`;
+  const examples = second
+    ? `The lead entry is "${lead.title}" (${lead.issue.toLowerCase()}); "${second.title}" sits alongside it (${second.issue.toLowerCase()}).`
+    : `The lead entry is "${lead.title}" (${lead.issue.toLowerCase()}).`;
+  const watch = `Watch for follow-on schedule disruption, premium adjustments on affected routes, and any operator decisions on diversion or port-skipping. Commercial pass-through to shippers typically follows the operational signal by one to two weeks.`;
+  return `${intro} ${examples}\n\n${watch}`;
+}
+
+function buildRegionalCountryRead(opts: {
+  regionRows: BarRow[];
+  countryRows: BarRow[];
+  weeklyCount: number;
+  locationNotIdentifiedCount: number;
+}): string {
+  const { regionRows, countryRows, weeklyCount, locationNotIdentifiedCount } = opts;
+  if (weeklyCount === 0) {
+    return `No qualifying maritime records reached the file across APAC and the Middle East in the weekly window. The underlying picture has not been benign for long, so a blank cycle should be treated as a reporting gap rather than a sustained easing of regional risk.`;
+  }
+  const regionRanked = [...regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+  const lead = regionRanked[0];
+  const second = regionRanked[1];
+  const regionLine = lead
+    ? `Across the weekly briefing window, ${lead.label} carries the heavier share with ${lead.value} record${lead.value === 1 ? "" : "s"}${second ? ` against ${second.value} for ${second.label}` : ""}.`
+    : `Regional attribution is thin this cycle, with most records sitting outside the APAC and Middle East scope.`;
+  const topCountries = countryRows.slice(0, 3).filter((r) => r.value > 0);
+  const countryLine = topCountries.length > 0
+    ? `At country level the cycle is led by ${joinList(topCountries.map((c) => `${c.label} (${c.value})`))}.`
+    : `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file.`;
+  const gapLine = locationNotIdentifiedCount > 0
+    ? `A further ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} could not be tied to a specific country and ${locationNotIdentifiedCount === 1 ? "is" : "are"} excluded from the country chart to avoid distortion.`
+    : "";
+  return `${regionLine} ${countryLine}${gapLine ? `\n\n${gapLine}` : ""}`;
+}
+
+// Operational priority for the closing Related Incidents table.
+//
+// Strong: hostile vessel actions, piracy, port/chokepoint/route
+// disruption, war-risk and P&I commentary with an operational hook.
+// Weak: residual "Other" / "Unclassified" buckets and any record we
+// already flagged as pure shipping-market noise.
+function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
+  const strong: EnrichedIncident[] = [];
+  const rest: EnrichedIncident[] = [];
+  for (const r of rows) {
+    if (isShippingMarketOnly(r)) continue;
+    const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
+    const isVesselHostile = OPERATIONAL_HOOK_RE.test(text) && /\b(attack|attacked|hijack|piracy|seized|missile|drone|hostilit)\b/.test(text);
+    const isPortRouteOrChoke = /\b(port|terminal|berth|chokepoint|hormuz|red\s*sea|bab[\s-]?el[\s-]?mandeb|suez|malacca|reroute|diversion|advisory|war[\s-]?risk|insurance|premium)\b/.test(text);
+    const isWeakBucket = r.issue === "Unclassified maritime record" || /^other\s.+/i.test(r.issue);
+    if ((isVesselHostile || isPortRouteOrChoke) && !isWeakBucket) strong.push(r);
+    else if (!isWeakBucket) rest.push(r);
+  }
+  const ordered = [...strong, ...rest];
+  // Cap at 15 to keep the table proportionate. Already date-sorted.
+  return ordered.slice(0, 15);
 }
 
 export const SHIPPING_SEV_LABEL = SEV_LABEL;

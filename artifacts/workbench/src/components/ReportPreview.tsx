@@ -3,7 +3,8 @@ import { TOPIC_LABELS } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
-import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
+import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
+import { buildCargoSecurityRead, buildLogisticsNodeRead } from "@/lib/cargoNarratives";
 import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
   buildFuelWatchReportData,
@@ -447,6 +448,26 @@ export default function ReportPreview({
               </p>
             </Section>
 
+            {report.topic === "cargo_watch" && (
+              <>
+                <NarrativeSection
+                  title="Cargo Security Read"
+                  text={buildCargoSecurityRead(
+                    report.topic && report.issueDate
+                      ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
+                      : [],
+                  )}
+                />
+                <NarrativeSection
+                  title="Logistics Node Read"
+                  text={buildLogisticsNodeRead(
+                    report.topic && report.issueDate
+                      ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
+                      : [],
+                  )}
+                />
+              </>
+            )}
             <NarrativeSection title="Situation" text={report.situation} />
             <NarrativeSection title="What Happened" text={report.whatHappened} />
             <NarrativeSection title="What Matters" text={report.whatMatters} />

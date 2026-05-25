@@ -27,6 +27,7 @@ import {
 } from "./fuelWatchReport";
 import type { ProducerBuyerActionRow } from "./fuelNarratives";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
+import { buildCargoSecurityRead, buildLogisticsNodeRead } from "./cargoNarratives";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
  *  market data and the caller did not pass allowMissingMarketData. The
@@ -578,18 +579,32 @@ export async function exportTopicReportPdf(
       }) as KpiCardData[],
     );
 
-    const sections: [string, string | null | undefined][] = [
-      ["Situation", data.situation],
-      ["What Happened", data.whatHappened],
-      ["What Matters", data.whatMatters],
-      ["Implications for Business", data.implications],
-      ["Watch Next", data.watchNext],
-      ["Polestar View", data.polestarView],
-    ];
+    const isCargo = data.topic === "cargo_watch";
+    const cargoSecurity = isCargo ? buildCargoSecurityRead(windowIncidents) : "";
+    const cargoNode = isCargo ? buildLogisticsNodeRead(windowIncidents) : "";
+
+    const sections: [string, string | null | undefined][] = isCargo
+      ? [
+          ["Cargo Security Read", cargoSecurity],
+          ["Logistics Node Read", cargoNode],
+          ["Situation", data.situation],
+          ["What Happened", data.whatHappened],
+          ["What Matters", data.whatMatters],
+          ["Implications for Business", data.implications],
+          ["Watch Next", data.watchNext],
+          ["Polestar View", data.polestarView],
+        ]
+      : [
+          ["Situation", data.situation],
+          ["What Happened", data.whatHappened],
+          ["What Matters", data.whatMatters],
+          ["Implications for Business", data.implications],
+          ["Watch Next", data.watchNext],
+          ["Polestar View", data.polestarView],
+        ];
     for (const [label, body] of sections) {
       if (body && body.trim()) {
-        drawSectionHeading(ctx, label);
-        renderProse(ctx, body);
+        drawSectionWithProse(ctx, label, body);
       }
     }
   }

@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import {
-  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, setRoboto, ensureRobotoLoaded,
+  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
+  setRoboto, ensureRobotoLoaded,
   drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
@@ -16,7 +17,6 @@ import {
   buildShippingReportDataset,
   type ShippingReportIncident,
   type BarRow,
-  type TimelinePoint,
   type ChokepointRow,
   type EnrichedIncident,
   type VesselRow,
@@ -48,15 +48,20 @@ function darkenHex(hex: string, amount: number): string {
   return toHex(r * f, g * f, b * f);
 }
 
-// Shipping report PDF. Section order (per spec):
-//   Cover -> Executive Summary -> Fast Facts -> Key Metrics ->
-//   Chokepoint Watch -> Vessel Attacks -> Piracy and Armed Robbery ->
-//   Issue Type Breakdown -> Daily Intelligence Summary ->
-//   Regional and Country View -> Incident Timeline -> Severity Distribution ->
-//   Commercial Impact -> Watch Next -> Polestar View ->
+// Shipping report PDF. Section order (per final spec):
+//   Cover -> Executive Summary -> Fast Facts ->
+//   Chokepoint / Route Read (prose + chokepoint table) ->
+//   Vessel Threat and Piracy Read (prose + vessel table + piracy table) ->
+//   Commercial Impact on Shipping (prose + commercial table) ->
+//   Regional and Country View (prose + region bar + country bar) ->
+//   What Matters -> Implications for Business ->
+//   Watch Next -> Polestar View ->
+//   Related Incidents ->
 //   Source Notes / Data Notes -> Disclaimer.
-// All analysed data comes from shippingReportDataset so the editor preview
-// and the PDF stay in lockstep.
+// Drops (vs. previous draft): Issue Type Breakdown, Daily Intelligence
+// Summary, Incident Timeline, Severity Distribution, the standalone
+// "Incidents by Country" heading. Everything in the body comes from
+// shippingReportDataset so the preview and the PDF cannot drift.
 
 export interface ShippingReportData {
   title: string;
@@ -338,92 +343,67 @@ function drawHorizontalBarChart(
   ctx.y += 6;
 }
 
-// Hand-drawn timeline bars --------------------------------------------------
+// Related Incidents ---------------------------------------------------------
 
-function drawTimelineChart(ctx: Ctx, heading: string, series: TimelinePoint[], peak: TimelinePoint | null) {
-  drawSectionHeading(ctx, heading);
+function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
+  if (rows.length === 0) return;
+  // Guard against a stranded heading at the foot of a page: pre-allocate
+  // heading + header row + a couple of body rows.
+  ensureSpace(ctx, 24 + 18 + 40);
+  drawSectionHeading(ctx, "Related Incidents");
+
   const { pdf, MX, CW } = ctx;
-  if (series.length === 0) {
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(9);
-    pdf.text("No timeline data available.", MX, ctx.y + 10);
-    setRoboto(pdf, "regular");
-    ctx.y += 22;
-    return;
-  }
-  const chartH = 130;
-  const labelStripH = 14;
-  const footerH = 16;
-  const yAxisW = 22;
-  const totalH = chartH + labelStripH + footerH + 6;
-  ensureSpace(ctx, totalH);
+  const colDateW = 86;
+  const colIssueW = 120;
+  const colSevW = 64;
+  const colTitleW = CW - colDateW - colIssueW - colSevW - 6;
+  const rowH = 18;
 
-  const x0 = MX + yAxisW;
-  const w = CW - yAxisW - 6;
-  const y0 = ctx.y;
-  const y1 = y0 + chartH;
-
-  const rawMax = series.reduce((mx, s) => Math.max(mx, s.count), 0) || 1;
-  const { max, step } = niceScale(rawMax);
-
-  // Horizontal gridlines + y-axis numeric ticks.
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(0.4);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(7);
-  for (let v = 0; v <= max; v += step) {
-    const gy = y1 - (v / max) * (chartH - 8);
-    pdf.line(x0, gy, x0 + w, gy);
-    pdf.text(String(v), x0 - 4, gy + 2, { align: "right" });
-  }
-
-  // Baseline.
-  setStroke(pdf, DUSK);
-  pdf.setLineWidth(0.6);
-  pdf.line(x0, y1, x0 + w, y1);
-
-  // Bars + peak highlight.
-  const barW = Math.max(2, Math.min(14, (w - (series.length - 1) * 2) / Math.max(series.length, 1)));
-  const stride = series.length > 1 ? (w - barW) / (series.length - 1) : 0;
-  const peakIdx = peak ? series.findIndex((s) => s.date === peak.date) : -1;
-  for (let i = 0; i < series.length; i++) {
-    const s = series[i];
-    const bx = x0 + i * stride;
-    const bh = (s.count / max) * (chartH - 8);
-    const base = i === peakIdx ? ELECTRIC : NAVY;
-    if (bh > 0) {
-      setFill(pdf, lightenHex(base, 0.12));
-      setStroke(pdf, darkenHex(base, 0.22));
-      pdf.setLineWidth(0.4);
-      pdf.rect(bx, y1 - bh, barW, bh, "FD");
-    }
-  }
-
-  // Date axis labels (first, middle, last).
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(7);
-  const tickIdx = [0, Math.floor(series.length / 2), series.length - 1].filter(
-    (v, i, a) => a.indexOf(v) === i,
-  );
-  for (const idx of tickIdx) {
-    const s = series[idx];
-    const bx = x0 + idx * stride + barW / 2;
-    pdf.text(sanitize(s.label), bx, y1 + 10, { align: "center" });
-  }
-
-  // Peak readout.
-  if (peak) {
-    setText(pdf, NAVY);
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(8);
-    pdf.text(sanitize(`Peak: ${peak.count} on ${peak.label}`), x0, y1 + labelStripH + footerH);
+    pdf.text("DATE", MX + 6, ctx.y + 12);
+    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 12);
+    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 12);
+    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 12);
+    ctx.y += rowH;
     setRoboto(pdf, "regular");
-  }
+    pdf.setFontSize(8);
+  };
+  drawHeader();
 
-  ctx.y += totalH;
+  for (const i of rows) {
+    const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
+    const issueLines: string[] = pdf.splitTextToSize(sanitize(i.issue), colIssueW - 8);
+    const rh = Math.max(rowH, Math.max(titleLines.length, issueLines.length) * 11 + 8);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) { newPage(ctx); drawHeader(); }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    setText(pdf, DUSK);
+    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 12);
+    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 12);
+    setText(pdf, NAVY);
+    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 12);
+
+    const sk = sevKey(i.severity);
+    setFill(pdf, SEV_COLOR[sk] ?? "#999999");
+    const chipX = MX + colDateW + colIssueW + colTitleW + 6;
+    pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text(sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
 }
 
 // Exporter ------------------------------------------------------------------
@@ -473,35 +453,42 @@ export async function exportShippingReportPdf(
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);
 
+  // Chokepoint / Route Read — prose leads the chokepoint table.
+  drawSectionWithProse(ctx, "Chokepoint / Route Read", ds.chokepointRouteRead);
   drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
 
+  // Vessel Threat and Piracy Read — prose leads both 30-day tables.
+  drawSectionWithProse(ctx, "Vessel Threat and Piracy Read", ds.vesselPiracyRead);
   drawIncidentTable<VesselRow>(ctx, `Vessel Attacks, last 30 days (${ds.thirtyDayShortLabel})`, ds.vesselRows, {
     showActColumn: true,
     actFor: (r) => r.vesselType,
     emptyMessage: "No hostile vessel incidents on file in the last 30 days.",
   });
-
   drawIncidentTable<PiracyRow>(ctx, `Piracy and Armed Robbery, last 30 days (${ds.thirtyDayShortLabel})`, ds.piracyRows, {
     showActColumn: true,
     actFor: (r) => r.act,
     emptyMessage: "No piracy or armed-robbery records in the last 30 days.",
   });
 
-  drawHorizontalBarChart(ctx, "Issue Type Breakdown", ds.issueRows, {
-    labelW: 180,
-    emptyMessage: "No issue-type classifications in window.",
+  // Commercial Impact on Shipping — prose leads the operational
+  // commercial-pressure table; pure market commentary is filtered out
+  // upstream in the dataset.
+  drawSectionWithProse(ctx, "Commercial Impact on Shipping", ds.commercialImpactRead);
+  drawIncidentTable<EnrichedIncident>(ctx, "Records", ds.commercialRows, {
+    showActColumn: true,
+    actFor: (r) => r.issue,
+    emptyMessage: "No port, freight, insurance or commercial-shipping disruption records in the weekly window.",
   });
 
-  drawSectionHeading(ctx, "Daily Intelligence Summary");
-  renderProse(ctx, ds.dailyIntelLines.join("\n\n"));
-
-  drawHorizontalBarChart(ctx, "Regional and Country View", ds.regionRows, {
+  // Regional and Country View — prose leads the region and country bars.
+  drawSectionWithProse(ctx, "Regional and Country View", ds.regionalCountryRead);
+  drawHorizontalBarChart(ctx, "Records by Region", ds.regionRows, {
     labelW: 160,
     emptyMessage: "No regional classifications in window.",
   });
   drawHorizontalBarChart(
     ctx,
-    ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country",
+    ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country",
     ds.countryRows,
     {
       labelW: 160,
@@ -509,36 +496,21 @@ export async function exportShippingReportPdf(
     },
   );
 
-  drawTimelineChart(ctx, "Incident Timeline", ds.timelineSeries, ds.timelinePeak);
-
-  drawHorizontalBarChart(ctx, "Severity Distribution", ds.severityRows, { labelW: 120 });
-
-  drawSectionHeading(ctx, "Commercial Impact on Shipping");
-  {
-    const { pdf, MX, CW } = ctx;
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(9);
-    const intro = "Scope here is shipping-side commercial pressure: port disruption, freight or insurance movement, and commercial shipping disruption with a direct vessel or cargo linkage. Pure market commentary without an operational shipping connection is excluded.";
-    const lines: string[] = pdf.splitTextToSize(sanitize(intro), CW);
-    pdf.text(lines, MX, ctx.y + 10);
-    ctx.y += lines.length * 11 + 8;
-    setRoboto(pdf, "regular");
+  // Editor-authored analyst sections.
+  if (data.whatMatters && data.whatMatters.trim()) {
+    drawSectionWithProse(ctx, "What Matters", data.whatMatters);
   }
-  drawIncidentTable<EnrichedIncident>(ctx, "Records", ds.commercialRows, {
-    showActColumn: true,
-    actFor: (r) => r.issue,
-    emptyMessage: "No port, freight, insurance or commercial-shipping disruption records in the weekly window.",
-  });
-
+  if (data.implications && data.implications.trim()) {
+    drawSectionWithProse(ctx, "Implications for Business", data.implications);
+  }
   if (data.watchNext && data.watchNext.trim()) {
-    drawSectionHeading(ctx, "Watch Next");
-    renderProse(ctx, data.watchNext);
+    drawSectionWithProse(ctx, "Watch Next", data.watchNext);
   }
   if (data.polestarView && data.polestarView.trim()) {
-    drawSectionHeading(ctx, "Polestar View");
-    renderProse(ctx, data.polestarView);
+    drawSectionWithProse(ctx, "Polestar View", data.polestarView);
   }
+
+  drawRelatedIncidents(ctx, ds.relatedIncidents);
 
   drawSourceNotes(ctx, ds.dataNote);
   drawDisclaimer(ctx);

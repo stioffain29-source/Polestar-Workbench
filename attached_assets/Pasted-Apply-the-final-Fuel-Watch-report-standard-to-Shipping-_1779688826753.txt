@@ -1,0 +1,222 @@
+Apply the final Fuel Watch report standard to Shipping Watch and Cargo Watch.
+
+Scope:
+- Shipping Watch
+- Cargo Watch
+
+Do not change Fuel Watch. Treat Fuel Watch as the working benchmark.
+
+Required approach:
+Use the same product logic that now works in Fuel Watch:
+- useful Fast Facts
+- supporting charts
+- written analytical sections
+- Market / Operational Read style prose where relevant
+- stronger What Matters
+- practical Implications for Business
+- Watch Next
+- Polestar View
+- tighter Related Incidents
+- no dashboard filler
+- no orphaned headings
+- preview and PDF parity
+
+Do not rebuild the plumbing unless required. This is mostly structure, prose and report-quality alignment.
+
+1. Shipping Watch
+
+Shipping Watch should read like a maritime operational risk report, not an incident list.
+
+Use sections:
+
+- Executive Summary
+- Fast Facts
+- Chokepoint / Route Read
+- Vessel Threat and Piracy Read
+- Commercial Impact on Shipping
+- Regional and Country View
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Related Incidents
+- Source Notes / Data Notes
+- Disclaimer
+
+Fast Facts should include meaningful shipping indicators, for example:
+- Reporting Period
+- Records in Window
+- Highest Severity
+- Main Affected Chokepoint
+- Vessel Attacks / Seizures 30d
+- Piracy / Armed Robbery 30d
+- Latest Significant Incident
+
+Keep existing Shipping fixes:
+- one Fast Facts section only
+- no duplicate Key Metrics section
+- no “Unclassified maritime record” in Issue Type Breakdown
+- no fake “Top 12” label unless 12 are shown
+- no “Location not identified” as a country
+- 30-day lookback for Chokepoint Watch, Vessel Attacks, Piracy and Armed Robbery
+- no FAO food price story as a lead Shipping incident
+- no broken country strings like “South Korea; Iran”
+- improved chart bar styling
+- correct brand colours
+
+Shipping prose should cover:
+- chokepoint exposure
+- vessel attacks / seizures
+- piracy and armed robbery
+- route diversion
+- port disruption
+- insurance and freight pressure
+- cargo flow
+- business impact on routing, cost, delay and continuity
+
+2. Cargo Watch
+
+Cargo Watch should read like a cargo-security and logistics-risk report, not a generic incident digest.
+
+Use sections:
+
+- Executive Summary
+- Fast Facts
+- Cargo Security Read
+- Logistics and Node Exposure
+- Regional and Country View
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Related Incidents
+- Source Notes / Data Notes
+- Disclaimer
+
+Fast Facts should include meaningful cargo indicators, for example:
+- Reporting Period
+- Records in Window
+- Highest Severity
+- Main Issue Type
+- Most Affected Country / Area
+- Theft / Pilferage Records
+- Warehouse / Logistics Node Disruption
+- Latest Significant Incident
+
+Cargo Watch prose should cover:
+- theft and pilferage
+- cargo loss
+- warehouse disruption
+- trucking and route exposure
+- port / logistics node disruption
+- labour or access disruption affecting cargo movement
+- supply chain loss
+- business impact on inventory, fulfilment, insurance and continuity
+
+Important:
+Theft and pilferage belong in Cargo Watch.
+
+3. Prose standard for both
+
+Apply the final Fuel Watch prose standard.
+
+Do not use:
+- “X records sit...”
+- “Activity concentrates...”
+- “The usable signal is...”
+- “Most recent...”
+- “Detail sits...”
+- “The reporting window is noisy...”
+- “The leading patterns are...”
+
+Use analyst prose:
+- explain what the data means
+- connect incidents to business risk
+- avoid repeated sentence structures
+- do not overclaim
+- keep it practical and operational
+
+The report should feel like:
+- 40 percent data / charts / tables
+- 60 percent written analysis
+
+Not a glorified infographic.
+
+4. Related Incidents
+
+Tighten Related Incidents for both reports.
+
+Shipping:
+Prioritise:
+- vessel attacks
+- vessel seizures
+- piracy / armed robbery
+- port disruption
+- route diversion
+- chokepoint disruption
+- insurance / freight pressure with operational relevance
+
+Exclude or demote:
+- generic maritime commentary
+- unrelated commodity stories
+- shipping finance
+- vessel sale / purchase
+- newbuild stories
+- company earnings
+
+Cargo:
+Prioritise:
+- cargo theft
+- pilferage
+- warehouse disruption
+- truck hijack
+- port / logistics node disruption
+- supply chain disruption
+- cargo-related protest or strike impacts
+
+Exclude or demote:
+- generic trade commentary
+- market forecasts
+- company finance
+- items with no cargo movement or loss relevance
+
+5. Layout and pagination
+
+Apply Fuel Watch final layout discipline:
+- no orphaned section headings
+- section heading and first paragraph must stay together
+- no dead final page with only disclaimer
+- Related Incidents should not dominate the report
+- Source Notes and Disclaimer should sit cleanly at the end
+- preview and PDF must match
+
+6. Branding and fonts
+
+Use exactly:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Do not use:
+- #0B0B3D
+- #4655FF
+- #303030
+- #E2E2E2
+
+Roboto remains mandatory.
+
+7. Acceptance check
+
+Export fresh Shipping Watch and Cargo Watch PDFs.
+
+Confirm:
+- both reports have real written analysis, not dashboard filler
+- Fast Facts are useful and not duplicated
+- charts support the prose
+- Related Incidents are relevant
+- Polestar View appears complete and not orphaned
+- headings are not stranded
+- no broken country strings
+- no internal Workbench notices
+- reports feel like the same product family as Fuel Watch

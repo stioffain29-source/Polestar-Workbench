@@ -15,9 +15,19 @@ import {
   shippingSevKey,
 } from "@/lib/shippingReportDataset";
 
+// Polestar disclaimer text used at the foot of every report. Kept inline
+// here (rather than imported from the PDF chrome) so the on-screen
+// preview never has to load the jsPDF chunk just to render this paragraph.
+const DISCLAIMER_TEXT =
+  "Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. " +
+  "The information in this report is based on open sources and is assessed as accurate at the time of writing. " +
+  "Polestar Advisory accepts no liability for decisions taken on the basis of this report. " +
+  "This report is intended for the named recipient and may not be redistributed without prior written consent. " +
+  "© Polestar Advisory Pte. Ltd. All rights reserved.";
+
 // Shipping-specific on-screen preview. Renders the same sections as
 // exportShippingReportPdf, in the same order, from the same dataset
-// (buildShippingReportDataset). Anything that draws in the PDF should
+// (buildShippingReportDataset). Anything that draws in the PDF must
 // appear here so the editor preview and the export never disagree.
 
 const NAVY = "#0b0a3d";
@@ -51,6 +61,8 @@ export interface ShippingPreviewReport {
   issueDate?: string;
   author?: string | null;
   executiveSummary?: string | null;
+  whatMatters?: string | null;
+  implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
 }
@@ -353,77 +365,54 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
   );
 }
 
-function TimelineChart({ series, peak }: { series: { date: string; label: string; count: number }[]; peak: { label: string; count: number } | null }) {
-  if (series.length === 0) {
-    return (
-      <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        No timeline data available.
-      </p>
-    );
-  }
-  const rawMax = series.reduce((m, s) => Math.max(m, s.count), 0) || 1;
-  const { max, step } = niceScale(rawMax);
-  const ticks: number[] = [];
-  for (let v = 0; v <= max; v += step) ticks.push(v);
-  const tickIdx = [0, Math.floor(series.length / 2), series.length - 1].filter((v, i, a) => a.indexOf(v) === i);
-  const chartH = 140;
-  const peakIdx = peak ? series.findIndex((s) => s.label === peak.label && s.count === peak.count) : -1;
+function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
+  if (rows.length === 0) return null;
   return (
-    <div>
-      <div className="flex" style={{ height: chartH }}>
+    <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
+      <div
+        className="grid uppercase tracking-widest"
+        style={{
+          gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr",
+          background: NAVY,
+          color: "#fff",
+          fontFamily: "Roboto, sans-serif",
+          fontWeight: 700,
+          fontSize: 10,
+          padding: "8px 10px",
+          gap: 10,
+        }}
+      >
+        <div>Date</div>
+        <div>Issue</div>
+        <div>Title</div>
+        <div>Severity</div>
+      </div>
+      {rows.map((r, i) => (
         <div
-          className="flex flex-col-reverse justify-between"
-          style={{ width: 28, paddingRight: 4, fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif", textAlign: "right" }}
+          key={String(r.id)}
+          className="grid"
+          style={{
+            gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr",
+            padding: "8px 10px",
+            gap: 10,
+            borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
+            fontFamily: "Roboto, sans-serif",
+            fontSize: 12,
+            color: DUSK,
+            alignItems: "center",
+          }}
         >
-          {ticks.map((v) => (
-            <span key={v} style={{ lineHeight: 1 }}>{v}</span>
-          ))}
-        </div>
-        <div className="flex-1 relative" style={{ borderBottom: `1px solid ${DUSK}` }}>
-          {ticks.map((v) => (
-            <div
-              key={v}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: `${(v / max) * 100}%`,
-                height: 1,
-                background: POLAR,
-              }}
+          <div>{format(r.date, "dd MMM yyyy")}</div>
+          <div>{r.issue}</div>
+          <div style={{ color: NAVY }}>{r.title}</div>
+          <div>
+            <SeverityChip
+              sevKey={shippingSevKey(r.severity)}
+              label={SHIPPING_SEV_LABEL[shippingSevKey(r.severity)] ?? r.severity}
             />
-          ))}
-          <div className="absolute inset-0 flex items-end gap-[2px]" style={{ paddingTop: 4 }}>
-            {series.map((s, i) => {
-              const h = Math.max(2, (s.count / max) * (chartH - 6));
-              return (
-                <div
-                  key={i}
-                  className="flex-1"
-                  style={{
-                    background: rgba(i === peakIdx ? ELECTRIC : NAVY, 0.85),
-                    border: `1px solid ${darken(i === peakIdx ? ELECTRIC : NAVY, 0.25)}`,
-                    boxSizing: "border-box",
-                    height: h,
-                    minWidth: 2,
-                  }}
-                  title={`${s.label}: ${s.count}`}
-                />
-              );
-            })}
           </div>
         </div>
-      </div>
-      <div className="flex justify-between mt-1" style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif", paddingLeft: 28 }}>
-        {tickIdx.map((idx) => (
-          <span key={idx}>{series[idx].label}</span>
-        ))}
-      </div>
-      {peak && (
-        <div className="mt-2" style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 12, color: NAVY }}>
-          Peak: {peak.count} on {peak.label}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -537,20 +526,33 @@ export default function ShippingReportPreview({
           <KpiGrid cards={ds.fastFacts} />
         </Section>
 
-        <Section title={`Chokepoint Watch, last 30 days (${ds.thirtyDayShortLabel})`}>
-          <ChokepointTable rows={ds.chokepointRows} />
+        <Section title="Chokepoint / Route Read">
+          <Paragraphs text={ds.chokepointRouteRead} />
+          <div className="mt-4">
+            <ChokepointTable rows={ds.chokepointRows} />
+          </div>
         </Section>
 
-        <Section title={`Vessel Attacks, last 30 days (${ds.thirtyDayShortLabel})`}>
+        <Section title="Vessel Threat and Piracy Read">
+          <Paragraphs text={ds.vesselPiracyRead} />
+          <div
+            className="uppercase mb-2 mt-4"
+            style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+          >
+            Vessel Attacks, last 30 days ({ds.thirtyDayShortLabel})
+          </div>
           <IncidentTable
             rows={ds.vesselRows}
             actLabel="Act"
             actFor={(r) => r.vesselType}
             emptyMessage="No hostile vessel incidents on file in the last 30 days."
           />
-        </Section>
-
-        <Section title={`Piracy and Armed Robbery, last 30 days (${ds.thirtyDayShortLabel})`}>
+          <div
+            className="uppercase mb-2 mt-4"
+            style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+          >
+            Piracy and Armed Robbery, last 30 days ({ds.thirtyDayShortLabel})
+          </div>
           <IncidentTable
             rows={ds.piracyRows}
             actLabel="Act"
@@ -559,54 +561,44 @@ export default function ShippingReportPreview({
           />
         </Section>
 
-        <Section title="Issue Type Breakdown">
-          <HorizontalBarChart rows={ds.issueRows} labelW={200} emptyMessage="No issue-type classifications in window." />
-        </Section>
-
-        <Section title="Daily Intelligence Summary">
-          {ds.dailyIntelLines.map((l, i) => (
-            <p key={i} className="text-[14px] leading-[1.7] mb-3 font-light" style={{ color: DUSK }}>
-              {l}
-            </p>
-          ))}
+        <Section title="Commercial Impact on Shipping">
+          <Paragraphs text={ds.commercialImpactRead} />
+          <div className="mt-4">
+            <IncidentTable
+              rows={ds.commercialRows}
+              actLabel="Issue"
+              actFor={(r) => r.issue}
+              emptyMessage="No port, freight, insurance or commercial-shipping disruption records in the weekly window."
+            />
+          </div>
         </Section>
 
         <Section title="Regional and Country View">
-          <div className="mb-5">
+          <Paragraphs text={ds.regionalCountryRead} />
+          <div className="mt-4 mb-5">
+            <div
+              className="uppercase mb-2"
+              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+            >
+              Records by Region
+            </div>
             <HorizontalBarChart rows={ds.regionRows} labelW={180} emptyMessage="No regional classifications in window." />
           </div>
           <div
             className="uppercase mb-2"
             style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
           >
-            {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
+            {ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country"}
           </div>
           <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries in window." />
         </Section>
 
-        <Section title="Incident Timeline">
-          <TimelineChart series={ds.timelineSeries} peak={ds.timelinePeak} />
-        </Section>
-
-        <Section title="Severity Distribution">
-          <HorizontalBarChart rows={ds.severityRows} labelW={140} />
-        </Section>
-
-        <Section title="Commercial Impact on Shipping">
-          <p
-            className="mb-3"
-            style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, fontStyle: "italic", color: DUSK, lineHeight: 1.6 }}
-          >
-            Scope here is shipping-side commercial pressure: port disruption, freight or insurance movement, and commercial shipping disruption with a direct vessel or cargo linkage. Pure market commentary without an operational shipping connection is excluded.
-          </p>
-          <IncidentTable
-            rows={ds.commercialRows}
-            actLabel="Issue"
-            actFor={(r) => r.issue}
-            emptyMessage="No port, freight, insurance or commercial-shipping disruption records in the weekly window."
-          />
-        </Section>
-
+        {report.whatMatters && report.whatMatters.trim() && (
+          <Section title="What Matters"><Paragraphs text={report.whatMatters} /></Section>
+        )}
+        {report.implications && report.implications.trim() && (
+          <Section title="Implications for Business"><Paragraphs text={report.implications} /></Section>
+        )}
         {report.watchNext && report.watchNext.trim() && (
           <Section title="Watch Next"><Paragraphs text={report.watchNext} /></Section>
         )}
@@ -614,8 +606,23 @@ export default function ShippingReportPreview({
           <Section title="Polestar View"><Paragraphs text={report.polestarView} /></Section>
         )}
 
+        {ds.relatedIncidents.length > 0 && (
+          <Section title="Related Incidents">
+            <RelatedIncidentsTable rows={ds.relatedIncidents} />
+          </Section>
+        )}
+
         <Section title="Source Notes / Data Notes">
           <p className="text-[12px] leading-[1.7]" style={{ color: DUSK }}>{ds.dataNote}</p>
+        </Section>
+
+        <Section title="Disclaimer">
+          <p
+            className="text-[12px] leading-[1.7]"
+            style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+          >
+            {DISCLAIMER_TEXT}
+          </p>
         </Section>
       </div>
 
