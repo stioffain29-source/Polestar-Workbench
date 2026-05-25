@@ -125,6 +125,15 @@ function classifyEnergy(t: string): string {
 // chemists / pharmacists / lawyers walkouts and university-led protests
 // don't fall through to the generic strike or fallback bucket.
 function classifyUnrest(t: string): string {
+  // Kinetic armed-conflict short-circuit. "Drone strike", "missile strike",
+  // "air strike", militant/insurgent attacks etc. must NEVER be routed
+  // into a labour, protest or generic clash bucket on the strength of a
+  // shared keyword. Only an explicit protest / public-order cue in the
+  // same headline can override this.
+  const kineticHit = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid))\b/.test(t);
+  const protestCue = /\b(protest|demonstration|rally|march|sit[- ]?in|riot|public disorder|crackdown|curfew|tear[- ]?gas|water cannon|rubber bullet|baton charge|student union|opposition (call|rally|march)|\bpti\b|imran khan|section\s*144|assembly ban|detention of (protesters|activists|students))\b/.test(t);
+  if (kineticHit && !protestCue) return "Armed group activity";
+
   if (/\b(pti|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144)\b/.test(t)) return "Protest";
   if (/\b(university|college|campus|student union|student federation|students? (rally|march|protest|gather|stage|boycott))\b/.test(t)) return "Student activism";
   if (/\b(sit[- ]?in|encampment|occupation of)\b/.test(t)) return "Sit-in";

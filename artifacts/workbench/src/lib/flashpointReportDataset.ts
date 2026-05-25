@@ -92,9 +92,14 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
 // out of scope unless the same headline also carries a protest / strike /
 // civil-unrest hook (e.g. crackdown on a march, security forces clash
 // with protesters).
-const KINETIC_ONLY_RE = /\b(drone strike|missile strike|air strike|airstrike|airborne attack|artillery|shelling|ambush|\bied\b|bomb (attack|blast|kills)|suicide bomb|car bomb|gunmen kill|gun battle|militants? (kill|attack|target|ambush)|insurgents? (kill|attack)|jihadist|terror attack|terrorist attack|armed group (attack|kill))\b/i;
+const KINETIC_ONLY_RE = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid))\b/i;
 
-const PROTEST_HOOK_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|riot|public disorder|looting|roadblock|unrest|disorder|crackdown|clash|curfew|state of emergency|martial law|lockdown|tear[- ]?gas|water cannon|rubber bullet|baton|student|activist|union|opposition|pti|imran khan|section\s*144|detention of (protesters|activists|students))\b/i;
+// Tight protest / public-order cue list. Deliberately excludes ambiguous
+// tokens like "strike", "walkout", "stoppage" and bare "clash" because
+// they collide with kinetic vocabulary ("drone strike", "militants clash
+// with troops"). Only explicit protest, public-order or named-movement
+// markers can override the kinetic exclusion.
+const PROTEST_HOOK_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|riot|public disorder|looting|roadblock|crackdown|curfew|state of emergency|martial law|lockdown imposed|tear[- ]?gas|water cannon|rubber bullet|baton charge|student union|activist|opposition (call|rally|march)|union (call|rally|strike)|\bpti\b|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144|assembly ban|detention of (protesters|activists|students)|chemists? (strike|walkout|shutdown)|pharmacists? (strike|walkout|shutdown)|lawyers? (strike|walkout|boycott)|traders? (strike|shutdown)|transporters? (strike|stoppage)|sectoral (strike|shutdown|walkout)|shutter[- ]down)\b/i;
 
 function isKineticOnly(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
