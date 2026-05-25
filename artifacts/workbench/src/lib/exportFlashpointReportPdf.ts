@@ -470,6 +470,12 @@ export async function exportFlashpointReportPdf(
 
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 
+  // Source Notes / Data Notes — scope transparency about what was
+  // excluded from the briefing window (kinetic, court-only, syndicated
+  // duplicates). This is data-scope methodology, distinct from
+  // internal Source Health diagnostics, and is client-safe.
+  drawSectionWithProse(ctx, "Source Notes / Data Notes", ds.dataNote);
+
   drawDisclaimer(ctx);
 
   drawFooters(ctx.pdf);

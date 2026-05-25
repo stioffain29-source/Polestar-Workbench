@@ -472,7 +472,7 @@ export function buildFlashpointReportDataset(
     noteParts.push(`${kineticDropped} kinetic armed-conflict record${kineticDropped === 1 ? "" : "s"} without a public-order hook were excluded so the read stays focused on activism, protests and civil unrest.`);
   }
   if (courtDropped > 0) {
-    noteParts.push(`${courtDropped} court-only legal-process record${courtDropped === 1 ? "" : "s"} without a civil-unrest hook were excluded.`);
+    noteParts.push(`${courtDropped} court-only legal-process record${courtDropped === 1 ? " was" : "s were"} excluded for lack of a civil-unrest hook.`);
   }
   const dedupedDropped = enrichedAll.length - enriched.length;
   if (dedupedDropped > 0) {

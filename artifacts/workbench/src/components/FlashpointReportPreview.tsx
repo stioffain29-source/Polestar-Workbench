@@ -497,6 +497,10 @@ export default function FlashpointReportPreview({
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
         </Section>
 
+        <Section title="Source Notes / Data Notes">
+          <Paragraphs text={ds.dataNote} />
+        </Section>
+
         <Section title="Disclaimer">
           <p className="text-[12px] leading-[1.7]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
             {DISCLAIMER_TEXT}
