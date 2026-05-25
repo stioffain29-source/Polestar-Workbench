@@ -150,18 +150,28 @@ const HANDLE_TITLE_RE = /^\s*[@#]/;
 
 // Repatriation, crew-welfare and human-interest items are real but they are
 // downstream of the maritime security picture, not operational drivers of it.
-// They should not lead a Chokepoint, Vessel or Piracy read.
-const HUMAN_INTEREST_RE = /\b(repatriat|repatriation|seafarer welfare|crew welfare|memorial|funeral|rescued (and )?(repatriated|returned home)|brought home|reunion|widow|mother of|family of|tribute to|interview with|opinion piece|op[- ]ed)\b/i;
+// They should not lead a Chokepoint, Vessel or Piracy read. Stems are kept
+// open (no trailing word-boundary) so inflections like "repatriated" /
+// "repatriation" / "memorialised" all match.
+const HUMAN_INTEREST_RE = /(\brepatriat|\bseafarer welfare|\bcrew welfare|\bmemorial|\bfuneral|\brescued (and )?(repatriated|returned home)|\bbrought home\b|\breunion\b|\bwidow|\bmother of\b|\bfamily of\b|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\baboard us-?seized vessels?\b|\bcrew (members? )?(released|freed|safe|safely)|\bdetained crew (returned|released|repatriated))/i;
 
-// Speculative strike claims and unverified rumour traffic ("reportedly",
-// "claims to have", "alleged strike", "unconfirmed reports") — when these
-// dominate they push the read away from validated maritime security.
-const SPECULATIVE_CLAIM_RE = /\b(unconfirmed|unverified|alleged|allegedly|reportedly|claim(s|ed) to have|claim of an attack|rumou?red|purportedly|may have (been )?(struck|hit|attacked|targeted)|appears to have been)\b/i;
+// Speculative strike claims and unverified rumour traffic. "Iran claims
+// missile strike", "Houthis claim attack", "claims to have struck" — when
+// these dominate they push the read away from validated maritime security.
+// Also catches "X says it hit/targeted Y" style claim language and the
+// classic "may have / appears to have" hedge stack.
+const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ballegedly|\breportedly|\bclaim(s|ed)\b[^.]{0,40}\b(strike|attack|hit|missile|drone|target|targeted|fired|sank|downed|shot down|launched)|\bclaim(s|ed) to have\b|\bclaim(s|ed) responsibility|\brumou?red|\bpurportedly|\bmay have (been )?(struck|hit|attacked|targeted)|\bappears to have been|\b(says|said) it (hit|struck|targeted|attacked|launched|downed))/i;
 
 // Pure commentary, explainer and analysis-piece headlines with no
 // operational anchor ("explained", "what to know", "five things", "in
 // charts", "guide to", listicles). These dilute operational reads.
 const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
+
+// Pure freight-market index / rate-tracker commentary with no operational
+// anchor. Drewry WCI, Baltic indices, container freight rate weekly
+// updates, etc. Blocked outright unless the headline also carries an
+// operational anchor (port closure, strike, attack, seizure).
+const FREIGHT_MARKET_INDEX_RE = /\b(drewry|world container index|\bwci\b|baltic (dry|exchange|capesize|panamax|supramax|handysize) index|\bbdi\b|\bbci\b|\bbpi\b|harpex|shanghai containerized freight index|\bscfi\b|ningbo containerized freight index|\bncfi\b|container (rate|rates|spot rate|spot rates|index) (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer)|freight (rate|rates) (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer)|spot rates? (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer))\b/i;
 
 function isLowCredibilitySource(r: ShippingReportIncident): boolean {
   if (HANDLE_TITLE_RE.test(r.title ?? "")) return true;
@@ -188,39 +198,70 @@ function normaliseTitle(s: string): string {
     .trim();
 }
 
+const TITLE_STOP = new Set([
+  "the", "a", "an", "of", "in", "on", "at", "to", "for", "and", "as", "by",
+  "off", "near", "after", "amid", "with", "from", "into", "over", "under",
+  "says", "say", "said", "reports", "report", "warning", "warns", "amid",
+  "is", "are", "was", "were", "be", "been", "being", "has", "have", "had",
+  "its", "it", "this", "that", "these", "those", "new",
+]);
+
 function titleKey(s: string): string {
-  // First 8 significant words after stripping common stopwords. Good enough
-  // to catch "Tanker X attacked off Yemen / Tanker X hit in Red Sea" as the
-  // same underlying incident without false-merging unrelated stories.
-  const STOP = new Set([
-    "the", "a", "an", "of", "in", "on", "at", "to", "for", "and", "as", "by",
-    "off", "near", "after", "amid", "with", "from", "into", "over",
-    "says", "say", "said", "reports", "report", "warning", "warns",
-  ]);
+  // First 6 significant words. Tighter than 8 so re-ordered syndicated
+  // rewrites collapse together.
   return normaliseTitle(s)
     .split(" ")
-    .filter((w) => w && !STOP.has(w))
-    .slice(0, 8)
+    .filter((w) => w && !TITLE_STOP.has(w))
+    .slice(0, 6)
     .join(" ");
 }
 
+function topicSignature(title: string, date: Date): string {
+  // Date-bucketed signature based on the 5 longest substantive words,
+  // sorted alphabetically. Catches syndicated rewrites that keep the
+  // same nouns / event words but reorder or rephrase them (e.g.
+  // "Iran seizes oil tanker in Hormuz" vs "Oil tanker held by Iranian
+  // forces near Strait of Hormuz"). The two-day bucket allows for
+  // wire-pickup lag without merging unrelated incidents.
+  const day = date.toISOString().slice(0, 10);
+  const yyyy = day.slice(0, 4);
+  const mm = day.slice(5, 7);
+  const dd = Number(day.slice(8, 10));
+  const bucket = `${yyyy}-${mm}-p${Math.floor((dd - 1) / 2)}`;
+  const words = normaliseTitle(title)
+    .split(" ")
+    .filter((w) => w && !TITLE_STOP.has(w) && w.length >= 4);
+  const top = [...new Set(words)]
+    .sort((a, b) => b.length - a.length || a.localeCompare(b))
+    .slice(0, 5)
+    .sort();
+  return `${bucket}|${top.join(" ")}`;
+}
+
 function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
-  const seen = new Map<string, T>();
+  // Two-pass: exact-title-key dedupe (catches direct republishing), then
+  // date+nouns signature dedupe (catches reworded syndication). Keeps
+  // the higher-severity / more-recent version of each underlying event.
+  const better = (a: T, b: T) => {
+    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+    if (sa !== sb) return sa > sb;
+    return a.date.getTime() >= b.date.getTime();
+  };
+  const byTitle = new Map<string, T>();
   for (const r of rows) {
     const k = titleKey(r.title);
-    if (!k) { seen.set(`__${Math.random()}`, r); continue; }
-    const prev = seen.get(k);
-    if (!prev) { seen.set(k, r); continue; }
-    // Keep the entry with the higher severity, or the more recent date as
-    // tiebreaker. This collapses syndicated dupes without losing the most
-    // authoritative version.
-    const sevA = SEV_RANK[sevKey(r.severity)] ?? 0;
-    const sevB = SEV_RANK[sevKey(prev.severity)] ?? 0;
-    if (sevA > sevB || (sevA === sevB && r.date.getTime() > prev.date.getTime())) {
-      seen.set(k, r);
-    }
+    if (!k) { byTitle.set(`__${Math.random()}`, r); continue; }
+    const prev = byTitle.get(k);
+    if (!prev || better(r, prev)) byTitle.set(k, r);
   }
-  return Array.from(seen.values());
+  const bySig = new Map<string, T>();
+  for (const r of byTitle.values()) {
+    const k = topicSignature(r.title, r.date);
+    const prev = bySig.get(k);
+    if (!prev || better(r, prev)) bySig.set(k, r);
+  }
+  return Array.from(bySig.values());
 }
 
 // Pure shipping-market / corporate-finance items with no operational hook
@@ -232,9 +273,19 @@ const OPERATIONAL_HOOK_RE = /\b(port|strike|closure|closes?|closed|delay|delayed
 
 function isShippingMarketOnly(r: ShippingReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  if (!MARKET_ONLY_RE.test(text)) return false;
-  return !OPERATIONAL_HOOK_RE.test(text);
+  if (MARKET_ONLY_RE.test(text) && !OPERATIONAL_HOOK_RE.test(text)) return true;
+  // Pure freight-market index commentary (Drewry / WCI / BDI / SCFI /
+  // weekly rate-tracker headlines) is blocked outright unless the same
+  // headline also carries a true operational anchor.
+  if (FREIGHT_MARKET_INDEX_RE.test(text) && !OPERATIONAL_HOOK_RE.test(text)) return true;
+  return false;
 }
+
+// Stronger commercial-operational anchor than OPERATIONAL_HOOK_RE alone.
+// Used by the Commercial Impact gate so generic mentions of "port" or
+// "insurance" inside a freight-market piece don't sneak through. We
+// require a verb or event word that signals real-world disruption.
+const COMMERCIAL_OPERATIONAL_RE = /\b(port (clos|closes|closed|closure|shut|halt|disrupt|congest|congestion|strike|stoppage|stopped|fire|blast|outage)|berth (clos|closes|closed|closure|congest|congestion|delay|delays|delayed)|terminal (clos|closes|closed|closure|fire|congest|disrupt|outage)|dock(workers?| strike|workers strike|workers walk)|stevedore strike|wharf (strike|stoppage)|canal (clos|closes|closed|closure|congest|congestion|disrupt|halt)|(vessel|ship|tanker|carrier|fleet) (divert|diverted|reroute|rerouted|re-?routed|delay|delayed|stranded|adrift|grounded|stopped|halt|halted|skipped)|skip(ping)? (port|call|calls)|port skipping|schedule (slip|slippage|disruption|reliability|miss|missed)|sailing cancel|blank sailing|service (suspension|suspended|cancel|cancelled|withdrawn)|liner service (suspension|cancel|cancelled)|war[\s-]?risk (premium|surcharge|adjust|adjustment|widened|extended|raised|raise|hike|hiked|review|reviewed)|insurance (premium|surcharge) (rise|rises|risen|jump|jumped|hike|hiked|adjust|adjustment|widen|widened|extended|raised|raise)|p&i (premium|surcharge|warning|advisory)|protection and indemnity (premium|warning|advisory)|surcharge (introduce|introduced|impose|imposed|raise|raised|hike|hiked|extend|extended)|advisory (issued|expanded|extended|widened|tightened)|naval (escort|patrol|protection)|convoy (operation|escort|protection)|crew (change|repatriation) (disrupt|delay|delayed|suspended|halted)|cargo (flow|movement|disruption|halt|backlog|backlogged)|export (halt|suspension|suspended|ban|banned)|import (halt|disruption|backlog)|attack(ed)? .{0,30}(vessel|tanker|ship|carrier|port|terminal)|seiz(ed|ure)? .{0,30}(vessel|tanker|ship|carrier|cargo)|hijack(ed)? .{0,30}(vessel|tanker|ship|carrier|cargo)|drone .{0,30}(vessel|tanker|ship|carrier|port|terminal)|missile .{0,30}(vessel|tanker|ship|carrier|port|terminal))\b/i;
 
 export function buildShippingReportDataset(
   incidents: ShippingReportIncident[],
@@ -435,8 +486,9 @@ export function buildShippingReportDataset(
     enriched
       .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
       .filter((r) => !isShippingMarketOnly(r))
-      .filter((r) => OPERATIONAL_HOOK_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`)),
-  ).slice(0, 12);
+      .filter((r) => !FREIGHT_MARKET_INDEX_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
+      .filter((r) => COMMERCIAL_OPERATIONAL_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`)),
+  ).slice(0, 10);
 
   const transitRecords = enriched.filter(
     (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
@@ -528,7 +580,14 @@ export function buildShippingReportDataset(
   const autoWatchNext = buildShippingWatchNext(autoCtx);
   const autoPolestarView = buildShippingPolestarView(autoCtx);
 
-  const locNote = `Records with no identifiable incident location (${locationNotIdentifiedCount} in window) are included in total counts but excluded from the country and regional comparison charts and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted as incident country.`;
+  // Source / data note. Records without a confirmed incident country are
+  // counted in totals but excluded from country and regional charts so
+  // they cannot distort the geographic picture. Vessel flag state is
+  // never counted as incident country. The placeholder label is an
+  // internal classification only and is intentionally NOT surfaced here.
+  const locNote = locationNotIdentifiedCount > 0
+    ? `${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} in the window could not be tied to a confirmed incident country; ${locationNotIdentifiedCount === 1 ? "it is" : "they are"} included in total counts but excluded from the country and regional charts to avoid geographic distortion. Vessel flag state is never counted as incident country.`
+    : `Vessel flag state is never counted as incident country.`;
   const dataNote = outOfScopeCount > 0
     ? `${outOfScopeCount} shipping record${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East were excluded from this view, matching the Shipping dashboard scope. ${locNote}`
     : locNote;
@@ -731,11 +790,18 @@ function buildVesselPiracyRead(opts: {
   if (vesselRows30.length + piracyRows30.length === 0) {
     return `Nothing hostile against vessels and no piracy or armed-robbery records reached the file over the last 30 days (${thirtyDayLabel}). The underlying threat picture in the region has not been benign for long, so treat the quiet cycle as a reporting gap and keep crew-change, advisory and naval-patrol signals on the watchlist.\n\nA return to hostile activity is usually announced first by naval forces, then by maritime risk bulletins, before it shows up in P&I or war-risk premium movement.`;
   }
+  // Lead-title quotes must come from a credible maritime / security /
+  // industry / news source — never from social-media handles, low-credibility
+  // sources, repatriation or human-interest items, or speculative "X claims
+  // missile strike" headlines. Falls back to a counts-only sentence when no
+  // credible lead exists.
+  const vesselLead = vesselRows30.find((r) => !isLowCredibilitySource(r));
+  const piracyLead = piracyRows30.find((r) => !isLowCredibilitySource(r));
   const vesselSegment = vesselRows30.length > 0
-    ? `Hostile activity against vessels over the last 30 days runs to ${vesselRows30.length} record${vesselRows30.length === 1 ? "" : "s"}, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach. The lead entry is "${vesselRows30[0].title}".`
+    ? `Hostile activity against vessels over the last 30 days runs to ${vesselRows30.length} record${vesselRows30.length === 1 ? "" : "s"}, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ` Available headlines on the file are dominated by low-credibility or speculative reporting, so no validated lead entry is quoted here.`}`
     : `No vessel-attack or seizure records landed in the 30-day window, even with piracy activity still on the file.`;
   const piracySegment = piracyRows30.length > 0
-    ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window, with "${piracyRows30[0].title}" as the lead entry.`
+    ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window${piracyLead ? `, with "${piracyLead.title}" as the lead entry.` : `; no credible single lead is quoted as the file leans on low-credibility or speculative reporting.`}`
     : `Piracy and armed-robbery reporting is empty across the 30-day window, which is unusual rather than reassuring for this geography.`;
   const weeklyV = vesselRowsWeekly.length;
   const weeklyP = piracyRowsWeekly.length;
@@ -782,7 +848,7 @@ function buildRegionalCountryRead(opts: {
     ? `At country level the cycle is led by ${joinList(topCountries.map((c) => `${c.label} (${c.value})`))}.`
     : `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file.`;
   const gapLine = locationNotIdentifiedCount > 0
-    ? `A further ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} could not be tied to a specific country and ${locationNotIdentifiedCount === 1 ? "is" : "are"} excluded from the country chart to avoid distortion.`
+    ? `A further ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} could not be tied to a confirmed incident country and ${locationNotIdentifiedCount === 1 ? "is" : "are"} excluded from the country chart to avoid distortion.`
     : "";
   return `${regionLine} ${countryLine}${gapLine ? `\n\n${gapLine}` : ""}`;
 }
@@ -806,9 +872,9 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
     else if (!isWeakBucket) rest.push(r);
   }
   const ordered = dedupeByTitle([...strong, ...rest]);
-  // Cap at 10 so the Source Notes / Disclaimer block can be pulled back
+  // Cap tight so the Source Notes / Disclaimer block can be pulled back
   // onto the same page rather than orphaned on a near-empty final page.
-  return ordered.slice(0, 10);
+  return ordered.slice(0, 8);
 }
 
 export const SHIPPING_SEV_LABEL = SEV_LABEL;

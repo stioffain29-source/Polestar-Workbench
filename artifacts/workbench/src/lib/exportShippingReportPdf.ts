@@ -499,9 +499,18 @@ export async function exportShippingReportPdf(
   // Editor-authored analyst sections. Editor text wins when supplied;
   // otherwise the dataset's auto-prose fills in so the report reads at
   // Fuel-Watch substance even before the analyst has written the form.
+  // Editor text wins only when it carries substance. Short stub text
+  // (legacy single-line entries, placeholders, " - " etc.) falls through
+  // to the dataset's auto-prose so the report reads at Fuel-Watch
+  // substance rather than printing a one-line section.
   const pickProse = (editor: string | null | undefined, auto: string): string => {
     const t = (editor ?? "").trim();
-    return t.length > 0 ? t : auto;
+    if (t.length >= 240) return t;
+    if (t.length === 0) return auto;
+    // Treat a thin editor stub as a lead paragraph above the auto-prose
+    // rather than discarding either side. This keeps any analyst note
+    // visible while still delivering the full operational read below.
+    return `${t}\n\n${auto}`;
   };
   drawSectionWithProse(ctx, "What Matters", pickProse(data.whatMatters, ds.autoWhatMatters));
   drawSectionWithProse(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));

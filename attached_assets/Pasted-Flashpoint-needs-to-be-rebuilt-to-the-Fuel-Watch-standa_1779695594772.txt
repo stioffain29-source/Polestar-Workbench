@@ -1,0 +1,197 @@
+Flashpoint needs to be rebuilt to the Fuel Watch standard.
+
+Scope:
+Flashpoint only.
+
+Flashpoint means:
+Activism, Protests and Civil Unrest.
+
+Do not treat Flashpoint as a generic incident digest.
+
+Current problems:
+- No real activism analysis.
+- No protest forecasting.
+- No forward-looking risk read.
+- Prose is too thin.
+- Related Incidents includes misclassified records.
+- PTI protest activity is incorrectly labelled as Tribal violence.
+- Myanmar drone strike is incorrectly labelled as Strike / labour action.
+- The report does not yet justify being a paid product.
+
+Required structure:
+
+- Executive Summary
+- Fast Facts
+- Activism and Protest Read
+- Civil Unrest and Public Order Read
+- Forecast: Next 7–14 Days
+- Regional and Country View
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+- Related Incidents
+- Source Notes / Data Notes
+- Disclaimer
+
+1. Activism and Protest Read
+
+Add a section focused on activism drivers, not just incident categories.
+
+Cover:
+- political mobilisation
+- labour action
+- student activism
+- civil-society campaigns
+- protest calls to action
+- court / election / detention triggers
+- union or sectoral mobilisation
+- online-to-street mobilisation where visible
+
+This section should explain:
+- who is mobilising
+- why they are mobilising
+- whether activity is planned, reactive or escalating
+- likely operational impact
+
+2. Civil Unrest and Public Order Read
+
+Separate protest activism from public-order risk.
+
+Cover:
+- riots
+- police restrictions
+- Section 144 / curfew / assembly restrictions
+- arrests
+- clashes
+- roadblocks
+- violence near protest sites
+- disruption to city centres, transport, campuses or government districts
+
+Do not mix armed conflict, drone strikes or militant incidents into this unless they directly affect civil unrest/public-order conditions.
+
+3. Forecast: Next 7–14 Days
+
+Add a clear forecasting section.
+
+This must include:
+- likely protest locations or countries
+- likely triggers
+- expected tempo
+- escalation indicators
+- de-escalation indicators
+- likely business impact
+
+Use cautious language:
+- “likely”
+- “possible”
+- “watch for”
+- “risk increases if”
+- “risk eases if”
+
+Do not overclaim.
+
+Example:
+“Pakistan is likely to remain the main watch point over the next 7–14 days, particularly around PTI mobilisation, detention-related protest calls and police restrictions. Risk increases if arrests rise, Section 144 restrictions expand, or protest activity shifts from symbolic gatherings to road disruption near administrative districts.”
+
+4. Regional and Country View
+
+Make this a real country read, not just record counts.
+
+For each main country:
+- what is driving mobilisation?
+- what kind of activity is likely?
+- where would disruption show up?
+- what should business users watch?
+
+Countries likely in this cycle:
+- Pakistan
+- India
+- South Korea
+- any other relevant country if supported by data
+
+5. Fix classification
+
+Improve Flashpoint classification so:
+- PTI protest / Imran Khan / Section 144 protest activity = Protest / political mobilisation / public-order risk, not Tribal violence.
+- Chemists strike / pharmacists protest = Strike / labour action.
+- University or student campaign = Student activism.
+- Drone strike / militant attack / armed conflict = exclude from Flashpoint unless directly connected to protest or civil unrest.
+- Tribal violence should only be used where it is genuinely tribal or communal violence.
+
+6. Related Incidents filtering
+
+Remove or demote:
+- drone strikes
+- armed conflict records
+- duplicate headlines
+- court-process stories with no protest activity
+- unrelated militant violence
+
+Prioritise:
+- planned protests
+- actual demonstrations
+- strikes
+- labour action
+- student activism
+- police restrictions
+- curfew / assembly ban
+- arrests linked to protest activity
+- clashes or disorder linked to protest activity
+- transport or city disruption
+
+7. What Matters
+
+Expand this into 2 paragraphs.
+
+It should explain:
+- how protest and activism create operational risk
+- why tempo, location and mobilisation capacity matter more than headline severity
+- how quickly activity can move from symbolic to disruptive
+
+8. Implications for Business
+
+Make this practical.
+
+Cover:
+- staff movement
+- journey management
+- site access
+- visitor travel
+- delivery disruption
+- public-facing facilities
+- comms triggers
+- escalation thresholds
+- working from home / travel delay decisions
+- security posture around offices and plants
+
+9. Watch Next
+
+Make this a proper list of indicators:
+- protest calls and mobilisation dates
+- union strike notices
+- court hearings / political detention triggers
+- police permit refusals or bans
+- Section 144 / curfew expansion
+- arrests or injuries
+- roadblocks / transport disruption
+- campus mobilisation
+- online calls moving to street action
+
+10. Polestar View
+
+Make this the judgement section.
+
+Example:
+“Flashpoint is not just measuring the number of protests. The useful signal is mobilisation capacity, the speed at which issues move from online or symbolic action to street disruption, and the likelihood of police restrictions turning a manageable demonstration into a business-continuity problem. Pakistan carries the clearest near-term pressure, while India and South Korea should be watched for sectoral or city-specific disruption.”
+
+11. Acceptance
+
+Export a fresh Flashpoint PDF and confirm:
+- Activism and Protest Read exists.
+- Civil Unrest and Public Order Read exists.
+- Forecast: Next 7–14 Days exists.
+- Related Incidents excludes drone/militant records unless directly protest-related.
+- PTI protest activity is not labelled Tribal violence.
+- Flashpoint contains forward-looking protest risk.
+- Report reads like a paid activism/protest risk brief, not a short incident digest.

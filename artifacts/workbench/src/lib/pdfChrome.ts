@@ -358,10 +358,12 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
 
 // Approximate heights used to keep Source Notes + Disclaimer together
 // on the same page when they fit, so the Disclaimer never gets a near-
-// empty page to itself.
-const DISCLAIMER_BLOCK_H = 36 + 14 * 6;
-const SOURCE_NOTES_BLOCK_H = 36 + 14 * 5;
-const NOTES_TO_DISCLAIMER_GAP = 14;
+// empty page to itself. Sized as compact as the actual line counts
+// allow so the pair can be pulled back onto a fuller previous page
+// rather than orphaned on a near-empty final page.
+const DISCLAIMER_BLOCK_H = 24 + 12 * 5;
+const SOURCE_NOTES_BLOCK_H = 24 + 12 * 4;
+const NOTES_TO_DISCLAIMER_GAP = 8;
 
 export function drawDisclaimer(ctx: Ctx) {
   // No internal page break here. drawSourceNotes pre-allocates space
