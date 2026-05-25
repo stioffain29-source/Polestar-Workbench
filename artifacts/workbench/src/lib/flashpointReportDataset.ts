@@ -92,7 +92,7 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
 // out of scope unless the same headline also carries a protest / strike /
 // civil-unrest hook (e.g. crackdown on a march, security forces clash
 // with protesters).
-const KINETIC_ONLY_RE = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid))\b/i;
+const KINETIC_ONLY_RE = /\b(drone[- ]?strike|drone[- ]?attack|quadcopter|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|bomb[- ]?blast|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike|gun down)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid)|claims? responsibility for (the |a )?(attack|blast|bomb|strike|killing)|tehrik[- ]?i[- ]?taliban|\bttp\b|isis|islamic state|baloch (liberation|raj)|bla\b)\b/i;
 
 // Tight protest / public-order cue list. Deliberately excludes ambiguous
 // tokens like "strike", "walkout", "stoppage" and bare "clash" because
@@ -143,10 +143,11 @@ function isLowCredibility(r: FlashpointReportIncident): boolean {
 const NOVELTY_RE = /\b(cockroach|parody party|joke party|meme party|viral (post|meme|reel|tweet|video)|going viral|founder responds?|spokesperson responds?|satir(e|ical|ised|ized)|spoof|prank|publicity stunt|fan club|tongue[- ]in[- ]cheek)\b/i;
 function isWeakNovelty(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  if (!NOVELTY_RE.test(text)) return false;
-  // If the same headline still carries a concrete mobilisation hook
-  // (announced protest, strike, arrest, Section 144), keep it.
-  return !PROTEST_HOOK_RE.test(text);
+  // Unconditional: novelty / parody / "founder responds" items are
+  // weak commentary even when the surrounding text mentions a real
+  // protest. They must never lead the brief and must not appear in
+  // Related Incidents. The user is explicit about this.
+  return NOVELTY_RE.test(text);
 }
 
 // --- Country normalisation -------------------------------------------------
@@ -351,8 +352,11 @@ export function buildFlashpointReportDataset(
   // dominate the operational read.
   const enriched = dedupeByTitle(enrichedAll);
 
-  const activismRows = enriched.filter((r) => r.bucket === "activism");
-  const unrestRows = enriched.filter((r) => r.bucket === "unrest");
+  // Activism / civil-unrest views: hide novelty items from the
+  // operational reads and tables. They stay in `enriched` so totals
+  // remain honest but never reach the lead or the protest table.
+  const activismRows = enriched.filter((r) => r.bucket === "activism" && !isWeakNovelty(r));
+  const unrestRows = enriched.filter((r) => r.bucket === "unrest" && !isWeakNovelty(r));
 
   // Fast Facts
   const hs = highestSeverity(enriched);
