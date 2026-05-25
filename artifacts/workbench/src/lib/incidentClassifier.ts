@@ -117,18 +117,32 @@ function classifyEnergy(t: string): string {
 }
 
 // Protests / unrest / flashpoint / PNG country -----------------------------
+// Order matters. Explicit political-protest markers (PTI, Imran Khan,
+// Section 144, named rallies) pre-empt every other bucket so a story
+// about a PTI rally in a tribal region is classified as Protest rather
+// than Tribal violence because the summary happens to mention a tribal
+// area. Sectoral and student-led actions are recognised explicitly so
+// chemists / pharmacists / lawyers walkouts and university-led protests
+// don't fall through to the generic strike or fallback bucket.
 function classifyUnrest(t: string): string {
-  if (/\b(tribal|tribesmen|clan (fight|clash))/.test(t)) return "Tribal violence";
-  if (/\barmed robbery|armed gang|hold[- ]?up|robbery at gunpoint/.test(t)) return "Armed robbery";
-  if (/\briot|public disorder|looting\b/.test(t)) return "Riot / public disorder";
-  if (/\b(strike|labour action|industrial action|walkout|stoppage)\b/.test(t)) return "Strike / labour action";
+  if (/\b(pti|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144)\b/.test(t)) return "Protest";
+  if (/\b(university|college|campus|student union|student federation|students? (rally|march|protest|gather|stage|boycott))\b/.test(t)) return "Student activism";
+  if (/\b(sit[- ]?in|encampment|occupation of)\b/.test(t)) return "Sit-in";
+  if (/\b(chemist|pharmacist|doctor|nurse|teacher|lawyer|trader|hauliers?|transporters?)s? (strike|walkout|stoppage|shutdown|boycott)|sector(al)? (strike|shutdown|walkout)|shutter[- ]down\b/.test(t)) return "Strike / labour action";
+  if (/\b(strike|labour action|labor action|industrial action|walkout|stoppage|shutdown call)\b/.test(t)) return "Strike / labour action";
   if (/\b(protest|demonstration|rally|march)\b/.test(t)) return "Protest";
-  if (/\b(militant|insurgent|armed group|rebel)\b/.test(t)) return "Armed group activity";
-  if (/\b(police operation|security force|military operation|raid|crackdown)\b/.test(t)) return "Security force operation";
+  if (/\b(curfew|state of emergency|martial law|lockdown imposed)\b/.test(t)) return "Curfew / emergency order";
+  if (/\b(crackdown|baton charge|tear[- ]?gas|water cannon|rubber bullet|mass arrest|detention of (protesters|activists|students))\b/.test(t)) return "Crackdown";
+  if (/\b(clash|skirmish|brawl)\b/.test(t)) return "Clash";
+  if (/\briot|public disorder|looting\b/.test(t)) return "Riot / public disorder";
+  if (/\b(tribal|tribesmen|clan (fight|clash))\b/.test(t)) return "Tribal violence";
+  if (/\barmed robbery|armed gang|hold[- ]?up|robbery at gunpoint/.test(t)) return "Armed robbery";
+  if (/\b(police operation|security force|military operation|raid)\b/.test(t)) return "Security force operation";
   if (/\b(roadblock|road block|highway block|access (block|denied|disrupt))\b/.test(t)) return "Roadblock / access disruption";
   if (/\b(airport (clos|disrupt|access)|port access|terminal closure)\b/.test(t)) return "Airport / port access issue";
   if (/\bmining (disruption|halt|protest)|contractor (attacked|disruption)/.test(t)) return "Mining / contractor disruption";
-  if (/\b(election|political (unrest|violence)|government|coup)\b/.test(t)) return "Political unrest";
+  if (/\b(election|political (unrest|violence)|coup)\b/.test(t)) return "Political unrest";
+  if (/\b(militant|insurgent|armed group|rebel)\b/.test(t)) return "Armed group activity";
   if (/\b(crime|theft|violence|assault|stabb|shoot)\b/.test(t)) return "Crime / public safety";
   return "Other operational incident";
 }

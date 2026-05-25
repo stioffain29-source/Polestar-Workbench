@@ -17,6 +17,7 @@ import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
+import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import {
@@ -170,6 +171,8 @@ export default function ReportEditor() {
       // does not run through the generic topic exporter.
       if (form.topic === "shipping") {
         await exportShippingReportPdf(reportData, mappedIncidents, filename);
+      } else if (form.topic === "flashpoint" || form.topic === "protests") {
+        await exportFlashpointReportPdf(reportData, mappedIncidents, filename);
       } else {
         try {
           // forceAllowMissing wins so the override button can re-export
