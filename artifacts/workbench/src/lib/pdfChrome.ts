@@ -312,20 +312,35 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
   ctx.y += totalH + 18;
 }
 
+// Approximate heights used to keep Source Notes + Disclaimer together
+// on the same page when they fit, so the Disclaimer never gets a near-
+// empty page to itself.
+const DISCLAIMER_BLOCK_H = 36 + 14 * 6;
+const SOURCE_NOTES_BLOCK_H = 36 + 14 * 5;
+const NOTES_TO_DISCLAIMER_GAP = 14;
+
 export function drawDisclaimer(ctx: Ctx) {
-  // Make sure the Disclaimer has room for the heading plus the body block
-  // before drawing; otherwise push it to a fresh page.
-  const need = 36 + 14 * 6;
-  if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
-  else ctx.y += 8;
+  // No internal page break here. drawSourceNotes pre-allocates space
+  // for both blocks together, so we either fit on the current page or
+  // were already pushed to a fresh one as a pair. A small safety guard
+  // remains for callers that invoke drawDisclaimer on its own.
+  if (ctx.y + DISCLAIMER_BLOCK_H > ctx.H - ctx.BOTTOM) {
+    newPage(ctx);
+  } else {
+    ctx.y += 8;
+  }
   drawSectionHeading(ctx, "Disclaimer");
   renderProse(ctx, DISCLAIMER_TEXT);
 }
 
 export function drawSourceNotes(ctx: Ctx, extra?: string) {
-  // Same guard: keep the heading and the source notes block together so the
-  // notes never collide with the previous section's table or italic note.
-  const need = 36 + 14 * 6 + (extra ? 14 * 4 : 0);
+  // Pre-allocate space for BOTH Source Notes and Disclaimer so the two
+  // either fit on the current page together or move to a fresh page
+  // together. This prevents the disclaimer landing alone on a near-
+  // empty final page.
+  const extraH = extra ? 14 * 4 : 0;
+  const need =
+    SOURCE_NOTES_BLOCK_H + extraH + NOTES_TO_DISCLAIMER_GAP + DISCLAIMER_BLOCK_H;
   if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
   else ctx.y += 14;
   drawSectionHeading(ctx, "Source Notes / Data Notes");

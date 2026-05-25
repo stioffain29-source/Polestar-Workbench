@@ -56,7 +56,11 @@ interface IssueFamily {
     | "crude";
   test: RegExp[];
   phrase: string;
+  /** Used in Regional Highlights — the per-country "why it matters" line. */
   why: string;
+  /** Used in Operational Read — a different angle on the same family
+   *  so the two sections never repeat the same sentence verbatim. */
+  opMeaning: string;
   watch: string;
 }
 const ISSUE_FAMILIES: IssueFamily[] = [
@@ -65,6 +69,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(strait of hormuz|hormuz)\b/, /\bbab[- ]el[- ]mandeb\b/, /\bred sea\b/, /\bmalacca\b/, /\bsuez\b/],
     phrase: "chokepoint pressure and tanker-route disruption",
     why: "Route pressure on Hormuz, Bab-el-Mandeb or the Red Sea feeds straight into bunker cost, transit time and war-risk premium.",
+    opMeaning: "Dependent fuel movement is forced onto longer, costlier cycles even when the underlying barrels are still available.",
     watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
   },
   {
@@ -72,6 +77,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(refinery|refineries) (outage|disruption|fire|attack|halt|maintenance|shutdown|closure)/],
     phrase: "refinery disruption and supply-side outage",
     why: "Refinery outage typically tightens regional crack spreads and pushes downstream pump and bunker prices up within days.",
+    opMeaning: "Affected grades go on allocation first; commercial buyers usually feel it before the published pump price moves.",
     watch: "Watch for restart timelines, force-majeure declarations and follow-on import announcements.",
   },
   {
@@ -79,6 +85,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(fuel|petrol|diesel|lpg|kerosene|jet fuel) (shortage|stockout|rationing|queue|queues)/, /\bforecourt (closure|shut|queue|disruption)/],
     phrase: "shortages, rationing and forecourt disruption",
     why: "Forecourt shortages put road transport, staff movement and generator runtime under immediate continuity pressure.",
+    opMeaning: "When forecourts dry up the constraint stops being price and becomes physical access; informal markets and queueing rules take over.",
     watch: "Watch for rationing rules, allocation cuts to commercial users and convoy or queue management announcements.",
   },
   {
@@ -86,6 +93,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\btanker (driver|drivers|strike|shortage|attack|blockade|convoy)/, /\b(fuel|tanker) (convoy|hijack|seizure)/],
     phrase: "tanker and fuel-transport disruption",
     why: "Tanker driver action or convoy disruption usually shows up as delivery delays at depots and forecourts inside a few days.",
+    opMeaning: "Inland distribution lags refinery output; depots draw down even when wholesale supply looks fine on paper.",
     watch: "Watch for negotiation outcomes, military or police escort decisions and downstream depot-stock levels.",
   },
   {
@@ -96,6 +104,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     ],
     phrase: "policy and subsidy / levy moves",
     why: "Policy moves on subsidies, levies or price controls reset operating cost assumptions and contract pass-through clauses.",
+    opMeaning: "Surcharge clauses and indexation formulas reset on the gazette date; today's contract economics may not survive the next cycle.",
     watch: "Watch for gazette dates, ministerial statements and any contract-renegotiation triggers from suppliers.",
   },
   {
@@ -103,6 +112,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(pump price|petrol price|diesel price|fuel price) (hike|rise|increase|cut|drop|fall|change)/, /\bfuel surcharge\b/],
     phrase: "pump and surcharge pricing pressure",
     why: "Pump and surcharge moves flow through fleet cost, freight rates and supplier invoices within the next billing cycle.",
+    opMeaning: "Visible at the pump now, visible in freight invoices next — the gap between the two is the negotiation window.",
     watch: "Watch for surcharge revisions on freight contracts and any government push-back against price rises.",
   },
   {
@@ -110,6 +120,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(oil|crude) (export ban|export halt|embargo|sanctions|sabotage|attack|spill)/],
     phrase: "crude supply-chain and sanctions pressure",
     why: "Crude-side disruption rolls into bunker, jet and downstream pricing on a 1-2 week lag and is hard to hedge away cleanly.",
+    opMeaning: "The cost shock arrives with a lag, which makes it easy to under-budget the cycle that absorbs it.",
     watch: "Watch for OPEC+ commentary, sanctions enforcement signals and any retaliation in shipping lanes.",
   },
 ];
@@ -243,20 +254,49 @@ function classifyCategory(t: string): FuelActionCategory | null {
   return null;
 }
 
-// Category → "Operational Read" template. Kept generic so it reads as
-// analyst judgement, not a headline restatement.
-const OPERATIONAL_READ_BY_CATEGORY: Record<FuelActionCategory, string> = {
-  "Producer action":
-    "Supply-side move: expect knock-on impact on bunker, jet and downstream pricing if the action sustains.",
-  "Buyer action":
-    "Buyer-side hedging or sourcing pressure; spot and contract pricing on similar grades is likely to follow.",
-  "Government / policy action":
-    "Policy moves reset pump price and subsidy exposure; review contract pass-through and surcharge clauses.",
-  "Infrastructure / routing action":
-    "Route diversification remains a live mitigation theme for Gulf-linked and Red Sea fuel movement.",
-  "Market / supply signal":
-    "Reinforces the cost-pressure picture in the market indicators; treat as confirming, not new, evidence.",
-};
+// Per-row operational-read derivation. Each row gets a sentence shaped
+// by keywords in the actual action text, so rows in the same category
+// don't all carry an identical generic line. Falls back to a per-
+// category default only when no keyword matches.
+function deriveOperationalRead(t: string, category: FuelActionCategory): string {
+  if (/\b(refinery|refining|crack spread)\b/.test(t))
+    return "Refinery-side move: regional crack spreads tighten and downstream pump and bunker pricing usually firms within days.";
+  if (/\b(export ban|import ban|export quota|import quota|embargo)\b/.test(t))
+    return "Trade controls reroute flows; expect tighter spot availability and wider freight differentials on affected grades.";
+  if (/\b(subsidy|subsidies|levy|levies|duty|excise|tax|price control|price cap|price freeze)\b/.test(t))
+    return "Policy reset: review pump-price exposure and contract pass-through clauses before the next billing cycle.";
+  if (/\b(jet fuel|bunker|fuel) hedg/.test(t))
+    return "Hedging signal from buyers; contract pricing on similar grades typically follows the lead within a cycle.";
+  if (/\b(spot purchase|tender|long[- ]term contract|long[- ]term deal|supply (contract|deal|agreement|swap))\b/.test(t))
+    return "Procurement signal: near-term demand pulled forward; watch tender outcomes and freight follow-through.";
+  if (/\b(strategic reserve|\bspr\b|storage|stockpile|reserve) (release|draw|tap|build|expand)/.test(t))
+    return "Reserve action smooths near-term pricing but does not fix the underlying supply tightness.";
+  if (/\b(pipeline|terminal|jetty|berth|loading)\b.{0,30}(bypass|reroute|rerouting|open|close|shut|expand|sabotage|attack)/.test(t)
+      || /\b(alternative route|bypass(?:ing)? hormuz|red sea bypass)/.test(t))
+    return "Logistics rerouting raises bunker and transit cost on dependent fuel flows.";
+  if (/\b(production|output) (cut|reduce|curtail)/.test(t))
+    return "Output discipline tightens balances and supports a firmer crude floor.";
+  if (/\b(production|output) (hike|increase|boost|expand|raise|restart)/.test(t))
+    return "Added barrels ease near-term tightness but rarely move prices on their own without demand confirmation.";
+  if (/\b(supply (tighten|tightens|squeeze)|inventory draw)/.test(t))
+    return "Tightening balances put a floor under prices and reduce buyer flexibility on the next cycle.";
+  if (/\b(price|prices) (rise|climb|surge|jump|hit|reach|break)/.test(t))
+    return "Reinforces the cost-pressure picture; freight surcharges and bunker invoices follow on the next cycle.";
+  // Per-category fallbacks (different from each other so the table never
+  // shows the same operational read across multiple categories).
+  switch (category) {
+    case "Producer action":
+      return "Supply-side move with read-through to bunker, jet and downstream pricing if the action sustains.";
+    case "Buyer action":
+      return "Buyer behaviour to track; spot and contract pricing on similar grades tends to follow the lead.";
+    case "Government / policy action":
+      return "Policy intervention resets pump-price and surcharge exposure for the next contract cycle.";
+    case "Infrastructure / routing action":
+      return "Keeps Gulf and Red Sea routing diversification a live mitigation theme rather than a future option.";
+    case "Market / supply signal":
+      return "Confirming evidence in the market indicators; treat as supporting context rather than a fresh driver.";
+  }
+}
 
 function fmtDate(iso: string): string {
   try {
@@ -304,22 +344,29 @@ export function buildFuelProducerBuyerActions(opts: {
   if (window.length === 0) return [];
 
   const raw: ProducerBuyerActionRow[] = [];
+  const seen = new Set<string>();
   for (const i of window) {
     const t = haystack(i);
     const category = classifyCategory(t);
     if (!category) continue;
+    const action = i.title.trim().replace(/\.$/, "");
+    const dedupeKey = action.toLowerCase();
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
     raw.push({
       actor: pickActor(i, category),
       category,
-      action: i.title.trim().replace(/\.$/, ""),
-      operationalRead: OPERATIONAL_READ_BY_CATEGORY[category],
+      action,
+      operationalRead: deriveOperationalRead(t, category),
       date: fmtDate(i.occurredAt),
     });
   }
   if (raw.length === 0) return [];
 
   // Group by category in the priority order so the strongest signals
-  // (Producer / Buyer / Government) lead the table.
+  // (Producer / Buyer / Government) lead the table. Cap to 2 rows per
+  // category and 6 rows overall — fewer, better rows beat a long list
+  // padded with generic entries.
   const ORDER: FuelActionCategory[] = [
     "Producer action",
     "Buyer action",
@@ -327,10 +374,16 @@ export function buildFuelProducerBuyerActions(opts: {
     "Infrastructure / routing action",
     "Market / supply signal",
   ];
+  const PER_CATEGORY = 2;
+  const TOTAL_CAP = 6;
   const out: ProducerBuyerActionRow[] = [];
   for (const cat of ORDER) {
-    const items = raw.filter((r) => r.category === cat).slice(0, 4);
-    out.push(...items);
+    const items = raw.filter((r) => r.category === cat).slice(0, PER_CATEGORY);
+    for (const r of items) {
+      if (out.length >= TOTAL_CAP) break;
+      out.push(r);
+    }
+    if (out.length >= TOTAL_CAP) break;
   }
   return out;
 }
@@ -385,7 +438,10 @@ export function buildFuelOperationalRead(opts: {
     .join("; ");
 
   const lead = ordered[0];
-  const driverPara = `The dominant operational themes in this window are ${themeLine}. ${lead.fam.why}`;
+  // Use `opMeaning` here, not `why` — `why` is already used verbatim in
+  // Regional Highlights and we don't want the same sentence in two
+  // adjacent sections.
+  const driverPara = `The dominant operational themes in this window are ${themeLine}. ${lead.fam.opMeaning}`;
 
   const watchLines: string[] = [];
   for (const { fam } of ordered.slice(0, 2)) watchLines.push(fam.watch);

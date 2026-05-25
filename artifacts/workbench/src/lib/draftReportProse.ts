@@ -240,17 +240,26 @@ const FUEL: ReportPack = {
     const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
+  // Situation: standing fuel exposure plus current market posture, not
+  // a one-line headline restatement. Two sentences.
   situation: ({ types, lead }) => {
-    const focus = types ? `Shortage and price signals dominate, with ${types} the recurring threads.` : "Shortage and price signals dominate, with downstream transport and forecourt risk close behind.";
-    const where = lead ? ` ${lead} remains the country to watch.` : "";
-    return `${focus}${where}`;
+    const standing = `Fuel exposure for this cycle sits across three layers: a crude and jet cost floor visible in the Fast Facts, a downstream availability picture shaped by shortages, route pressure and policy moves, and a contract-economics layer where subsidy, levy and surcharge clauses do the actual financial damage.`;
+    const focus = types
+      ? ` ${types.charAt(0).toUpperCase() + types.slice(1)} are the recurring threads this window, which is what makes the read a continuity question rather than a passing price story.`
+      : ` The incident layer is light this window, so the read leans on the market indicators and on standing exposures rather than fresh operational evidence.`;
+    const where = lead ? ` ${lead} is the country carrying the most weight.` : "";
+    return `${standing}${focus}${where}`;
   },
-  whatHappened: ({ types, countries, sev }) => {
-    const lead = types
-      ? `Reporting was shaped by ${types}.`
-      : `Reporting stayed light on classifiable detail.`;
-    const geo = countries ? ` Identifiable activity tracked back to ${countries}.` : "";
-    return `${lead}${geo}${sevTail(sev)}`;
+  // What Happened: concrete pattern from the incident set, tied to the
+  // operational consequence — never a generic "reporting was shaped by"
+  // sentence on its own.
+  whatHappened: ({ types, countries, sev, lead }) => {
+    if (!types) {
+      return `Classifiable fuel reporting was light this cycle, with no single pattern dominating the window.${sevTail(sev)} The market indicators in the Fast Facts carry the bulk of the read; the incident layer adds little new colour, which is itself worth noting.`;
+    }
+    const para1 = `The pattern this cycle was ${types}${lead ? ` concentrated on ${lead}` : ""}${countries && countries !== lead ? `, with secondary reporting from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.${sevTail(sev)}`;
+    const para2 = `The operational read of that pattern is in the Operational Read section below; the table that follows lists the underlying records so each line in this section is traceable to source.`;
+    return `${para1}\n\n${para2}`;
   },
   // What Matters: two analytical paragraphs connecting prices, jet movement,
   // shortage / route pressure and business continuity.

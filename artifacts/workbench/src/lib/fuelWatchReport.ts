@@ -158,29 +158,35 @@ export function buildFuelWatchReportData(
   //   1. an explicit price card whose label/benchmark mentions jet
   //   2. the jetFuel snapshot's latestValue
   //   3. the latest trajectory point
+  // The card label is always the bare "Jet fuel" string so the Fast
+  // Facts grid reads "JET FUEL" uppercased; the benchmark moves into
+  // the `note` subline ("US Gulf Coast kerosene-type").
   let jetFuel: FuelDataCard | null = findCard(prices, JET_RE);
+  if (jetFuel) jetFuel = normaliseJetCard(jetFuel);
   if (!jetFuel && parsed.jetFuel?.latestValue !== undefined) {
     const s = parsed.jetFuel;
     const latest = s.latestValue as number;
-    const label = s.benchmark ? `Jet fuel — ${s.benchmark}` : "Jet fuel";
-    const built: FuelDataCard = { label, value: latest };
+    const built: FuelDataCard = { label: "Jet fuel", value: latest };
     if (s.unit) built.unit = s.unit;
     if (s.change) built.change = s.change;
     if (s.asOf) built.asOf = s.asOf;
     if (s.source) built.source = s.source;
+    const note = stripBenchmarkSuffix(s.benchmark);
+    if (note) built.note = note;
     jetFuel = built;
   }
   if (!jetFuel && parsed.jetFuelTrajectory.points.length >= 1) {
     const last = parsed.jetFuelTrajectory.points[parsed.jetFuelTrajectory.points.length - 1];
-    const benchmark = parsed.jetFuelTrajectory.benchmark;
     const built: FuelDataCard = {
-      label: benchmark ? `Jet fuel — ${benchmark}` : "Jet fuel",
+      label: "Jet fuel",
       value: last.value,
       asOf: last.date,
     };
     const unit = last.unit ?? parsed.jetFuelTrajectory.unit;
     if (unit) built.unit = unit;
     if (parsed.jetFuelTrajectory.source) built.source = parsed.jetFuelTrajectory.source;
+    const note = stripBenchmarkSuffix(parsed.jetFuelTrajectory.benchmark);
+    if (note) built.note = note;
     jetFuel = built;
   }
 
@@ -385,6 +391,51 @@ export function buildFuelMarketRead(opts: {
  * FuelDataCard renders identically in both. Numbers pick decimals
  * based on magnitude; pre-formatted strings pass through.
  */
+/** Trim a redundant trailing " jet fuel" off a benchmark string so it
+ *  reads cleanly as a subline (e.g. "US Gulf Coast kerosene-type jet
+ *  fuel" → "US Gulf Coast kerosene-type"). */
+function stripBenchmarkSuffix(b: string | undefined | null): string {
+  if (!b) return "";
+  return b.replace(/\s*jet\s*fuel\s*$/i, "").trim();
+}
+
+/** Apply the same label/note normalisation to a price-list card that
+ *  already mentions jet fuel, so explicit cards stay consistent with
+ *  the snapshot- and trajectory-derived branches. */
+function normaliseJetCard(c: FuelDataCard): FuelDataCard {
+  const out: FuelDataCard = { ...c, label: "Jet fuel" };
+  if (!out.note) {
+    // Prefer an explicit benchmark stripped of "jet fuel"; fall back to
+    // anything that came after "Jet fuel — " in the original label.
+    const fromBenchmark = stripBenchmarkSuffix(
+      (c as FuelDataCard & { benchmark?: string }).benchmark,
+    );
+    if (fromBenchmark) {
+      out.note = fromBenchmark;
+    } else {
+      const m = c.label.match(/^jet fuel\s*[—–-]\s*(.+)$/i);
+      if (m) out.note = stripBenchmarkSuffix(m[1]);
+    }
+  }
+  return out;
+}
+
+/** Format an ISO-style date ("YYYY-MM-DD") as "15 May 2026". Returns
+ *  the input unchanged when it isn't a recognisable ISO date. */
+export function formatAsOfDate(raw: string): string {
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return raw;
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return raw;
+  return `${d} ${months[mo - 1]} ${y}`;
+}
+
 export function formatFuelCardValue(value: number | string, unit?: string): string {
   if (typeof value === "string") return unit ? `${value} ${unit}` : value;
   const formatted = Number.isInteger(value)
@@ -407,7 +458,7 @@ export function toRenderableCard(c: FuelDataCard): RenderableFuelCard {
   if (c.change) noteParts.push(c.change);
   if (c.note) noteParts.push(c.note);
   if (noteParts.length) out.note = noteParts.join(" · ");
-  if (c.asOf) out.asOf = c.asOf;
+  if (c.asOf) out.asOf = formatAsOfDate(c.asOf);
   if (c.source) out.source = c.source;
   return out;
 }
@@ -418,7 +469,7 @@ export const FUEL_MARKET_DATA_SAMPLE = {
     prices: [
       { label: "Brent crude", value: 109.26, unit: "USD/bbl", change: "+7.9% 7d", asOf: "2026-05-15", source: "Manual" },
       { label: "WTI crude", value: 101.02, unit: "USD/bbl", change: "+10.5% 7d", asOf: "2026-05-15", source: "Manual" },
-      { label: "Jet fuel", benchmark: "US Gulf Coast kerosene-type jet fuel", value: 4.152, unit: "USD/gal", change: "+2.5% 7d", asOf: "2026-05-15", source: "EIA / FRED" },
+      { label: "Jet fuel", benchmark: "US Gulf Coast kerosene-type", value: 4.152, unit: "USD/gal", change: "+2.5% 7d", asOf: "2026-05-15", source: "EIA / FRED" },
     ],
     supply: [
       { label: "Fuel shortages / rationing", value: 5, unit: "events", note: "reporting window" },

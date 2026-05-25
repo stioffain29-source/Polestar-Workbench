@@ -309,11 +309,31 @@ function drawRelatedIncidents(
 ) {
   if (windowIncidents.length === 0) return;
   const { max } = relatedIncidentsLimit(topic);
-  const sorted = [...windowIncidents].sort(
+  // Prioritise operationally meaningful rows. When the classifier
+  // returns its weakest bucket (e.g. "Other fuel incident") we push
+  // those rows to the bottom; if we have at least a handful of
+  // operationally classified rows, the weakest bucket is dropped
+  // entirely so the table does not drag the report down.
+  function weakBucket(label: string): boolean {
+    return /^other\s.+incident$/i.test(label) || label === "Unclassified maritime record";
+  }
+  const annotated = windowIncidents.map((i) => ({
+    i,
+    weak: weakBucket(classifyIncidentType(i)),
+  }));
+  const strong = annotated.filter((r) => !r.weak).map((r) => r.i);
+  const weak = annotated.filter((r) => r.weak).map((r) => r.i);
+  const STRONG_FLOOR = 4;
+  const ordered = strong.length >= STRONG_FLOOR ? strong : [...strong, ...weak];
+  const sorted = [...ordered].sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
-  const rows = sorted.slice(0, max);
+  // For fuel specifically the table felt padded at the full limit;
+  // hold it to a tighter cap when we have strong-enough rows.
+  const effectiveMax = topic === "fuel" ? Math.min(max, 8) : max;
+  const rows = sorted.slice(0, effectiveMax);
   const truncated = sorted.length - rows.length;
+  if (rows.length === 0) return;
 
   drawSectionHeading(ctx, "Related Incidents");
 
