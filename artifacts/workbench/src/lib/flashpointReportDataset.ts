@@ -808,9 +808,8 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
     .slice(0, 6);
   if (future.length > 0) {
     return future.map((r) => {
-      const dateStr = format(r.date, "dd MMM");
-      const where = r.country ? `, ${r.country}` : "";
-      return `- ${dateStr}${where} — ${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`;
+      const where = r.country ? `${r.country} — ` : "";
+      return `- ${where}${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`;
     }).join("\n");
   }
   const bullets: string[] = [
@@ -882,15 +881,15 @@ function buildPolestarView(ctx: AutoCtx): string {
   if (sectoral > 0) mobBuckets.push(`sectoral chamber and union action (${sectoral})`);
   if (student > 0) mobBuckets.push(`student and campus mobilisation (${student})`);
   const mobLine = mobBuckets.length > 0
-    ? `Mobilisation capacity across ${where} is non-trivial this cycle, drawing on ${joinList(mobBuckets)}. That mix gives the political opposition multiple independent vectors for street action and is harder to contain than a single-issue protest wave.`
-    : `Mobilisation capacity across ${where} sits below its structural ceiling this cycle. That is a function of timing rather than capacity — the organising infrastructure (parties, unions, student bodies, sectoral chambers) remains intact and can be reactivated by a single political trigger inside a week.`;
+    ? `Mobilisation capacity across ${where} is non-trivial this cycle, drawing on ${joinList(mobBuckets)} — multiple independent vectors, harder to contain than a single-issue wave.`
+    : `Mobilisation capacity across ${where} sits below its ceiling this cycle, but the organising infrastructure remains intact and can reactivate on a single political trigger inside a week.`;
   parts.push(mobLine);
 
   // 2. Speed of escalation judgement.
   const hasEnforcement = ctx.unrestRows.some((r) => /\b(curfew|tear[- ]?gas|baton|water cannon|arrest|detention|section\s*144|crackdown|lockdown)\b/i.test(`${r.title} ${r.summary ?? ""}`));
   const escLine = hasEnforcement
-    ? `Speed of escalation should be assumed to be fast. Visible enforcement (Section 144 orders, tear-gas dispersal, mass detentions, curfew impositions) is already on the file, which historically compresses the runway from a peaceful announced rally to a kinetic street incident from days to hours. Operators should not assume a graduated build-up.`
-    : `Speed of escalation looks measured for now, but the structural runway is short. In the covered geographies, the gap between a peaceful announced rally and a kinetic street incident has historically been 24-72 hours once a political trigger lands. Plan against that compressed window rather than the current calm.`;
+    ? `Speed of escalation should be assumed fast: visible enforcement is already on file, compressing the runway from announced rally to kinetic incident from days to hours.`
+    : `Speed of escalation looks measured, but the runway is short — historically 24-72 hours from a peaceful announced rally to a kinetic incident once a political trigger lands.`;
   parts.push(escLine);
 
   // 3. Likely protest geography.
@@ -898,13 +897,13 @@ function buildPolestarView(ctx: AutoCtx): string {
   if (lead) geoBits.push(`${lead.label} (${lead.value} record${lead.value === 1 ? "" : "s"}) sets the tempo`);
   if (second) geoBits.push(`${second.label} (${second.value}) is the most likely secondary flashpoint`);
   const geoLine = geoBits.length > 0
-    ? `Likely protest geography over the next 7-14 days concentrates where the current file is heaviest: ${joinList(geoBits)}. Within those countries, expect activity to cluster around the standard friction points — court complexes, party headquarters, ministry quarters, university precincts and main commercial arteries — rather than residential or suburban locations.`
-    : `Likely protest geography is broadly distributed this cycle with no single country dominating, which historically signals a diffuse political mood. That can reconcentrate quickly: a named opposition call or a single policy trigger tends to pull activity back to one or two capitals within days.`;
+    ? `Likely protest geography over the next 7-14 days: ${joinList(geoBits)}. Expect clustering around court complexes, party HQs, ministry quarters, campuses and main commercial arteries.`
+    : `Likely protest geography is diffuse this cycle, but a named opposition call or single policy trigger tends to reconcentrate activity into one or two capitals within days.`;
   parts.push(geoLine);
 
   // 4. Business disruption risk judgement.
   parts.push(
-    `Business disruption risk through the next window is judged moderate-to-elevated. Most exposure sits in three forms: short-notice transport and last-mile disruption on protest days, branch and public-facing site closures driven by Section 144 / curfew orders rather than direct targeting, and supply-chain friction from sectoral walkouts running ahead of street action. The single largest residual risk is a triggering event — adverse court ruling, fuel-price decision, security-force fatality — converting the current cycle from contained protests into sustained unrest. That is a low-probability, high-impact case and is what standing readiness on staff movement, site closure and crisis-comms is sized for.`,
+    `Business disruption risk over the next window is moderate-to-elevated: short-notice transport disruption on protest days, public-facing site closures driven by Section 144 / curfew orders, and supply-chain friction from sectoral walkouts. The residual tail is a triggering event — adverse ruling, fuel-price decision, security-force fatality — flipping the cycle into sustained unrest.`,
   );
 
   return parts.join("\n\n");
