@@ -1,0 +1,112 @@
+Show proof that the Fuel Watch overhaul is actually working.
+
+Do not give me another implementation summary.
+
+I need evidence from the running app and codebase.
+
+Provide proof for each item below:
+
+1. Canonical builder proof
+Show the file path and function name for the single Fuel Watch report builder.
+
+Confirm:
+- preview uses this builder
+- PDF export uses this builder
+- editor/debug panel uses this builder
+- no renderer separately parses jet fuel or Fast Facts
+
+2. Obsolete files proof
+Confirm whether these files are deleted or no longer imported:
+- fuelWatchMarketData.ts
+- fuelHardNumbers.ts
+
+Show the search result proving there are no remaining imports.
+
+3. Fast Facts proof
+Show the exact code path where Fast Facts is populated from marketData, not incident-count fallback.
+
+Confirm there is no fallback that fills Fast Facts with only:
+- shortages
+- levy moves
+- chokepoint pressure
+
+4. Required market data validation proof
+Show the validation rules proving Fuel Watch requires:
+- Brent or WTI
+- jet fuel
+- at least one supply or policy indicator
+
+Show the exact validation error text if these are missing.
+
+5. Export blocking proof
+Show the code path where PDF export is blocked when required market data is missing.
+
+Confirm:
+- normal export is blocked
+- “Export with missing market data” is the only override path
+- override is explicit, not automatic
+
+6. Editor panel proof
+Show the running editor or code proving there are form fields for:
+- Brent
+- WTI
+- jet fuel benchmark
+- jet fuel value
+- jet fuel source
+- jet fuel as-of date
+- jet fuel trajectory points
+
+JSON import can exist, but prove the normal path is form-based.
+
+7. Persistence proof
+Use the Fuel Market Data panel.
+
+Enter or load sample data with:
+- Brent
+- WTI
+- jet fuel
+- at least two jet fuel trajectory points
+
+Then:
+- save the report
+- reload the page
+- show that the data is still present after reload
+
+Do not claim persistence works unless the data survives reload.
+
+8. Preview proof
+After reload, show the Fuel Watch preview displaying:
+- Fast Facts
+- Brent
+- WTI
+- jet fuel
+- Jet Fuel Price Trajectory chart
+
+It must not show:
+- “Fuel price indicators are not available”
+- “Jet fuel data has not been loaded”
+- “Jet fuel trajectory data is not available”
+
+9. PDF proof
+Export the PDF from the same saved report.
+
+Show that the PDF contains:
+- Fast Facts
+- Brent
+- WTI
+- jet fuel
+- Jet Fuel Price Trajectory chart
+
+Preview and PDF must match.
+
+10. Typecheck proof
+Run:
+
+pnpm --filter @workspace/workbench run typecheck
+
+Show the result.
+
+Acceptance:
+Do not mark this complete unless all proof items above are shown.
+If any item fails, say exactly where the chain breaks:
+editor → PATCH payload → server schema → DB → GET response → builder input → builder output → preview → PDF.
