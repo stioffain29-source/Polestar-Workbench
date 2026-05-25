@@ -137,7 +137,7 @@ function classifyUnrest(t: string): string {
   if (/\b(pti|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144)\b/.test(t)) return "Protest";
   if (/\b(university|college|campus|student union|student federation|students? (rally|march|protest|gather|stage|boycott))\b/.test(t)) return "Student activism";
   if (/\b(sit[- ]?in|encampment|occupation of)\b/.test(t)) return "Sit-in";
-  if (/\b(chemist|pharmacist|doctor|nurse|teacher|lawyer|trader|hauliers?|transporters?)s? (strike|walkout|stoppage|shutdown|boycott)|sector(al)? (strike|shutdown|walkout)|shutter[- ]down\b/.test(t)) return "Strike / labour action";
+  if (/\b(chemist|pharmacist|doctor|nurse|teacher|lawyer|trader|hauliers?|transporters?)s? (strike|walkout|stoppage|shutdown|boycott|protest|demonstrat|rally|march|sit[- ]?in)|sector(al)? (strike|shutdown|walkout|protest|demonstration)|shutter[- ]down|(chemists?|pharmacists?|lawyers?|traders?|transporters?|hauliers?) (associations?|councils?|federations?|unions?|chambers?) (call|announce|stage|hold|begin|launch)\b/.test(t)) return "Strike / labour action";
   if (/\b(strike|labour action|labor action|industrial action|walkout|stoppage|shutdown call)\b/.test(t)) return "Strike / labour action";
   if (/\b(protest|demonstration|rally|march)\b/.test(t)) return "Protest";
   if (/\b(curfew|state of emergency|martial law|lockdown imposed)\b/.test(t)) return "Curfew / emergency order";
