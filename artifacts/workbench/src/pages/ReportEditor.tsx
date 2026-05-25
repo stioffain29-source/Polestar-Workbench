@@ -110,6 +110,31 @@ export default function ReportEditor() {
   const downloadPdf = async (opts?: { forceAllowMissing?: boolean }) => {
     setExporting(true);
     setExportError(null);
+    // System-error guard: if the form clearly has values but the builder
+    // we're about to hand to the exporter does not see them, the wiring
+    // is broken — block export instead of silently producing a bad PDF.
+    if (form.topic === "fuel" && liveFuelData) {
+      const md = liveFuelData.marketData;
+      const formHasNow = {
+        brent: fuelForm.brent.value.trim() !== "",
+        wti: fuelForm.wti.value.trim() !== "",
+        jet: fuelForm.jet.value.trim() !== "",
+      };
+      const builderHas = {
+        brent: md.brent != null,
+        wti: md.wti != null,
+        jet: md.jetFuel != null,
+      };
+      if (
+        (formHasNow.brent && !builderHas.brent) ||
+        (formHasNow.wti && !builderHas.wti) ||
+        (formHasNow.jet && !builderHas.jet)
+      ) {
+        setExportError("Fuel market form values are not reaching the report builder.");
+        setExporting(false);
+        return;
+      }
+    }
     try {
       const reportData = {
         title: form.title,
@@ -302,7 +327,15 @@ export default function ReportEditor() {
           return;
         }
         setFuelFormErrors([]);
-        payload.hardNumbers = result.payload;
+        // Persist exactly what the preview shows: merge form-controlled
+        // sections with any non-form sections (sample supply/policy/
+        // routes, jetFuel snapshot, etc.) carried in hardNumbersEdited
+        // or the prior saved payload. This is the same merge applyFuelForm
+        // uses, so save === preview by construction.
+        const prior =
+          (hardNumbersEdited as Record<string, unknown> | null | undefined) ??
+          (report?.hardNumbers as Record<string, unknown> | null | undefined);
+        payload.hardNumbers = mergeFuelHardNumbers(result.payload, prior);
       }
     }
     update.mutate({ id, data: payload as never }, {
@@ -322,14 +355,22 @@ export default function ReportEditor() {
 
   // Form-driven rebuild — every field edit re-assembles the canonical
   // hardNumbers payload and pushes it to the preview via hardNumbersEdited.
+  // Non-form sections (fastFacts.supply/policy/routes and any other
+  // top-level keys we don't surface in the form) are preserved from the
+  // current live payload so that editing a single Brent field after
+  // Load Sample doesn't silently drop the rest of the sample.
   const applyFuelForm = (next: FuelMarketFormState) => {
     setFuelForm(next);
     setAllowMissingExport(false);
     setExportError(null);
     const built = buildHardNumbersFromForm(next);
     setFuelFormErrors(built.errors);
-    setHardNumbersEdited(built.payload);
-    setHardNumbersText(built.payload ? JSON.stringify(built.payload, null, 2) : "");
+    const prior =
+      (hardNumbersEdited as Record<string, unknown> | null | undefined) ??
+      (report?.hardNumbers as Record<string, unknown> | null | undefined);
+    const merged = mergeFuelHardNumbers(built.payload, prior);
+    setHardNumbersEdited(merged);
+    setHardNumbersText(merged ? JSON.stringify(merged, null, 2) : "");
   };
 
   const setFuelCardField = (
@@ -379,6 +420,18 @@ export default function ReportEditor() {
     );
     setFuelForm(fuelMarketFormFromData(seeded));
     setFuelFormErrors([]);
+  };
+
+  // Form-state truth for the debug panel and the system-error guard.
+  // We can't trust placeholder text — only `.value.trim()` counts as
+  // "the user actually entered something".
+  const formHas = {
+    brent: fuelForm.brent.value.trim() !== "",
+    wti: fuelForm.wti.value.trim() !== "",
+    jet: fuelForm.jet.value.trim() !== "",
+    trajectoryLines: fuelForm.trajectoryText
+      .split(/\r?\n/)
+      .filter((l) => l.trim() !== "").length,
   };
 
   // Live canonical view of the report — drives the editor banner and the
@@ -521,27 +574,27 @@ export default function ReportEditor() {
                   <Field label="Benchmark">
                     <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.benchmark}
                       onChange={(e) => setFuelJetField("benchmark", e.target.value)}
-                      placeholder="US Gulf Coast kerosene-type jet fuel" />
+                      placeholder="e.g. US Gulf Coast kerosene-type jet fuel" />
                   </Field>
                   <Field label="Source">
                     <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.source}
                       onChange={(e) => setFuelJetField("source", e.target.value)}
-                      placeholder="EIA / FRED" />
+                      placeholder="e.g. EIA / FRED" />
                   </Field>
                   <Field label="Value">
                     <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.value}
                       onChange={(e) => setFuelJetField("value", e.target.value)}
-                      placeholder="4.152" />
+                      placeholder="e.g. 4.152" />
                   </Field>
                   <Field label="Unit">
                     <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.unit}
                       onChange={(e) => setFuelJetField("unit", e.target.value)}
-                      placeholder="USD/gal" />
+                      placeholder="e.g. USD/gal" />
                   </Field>
                   <Field label="Change">
                     <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.change}
                       onChange={(e) => setFuelJetField("change", e.target.value)}
-                      placeholder="+2.5% 7d" />
+                      placeholder="e.g. +2.5% 7d" />
                   </Field>
                   <Field label="As of">
                     <Input type="date" className="rounded-sm h-8 text-xs" value={fuelForm.jet.asOf}
@@ -601,6 +654,66 @@ export default function ReportEditor() {
                 </div>
               )}
 
+              {/* Per-field optional-data warnings. These do not block
+                  export — they help the author tighten provenance. */}
+              {(() => {
+                const md = liveFuelData?.marketData;
+                const hints: string[] = [];
+                const check = (prefix: string, card: { asOf?: string; source?: string; unit?: string } | null) => {
+                  if (!card) return;
+                  if (!card.asOf) hints.push(`${prefix} as-of date missing`);
+                  if (!card.source) hints.push(`${prefix} source missing`);
+                  if (!card.unit) hints.push(`${prefix} unit missing`);
+                };
+                check("Brent", md?.brent ?? null);
+                check("WTI", md?.wti ?? null);
+                check("Jet fuel", md?.jetFuel ?? null);
+                if (md && md.jetFuel && md.jetFuelTrajectory.length < 2) {
+                  hints.push("Jet fuel trajectory needs at least two dated points");
+                }
+                if (hints.length === 0) return null;
+                return (
+                  <div
+                    className="text-[11px] p-2 rounded-sm border"
+                    style={{ background: "#f3f4fa", borderColor: "#465bff", color: "#0b0a3d", fontFamily: "Roboto, sans-serif" }}
+                  >
+                    <div className="font-bold mb-1">Recommended provenance fields</div>
+                    <ul className="list-disc list-inside leading-snug">
+                      {hints.map((h, i) => <li key={i}>{h}</li>)}
+                    </ul>
+                  </div>
+                );
+              })()}
+
+              {/* Editor-only debug panel. Hidden in PDF (no-print) and
+                  inside `.no-print` ancestors. Shows the live form ↔
+                  builder agreement so an author can see at a glance
+                  whether their edits are reaching the report builder. */}
+              {liveFuelData && (() => {
+                const md = liveFuelData.marketData;
+                const hardNumbersSource =
+                  hardNumbersEdited !== undefined ? "live form"
+                  : report?.hardNumbers ? "saved DB"
+                  : "empty";
+                const yn = (b: boolean) => (b ? "yes" : "no");
+                return (
+                  <div
+                    className="text-[11px] p-2 rounded-sm border font-mono"
+                    style={{ background: "#f7f7fa", borderColor: "#e2e2e2", color: "#363636" }}
+                  >
+                    <div className="uppercase tracking-widest text-[10px] font-bold mb-1" style={{ fontFamily: "Roboto, sans-serif", color: "#465bff" }}>
+                      Fuel debug
+                    </div>
+                    <div>hardNumbers source: <b>{hardNumbersSource}</b></div>
+                    <div>form Brent value: <b>{fuelForm.brent.value || "—"}</b> · builder Brent found: <b>{yn(md.brent != null)}</b></div>
+                    <div>form WTI value: <b>{fuelForm.wti.value || "—"}</b> · builder WTI found: <b>{yn(md.wti != null)}</b></div>
+                    <div>form jet fuel value: <b>{fuelForm.jet.value || "—"}</b> · builder jet fuel found: <b>{yn(md.jetFuel != null)}</b></div>
+                    <div>trajectory lines in form: <b>{formHas.trajectoryLines}</b> · trajectory points in builder: <b>{md.jetFuelTrajectory.length}</b></div>
+                    <div>gate hasRequiredFuelWatchData: <b>{yn(liveFuelData.validation.hasRequiredFuelWatchData)}</b></div>
+                  </div>
+                );
+              })()}
+
               {/* Export gate. The exporter throws when required data is
                   missing; this banner gives the author the explicit
                   "Export with missing market data" override. */}
@@ -656,15 +769,15 @@ function FuelMarketCardFields({
       <div className="grid grid-cols-2 gap-2">
         <Field label="Value">
           <Input className="rounded-sm h-8 text-xs" value={form.value}
-            onChange={(e) => onChange("value", e.target.value)} placeholder="109.26" />
+            onChange={(e) => onChange("value", e.target.value)} placeholder="e.g. 109.26" />
         </Field>
         <Field label="Unit">
           <Input className="rounded-sm h-8 text-xs" value={form.unit}
-            onChange={(e) => onChange("unit", e.target.value)} placeholder="USD/bbl" />
+            onChange={(e) => onChange("unit", e.target.value)} placeholder="e.g. USD/bbl" />
         </Field>
         <Field label="Change">
           <Input className="rounded-sm h-8 text-xs" value={form.change}
-            onChange={(e) => onChange("change", e.target.value)} placeholder="+7.9% 7d" />
+            onChange={(e) => onChange("change", e.target.value)} placeholder="e.g. +7.9% 7d" />
         </Field>
         <Field label="As of">
           <Input type="date" className="rounded-sm h-8 text-xs" value={form.asOf}
@@ -672,11 +785,47 @@ function FuelMarketCardFields({
         </Field>
         <Field label="Source">
           <Input className="rounded-sm h-8 text-xs" value={form.source}
-            onChange={(e) => onChange("source", e.target.value)} placeholder="Manual" />
+            onChange={(e) => onChange("source", e.target.value)} placeholder="e.g. Manual" />
         </Field>
       </div>
     </div>
   );
+}
+
+/**
+ * Merge a form-rebuilt fuel hardNumbers payload with the prior payload so
+ * that non-form sections (fastFacts.supply / policy / routes, jetFuel
+ * snapshot, and any top-level extras) are preserved across form edits.
+ * Form-controlled keys (fastFacts.prices, jetFuelTrajectory) always come
+ * from `built` so that clearing a field clears it in the persisted state.
+ */
+function mergeFuelHardNumbers(
+  built: Record<string, unknown> | null,
+  prior: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!prior || typeof prior !== "object") return built;
+  const out: Record<string, unknown> = { ...prior };
+  const builtFastFacts = (built?.fastFacts as Record<string, unknown> | undefined) ?? undefined;
+  const priorFastFacts = (prior.fastFacts as Record<string, unknown> | undefined) ?? undefined;
+  if (priorFastFacts || builtFastFacts) {
+    const mergedFastFacts: Record<string, unknown> = { ...(priorFastFacts ?? {}) };
+    // Form owns `prices`; clearing the form clears the field.
+    if (builtFastFacts && "prices" in builtFastFacts) {
+      mergedFastFacts.prices = builtFastFacts.prices;
+    } else if (built === null) {
+      delete mergedFastFacts.prices;
+    }
+    out.fastFacts = mergedFastFacts;
+  }
+  // Form owns `jetFuelTrajectory`.
+  if (built && "jetFuelTrajectory" in built) {
+    out.jetFuelTrajectory = built.jetFuelTrajectory;
+  } else if (built === null) {
+    delete out.jetFuelTrajectory;
+  }
+  // If nothing meaningful remains, collapse to null.
+  if (Object.keys(out).length === 0) return null;
+  return out;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

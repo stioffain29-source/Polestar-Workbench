@@ -1,0 +1,163 @@
+Fuel Watch market data panel is still not working correctly.
+
+The screenshot proves the form fields and the preview are not connected properly.
+
+Current visible problem:
+- Brent value is entered: 109.26
+- Brent unit is entered: USD/bbl
+- Brent change is entered: +7.9% 7d
+- Brent source is entered: Manual
+- But the preview still says:
+  “Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.”
+  “Missing: Brent crude price, WTI crude price, Jet fuel indicator.”
+
+This is wrong.
+
+The form values must feed the same FuelWatchReportData builder used by preview and PDF.
+
+Fix this properly.
+
+1. Form state must update the preview
+
+When the user types Brent, WTI or Jet fuel values into the Fuel Market Data form, the preview must update immediately or after a clear Apply/Validate button.
+
+Do not require hidden JSON editing.
+Do not require page reload.
+Do not allow the preview to keep reading stale persisted data while the form shows new values.
+
+Required behaviour:
+- Enter Brent value/unit/source/change → Brent appears in Fast Facts or validation changes.
+- Enter WTI value/unit/source/change → WTI appears in Fast Facts or validation changes.
+- Enter Jet fuel value/unit/source/change/benchmark → Jet fuel appears in Fast Facts or validation changes.
+- Enter at least two trajectory points → Jet Fuel Price Trajectory renders.
+
+2. Validation must be field-specific
+
+Do not say “Brent crude price missing” when the Brent value is visibly entered.
+
+If the value is present but another required field is missing, say exactly that.
+
+Example:
+- “Brent as-of date missing”
+not:
+- “Brent crude price missing”
+
+Required validation logic:
+- Brent is present if label/type is Brent and numeric value exists.
+- WTI is present if label/type is WTI and numeric value exists.
+- Jet fuel is present if benchmark/type is jet fuel and numeric value exists.
+- As-of date, source and unit are strongly recommended, but should have their own warnings.
+
+Do not make the report claim the price is missing when only the date is missing.
+
+3. Date fields need usable defaults
+
+The as-of date fields currently show empty placeholder text.
+
+When the user loads sample data, dates must populate.
+When the user enters a report date, default as-of date can use the report issue date unless manually changed.
+
+Required:
+- Load sample must fill Brent as-of date.
+- Load sample must fill WTI as-of date.
+- Load sample must fill Jet fuel as-of date.
+- Dates must persist after save and reload.
+
+4. Load sample must prove the full chain
+
+The Load sample button must populate:
+- Brent crude
+- WTI crude
+- Jet fuel benchmark
+- Jet fuel value
+- Jet fuel unit
+- Jet fuel source
+- Jet fuel as-of date
+- at least five trajectory points
+
+After clicking Load sample:
+- preview should immediately show Brent, WTI and Jet fuel in Fast Facts
+- missing-data warning should disappear
+- Jet Fuel Price Trajectory chart should render
+
+If Load sample only fills the form but not the preview, it is not working.
+
+5. Add an explicit Apply to Preview button if needed
+
+If live updating is difficult, add a clear button:
+
+Apply market data to preview
+
+This button should:
+- build hardNumbers from the form fields
+- run buildFuelWatchReportData
+- update preview state
+- show validation result
+- not require saving to DB first
+
+Then Save should persist exactly the same object.
+
+6. Save must persist the same object used by preview
+
+No separate transformations.
+
+The object used for preview must be the object sent in PATCH.
+
+After Save:
+- GET the report again
+- rebuild FuelWatchReportData from the fetched hardNumbers
+- confirm the preview still shows the same data
+
+7. Debug panel must show real state
+
+Add or keep a small editor-only debug panel showing:
+
+- form Brent value
+- form WTI value
+- form jet fuel value
+- builder Brent found: yes/no
+- builder WTI found: yes/no
+- builder jet fuel found: yes/no
+- trajectory points found: number
+- hardNumbers source: live form / saved DB / empty
+
+This debug panel must not appear in PDF.
+
+8. Do not export while the form and builder disagree
+
+If form fields contain Brent/WTI/Jet values but the builder says they are missing, block export and show:
+
+“Fuel market form values are not reaching the report builder.”
+
+That is a system error, not a user data error.
+
+9. Acceptance check
+
+Using the editor:
+
+A. Click Load sample.
+Expected:
+- Brent field populated
+- WTI field populated
+- Jet fuel field populated
+- As-of dates populated
+- Trajectory points populated
+- Preview Fast Facts shows Brent, WTI and Jet fuel
+- Missing-data warning disappears
+- Jet Fuel chart appears
+
+B. Click Save.
+Expected:
+- save succeeds
+- reload page
+- form fields still populated
+- preview still populated
+- no missing-data warning
+
+C. Export PDF.
+Expected:
+- PDF Fast Facts shows Brent, WTI and Jet fuel
+- PDF Jet Fuel Price Trajectory chart renders
+- preview and PDF match
+
+Do not mark complete until the visible editor screenshot shows the preview populated from the form.
