@@ -654,12 +654,12 @@ function buildRegionalCountryRead(opts: {
     const rows = byCountry.get(cr.label) ?? [];
     if (rows.length === 0) continue;
     countryParas.push(
-      `${cr.label} — ${cr.value} record${cr.value === 1 ? "" : "s"} this cycle, driven by ${driverFor(rows)}. The likely form of mobilisation is ${formFor(rows)}; the principal disruption loci are ${lociFor(rows)}. Business users with on-the-ground exposure should keep staff-movement and venue-access plans on a live footing and treat any opposition political-calendar event in the next 7-14 days as a potential accelerant.`,
+      `${cr.label} — ${cr.value} record${cr.value === 1 ? "" : "s"}, driven by ${driverFor(rows)}. Likely form: ${formFor(rows)}; main disruption loci: ${lociFor(rows)}.`,
     );
   }
   const reach = countryRows.length > 3
-    ? `A further ${countryRows.length - 3} countr${countryRows.length - 3 === 1 ? "y" : "ies"} carry single-figure or low-volume entries this cycle; treat them as background signal that can firm up quickly if a regional trigger crosses borders. The full distribution is in the chart below.`
-    : `The chart below shows the full distribution.`;
+    ? `A further ${countryRows.length - 3} countr${countryRows.length - 3 === 1 ? "y" : "ies"} carry low-volume entries; see chart below.`
+    : `Full distribution in chart below.`;
   // Coverage callouts. The product needs to be visibly checking the
   // recurring Asia-Pacific protest environments — Australia, Papua /
   // PNG / Indonesian Papua, Philippines / Manila, Japan / Tokyo,
@@ -687,13 +687,11 @@ function buildRegionalCountryRead(opts: {
     }
   }
   const coverageBits: string[] = [];
-  if (present.length > 0) coverageBits.push(`${joinList(present)} ${present.length === 1 ? "is" : "are"} on file this cycle and should be tracked alongside the primary countries above.`);
-  if (absent.length > 0) coverageBits.push(`No qualifying ${joinList(absent)} protest records were present in this reporting window — checked, not silently omitted. A blank cycle in these geographies is unusual rather than reassuring, and the next political trigger usually repopulates them inside a week.`);
-  const coverage = coverageBits.length > 0 ? `Coverage check (recurring Asia-Pacific protest environments). ${coverageBits.join(" ")}` : "";
-  const watch = `Watch for opposition political-calendar moves, sectoral chamber notifications (chemists, transporters, lawyers, traders), student-body statements, and district-administration orders under Section 144 or equivalent public-order legislation — those move ahead of street-level disruption and provide the cleanest leading signal that the country-level picture is firming.`;
+  if (present.length > 0) coverageBits.push(`${joinList(present)} on file this cycle.`);
+  if (absent.length > 0) coverageBits.push(`${joinList(absent)}: no qualifying records (checked, not omitted).`);
+  const coverage = coverageBits.length > 0 ? `Coverage check — ${coverageBits.join(" ")}` : "";
   const blocks = [headline, ...countryParas, reach];
   if (coverage) blocks.push(coverage);
-  blocks.push(watch);
   return blocks.join("\n\n");
 }
 
@@ -807,34 +805,39 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const all = [...ctx.activismRows, ...ctx.unrestRows];
   const future = extractFutureSignals(all)
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
-    .slice(0, 8);
+    .slice(0, 6);
   if (future.length > 0) {
     return future.map((r) => {
-      const country = r.country ? ` (${r.country})` : "";
-      const dateStr = format(r.date, "dd MMM yyyy");
-      return `- ${dateStr}${country}, ${r.title}: ${operationalMeaningFor(r)}`;
+      const dateStr = format(r.date, "dd MMM");
+      const where = r.country ? `, ${r.country}` : "";
+      return `- ${dateStr}${where} — ${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`;
     }).join("\n");
   }
   const bullets: string[] = [
-    `Fresh opposition or movement protest calls naming a date: brief drivers and customer-facing teams in advance.`,
-    `Union or chamber strike notices (chemists, transporters, lawyers, traders): expect supply-chain friction 24-72 hours ahead.`,
-    `Section 144 / curfew orders or assembly bans: trigger work-from-home protocol and shut public-facing sites in the affected area.`,
-    `Court hearings, bail rulings or detention triggers involving political figures: ready customer-comms templates for same-day closures.`,
-    `Arrests, injuries or fatalities in a protest context: assume retaliatory mobilisation within 48 hours and harden site posture.`,
-    `Student-union or campus mobilisation calls: leading indicator of a sustained cycle, step up journey-management review.`,
-    `Internet-shutdown notices or military-aid-to-civil-power references: the state response has crossed measured policing — plan against a harder next cycle.`,
+    `Opposition or movement protest calls naming a date: road closures and venue-access friction.`,
+    `Union or chamber strike notices: supply-chain friction 24-72 hours ahead.`,
+    `Section 144 / curfew orders or assembly bans: trigger WFH and close public-facing sites.`,
+    `Court hearings or detention rulings on political figures: prep same-day customer-comms.`,
+    `Arrests, injuries or fatalities in a protest context: expect retaliatory mobilisation inside 48 hours.`,
+    `Student-union or campus mobilisation calls: leading indicator of a sustained cycle.`,
   ];
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
+function shortSignalLabel(r: EnrichedIncident): string {
+  const t = (r.title ?? "").trim();
+  if (t.length <= 60) return t;
+  return t.slice(0, 57).trimEnd() + "...";
+}
+
 function operationalMeaningFor(r: EnrichedIncident): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "expect supply-chain friction, sectoral closures and customer-service degradation 24-72 hours ahead of the named date.";
-  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "expect road closures, transport disruption and venue-access friction around the named location; brief drivers and customer-facing teams in advance.";
-  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "an adverse ruling typically converts into same-day rallies and route closures around the court complex; pre-cleared customer-comms templates should be ready.";
-  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate the named route against the company's logistics corridor and pre-position alternative routings.";
-  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger work-from-home protocol, suspend non-essential staff movement and close public-facing sites in the affected geography.";
-  return "treat as a leading indicator and monitor for confirmation in the next 24-48 hours.";
+  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "supply-chain friction and sectoral closures 24-72h ahead.";
+  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "road closures and venue-access friction; brief drivers in advance.";
+  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "adverse ruling triggers same-day rallies near the court complex.";
+  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate against logistics corridor; pre-position alternative routings.";
+  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger WFH and close public-facing sites in the affected area.";
+  return "treat as leading indicator; confirm inside 24-48h.";
 }
 
 function buildWatchNext(ctx: AutoCtx): string {

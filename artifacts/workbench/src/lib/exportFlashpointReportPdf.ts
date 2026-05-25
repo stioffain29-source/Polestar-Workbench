@@ -163,6 +163,16 @@ function drawHorizontalBarChart(
   rows: BarRow[],
   opts: { labelW?: number; barColor?: string; emptyMessage?: string } = {},
 ) {
+  const labelW = opts.labelW ?? 160;
+  const valueW = 34;
+  const rowH = 20;
+  const gap = 5;
+  const axisH = 14;
+  const headingH = 32;
+  const projectedH = rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
+  // Reserve room for heading + chart body together so the heading
+  // cannot strand at the bottom of a page above an orphaned chart.
+  ensureSpace(ctx, headingH + projectedH);
   drawSectionHeading(ctx, heading);
   const { pdf, MX, CW } = ctx;
   if (rows.length === 0) {
@@ -174,15 +184,8 @@ function drawHorizontalBarChart(
     ctx.y += 22;
     return;
   }
-  const labelW = opts.labelW ?? 160;
-  const valueW = 34;
   const trackX = MX + labelW + 6;
   const trackW = CW - labelW - 6 - valueW - 6;
-  const rowH = 20;
-  const gap = 5;
-  const axisH = 14;
-  const totalH = rows.length * (rowH + gap) + axisH;
-  ensureSpace(ctx, totalH + 6);
 
   const rawMax = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
   const { max, step } = niceScale(rawMax);
