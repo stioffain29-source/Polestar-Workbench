@@ -115,13 +115,26 @@ const HARD_KINETIC_RE = /\b(drone[- ]?strike|drone[- ]?attack|quadcopter|missile
 // markers can override the kinetic exclusion.
 const PROTEST_HOOK_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|riot|public disorder|looting|roadblock|crackdown|curfew|state of emergency|martial law|lockdown imposed|tear[- ]?gas|water cannon|rubber bullet|baton charge|student union|activist|opposition (call|rally|march)|union (call|rally|strike)|\bpti\b|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144|assembly ban|detention of (protesters|activists|students)|chemists? (strike|walkout|shutdown)|pharmacists? (strike|walkout|shutdown)|lawyers? (strike|walkout|boycott)|traders? (strike|shutdown)|transporters? (strike|stoppage)|sectoral (strike|shutdown|walkout)|shutter[- ]down)\b/i;
 
+// Tight exception for hard-kinetic records: only allow through when
+// the kinetic action is *directly* connected to a protest or public-
+// order condition (security forces firing on demonstrators, clashes
+// at a rally site, a crackdown that escalates into live fire, a
+// curfew imposed after rioting). A bare "protest" token in the summary
+// is not enough — the linkage must be explicit. A school bombing or a
+// counter-terror raid in a remote district stays out.
+const PROTEST_LINKED_KINETIC_RE = /\b((security forces|police|troops|soldiers|army|paramilitary|rangers) (open(ed)? fire|fired|shot|killed|wounded|injured|tear[- ]?gas(sed|sing)?|baton[- ]?charg(ed|ing)?) (on|at|into) (a |the )?(protest|protesters|demonstration|demonstrators|march|marchers|rally|crowd|mob|sit[- ]?in|picket)|(protesters|demonstrators|marchers|activists|students|workers|rioters) (shot|killed|wounded|injured|fired (on|upon)|gunned down|tear[- ]?gassed|baton[- ]?charged)|(clash(es)?|confrontation|gun ?fire|live (fire|rounds)|live ammunition) (at|during|with) (a |the )?(protest|demonstration|rally|march|sit[- ]?in|crackdown|curfew|riot)|crackdown (on|against) (protests?|demonstrations?|rallies|marchers|activists|students)|curfew (imposed|declared|ordered) (after|following) (protest|demonstration|rally|riot|clash|unrest)|riot police (open(ed)? fire|fired|shot)|(blast|bomb) (at|near|during) (a |the )?(rally|protest|demonstration|march|polling station|election))\b/i;
+
 function isKineticOnly(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  // Hard-kinetic terms (quadcopter, drone strike, bomb blast, militant
-  // attack on civilians, named militant groups) are excluded
-  // unconditionally — a passing "protest" mention in the summary does
-  // not make a school bombing a protest event.
-  if (HARD_KINETIC_RE.test(text)) return true;
+  // Hard-kinetic records (drone strikes, bomb blasts, militant raids,
+  // named militant groups, counter-terror operations) are dropped
+  // unless they carry an *explicit* protest / public-order linkage —
+  // e.g. security forces firing on demonstrators, a crackdown that
+  // escalates into live fire, or a bomb at a rally. A passing
+  // "protest" mention is insufficient; the linkage must be specific.
+  if (HARD_KINETIC_RE.test(text)) {
+    return !PROTEST_LINKED_KINETIC_RE.test(text);
+  }
   if (!KINETIC_ONLY_RE.test(text)) return false;
   return !PROTEST_HOOK_RE.test(text);
 }
