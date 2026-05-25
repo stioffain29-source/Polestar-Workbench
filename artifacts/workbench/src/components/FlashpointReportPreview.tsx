@@ -92,6 +92,32 @@ function Paragraphs({ text }: { text?: string | null }) {
   );
 }
 
+function toBullets(text?: string | null, max = 7): string[] {
+  const s = (text ?? "").trim();
+  if (!s) return [];
+  const marked = s.split(/\r?\n/).map((l) => l.trim())
+    .filter((l) => /^([-*•])\s+/.test(l))
+    .map((l) => l.replace(/^([-*•])\s+/, "").trim())
+    .filter(Boolean);
+  let out: string[];
+  if (marked.length > 0) out = marked;
+  else out = s.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean)
+    .map((p) => p.length <= 220 ? p : (p.match(/^(.+?[.!?])(\s|$)/)?.[1] ?? p.slice(0, 217) + "...").trim());
+  return out.slice(0, max);
+}
+
+function Bullets({ text, max = 7 }: { text?: string | null; max?: number }) {
+  const items = toBullets(text, max);
+  if (items.length === 0) return null;
+  return (
+    <ul className="list-disc pl-5 space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+      {items.map((it, i) => (
+        <li key={i} className="text-[14px] leading-[1.6] font-light">{it}</li>
+      ))}
+    </ul>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="report-section mb-8">
@@ -436,10 +462,10 @@ export default function FlashpointReportPreview({
           <Paragraphs text={pickProse(report.whatMatters, ds.autoWhatMatters)} />
         </Section>
         <Section title="Implications for Business">
-          <Paragraphs text={pickProse(report.implications, ds.autoImplications)} />
+          <Bullets text={pickProse(report.implications, ds.autoImplications)} />
         </Section>
         <Section title="Watch Next">
-          <Paragraphs text={pickProse(report.watchNext, ds.autoWatchNext)} />
+          <Bullets text={pickProse(report.watchNext, ds.autoWatchNext)} max={8} />
         </Section>
         <Section title="Polestar View">
           <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
@@ -447,10 +473,6 @@ export default function FlashpointReportPreview({
 
         <Section title="Related Incidents">
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
-        </Section>
-
-        <Section title="Source Notes / Data Notes">
-          <p className="text-[12px] leading-[1.7]" style={{ color: DUSK }}>{ds.dataNote}</p>
         </Section>
 
         <Section title="Disclaimer">

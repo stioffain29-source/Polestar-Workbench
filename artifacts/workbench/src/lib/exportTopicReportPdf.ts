@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
-  drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
+  drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
@@ -623,8 +623,12 @@ export async function exportTopicReportPdf(
       drawProducerBuyerActionsTable(ctx, fuelData.incidentData.producerBuyerActions);
     }
     renderProseSection("What Matters", data.whatMatters);
-    renderProseSection("Implications for Business", data.implications);
-    renderProseSection("Watch Next", data.watchNext);
+    if (data.implications && data.implications.trim()) {
+      drawBulletSection(ctx, "Implications for Business", data.implications);
+    }
+    if (data.watchNext && data.watchNext.trim()) {
+      drawBulletSection(ctx, "Watch Next", data.watchNext, 8);
+    }
     renderProseSection("Polestar View", data.polestarView);
   } else {
     drawSectionHeading(ctx, "Fast Facts");
@@ -650,37 +654,45 @@ export async function exportTopicReportPdf(
       // Editor text always wins on the four standard analyst sections;
       // auto-prose fills in when the editor leaves a field blank so the
       // cargo report reads at Fuel-Watch substance out of the box.
-      const cargoSections: [string, string][] = [
+      const proseSections: [string, string][] = [
         ["Cargo Security Read", cargoSecurity],
         ["Logistics Hub Read", cargoNode],
         ["Situation", (data.situation ?? "").trim()],
         ["What Happened", (data.whatHappened ?? "").trim()],
         ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],
-        ["Implications for Business", pickProse(data.implications, buildCargoImplications(windowIncidents))],
-        ["Watch Next", pickProse(data.watchNext, buildCargoWatchNext(windowIncidents))],
-        ["Polestar View", pickProse(data.polestarView, buildCargoPolestarView(windowIncidents))],
       ];
-      for (const [label, body] of cargoSections) {
+      for (const [label, body] of proseSections) {
         if (body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
+      const implBody = pickProse(data.implications, buildCargoImplications(windowIncidents));
+      if (implBody && implBody.trim()) drawBulletSection(ctx, "Implications for Business", implBody);
+      const wnBody = pickProse(data.watchNext, buildCargoWatchNext(windowIncidents));
+      if (wnBody && wnBody.trim()) drawBulletSection(ctx, "Watch Next", wnBody, 8);
+      const psBody = pickProse(data.polestarView, buildCargoPolestarView(windowIncidents));
+      if (psBody && psBody.trim()) drawSectionWithProse(ctx, "Polestar View", psBody);
     } else {
-      const sections: [string, string | null | undefined][] = [
+      const proseSections: [string, string | null | undefined][] = [
         ["Situation", data.situation],
         ["What Happened", data.whatHappened],
         ["What Matters", data.whatMatters],
-        ["Implications for Business", data.implications],
-        ["Watch Next", data.watchNext],
-        ["Polestar View", data.polestarView],
       ];
-      for (const [label, body] of sections) {
+      for (const [label, body] of proseSections) {
         if (body && body.trim()) drawSectionWithProse(ctx, label, body);
+      }
+      if (data.implications && data.implications.trim()) {
+        drawBulletSection(ctx, "Implications for Business", data.implications);
+      }
+      if (data.watchNext && data.watchNext.trim()) {
+        drawBulletSection(ctx, "Watch Next", data.watchNext, 8);
+      }
+      if (data.polestarView && data.polestarView.trim()) {
+        drawSectionWithProse(ctx, "Polestar View", data.polestarView);
       }
     }
   }
 
   drawRelatedIncidents(ctx, windowIncidents, data.topic, topicLabels);
 
-  drawSourceNotes(ctx);
   drawDisclaimer(ctx);
 
   drawFooters(ctx.pdf);

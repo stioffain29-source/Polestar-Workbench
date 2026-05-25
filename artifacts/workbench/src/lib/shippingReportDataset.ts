@@ -674,46 +674,55 @@ function buildShippingWhatMatters(ctx: ShippingAutoCtx): string {
 
 function buildShippingImplications(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
-  const parts: string[] = [];
-  parts.push(
-    `Operators with route exposure through ${cp ? cp.name : "the affected corridors"} should be running a live review of vessel scheduling, port-call sequencing and bunker planning against the latest advisory traffic. War-risk and P&I premium adjustments tend to land one to two cycles after the operational signal firms, so the time to size insurance exposure is now rather than after the first underwriting notice.`,
-  );
-  if (ctx.vesselHostile.length > 0 || ctx.piracyRows.length > 0) {
-    parts.push(
-      `Crew-change locations should be re-examined for any voyage transiting the affected lanes. The cleanest mitigation is a shift to a safer port of crew change, paired with naval-escort or convoy options where advisory partners support them. Cargo owners should expect higher demurrage and schedule-reliability variance on rerouted strings, and should be writing in flexibility clauses on near-term lifting contracts.`,
+  const where = cp ? cp.name : "the affected corridors";
+  const bullets: string[] = [
+    `Run a live review of vessel scheduling, port-call sequencing and bunker planning against the latest advisories for ${where}.`,
+    `Size war-risk and P&I exposure now — premium adjustments typically land one to two cycles after the operational signal firms.`,
+    `Pre-position alternative routings and skip-call options on affected strings; brief commercial teams on demurrage and schedule-reliability risk.`,
+  ];
+  if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
+    bullets.push(
+      `Re-examine crew-change locations on voyages transiting the affected lanes; shift to safer ports where supported.`,
+    );
+    bullets.push(
+      `Confirm naval-escort or convoy options with advisory partners for the highest-risk strings.`,
     );
   }
   if (ctx.commercialRecords.length > 0) {
-    parts.push(
-      `Freight pass-through to shippers on affected lanes is the second-order consequence. Port-call disruption and schedule slippage typically convert into surcharges within one to two weeks; cargo flow planning should price that in rather than assume the disruption stays on the carrier balance sheet.`,
+    bullets.push(
+      `Price surcharge pass-through into cargo-flow planning — port-call disruption converts to surcharges within one to two weeks.`,
     );
   } else {
-    parts.push(
-      `Freight-market commentary stays muted this cycle on the operational definition used here. That can flip quickly: a single port closure or a credible war-risk adjustment can pull surcharges across an entire trade lane within days.`,
+    bullets.push(
+      `Write flexibility clauses into near-term lifting contracts — a single port closure or war-risk move can pull surcharges across a lane within days.`,
     );
   }
-  return parts.join("\n\n");
+  return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
-  const lines: string[] = [];
-  lines.push(
-    `Track fresh naval and maritime advisories on ${cp ? cp.name : "Hormuz, Bab-el-Mandeb, the Red Sea and Malacca"}, plus any UKMTO, IMB or coalition-force bulletins. Those move ahead of headline freight rates and signal where pressure is firming.`,
-  );
-  lines.push(
-    `Watch for war-risk and P&I premium movement on the affected lanes, operator decisions to divert or skip a port call, and any escalation in naval escort or convoy posture. Reliability indices and schedule-reliability monthly bulletins are the cleanest lagging confirmation that the operational signal has converted into commercial pressure.`,
-  );
+  const where = cp ? cp.name : "Hormuz, Bab-el-Mandeb, the Red Sea and Malacca";
+  const bullets: string[] = [
+    `Fresh naval and maritime advisories on ${where}: leading signal for where pressure is firming.`,
+    `UKMTO, IMB and coalition-force bulletins: move ahead of headline freight rates.`,
+    `War-risk and P&I premium movement on affected lanes: cleanest confirmation that the operational signal has firmed commercially.`,
+    `Operator decisions to divert or skip a port call: trigger schedule-reliability and demurrage review.`,
+    `Escalation in naval-escort or convoy posture: signal that advisory partners are sizing up the threat.`,
+  ];
   if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
-    lines.push(
-      `On vessel and crew risk: monitor crew-change advisories from major manning hubs, any change in flag-state guidance, and whether insurance underwriters extend hostile-area surcharges to adjacent waters. A widening of the hostile-area perimeter is the single clearest sign the threat picture is firming, not easing.`,
+    bullets.push(
+      `Crew-change advisories and flag-state guidance updates: re-examine manning-hub plans on transiting voyages.`,
+    );
+    bullets.push(
+      `Hostile-area underwriting extended to adjacent waters: clearest sign the threat perimeter is widening, not easing.`,
     );
   } else {
-    lines.push(
-      `Even on a quiet cycle, monitor crew-change advisories, flag-state guidance updates and any extension of hostile-area underwriting clauses. Those are early indicators that the threat picture is firming again ahead of the next reporting cycle.`,
+    bullets.push(
+      `Any extension of hostile-area underwriting clauses: early indicator the threat picture is firming again.`,
     );
   }
-  return lines.join("\n\n");
+  return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 function buildShippingPolestarView(ctx: ShippingAutoCtx): string {

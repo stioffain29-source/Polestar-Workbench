@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
   setRoboto, ensureRobotoLoaded,
-  drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
+  drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize,
@@ -403,13 +403,12 @@ export async function exportFlashpointReportPdf(
     return `${t}\n\n${auto}`;
   };
   drawSectionWithProse(ctx, "What Matters", pickProse(data.whatMatters, ds.autoWhatMatters));
-  drawSectionWithProse(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));
-  drawSectionWithProse(ctx, "Watch Next", pickProse(data.watchNext, ds.autoWatchNext));
+  drawBulletSection(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));
+  drawBulletSection(ctx, "Watch Next", pickProse(data.watchNext, ds.autoWatchNext), 8);
   drawSectionWithProse(ctx, "Polestar View", pickProse(data.polestarView, ds.autoPolestarView));
 
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 
-  drawSourceNotes(ctx, ds.dataNote);
   drawDisclaimer(ctx);
 
   drawFooters(ctx.pdf);

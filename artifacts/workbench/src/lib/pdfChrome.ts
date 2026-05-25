@@ -356,20 +356,12 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
   ctx.y += totalH + 18;
 }
 
-// Approximate heights used to keep Source Notes + Disclaimer together
-// on the same page when they fit, so the Disclaimer never gets a near-
-// empty page to itself. Sized as compact as the actual line counts
-// allow so the pair can be pulled back onto a fuller previous page
-// rather than orphaned on a near-empty final page.
+// Disclaimer is the only closing block. It tries hard to fit on the
+// current page; only when it cannot does it start a new page. That
+// avoids leaving a near-empty final page with just a five-line legal.
 const DISCLAIMER_BLOCK_H = 24 + 12 * 5;
-const SOURCE_NOTES_BLOCK_H = 24 + 12 * 4;
-const NOTES_TO_DISCLAIMER_GAP = 8;
 
 export function drawDisclaimer(ctx: Ctx) {
-  // No internal page break here. drawSourceNotes pre-allocates space
-  // for both blocks together, so we either fit on the current page or
-  // were already pushed to a fresh one as a pair. A small safety guard
-  // remains for callers that invoke drawDisclaimer on its own.
   if (ctx.y + DISCLAIMER_BLOCK_H > ctx.H - ctx.BOTTOM) {
     newPage(ctx);
   } else {
@@ -379,18 +371,91 @@ export function drawDisclaimer(ctx: Ctx) {
   renderProse(ctx, DISCLAIMER_TEXT);
 }
 
-export function drawSourceNotes(ctx: Ctx, extra?: string) {
-  // Pre-allocate space for BOTH Source Notes and Disclaimer so the two
-  // either fit on the current page together or move to a fresh page
-  // together. This prevents the disclaimer landing alone on a near-
-  // empty final page.
-  const extraH = extra ? 14 * 4 : 0;
-  const need =
-    SOURCE_NOTES_BLOCK_H + extraH + NOTES_TO_DISCLAIMER_GAP + DISCLAIMER_BLOCK_H;
+/**
+ * @deprecated Source Notes / Data Notes are internal workbench notes
+ * and must not appear on client-facing reports. Kept as a no-op so
+ * older call sites compile while we remove them.
+ */
+export function drawSourceNotes(_ctx: Ctx, _extra?: string) {
+  void _ctx; void _extra;
+}
+
+// --- Bullets ---------------------------------------------------------------
+// Implications for Business and Watch Next are rendered as compact
+// bullet lists, never long paragraphs. The parser accepts either:
+//   - Lines beginning with "- " (or "•") -> one bullet per line
+//   - Otherwise: paragraphs separated by blank lines -> one bullet
+//     per paragraph (first sentence kept, rest truncated for length)
+// Lists are capped at `maxBullets` so the section stays scannable.
+
+export function parseBullets(text: string, maxBullets = 7): string[] {
+  const s = sanitize(text ?? "").trim();
+  if (!s) return [];
+  // Explicit bullet markers win.
+  const marked = s
+    .split(/\r?\n/)
+    .map((ln) => ln.trim())
+    .filter((ln) => /^([-*•])\s+/.test(ln))
+    .map((ln) => ln.replace(/^([-*•])\s+/, "").trim())
+    .filter(Boolean);
+  let bullets: string[];
+  if (marked.length > 0) {
+    bullets = marked;
+  } else {
+    // Fall back to paragraph splitting; keep paragraphs short by
+    // taking the first sentence only when they run long.
+    bullets = s
+      .split(/\n\s*\n/)
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .map((p) => {
+        if (p.length <= 220) return p;
+        const m = p.match(/^(.+?[.!?])(\s|$)/);
+        return (m ? m[1] : p.slice(0, 217) + "...").trim();
+      });
+  }
+  return bullets.slice(0, maxBullets);
+}
+
+export function drawBulletSection(
+  ctx: Ctx,
+  title: string,
+  text: string,
+  maxBullets = 7,
+) {
+  const bullets = parseBullets(text, maxBullets);
+  if (bullets.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(10);
+  const lineH = 13;
+  const bulletIndent = 12;
+  const gapBetween = 4;
+  // Pre-measure to keep heading + first bullet together.
+  const firstLines: string[] = pdf.splitTextToSize(bullets[0], CW - bulletIndent);
+  const headingBlockH = 6 + 14 + 8;
+  const firstParaH = firstLines.length * lineH + gapBetween;
+  const need = headingBlockH + firstParaH + 10;
   if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
-  else ctx.y += 14;
-  drawSectionHeading(ctx, "Source Notes / Data Notes");
-  renderProse(ctx, extra ? `${SOURCE_NOTES_TEXT}\n\n${extra}` : SOURCE_NOTES_TEXT);
+  drawSectionHeading(ctx, title);
+  setRoboto(pdf, "regular");
+  setText(pdf, DUSK);
+  pdf.setFontSize(10);
+  for (const b of bullets) {
+    const lines: string[] = pdf.splitTextToSize(b, CW - bulletIndent);
+    const blockH = lines.length * lineH + gapBetween;
+    // Keep a bullet together with its first line; otherwise page break first.
+    if (ctx.y + blockH > ctx.H - ctx.BOTTOM) newPage(ctx);
+    // Marker
+    pdf.text("\u2022", MX, ctx.y + 10);
+    // Body lines
+    for (let i = 0; i < lines.length; i++) {
+      pdf.text(lines[i], MX + bulletIndent, ctx.y + 10);
+      ctx.y += lineH;
+    }
+    ctx.y += gapBetween;
+  }
+  ctx.y += 4;
 }
 
 /**

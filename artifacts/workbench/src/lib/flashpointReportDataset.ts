@@ -783,22 +783,20 @@ function buildWhatMatters(ctx: AutoCtx): string {
 function buildImplications(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
   const where = lead ? lead.label : "the affected geographies";
-  const parts: string[] = [];
-  parts.push(
-    `For operators with on-the-ground exposure in ${where}, the practical first-order implications sit with staff movement, journey management and site access. Daily commuting plans into central business districts and ministry quarters should be reviewed against the live protest calendar, not the previous quarter's pattern. Drivers and staff travelling on routes that cross courts, parliament approaches, university precincts or party headquarters should have alternative routings briefed in advance and clear criteria for turning back. Visitor travel — inbound principals, auditors, customers — needs the same screening: arrival windows, hotel zoning away from likely rally corridors, and a named local escort with delegated authority to abort a movement.`,
-  );
-  parts.push(
-    `Site-level posture should reflect the same risk picture. Public-facing facilities (branches, showrooms, clinics, dealerships, customer-service counters) carry the highest exposure to opportunistic crowd action and should have published early-close protocols, shutter procedures and a single decision-maker for same-day closures. Plants, warehouses and corporate offices need a documented work-from-home / delayed-start trigger keyed to specific civil-unrest indicators rather than headline severity, and a security-posture step-up — perimeter checks, access-control hardening, visitor restrictions and standby for guard reinforcement — that can be activated inside an hour of a named flashpoint. Delivery disruption should be treated as a baseline planning assumption on protest days: last-mile reroutes, customer-comms templates for delayed orders and a freight contingency for blocked arterial routes.`,
-  );
-  parts.push(
-    `Crisis-communications triggers and escalation thresholds need to be explicit and pre-agreed, not improvised under pressure. Define in advance the events that move the response from monitoring to action: a Section 144 / curfew order in the city of operation, a confirmed protest call on a route the business uses, a strike notice from a sector the business depends on, an injury or arrest involving staff, or any internet-shutdown notice. Each threshold should pair with a named owner, a defined audience (staff, customers, regulators, board) and a pre-cleared first message so the response is measured in minutes rather than hours.`,
-  );
+  const bullets: string[] = [
+    `Review staff movement plans and journey-management routings across ${where} against the live protest calendar.`,
+    `Set clear work-from-home or delayed-start triggers for offices, plants and customer-facing sites in affected cities.`,
+    `Confirm alternative routes for staff, visitors and delivery movements around courts, ministries, campuses and party offices.`,
+    `Harden site access controls, perimeter checks and visitor restrictions; pre-position guard reinforcement.`,
+    `Pre-approve staff, customer and regulator communications for disruption days so messages move in minutes, not hours.`,
+    `Monitor Section 144 / curfew orders, arrests, injuries and any internet-shutdown notices in cities of operation.`,
+  ];
   if (ctx.activismRows.length >= 3) {
-    parts.push(
-      `Sectoral walkouts (chemists, pharmacists, transporters, traders, lawyers) and student-body mobilisation are not background noise — they routinely lead street-level escalation by 24-72 hours. Procurement, distribution and customer-service teams should be wired into the same early-warning feed as security, so a chamber announcement or a campus call converts into preventive stock build, customer expectation-setting and rota adjustments before the disruption lands.`,
+    bullets.push(
+      `Wire procurement, distribution and customer-service into the security early-warning feed — sectoral walkouts and campus calls lead street action by 24-72 hours.`,
     );
   }
-  return parts.join("\n\n");
+  return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 // Build Watch Next from actual future-looking signals in the file
@@ -810,26 +808,23 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const future = extractFutureSignals(all)
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
     .slice(0, 8);
-  const intro = `Watch Next is built from actual upcoming or announced activity in the current file where data exists. Each item is paired with its operational meaning so the response can be planned, not improvised.`;
-  if (future.length === 0) {
-    const fallback = `No confirmed future-dated protest calls, strike notices or scheduled mobilisation events were identified in the current Flashpoint dataset. Watch indicators below are therefore based on current mobilisation patterns and standing enforcement triggers rather than scheduled events, and should not be treated as a forecast.`;
-    const indicators: string[] = [
-      `Fresh opposition political-calendar calls, named protest schedules and union or chamber statements naming a date.`,
-      `Section 144 / curfew impositions, assembly bans and any geographical expansion of public-order restrictions.`,
-      `Arrests, injuries or confirmed fatalities in a protest or unrest context — the single clearest signal that the cycle will firm up.`,
-      `Court hearings, bail rulings and detention triggers involving political figures, activists or movement leaders.`,
-      `Sectoral chamber notifications (chemists, transporters, lawyers, traders) and student-union calls — 24-72 hour lead indicators.`,
-      `Internet-shutdown notices and military-aid-to-civil-power references — markers that the state response has crossed the threshold of measured policing.`,
-    ];
-    return `${intro}\n\n${fallback}\n\n${indicators.map((l) => `\u2022 ${l}`).join("\n\n")}`;
+  if (future.length > 0) {
+    return future.map((r) => {
+      const country = r.country ? ` (${r.country})` : "";
+      const dateStr = format(r.date, "dd MMM yyyy");
+      return `- ${dateStr}${country}, ${r.title}: ${operationalMeaningFor(r)}`;
+    }).join("\n");
   }
-  const lines = future.map((r) => {
-    const country = r.country ? ` (${r.country})` : "";
-    const dateStr = format(r.date, "dd MMM yyyy");
-    return `${dateStr}${country} — "${r.title}". Operational meaning: ${operationalMeaningFor(r)}`;
-  });
-  const tail = `Treat any of the above moving from announced to executed as the trigger to escalate the standing response (staff-movement restrictions, branch closures, customer comms, perimeter posture). Monitor for fresh entries to this list daily through the next reporting window.`;
-  return `${intro}\n\n${lines.map((l) => `\u2022 ${l}`).join("\n\n")}\n\n${tail}`;
+  const bullets: string[] = [
+    `Fresh opposition or movement protest calls naming a date: brief drivers and customer-facing teams in advance.`,
+    `Union or chamber strike notices (chemists, transporters, lawyers, traders): expect supply-chain friction 24-72 hours ahead.`,
+    `Section 144 / curfew orders or assembly bans: trigger work-from-home protocol and shut public-facing sites in the affected area.`,
+    `Court hearings, bail rulings or detention triggers involving political figures: ready customer-comms templates for same-day closures.`,
+    `Arrests, injuries or fatalities in a protest context: assume retaliatory mobilisation within 48 hours and harden site posture.`,
+    `Student-union or campus mobilisation calls: leading indicator of a sustained cycle, step up journey-management review.`,
+    `Internet-shutdown notices or military-aid-to-civil-power references: the state response has crossed measured policing — plan against a harder next cycle.`,
+  ];
+  return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 function operationalMeaningFor(r: EnrichedIncident): string {

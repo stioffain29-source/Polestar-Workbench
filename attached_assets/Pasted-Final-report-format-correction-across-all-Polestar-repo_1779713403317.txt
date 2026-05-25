@@ -1,0 +1,128 @@
+Final report-format correction across all Polestar reports.
+
+Apply to:
+- Fuel Watch
+- Shipping Watch
+- Cargo Watch
+- Flashpoint
+- Energy Watch
+- Fertiliser Watch
+- any other report using the same PDF/report template
+
+Do not change:
+- data plumbing
+- classification logic
+- Fast Facts
+- charts
+- colours
+- fonts
+- cover design
+- report titles
+
+Required changes:
+
+1. Remove Source Notes / Data Notes completely
+
+Delete the Source Notes / Data Notes section from all report PDFs and previews.
+
+Do not show:
+- SOURCE NOTES / DATA NOTES
+- “Based on records held in the Polestar Workbench...”
+- “Records without coordinates...”
+- “Severity ratings follow...”
+- exclusion counts
+- dedupe notes
+- internal methodology notes
+- “records were excluded...”
+- “syndicated duplicate was collapsed...”
+
+These are internal workbench notes and should not appear in client-facing reports.
+
+Keep only:
+- Disclaimer
+
+2. Business Implications must be short bullet points
+
+The Flashpoint Implications section is too long and reads like a wall of text.
+
+Convert Implications for Business into short, practical bullet points across all reports.
+
+Format:
+- 4 to 7 bullets maximum
+- one line each where possible
+- direct operational action
+- no long paragraphs
+
+Example for Flashpoint:
+
+Implications for Business
+- Review staff movement plans for cities with active protest calls.
+- Set clear work-from-home or delayed-start triggers for affected locations.
+- Confirm alternate routes for staff, visitors and delivery movements.
+- Check site access controls for offices, plants and public-facing facilities.
+- Pre-approve customer and staff communications for disruption days.
+- Monitor police restrictions, Section 144 orders, arrests and road closures.
+- Align security, logistics and HR on escalation thresholds.
+
+3. Watch Next should be concise
+
+Watch Next should not become a long essay.
+
+Use short bullets.
+
+For Flashpoint:
+- If there are actual future-dated protest / strike / mobilisation items, list them clearly.
+- If no future-dated items exist, state that clearly and then list watch indicators.
+
+Format:
+- 5 to 8 bullets maximum
+- each bullet starts with the signal
+- then one short operational meaning
+
+Example:
+- PTI mobilisation in Pakistan: watch for road closures near courts, party offices and administrative districts.
+- Indian chemists’ strike activity: monitor pharmacy closures and local service disruption.
+- South Korea labour action: watch for union escalation around Samsung-linked activity.
+- Section 144 / police restrictions: trigger journey-management review.
+- Arrests or injuries: likely to harden protest response and extend disruption.
+
+Do not write long paragraphs here.
+
+4. Reduce white space
+
+The Flashpoint PDF has ridiculous white space across pages.
+
+Fix pagination and spacing:
+- reduce oversized top gaps after page breaks
+- do not push sections halfway down a page
+- keep section heading and first content together
+- avoid large blank areas before Watch Next / Polestar View
+- remove Source Notes to recover space
+- make the report compact but readable
+
+5. Keep Disclaimer only
+
+At the end of each report:
+- show Disclaimer
+- no Source Notes
+- no Data Notes
+- no internal methodology
+
+If the disclaimer can fit on the previous page, pull it back.
+Do not leave a dead final page with only a short disclaimer unless unavoidable.
+
+6. Acceptance
+
+Export fresh PDFs for:
+- Fuel Watch
+- Shipping Watch
+- Cargo Watch
+- Flashpoint
+
+Confirm:
+- no Source Notes / Data Notes section appears anywhere
+- Implications for Business is bullet-pointed
+- Watch Next is concise and operational
+- no giant white-space gaps
+- Disclaimer remains
+- report still looks professional and client-facing

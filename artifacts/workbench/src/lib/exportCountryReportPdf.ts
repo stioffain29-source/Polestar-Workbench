@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
-  drawFastFactsKpiCards, drawSourceNotes, drawDisclaimer, drawFooters,
+  drawFastFactsKpiCards, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, todayLabel, setRoboto, ensureRobotoLoaded,
@@ -356,8 +356,6 @@ export async function exportCountryReportPdf(
   drawNarrative(ctx, "Watch Next", extras.watchNext);
   drawNarrative(ctx, "Polestar View", extras.polestarView);
 
-  // 11. Source Notes
-  drawSourceNotes(ctx);
 
   // 12. Disclaimer
   drawDisclaimer(ctx);

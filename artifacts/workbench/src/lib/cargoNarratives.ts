@@ -144,44 +144,49 @@ export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[])
 
 export function buildCargoImplications(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
-  const parts: string[] = [];
-  parts.push(
-    `For cargo owners the immediate consequence is inventory-loss exposure on affected corridors and fulfilment slippage where re-supply has to be ordered against the lost stock. Insurance underwriters typically respond to a clustered loss pattern within one to two cycles; expect deductibles, route exclusions or premium movement on lanes that show repeat activity.`,
-  );
+  const bullets: string[] = [
+    `Treat affected corridors as live inventory-loss exposure and order re-supply against lost stock without delay.`,
+    `Expect underwriter response within one to two cycles — deductibles, route exclusions or premium moves on lanes with repeat activity.`,
+  ];
   if (ctx.securityMatches.length > 0) {
-    parts.push(
-      `For hauliers and 3PL operators the route-side picture argues for tightening driver and crew vetting on the affected corridors, reviewing rest-stop and refuelling discipline, and instituting hard rules on convoying or escorts for high-value loads. A single insider-enabled loss is enough to invalidate an entire route-security posture, so the controls have to assume the threat is internal as well as external.`,
+    bullets.push(
+      `Tighten driver and crew vetting on affected corridors and enforce convoy or escort rules on high-value loads.`,
+    );
+    bullets.push(
+      `Review rest-stop, refuelling and handover discipline; assume the threat is insider as well as external.`,
     );
   }
   if (ctx.hubMatches.length > 0) {
-    parts.push(
-      `For warehouse and depot operators the logistics-hub picture argues for an immediate review of perimeter controls, after-hours staffing, CCTV coverage at known blind spots, and seal-and-lock integrity at every handover. Yard-staff vetting and visitor controls are the lowest-cost wins and tend to be the first thing to slip during operator turnover.`,
+    bullets.push(
+      `Review depot perimeter, after-hours staffing, CCTV blind spots and seal-and-lock integrity at every handover.`,
+    );
+    bullets.push(
+      `Re-baseline yard-staff vetting and visitor controls — lowest-cost wins and first to slip during operator turnover.`,
     );
   }
-  parts.push(
-    `For finance and procurement the implication is to assume insurance and freight-cost exposure on affected corridors will firm before the next renewal, and to write loss-mitigation clauses into near-term contracts rather than rely on standard cover.`,
+  bullets.push(
+    `Write loss-mitigation clauses into near-term freight and insurance contracts rather than rely on standard cover.`,
   );
-  return parts.join("\n\n");
+  return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 export function buildCargoWatchNext(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
-  const lines: string[] = [];
-  lines.push(
-    `Watch for repeat losses on the same corridor across consecutive cycles — repeats are the single clearest sign an organised crew is working a specific lane, and they typically appear before any police or insurance bulletin is issued. Copycat theft patterns after a publicised incident are the second pattern to watch; one well-covered hijack often draws three or four imitators within a fortnight.`,
-  );
-  lines.push(
-    `Track insider-involvement indicators: cargo loaded out of normal hours, driver or yard-staff turnover that coincides with a loss, and seal or lock failures that do not match the documented handover sequence. Depot access failures, broken seals, lock tampering and CCTV outages on the same shift cluster are the operational tells.`,
-  );
-  lines.push(
-    `Monitor insurance underwriter bulletins, transport-association advisories, police-alert circulars and any operator announcements on route displacement. Displacement of loads from a controlled depot to a weaker one — usually under cost pressure — is a common precursor to a fresh loss cycle. Premium movement on the affected lanes is the cleanest lagging confirmation that the operational signal has firmed into a commercial one.`,
-  );
+  const bullets: string[] = [
+    `Repeat losses on the same corridor across consecutive cycles: clearest sign an organised crew is working a specific lane.`,
+    `Copycat theft after a publicised hijack: one event often draws three or four imitators within a fortnight.`,
+    `Insider tells — out-of-hours loading, driver or yard-staff turnover coinciding with a loss, seal or lock failures: trigger handover audit.`,
+    `Depot access failures, broken seals and CCTV outages on the same shift: signal organised facility-side activity, not pilferage.`,
+    `Insurance underwriter bulletins, transport-association advisories and police-alert circulars: leading market signal.`,
+    `Operator route displacement under cost pressure (controlled depot to weaker one): common precursor to a fresh loss cycle.`,
+    `Premium movement on affected lanes: cleanest lagging confirmation the operational signal has firmed commercially.`,
+  ];
   if (ctx.hubMatches.length > 0) {
-    lines.push(
-      `On logistics-hub risk specifically: watch for facility-access incidents, perimeter breaches, after-hours staffing changes and any escalation from pilferage to organised raiding at the same facility.`,
+    bullets.push(
+      `Facility-access incidents and perimeter breaches at named hubs: watch for escalation from pilferage to organised raiding.`,
     );
   }
-  return lines.join("\n\n");
+  return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]): string {

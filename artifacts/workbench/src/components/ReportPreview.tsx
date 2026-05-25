@@ -59,6 +59,34 @@ export interface ReportPreviewData {
   hardNumbers?: unknown;
 }
 
+function toBullets(text?: string | null, max = 7): string[] {
+  const s = (text ?? "").trim();
+  if (!s) return [];
+  const marked = s.split(/\r?\n/).map((l) => l.trim())
+    .filter((l) => /^([-*•])\s+/.test(l))
+    .map((l) => l.replace(/^([-*•])\s+/, "").trim())
+    .filter(Boolean);
+  let out: string[];
+  if (marked.length > 0) out = marked;
+  else out = s.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean)
+    .map((p) => p.length <= 220 ? p : (p.match(/^(.+?[.!?])(\s|$)/)?.[1] ?? p.slice(0, 217) + "...").trim());
+  return out.slice(0, max);
+}
+
+function BulletsSection({ title, text, max = 7 }: { title: string; text?: string | null; max?: number }) {
+  const items = toBullets(text, max);
+  if (items.length === 0) return null;
+  return (
+    <Section title={title}>
+      <ul className="list-disc pl-5 space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+        {items.map((it, i) => (
+          <li key={i} className="text-[14px] leading-[1.6] font-light">{it}</li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
 function Paragraphs({ text }: { text?: string | null }) {
   if (!text) return null;
   const parts = text.split(/\n+/).filter(Boolean);
@@ -440,8 +468,8 @@ export default function ReportPreview({
               </Section>
             )}
             <NarrativeSection title="What Matters" text={report.whatMatters} />
-            <NarrativeSection title="Implications for Business" text={report.implications} />
-            <NarrativeSection title="Watch Next" text={report.watchNext} />
+            <BulletsSection title="Implications for Business" text={report.implications} />
+            <BulletsSection title="Watch Next" text={report.watchNext} max={8} />
             <NarrativeSection title="Polestar View" text={report.polestarView} />
           </>
         ) : (
@@ -487,17 +515,18 @@ export default function ReportPreview({
                       ? pick(report.whatMatters, buildCargoWhatMatters(cargoWindow))
                       : report.whatMatters}
                   />
-                  <NarrativeSection
+                  <BulletsSection
                     title="Implications for Business"
                     text={isCargo
                       ? pick(report.implications, buildCargoImplications(cargoWindow))
                       : report.implications}
                   />
-                  <NarrativeSection
+                  <BulletsSection
                     title="Watch Next"
                     text={isCargo
                       ? pick(report.watchNext, buildCargoWatchNext(cargoWindow))
                       : report.watchNext}
+                    max={8}
                   />
                   <NarrativeSection
                     title="Polestar View"
