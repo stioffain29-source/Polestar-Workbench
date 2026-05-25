@@ -84,6 +84,12 @@ export interface ShippingReportDataset {
   regionalCountryRead: string;
   /** Prioritised in-window operational incidents for the closing table. */
   relatedIncidents: EnrichedIncident[];
+  /** Auto-derived analyst prose, used when the editor leaves the matching
+   *  section blank. Editor-authored text always wins when supplied. */
+  autoWhatMatters: string;
+  autoImplications: string;
+  autoWatchNext: string;
+  autoPolestarView: string;
   dataNote: string;
 }
 
@@ -134,17 +140,87 @@ function sortByDateDesc<T extends { date: Date }>(rows: T[]): T[] {
 }
 
 // --- Source-credibility helpers --------------------------------------------
-// Used to keep social-media-style and pure shipping-market items out of the
-// surfaces where they would otherwise drive the analyst narrative
-// (chokepoint operational read; Commercial Impact on Shipping).
+// Used to keep social-media-style, repatriation/human-interest, speculative
+// strike-claim and generic commentary items out of the surfaces where they
+// would otherwise drive the analyst narrative (chokepoint operational read;
+// Commercial Impact on Shipping; Vessel and Piracy reads).
 
 const SOCIAL_SOURCE_RE = /\b(twitter|x\.com|t\.co|instagram|tiktok|facebook|threads|youtube|reddit|telegram|t\.me|mastodon|truth\s*social|weibo|social\s*media)\b/i;
 const HANDLE_TITLE_RE = /^\s*[@#]/;
 
+// Repatriation, crew-welfare and human-interest items are real but they are
+// downstream of the maritime security picture, not operational drivers of it.
+// They should not lead a Chokepoint, Vessel or Piracy read.
+const HUMAN_INTEREST_RE = /\b(repatriat|repatriation|seafarer welfare|crew welfare|memorial|funeral|rescued (and )?(repatriated|returned home)|brought home|reunion|widow|mother of|family of|tribute to|interview with|opinion piece|op[- ]ed)\b/i;
+
+// Speculative strike claims and unverified rumour traffic ("reportedly",
+// "claims to have", "alleged strike", "unconfirmed reports") — when these
+// dominate they push the read away from validated maritime security.
+const SPECULATIVE_CLAIM_RE = /\b(unconfirmed|unverified|alleged|allegedly|reportedly|claim(s|ed) to have|claim of an attack|rumou?red|purportedly|may have (been )?(struck|hit|attacked|targeted)|appears to have been)\b/i;
+
+// Pure commentary, explainer and analysis-piece headlines with no
+// operational anchor ("explained", "what to know", "five things", "in
+// charts", "guide to", listicles). These dilute operational reads.
+const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
+
 function isLowCredibilitySource(r: ShippingReportIncident): boolean {
   if (HANDLE_TITLE_RE.test(r.title ?? "")) return true;
   const src = (r.source ?? "") + " " + (r.sourceUrl ?? "");
-  return SOCIAL_SOURCE_RE.test(src);
+  if (SOCIAL_SOURCE_RE.test(src)) return true;
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  if (HUMAN_INTEREST_RE.test(text)) return true;
+  if (SPECULATIVE_CLAIM_RE.test(text)) return true;
+  if (GENERIC_COMMENTARY_RE.test(text)) return true;
+  return false;
+}
+
+// --- Dedupe helpers --------------------------------------------------------
+// Maritime stories get syndicated heavily — the same vessel attack or
+// seizure routinely appears under five or six near-identical headlines on
+// the same day. Collapse those before they dominate the tables.
+
+function normaliseTitle(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201C\u201D"'`]/g, "")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function titleKey(s: string): string {
+  // First 8 significant words after stripping common stopwords. Good enough
+  // to catch "Tanker X attacked off Yemen / Tanker X hit in Red Sea" as the
+  // same underlying incident without false-merging unrelated stories.
+  const STOP = new Set([
+    "the", "a", "an", "of", "in", "on", "at", "to", "for", "and", "as", "by",
+    "off", "near", "after", "amid", "with", "from", "into", "over",
+    "says", "say", "said", "reports", "report", "warning", "warns",
+  ]);
+  return normaliseTitle(s)
+    .split(" ")
+    .filter((w) => w && !STOP.has(w))
+    .slice(0, 8)
+    .join(" ");
+}
+
+function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
+  const seen = new Map<string, T>();
+  for (const r of rows) {
+    const k = titleKey(r.title);
+    if (!k) { seen.set(`__${Math.random()}`, r); continue; }
+    const prev = seen.get(k);
+    if (!prev) { seen.set(k, r); continue; }
+    // Keep the entry with the higher severity, or the more recent date as
+    // tiebreaker. This collapses syndicated dupes without losing the most
+    // authoritative version.
+    const sevA = SEV_RANK[sevKey(r.severity)] ?? 0;
+    const sevB = SEV_RANK[sevKey(prev.severity)] ?? 0;
+    if (sevA > sevB || (sevA === sevB && r.date.getTime() > prev.date.getTime())) {
+      seen.set(k, r);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 // Pure shipping-market / corporate-finance items with no operational hook
@@ -225,13 +301,49 @@ export function buildShippingReportDataset(
 
   // Vessel / piracy — 30-day window so the dedicated sections show a
   // meaningful operational picture even on a quiet weekly cycle.
-  const vesselRows: VesselRow[] = enriched30
-    .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
-    .filter((r): r is VesselRow => r.vesselType !== null);
-  const vAttackSeize = vesselRows.filter((r) => r.vesselType === "Attack" || r.vesselType === "Seized").length;
-  const piracyRows: PiracyRow[] = enriched30
-    .map((r) => ({ ...r, act: classifyPiracy(r) }))
-    .filter((r): r is PiracyRow => r.act !== null);
+  //
+  // Two passes:
+  //   1. Syndicated dupes (same headline picked up by five wires on the
+  //      same day) are collapsed via `dedupeByTitle` — keeps the most
+  //      severe / most recent version of each underlying incident.
+  //   2. Tables are capped at 12 rows each, prioritising attack/seizure
+  //      over softer boarding/approach activity so the section stops
+  //      visually dominating the report on noisy cycles.
+  const vesselAll: VesselRow[] = sortByDateDesc(
+    enriched30
+      .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
+      .filter((r): r is VesselRow => r.vesselType !== null),
+  );
+  const vesselDeduped = dedupeByTitle(vesselAll);
+  const vesselHostile = vesselDeduped.filter(
+    (r) => r.vesselType === "Attack" || r.vesselType === "Seized",
+  );
+  const vesselOther = vesselDeduped.filter(
+    (r) => r.vesselType !== "Attack" && r.vesselType !== "Seized",
+  );
+  const VESSEL_TABLE_CAP = 12;
+  // Hostile (attack / seizure) rows always take priority for the cap.
+  // Only when there is headroom do softer boarding / approach records
+  // fill the remaining slots. Each bucket is sorted newest-first inside
+  // its own group so we never displace a hostile row with a fresher
+  // non-hostile one.
+  const hostileSorted = sortByDateDesc(vesselHostile);
+  const otherSorted = sortByDateDesc(vesselOther);
+  const hostileSlice = hostileSorted.slice(0, VESSEL_TABLE_CAP);
+  const remaining = VESSEL_TABLE_CAP - hostileSlice.length;
+  const vesselRows: VesselRow[] =
+    remaining > 0
+      ? [...hostileSlice, ...otherSorted.slice(0, remaining)]
+      : hostileSlice;
+  const vAttackSeize = vesselHostile.length;
+
+  const piracyAll: PiracyRow[] = sortByDateDesc(
+    enriched30
+      .map((r) => ({ ...r, act: classifyPiracy(r) }))
+      .filter((r): r is PiracyRow => r.act !== null),
+  );
+  const PIRACY_TABLE_CAP = 12;
+  const piracyRows: PiracyRow[] = dedupeByTitle(piracyAll).slice(0, PIRACY_TABLE_CAP);
 
   // Weekly-window vessel/piracy counts (used only by the Daily Intelligence
   // Summary line, which describes the weekly briefing window itself).
@@ -312,15 +424,19 @@ export function buildShippingReportDataset(
     };
   });
 
-  // Commercial Impact must stay focused on operational and commercial risk
-  // to shipping (port disruption, freight/insurance pressure with an
-  // operational hook, war-risk, route disruption, etc.). Pure shipping-market
-  // items — vessel S&P, newbuild orders, fleet finance, earnings, share-price
-  // moves — are filtered out unless the title or summary also carries an
-  // operational signal.
-  const commercialRecords = enriched
-    .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
-    .filter((r) => !isShippingMarketOnly(r));
+  // Commercial Impact must stay focused on the operational consequence of
+  // shipping disruption: port closures, route diversion, schedule
+  // reliability, war-risk / P&I premium movement, cargo flow impact and
+  // insurance pressure with a route or vessel anchor. Pure shipping-market
+  // commentary (vessel S&P, newbuilds, fleet finance, earnings, share-price
+  // moves, freight-rate-only stories with no disruption anchor) is filtered
+  // out so the section does not drift into freight-market reporting.
+  const commercialRecords = dedupeByTitle(
+    enriched
+      .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
+      .filter((r) => !isShippingMarketOnly(r))
+      .filter((r) => OPERATIONAL_HOOK_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`)),
+  ).slice(0, 12);
 
   const transitRecords = enriched.filter(
     (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
@@ -389,8 +505,28 @@ export function buildShippingReportDataset(
   // Related Incidents — prioritised operational records for the closing
   // table. Vessel and piracy hits lead, then port / chokepoint / route /
   // war-risk records, then the rest of the weekly window. Pure shipping-
-  // market items are dropped entirely.
+  // market items are dropped entirely. Capped tight so Source Notes /
+  // Disclaimer don't get pushed alone onto a near-empty final page.
   const relatedIncidents = prioritiseRelated(enriched);
+
+  // Shipping-specific auto-prose for the four analyst sections. Editor
+  // text takes precedence in the exporter and preview; these fallbacks
+  // ensure the report reads at Fuel Watch-level substance even before
+  // the analyst has written into the form.
+  const autoCtx = {
+    cpRanked,
+    vesselHostile,
+    piracyRows,
+    commercialRecords,
+    regionRows,
+    countryRows,
+    thirtyDayLabel: thirtyDayShortLabel,
+    weeklyCount: enriched.length,
+  };
+  const autoWhatMatters = buildShippingWhatMatters(autoCtx);
+  const autoImplications = buildShippingImplications(autoCtx);
+  const autoWatchNext = buildShippingWatchNext(autoCtx);
+  const autoPolestarView = buildShippingPolestarView(autoCtx);
 
   const locNote = `Records with no identifiable incident location (${locationNotIdentifiedCount} in window) are included in total counts but excluded from the country and regional comparison charts and surfaced as "${LOCATION_NOT_IDENTIFIED}". Vessel flag state is never counted as incident country.`;
   const dataNote = outOfScopeCount > 0
@@ -416,9 +552,130 @@ export function buildShippingReportDataset(
     commercialImpactRead,
     regionalCountryRead,
     relatedIncidents,
+    autoWhatMatters,
+    autoImplications,
+    autoWatchNext,
+    autoPolestarView,
     dataNote,
   };
 }
+
+// --- Shipping analyst auto-prose ------------------------------------------
+// Editor-authored text always wins. When the analyst leaves a section
+// blank these builders provide Fuel-Watch-level substance, anchored on
+// routing, port calls, war-risk / P&I premium, vessel scheduling,
+// bunker planning, cargo flow and operator advisories.
+
+interface ShippingAutoCtx {
+  cpRanked: ChokepointRow[];
+  vesselHostile: VesselRow[];
+  piracyRows: PiracyRow[];
+  commercialRecords: EnrichedIncident[];
+  regionRows: BarRow[];
+  countryRows: BarRow[];
+  thirtyDayLabel: string;
+  weeklyCount: number;
+}
+
+function buildShippingWhatMatters(ctx: ShippingAutoCtx): string {
+  const cp = ctx.cpRanked[0];
+  const cp2 = ctx.cpRanked[1];
+  const region = [...ctx.regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+  const lines: string[] = [];
+  if (cp) {
+    lines.push(
+      `The cycle's centre of gravity is ${cp.name}, which carries ${cp.count} qualifying record${cp.count === 1 ? "" : "s"}${cp2 ? ` ahead of ${cp2.name} on ${cp2.count}` : ""}. That matters for routing decisions because every additional advisory tightens transit-time variance and feeds straight into vessel scheduling and bunker planning for any operator with exposure to the region.`,
+    );
+  } else {
+    lines.push(
+      `No single chokepoint dominated this cycle, which sounds reassuring but is usually a coverage gap rather than a genuine easing. Treat the picture as fragile: when activity returns it tends to land on the same two or three transit corridors.`,
+    );
+  }
+  if (ctx.vesselHostile.length > 0 || ctx.piracyRows.length > 0) {
+    lines.push(
+      `Hostile activity against vessels still anchors the risk picture, with ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} on file over the trailing 30 days (${ctx.thirtyDayLabel}). Any operator running through the affected lanes should be reviewing crew-change locations, war-risk and P&I premium exposure, and the threshold at which their advisory partners would recommend re-routing.`,
+    );
+  } else {
+    lines.push(
+      `Vessel-side and piracy reporting was thin this cycle. The underlying threat picture has not been benign for long, so a quiet window should be read as a reporting gap and not as a sustained easing of crew, hull or cargo risk.`,
+    );
+  }
+  if (ctx.commercialRecords.length > 0) {
+    lines.push(
+      `On the commercial side the cycle carries ${ctx.commercialRecords.length} qualifying record${ctx.commercialRecords.length === 1 ? "" : "s"} of port disruption, schedule slippage, war-risk or insurance movement with a clean operational anchor. That feeds directly into cargo flow planning, port-call sequencing and freight-cost pass-through to shippers.`,
+    );
+  }
+  if (region) {
+    lines.push(
+      `Regionally the weekly window leaned on ${region.label}; country-level concentration is set out in the chart below.`,
+    );
+  }
+  return lines.join("\n\n");
+}
+
+function buildShippingImplications(ctx: ShippingAutoCtx): string {
+  const cp = ctx.cpRanked[0];
+  const parts: string[] = [];
+  parts.push(
+    `Operators with route exposure through ${cp ? cp.name : "the affected corridors"} should be running a live review of vessel scheduling, port-call sequencing and bunker planning against the latest advisory traffic. War-risk and P&I premium adjustments tend to land one to two cycles after the operational signal firms, so the time to size insurance exposure is now rather than after the first underwriting notice.`,
+  );
+  if (ctx.vesselHostile.length > 0 || ctx.piracyRows.length > 0) {
+    parts.push(
+      `Crew-change locations should be re-examined for any voyage transiting the affected lanes. The cleanest mitigation is a shift to a safer port of crew change, paired with naval-escort or convoy options where advisory partners support them. Cargo owners should expect higher demurrage and schedule-reliability variance on rerouted strings, and should be writing in flexibility clauses on near-term lifting contracts.`,
+    );
+  }
+  if (ctx.commercialRecords.length > 0) {
+    parts.push(
+      `Freight pass-through to shippers on affected lanes is the second-order consequence. Port-call disruption and schedule slippage typically convert into surcharges within one to two weeks; cargo flow planning should price that in rather than assume the disruption stays on the carrier balance sheet.`,
+    );
+  } else {
+    parts.push(
+      `Freight-market commentary stays muted this cycle on the operational definition used here. That can flip quickly: a single port closure or a credible war-risk adjustment can pull surcharges across an entire trade lane within days.`,
+    );
+  }
+  return parts.join("\n\n");
+}
+
+function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
+  const cp = ctx.cpRanked[0];
+  const lines: string[] = [];
+  lines.push(
+    `Track fresh naval and maritime advisories on ${cp ? cp.name : "Hormuz, Bab-el-Mandeb, the Red Sea and Malacca"}, plus any UKMTO, IMB or coalition-force bulletins. Those move ahead of headline freight rates and signal where pressure is firming.`,
+  );
+  lines.push(
+    `Watch for war-risk and P&I premium movement on the affected lanes, operator decisions to divert or skip a port call, and any escalation in naval escort or convoy posture. Reliability indices and schedule-reliability monthly bulletins are the cleanest lagging confirmation that the operational signal has converted into commercial pressure.`,
+  );
+  if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
+    lines.push(
+      `On vessel and crew risk: monitor crew-change advisories from major manning hubs, any change in flag-state guidance, and whether insurance underwriters extend hostile-area surcharges to adjacent waters. A widening of the hostile-area perimeter is the single clearest sign the threat picture is firming, not easing.`,
+    );
+  } else {
+    lines.push(
+      `Even on a quiet cycle, monitor crew-change advisories, flag-state guidance updates and any extension of hostile-area underwriting clauses. Those are early indicators that the threat picture is firming again ahead of the next reporting cycle.`,
+    );
+  }
+  return lines.join("\n\n");
+}
+
+function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
+  const cp = ctx.cpRanked[0];
+  const region = [...ctx.regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+  const lead: string[] = [];
+  lead.push(
+    `Our read on the cycle is that the underlying maritime security picture remains structurally elevated even when the weekly file looks quieter than the trailing 30 days. ${cp ? `${cp.name} continues to set the tempo` : `No single chokepoint dominated this week, but the regional baseline has not reset`}, and operators should be planning against a "quiet weeks, sharp incidents" cadence rather than a sustained easing.`,
+  );
+  lead.push(
+    `For commercial decisions, the practical implication is that routing, port-call sequencing and crew-change planning should be treated as live risk decisions every cycle — not annual reviews. War-risk and P&I premium movement remains the cleanest single signal that the operational picture is firming; reliability indices and headline freight rates lag it.`,
+  );
+  if (region) {
+    lead.push(
+      `Geographically the pressure this cycle sat with ${region.label}. We expect the same lanes and corridors to set the tempo through the next reporting window unless a fresh naval-force posture change or a credible diplomatic move on the underlying conflicts disrupts the pattern.`,
+    );
+  }
+  return lead.join("\n\n");
+}
+
+
 
 // --- Prose builders --------------------------------------------------------
 // Analyst-style prose, never count-led. Forbidden idioms include
@@ -548,9 +805,10 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
     if ((isVesselHostile || isPortRouteOrChoke) && !isWeakBucket) strong.push(r);
     else if (!isWeakBucket) rest.push(r);
   }
-  const ordered = [...strong, ...rest];
-  // Cap at 15 to keep the table proportionate. Already date-sorted.
-  return ordered.slice(0, 15);
+  const ordered = dedupeByTitle([...strong, ...rest]);
+  // Cap at 10 so the Source Notes / Disclaimer block can be pulled back
+  // onto the same page rather than orphaned on a near-empty final page.
+  return ordered.slice(0, 10);
 }
 
 export const SHIPPING_SEV_LABEL = SEV_LABEL;

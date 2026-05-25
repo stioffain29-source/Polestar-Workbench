@@ -496,19 +496,17 @@ export async function exportShippingReportPdf(
     },
   );
 
-  // Editor-authored analyst sections.
-  if (data.whatMatters && data.whatMatters.trim()) {
-    drawSectionWithProse(ctx, "What Matters", data.whatMatters);
-  }
-  if (data.implications && data.implications.trim()) {
-    drawSectionWithProse(ctx, "Implications for Business", data.implications);
-  }
-  if (data.watchNext && data.watchNext.trim()) {
-    drawSectionWithProse(ctx, "Watch Next", data.watchNext);
-  }
-  if (data.polestarView && data.polestarView.trim()) {
-    drawSectionWithProse(ctx, "Polestar View", data.polestarView);
-  }
+  // Editor-authored analyst sections. Editor text wins when supplied;
+  // otherwise the dataset's auto-prose fills in so the report reads at
+  // Fuel-Watch substance even before the analyst has written the form.
+  const pickProse = (editor: string | null | undefined, auto: string): string => {
+    const t = (editor ?? "").trim();
+    return t.length > 0 ? t : auto;
+  };
+  drawSectionWithProse(ctx, "What Matters", pickProse(data.whatMatters, ds.autoWhatMatters));
+  drawSectionWithProse(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));
+  drawSectionWithProse(ctx, "Watch Next", pickProse(data.watchNext, ds.autoWatchNext));
+  drawSectionWithProse(ctx, "Polestar View", pickProse(data.polestarView, ds.autoPolestarView));
 
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 

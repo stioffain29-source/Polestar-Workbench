@@ -27,7 +27,14 @@ import {
 } from "./fuelWatchReport";
 import type { ProducerBuyerActionRow } from "./fuelNarratives";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
-import { buildCargoSecurityRead, buildLogisticsNodeRead } from "./cargoNarratives";
+import {
+  buildCargoSecurityRead,
+  buildLogisticsNodeRead,
+  buildCargoWhatMatters,
+  buildCargoImplications,
+  buildCargoWatchNext,
+  buildCargoPolestarView,
+} from "./cargoNarratives";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
  *  market data and the caller did not pass allowMissingMarketData. The
@@ -318,20 +325,72 @@ function drawRelatedIncidents(
   function weakBucket(label: string): boolean {
     return /^other\s.+incident$/i.test(label) || label === "Unclassified maritime record";
   }
-  const annotated = windowIncidents.map((i) => ({
+  // For Cargo specifically the source data carries a lot of generic
+  // "Warehouse theft - Other" / "Container theft - Other" /
+  // "Warehouse theft - Electronics" titles that repeat across the
+  // window. Treat any title ending in a generic suffix as a weak row
+  // so the table prefers named-place / named-corridor / named-cargo
+  // records when they exist.
+  function isGenericCargoTitle(title: string): boolean {
+    return /\b(warehouse|container|cargo|truck|depot)\s+theft\s+-\s+(other|unknown|misc|miscellaneous|general|electronics|goods|items|various|assorted)\s*$/i.test(
+      (title ?? "").trim(),
+    );
+  }
+  // Title-based dedupe: collapse syndicated / repeated rows so the
+  // Related Incidents table does not list the same loss four times.
+  function titleKey(s: string): string {
+    const STOP = new Set([
+      "the", "a", "an", "of", "in", "on", "at", "to", "for", "and",
+      "as", "by", "off", "near", "after", "amid", "with", "from", "into", "over",
+      "says", "say", "said", "reports", "report",
+    ]);
+    return (s ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter((w) => w && !STOP.has(w))
+      .slice(0, 8)
+      .join(" ");
+  }
+  const seen = new Set<string>();
+  const deduped: TopicReportIncident[] = [];
+  for (const i of windowIncidents) {
+    const k = titleKey(i.title);
+    if (k && seen.has(k)) continue;
+    if (k) seen.add(k);
+    deduped.push(i);
+  }
+  const annotated = deduped.map((i) => ({
     i,
-    weak: weakBucket(classifyIncidentType(i)),
+    weak:
+      weakBucket(classifyIncidentType(i)) ||
+      (topic === "cargo_watch" && isGenericCargoTitle(i.title)),
   }));
   const strong = annotated.filter((r) => !r.weak).map((r) => r.i);
   const weak = annotated.filter((r) => r.weak).map((r) => r.i);
   const STRONG_FLOOR = 4;
-  const ordered = strong.length >= STRONG_FLOOR ? strong : [...strong, ...weak];
+  // Cargo: generic-suffix titles ("Warehouse theft - Other" /
+  // "Container theft - Electronics" etc.) are hard-excluded regardless
+  // of strong-row count — they add noise without operational signal.
+  // Other topics keep the existing weak-fallback behaviour so sparse
+  // windows still produce a usable table.
+  const ordered =
+    topic === "cargo_watch"
+      ? strong
+      : strong.length >= STRONG_FLOOR ? strong : [...strong, ...weak];
   const sorted = [...ordered].sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
-  // For fuel specifically the table felt padded at the full limit;
-  // hold it to a tighter cap when we have strong-enough rows.
-  const effectiveMax = topic === "fuel" ? Math.min(max, 8) : max;
+  // Per-topic caps. Fuel was already tighter; Cargo and the generic
+  // path are now held at 10 so the Source Notes / Disclaimer block can
+  // be pulled back onto the same page rather than orphaned on a near-
+  // empty final page.
+  const effectiveMax =
+    topic === "fuel" ? Math.min(max, 8)
+    : topic === "cargo_watch" ? Math.min(max, 10)
+    : Math.min(max, 10);
   const rows = sorted.slice(0, effectiveMax);
   const truncated = sorted.length - rows.length;
   if (rows.length === 0) return;
@@ -580,31 +639,41 @@ export async function exportTopicReportPdf(
     );
 
     const isCargo = data.topic === "cargo_watch";
-    const cargoSecurity = isCargo ? buildCargoSecurityRead(windowIncidents) : "";
-    const cargoNode = isCargo ? buildLogisticsNodeRead(windowIncidents) : "";
+    const pickProse = (editor: string | null | undefined, auto: string): string => {
+      const t = (editor ?? "").trim();
+      return t.length > 0 ? t : auto;
+    };
 
-    const sections: [string, string | null | undefined][] = isCargo
-      ? [
-          ["Cargo Security Read", cargoSecurity],
-          ["Logistics Node Read", cargoNode],
-          ["Situation", data.situation],
-          ["What Happened", data.whatHappened],
-          ["What Matters", data.whatMatters],
-          ["Implications for Business", data.implications],
-          ["Watch Next", data.watchNext],
-          ["Polestar View", data.polestarView],
-        ]
-      : [
-          ["Situation", data.situation],
-          ["What Happened", data.whatHappened],
-          ["What Matters", data.whatMatters],
-          ["Implications for Business", data.implications],
-          ["Watch Next", data.watchNext],
-          ["Polestar View", data.polestarView],
-        ];
-    for (const [label, body] of sections) {
-      if (body && body.trim()) {
-        drawSectionWithProse(ctx, label, body);
+    if (isCargo) {
+      const cargoSecurity = buildCargoSecurityRead(windowIncidents);
+      const cargoNode = buildLogisticsNodeRead(windowIncidents);
+      // Editor text always wins on the four standard analyst sections;
+      // auto-prose fills in when the editor leaves a field blank so the
+      // cargo report reads at Fuel-Watch substance out of the box.
+      const cargoSections: [string, string][] = [
+        ["Cargo Security Read", cargoSecurity],
+        ["Logistics Node Read", cargoNode],
+        ["Situation", (data.situation ?? "").trim()],
+        ["What Happened", (data.whatHappened ?? "").trim()],
+        ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],
+        ["Implications for Business", pickProse(data.implications, buildCargoImplications(windowIncidents))],
+        ["Watch Next", pickProse(data.watchNext, buildCargoWatchNext(windowIncidents))],
+        ["Polestar View", pickProse(data.polestarView, buildCargoPolestarView(windowIncidents))],
+      ];
+      for (const [label, body] of cargoSections) {
+        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
+      }
+    } else {
+      const sections: [string, string | null | undefined][] = [
+        ["Situation", data.situation],
+        ["What Happened", data.whatHappened],
+        ["What Matters", data.whatMatters],
+        ["Implications for Business", data.implications],
+        ["Watch Next", data.watchNext],
+        ["Polestar View", data.polestarView],
+      ];
+      for (const [label, body] of sections) {
+        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
     }
   }

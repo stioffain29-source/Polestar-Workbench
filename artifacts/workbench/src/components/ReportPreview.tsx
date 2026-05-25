@@ -4,7 +4,14 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
-import { buildCargoSecurityRead, buildLogisticsNodeRead } from "@/lib/cargoNarratives";
+import {
+  buildCargoSecurityRead,
+  buildLogisticsNodeRead,
+  buildCargoWhatMatters,
+  buildCargoImplications,
+  buildCargoWatchNext,
+  buildCargoPolestarView,
+} from "@/lib/cargoNarratives";
 import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
   buildFuelWatchReportData,
@@ -20,15 +27,16 @@ const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
-// Brand-aligned severity palette. The subdued red #a33232 is reserved for
-// Extreme; other tiers use grayscale + electric blue so the only red on
-// the page is the highest tier.
+// Canonical severity palette — kept SEPARATE from brand colours.
+// Brand (#0b0a3d / #465bff / #363636 / #e2e2e2) is reserved for chrome,
+// headings and non-severity chart fills. #a33232 is reserved exclusively
+// for the Fuel Watch fail-closed banner and must never appear here.
 const SEV_COLOR: Record<string, string> = {
-  Extreme: "#a33232",
-  High: "#363636",
-  Moderate: "#465bff",
-  Low: "#6fb872",
-  Insignificant: "#e2e2e2",
+  Extreme: "#800000",
+  High: "#C0392B",
+  Moderate: "#E67E22",
+  Low: "#6FB872",
+  Insignificant: "#B8C2CC",
 };
 
 export interface ReportPreviewData {
@@ -448,32 +456,58 @@ export default function ReportPreview({
               </p>
             </Section>
 
-            {report.topic === "cargo_watch" && (
-              <>
-                <NarrativeSection
-                  title="Cargo Security Read"
-                  text={buildCargoSecurityRead(
-                    report.topic && report.issueDate
-                      ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
-                      : [],
+            {(() => {
+              const isCargo = report.topic === "cargo_watch";
+              const cargoWindow = isCargo && report.topic && report.issueDate
+                ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
+                : [];
+              const pick = (editor: string | null | undefined, auto: string): string => {
+                const t = (editor ?? "").trim();
+                return t.length > 0 ? t : auto;
+              };
+              return (
+                <>
+                  {isCargo && (
+                    <>
+                      <NarrativeSection
+                        title="Cargo Security Read"
+                        text={buildCargoSecurityRead(cargoWindow)}
+                      />
+                      <NarrativeSection
+                        title="Logistics Node Read"
+                        text={buildLogisticsNodeRead(cargoWindow)}
+                      />
+                    </>
                   )}
-                />
-                <NarrativeSection
-                  title="Logistics Node Read"
-                  text={buildLogisticsNodeRead(
-                    report.topic && report.issueDate
-                      ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
-                      : [],
-                  )}
-                />
-              </>
-            )}
-            <NarrativeSection title="Situation" text={report.situation} />
-            <NarrativeSection title="What Happened" text={report.whatHappened} />
-            <NarrativeSection title="What Matters" text={report.whatMatters} />
-            <NarrativeSection title="Implications for Business" text={report.implications} />
-            <NarrativeSection title="Watch Next" text={report.watchNext} />
-            <NarrativeSection title="Polestar View" text={report.polestarView} />
+                  <NarrativeSection title="Situation" text={report.situation} />
+                  <NarrativeSection title="What Happened" text={report.whatHappened} />
+                  <NarrativeSection
+                    title="What Matters"
+                    text={isCargo
+                      ? pick(report.whatMatters, buildCargoWhatMatters(cargoWindow))
+                      : report.whatMatters}
+                  />
+                  <NarrativeSection
+                    title="Implications for Business"
+                    text={isCargo
+                      ? pick(report.implications, buildCargoImplications(cargoWindow))
+                      : report.implications}
+                  />
+                  <NarrativeSection
+                    title="Watch Next"
+                    text={isCargo
+                      ? pick(report.watchNext, buildCargoWatchNext(cargoWindow))
+                      : report.watchNext}
+                  />
+                  <NarrativeSection
+                    title="Polestar View"
+                    text={isCargo
+                      ? pick(report.polestarView, buildCargoPolestarView(cargoWindow))
+                      : report.polestarView}
+                  />
+                </>
+              );
+            })()}
           </>
         )}
       </div>

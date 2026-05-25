@@ -593,18 +593,18 @@ export default function ShippingReportPreview({
           <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries in window." />
         </Section>
 
-        {report.whatMatters && report.whatMatters.trim() && (
-          <Section title="What Matters"><Paragraphs text={report.whatMatters} /></Section>
-        )}
-        {report.implications && report.implications.trim() && (
-          <Section title="Implications for Business"><Paragraphs text={report.implications} /></Section>
-        )}
-        {report.watchNext && report.watchNext.trim() && (
-          <Section title="Watch Next"><Paragraphs text={report.watchNext} /></Section>
-        )}
-        {report.polestarView && report.polestarView.trim() && (
-          <Section title="Polestar View"><Paragraphs text={report.polestarView} /></Section>
-        )}
+        <Section title="What Matters">
+          <Paragraphs text={(report.whatMatters ?? "").trim() || ds.autoWhatMatters} />
+        </Section>
+        <Section title="Implications for Business">
+          <Paragraphs text={(report.implications ?? "").trim() || ds.autoImplications} />
+        </Section>
+        <Section title="Watch Next">
+          <Paragraphs text={(report.watchNext ?? "").trim() || ds.autoWatchNext} />
+        </Section>
+        <Section title="Polestar View">
+          <Paragraphs text={(report.polestarView ?? "").trim() || ds.autoPolestarView} />
+        </Section>
 
         {ds.relatedIncidents.length > 0 && (
           <Section title="Related Incidents">

@@ -1,0 +1,121 @@
+Shipping Watch and Cargo Watch need another tightening pass. Do not touch Fuel Watch.
+
+First: revert/confirm severity colours.
+
+Brand colours and severity colours are separate.
+
+Brand colours:
+- Midnight Blue: #0b0a3d
+- Electric Blue: #465bff
+- Dusk Gray: #363636
+- Polar Gray: #e2e2e2
+
+Severity colours:
+- Extreme: #800000
+- High: #C0392B
+- Moderate: #E67E22
+- Low: #6FB872
+- Insignificant: #B8C2CC
+
+Do not replace severity colours with brand colours.
+
+Shipping Watch fixes:
+
+1. Reduce table dominance
+The Vessel Attacks table is too long and dominates the report.
+Show only the most relevant records, not every duplicate/semi-duplicate item.
+Prioritise validated maritime security, vessel attack, seizure, piracy, port disruption and chokepoint records.
+Demote duplicate syndicated versions of the same event.
+
+2. Improve Chokepoint Watch quality
+Operational Read should not be led by weak/noisy headlines.
+Do not use repatriation stories, social media-style items, speculative strike claims or generic commentary as lead operational reads.
+Use credible maritime/security/industry/advisory records.
+If the available data is weak, say:
+“Low-confidence reporting only; no validated maritime advisory or credible operational incident identified.”
+
+3. Strengthen written analysis
+Shipping needs Fuel Watch-level substance.
+Expand:
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+
+Make them specific to:
+- routing
+- port calls
+- insurance and war-risk premium
+- vessel scheduling
+- bunker planning
+- cargo flow
+- operator advisories
+- crew-change and routing decisions
+
+4. Tighten Commercial Impact
+Do not let freight market commentary dominate.
+Commercial Impact should focus on operational consequence:
+- freight cost linked to disruption
+- insurance premium movement
+- port disruption
+- route diversion
+- schedule reliability
+- cargo flow impact
+
+5. Fix final page waste
+Do not leave Source Notes / Disclaimer sitting alone on a mostly blank page if it can be pulled back.
+
+Cargo Watch fixes:
+
+1. Add more written value
+Cargo needs more analysis, not just a short cargo incident digest.
+Expand:
+- What Matters
+- Implications for Business
+- Watch Next
+- Polestar View
+
+Make them specific to:
+- inventory loss
+- fulfilment impact
+- insurance exposure
+- repeat corridors
+- warehouse/depot controls
+- driver and yard staff vetting
+- route security
+- handover/seal integrity
+- high-value cargo moves
+
+2. Tighten Related Incidents
+Remove weak/generic duplicate rows such as:
+- “Warehouse theft - Electronics” repeated
+- “Container theft - Other”
+- “Warehouse theft - Other”
+
+Prefer records with:
+- named place
+- named corridor
+- clear cargo type
+- clear modus operandi
+- clear operational relevance
+
+3. Expand Watch Next
+Cargo Watch Next should include:
+- repeat losses on same corridor
+- copycat theft after publicised incident
+- insider involvement
+- depot access failures
+- seal/lock failures
+- insurance or police alerts
+- route displacement to weaker depots
+
+4. Fix final page waste
+Do not leave Source Notes / Disclaimer sitting alone on a mostly blank page.
+
+Acceptance:
+- Shipping no longer feels table-dominated.
+- Cargo has more written analytical value.
+- Related Incidents are stricter.
+- What Matters / Implications / Watch Next / Polestar View are closer to Fuel Watch quality.
+- Severity colours are the proper severity palette, not brand colours.
+- No dead final disclaimer page if avoidable.
