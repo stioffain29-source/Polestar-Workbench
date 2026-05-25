@@ -613,18 +613,20 @@ function buildWhatMatters(ctx: AutoCtx): string {
 
 function buildImplications(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
+  const where = lead ? lead.label : "the affected geographies";
   const parts: string[] = [];
   parts.push(
-    `Operators with city-centre exposure in ${lead ? lead.label : "the affected geographies"} should be running live duty-of-care reviews on staff movement, last-mile logistics and any customer-facing operations on protest routes. Activism cadence in these geographies converts into rolling road closures and intermittent transport disruption faster than headline media coverage suggests.`,
+    `For operators with on-the-ground exposure in ${where}, the practical first-order implications sit with staff movement, journey management and site access. Daily commuting plans into central business districts and ministry quarters should be reviewed against the live protest calendar, not the previous quarter's pattern. Drivers and staff travelling on routes that cross courts, parliament approaches, university precincts or party headquarters should have alternative routings briefed in advance and clear criteria for turning back. Visitor travel — inbound principals, auditors, customers — needs the same screening: arrival windows, hotel zoning away from likely rally corridors, and a named local escort with delegated authority to abort a movement.`,
   );
-  if (ctx.unrestRows.length > 0) {
-    parts.push(
-      `Where civil-unrest reporting is on the file, security planning should price in curfew impositions, internet-shutdown orders and short-notice mass arrests around named flashpoints. Crisis-comms cascade lists, alternative-route plans and a clear escalation threshold for closing offices early are the practical first-line mitigations.`,
-    );
-  }
+  parts.push(
+    `Site-level posture should reflect the same risk picture. Public-facing facilities (branches, showrooms, clinics, dealerships, customer-service counters) carry the highest exposure to opportunistic crowd action and should have published early-close protocols, shutter procedures and a single decision-maker for same-day closures. Plants, warehouses and corporate offices need a documented work-from-home / delayed-start trigger keyed to specific civil-unrest indicators rather than headline severity, and a security-posture step-up — perimeter checks, access-control hardening, visitor restrictions and standby for guard reinforcement — that can be activated inside an hour of a named flashpoint. Delivery disruption should be treated as a baseline planning assumption on protest days: last-mile reroutes, customer-comms templates for delayed orders and a freight contingency for blocked arterial routes.`,
+  );
+  parts.push(
+    `Crisis-communications triggers and escalation thresholds need to be explicit and pre-agreed, not improvised under pressure. Define in advance the events that move the response from monitoring to action: a Section 144 / curfew order in the city of operation, a confirmed protest call on a route the business uses, a strike notice from a sector the business depends on, an injury or arrest involving staff, or any internet-shutdown notice. Each threshold should pair with a named owner, a defined audience (staff, customers, regulators, board) and a pre-cleared first message so the response is measured in minutes rather than hours.`,
+  );
   if (ctx.activismRows.length >= 3) {
     parts.push(
-      `On the commercial side, sectoral walkouts (chemists, transporters, traders, lawyers) and student-body actions can disrupt supply chains and retail footfall ahead of any visible street-level escalation. Procurement, distribution and customer-service teams should treat sectoral calls as early-warning signals rather than background noise.`,
+      `Sectoral walkouts (chemists, pharmacists, transporters, traders, lawyers) and student-body mobilisation are not background noise — they routinely lead street-level escalation by 24-72 hours. Procurement, distribution and customer-service teams should be wired into the same early-warning feed as security, so a chamber announcement or a campus call converts into preventive stock build, customer expectation-setting and rota adjustments before the disruption lands.`,
     );
   }
   return parts.join("\n\n");
@@ -632,39 +634,71 @@ function buildImplications(ctx: AutoCtx): string {
 
 function buildWatchNext(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
-  const lines: string[] = [];
-  lines.push(
-    `Track opposition political calendars in ${lead ? lead.label : "the affected geographies"}, named protest schedules from union and student bodies, and sectoral chamber notifications (chemists, transporters, lawyers, traders). Those move ahead of street-level disruption.`,
-  );
-  lines.push(
-    `Watch for district-administration orders under Section 144 or equivalent public-order legislation, fresh police statements on rally permissions, and any military-aid-to-civil-power references. Curfew impositions, internet-shutdown notices and mass-arrest reporting are the leading indicators that the state response has crossed the threshold of visible enforcement.`,
-  );
+  const where = lead ? lead.label : "the affected geographies";
+  const intro = `The following indicators sit ahead of street-level escalation in ${where} and should be tracked daily through the next reporting window. Each carries a specific operational meaning rather than a generic risk flag.`;
+  const items: string[] = [
+    `Protest calls and mobilisation dates from opposition parties, named movements and civil-society coalitions. A dated, location-specific call is the single best lead indicator for road closures, transport disruption and crowd action around the targeted venue.`,
+    `Union strike notices — federation-level call-outs, sectoral chamber announcements (chemists, transporters, traders, lawyers) and confirmed walkout dates. Treat these as 24-72 hour warnings of supply-chain disruption, branch closures and customer-service degradation before any street activity is visible.`,
+    `Court hearings and detention triggers — bail rulings, indictments, contempt findings and high-profile transfers involving political figures, activists or movement leaders. Adverse rulings convert into same-day rallies and route closures around court complexes.`,
+    `Police permit refusals or assembly bans for announced rallies. A refusal rarely cancels the protest — it converts an organised event into a dispersed, harder-to-police one and raises the probability of clashes, baton charges and tear-gas dispersal at the venue.`,
+    `Section 144 / curfew orders or their geographical expansion. A fresh imposition in a city of operation is the trigger for immediate work-from-home declaration, suspension of non-essential staff movement and customer-facing site closure.`,
+    `Arrests, injuries and any confirmed fatalities in a protest or unrest context. These are the single clearest signal that the cycle will firm up rather than ease — expect retaliatory mobilisation, sympathy strikes in adjacent sectors and a hardened state response inside 48 hours.`,
+    `Roadblocks and transport disruption — confirmed motorway closures, rail stoppages, port-access blockades and airport-route disruption. Validate these against named routes the business uses and convert into live driver advisories rather than passive monitoring.`,
+    `Campus mobilisation — student-union calls, occupations, walkouts and university-administration closure notices. Campus action routinely seeds wider city-centre protest within a week and is a leading indicator of a sustained rather than one-off cycle.`,
+    `Online calls moving to street action — verified hashtags, telegram channels or WhatsApp mobilisation that name a date and location. The transition from digital organising to a confirmed venue is where social-media noise becomes operationally relevant.`,
+  ];
   if (ctx.unrestRows.length > 0) {
-    lines.push(
-      `On civil unrest specifically, monitor any fatalities, high-profile detentions or footage of security-force violence — these are the single clearest signals that the current cycle will firm up rather than ease through the next reporting window.`,
+    items.push(
+      `Visible enforcement steps already in play on the current file — internet-shutdown notices, mass-arrest reporting and military-aid-to-civil-power references. These indicate the state response has crossed the threshold of measured policing and the next cycle is likely to be harder, not softer.`,
     );
   } else {
-    lines.push(
-      `Even on a quiet civil-unrest cycle, monitor for a triggering event (court ruling, fuel-price decision, election-calendar move). Those are the typical accelerants when a thin briefing cycle flips into a sharp escalation.`,
+    items.push(
+      `Triggering events that historically flip a quiet civil-unrest cycle into a sharp one — fuel-price decisions, currency moves, election-calendar shifts, security-force fatalities or a major court ruling. Treat any of these as accelerants and step up monitoring cadence immediately.`,
     );
   }
-  return lines.join("\n\n");
+  return `${intro}\n\n${items.map((l) => `\u2022 ${l}`).join("\n\n")}`;
 }
 
 function buildPolestarView(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
+  const second = ctx.countryRows[1];
+  const where = lead ? lead.label : "the covered geographies";
   const parts: string[] = [];
+
+  // 1. Mobilisation capacity judgement.
+  const sectoral = ctx.activismRows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral)\b/i.test(`${r.title} ${r.summary ?? ""}`)).length;
+  const student = ctx.activismRows.filter((r) => /\b(student|university|campus|college)\b/i.test(`${r.title} ${r.summary ?? ""}`)).length;
+  const named = ctx.activismRows.filter((r) => /\b(pti|imran khan|tehreek|opposition|movement)\b/i.test(`${r.title} ${r.summary ?? ""}`)).length;
+  const mobBuckets: string[] = [];
+  if (named > 0) mobBuckets.push(`named-movement organising (${named})`);
+  if (sectoral > 0) mobBuckets.push(`sectoral chamber and union action (${sectoral})`);
+  if (student > 0) mobBuckets.push(`student and campus mobilisation (${student})`);
+  const mobLine = mobBuckets.length > 0
+    ? `Mobilisation capacity across ${where} is non-trivial this cycle, drawing on ${joinList(mobBuckets)}. That mix gives the political opposition multiple independent vectors for street action and is harder to contain than a single-issue protest wave.`
+    : `Mobilisation capacity across ${where} sits below its structural ceiling this cycle. That is a function of timing rather than capacity — the organising infrastructure (parties, unions, student bodies, sectoral chambers) remains intact and can be reactivated by a single political trigger inside a week.`;
+  parts.push(mobLine);
+
+  // 2. Speed of escalation judgement.
+  const hasEnforcement = ctx.unrestRows.some((r) => /\b(curfew|tear[- ]?gas|baton|water cannon|arrest|detention|section\s*144|crackdown|lockdown)\b/i.test(`${r.title} ${r.summary ?? ""}`));
+  const escLine = hasEnforcement
+    ? `Speed of escalation should be assumed to be fast. Visible enforcement (Section 144 orders, tear-gas dispersal, mass detentions, curfew impositions) is already on the file, which historically compresses the runway from a peaceful announced rally to a kinetic street incident from days to hours. Operators should not assume a graduated build-up.`
+    : `Speed of escalation looks measured for now, but the structural runway is short. In the covered geographies, the gap between a peaceful announced rally and a kinetic street incident has historically been 24-72 hours once a political trigger lands. Plan against that compressed window rather than the current calm.`;
+  parts.push(escLine);
+
+  // 3. Likely protest geography.
+  const geoBits: string[] = [];
+  if (lead) geoBits.push(`${lead.label} (${lead.value} record${lead.value === 1 ? "" : "s"}) sets the tempo`);
+  if (second) geoBits.push(`${second.label} (${second.value}) is the most likely secondary flashpoint`);
+  const geoLine = geoBits.length > 0
+    ? `Likely protest geography over the next 7-14 days concentrates where the current file is heaviest: ${joinList(geoBits)}. Within those countries, expect activity to cluster around the standard friction points — court complexes, party headquarters, ministry quarters, university precincts and main commercial arteries — rather than residential or suburban locations.`
+    : `Likely protest geography is broadly distributed this cycle with no single country dominating, which historically signals a diffuse political mood. That can reconcentrate quickly: a named opposition call or a single policy trigger tends to pull activity back to one or two capitals within days.`;
+  parts.push(geoLine);
+
+  // 4. Business disruption risk judgement.
   parts.push(
-    `Our read on the cycle is that the structural picture across the covered geographies remains a "quiet weeks, sharp incidents" cadence rather than a sustained easing of activism or civil-unrest risk. ${lead ? `${lead.label} continues to set the tempo` : `No single country dominated this cycle, but the regional baseline has not reset`}, and operators should plan against that rhythm rather than the headline weekly count.`,
+    `Business disruption risk through the next window is judged moderate-to-elevated. Most exposure sits in three forms: short-notice transport and last-mile disruption on protest days, branch and public-facing site closures driven by Section 144 / curfew orders rather than direct targeting, and supply-chain friction from sectoral walkouts running ahead of street action. The single largest residual risk is a triggering event — adverse court ruling, fuel-price decision, security-force fatality — converting the current cycle from contained protests into sustained unrest. That is a low-probability, high-impact case and is what standing readiness on staff movement, site closure and crisis-comms is sized for.`,
   );
-  parts.push(
-    `For commercial decisions, the practical implication is that staff movement plans, office-closure thresholds and crisis-comms cascade lists should be treated as live operational documents and reviewed every cycle — not annual exercises. The cost of a stale plan is realised the day a curfew lands or a city-centre rally turns kinetic, not on the day it is written.`,
-  );
-  if (lead) {
-    parts.push(
-      `Geographically the pressure this cycle sat with ${lead.label}. We expect the same cities and political triggers to set the tempo through the next reporting window unless a credible easing of the underlying political driver — court decision, opposition standdown, formal talks — disrupts the pattern.`,
-    );
-  }
+
   return parts.join("\n\n");
 }
 

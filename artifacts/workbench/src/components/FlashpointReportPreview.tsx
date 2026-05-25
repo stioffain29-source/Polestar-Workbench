@@ -51,6 +51,17 @@ function sevKey(s: string | null | undefined): string {
   return (s ?? "").toLowerCase();
 }
 
+// Match exportFlashpointReportPdf.pickProse: editor text wins only when
+// it carries substance (>= 240 chars); thin stubs (one-line generic
+// fallback prose left over from an older report draft) get replaced by
+// the dataset's substantive auto-prose so preview and PDF agree.
+function pickProse(editor: string | null | undefined, auto: string): string {
+  const t = (editor ?? "").trim();
+  if (t.length >= 240) return t;
+  if (t.length === 0) return auto;
+  return `${t}\n\n${auto}`;
+}
+
 export interface FlashpointPreviewReport {
   title?: string;
   topic?: string;
@@ -422,16 +433,16 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section title="What Matters">
-          <Paragraphs text={(report.whatMatters ?? "").trim() || ds.autoWhatMatters} />
+          <Paragraphs text={pickProse(report.whatMatters, ds.autoWhatMatters)} />
         </Section>
         <Section title="Implications for Business">
-          <Paragraphs text={(report.implications ?? "").trim() || ds.autoImplications} />
+          <Paragraphs text={pickProse(report.implications, ds.autoImplications)} />
         </Section>
         <Section title="Watch Next">
-          <Paragraphs text={(report.watchNext ?? "").trim() || ds.autoWatchNext} />
+          <Paragraphs text={pickProse(report.watchNext, ds.autoWatchNext)} />
         </Section>
         <Section title="Polestar View">
-          <Paragraphs text={(report.polestarView ?? "").trim() || ds.autoPolestarView} />
+          <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
         </Section>
 
         <Section title="Related Incidents">
