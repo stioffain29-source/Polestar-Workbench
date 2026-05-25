@@ -1,0 +1,581 @@
+// Canonical Fuel Watch report data.
+//
+// This is the ONLY place Fuel Watch assembles its report payload.
+// Preview, PDF exporter and the editor debug panel all consume the
+// FuelWatchReportData object returned by buildFuelWatchReportData.
+//
+// Design rules:
+//   * Fast Facts is built from marketData ONLY — no incident-count
+//     fallbacks (no "shortages-only" or "chokepoint-only" Fast Facts).
+//   * Brent / WTI / jet fuel are required market indicators. The
+//     validation block names exactly what is missing so the editor
+//     can fail closed instead of exporting a polished but empty report.
+//   * Jet fuel headline can resolve from prices[], jetFuel snapshot,
+//     or the latest trajectory point (in that priority order).
+
+import {
+  parseFuelHardNumbers,
+  jetFuelBenchmarkLabel as resolveBenchmark,
+  type FuelDataCard,
+  type JetFuelPricePoint,
+} from "./jetFuelTrajectory";
+import {
+  filterTopicReportIncidents,
+  type TopicFastFactsIncident,
+} from "./topicFastFacts";
+import {
+  buildFuelRegionalHighlights,
+  buildFuelProducerBuyerActions,
+} from "./fuelNarratives";
+
+export type { FuelDataCard, JetFuelPricePoint };
+
+export const FUEL_MISSING_REQUIRED_NOTE =
+  "Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.";
+export const FUEL_JET_MISSING_NOTE =
+  "Jet fuel data has not been loaded for this reporting cycle.";
+
+// Detection patterns for the headline crude/jet rows. Kept narrow on
+// purpose so a card titled "Brent" wins over a generic "Crude oil" card.
+const BRENT_RE = /brent/i;
+const WTI_RE = /\bwti\b|west\s*texas/i;
+const JET_RE = /\bjet\b|kerosene/i;
+
+function cardHaystack(c: FuelDataCard): string {
+  return `${c.label} ${c.note ?? ""}`;
+}
+
+function findCard(cards: FuelDataCard[], re: RegExp): FuelDataCard | null {
+  for (const c of cards) if (re.test(cardHaystack(c))) return c;
+  return null;
+}
+
+export interface FuelReportInput {
+  id?: number;
+  title?: string;
+  issueDate: string;
+  author?: string | null;
+  executiveSummary?: string | null;
+  situation?: string | null;
+  whatHappened?: string | null;
+  whatMatters?: string | null;
+  implications?: string | null;
+  polestarView?: string | null;
+  watchNext?: string | null;
+  hardNumbers?: unknown;
+}
+
+export interface FuelReportMeta {
+  id?: number;
+  title: string;
+  topic: "fuel";
+  issueDate: string;
+  author?: string | null;
+}
+
+export interface FuelMarketData {
+  prices: FuelDataCard[];
+  brent: FuelDataCard | null;
+  wti: FuelDataCard | null;
+  /** Headline jet fuel card — resolved from prices[], jetFuel snapshot,
+   *  or the latest trajectory point. Null if none of those are present. */
+  jetFuel: FuelDataCard | null;
+  jetFuelBenchmarkLabel: string;
+  /** Trajectory series. Empty array when fewer than 2 valid points. */
+  jetFuelTrajectory: JetFuelPricePoint[];
+  supplyIndicators: FuelDataCard[];
+  policyIndicators: FuelDataCard[];
+  routeIndicators: FuelDataCard[];
+  /** The ordered Fast Facts grid. Built from marketData only — never
+   *  back-filled from incident counts. */
+  fastFactsCards: FuelDataCard[];
+}
+
+export interface FuelIncidentData {
+  fuelIncidents: TopicFastFactsIncident[];
+  regionalHighlights: string | null;
+  producerBuyerActions: string | null;
+}
+
+export interface FuelNarrativeData {
+  executiveSummary?: string | null;
+  situation?: string | null;
+  whatHappened?: string | null;
+  whatMatters?: string | null;
+  implications?: string | null;
+  polestarView?: string | null;
+  watchNext?: string | null;
+}
+
+export interface FuelValidation {
+  hasPrices: boolean;
+  hasBrent: boolean;
+  hasWti: boolean;
+  hasBrentOrWti: boolean;
+  hasJetFuel: boolean;
+  hasJetFuelTrajectory: boolean;
+  hasSupplyOrPolicy: boolean;
+  hasRelatedIncidents: boolean;
+  hasRequiredFuelWatchData: boolean;
+  /** Human-readable list of missing required indicators. */
+  missingRequired: string[];
+  errors: string[];
+  warnings: string[];
+}
+
+export interface FuelWatchReportData {
+  reportMeta: FuelReportMeta;
+  marketData: FuelMarketData;
+  incidentData: FuelIncidentData;
+  narrativeData: FuelNarrativeData;
+  validation: FuelValidation;
+}
+
+/**
+ * The one place Fuel Watch data is assembled. Preview, PDF and the
+ * editor debug panel must all call this — no renderer is allowed to
+ * parse hardNumbers or derive jet fuel on its own.
+ */
+export function buildFuelWatchReportData(
+  report: FuelReportInput,
+  incidents: TopicFastFactsIncident[],
+): FuelWatchReportData {
+  const parsed = parseFuelHardNumbers(report.hardNumbers);
+  const prices = parsed.prices;
+  const brent = findCard(prices, BRENT_RE);
+  const wti = findCard(prices, WTI_RE);
+
+  // Jet fuel headline card resolution, in priority order:
+  //   1. an explicit price card whose label/benchmark mentions jet
+  //   2. the jetFuel snapshot's latestValue
+  //   3. the latest trajectory point
+  let jetFuel: FuelDataCard | null = findCard(prices, JET_RE);
+  if (!jetFuel && parsed.jetFuel?.latestValue !== undefined) {
+    const s = parsed.jetFuel;
+    const latest = s.latestValue as number;
+    const label = s.benchmark ? `Jet fuel — ${s.benchmark}` : "Jet fuel";
+    const built: FuelDataCard = { label, value: latest };
+    if (s.unit) built.unit = s.unit;
+    if (s.change) built.change = s.change;
+    if (s.asOf) built.asOf = s.asOf;
+    if (s.source) built.source = s.source;
+    jetFuel = built;
+  }
+  if (!jetFuel && parsed.jetFuelTrajectory.points.length >= 1) {
+    const last = parsed.jetFuelTrajectory.points[parsed.jetFuelTrajectory.points.length - 1];
+    const benchmark = parsed.jetFuelTrajectory.benchmark;
+    const built: FuelDataCard = {
+      label: benchmark ? `Jet fuel — ${benchmark}` : "Jet fuel",
+      value: last.value,
+      asOf: last.date,
+    };
+    const unit = last.unit ?? parsed.jetFuelTrajectory.unit;
+    if (unit) built.unit = unit;
+    if (parsed.jetFuelTrajectory.source) built.source = parsed.jetFuelTrajectory.source;
+    jetFuel = built;
+  }
+
+  // The trajectory chart minimum-data contract is unchanged: at least
+  // two dated points. Fewer than that and the series is empty.
+  const trajectoryPoints =
+    parsed.jetFuelTrajectory.points.length >= 2 ? parsed.jetFuelTrajectory.points : [];
+  const jetFuelBenchmarkLabel = resolveBenchmark(report.hardNumbers);
+
+  // Fast Facts order: Brent, WTI, jet fuel, any other price cards
+  // (e.g. pump, diesel), then supply / policy / routes. Never any
+  // incident-derived fallbacks.
+  const fastFactsCards: FuelDataCard[] = [];
+  if (brent) fastFactsCards.push(brent);
+  if (wti) fastFactsCards.push(wti);
+  if (jetFuel) fastFactsCards.push(jetFuel);
+  for (const p of prices) {
+    if (p === brent || p === wti || p === jetFuel) continue;
+    // Skip a duplicate jet card if jetFuel was derived from prices[] above.
+    if (jetFuel && p === jetFuel) continue;
+    if (JET_RE.test(cardHaystack(p))) continue;
+    fastFactsCards.push(p);
+  }
+  for (const c of parsed.supply) fastFactsCards.push(c);
+  for (const c of parsed.policy) fastFactsCards.push(c);
+  for (const c of parsed.routes) fastFactsCards.push(c);
+
+  // Related-incident filtering uses the topic window + topic-relevance
+  // filter so a hiking story that happens to say "fuel" is dropped.
+  const fuelIncidents = filterTopicReportIncidents(incidents, "fuel", report.issueDate);
+  const regionalHighlights = buildFuelRegionalHighlights({
+    issueDate: report.issueDate,
+    incidents,
+  });
+  const producerBuyerActions = buildFuelProducerBuyerActions({
+    issueDate: report.issueDate,
+    incidents,
+  });
+
+  // Validation. The fail-closed export gate is keyed on market data
+  // only: Brent, WTI and jet fuel are the required indicators. Other
+  // signals (supply/policy/routes/related incidents) are reported as
+  // completeness warnings, not as export blockers — a missing incident
+  // window is normal and must not stop publication of valid market data.
+  const hasPrices = prices.length > 0;
+  const hasBrent = brent !== null;
+  const hasWti = wti !== null;
+  const hasBrentOrWti = hasBrent || hasWti;
+  const hasJetFuel = jetFuel !== null;
+  const hasJetFuelTrajectory = trajectoryPoints.length >= 2;
+  const hasSupplyOrPolicy =
+    parsed.supply.length > 0 || parsed.policy.length > 0 || parsed.routes.length > 0;
+  const hasRelatedIncidents = fuelIncidents.length > 0;
+
+  const missingRequired: string[] = [];
+  if (!hasBrent) missingRequired.push("Brent crude price");
+  if (!hasWti) missingRequired.push("WTI crude price");
+  if (!hasJetFuel) missingRequired.push("Jet fuel indicator");
+  const hasRequiredFuelWatchData = missingRequired.length === 0;
+
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (!hasJetFuel) errors.push(FUEL_JET_MISSING_NOTE);
+  if (hasJetFuel && !hasJetFuelTrajectory) {
+    warnings.push("Jet fuel trajectory needs at least two dated points to render the chart.");
+  }
+  if (!hasSupplyOrPolicy) {
+    warnings.push("No supply, policy or route indicators supplied.");
+  }
+  if (!hasRelatedIncidents) {
+    warnings.push("No related fuel incidents in the reporting window.");
+  }
+
+  return {
+    reportMeta: {
+      ...(report.id !== undefined ? { id: report.id } : {}),
+      title: report.title ?? "",
+      topic: "fuel",
+      issueDate: report.issueDate,
+      ...(report.author !== undefined ? { author: report.author } : {}),
+    },
+    marketData: {
+      prices,
+      brent,
+      wti,
+      jetFuel,
+      jetFuelBenchmarkLabel,
+      jetFuelTrajectory: trajectoryPoints,
+      supplyIndicators: parsed.supply,
+      policyIndicators: parsed.policy,
+      routeIndicators: parsed.routes,
+      fastFactsCards,
+    },
+    incidentData: {
+      fuelIncidents,
+      regionalHighlights,
+      producerBuyerActions,
+    },
+    narrativeData: {
+      executiveSummary: report.executiveSummary,
+      situation: report.situation,
+      whatHappened: report.whatHappened,
+      whatMatters: report.whatMatters,
+      implications: report.implications,
+      polestarView: report.polestarView,
+      watchNext: report.watchNext,
+    },
+    validation: {
+      hasPrices,
+      hasBrent,
+      hasWti,
+      hasBrentOrWti,
+      hasJetFuel,
+      hasJetFuelTrajectory,
+      hasSupplyOrPolicy,
+      hasRelatedIncidents,
+      hasRequiredFuelWatchData,
+      missingRequired,
+      errors,
+      warnings,
+    },
+  };
+}
+
+/**
+ * Render-time formatting helper used by both preview and PDF so a
+ * FuelDataCard renders identically in both. Numbers pick decimals
+ * based on magnitude; pre-formatted strings pass through.
+ */
+export function formatFuelCardValue(value: number | string, unit?: string): string {
+  if (typeof value === "string") return unit ? `${value} ${unit}` : value;
+  const formatted = Number.isInteger(value)
+    ? value.toString()
+    : value.toFixed(value >= 100 ? 1 : Math.abs(value) >= 10 ? 2 : 3);
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+/** Build the renderer-friendly card shape (label/value/note/asOf/source). */
+export interface RenderableFuelCard {
+  label: string;
+  value: string;
+  note?: string;
+  asOf?: string;
+  source?: string;
+}
+export function toRenderableCard(c: FuelDataCard): RenderableFuelCard {
+  const out: RenderableFuelCard = { label: c.label, value: formatFuelCardValue(c.value, c.unit) };
+  const noteParts: string[] = [];
+  if (c.change) noteParts.push(c.change);
+  if (c.note) noteParts.push(c.note);
+  if (noteParts.length) out.note = noteParts.join(" · ");
+  if (c.asOf) out.asOf = c.asOf;
+  if (c.source) out.source = c.source;
+  return out;
+}
+
+/** Canonical sample payload, surfaced by the editor's "Load sample" button. */
+export const FUEL_MARKET_DATA_SAMPLE = {
+  fastFacts: {
+    prices: [
+      { label: "Brent crude", value: 109.26, unit: "USD/bbl", change: "+7.9% 7d", asOf: "2026-05-15", source: "Manual" },
+      { label: "WTI crude", value: 101.02, unit: "USD/bbl", change: "+10.5% 7d", asOf: "2026-05-15", source: "Manual" },
+      { label: "Jet fuel", benchmark: "US Gulf Coast kerosene-type jet fuel", value: 4.152, unit: "USD/gal", change: "+2.5% 7d", asOf: "2026-05-15", source: "EIA / FRED" },
+    ],
+    supply: [
+      { label: "Fuel shortages / rationing", value: 5, unit: "events", note: "reporting window" },
+    ],
+    policy: [
+      { label: "Subsidy / levy moves", value: 1, unit: "policy event", note: "reporting window" },
+    ],
+    routes: [
+      { label: "Fuel-relevant chokepoint pressure", value: 15, unit: "records", note: "Hormuz / route disruption" },
+    ],
+  },
+  jetFuelTrajectory: {
+    benchmark: "US Gulf Coast kerosene-type jet fuel",
+    source: "EIA / FRED",
+    unit: "USD/gal",
+    period: "last 30 days",
+    points: [
+      { date: "2026-04-17", value: 3.709 },
+      { date: "2026-04-24", value: 3.906 },
+      { date: "2026-05-01", value: 4.160 },
+      { date: "2026-05-08", value: 4.049 },
+      { date: "2026-05-15", value: 4.152 },
+    ],
+  },
+} as const;
+
+/**
+ * Validate a raw hardNumbers JSON string from the editor's advanced
+ * view. Returns parsed value or human-readable error messages.
+ */
+export function validateFuelHardNumbersJson(
+  text: string,
+): { ok: true; value: unknown } | { ok: false; errors: string[] } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: null };
+  let value: unknown;
+  try {
+    value = JSON.parse(trimmed);
+  } catch (e) {
+    return { ok: false, errors: [`Invalid JSON: ${(e as Error).message}`] };
+  }
+  if (value !== null && typeof value !== "object") {
+    return { ok: false, errors: ["Top-level value must be an object, array, or null."] };
+  }
+  const parsed = parseFuelHardNumbers(value);
+  const hasAny =
+    parsed.prices.length > 0 ||
+    parsed.supply.length > 0 ||
+    parsed.policy.length > 0 ||
+    parsed.routes.length > 0 ||
+    parsed.legacyCards.length > 0 ||
+    parsed.jetFuel !== undefined ||
+    parsed.jetFuelTrajectory.points.length > 0;
+  if (!hasAny) {
+    return {
+      ok: false,
+      errors: [
+        "Payload parses as JSON but carries no recognised fields. Expected one of: fastFacts, prices, supply, policy, routes, jetFuel, jetFuelTrajectory, cards.",
+      ],
+    };
+  }
+  return { ok: true, value };
+}
+
+// ----------------------------------------------------------------------
+// Editor form helpers — round-trip between the canonical hardNumbers
+// jsonb shape and a flat form-state used by the Fuel Market Data panel.
+// ----------------------------------------------------------------------
+
+export interface FuelMarketCardForm {
+  value: string;
+  unit: string;
+  change: string;
+  asOf: string;
+  source: string;
+}
+
+export interface FuelMarketJetForm extends FuelMarketCardForm {
+  benchmark: string;
+}
+
+export interface FuelMarketFormState {
+  brent: FuelMarketCardForm;
+  wti: FuelMarketCardForm;
+  jet: FuelMarketJetForm;
+  /** One trajectory point per line, formatted "YYYY-MM-DD, value". */
+  trajectoryText: string;
+}
+
+export const EMPTY_FUEL_MARKET_FORM: FuelMarketFormState = {
+  brent: { value: "", unit: "USD/bbl", change: "", asOf: "", source: "" },
+  wti: { value: "", unit: "USD/bbl", change: "", asOf: "", source: "" },
+  jet: { benchmark: "", value: "", unit: "USD/gal", change: "", asOf: "", source: "" },
+  trajectoryText: "",
+};
+
+function cardFormFrom(c: FuelDataCard | null, fallbackUnit: string): FuelMarketCardForm {
+  if (!c) return { value: "", unit: fallbackUnit, change: "", asOf: "", source: "" };
+  return {
+    value: typeof c.value === "number" ? String(c.value) : c.value,
+    unit: c.unit ?? fallbackUnit,
+    change: c.change ?? "",
+    asOf: c.asOf ?? "",
+    source: c.source ?? "",
+  };
+}
+
+/** Seed the form from a parsed FuelWatchReportData. */
+export function fuelMarketFormFromData(data: FuelWatchReportData): FuelMarketFormState {
+  const { brent, wti, jetFuel, jetFuelBenchmarkLabel, jetFuelTrajectory } = data.marketData;
+  const jet = jetFuel
+    ? {
+        benchmark:
+          // Prefer the trajectory/snapshot benchmark over a label-baked one.
+          jetFuelBenchmarkLabel && jetFuelBenchmarkLabel !== "Jet fuel benchmark"
+            ? jetFuelBenchmarkLabel
+            : (jetFuel.label.replace(/^Jet fuel\s+—\s+/, "") !== jetFuel.label
+                ? jetFuel.label.replace(/^Jet fuel\s+—\s+/, "")
+                : ""),
+        value: typeof jetFuel.value === "number" ? String(jetFuel.value) : jetFuel.value,
+        unit: jetFuel.unit ?? "USD/gal",
+        change: jetFuel.change ?? "",
+        asOf: jetFuel.asOf ?? "",
+        source: jetFuel.source ?? "",
+      }
+    : { ...EMPTY_FUEL_MARKET_FORM.jet };
+  const trajectoryText = jetFuelTrajectory
+    .map((p) => `${p.date}, ${p.value}`)
+    .join("\n");
+  return {
+    brent: cardFormFrom(brent, "USD/bbl"),
+    wti: cardFormFrom(wti, "USD/bbl"),
+    jet,
+    trajectoryText,
+  };
+}
+
+function buildCardPayload(
+  label: string,
+  form: FuelMarketCardForm,
+): Record<string, unknown> | null {
+  const valTrim = form.value.trim();
+  if (!valTrim) return null;
+  const num = Number(valTrim);
+  const out: Record<string, unknown> = {
+    label,
+    value: Number.isFinite(num) ? num : valTrim,
+  };
+  if (form.unit.trim()) out.unit = form.unit.trim();
+  if (form.change.trim()) out.change = form.change.trim();
+  if (form.asOf.trim()) out.asOf = form.asOf.trim();
+  if (form.source.trim()) out.source = form.source.trim();
+  return out;
+}
+
+export interface ParseTrajectoryResult {
+  points: { date: string; value: number }[];
+  errors: string[];
+}
+
+/** Parse the trajectory textarea into ordered points + line-level errors. */
+export function parseTrajectoryText(text: string): ParseTrajectoryResult {
+  const points: { date: string; value: number }[] = [];
+  const errors: string[] = [];
+  const lines = text.split(/\r?\n/);
+  lines.forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) return;
+    // Accept "YYYY-MM-DD, value" or "YYYY-MM-DD value" or tab-separated.
+    const parts = line.split(/[,\s\t]+/).filter(Boolean);
+    if (parts.length < 2) {
+      errors.push(`Line ${i + 1}: expected "YYYY-MM-DD, value".`);
+      return;
+    }
+    const [date, valueStr] = parts;
+    const d = new Date(date);
+    if (isNaN(d.getTime()) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      errors.push(`Line ${i + 1}: invalid date "${date}".`);
+      return;
+    }
+    const value = Number(valueStr);
+    if (!Number.isFinite(value)) {
+      errors.push(`Line ${i + 1}: invalid number "${valueStr}".`);
+      return;
+    }
+    points.push({ date, value });
+  });
+  points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return { points, errors };
+}
+
+export interface BuildHardNumbersResult {
+  /** The hardNumbers payload to persist. `null` when nothing was entered. */
+  payload: Record<string, unknown> | null;
+  errors: string[];
+}
+
+/**
+ * Assemble the form state into the canonical hardNumbers jsonb shape.
+ * Returns null payload if every field is empty (i.e. user wants to
+ * clear the payload). Surfaces trajectory line errors verbatim.
+ */
+export function buildHardNumbersFromForm(form: FuelMarketFormState): BuildHardNumbersResult {
+  const errors: string[] = [];
+  const prices: Record<string, unknown>[] = [];
+  const brent = buildCardPayload("Brent crude", form.brent);
+  if (brent) prices.push(brent);
+  const wti = buildCardPayload("WTI crude", form.wti);
+  if (wti) prices.push(wti);
+  // Jet fuel is stored as a price card with an optional benchmark
+  // so the parser picks it up via the jet regex and the renderer
+  // shows the benchmark name alongside the label.
+  if (form.jet.value.trim()) {
+    const valTrim = form.jet.value.trim();
+    const num = Number(valTrim);
+    const jetCard: Record<string, unknown> = {
+      label: "Jet fuel",
+      value: Number.isFinite(num) ? num : valTrim,
+    };
+    if (form.jet.benchmark.trim()) jetCard.benchmark = form.jet.benchmark.trim();
+    if (form.jet.unit.trim()) jetCard.unit = form.jet.unit.trim();
+    if (form.jet.change.trim()) jetCard.change = form.jet.change.trim();
+    if (form.jet.asOf.trim()) jetCard.asOf = form.jet.asOf.trim();
+    if (form.jet.source.trim()) jetCard.source = form.jet.source.trim();
+    prices.push(jetCard);
+  }
+
+  const traj = parseTrajectoryText(form.trajectoryText);
+  errors.push(...traj.errors);
+
+  const payload: Record<string, unknown> = {};
+  if (prices.length > 0) payload.fastFacts = { prices };
+  if (traj.points.length > 0) {
+    const container: Record<string, unknown> = { points: traj.points };
+    if (form.jet.benchmark.trim()) container.benchmark = form.jet.benchmark.trim();
+    if (form.jet.unit.trim()) container.unit = form.jet.unit.trim();
+    if (form.jet.source.trim()) container.source = form.jet.source.trim();
+    payload.jetFuelTrajectory = container;
+  }
+  if (Object.keys(payload).length === 0) {
+    return { payload: null, errors };
+  }
+  return { payload, errors };
+}

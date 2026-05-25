@@ -1,0 +1,200 @@
+Stop patching Fuel Watch output. Build a robust Fuel Watch data contract and make the report fail closed if required market data is missing.
+
+Scope:
+Fuel Watch only.
+
+Problem:
+We keep fixing renderers, parsers and labels, but the report still exports without Brent, WTI, jet fuel or the jet fuel trajectory. This means the system does not have a reliable end-to-end data contract.
+
+Required approach:
+Create one canonical Fuel Watch report object and make every part of the report use it.
+
+1. Create a canonical FuelWatchReportData object
+
+Before rendering preview or PDF, build one object:
+
+FuelWatchReportData {
+  reportMeta
+  marketData
+  incidentData
+  narrativeData
+  validation
+}
+
+marketData must include:
+- prices
+- jetFuel
+- jetFuelTrajectory
+- supplyIndicators
+- policyIndicators
+- routeIndicators
+
+incidentData must include:
+- filtered fuel incidents
+- related incidents
+- regional signals
+- producer / buyer / policy / routing actions
+
+validation must include:
+- hasPrices
+- hasJetFuel
+- hasJetFuelTrajectory
+- hasRequiredFuelWatchData
+- errors
+- warnings
+
+2. One builder only
+
+Create one function:
+
+buildFuelWatchReportData(report, incidents)
+
+This function is the only place where Fuel Watch data is assembled.
+
+Preview must use this object.
+PDF export must use this object.
+The editor debug panel must use this object.
+No renderer should independently parse hardNumbers.
+No renderer should independently derive jet fuel.
+No renderer should independently calculate Fast Facts.
+
+3. Make Fuel Watch fail closed
+
+If Fuel Watch has no price indicators and no jet fuel data, do not silently export a weak report.
+
+Instead, show a clear editor warning:
+
+“Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.”
+
+Block PDF export unless the user explicitly clicks:
+
+“Export with missing market data”
+
+This prevents another polished but incomplete report.
+
+4. Minimum required data for a proper Fuel Watch
+
+A Fuel Watch report should be considered complete only when it has:
+
+Required:
+- at least one crude price indicator: Brent or WTI
+- at least one jet fuel indicator
+- at least one fuel supply or policy indicator
+- related fuel incidents
+
+Preferred:
+- Brent
+- WTI
+- jet fuel latest value
+- jet fuel trajectory
+- shortages / rationing
+- subsidy / levy / tax movement
+- chokepoint / route pressure
+
+5. Fast Facts rules
+
+The section title remains:
+
+FAST FACTS
+
+Fast Facts must be populated from FuelWatchReportData.marketData.
+
+It must not fall back to incident-count cards if market data is missing.
+
+If market data is missing, show a warning in the editor, not a fake Fast Facts section in the report.
+
+6. Jet fuel rules
+
+Jet fuel must be treated as a required Fuel Watch market indicator.
+
+Accepted sources:
+- hardNumbers.fastFacts.prices entry where label or benchmark includes jet fuel
+- hardNumbers.jetFuel
+- hardNumbers.jetFuelTrajectory latest point
+- internal market data table if available
+- manual Fuel Market Data panel entry
+
+If jet fuel is missing:
+- validation.hasJetFuel = false
+- editor shows warning
+- export is blocked unless explicitly overridden
+
+7. Jet Fuel Price Trajectory rules
+
+The trajectory chart renders only from FuelWatchReportData.marketData.jetFuelTrajectory.
+
+No separate parser in the PDF.
+No separate parser in the preview.
+
+If at least 2 dated points exist:
+- render chart
+
+If fewer than 2 points exist:
+- show editor warning
+- omit the chart from the PDF or show a clear missing-data note only if export is overridden
+
+8. Fuel Market Data editor panel
+
+The panel must not just be a JSON textarea.
+
+Add clear fields for:
+- Brent value
+- Brent unit
+- Brent change
+- Brent as-of date
+- Brent source
+- WTI value
+- WTI unit
+- WTI change
+- WTI as-of date
+- WTI source
+- Jet fuel benchmark
+- Jet fuel value
+- Jet fuel unit
+- Jet fuel change
+- Jet fuel as-of date
+- Jet fuel source
+- Jet fuel trajectory points
+
+JSON import can remain as an advanced option, but the normal user path must be form-based.
+
+9. Persistence test
+
+Add an automated or visible manual test:
+
+Create Fuel Watch report.
+Enter Brent, WTI and jet fuel.
+Save.
+Reload page.
+Confirm builder sees:
+- prices count > 0
+- jet fuel present
+- trajectory points count > 1
+Export PDF.
+Confirm PDF contains the same data.
+
+Do not mark complete until this passes after page refresh.
+
+10. Remove weak fallback behaviour
+
+Delete or disable fallback logic that turns missing market data into:
+- shortages-only Fast Facts
+- levy-only Fast Facts
+- chokepoint-only Fast Facts
+
+Those are supporting indicators, not a replacement for fuel market data.
+
+11. Acceptance check
+
+The task is only complete when:
+
+- FuelWatchReportData is built once and used by preview and PDF
+- Fast Facts uses marketData only
+- Brent appears when entered
+- WTI appears when entered
+- jet fuel appears when entered
+- jet fuel trajectory chart appears when trajectory points are entered
+- data survives save and page refresh
+- export PDF matches preview
+- export is blocked or warned when required fuel market data is missing
+- no renderer-level patching is required

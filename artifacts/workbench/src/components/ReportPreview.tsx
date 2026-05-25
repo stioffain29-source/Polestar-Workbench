@@ -5,7 +5,11 @@ import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "@/lib/fuelNarratives";
-import { buildFuelWatchMarketData } from "@/lib/fuelWatchMarketData";
+import {
+  buildFuelWatchReportData,
+  toRenderableCard,
+  FUEL_MISSING_REQUIRED_NOTE,
+} from "@/lib/fuelWatchReport";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
@@ -174,22 +178,26 @@ export default function ReportPreview({
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
   const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
-  // Unified Fuel Watch market data — both preview and PDF read from
-  // this same builder so they cannot drift on cards, jet fuel series,
-  // benchmark label, or missing-data warnings.
-  const market = isFuel && report.issueDate
-    ? buildFuelWatchMarketData({
-        issueDate: report.issueDate,
+  // Canonical Fuel Watch payload. Preview, PDF and the editor debug
+  // panel all consume this — no renderer parses hardNumbers on its own.
+  const fuelData = isFuel && report.issueDate
+    ? buildFuelWatchReportData(
+        {
+          title: report.title,
+          issueDate: report.issueDate,
+          executiveSummary: report.executiveSummary,
+          situation: report.situation,
+          whatHappened: report.whatHappened,
+          whatMatters: report.whatMatters,
+          implications: report.implications,
+          polestarView: report.polestarView,
+          watchNext: report.watchNext,
+          hardNumbers: report.hardNumbers,
+        },
         incidents,
-        hardNumbersRaw: report.hardNumbers,
-      })
+      )
     : null;
-  const fuelRegionalHighlights = isFuel && report.issueDate
-    ? buildFuelRegionalHighlights({ issueDate: report.issueDate, incidents })
-    : null;
-  const fuelProducerBuyerActions = isFuel && report.issueDate
-    ? buildFuelProducerBuyerActions({ issueDate: report.issueDate, incidents })
-    : null;
+  void buildFuelRegionalHighlights; void buildFuelProducerBuyerActions;
   const periodLabel = report.topic && report.issueDate
     ? resolveReportWindow(report.topic, report.issueDate).label
     : "";
@@ -310,28 +318,36 @@ export default function ReportPreview({
           </Section>
         )}
 
-        {isFuel && market ? (
+        {isFuel && fuelData ? (
           <>
             <Section title="Fast Facts">
-              {market.fastFactsCards.length > 0 ? (
-                <FastFactsGrid cards={market.fastFactsCards} />
-              ) : null}
-              {market.warnings.map((w, i) => (
+              {/* Fast Facts is built from marketData only — never back-filled
+                  from incident counts. When required data is missing we show
+                  the fail-closed banner instead of pretending. */}
+              {!fuelData.validation.hasRequiredFuelWatchData && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#a33232",
+                    fontFamily: "Roboto, sans-serif",
+                    padding: 12,
+                    background: "#fdecec",
+                    border: "1px solid #a33232",
+                    marginBottom: fuelData.marketData.fastFactsCards.length > 0 ? 12 : 0,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{FUEL_MISSING_REQUIRED_NOTE}</div>
+                  <div>Missing: {fuelData.validation.missingRequired.join(", ")}.</div>
+                </div>
+              )}
+              {fuelData.marketData.fastFactsCards.length > 0 && (
+                <FastFactsGrid cards={fuelData.marketData.fastFactsCards.map(toRenderableCard)} />
+              )}
+              {fuelData.validation.warnings.map((w, i) => (
                 <p
                   key={i}
-                  className={market.fastFactsCards.length > 0 ? "mt-3" : ""}
-                  style={
-                    market.fastFactsCards.length > 0
-                      ? { fontSize: 11, color: DUSK, fontFamily: "Roboto, sans-serif" }
-                      : {
-                          fontSize: 11,
-                          color: DUSK,
-                          fontFamily: "Roboto, sans-serif",
-                          padding: 16,
-                          background: "#f7f7f7",
-                          border: `1px solid ${POLAR}`,
-                        }
-                  }
+                  className={fuelData.marketData.fastFactsCards.length > 0 ? "mt-3" : ""}
+                  style={{ fontSize: 11, color: DUSK, fontFamily: "Roboto, sans-serif" }}
                 >
                   {w}
                 </p>
@@ -339,13 +355,16 @@ export default function ReportPreview({
             </Section>
 
             <Section title="Jet Fuel Price Trajectory">
-              <JetFuelTrajectoryChart data={market.jetFuelSeries} benchmarkLabel={market.jetFuelLabel} />
+              <JetFuelTrajectoryChart
+                data={fuelData.marketData.jetFuelTrajectory.length >= 2 ? fuelData.marketData.jetFuelTrajectory : null}
+                benchmarkLabel={fuelData.marketData.jetFuelBenchmarkLabel}
+              />
             </Section>
 
             <NarrativeSection title="Situation" text={report.situation} />
             <NarrativeSection title="What Happened" text={report.whatHappened} />
-            <NarrativeSection title="Regional Highlights" text={fuelRegionalHighlights} />
-            <NarrativeSection title="Producer and Buyer Actions" text={fuelProducerBuyerActions} />
+            <NarrativeSection title="Regional Highlights" text={fuelData.incidentData.regionalHighlights} />
+            <NarrativeSection title="Producer and Buyer Actions" text={fuelData.incidentData.producerBuyerActions} />
             <NarrativeSection title="What Matters" text={report.whatMatters} />
             <NarrativeSection title="Implications for Business" text={report.implications} />
             <NarrativeSection title="Watch Next" text={report.watchNext} />

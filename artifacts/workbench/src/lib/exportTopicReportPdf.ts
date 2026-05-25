@@ -20,9 +20,33 @@ import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import { computeTopicFastFacts } from "./topicFastFacts";
-import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "./fuelNarratives";
-import { buildFuelWatchMarketData } from "./fuelWatchMarketData";
+import {
+  buildFuelWatchReportData,
+  toRenderableCard,
+  FUEL_MISSING_REQUIRED_NOTE,
+} from "./fuelWatchReport";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
+
+/** Thrown by exportTopicReportPdf when Fuel Watch is missing required
+ *  market data and the caller did not pass allowMissingMarketData. The
+ *  editor catches this error code to surface its override button. */
+export const FUEL_REQUIRED_DATA_MISSING_CODE = "FUEL_REQUIRED_DATA_MISSING";
+export class FuelRequiredDataMissingError extends Error {
+  readonly code = FUEL_REQUIRED_DATA_MISSING_CODE;
+  readonly missing: string[];
+  constructor(missing: string[]) {
+    super(`${FUEL_MISSING_REQUIRED_NOTE} Missing: ${missing.join(", ")}.`);
+    this.name = "FuelRequiredDataMissingError";
+    this.missing = missing;
+  }
+}
+
+export interface ExportTopicReportPdfOptions {
+  /** When true, Fuel Watch will export even with missing required data
+   *  and surface the warnings in the document. Defaults to false (fail
+   *  closed) so authors cannot accidentally ship a hollow report. */
+  allowMissingMarketData?: boolean;
+}
 
 export interface TopicReportData {
   title: string;
@@ -300,6 +324,7 @@ export async function exportTopicReportPdf(
   incidents: TopicReportIncident[],
   topicLabels: Record<string, string>,
   filename: string,
+  options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
   const topicLabel = topicLabels[data.topic] ?? data.topic;
   // Canonical naming: cover title, running header and subtitle use the
@@ -367,41 +392,65 @@ export async function exportTopicReportPdf(
   );
   const isFuel = data.topic === "fuel";
   if (isFuel) {
-    // Fuel Watch's Fast Facts is a fuel-market block (prices / jet fuel
-    // / supply / policy / routes), not a generic incident counter.
-    // The unified market-data builder is the single source of truth for
-    // both Fast Facts cards and the jet fuel trajectory chart.
-    const market = buildFuelWatchMarketData({
-      issueDate: data.issueDate,
+    // Canonical Fuel Watch payload — shared by preview/PDF/editor.
+    const fuelData = buildFuelWatchReportData(
+      {
+        title: data.title,
+        issueDate: data.issueDate,
+        author: data.author,
+        executiveSummary: data.executiveSummary,
+        situation: data.situation,
+        whatHappened: data.whatHappened,
+        whatMatters: data.whatMatters,
+        implications: data.implications,
+        polestarView: data.polestarView,
+        watchNext: data.watchNext,
+        hardNumbers: data.hardNumbers,
+      },
       incidents,
-      hardNumbersRaw: data.hardNumbers,
-    });
+    );
+
+    // Fail closed: refuse to export a polished but hollow report unless
+    // the caller explicitly opted in via options.allowMissingMarketData.
+    if (!fuelData.validation.hasRequiredFuelWatchData && !options.allowMissingMarketData) {
+      throw new FuelRequiredDataMissingError(fuelData.validation.missingRequired);
+    }
+
     drawSectionHeading(ctx, "Fast Facts");
-    if (market.fastFactsCards.length === 0) {
-      renderProse(ctx, market.warnings.join(" "));
+    if (!fuelData.validation.hasRequiredFuelWatchData) {
+      // Override path: render a visible warning at the top of Fast Facts.
+      renderProse(
+        ctx,
+        `${FUEL_MISSING_REQUIRED_NOTE} Missing: ${fuelData.validation.missingRequired.join(", ")}.`,
+      );
+    }
+    if (fuelData.marketData.fastFactsCards.length === 0) {
+      // No marketData at all but the user overrode — emit warnings only.
+      for (const w of fuelData.validation.warnings) renderProse(ctx, w);
     } else {
-      drawFastFactsKpiCards(ctx, market.fastFactsCards as KpiCardData[]);
-      for (const w of market.warnings) renderProse(ctx, w);
+      const kpis: KpiCardData[] = fuelData.marketData.fastFactsCards.map(toRenderableCard);
+      drawFastFactsKpiCards(ctx, kpis);
+      for (const w of fuelData.validation.warnings) renderProse(ctx, w);
     }
 
-    // Jet Fuel Price Trajectory — render the real chart only when the
-    // report carries a usable series (≥2 valid dated points). Otherwise
-    // fall back to the honest empty-state card.
+    // Jet Fuel Price Trajectory — render only when the series has
+    // ≥2 valid dated points (the canonical data already enforces this).
     drawSectionHeading(ctx, "Jet Fuel Price Trajectory");
-    if (market.jetFuelSeries) {
-      drawJetFuelChart(ctx, market.jetFuelSeries, market.jetFuelLabel);
+    if (fuelData.marketData.jetFuelTrajectory.length >= 2) {
+      drawJetFuelChart(
+        ctx,
+        fuelData.marketData.jetFuelTrajectory,
+        fuelData.marketData.jetFuelBenchmarkLabel,
+      );
     } else {
-      drawJetFuelEmptyCard(ctx, market.jetFuelLabel);
+      drawJetFuelEmptyCard(ctx, fuelData.marketData.jetFuelBenchmarkLabel);
     }
-
-    const regional = buildFuelRegionalHighlights({ issueDate: data.issueDate, incidents });
-    const producerBuyer = buildFuelProducerBuyerActions({ issueDate: data.issueDate, incidents });
 
     const fuelSections: [string, string | null | undefined][] = [
       ["Situation", data.situation],
       ["What Happened", data.whatHappened],
-      ["Regional Highlights", regional],
-      ["Producer and Buyer Actions", producerBuyer],
+      ["Regional Highlights", fuelData.incidentData.regionalHighlights],
+      ["Producer and Buyer Actions", fuelData.incidentData.producerBuyerActions],
       ["What Matters", data.whatMatters],
       ["Implications for Business", data.implications],
       ["Watch Next", data.watchNext],
