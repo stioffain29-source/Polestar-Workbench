@@ -47,25 +47,25 @@ title = "Font audit — Roboto-only proof for all 4 topics"
 id = "VEUzfqRgOU-zPRWzMV6w-"
 uri = "file://screenshots/font_proof/fuel.pdf"
 type = "pdf"
-title = "Fuel PDF (re-export, logo + Roboto)"
+title = "Fuel report"
 
 [[outputs]]
 id = "Dqcr4P91yNqCNM0VQfdeB"
 uri = "file://screenshots/font_proof/shipping.pdf"
 type = "pdf"
-title = "Shipping PDF (re-export, logo + Roboto)"
+title = "Shipping report"
 
 [[outputs]]
 id = "oJgIMrv0Z5_fZewLRziUm"
 uri = "file://screenshots/font_proof/cargo.pdf"
 type = "pdf"
-title = "Cargo PDF (re-export, logo + Roboto)"
+title = "Cargo Watch report"
 
 [[outputs]]
 id = "KepINUFMTpMJRiWR2pOl-"
 uri = "file://screenshots/font_proof/flashpoint.pdf"
 type = "pdf"
-title = "Flashpoint PDF (re-export, logo + Roboto)"
+title = "Flashpoint report"
 
 [[outputs]]
 id = "V-f95BKY2gZplBSuwv5fG"
