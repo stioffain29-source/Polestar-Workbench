@@ -17,15 +17,68 @@ export type JetFuelPricePoint = {
 };
 
 /**
- * Container for the report.hardNumbers jsonb column. Fuel Watch uses
- * `jetFuelTrajectory` to drive the Jet Fuel Price Trajectory chart.
- * Both fields are optional so legacy reports with null hardNumbers
- * stay valid, and reports that only carry cards stay valid too.
+ * A single fuel-market card (Fast Facts). See OpenAPI FuelDataCard.
+ * `value` is intentionally `number | string` so authors can store
+ * either a numeric benchmark (formatted at render time) or a
+ * pre-formatted string for human-curated cards.
+ */
+export type FuelDataCard = {
+  label: string;
+  value: number | string;
+  unit?: string;
+  change?: string;
+  asOf?: string;
+  source?: string;
+  note?: string;
+  /** Optional benchmark name. Appended to the label by the renderer. */
+  benchmark?: string;
+};
+
+/** Headline jet fuel snapshot. See OpenAPI JetFuelSnapshot. */
+export type JetFuelSnapshot = {
+  benchmark?: string;
+  source?: string;
+  unit?: string;
+  latestValue?: number;
+  asOf?: string;
+  change?: string;
+};
+
+/** Jet fuel trajectory container. Accepts both the v1 bare array and
+ *  the v2 named container — see OpenAPI JetFuelTrajectory. */
+export type JetFuelTrajectory =
+  | JetFuelPricePoint[]
+  | {
+      benchmark?: string;
+      source?: string;
+      unit?: string;
+      period?: string;
+      points: JetFuelPricePoint[];
+    };
+
+/** Optional wrapper for Fast Facts. See OpenAPI FuelFastFacts. */
+export type FuelFastFacts = {
+  prices?: FuelDataCard[];
+  supply?: FuelDataCard[];
+  policy?: FuelDataCard[];
+  routes?: FuelDataCard[];
+};
+
+/**
+ * Container for the report.hardNumbers jsonb column. All fields are
+ * optional so legacy reports (null, KpiCard[], or `{cards:[...]}` only)
+ * stay valid. Fuel Watch reports use the v2 fields below.
  */
 export type FuelHardNumbers = {
   cards?: KpiCard[];
-  jetFuelTrajectory?: JetFuelPricePoint[];
+  jetFuelTrajectory?: JetFuelTrajectory;
   jetFuelBenchmarkLabel?: string;
+  fastFacts?: FuelFastFacts;
+  prices?: FuelDataCard[];
+  supply?: FuelDataCard[];
+  policy?: FuelDataCard[];
+  routes?: FuelDataCard[];
+  jetFuel?: JetFuelSnapshot;
 };
 
 export const reportsTable = pgTable("reports", {

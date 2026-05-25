@@ -87,14 +87,116 @@ export const GetDashboardOverviewResponse = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
-  "jetFuelTrajectory": zod.array(zod.object({
+  "jetFuelTrajectory": zod.union([zod.array(zod.object({
   "date": zod.coerce.date(),
   "value": zod.number(),
   "unit": zod.string().optional(),
   "label": zod.string().optional(),
   "annotation": zod.string().optional()
+})),zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "period": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+}))
+})]).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional(),
+  "fastFacts": zod.object({
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
 })).optional(),
-  "jetFuelBenchmarkLabel": zod.string().optional()
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional()
+}).optional(),
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "jetFuel": zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "latestValue": zod.number().optional(),
+  "asOf": zod.string().optional(),
+  "change": zod.string().optional()
+}).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -563,14 +665,116 @@ export const ListReportsResponseItem = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
-  "jetFuelTrajectory": zod.array(zod.object({
+  "jetFuelTrajectory": zod.union([zod.array(zod.object({
   "date": zod.coerce.date(),
   "value": zod.number(),
   "unit": zod.string().optional(),
   "label": zod.string().optional(),
   "annotation": zod.string().optional()
+})),zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "period": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+}))
+})]).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional(),
+  "fastFacts": zod.object({
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
 })).optional(),
-  "jetFuelBenchmarkLabel": zod.string().optional()
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional()
+}).optional(),
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "jetFuel": zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "latestValue": zod.number().optional(),
+  "asOf": zod.string().optional(),
+  "change": zod.string().optional()
+}).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -602,14 +806,116 @@ export const CreateReportBody = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
-  "jetFuelTrajectory": zod.array(zod.object({
+  "jetFuelTrajectory": zod.union([zod.array(zod.object({
   "date": zod.coerce.date(),
   "value": zod.number(),
   "unit": zod.string().optional(),
   "label": zod.string().optional(),
   "annotation": zod.string().optional()
+})),zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "period": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+}))
+})]).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional(),
+  "fastFacts": zod.object({
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
 })).optional(),
-  "jetFuelBenchmarkLabel": zod.string().optional()
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional()
+}).optional(),
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "jetFuel": zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "latestValue": zod.number().optional(),
+  "asOf": zod.string().optional(),
+  "change": zod.string().optional()
+}).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -644,14 +950,116 @@ export const GetReportResponse = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
-  "jetFuelTrajectory": zod.array(zod.object({
+  "jetFuelTrajectory": zod.union([zod.array(zod.object({
   "date": zod.coerce.date(),
   "value": zod.number(),
   "unit": zod.string().optional(),
   "label": zod.string().optional(),
   "annotation": zod.string().optional()
+})),zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "period": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+}))
+})]).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional(),
+  "fastFacts": zod.object({
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
 })).optional(),
-  "jetFuelBenchmarkLabel": zod.string().optional()
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional()
+}).optional(),
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "jetFuel": zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "latestValue": zod.number().optional(),
+  "asOf": zod.string().optional(),
+  "change": zod.string().optional()
+}).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -686,14 +1094,116 @@ export const UpdateReportBody = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
-  "jetFuelTrajectory": zod.array(zod.object({
+  "jetFuelTrajectory": zod.union([zod.array(zod.object({
   "date": zod.coerce.date(),
   "value": zod.number(),
   "unit": zod.string().optional(),
   "label": zod.string().optional(),
   "annotation": zod.string().optional()
+})),zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "period": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+}))
+})]).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional(),
+  "fastFacts": zod.object({
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
 })).optional(),
-  "jetFuelBenchmarkLabel": zod.string().optional()
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional()
+}).optional(),
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "jetFuel": zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "latestValue": zod.number().optional(),
+  "asOf": zod.string().optional(),
+  "change": zod.string().optional()
+}).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -723,14 +1233,116 @@ export const UpdateReportResponse = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
-  "jetFuelTrajectory": zod.array(zod.object({
+  "jetFuelTrajectory": zod.union([zod.array(zod.object({
   "date": zod.coerce.date(),
   "value": zod.number(),
   "unit": zod.string().optional(),
   "label": zod.string().optional(),
   "annotation": zod.string().optional()
+})),zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "period": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "value": zod.number(),
+  "unit": zod.string().optional(),
+  "label": zod.string().optional(),
+  "annotation": zod.string().optional()
+}))
+})]).optional(),
+  "jetFuelBenchmarkLabel": zod.string().optional(),
+  "fastFacts": zod.object({
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
 })).optional(),
-  "jetFuelBenchmarkLabel": zod.string().optional()
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional()
+}).optional(),
+  "prices": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "supply": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "policy": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "routes": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.union([zod.number(),zod.string()]),
+  "unit": zod.string().optional(),
+  "change": zod.string().optional(),
+  "asOf": zod.string().optional(),
+  "source": zod.string().optional(),
+  "note": zod.string().optional(),
+  "benchmark": zod.string().optional()
+})).optional(),
+  "jetFuel": zod.object({
+  "benchmark": zod.string().optional(),
+  "source": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "latestValue": zod.number().optional(),
+  "asOf": zod.string().optional(),
+  "change": zod.string().optional()
+}).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),

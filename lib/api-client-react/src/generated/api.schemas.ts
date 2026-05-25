@@ -360,10 +360,51 @@ export interface JetFuelPricePoint {
   annotation?: string;
 }
 
+export type JetFuelTrajectory = JetFuelPricePoint[] | {
+  benchmark?: string;
+  source?: string;
+  unit?: string;
+  period?: string;
+  points: JetFuelPricePoint[];
+};
+
+export interface FuelDataCard {
+  label: string;
+  value: number | string;
+  unit?: string;
+  change?: string;
+  asOf?: string;
+  source?: string;
+  note?: string;
+  benchmark?: string;
+}
+
+export interface FuelFastFacts {
+  prices?: FuelDataCard[];
+  supply?: FuelDataCard[];
+  policy?: FuelDataCard[];
+  routes?: FuelDataCard[];
+}
+
+export interface JetFuelSnapshot {
+  benchmark?: string;
+  source?: string;
+  unit?: string;
+  latestValue?: number;
+  asOf?: string;
+  change?: string;
+}
+
 export interface FuelHardNumbers {
   cards?: KpiCard[];
-  jetFuelTrajectory?: JetFuelPricePoint[];
+  jetFuelTrajectory?: JetFuelTrajectory;
   jetFuelBenchmarkLabel?: string;
+  fastFacts?: FuelFastFacts;
+  prices?: FuelDataCard[];
+  supply?: FuelDataCard[];
+  policy?: FuelDataCard[];
+  routes?: FuelDataCard[];
+  jetFuel?: JetFuelSnapshot;
 }
 
 export interface Report {

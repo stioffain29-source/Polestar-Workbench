@@ -19,6 +19,10 @@ import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import {
+  FUEL_MARKET_DATA_SAMPLE,
+  validateFuelHardNumbersJson,
+} from "@/lib/fuelWatchMarketData";
 
 const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
 
@@ -77,6 +81,13 @@ export default function ReportEditor() {
   const [exporting, setExporting] = useState(false);
   const { data: incidents } = useListIncidents({});
   const seededForId = useRef<number | null>(null);
+  // Fuel Watch market-data editor. `hardNumbersText` is the textarea
+  // buffer; `hardNumbersEdited` is the last-validated object surfaced
+  // to the preview so authors see their edits live before saving.
+  const [hardNumbersText, setHardNumbersText] = useState<string>("");
+  const [hardNumbersError, setHardNumbersError] = useState<string | null>(null);
+  const [hardNumbersEdited, setHardNumbersEdited] = useState<unknown | undefined>(undefined);
+  const hardNumbersSeededForId = useRef<number | null>(null);
 
   const incidentsForExport = incidents ?? [];
 
@@ -96,8 +107,9 @@ export default function ReportEditor() {
         watchNext: form.watchNext,
         polestarView: form.polestarView,
         // Pass the raw jsonb through so the PDF exporter and the preview
-        // read from the same source for jet fuel trajectory + Hard Numbers.
-        hardNumbers: report?.hardNumbers,
+        // read from the same source for jet fuel trajectory + Fast Facts.
+        // Prefer the live editor buffer when the author has made changes.
+        hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
       };
       const mappedIncidents = incidentsForExport.map((i) => ({
         id: i.id,
@@ -185,7 +197,26 @@ export default function ReportEditor() {
     if (seededForId.current !== null && seededForId.current !== id) {
       seededForId.current = null;
     }
+    if (hardNumbersSeededForId.current !== null && hardNumbersSeededForId.current !== id) {
+      hardNumbersSeededForId.current = null;
+      setHardNumbersText("");
+      setHardNumbersError(null);
+      setHardNumbersEdited(undefined);
+    }
   }, [id]);
+
+  // Seed the fuel-market editor buffer from the stored payload once
+  // per report so opening a report shows what's actually persisted.
+  useEffect(() => {
+    if (!report) return;
+    if (hardNumbersSeededForId.current === report.id) return;
+    hardNumbersSeededForId.current = report.id;
+    setHardNumbersText(
+      report.hardNumbers ? JSON.stringify(report.hardNumbers, null, 2) : "",
+    );
+    setHardNumbersError(null);
+    setHardNumbersEdited(undefined);
+  }, [report]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -196,13 +227,55 @@ export default function ReportEditor() {
         window.localStorage.setItem(execSummaryStorageKey(id), executiveSummary);
       }
     } catch { /* ignore */ }
-    update.mutate({ id, data: persistable as never }, {
+    // Fuel Watch market-data save semantics:
+    //   * empty textarea → explicitly clear with `hardNumbers: null`
+    //     (so authors can wipe a stored payload without DB access).
+    //   * non-empty → validate and persist. Block save on invalid JSON
+    //     rather than silently dropping the edit.
+    const payload: Record<string, unknown> = { ...persistable };
+    if (form.topic === "fuel") {
+      if (!hardNumbersText.trim()) {
+        payload.hardNumbers = null;
+        setHardNumbersError(null);
+      } else {
+        const v = validateFuelHardNumbersJson(hardNumbersText);
+        if (!v.ok) {
+          setHardNumbersError(v.errors.join(" "));
+          return;
+        }
+        setHardNumbersError(null);
+        payload.hardNumbers = v.value;
+      }
+    }
+    update.mutate({ id, data: payload as never }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetReportQueryKey(id) });
         qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
         qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+        // After a successful save, drop the in-memory override and let
+        // the next report refetch reseed the textarea from DB truth.
+        hardNumbersSeededForId.current = null;
+        setHardNumbersEdited(undefined);
       },
     });
+  };
+
+  const loadSampleFuelData = () => {
+    const text = JSON.stringify(FUEL_MARKET_DATA_SAMPLE, null, 2);
+    setHardNumbersText(text);
+    setHardNumbersError(null);
+    setHardNumbersEdited(FUEL_MARKET_DATA_SAMPLE);
+  };
+
+  const validateFuelData = () => {
+    const v = validateFuelHardNumbersJson(hardNumbersText);
+    if (!v.ok) {
+      setHardNumbersError(v.errors.join(" "));
+      setHardNumbersEdited(undefined);
+      return;
+    }
+    setHardNumbersError(null);
+    setHardNumbersEdited(v.value);
   };
 
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading...</div>;
@@ -266,6 +339,59 @@ export default function ReportEditor() {
           <Field label="Implications for Business"><Textarea rows={4} value={form.implications} onChange={(e) => set("implications", e.target.value)} className="rounded-sm" /></Field>
           <Field label="Watch Next"><Textarea rows={3} value={form.watchNext} onChange={(e) => set("watchNext", e.target.value)} className="rounded-sm" /></Field>
           <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} className="rounded-sm" /></Field>
+
+          {form.topic === "fuel" && (
+            <div className="border-t border-border pt-4 mt-2 space-y-2">
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+                    Fuel Market Data (hardNumbers JSON)
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                    Drives Fast Facts cards and the Jet Fuel Price Trajectory chart. Accepts <code>fastFacts</code>, top-level <code>prices/supply/policy/routes</code>, <code>jetFuel</code> snapshot, and <code>jetFuelTrajectory</code>. Leave empty to clear.
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button type="button" variant="outline" className="rounded-sm h-8 text-xs" onClick={loadSampleFuelData}>
+                    Load sample
+                  </Button>
+                  <Button type="button" variant="outline" className="rounded-sm h-8 text-xs" onClick={validateFuelData}>
+                    Validate
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                rows={12}
+                value={hardNumbersText}
+                onChange={(e) => {
+                  setHardNumbersText(e.target.value);
+                  setHardNumbersError(null);
+                  // Clear the live override so the preview falls back to
+                  // the persisted payload until the author re-validates.
+                  // Prevents stale "validated" JSON lingering after edits.
+                  setHardNumbersEdited(undefined);
+                }}
+                className="rounded-sm font-mono text-[11px]"
+                placeholder={'{\n  "fastFacts": { "prices": [ ... ] },\n  "jetFuelTrajectory": { "benchmark": "...", "points": [ ... ] }\n}'}
+              />
+              {hardNumbersError && (
+                <div
+                  className="text-[11px] p-2 rounded-sm border"
+                  style={{ background: "#FDECEC", borderColor: "#A33232", color: "#A33232", fontFamily: "Roboto, sans-serif" }}
+                >
+                  {hardNumbersError}
+                </div>
+              )}
+              {!hardNumbersError && hardNumbersEdited !== undefined && (
+                <div
+                  className="text-[11px] p-2 rounded-sm border"
+                  style={{ background: "#F3F4FA", borderColor: "#465bff", color: "#0b0a3d", fontFamily: "Roboto, sans-serif" }}
+                >
+                  Validated. Preview updated. Click Save to persist.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="bg-white border border-border rounded-sm overflow-hidden">
@@ -273,7 +399,7 @@ export default function ReportEditor() {
             <ShippingReportPreview report={form} incidents={incidentsForExport} />
           ) : (
             <ReportPreview
-              report={{ ...form, hardNumbers: report?.hardNumbers }}
+              report={{ ...form, hardNumbers: hardNumbersEdited ?? report?.hardNumbers }}
               incidents={incidentsForExport}
             />
           )}

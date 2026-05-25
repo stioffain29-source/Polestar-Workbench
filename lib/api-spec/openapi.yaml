@@ -873,21 +873,88 @@ components:
         label: { type: string }
         annotation: { type: string }
 
+    # Single fuel-market data card used in Fuel Watch Fast Facts.
+    # Used for prices (Brent, WTI, jet fuel, pump), supply indicators
+    # (shortages, refinery outages), policy indicators (subsidy/levy
+    # moves), and route/chokepoint pressure. `value` may be numeric or
+    # a pre-formatted string. `benchmark` is optional and is appended
+    # to the label by the renderer (used mainly for jet fuel rows).
+    FuelDataCard:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value:
+          oneOf:
+            - type: number
+            - type: string
+        unit: { type: string }
+        change: { type: string }
+        asOf: { type: string }
+        source: { type: string }
+        note: { type: string }
+        benchmark: { type: string }
+
+    # Headline jet fuel snapshot. Used when the report carries a
+    # single latest jet fuel print rather than a trajectory series.
+    JetFuelSnapshot:
+      type: object
+      properties:
+        benchmark: { type: string }
+        source: { type: string }
+        unit: { type: string }
+        latestValue: { type: number }
+        asOf: { type: string }
+        change: { type: string }
+
+    # Jet fuel trajectory series. Accepts either the legacy bare array
+    # of points or the v2 container that names the benchmark / source /
+    # unit / period alongside the points.
+    JetFuelTrajectory:
+      oneOf:
+        - type: array
+          items: { $ref: "#/components/schemas/JetFuelPricePoint" }
+        - type: object
+          required: [points]
+          properties:
+            benchmark: { type: string }
+            source: { type: string }
+            unit: { type: string }
+            period: { type: string }
+            points:
+              type: array
+              items: { $ref: "#/components/schemas/JetFuelPricePoint" }
+
+    # Optional wrapper for the Fuel Watch Fast Facts cards. Authors
+    # may put prices/supply/policy/routes here OR at the top level of
+    # FuelHardNumbers; the parser merges both.
+    FuelFastFacts:
+      type: object
+      properties:
+        prices: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        supply: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        policy: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        routes: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+
     # Container shape for the report.hardNumbers jsonb column.
-    # `cards` (optional) carries the existing per-report KPI cards.
-    # `jetFuelTrajectory` (optional) carries a Fuel Watch jet fuel
-    # benchmark price series. Both are optional so legacy reports
-    # remain valid.
+    # All fields are optional so legacy reports (null, KpiCard[], or
+    # `{cards:[...]}` only) continue to deserialise. Fuel Watch
+    # reports use the v2 fields (`fastFacts` and/or top-level
+    # `prices`/`supply`/`policy`/`routes`/`jetFuel`/`jetFuelTrajectory`).
     FuelHardNumbers:
       type: object
       properties:
         cards:
           type: array
           items: { $ref: "#/components/schemas/KpiCard" }
-        jetFuelTrajectory:
-          type: array
-          items: { $ref: "#/components/schemas/JetFuelPricePoint" }
+        jetFuelTrajectory: { $ref: "#/components/schemas/JetFuelTrajectory" }
         jetFuelBenchmarkLabel: { type: string }
+        fastFacts: { $ref: "#/components/schemas/FuelFastFacts" }
+        prices: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        supply: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        policy: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        routes: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
+        jetFuel: { $ref: "#/components/schemas/JetFuelSnapshot" }
 
     ReportInput:
       type: object

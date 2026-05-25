@@ -4,10 +4,9 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
-import { computeFuelHardNumbers, fuelHasNoPriceIndicators, FUEL_NO_PRICE_NOTE } from "@/lib/fuelHardNumbers";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "@/lib/fuelNarratives";
+import { buildFuelWatchMarketData } from "@/lib/fuelWatchMarketData";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
-import { getFuelJetFuelTrajectory, jetFuelBenchmarkLabel } from "@/lib/jetFuelTrajectory";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0b0a3d";
@@ -175,11 +174,16 @@ export default function ReportPreview({
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
   const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
-  const jetFuelSeries = isFuel ? getFuelJetFuelTrajectory(report.hardNumbers) : null;
-  const jetFuelLabel = isFuel ? jetFuelBenchmarkLabel(report.hardNumbers) : undefined;
-  const fuelHardNumbers = isFuel && report.issueDate
-    ? computeFuelHardNumbers({ issueDate: report.issueDate, incidents, hardNumbersRaw: report.hardNumbers })
-    : [];
+  // Unified Fuel Watch market data — both preview and PDF read from
+  // this same builder so they cannot drift on cards, jet fuel series,
+  // benchmark label, or missing-data warnings.
+  const market = isFuel && report.issueDate
+    ? buildFuelWatchMarketData({
+        issueDate: report.issueDate,
+        incidents,
+        hardNumbersRaw: report.hardNumbers,
+      })
+    : null;
   const fuelRegionalHighlights = isFuel && report.issueDate
     ? buildFuelRegionalHighlights({ issueDate: report.issueDate, incidents })
     : null;
@@ -306,39 +310,36 @@ export default function ReportPreview({
           </Section>
         )}
 
-        {isFuel ? (
+        {isFuel && market ? (
           <>
             <Section title="Fast Facts">
-              {fuelHardNumbers.length > 0 ? (
-                <>
-                  <FastFactsGrid cards={fuelHardNumbers} />
-                  {fuelHasNoPriceIndicators(report.hardNumbers) && (
-                    <p
-                      className="mt-3"
-                      style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
-                    >
-                      {FUEL_NO_PRICE_NOTE}
-                    </p>
-                  )}
-                </>
-              ) : (
+              {market.fastFactsCards.length > 0 ? (
+                <FastFactsGrid cards={market.fastFactsCards} />
+              ) : null}
+              {market.warnings.map((w, i) => (
                 <p
-                  style={{
-                    fontSize: 11,
-                    color: DUSK,
-                    fontFamily: "Roboto, sans-serif",
-                    padding: 16,
-                    background: "#f7f7f7",
-                    border: `1px solid ${POLAR}`,
-                  }}
+                  key={i}
+                  className={market.fastFactsCards.length > 0 ? "mt-3" : ""}
+                  style={
+                    market.fastFactsCards.length > 0
+                      ? { fontSize: 11, color: DUSK, fontFamily: "Roboto, sans-serif" }
+                      : {
+                          fontSize: 11,
+                          color: DUSK,
+                          fontFamily: "Roboto, sans-serif",
+                          padding: 16,
+                          background: "#f7f7f7",
+                          border: `1px solid ${POLAR}`,
+                        }
+                  }
                 >
-                  {FUEL_NO_PRICE_NOTE}
+                  {w}
                 </p>
-              )}
+              ))}
             </Section>
 
             <Section title="Jet Fuel Price Trajectory">
-              <JetFuelTrajectoryChart data={jetFuelSeries} benchmarkLabel={jetFuelLabel} />
+              <JetFuelTrajectoryChart data={market.jetFuelSeries} benchmarkLabel={market.jetFuelLabel} />
             </Section>
 
             <NarrativeSection title="Situation" text={report.situation} />

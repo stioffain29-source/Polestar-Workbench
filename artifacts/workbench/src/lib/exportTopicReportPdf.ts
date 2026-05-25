@@ -20,13 +20,9 @@ import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import { computeTopicFastFacts } from "./topicFastFacts";
-import { computeFuelHardNumbers, fuelHasNoPriceIndicators, FUEL_NO_PRICE_NOTE } from "./fuelHardNumbers";
 import { buildFuelRegionalHighlights, buildFuelProducerBuyerActions } from "./fuelNarratives";
-import {
-  getFuelJetFuelTrajectory,
-  jetFuelBenchmarkLabel,
-  type JetFuelPricePoint,
-} from "./jetFuelTrajectory";
+import { buildFuelWatchMarketData } from "./fuelWatchMarketData";
+import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 
 export interface TopicReportData {
   title: string;
@@ -373,31 +369,29 @@ export async function exportTopicReportPdf(
   if (isFuel) {
     // Fuel Watch's Fast Facts is a fuel-market block (prices / jet fuel
     // / supply / policy / routes), not a generic incident counter.
-    drawSectionHeading(ctx, "Fast Facts");
-    const fuelCards = computeFuelHardNumbers({
+    // The unified market-data builder is the single source of truth for
+    // both Fast Facts cards and the jet fuel trajectory chart.
+    const market = buildFuelWatchMarketData({
       issueDate: data.issueDate,
       incidents,
       hardNumbersRaw: data.hardNumbers,
-    }) as KpiCardData[];
-    if (fuelCards.length === 0) {
-      renderProse(ctx, FUEL_NO_PRICE_NOTE);
+    });
+    drawSectionHeading(ctx, "Fast Facts");
+    if (market.fastFactsCards.length === 0) {
+      renderProse(ctx, market.warnings.join(" "));
     } else {
-      drawFastFactsKpiCards(ctx, fuelCards);
-      if (fuelHasNoPriceIndicators(data.hardNumbers)) {
-        renderProse(ctx, FUEL_NO_PRICE_NOTE);
-      }
+      drawFastFactsKpiCards(ctx, market.fastFactsCards as KpiCardData[]);
+      for (const w of market.warnings) renderProse(ctx, w);
     }
 
     // Jet Fuel Price Trajectory — render the real chart only when the
     // report carries a usable series (≥2 valid dated points). Otherwise
-    // fall back to the honest empty-state card. Preview and PDF use the
-    // same parser (getFuelJetFuelTrajectory) so they cannot drift.
+    // fall back to the honest empty-state card.
     drawSectionHeading(ctx, "Jet Fuel Price Trajectory");
-    const jetSeries = getFuelJetFuelTrajectory(data.hardNumbers);
-    if (jetSeries) {
-      drawJetFuelChart(ctx, jetSeries, jetFuelBenchmarkLabel(data.hardNumbers));
+    if (market.jetFuelSeries) {
+      drawJetFuelChart(ctx, market.jetFuelSeries, market.jetFuelLabel);
     } else {
-      drawJetFuelEmptyCard(ctx, jetFuelBenchmarkLabel(data.hardNumbers));
+      drawJetFuelEmptyCard(ctx, market.jetFuelLabel);
     }
 
     const regional = buildFuelRegionalHighlights({ issueDate: data.issueDate, incidents });

@@ -1,0 +1,253 @@
+Fuel Watch needs a more robust data approach.
+
+The current fix is not enough. The parser can read fastFacts and jetFuelTrajectory if the data exists, but the report is still not reliably getting that data. That means the problem is upstream, not just rendering.
+
+Scope:
+Fuel Watch only.
+
+Objective:
+Build a reliable Fuel Watch market-data layer so Fast Facts and Jet Fuel Price Trajectory are populated from a known data source, not from optional ad hoc JSON that may or may not exist.
+
+1. Stop treating hardNumbers jsonb as optional decoration
+
+Fuel Watch requires a proper report data object.
+
+Create a clear Fuel Watch data model, for example:
+
+FuelWatchMarketData:
+- reportingPeriod
+- prices
+- jetFuel
+- jetFuelTrajectory
+- supplyIndicators
+- policyIndicators
+- routeIndicators
+- sourceNotes
+- dataStatus
+
+This model should be created before preview and before PDF export.
+
+Both preview and PDF must consume the same FuelWatchMarketData object.
+
+Do not let preview and PDF each parse/report differently.
+
+2. Add a Fuel Watch data builder
+
+Create a single shared builder, for example:
+
+buildFuelWatchMarketData(report, incidents)
+
+This builder should:
+- read report.hardNumbers jsonb
+- read any existing fuel market fields
+- read any stored jet fuel series
+- derive limited incident-based indicators only where appropriate
+- validate required fields
+- return a clean object for rendering
+
+The renderer should not be doing business logic.
+
+3. Add validation
+
+Fuel Watch should know whether it has enough market data to show a proper report.
+
+Validation rules:
+- Fast Facts must not be filled mainly with incident counts.
+- At least one price indicator should be present.
+- Jet fuel should be present either as:
+  - latest jet fuel value, or
+  - trajectory series, or
+  - explicit “not available” data status.
+- If jet fuel is missing, the report should show a clear data warning, not silently behave as though this is acceptable.
+
+4. Fast Facts requirements
+
+The section title must be:
+
+FAST FACTS
+
+The content must be hard-number fuel indicators.
+
+Priority order:
+1. Jet fuel price
+2. Brent crude
+3. WTI crude
+4. Diesel / petrol price movement
+5. Fuel shortages / rationing
+6. Refinery outages
+7. Subsidy / levy / tax moves
+8. Route / chokepoint pressure
+
+Do not show weak cards as primary Fast Facts:
+- Fuel incidents
+- Latest incident
+- Most affected country
+- Total records
+
+Those can go elsewhere if needed.
+
+5. Jet fuel must be treated as mandatory data for Fuel Watch
+
+Jet fuel is not optional decoration.
+
+The builder must actively look for jet fuel data in this order:
+1. report.hardNumbers.fastFacts.prices where label includes jet fuel
+2. report.hardNumbers.jetFuel
+3. report.hardNumbers.jetFuelTrajectory latest point
+4. any existing internal fuel/market data source
+5. manual hardNumbers jsonb entry
+
+If none exists, return:
+dataStatus.jetFuel = "missing"
+
+Then render:
+“Jet fuel data has not been loaded for this reporting cycle.”
+
+This is different from pretending the report is complete.
+
+6. Jet Fuel Price Trajectory
+
+The chart should render only when there are at least two valid dated points.
+
+If data exists:
+- render chart in preview
+- render same chart in PDF
+- benchmark name must be accurate
+- source and as-of date must be visible
+
+If data is missing:
+- show a clear missing-data card
+- do not generate fake values
+- do not hardcode Singapore
+- do not leave it as a vague empty state
+
+7. Add an editor/admin way to input the data
+
+If there is no automatic source yet, add a practical manual input path.
+
+Minimum acceptable approach:
+- allow hardNumbers jsonb to be edited or seeded for a Fuel Watch report
+- provide a clear sample payload
+- validate it before export
+- show validation errors in the editor if the payload is unusable
+
+Better approach:
+Add a Fuel Market Data panel in the editor with fields for:
+- Brent
+- WTI
+- Jet fuel benchmark name
+- Jet fuel latest value
+- unit
+- as-of date
+- source
+- trajectory points
+
+Do not rely on a hidden JSON field forever if the report needs weekly production.
+
+8. Remove fake completion
+
+Do not mark the task complete just because:
+- the parser supports the field
+- the component can render a chart
+- typecheck passes
+
+The task is complete only when a fresh Fuel Watch report actually shows:
+- Fast Facts with real fuel price/supply indicators
+- Jet fuel in Fast Facts
+- Jet Fuel Price Trajectory chart when series exists
+- clear missing-data warning when jet fuel is absent
+
+9. Fix current report defects while doing this
+
+Also ensure:
+- cover reporting period is not duplicated
+- “Showing 15 latest...” Workbench line is removed
+- broken country strings are not rendered
+- Regional Highlights do not show Unknown
+- Producer and Buyer Actions are classified properly
+- Related Incidents are not generic oil-market filler
+
+10. Acceptance test
+
+Create one Fuel Watch draft with this test hardNumbers payload:
+
+{
+  "fastFacts": {
+    "prices": [
+      {
+        "label": "Brent crude",
+        "value": 109.26,
+        "unit": "USD/bbl",
+        "change": "+7.9% 7d",
+        "asOf": "2026-05-15",
+        "source": "Manual"
+      },
+      {
+        "label": "WTI crude",
+        "value": 101.02,
+        "unit": "USD/bbl",
+        "change": "+10.5% 7d",
+        "asOf": "2026-05-15",
+        "source": "Manual"
+      },
+      {
+        "label": "Jet fuel",
+        "benchmark": "US Gulf Coast kerosene-type jet fuel",
+        "value": 4.152,
+        "unit": "USD/gal",
+        "change": "+2.5% 7d",
+        "asOf": "2026-05-15",
+        "source": "EIA / FRED"
+      }
+    ],
+    "supply": [
+      {
+        "label": "Fuel shortages / rationing",
+        "value": 5,
+        "unit": "events",
+        "note": "reporting window"
+      }
+    ],
+    "policy": [
+      {
+        "label": "Subsidy / levy moves",
+        "value": 1,
+        "unit": "policy event",
+        "note": "reporting window"
+      }
+    ],
+    "routes": [
+      {
+        "label": "Fuel-relevant chokepoint pressure",
+        "value": 15,
+        "unit": "records",
+        "note": "Hormuz / route disruption"
+      }
+    ]
+  },
+  "jetFuelTrajectory": {
+    "benchmark": "US Gulf Coast kerosene-type jet fuel",
+    "source": "EIA / FRED",
+    "unit": "USD/gal",
+    "period": "last 30 days",
+    "points": [
+      { "date": "2026-04-17", "value": 3.709 },
+      { "date": "2026-04-24", "value": 3.906 },
+      { "date": "2026-05-01", "value": 4.160 },
+      { "date": "2026-05-08", "value": 4.049 },
+      { "date": "2026-05-15", "value": 4.152 }
+    ]
+  }
+}
+
+Then export the PDF.
+
+Acceptance:
+- FAST FACTS appears, not Hard Numbers.
+- Brent appears.
+- WTI appears.
+- Jet fuel appears with benchmark name.
+- Jet Fuel Price Trajectory chart renders.
+- Preview and PDF match.
+- If the payload is removed, the report clearly says market data is missing.
+- Typecheck passes.

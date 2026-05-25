@@ -5,11 +5,20 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
-import type { JetFuelPricePoint } from './jetFuelPricePoint';
+import type { FuelDataCard } from './fuelDataCard';
+import type { FuelFastFacts } from './fuelFastFacts';
+import type { JetFuelSnapshot } from './jetFuelSnapshot';
+import type { JetFuelTrajectory } from './jetFuelTrajectory';
 import type { KpiCard } from './kpiCard';
 
 export interface FuelHardNumbers {
   cards?: KpiCard[];
-  jetFuelTrajectory?: JetFuelPricePoint[];
+  jetFuelTrajectory?: JetFuelTrajectory;
   jetFuelBenchmarkLabel?: string;
+  fastFacts?: FuelFastFacts;
+  prices?: FuelDataCard[];
+  supply?: FuelDataCard[];
+  policy?: FuelDataCard[];
+  routes?: FuelDataCard[];
+  jetFuel?: JetFuelSnapshot;
 }
