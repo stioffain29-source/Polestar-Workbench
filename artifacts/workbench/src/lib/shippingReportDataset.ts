@@ -153,7 +153,7 @@ const HANDLE_TITLE_RE = /^\s*[@#]/;
 // They should not lead a Chokepoint, Vessel or Piracy read. Stems are kept
 // open (no trailing word-boundary) so inflections like "repatriated" /
 // "repatriation" / "memorialised" all match.
-const HUMAN_INTEREST_RE = /(\brepatriat|\bseafarer welfare|\bcrew welfare|\bmemorial|\bfuneral|\brescued (and )?(repatriated|returned home)|\bbrought home\b|\breunion\b|\bwidow|\bmother of\b|\bfamily of\b|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\baboard us-?seized vessels?\b|\bcrew (members? )?(released|freed|safe|safely)|\bdetained crew (returned|released|repatriated))/i;
+const HUMAN_INTEREST_RE = /(\brepatriat|\bseafarer welfare|\bcrew welfare|\bmemorial|\bfuneral|\brescued (and )?(repatriated|returned home)|\bbrought home\b|\breunion\b|\bwidow|\bmother of\b|\bfamily of\b|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\baboard us-?seized vessels?\b|\bcrew (members? )?(released|freed|safe|safely)|\bdetained crew (returned|released|repatriated)|\b(transfers?|transferred|transferring|hands? over|handed over|handover of|hand[- ]?over of|returns?|returned|returning|releases?|released|releasing|delivers?|delivered|delivering|flies? home|flown home) (the )?crew\b|\bcrew (of [^.,]{1,80} )?(transferred|handed over|repatriated|released|freed|returned|sent home|flown home|brought home))/i;
 
 // Speculative strike claims and unverified rumour traffic. "Iran claims
 // missile strike", "Houthis claim attack", "claims to have struck" — when
@@ -621,9 +621,19 @@ export function buildShippingReportDataset(
   // Related Incidents — prioritised operational records for the closing
   // table. Vessel and piracy hits lead, then port / chokepoint / route /
   // war-risk records, then the rest of the weekly window. Pure shipping-
-  // market items are dropped entirely. Capped tight so Source Notes /
-  // Disclaimer don't get pushed alone onto a near-empty final page.
-  const relatedIncidents = prioritiseRelated(enriched);
+  // market items are dropped entirely. Capped tight so the Disclaimer
+  // block can be pulled back onto the same page rather than orphaned.
+  //
+  // Balance rule: when the report carries a meaningful Vessel Threat
+  // section, the Related Incidents table must not collapse to
+  // chokepoint-only headlines. We seed the table with the strongest
+  // vessel-threat record from the 30-day file (already filtered for
+  // credibility, repatriation and human-interest noise) so the closing
+  // table reflects the operational lead, not just the lane-level
+  // commentary. Weak repatriation / generic items cannot reach this
+  // path because they were dropped upstream in the vessel pipeline.
+  const vesselThreatSeed = (vesselHostile[0] ?? vesselOther[0]) ?? null;
+  const relatedIncidents = prioritiseRelated(enriched, vesselThreatSeed);
 
   // Shipping-specific auto-prose for the four analyst sections. Editor
   // text takes precedence in the exporter and preview; these fallbacks
@@ -789,46 +799,30 @@ function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
+// Polestar View: a concise two-paragraph judgement, not a five-bullet
+// recap. Paragraph 1 names the dominant pressure point (typically
+// Hormuz on the trailing 30 days) and contrasts the thin weekly
+// vessel-side cadence with the still-live 30-day vessel threat
+// picture. Paragraph 2 frames the cycle as a routing / insurance /
+// advisory-monitoring problem — not a broad maritime shutdown — and
+// names the practical business levers (war-risk, P&I, crew change,
+// port call).
 function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
-  const region = [...ctx.regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
-  const vesselThreat = ctx.vesselHostile.length + ctx.piracyRows.length;
-  const lead: string[] = [];
+  const vesselThreat30 = ctx.vesselHostile.length + ctx.piracyRows.length;
+  const pressurePoint = cp ? cp.name : "Hormuz and the Red Sea corridor";
 
-  // 1. Dominant pressure point on the trailing 30 days.
-  lead.push(
-    cp
-      ? `${cp.name} is the dominant pressure point on the trailing 30-day file with ${cp.count} qualifying record${cp.count === 1 ? "" : "s"}, and that is where the structural risk sits regardless of the weekly cadence.`
-      : `No single chokepoint dominated the trailing 30 days, but the regional baseline on Hormuz, the Red Sea and Bab-el-Mandeb has not reset — treat the absence of a clear lead as a coverage gap, not a structural easing.`,
-  );
+  const para1Pressure = cp
+    ? `${pressurePoint} remains the dominant shipping pressure point on the trailing 30-day file (${cp.count} qualifying record${cp.count === 1 ? "" : "s"}), and that is where the structural risk continues to sit regardless of any individual week's cadence.`
+    : `${pressurePoint} remains the dominant shipping pressure point on the trailing 30-day file, and that is where the structural risk continues to sit regardless of any individual week's cadence.`;
+  const para1Vessel = vesselThreat30 > 0
+    ? ` Fresh weekly vessel-side activity is limited, but the trailing 30-day vessel threat picture — ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} — still matters. A quiet week against a heavier month is the normal pattern in this geography, not a benign trend.`
+    : ` Fresh weekly vessel-side activity is limited, but the trailing 30-day vessel threat picture still matters: the same lanes have not been clean for long, so a thin week should be read as cycle noise rather than a sustained easing.`;
+  const para1 = `${para1Pressure}${para1Vessel}`;
 
-  // 2. 30-day vessel-threat context against thin weekly cadence.
-  if (vesselThreat > 0) {
-    lead.push(
-      `Vessel-threat reporting on the same 30-day window carries ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"}, against ${ctx.weeklyCount} record${ctx.weeklyCount === 1 ? "" : "s"} in the weekly window. A thin week against a heavier month is the normal pattern in this geography and should be read as cycle noise rather than a sustained easing.`,
-    );
-  } else {
-    lead.push(
-      `Weekly vessel-side activity is light against a structurally heavier 30-day backdrop. A quiet week here is normal cycle noise rather than a benign trend; the same lanes have not been clean for long.`,
-    );
-  }
+  const para2 = `Operators should treat the current cycle as a routing, insurance and advisory-monitoring problem rather than a broad maritime shutdown. The practical business levers sit with war-risk and P&I premium reviews, crew-change locations on voyages transiting ${pressurePoint}, and the port-call sequencing decisions that follow from fresh advisories — not with any expectation of a regional standstill.`;
 
-  // 3. Insurance / war-risk / routing implications.
-  lead.push(
-    `Insurance and routing implications follow directly: war-risk and P&I premium reviews on Hormuz, Red Sea and adjacent lanes should be treated as live, not annual. Premium adjustments typically firm one to two cycles after the operational signal, so the moment to size exposure is now — not after the next visible event.`,
-  );
-
-  // 4. What business users should actually do with the read.
-  lead.push(
-    `For business users the practical actions are: keep routing and port-call sequencing under live review on ${cp ? cp.name : "the affected corridors"}; price war-risk and P&I uplift into near-term lifting contracts and add flexibility clauses on diversion or skip-call; brief commercial teams that schedule reliability — not headline freight rates — is the cleanest signal of when this cycle will hit cargo flow.`,
-  );
-
-  if (region) {
-    lead.push(
-      `Geographically the weekly pressure sat with ${region.label}; we expect the same lanes to set the tempo through the next reporting window unless a naval-force posture change or a credible diplomatic move on the underlying conflicts disrupts the pattern.`,
-    );
-  }
-  return lead.join("\n\n");
+  return `${para1}\n\n${para2}`;
 }
 
 
@@ -964,7 +958,10 @@ function buildRegionalCountryRead(opts: {
 // disruption, war-risk and P&I commentary with an operational hook.
 // Weak: residual "Other" / "Unclassified" buckets and any record we
 // already flagged as pure shipping-market noise.
-function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
+function prioritiseRelated(
+  rows: EnrichedIncident[],
+  vesselThreatSeed: EnrichedIncident | null = null,
+): EnrichedIncident[] {
   const strong: EnrichedIncident[] = [];
   const rest: EnrichedIncident[] = [];
   for (const r of rows) {
@@ -983,9 +980,16 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
     if ((isVesselHostile || isPortRouteOrChoke) && !isWeakBucket) strong.push(r);
     else if (!isWeakBucket) rest.push(r);
   }
-  const ordered = dedupeByTitle([...strong, ...rest]);
-  // Cap tight so the Source Notes / Disclaimer block can be pulled back
-  // onto the same page rather than orphaned on a near-empty final page.
+  // Seed the strongest vessel-threat record at the head of the list
+  // when the upstream vessel pipeline has surfaced one. dedupeByTitle
+  // below collapses any overlap with weekly-window rows. The seed has
+  // already cleared the vessel pipeline's credibility, human-interest
+  // and speculative-claim filters, so it never reintroduces weak
+  // repatriation or generic-commentary items.
+  const seeded = vesselThreatSeed ? [vesselThreatSeed, ...strong, ...rest] : [...strong, ...rest];
+  const ordered = dedupeByTitle(seeded);
+  // Cap tight so the Disclaimer block can be pulled back onto the same
+  // page rather than orphaned on a near-empty final page.
   return ordered.slice(0, 6);
 }
 

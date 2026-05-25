@@ -364,10 +364,23 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
 // Disclaimer is the only closing block. It tries hard to fit on the
 // current page; only when it cannot does it start a new page. That
 // avoids leaving a near-empty final page with just a five-line legal.
-const DISCLAIMER_BLOCK_H = 24 + 12 * 5;
+//
+// The heading and body MUST stay together — never let the "Disclaimer"
+// heading sit on page N with the prose flowing onto page N+1. We
+// measure the wrapped body at the actual text width so the block
+// estimate matches what `renderProse` will draw.
 
 export function drawDisclaimer(ctx: Ctx) {
-  if (ctx.y + DISCLAIMER_BLOCK_H > ctx.H - ctx.BOTTOM) {
+  const { pdf, CW } = ctx;
+  // Match renderProse setup so splitTextToSize uses the same metrics.
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(10);
+  const wrapped: string[] = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
+  const headingBlockH = 6 + 14 + 8;   // pre-heading pad + heading line + post-heading pad
+  const bodyH = wrapped.length * 14 + 6 + 6; // line height matches renderProse
+  // 8pt lead-in (the else branch below) plus a small safety margin.
+  const need = 8 + headingBlockH + bodyH + 4;
+  if (ctx.y + need > ctx.H - ctx.BOTTOM) {
     newPage(ctx);
   } else {
     ctx.y += 8;
