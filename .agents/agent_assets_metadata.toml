@@ -90,3 +90,9 @@ id = "9mAyYjsshQFMeb8WxlFR3"
 uri = "file://screenshots/font_proof/flashpoint_p1-1.jpg"
 type = "image"
 title = "Flashpoint — cover page (logo now embedded)"
+
+[[outputs]]
+id = "nloHA--Dz45JkY_rcM7SS"
+uri = "file://screenshots/font_proof/cargo_watch.pdf"
+type = "pdf"
+title = "Cargo Watch report"
