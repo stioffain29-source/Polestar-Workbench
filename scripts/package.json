@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "import:legacy": "tsx ./src/import-legacy.ts",
     "scrape:cargo-watch": "tsx ./src/scrape-cargo-watch.ts",
+    "scrape:flashpoint": "tsx ./src/scrape-flashpoint.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

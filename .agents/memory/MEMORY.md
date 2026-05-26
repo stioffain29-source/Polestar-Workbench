@@ -1,0 +1,2 @@
+- [Flashpoint ingest pipeline](flashpoint-ingest.md) — there is no auto-scheduled scraper; all live ingest is manual `pnpm scrape:*`. Cleanup migrations on API-server boot are the only auto-running data layer.
+- [Postgres POSIX regex in drizzle sql](pg-regex-in-drizzle.md) — use `\y` not `\b` for word boundaries inside `sql\`...\`` blocks; `\b` is backspace in JS template literals.

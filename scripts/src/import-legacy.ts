@@ -99,6 +99,42 @@ function categoryToTopic(cat: ControlledCategory): string {
   }
 }
 
+// Per the Flashpoint Data Coverage Audit, Civil Unrest / Other records
+// from the legacy seed include three classes of pollution that must not
+// land in the flashpoint or protests bucket:
+//   1. Kinetic armed conflict (drone strikes, militants kill, etc.)
+//      with no protest cue → strikes.
+//   2. Cargo-theft Google-News sources misrouted as Civil Unrest →
+//      cargo_watch.
+//   3. Operational-risk-zone watchlist rows (PNG corridors etc.) that
+//      belong in country_baselines.locationWatchlist → drop entirely.
+// The startup migration in artifacts/api-server/src/lib/migrations.ts
+// applies the same rules to already-imported rows. Keep the two in sync.
+const KINETIC_RE = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|gun battle|gunbattle|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|militants? (kill|attack|target|ambush|raid|strike|fire)|insurgents? (kill|attack|target|ambush)|terror(ist)? attack|armed group (attack|kill|raid)|terrorists? killed|security forces? kill|wanted (commander|terrorist|ringleader)|quadcopter)/i;
+const PROTEST_CUE_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton charge|student union|opposition (call|rally|march)|\bpti\b|imran khan|section ?144|assembly ban|detention of (protesters|activists|students))/i;
+const CARGO_SOURCE_RE = /(cargo theft|truck.*theft|freight.*theft|trucking & transport|tobacco.*cargo|truck hijack)/i;
+const UAE_AIR_DEFENSE = "UAE Air-Defense / Missile Activity (Google News)";
+
+// Returns the topic the record should actually land under, or null if
+// the record should be dropped entirely.
+function refineTopic(rawTopic: string, r: LegacyRecord): string | null {
+  if (rawTopic !== "flashpoint" && rawTopic !== "protests") return rawTopic;
+
+  // Drop operational-risk-zone watchlist rows — they belong in
+  // country_baselines.locationWatchlist, not in incidents.
+  if (r.legacyType === "db:operational_risk_zones") return null;
+
+  // UAE air-defense Google-News feed is kinetic Strike content, not
+  // public order. Reassign even if the title has a protest-looking word.
+  if (r.source === UAE_AIR_DEFENSE) return "strikes";
+
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  if (CARGO_SOURCE_RE.test(r.source ?? "")) return "cargo_watch";
+  if (KINETIC_RE.test(text) && !PROTEST_CUE_RE.test(text)) return "strikes";
+
+  return rawTopic;
+}
+
 function parseDate(d: string): Date | null {
   // Accept YYYY-MM-DD or full ISO; reject MM-DD style timeline anniversaries.
   if (!d || !/^\d{4}-\d{2}-\d{2}/.test(d)) return null;
@@ -219,7 +255,13 @@ async function main(): Promise<void> {
         });
         report[cat]++;
       } else {
-        const topic = categoryToTopic(cat);
+        const rawTopic = categoryToTopic(cat);
+        const refined = refineTopic(rawTopic, r);
+        if (refined === null) {
+          skippedNoCategory++;
+          continue;
+        }
+        const topic = refined;
         const key = dedupeKey(title, when, country, topic);
         if (incidentKeys.has(key)) {
           skippedDuplicate++;
