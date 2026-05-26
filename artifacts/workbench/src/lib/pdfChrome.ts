@@ -622,6 +622,19 @@ export async function prepareCoverImage(
     throw new Error(`prepareCoverImage: fetch ${res.status} for ${src}`);
   }
   const blob = await res.blob();
+  // Node / headless fallback: no DOM Image / canvas available. Return
+  // raw bytes as a data URL so jsPDF.addImage can still embed the
+  // cover photo at the requested slot — without canvas-based cover
+  // cropping, the slot dimensions stretch the image, which is fine
+  // for the registered cover assets (already close to 16:9).
+  if (typeof Image === "undefined" || typeof document === "undefined") {
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const head = buf.subarray(0, 4);
+    const isPng = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47;
+    const format: "JPEG" | "PNG" = isPng ? "PNG" : "JPEG";
+    const mime = isPng ? "image/png" : "image/jpeg";
+    return { dataUrl: `data:${mime};base64,${buf.toString("base64")}`, format };
+  }
   const blobUrl = URL.createObjectURL(blob);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {

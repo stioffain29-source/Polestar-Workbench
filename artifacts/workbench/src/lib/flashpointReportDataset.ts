@@ -239,6 +239,92 @@ function isWeakNovelty(r: FlashpointReportIncident): boolean {
   return NOVELTY_RE.test(text);
 }
 
+// Weak operational filter. These are records the classifier accepts on
+// surface keywords (protest, strike, rally) but which carry no live
+// operational signal — stock-photo agency captions with no place/impact
+// detail, sports / workplace media protests, withdrawn/suspended strikes,
+// and retrospective legal-process stories. Excluded from prose builders
+// and from Related Incidents. User-driven: see "Final tightening"
+// brief — these are the recurring noise classes that survived the
+// classifier pass.
+const LICENSABLE_PHOTO_RE = /\b(licensable picture|reuters connect|getty images|epa[- ]efe|alamy|stock photo|file photo|photo caption|photo: ap|photo by)\b/i;
+const SPORTS_LEAGUE_RE = /\b(french open|us open|wimbledon|australian open|grand slam|atp|wta|nba|nfl|mlb|ipl|epl|premier league|champions league|olympics?|fifa world cup|formula one|formula 1|f1|grand prix|moto[- ]?gp|tour de france|esports?|cricket world cup|rugby world cup)\b/i;
+const SPORTS_PROTEST_VERB_RE = /\b(protest|boycott|walkout|media protest|prize money|players plan)\b/i;
+const SUSPENDED_STRIKE_RE = /\b(strike|walkout|stoppage|shutdown|protest|march|rally)\b.{0,40}\b(suspend(ed|s)|call(ed)? off|cancell?ed|withdraws?|stood down|postpon(ed|es))\b/i;
+const SUSPENDED_STRIKE_REV_RE = /\b(suspend(ed|s)|call(ed)? off|cancell?ed|withdraws?|postpon(ed|es))\b.{0,40}\b(strike|walkout|stoppage|shutdown|protest|march|rally|mobilisation)\b/i;
+// SK martial-law legal-process records get auto-classified as
+// "Curfew / emergency order" because the topic vocabulary still
+// matches, but they describe trials, indictments, perjury sentences,
+// historical anniversaries — not live public-order risk.
+const MARTIAL_LAW_LEGAL_TRIGGER = /\b(perjury|trial|sentenc|indict|acquit|deputy chief|nis|spy chief|alleg|allegations|denies|deni(ed|al)|drone acquisition|probe|investigation|reborn|pro[- ]democracy|anniversary|thwart(ed|ing)|prosecutor|special counsel|hearing|verdict|appeal|ruling|conviction|witness|testimony|courthouse|rioters? get|suspended (term|sentence)s?)\b/i;
+const MARTIAL_LAW_RE = /\bmartial law\b/i;
+// Standalone court-verdict catcher for items the topic classifier
+// already binned into civil unrest (Riot / public disorder, Curfew /
+// emergency order) but which carry only a judicial-outcome narrative
+// (sentencing, suspended terms, indictments). Filtered out unless a
+// live public-order hook is also present.
+const COURT_VERDICT_RE = /\b(suspended (term|sentence)s?|get suspended|sentenc(ed|ing)|acquitt(ed|al)|indict(ed|ment)|conviction|guilty plea|plea bargain|appeal (filed|dismissed|granted))\b/i;
+const LIVE_PUBLIC_ORDER_RE = /\b(protest(s|ers|ing)? today|rally today|crowd|crowds|tear[- ]?gas|water cannon|baton|road closure|roadblock|blockad|curfew imposed|curfew extended|curfew lifted|troops deployed|martial law (imposed|declared|extended)|clash(es|ed)?|fatalit|injur(ed|ies)|mass arrest|detained at|arrested at|sit[- ]?in|march(ed|ing) on)\b/i;
+// Spammy SEO keyword-stuffed photo captions. Real headlines almost
+// never carry 3+ commas, and they don't mix Devanagari / CJK script
+// fragments with English keyword runs. Either pattern alone is a
+// reliable spam signal in this corpus.
+const SPAM_CAPTION_COMMAS_RE = /,\s*,|,\s+-\s+|(?:\b[A-Z]{2,5}\b[ ,]+){3,}/;
+const NON_LATIN_SCRIPT_RE = /[\u0900-\u097F\u3040-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\uAC00-\uD7AF]/;
+function isSpamCaption(title: string): boolean {
+  if (!title) return false;
+  if (SPAM_CAPTION_COMMAS_RE.test(title)) return true;
+  // 3+ commas in title.
+  const commas = (title.match(/,/g) ?? []).length;
+  if (commas >= 3) return true;
+  // Non-Latin script mixed with ASCII letters in same title.
+  if (NON_LATIN_SCRIPT_RE.test(title) && /[A-Za-z]{3,}/.test(title)) return true;
+  return false;
+}
+
+// Strip a trailing " - <Source Name>" suffix from a headline so
+// geographic / topical pattern checks operate on the editorial title
+// rather than the wire-attribution name (e.g. dropping a Greenland
+// protest piece syndicated by "Bangladesh Sangbad Sangstha").
+function titleWithoutSource(title: string): string {
+  if (!title) return "";
+  const idx = title.lastIndexOf(" - ");
+  if (idx <= 0) return title;
+  // Heuristic: a source suffix is short (<= 80 chars) and rarely
+  // contains a comma. Otherwise, treat the whole thing as the title.
+  const suffix = title.slice(idx + 3);
+  if (suffix.length > 80 || /[,.]/.test(suffix)) return title;
+  return title.slice(0, idx);
+}
+const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|argentina|brazil|chile|peru|colombia|mexico|venezuela|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
+const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu)\b/i;
+function isWeakOperational(r: FlashpointReportIncident): boolean {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  if (LICENSABLE_PHOTO_RE.test(text)) return true;
+  if (SPORTS_LEAGUE_RE.test(text) && SPORTS_PROTEST_VERB_RE.test(text)) return true;
+  if (SUSPENDED_STRIKE_RE.test(text)) return true;
+  if (SUSPENDED_STRIKE_REV_RE.test(text)) return true;
+  // Martial-law legal-process: drop unless the same record carries a
+  // live public-order hook. Bidirectional — "martial law" can precede
+  // or follow the legal-process trigger word in the headline.
+  if (MARTIAL_LAW_RE.test(text) && MARTIAL_LAW_LEGAL_TRIGGER.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Standalone court-verdict items (suspended terms, sentencings,
+  // indictments) the classifier still keeps in civil-unrest because
+  // of "rioters" / "courthouse" vocabulary — drop unless live public
+  // order is present.
+  if (COURT_VERDICT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // SEO comma-spam / multi-script keyword-stuffed captions.
+  if (isSpamCaption(r.title ?? "")) return true;
+  // Non-APAC focus headlines syndicated by an APAC source. Strip the
+  // " - <Source>" suffix from the title before testing. Match on the
+  // editorial title only — summaries often repeat the source name
+  // verbatim ("...Bangladesh Sangbad Sangstha (BSS)") and would
+  // falsely satisfy the APAC hook.
+  const editorialTitle = titleWithoutSource(r.title ?? "");
+  if (NON_APAC_FOCUS_RE.test(editorialTitle) && !APAC_HOOK_RE.test(editorialTitle)) return true;
+  return false;
+}
+
 // --- Country normalisation -------------------------------------------------
 // Upstream feeds frequently deliver multi-country strings such as
 // "Pakistan; India", "India; Bangladesh; Sri Lanka; Nepal" or
@@ -451,8 +537,8 @@ export function buildFlashpointReportDataset(
   // Activism / civil-unrest views: hide novelty items from the
   // operational reads and tables. They stay in `enriched` so totals
   // remain honest but never reach the lead or the protest table.
-  const activismRows = enriched.filter((r) => r.bucket === "activism" && !isWeakNovelty(r));
-  const unrestRows = enriched.filter((r) => r.bucket === "unrest" && !isWeakNovelty(r));
+  const activismRows = enriched.filter((r) => r.bucket === "activism" && !isWeakNovelty(r) && !isWeakOperational(r));
+  const unrestRows = enriched.filter((r) => r.bucket === "unrest" && !isWeakNovelty(r) && !isWeakOperational(r));
 
   // Fast Facts
   const hs = highestSeverity(enriched);
@@ -505,7 +591,7 @@ export function buildFlashpointReportDataset(
   // Forward-looking items rendered as a structured Country / Signal /
   // Operational meaning table rather than a quoted paragraph dump.
   const futureRaw = extractFutureSignals([...activismRows, ...unrestRows])
-    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r) && !isWeakOperational(r));
   const forecastFuture: ForecastFutureRow[] = dedupeByTitle(futureRaw)
     .slice(0, 6)
     .map((r) => ({
@@ -862,58 +948,75 @@ function pickPoliticalSeed(rows: EnrichedIncident[]): EnrichedIncident | null {
 }
 
 function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
-  // Hard-exclude armed-conflict / crime / robbery and novelty/parody
-  // items. Then rank what remains by operational usefulness:
-  //   1. highest severity wins (Extreme > High > Moderate > ...)
-  //   2. actual protest events / strikes / public-order restrictions
-  //      / arrests / road disruption are preferred over generic
-  //      activism commentary
-  //   3. credibility / non-novelty
-  //   4. recency
-  // Finally, GUARANTEE that the top-severity qualifying record from
-  // the activism+unrest mix is present in the output so Fast Facts
-  // (Highest Severity) and Related Incidents cannot contradict.
+  // Hard-exclude armed-conflict / crime / robbery, novelty/parody and
+  // weak-operational items. Then rank what remains by operational
+  // usefulness (severity > action verbs > credibility > recency) and
+  // round-robin across countries so the table reflects the regional
+  // spread of the file rather than a Pakistan-only lead.
   const ACTION_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|clash|fatalit)\b/i;
   const eligible = rows.filter((r) => {
     if (r.issue === "Armed robbery" || r.issue === "Crime / public safety" || r.issue === "Armed group activity") return false;
     if (isWeakNovelty(r)) return false;
+    if (isWeakOperational(r)) return false;
     return r.bucket === "activism" || r.bucket === "unrest";
   });
   const score = (r: EnrichedIncident): number => {
     const sev = SEV_RANK[sevKey(r.severity)] ?? 0;
     const action = ACTION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`) ? 1 : 0;
     const cred = isLowCredibility(r) ? 0 : 1;
-    // sev dominates, then action, then credibility; recency is the tiebreaker.
     return sev * 1000 + action * 50 + cred * 10;
   };
-  const ranked = [...eligible].sort((a, b) => {
+  const ranked = dedupeByTitle([...eligible].sort((a, b) => {
     const ds = score(b) - score(a);
     if (ds !== 0) return ds;
     return b.date.getTime() - a.date.getTime();
-  });
-  // Seed the lead row with the strongest political-mobilisation record
-  // (PTI / Imran / Section 144) ahead of dedupe so the centre-of-gravity
-  // geography is the first thing the reader sees.
-  const politicalSeed = pickPoliticalSeed(rows);
-  const seeded = politicalSeed
-    ? [politicalSeed, ...ranked.filter((r) => r.id !== politicalSeed.id)]
-    : ranked;
-  const ordered = dedupeByTitle(seeded);
-  // Cap at 6 rows so the Related table plus Disclaimer can fit on the
-  // same final page rather than orphaning the disclaimer.
+  }));
   const CAP = 6;
-  // Guarantee top-severity inclusion.
+  // Seed the lead row with the strongest political-mobilisation record
+  // so the centre-of-gravity geography opens the table.
+  const politicalSeed = pickPoliticalSeed(rows);
+  const out: EnrichedIncident[] = [];
+  const taken = new Set<string | number>();
+  if (politicalSeed && !isWeakOperational(politicalSeed)) {
+    out.push(politicalSeed);
+    taken.add(politicalSeed.id);
+  }
+  // First pass: pick the single best record per country (round-robin)
+  // walking down the ranked list. This forces regional diversity —
+  // Bangladesh, Philippines, South Korea, India, etc. all get a seat
+  // before any country gets a second.
+  const seenCountry = new Set<string>();
+  if (politicalSeed) seenCountry.add((politicalSeed.country ?? "").trim().toLowerCase());
+  for (const r of ranked) {
+    if (out.length >= CAP) break;
+    if (taken.has(r.id)) continue;
+    const c = (r.country ?? "").trim().toLowerCase();
+    if (c && seenCountry.has(c)) continue;
+    out.push(r);
+    taken.add(r.id);
+    if (c) seenCountry.add(c);
+  }
+  // Second pass: fill any remaining slots from the global ranking
+  // regardless of country, so a strong second Pakistan record can still
+  // appear after every country has had one seat.
+  for (const r of ranked) {
+    if (out.length >= CAP) break;
+    if (taken.has(r.id)) continue;
+    out.push(r);
+    taken.add(r.id);
+  }
+  // Guarantee the top-severity qualifying record is present so Fast
+  // Facts (Highest Severity) and Related Incidents cannot contradict.
   const top = eligible.reduce<EnrichedIncident | null>((best, r) => {
     if (!best) return r;
     const sb = SEV_RANK[sevKey(best.severity)] ?? 0;
     const sr = SEV_RANK[sevKey(r.severity)] ?? 0;
     return sr > sb ? r : best;
   }, null);
-  let out = ordered.slice(0, CAP);
   if (top && !out.some((r) => r.id === top.id)) {
-    out = [out[0], top, ...out.slice(1).filter((r) => r.id !== top.id)].slice(0, CAP);
+    return [out[0], top, ...out.slice(1).filter((r) => r.id !== top.id)].slice(0, CAP);
   }
-  return out;
+  return out.slice(0, CAP);
 }
 
 interface AutoCtx {
@@ -1017,36 +1120,106 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
+// Detect a city / location cue in the text so forecast labels can
+// carry "Country (City)" rather than country alone. Restricted to the
+// recurring APAC capitals and major commercial cities the brief
+// actually covers.
+const CITY_LOOKUP: Array<[RegExp, string]> = [
+  [/\bislamabad\b/i, "Islamabad"],
+  [/\brawalpindi\b/i, "Rawalpindi"],
+  [/\blahore\b/i, "Lahore"],
+  [/\bkarachi\b/i, "Karachi"],
+  [/\bpeshawar\b/i, "Peshawar"],
+  [/\bquetta\b/i, "Quetta"],
+  [/\badiala\b/i, "Rawalpindi"],
+  [/\bdhaka\b/i, "Dhaka"],
+  [/\bchittagong\b/i, "Chittagong"],
+  [/\bnew delhi\b|\bdelhi\b/i, "Delhi"],
+  [/\bmumbai\b/i, "Mumbai"],
+  [/\bkolkata\b/i, "Kolkata"],
+  [/\bchennai\b/i, "Chennai"],
+  [/\bbengaluru\b|\bbangalore\b/i, "Bengaluru"],
+  [/\bmanila\b|\bquezon city\b/i, "Manila"],
+  [/\bcebu\b/i, "Cebu"],
+  [/\bseoul\b/i, "Seoul"],
+  [/\bbusan\b/i, "Busan"],
+  [/\btokyo\b/i, "Tokyo"],
+  [/\bosaka\b/i, "Osaka"],
+  [/\bjakarta\b/i, "Jakarta"],
+  [/\bbangkok\b/i, "Bangkok"],
+  [/\bkuala lumpur\b/i, "Kuala Lumpur"],
+  [/\bhanoi\b/i, "Hanoi"],
+  [/\bho chi minh\b/i, "Ho Chi Minh City"],
+  [/\bkathmandu\b/i, "Kathmandu"],
+  [/\bcolombo\b/i, "Colombo"],
+  [/\bport moresby\b/i, "Port Moresby"],
+  [/\bsydney\b/i, "Sydney"],
+  [/\bmelbourne\b/i, "Melbourne"],
+  [/\bcanberra\b/i, "Canberra"],
+  [/\btaipei\b/i, "Taipei"],
+];
+function detectCity(r: EnrichedIncident): string | null {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  for (const [rx, name] of CITY_LOOKUP) {
+    if (rx.test(text)) return name;
+  }
+  return null;
+}
+
 // Clean, content-based signal labels for Watch Next and the Forecast
-// table. Never returns a mid-word truncation with an ellipsis; for
-// records that do not match a known cue, falls back to a whole-word
-// clip on a sentence-friendly boundary.
+// table. Labels must read as actor + trigger + form — never bare
+// "Protest mobilisation". Adds city in parens when detectable so the
+// reader sees country + city + actor + expected effect across the
+// row (effect column comes from forecastMeaningFor).
 function shortSignalLabel(r: EnrichedIncident): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
+  const city = detectCity(r);
+  const withCity = (label: string): string => (city ? `${label} (${city})` : label);
   if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) {
-    if (/\bsection\s*144\b|\bdefy/.test(text)) return "PTI protest defying Section 144";
-    if (/release|imprisonment|bail|adiala/.test(text)) return "PTI mobilisation for Imran's release";
-    if (/case|court|cjp|hearing|trial/.test(text)) return "PTI court-hearing pressure";
+    if (/\bsection\s*144\b|\bdefy/.test(text)) return withCity("PTI protest defying Section 144");
+    if (/release|imprisonment|bail|adiala/.test(text)) return withCity("PTI mobilisation for Imran's release");
+    if (/case|court|cjp|hearing|trial/.test(text)) return withCity("PTI court-hearing pressure");
     if (/countrywide|nationwide|across.*cities/.test(text)) return "PTI countrywide protest call";
-    return "PTI protest mobilisation";
+    return withCity("PTI street mobilisation");
   }
-  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Section 144 / curfew order";
-  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Chemists' strike notice";
-  if (/(union|labour|labor).*(injunct|strike|walkout)|injunct.*(union|strike|labour|labor)/.test(text)) return "Union injunction ruling";
-  if (/\b(metro bus|salaries|salary|pay|wages?|unpaid)\b/.test(text)) return "Sectoral pay protest";
-  if (/\b(teacher|faculty|abduction|vc|university|campus|student union)\b/.test(text)) return "Faculty / campus protest";
-  if (/\b(dowry|kin|family|relatives).*(protest|sit|demand)|protest.*(family|kin)/.test(text)) return "Family-led protest";
-  if (/\b(petroleum|fuel|levy|tariff|tax|price)\b/.test(text)) return "Fuel / levy challenge";
-  if (/\bhearing|court|trial|bail|verdict|indictment\b/.test(text)) return "Court hearing";
-  if (/\bblockade|roadblock|highway|motorway|sit[- ]?in\b/.test(text)) return "Road blockade / sit-in";
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Strike notice";
-  if (/\brally|march|protest|demonstration\b/.test(text)) return "Protest mobilisation";
-  // Last-resort: clean clip on a word boundary, no ellipsis.
+  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return withCity("Section 144 / curfew order");
+  if (/\b(chemist|pharmacist)s?\b/.test(text)) return withCity("Chemists' strike notice over e-pharmacy rules");
+  if (/(union|labour|labor).*(injunct|strike|walkout)|injunct.*(union|strike|labour|labor)/.test(text)) return withCity("Union injunction ruling — sectoral strike risk");
+  if (/\b(metro bus|salaries|salary|pay|wages?|unpaid)\b/.test(text)) return withCity("Sectoral pay protest by transport / public-sector staff");
+  if (/\b(student union|student body|students?)\b.{0,40}\b(protest|march|rally|walkout|strike)\b/.test(text)) return withCity("Student-body mobilisation");
+  if (/\b(teacher|faculty|vc|university|campus)\b/.test(text)) return withCity("Faculty / campus protest");
+  if (/\b(dowry|kin|family|relatives).*(protest|sit|demand)|protest.*(family|kin)/.test(text)) return withCity("Family-led sit-in at official premises");
+  if (/\b(petroleum|fuel|levy|tariff|tax|price)\b/.test(text)) return withCity("Fuel / levy political challenge");
+  if (/\bblockade|roadblock|highway|motorway|sit[- ]?in\b/.test(text)) return withCity("Road blockade / sit-in");
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return withCity("Sectoral strike notice");
+  if (/\brally|march|protest|demonstration\b/.test(text)) {
+    // Pull the trigger keyword instead of a bare "Protest mobilisation".
+    const trig =
+      /\b(rape|murder|killing|femicide|gender violence|gbv)\b/i.test(text) ? "gender-violence protest"
+      : /\bpalestin|gaza|israel|sumud\b/i.test(text) ? "Palestine solidarity protest"
+      : /\banti[- ]?india\b/i.test(text) ? "anti-India protest"
+      : /\bdefence spending|parliament|budget|funds\b/i.test(text) ? "policy / budget protest"
+      : /\b(election|vote|electoral|poll)\b/i.test(text) ? "electoral protest"
+      : /\b(opposition|movement)\b/i.test(text) ? "opposition street action"
+      : /\b(union|labour|labor|workers?)\b/i.test(text) ? "labour-led protest march"
+      : "civic protest march";
+    return withCity(trig.charAt(0).toUpperCase() + trig.slice(1));
+  }
+  // Last-resort: clean clip on a word boundary, no ellipsis. Final
+  // guard: never return a bare "Protest mobilisation" — fall back to
+  // a generic but trigger-aware label instead.
   const t = (r.title ?? "").trim();
-  if (t.length <= 48) return t;
-  const slice = t.slice(0, 48);
-  const cut = slice.lastIndexOf(" ");
-  return cut > 20 ? slice.slice(0, cut).trim() : slice.trim();
+  const candidate = t.length <= 48
+    ? t
+    : (() => {
+        const slice = t.slice(0, 48);
+        const cut = slice.lastIndexOf(" ");
+        return cut > 20 ? slice.slice(0, cut).trim() : slice.trim();
+      })();
+  if (/^\s*protest mobilisation\s*$/i.test(candidate)) {
+    return withCity("Civic protest march");
+  }
+  return candidate;
 }
 
 // Forecast-table operational meaning — short, decision-grade phrase
