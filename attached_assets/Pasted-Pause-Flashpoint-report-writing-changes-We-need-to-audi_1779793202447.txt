@@ -1,0 +1,96 @@
+Pause Flashpoint report-writing changes.
+
+We need to audit data coverage first.
+
+Create a Flashpoint data coverage audit before making further prose or report changes.
+
+Scope:
+Flashpoint / Activism / Protests / Civil Unrest only.
+
+Audit the current data pipeline for:
+
+1. Sources currently feeding Flashpoint
+List each source:
+- source name
+- topic assignment
+- source type
+- status
+- last successful pull
+- last failure
+- reliability score
+- geographic coverage
+- what kind of records it provides
+
+2. Misassigned sources
+Identify sources assigned to Flashpoint that should not be there.
+Example:
+- fertiliser sources
+- energy sources
+- armed conflict sources without protest/public-order relevance
+
+3. Missing regional coverage
+Check whether Flashpoint has useful coverage for:
+- Australia
+- Papua / PNG / Indonesian Papua
+- Philippines / Manila
+- Japan / Tokyo
+- Nepal
+- Indonesia
+- Thailand
+- Malaysia
+- Bangladesh
+- Sri Lanka
+- Pakistan
+- India
+- South Korea
+- Hong Kong / China
+
+For each country, report:
+- number of qualifying records in the current window
+- number of records in the last 30 days
+- number of records in the last 90 days
+- whether the source coverage looks adequate, weak or absent
+
+4. Classification quality
+Sample recent Flashpoint candidate records and identify:
+- correctly classified protest / activism / unrest records
+- misclassified armed conflict
+- misclassified court/legal background
+- misclassified labour action
+- duplicate syndicated records
+- soft commentary or parody items
+
+5. Source gaps
+Identify which source types are missing:
+- local media
+- union / labour notices
+- police advisories
+- city transport disruption notices
+- campus/student activism
+- protest calendars
+- election / court trigger monitoring
+- local APAC stringers
+- social mobilisation indicators
+
+6. Output required
+Produce an internal table called:
+
+Flashpoint Data Coverage Audit
+
+Columns:
+- Country / Area
+- Current window records
+- 30-day records
+- 90-day records
+- Main sources
+- Coverage rating
+- Main gaps
+- Action required
+
+7. Do not change the client PDF yet.
+
+Acceptance:
+- We understand whether Flashpoint is weak because of prose, classification, missing sources, or lack of data.
+- We know which countries are genuinely quiet and which are under-covered.
+- We know which sources need fixing or reassignment.
+- No report-writing changes until this audit is complete.

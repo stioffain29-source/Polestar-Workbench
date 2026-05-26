@@ -96,3 +96,9 @@ id = "nloHA--Dz45JkY_rcM7SS"
 uri = "file://screenshots/font_proof/cargo_watch.pdf"
 type = "pdf"
 title = "Cargo Watch report"
+
+[[outputs]]
+id = "90NJUPsCrHb4q1FjayEbB"
+uri = "file://attached_assets/flashpoint_data_coverage_audit.md"
+type = "text"
+title = "Flashpoint Data Coverage Audit"
