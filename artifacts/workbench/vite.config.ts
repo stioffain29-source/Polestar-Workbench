@@ -26,8 +26,13 @@ if (!basePath) {
   );
 }
 
+const buildTime = new Date().toISOString();
+
 export default defineConfig({
   base: basePath,
+  define: {
+    __BUILD_TIME__: JSON.stringify(buildTime),
+  },
   plugins: [
     react(),
     tailwindcss(),

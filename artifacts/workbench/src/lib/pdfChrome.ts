@@ -481,7 +481,7 @@ export function drawBulletSection(
  * full-bleed cover). Polar Gray band, flush to the bottom edge.
  * Contents: website left, email centre, "Page X of Y" right. Nothing else.
  */
-export function drawFooters(pdf: jsPDF, _reportDate?: string) {
+export function drawFooters(pdf: jsPDF, _reportDate?: string, debugLine?: string) {
   void _reportDate; // intentionally unused — date no longer in footer per brand spec
   const pageCount = pdf.getNumberOfPages();
   const W = pdf.internal.pageSize.getWidth();
@@ -498,6 +498,16 @@ export function drawFooters(pdf: jsPDF, _reportDate?: string) {
     pdf.text(sanitize(POLESTAR_URL), 18, ty);
     pdf.text(sanitize(POLESTAR_EMAIL), W / 2, ty, { align: "center" });
     pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, { align: "right" });
+    // Temporary diagnostic proof line, sits just above the footer band.
+    // Used to verify which exporter / dataset / build is actually
+    // producing the rendered PDF. Removable once the runtime path is
+    // confirmed.
+    if (debugLine) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(6.5);
+      pdf.text(sanitize(debugLine), 18, H - FOOTER_BAND_H - 2);
+    }
   }
 }
 

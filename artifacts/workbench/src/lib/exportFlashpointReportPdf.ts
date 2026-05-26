@@ -472,6 +472,20 @@ export async function exportFlashpointReportPdf(
 
   drawDisclaimer(ctx);
 
-  drawFooters(ctx.pdf);
+  drawFooters(ctx.pdf, undefined, FLASHPOINT_EXPORT_PROOF);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }
+
+// --- Runtime-path proof marker --------------------------------------------
+// Visible diagnostic. Lets us prove from a rendered PDF exactly which
+// exporter file, dataset builder and bundle build produced it. The
+// build timestamp comes from Vite's `define` substitution (see
+// vite.config.ts); for the headless Node exporter it falls back to the
+// process start time. Increment EXPORTER_REVISION whenever the
+// Flashpoint exporter / dataset semantics change so a stale browser
+// bundle is immediately obvious in the rendered footer.
+const EXPORTER_REVISION = "v10-out-of-scope+forecast-dedupe+proofline";
+const BUILD_TIME: string =
+  typeof __BUILD_TIME__ !== "undefined" ? __BUILD_TIME__ : new Date().toISOString();
+export const FLASHPOINT_EXPORT_PROOF =
+  `FLASHPOINT EXPORT PATH: exportFlashpointReportPdf.ts \u2022 buildFlashpointReportDataset \u2022 ${EXPORTER_REVISION} \u2022 build ${BUILD_TIME}`;
