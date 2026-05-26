@@ -94,6 +94,72 @@ const FUEL_EXCLUDE: RegExp[] = [
 // even when the text mentions a chokepoint or freight word in passing.
 // These records may discuss shipping in macro terms but they are not
 // operational maritime incidents.
+// Flashpoint-specific exclusions. The Flashpoint surface covers
+// activism, protest, labour action and civil unrest. The word "rally"
+// is heavily overloaded (sports, motorsport, equities, FX, bond, oil,
+// concert/fan rallies) and the word "strike" is heavily overloaded
+// (lightning/thunder/storm strike, military strike, drone/missile
+// strike). Country-name Google News queries pull these homonyms in
+// directly, and they were leaking into the Activism Records table.
+// Each pattern below kills a recognised homonym so the relevance
+// gate can keep the legitimate public-order meaning of those words.
+const FLASHPOINT_EXCLUDE: RegExp[] = [
+  // Sports: baseball/cricket/football "rally", "rally past", "rally to
+  // beat", "rally to win", "wins after rally", "late rally", "ninth-
+  // inning rally", "tournament rally", "racing rally", motorsport
+  // event names ("Rally Japan", "WRC Rally", "Round N - Rally X").
+  /\brally (past|to (beat|defeat|win|tie|overcome)|caps|seals|secures|stuns|sinks|past the|from \d+)/,
+  /\b(wins?|won|beats?|beat|stuns?|stunned|tops|topped|edges?|edged) .{0,40}(after|with|on) .{0,20}rally\b/,
+  /\b(late|ninth[- ]inning|eighth[- ]inning|seventh[- ]inning|fourth[- ]quarter|comeback|come[- ]from[- ]behind|game[- ]winning|series[- ]clinching|tournament) rally\b/,
+  /\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/,
+  /\b(wrc|world rally championship|rally championship|rally cross|rallycross|dakar rally|paris[- ]dakar)\b/,
+  /\bround \d+ [-–] rally\b/,
+  /\b(rays|yankees|mets|red sox|cubs|dodgers|giants|astros|orioles|phillies|braves|cardinals|marlins|blue jays|royals|tigers|twins|rangers|mariners|angels|athletics|padres|rockies|nationals|brewers|pirates|reds|guardians|white sox|d[- ]?backs|diamondbacks) (rally|rallied|rallies)/,
+
+  // Finance / markets: stock, share, equity, bond, currency, FX,
+  // commodity rallies. "Ringgit rally", "Rupee rally", "Stocks extend
+  // rally", "Brent rally", "Gold rally", "Bitcoin rally".
+  /\b(stock|stocks|share|shares|equity|equities|market|markets|index|nifty|sensex|nikkei|kospi|hang seng|shanghai composite|kse[- ]?100|psx|jci|ftse|s&p|nasdaq|dow|asx|set index|pse(i)?|vn[- ]index|wall street|wall[- ]?st|main street) .{0,60}rally\b/,
+  /\brally\b .{0,30}(stocks?|shares?|equit(y|ies)|markets?|bonds?|treasur(y|ies)|currenc(y|ies)|commodities?|wall street|nikkei|kospi|sensex|nifty|hang seng|ftse|s&p|nasdaq|dow|psei|jci)/,
+  // "PSEi rebounds above 5,900 on Wall Street rally" — index name +
+  // points/level + "on … rally" is unambiguously a markets headline.
+  /\b(psei|nifty|sensex|nikkei|kospi|hang seng|shanghai composite|ftse|s&p|nasdaq|dow|asx|jci|kse[- ]?100|vn[- ]index|set index) .{0,50}(rally|rebound|surge|jump|gain|loss|drop|slip|fall|close|opens?)/,
+  /\brally (in|across) .{0,20}(stocks?|shares?|equit(y|ies)|markets?|bonds?|treasur(y|ies)|currenc(y|ies)|commodities?)/,
+  /\b(extend|extends|extended|extending|continues?|continued|continuing|halts?|halted|stalls?|stalled|fades?|faded|sparks?|sparked|ignites?|ignited|drives?|drove|lifts?|lifted|powers?|powered|fuels?|fuelled|fueled) (its |a |the )?rally\b/,
+  /\b(\d+[- ]day|multi[- ]day|two[- ]day|three[- ]day|week[- ]long|month[- ]long|year[- ]end|santa|relief|bear[- ]market|bull[- ]market|tech|chip|ai|crypto|bitcoin|ethereum|gold|silver|oil|crude|brent|wti|copper|iron ore|treasury|bond|dollar|yen|euro|pound|sterling|yuan|renminbi|ringgit|rupee|rupiah|peso|baht|dong|kyat|taka|kip) rally\b/,
+  /\brally (fizzles|stalls|fades|ends|cools|extends|continues|pauses|resumes)\b/,
+  /\bends? .{0,15}rally\b/,
+  /\b(ringgit|rupee|rupiah|peso|baht|yuan|renminbi|dong|kyat|taka|kip|won|yen|dollar|euro|pound|sterling|riyal|dirham|lira) .{0,20}(rally|rallied|rallies|gains?|jumps?|surges?)\b.{0,40}(against|versus|vs\.?) /,
+  /\brally past (\$|us\$|usd|inr|rs\.?|rm|php|idr|myr|jpy|cny|eur|gbp|sgd|aud|hkd|krw)/,
+
+  // Weather / natural: "lightning/thunder/storm strike", "rain and
+  // thunder strike", "cyclone strike", "typhoon strike", "tsunami
+  // strike". These are weather events, not industrial action.
+  /\b(lightning|thunder|storm|rain|hail|snow|blizzard|cyclone|typhoon|hurricane|tornado|tsunami|earthquake|quake|flood|monsoon|heatwave|cold wave) (strike|strikes|struck|striking)/,
+  /\b(strike|strikes|struck|striking) .{0,30}(provinces?|districts?|villages?|towns?|cities|coast|region) .{0,40}(rain|thunder|lightning|storm|cyclone|typhoon|hurricane|monsoon|flood)/,
+  /\brain and thunder\b/,
+
+  // Military / kinetic homonyms. "Drone strike", "missile strike",
+  // "air strike", "airstrike", "Ukrainian strike", "Russian strike",
+  // "Israeli strike", "junta strike", "military strike", "IBO",
+  // "intelligence-based operation", named militant groups attacking.
+  // The flashpointReportDataset kinetic filter is the deeper guard,
+  // but blocking these at the relevance gate prevents them from ever
+  // being scored as activism in the first place.
+  /\b(drone|missile|air|artillery|naval|precision|cruise|ballistic|hypersonic|stealth|tactical|surgical|retaliatory|pre[- ]?emptive|joint|coalition|allied) (strike|strikes|struck|striking)/,
+  /\bair[- ]?strike(s)?\b/,
+  /\b(ukrainian|russian|israeli|hamas|hezbollah|houthi|iranian|us|american|nato|saudi[- ]led|coalition|israeli[- ]defen[cs]e|idf|junta|myanmar (army|junta|military)|tatmadaw|pla|chinese (army|pla)|indian (army|military)|pakistani (army|military)|afghan (taliban|forces)|taliban|isis|islamic state|isk|iskp|al[- ]qaeda|tehrik[- ]?i[- ]?taliban|\bttp\b|\bbla\b|baloch (liberation|raj)|maoist|naxal|lashkar|jaish) .{0,30}(strike|strikes|struck)/,
+  /\bstrike (on|against|at|hits|hit|kills|killed|destroyed|levels?|leveled|levelled) .{0,40}(college|school|hospital|town|village|city|base|airfield|airbase|airport|port|depot|barracks|convoy|installation|facility|refinery|pipeline|grid|building|residential)/,
+  /\b(intelligence[- ]based operation|\bibo\b|counter[- ]?terror(ism)? (operation|raid|action)|search (and|&) (cordon|destroy) operation|cordon and search)/,
+  /\b\d+\s+(terrorists?|militants?|insurgents?|gunmen|attackers?|fighters?)\s+(killed|neutralis(e|ed)|gunned down|eliminated|dead)\b/,
+
+  // Entertainment / events: concert rallies, fan rallies, product
+  // launch rallies, promotional rallies, "rally for <artist> concert".
+  /\b(concert|fan|gig|tour|album|product launch|launch|promotional|promo|brand|sale|crowdfund|donation drive) rally\b/,
+  /\brally (for|to see|to meet|to support|to celebrate) .{0,30}(concert|gig|tour|album|launch|artist|singer|band|actor|star|celebrity|idol)/,
+  /\b(anne curtis|taylor swift|bts|blackpink|gracie abrams|ed sheeran|coldplay|harry styles|olivia rodrigo|sabrina carpenter)\b/i,
+];
+
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
@@ -161,17 +227,55 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\blogistics crime/,
     /\b(broken seal|seal break|seal broken)/,
   ],
+  // Protests / Flashpoint use a two-tier match: an UNAMBIGUOUS phrase
+  // alone is sufficient, but the ambiguous tokens "rally", "strike"
+  // and "student(s)" must additionally co-occur with a public-order
+  // cue (see FLASHPOINT_AMBIGUOUS_RE + FLASHPOINT_PUBLIC_ORDER_CUE_RE
+  // below). The REQUIRED entries here represent only the unambiguous
+  // tier; the ambiguous tier is enforced separately in
+  // `isTopicRelevant` for `protests` and `flashpoint`.
   protests: [
-    /\b(protest|demonstration|rally|march|sit[- ]in|strike|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|disorder)/,
-    /\b(students?|farmers|workers|union|opposition|civil society) .{0,30}(protest|march|rally|strike|gather)/,
-    /\b(police|security forces?) .{0,30}(clash|crackdown|operation|tear gas|baton|rubber bullet)/,
+    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)\b/,
+    /\b(farmers|workers|union|opposition|civil society|activists) .{0,30}(protest|march|gather|demonstrate|mobilis(e|ed)|mobiliz(e|ed))/,
+    /\b(police|security forces?) .{0,30}(clash|crackdown|tear gas|baton|rubber bullet|water cannon) .{0,30}(protest|demonstration|march|crowd|mob|sit[- ]?in)/,
+    /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
   ],
   flashpoint: [
-    /\b(protest|demonstration|rally|march|sit[- ]in|strike|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|disorder|crackdown|clash)/,
-    /\b(curfew|state of emergency|martial law|lockdown)/,
-    /\b(security forces?|police|military) .{0,30}(deployed|operation|clash|crackdown)/,
+    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)\b/,
+    /\b(farmers|workers|union|opposition|civil society|activists) .{0,30}(protest|march|gather|demonstrate|mobilis(e|ed)|mobiliz(e|ed))/,
+    /\b(police|security forces?|military) .{0,30}(clash|crackdown|tear gas|baton|rubber bullet|water cannon) .{0,30}(protest|demonstration|march|crowd|mob|sit[- ]?in)/,
+    /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
   ],
 };
+
+// Ambiguous tier for the flashpoint/protests relevance gate. These
+// tokens are too heavily overloaded to admit on their own — they need
+// an explicit public-order companion in the same record.
+const FLASHPOINT_AMBIGUOUS_RE =
+  /\b(rally|rallies|rallied|strike|strikes|striking|struck|students?)\b/;
+
+// Public-order companion. If a record's only flashpoint signal is an
+// ambiguous token (rally/strike/student), one of these cues must also
+// be present or the record is dropped. This is the rule the user
+// requires for headlines like "Stocks extend rally" or "Lightning
+// strike kills three" — both have an ambiguous trigger but no
+// public-order companion, so they are not flashpoint material.
+const FLASHPOINT_PUBLIC_ORDER_CUE_RE =
+  /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage))\b/;
+
+// Student-specific extra guard. A record whose only flashpoint hook
+// is the word "student(s)" must also describe mobilisation or public-
+// order action against students — not crime stories about a student,
+// not education-policy notes, not a military strike on a school.
+const STUDENT_MOBILISATION_RE =
+  /\b(student (protest|protests|union|unions|movement|march|rally|sit[- ]?in|walkout|strike|boycott|mobilisation|mobilization)|students? (protest|protests|protested|protesting|march|marched|marching|rally|rallied|gather|gathered|stage(d)? (a )?(sit[- ]?in|walkout|protest|march|demonstration|boycott)|clash(ed)? with police|arrest(ed)?|detained|tear[- ]?gassed|baton[- ]?charged|launched (a )?(campaign|movement|drive)|occupy|occupied)|campus (protest|unrest|crackdown|sit[- ]?in)|students? (and|along with) (teachers|workers|farmers|activists))\b/;
+
+// Non-mobilisation student stories (school attacks, education policy,
+// crime stories involving students, military strikes on schools).
+// These are NOT student protests and must be excluded even if the
+// public-order cue regex happens to match incidentally.
+const STUDENT_NON_MOBILISATION_RE =
+  /\b((attack|attacked|attacks|bomb|bombed|bombing|shooting|stabbing|shot dead|killed|raped|abducted|kidnapped|missing) .{0,40}(student|students|pupil|pupils|schoolchildren|schoolgirl|schoolboy|college|university|campus)|(student|pupil|schoolchildren|schoolgirl|schoolboy) .{0,30}(raped|killed|abducted|kidnapped|stabbed|shot dead|missing|murdered)|education (policy|reform|budget|act|bill|board exam|board examination|results)|(strike|airstrike|missile|drone) (on|hits|kills|killed|destroyed) .{0,30}(college|school|university|campus|hostel)|exam (scandal|leak|cheating|fraud|controversy|results)|admission (deadline|policy|quota))\b/;
 
 function haystack(i: RelevanceInput): string {
   return [
@@ -207,6 +311,37 @@ export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
     for (const re of CARGO_EXCLUDE) {
       if (re.test(text)) return false;
     }
+  }
+  if (topic === "flashpoint" || topic === "protests") {
+    // 1. Hard exclusions first — sports/finance/weather/military/
+    //    entertainment homonyms of "rally" / "strike" / "student".
+    for (const re of FLASHPOINT_EXCLUDE) {
+      if (re.test(text)) return false;
+    }
+    // 2. Non-mobilisation student stories (school attacks, crime
+    //    stories, education policy) are never flashpoint, even if
+    //    the public-order cue regex incidentally matches.
+    if (STUDENT_NON_MOBILISATION_RE.test(text)) return false;
+    // 3. Unambiguous-tier match: any REQUIRED.flashpoint phrase
+    //    qualifies on its own.
+    const unambiguous = REQUIRED[topic] ?? [];
+    for (const re of unambiguous) {
+      if (re.test(text)) return true;
+    }
+    // 4. Ambiguous-tier match: bare "rally" / "strike" needs a
+    //    public-order companion; bare "student(s)" needs a student-
+    //    mobilisation phrase.
+    if (FLASHPOINT_AMBIGUOUS_RE.test(text)) {
+      const mentionsStudent = /\bstudents?\b/.test(text);
+      if (mentionsStudent && !STUDENT_MOBILISATION_RE.test(text)) {
+        // Has "student" but no mobilisation — needs another non-
+        // student ambiguous trigger plus a public-order cue.
+        const otherAmbiguous = /\b(rally|rallies|rallied|strike|strikes|striking|struck)\b/.test(text);
+        if (!otherAmbiguous) return false;
+      }
+      if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) return true;
+    }
+    return false;
   }
   const required = REQUIRED[topic];
   if (!required || required.length === 0) return true;

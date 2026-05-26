@@ -1,0 +1,171 @@
+Good. Do not touch prose yet.
+
+Now harden the Flashpoint relevance/classifier layer before rebuilding the report.
+
+Problem:
+The pipeline now feeds wider APAC coverage, but the report is allowing homonym noise through:
+- “rally” as baseball / motorsport / market rally / currency rally
+- “strike” as weather strike or military strike
+- “student” in unrelated college attack stories
+- finance / sports / entertainment / weather / military items leaking into Flashpoint
+
+Scope:
+Flashpoint relevance filtering only.
+
+Do not change:
+- report prose
+- report layout
+- source list
+- scraper
+- Fast Facts design
+- PDF formatting
+
+Required classifier fixes:
+
+1. Add Flashpoint hard exclusions for non-public-order meanings
+
+Exclude records where the headline/body indicates:
+
+Sports:
+- baseball rally
+- team rally
+- wins after rally
+- rally past
+- rally Japan / motorsport rally
+- racing rally
+- tournament rally
+
+Finance / markets:
+- stock rally
+- market rally
+- shares rally
+- currency rally
+- ringgit rally
+- rupee rally
+- bond rally
+- oil rally
+- gold rally
+- price rally
+
+Weather / natural events:
+- lightning strike
+- thunder strike
+- storm strike
+- rain and thunder strike
+- cyclone / typhoon strike
+
+Military / kinetic:
+- drone strike
+- missile strike
+- air strike
+- artillery strike
+- Ukrainian strike
+- junta strike
+- military strike
+- militants attack
+- terrorists killed
+- IBO / intelligence-based operation
+- armed group attack
+
+Entertainment / events:
+- concert rally
+- fan rally
+- product launch rally
+- promotional rally
+
+2. Require a public-order cue for ambiguous terms
+
+If a record only has “rally” or “strike”, do not include it unless it also has one of:
+- protest
+- demonstration
+- march
+- sit-in
+- picket
+- union
+- labour
+- workers
+- students protest
+- activists
+- police
+- arrest
+- curfew
+- assembly ban
+- Section 144
+- roadblock
+- blockade
+- public disorder
+- civil unrest
+- strike notice
+- walkout
+- industrial action
+
+3. Student-related records
+
+Do not include all “student” records.
+
+Include only if linked to:
+- student protest
+- student union
+- campus protest
+- demonstration
+- march
+- sit-in
+- police action
+- arrests
+- public-order disruption
+
+Exclude:
+- attacks on schools / colleges
+- education policy stories without mobilisation
+- crime stories involving students
+- military strikes on schools or colleges
+
+4. Kinetic filter
+
+Kinetic / armed-conflict records must be excluded unless they explicitly describe protest/public-order impact.
+
+Exclude:
+- drone attack
+- missile strike
+- airstrike
+- shelling
+- militants
+- terrorists
+- battlefield
+- military operation
+- security forces killed
+- armed group
+- insurgents
+- junta troops
+- IBO
+
+5. Add test examples
+
+Create classifier test cases using the exact bad examples found:
+- Rays rally past Yankees
+- Stocks extend rally
+- Ringgit ends 3-day rally
+- Preview: Round 7 - Rally Japan
+- Rain and thunder strike four provinces
+- 10 dead in Ukrainian strike on college
+- Chemists strike on May 20
+- PTI launches protest drive
+- Students hold protest in Balochistan
+- Section 144 protest activity
+
+Expected:
+Bad homonyms excluded.
+Real protest / labour / student mobilisation retained.
+
+6. Re-export proof
+
+After classifier hardening:
+- reload Flashpoint preview
+- export Flashpoint PDF
+- inspect Related Incidents, Activism Records, Forecast and Watch Next
+
+Acceptance:
+- no sports / market / currency / weather / military strike homonyms
+- no kinetic records without protest hook
+- broader APAC coverage remains
+- Flashpoint records are actual activism, protest, labour action or public-order items

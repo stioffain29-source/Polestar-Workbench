@@ -107,7 +107,7 @@ title = "Flashpoint data coverage audit"
 id = "1Z7EUoe0E3-_nYsYROd8p"
 uri = "file://deliverables/flashpoint_proof.pdf"
 type = "pdf"
-title = "Flashpoint PDF — fresh export with post-cleanup data"
+title = "Flashpoint PDF — post classifier hardening (18 activism + 6 strike rows, zero homonyms)"
 
 [[outputs]]
 id = "QEcCxhigDqM5A45EnOEzB"
