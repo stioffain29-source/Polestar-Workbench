@@ -4,7 +4,11 @@ import {
   useGetCountryReport,
   useListIncidents,
   useUpdateCountryReport,
+  useGetCountryBaseline,
+  useUpsertCountryBaseline,
+  useDeleteCountryBaseline,
   getGetCountryReportQueryKey,
+  getGetCountryBaselineQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -12,14 +16,14 @@ import html2canvas from "html2canvas";
 import { TOPIC_LABELS } from "@/lib/topics";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
-import { ArrowLeft, Download, Loader2, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { slugifyForFilename } from "@/lib/exportPdf";
 import { exportCountryReportPdf } from "@/lib/exportCountryReportPdf";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
-import { getCountryBaseline, type CountryBaseline } from "@/lib/countryBaselines";
+import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, type WatchlistRow, type CountryLayerBuckets } from "@/lib/countryReportLayers";
 
 // Brand palette (lowercase per brand spec).
@@ -55,6 +59,18 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = { name: "", region: "", overview: "", trendSummary: "", implications: "" };
 
+const EMPTY_BASELINE: CountryBaseline = {
+  operatingEnvironment: "",
+  securityContext: "",
+  knownRiskAreas: [],
+  keyCitiesProvinces: [],
+  movementConstraints: "",
+  infrastructureLimits: "",
+  medicalEvac: "",
+  resourceSectorExposure: "",
+  locationWatchlist: [],
+};
+
 export default function CountryReport() {
   const [, params] = useRoute("/countries/:slug");
   const slug = params?.slug ?? "";
@@ -69,10 +85,23 @@ export default function CountryReport() {
   const incidents = useMemo(() => incidentsData ?? [], [incidentsData]);
   const update = useUpdateCountryReport();
 
+  // Country baseline (editorial reference content stored in the DB).
+  // 404 is the expected "no baseline curated" state and is mapped to
+  // null so the report still renders the live-data layers.
+  const { data: baselineData, isSuccess: baselineLoaded, isError: baselineMissing } =
+    useGetCountryBaseline(slug, {
+      query: { enabled: !!slug, retry: false },
+    } as never);
+  const upsertBaseline = useUpsertCountryBaseline();
+  const deleteBaseline = useDeleteCountryBaseline();
+
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [baselineDraft, setBaselineDraft] = useState<CountryBaseline>(EMPTY_BASELINE);
+  const [baselineDirty, setBaselineDirty] = useState(false);
   const seededForSlug = useRef<string | null>(null);
+  const baselineSeededForSlug = useRef<string | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
 
   const issueDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -90,11 +119,23 @@ export default function CountryReport() {
   // reference content that does not depend on the incident feed; the
   // layers partition the 90-day pull into current / 30 / 90 buckets so
   // the report carries proper context even when the current window is
-  // thin.
-  const baseline: CountryBaseline | null = useMemo(
-    () => getCountryBaseline(country?.name),
-    [country?.name],
-  );
+  // thin. When editing, the report renders against the in-progress
+  // draft so the editor can preview their changes immediately.
+  const persistedBaseline: CountryBaseline | null = useMemo(() => {
+    if (!baselineData) return null;
+    return {
+      operatingEnvironment: baselineData.operatingEnvironment,
+      securityContext: baselineData.securityContext,
+      knownRiskAreas: baselineData.knownRiskAreas,
+      keyCitiesProvinces: baselineData.keyCitiesProvinces,
+      movementConstraints: baselineData.movementConstraints,
+      infrastructureLimits: baselineData.infrastructureLimits,
+      medicalEvac: baselineData.medicalEvac,
+      resourceSectorExposure: baselineData.resourceSectorExposure,
+      locationWatchlist: baselineData.locationWatchlist,
+    };
+  }, [baselineData]);
+  const baseline: CountryBaseline | null = editing ? baselineDraft : persistedBaseline;
   const layers: CountryLayerBuckets = useMemo(
     () => buildCountryLayers(incidents as CountryFastFactsIncident[], issueDate),
     [incidents, issueDate],
@@ -146,7 +187,25 @@ export default function CountryReport() {
     if (seededForSlug.current !== null && seededForSlug.current !== slug) {
       seededForSlug.current = null;
     }
+    if (baselineSeededForSlug.current !== null && baselineSeededForSlug.current !== slug) {
+      baselineSeededForSlug.current = null;
+      setBaselineDirty(false);
+    }
   }, [slug]);
+
+  // Seed the baseline draft once the baseline query has actually
+  // resolved for this slug — either a 200 with content or a 404 telling
+  // us no baseline is curated yet. Seeding before the query settles
+  // would lock in EMPTY_BASELINE and then silently overwrite the real
+  // record on save.
+  useEffect(() => {
+    if (!slug) return;
+    if (baselineSeededForSlug.current === slug) return;
+    if (!baselineLoaded && !baselineMissing) return;
+    baselineSeededForSlug.current = slug;
+    setBaselineDraft(persistedBaseline ?? EMPTY_BASELINE);
+    setBaselineDirty(false);
+  }, [slug, baselineLoaded, baselineMissing, persistedBaseline]);
 
   const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -211,10 +270,10 @@ export default function CountryReport() {
     }
   };
 
-  const save = () => {
+  const save = async () => {
     if (!country) return;
-    update.mutate(
-      {
+    try {
+      await update.mutateAsync({
         slug,
         data: {
           name: draft.name,
@@ -223,14 +282,35 @@ export default function CountryReport() {
           trendSummary: draft.trendSummary,
           implications: draft.implications,
         },
-      },
-      {
-        onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getGetCountryReportQueryKey(slug) });
-          setEditing(false);
-        },
-      },
-    );
+      });
+      // Only touch the baseline row if the editor actually changed
+      // something. Without this gate, hitting Save on a country whose
+      // baseline query hasn't settled (or whose editor wasn't touched)
+      // would upsert whatever happens to be in `baselineDraft` and can
+      // wipe curated content with empty strings/arrays.
+      if (baselineDirty) {
+        await upsertBaseline.mutateAsync({
+          slug,
+          data: {
+            operatingEnvironment: baselineDraft.operatingEnvironment,
+            securityContext: baselineDraft.securityContext,
+            knownRiskAreas: baselineDraft.knownRiskAreas,
+            keyCitiesProvinces: baselineDraft.keyCitiesProvinces,
+            movementConstraints: baselineDraft.movementConstraints,
+            infrastructureLimits: baselineDraft.infrastructureLimits,
+            medicalEvac: baselineDraft.medicalEvac,
+            resourceSectorExposure: baselineDraft.resourceSectorExposure,
+            locationWatchlist: baselineDraft.locationWatchlist,
+          },
+        });
+        qc.invalidateQueries({ queryKey: getGetCountryBaselineQueryKey(slug) });
+        setBaselineDirty(false);
+      }
+      qc.invalidateQueries({ queryKey: getGetCountryReportQueryKey(slug) });
+      setEditing(false);
+    } catch (err) {
+      console.error("[CountryReport] save failed", err);
+    }
   };
 
   const cancel = () => {
@@ -243,7 +323,29 @@ export default function CountryReport() {
         implications: country.implications ?? "",
       });
     }
+    setBaselineDraft(persistedBaseline ?? EMPTY_BASELINE);
+    setBaselineDirty(false);
     setEditing(false);
+  };
+
+  const clearBaseline = async () => {
+    if (!slug) return;
+    if (!window.confirm(`Retire the curated baseline for ${effective?.name ?? "this country"}? The report will fall back to live-data layers only.`)) return;
+    try {
+      await deleteBaseline.mutateAsync({ slug });
+      qc.invalidateQueries({ queryKey: getGetCountryBaselineQueryKey(slug) });
+      setBaselineDraft(EMPTY_BASELINE);
+      // Disarm the upsert path so a subsequent Save click does not
+      // immediately recreate an empty baseline row.
+      setBaselineDirty(false);
+    } catch (err) {
+      console.error("[CountryReport] baseline delete failed", err);
+    }
+  };
+
+  const setBaselineField = <K extends keyof CountryBaseline>(k: K, v: CountryBaseline[K]) => {
+    setBaselineDraft((b) => ({ ...b, [k]: v }));
+    setBaselineDirty(true);
   };
 
   if (isLoading) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Loading...</div>;
@@ -420,15 +522,31 @@ export default function CountryReport() {
         onChange={(v) => setField("implications", v)}
       />
 
-      {/* 6a. Country Baseline (only when a baseline is curated for this country) */}
-      {baseline && (
+      {/* 6a. Country Baseline (editorial reference content stored in
+          the DB). When editing, the analyst can rewrite every field
+          and tweak the location watchlist; when viewing, the block
+          renders the persisted baseline if one is curated. */}
+      {editing ? (
         <Section title="Country Baseline">
-          <BaselineBlock baseline={baseline} />
+          <BaselineEditor
+            baseline={baselineDraft}
+            setField={setBaselineField}
+            onClear={persistedBaseline ? clearBaseline : undefined}
+            clearing={deleteBaseline.isPending}
+          />
         </Section>
+      ) : (
+        baseline && (
+          <Section title="Country Baseline">
+            <BaselineBlock baseline={baseline} />
+          </Section>
+        )
       )}
 
-      {/* 6b. Location Watchlist (only when a baseline is curated) */}
-      {baseline && watchlist.length > 0 && (
+      {/* 6b. Location Watchlist — in edit mode the editor lives
+          inside the Country Baseline section above. The read-only
+          breakdown only appears when a baseline is curated. */}
+      {!editing && baseline && watchlist.length > 0 && (
         <Section title="Location Watchlist">
           <WatchlistTable rows={watchlist} />
         </Section>
@@ -583,7 +701,7 @@ export default function CountryReport() {
           )}
           {!baseline && (
             <li style={{ color: "#A33232" }}>
-              No country baseline curated for {effective.name}. The report falls back to live data only; add a baseline entry in <code>countryBaselines.ts</code> for the full operating picture.
+              No country baseline curated for {effective.name}. The report falls back to live data only. Click <strong>Edit</strong> (top right) to add the operating environment, security context, key cities and the location watchlist.
             </li>
           )}
         </ul>
@@ -780,6 +898,262 @@ function EditableSection({
         <Prose text={savedValue} />
       )}
     </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Country Baseline editor
+// ---------------------------------------------------------------------------
+
+function BaselineEditor({
+  baseline,
+  setField,
+  onClear,
+  clearing,
+}: {
+  baseline: CountryBaseline;
+  setField: <K extends keyof CountryBaseline>(k: K, v: CountryBaseline[K]) => void;
+  onClear?: () => void;
+  clearing?: boolean;
+}) {
+  return (
+    <div>
+      <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginBottom: 10 }}>
+        Edits here update the curated country baseline. Save the report (top right) to persist; cancel to discard. Baseline content is reference material — keep it stable across reporting cycles.
+      </div>
+
+      <BaselineTextField
+        label="Operating Environment"
+        value={baseline.operatingEnvironment}
+        onChange={(v) => setField("operatingEnvironment", v)}
+      />
+      <BaselineTextField
+        label="Security Context"
+        value={baseline.securityContext}
+        onChange={(v) => setField("securityContext", v)}
+      />
+      <BaselineListField
+        label="Known Risk Areas"
+        items={baseline.knownRiskAreas}
+        onChange={(v) => setField("knownRiskAreas", v)}
+        placeholder="One risk area per row (geography, dispute, recurring trigger)"
+      />
+      <BaselineListField
+        label="Key Cities / Provinces"
+        items={baseline.keyCitiesProvinces}
+        onChange={(v) => setField("keyCitiesProvinces", v)}
+        placeholder="One city or province per row"
+      />
+      <BaselineTextField
+        label="Movement Constraints"
+        value={baseline.movementConstraints}
+        onChange={(v) => setField("movementConstraints", v)}
+      />
+      <BaselineTextField
+        label="Infrastructure Limits"
+        value={baseline.infrastructureLimits}
+        onChange={(v) => setField("infrastructureLimits", v)}
+      />
+      <BaselineTextField
+        label="Medical / Evacuation"
+        value={baseline.medicalEvac}
+        onChange={(v) => setField("medicalEvac", v)}
+      />
+      <BaselineTextField
+        label="Resource-Sector Exposure"
+        value={baseline.resourceSectorExposure}
+        onChange={(v) => setField("resourceSectorExposure", v)}
+      />
+
+      <WatchlistEditor
+        items={baseline.locationWatchlist}
+        onChange={(v) => setField("locationWatchlist", v)}
+      />
+
+      {onClear && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${POLAR}`, paddingTop: 12 }}>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={clearing}
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm disabled:opacity-60"
+            style={{ fontFamily: ROBOTO, fontWeight: 700, border: `1px solid #A33232`, color: "#A33232", background: "#fff" }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {clearing ? "Retiring..." : "Retire curated baseline"}
+          </button>
+          <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 6, fontStyle: "italic" }}>
+            Removes the curated baseline for this country. The report will fall back to live-data layers only.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BaselineTextField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
+        {label}
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={Math.max(3, Math.min(12, value.split("\n").length + 1))}
+        style={{
+          width: "100%", background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2,
+          padding: 10, fontFamily: ROBOTO, fontSize: 13, color: DUSK, lineHeight: 1.55, outline: "none",
+        }}
+      />
+    </div>
+  );
+}
+
+function BaselineListField({
+  label,
+  items,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  items: string[];
+  onChange: (v: string[]) => void;
+  placeholder?: string;
+}) {
+  // Stored as `string[]` but edited as a textarea: one entry per line.
+  // This keeps the editor lightweight (no per-row state management)
+  // while preserving order on save.
+  const text = items.join("\n");
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
+        {label}
+      </div>
+      <textarea
+        value={text}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const next = e.target.value.split("\n").map((s) => s.trimEnd());
+          // Preserve trailing blank rows while typing; only trim on save.
+          onChange(next);
+        }}
+        onBlur={(e) => {
+          // On blur, drop empty rows so the saved baseline stays tidy.
+          const clean = e.target.value
+            .split("\n")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+          onChange(clean);
+        }}
+        rows={Math.max(3, Math.min(12, items.length + 2))}
+        style={{
+          width: "100%", background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2,
+          padding: 10, fontFamily: ROBOTO, fontSize: 13, color: DUSK, lineHeight: 1.55, outline: "none",
+        }}
+      />
+    </div>
+  );
+}
+
+function WatchlistEditor({
+  items,
+  onChange,
+}: {
+  items: Array<{ label: string; note: string; match: string[] }>;
+  onChange: (v: Array<{ label: string; note: string; match: string[] }>) => void;
+}) {
+  const update = (i: number, patch: Partial<{ label: string; note: string; match: string[] }>) => {
+    onChange(items.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+  };
+  const remove = (i: number) => {
+    onChange(items.filter((_, idx) => idx !== i));
+  };
+  const add = () => {
+    onChange([...items, { label: "", note: "", match: [] }]);
+  };
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
+        Location Watchlist
+      </div>
+      <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginBottom: 8 }}>
+        Each entry is reported against the current / 30 / 90 windows regardless of whether incidents land. Match tokens are case-insensitive substrings checked against incident.location, incident.title and incident.summary — separate multiple spellings with commas.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((row, i) => (
+          <div
+            key={i}
+            style={{
+              border: `1px solid ${POLAR}`,
+              background: "#fff",
+              borderRadius: 2,
+              padding: 10,
+              display: "grid",
+              gridTemplateColumns: "1fr 1.5fr 1.5fr auto",
+              gap: 8,
+              alignItems: "start",
+            }}
+          >
+            <input
+              value={row.label}
+              placeholder="Display label"
+              onChange={(e) => update(i, { label: e.target.value })}
+              style={{ background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2, padding: 8, fontFamily: ROBOTO, fontSize: 13, color: DUSK, outline: "none" }}
+            />
+            <input
+              value={row.note}
+              placeholder="Why it's on the watchlist"
+              onChange={(e) => update(i, { note: e.target.value })}
+              style={{ background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2, padding: 8, fontFamily: ROBOTO, fontSize: 13, color: DUSK, outline: "none" }}
+            />
+            <input
+              value={row.match.join(", ")}
+              placeholder="Match tokens, comma separated"
+              onChange={(e) =>
+                update(i, {
+                  match: e.target.value
+                    .split(",")
+                    .map((s) => s.trim().toLowerCase())
+                    .filter((s) => s.length > 0),
+                })
+              }
+              style={{ background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2, padding: 8, fontFamily: ROBOTO, fontSize: 13, color: DUSK, outline: "none" }}
+            />
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              title="Remove watchlist entry"
+              className="inline-flex items-center justify-center"
+              style={{ background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2, padding: 8, color: "#A33232", cursor: "pointer" }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+        {items.length === 0 && (
+          <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, fontStyle: "italic" }}>
+            No watchlist entries. Add a city, corridor or sector the report should always read against.
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={add}
+        className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm mt-2"
+        style={{ fontFamily: ROBOTO, fontWeight: 700, border: `1px solid ${NAVY}`, color: NAVY, background: "#fff" }}
+      >
+        <Plus className="w-3.5 h-3.5" /> Add location
+      </button>
+    </div>
   );
 }
 

@@ -500,6 +500,38 @@ export interface CountryReportUpdate {
   keyNumbers?: KpiCard[];
 }
 
+export interface CountryBaselineWatchlistItem {
+  label: string;
+  note: string;
+  match: string[];
+}
+
+export interface CountryBaseline {
+  slug: string;
+  operatingEnvironment: string;
+  securityContext: string;
+  knownRiskAreas: string[];
+  keyCitiesProvinces: string[];
+  movementConstraints: string;
+  infrastructureLimits: string;
+  medicalEvac: string;
+  resourceSectorExposure: string;
+  locationWatchlist: CountryBaselineWatchlistItem[];
+  updatedAt: string;
+}
+
+export interface CountryBaselineInput {
+  operatingEnvironment?: string;
+  securityContext?: string;
+  knownRiskAreas?: string[];
+  keyCitiesProvinces?: string[];
+  movementConstraints?: string;
+  infrastructureLimits?: string;
+  medicalEvac?: string;
+  resourceSectorExposure?: string;
+  locationWatchlist?: CountryBaselineWatchlistItem[];
+}
+
 export interface DashboardTopicCard {
   topic: Topic;
   label: string;

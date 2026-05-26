@@ -459,6 +459,54 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CountryReport" }
 
+  /countries/{slug}/baseline:
+    get:
+      operationId: getCountryBaseline
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryBaseline" }
+        "404":
+          description: No baseline curated for this country
+    put:
+      operationId: upsertCountryBaseline
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CountryBaselineInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryBaseline" }
+    delete:
+      operationId: deleteCountryBaseline
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
   /countries/{slug}:
     get:
       operationId: getCountryReport
@@ -1040,6 +1088,68 @@ components:
         keyNumbers:
           type: array
           items: { $ref: "#/components/schemas/KpiCard" }
+
+    CountryBaselineWatchlistItem:
+      type: object
+      required: [label, note, match]
+      properties:
+        label: { type: string }
+        note: { type: string }
+        match:
+          type: array
+          items: { type: string }
+
+    CountryBaseline:
+      type: object
+      required:
+        - slug
+        - operatingEnvironment
+        - securityContext
+        - knownRiskAreas
+        - keyCitiesProvinces
+        - movementConstraints
+        - infrastructureLimits
+        - medicalEvac
+        - resourceSectorExposure
+        - locationWatchlist
+        - updatedAt
+      properties:
+        slug: { type: string }
+        operatingEnvironment: { type: string }
+        securityContext: { type: string }
+        knownRiskAreas:
+          type: array
+          items: { type: string }
+        keyCitiesProvinces:
+          type: array
+          items: { type: string }
+        movementConstraints: { type: string }
+        infrastructureLimits: { type: string }
+        medicalEvac: { type: string }
+        resourceSectorExposure: { type: string }
+        locationWatchlist:
+          type: array
+          items: { $ref: "#/components/schemas/CountryBaselineWatchlistItem" }
+        updatedAt: { type: string, format: date-time }
+
+    CountryBaselineInput:
+      type: object
+      properties:
+        operatingEnvironment: { type: string }
+        securityContext: { type: string }
+        knownRiskAreas:
+          type: array
+          items: { type: string }
+        keyCitiesProvinces:
+          type: array
+          items: { type: string }
+        movementConstraints: { type: string }
+        infrastructureLimits: { type: string }
+        medicalEvac: { type: string }
+        resourceSectorExposure: { type: string }
+        locationWatchlist:
+          type: array
+          items: { $ref: "#/components/schemas/CountryBaselineWatchlistItem" }
 
     DashboardTopicCard:
       type: object

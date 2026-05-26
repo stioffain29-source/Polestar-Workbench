@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CountryBaseline,
+  CountryBaselineInput,
   CountryReport,
   CountryReportInput,
   CountryReportUpdate,
@@ -1983,6 +1985,207 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateCountryReportMutationOptions(options));
+    }
+
+export const getGetCountryBaselineUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/baseline`
+}
+
+export const getCountryBaseline = async (slug: string, options?: RequestInit): Promise<CountryBaseline> => {
+
+  return customFetch<CountryBaseline>(getGetCountryBaselineUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCountryBaselineQueryKey = (slug: string,) => {
+    return [
+    `/api/countries/${slug}/baseline`
+    ] as const;
+    }
+
+
+export const getGetCountryBaselineQueryOptions = <TData = Awaited<ReturnType<typeof getCountryBaseline>>, TError = ErrorType<void>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryBaseline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCountryBaselineQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCountryBaseline>>> = ({ signal }) => getCountryBaseline(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(slug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCountryBaseline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCountryBaselineQueryResult = NonNullable<Awaited<ReturnType<typeof getCountryBaseline>>>
+export type GetCountryBaselineQueryError = ErrorType<void>
+
+
+
+export function useGetCountryBaseline<TData = Awaited<ReturnType<typeof getCountryBaseline>>, TError = ErrorType<void>>(
+ slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryBaseline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCountryBaselineQueryOptions(slug,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpsertCountryBaselineUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/baseline`
+}
+
+export const upsertCountryBaseline = async (slug: string,
+    countryBaselineInput: CountryBaselineInput, options?: RequestInit): Promise<CountryBaseline> => {
+
+  return customFetch<CountryBaseline>(getUpsertCountryBaselineUrl(slug),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      countryBaselineInput,)
+  }
+);}
+
+
+
+
+export const getUpsertCountryBaselineMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCountryBaseline>>, TError,{slug: string;data: BodyType<CountryBaselineInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertCountryBaseline>>, TError,{slug: string;data: BodyType<CountryBaselineInput>}, TContext> => {
+
+const mutationKey = ['upsertCountryBaseline'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertCountryBaseline>>, {slug: string;data: BodyType<CountryBaselineInput>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  upsertCountryBaseline(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertCountryBaselineMutationResult = NonNullable<Awaited<ReturnType<typeof upsertCountryBaseline>>>
+    export type UpsertCountryBaselineMutationBody = BodyType<CountryBaselineInput>
+    export type UpsertCountryBaselineMutationError = ErrorType<unknown>
+
+    export const useUpsertCountryBaseline = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCountryBaseline>>, TError,{slug: string;data: BodyType<CountryBaselineInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertCountryBaseline>>,
+        TError,
+        {slug: string;data: BodyType<CountryBaselineInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertCountryBaselineMutationOptions(options));
+    }
+
+export const getDeleteCountryBaselineUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/baseline`
+}
+
+export const deleteCountryBaseline = async (slug: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCountryBaselineUrl(slug),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCountryBaselineMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCountryBaseline>>, TError,{slug: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCountryBaseline>>, TError,{slug: string}, TContext> => {
+
+const mutationKey = ['deleteCountryBaseline'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCountryBaseline>>, {slug: string}> = (props) => {
+          const {slug} = props ?? {};
+
+          return  deleteCountryBaseline(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCountryBaselineMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCountryBaseline>>>
+
+    export type DeleteCountryBaselineMutationError = ErrorType<unknown>
+
+    export const useDeleteCountryBaseline = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCountryBaseline>>, TError,{slug: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCountryBaseline>>,
+        TError,
+        {slug: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCountryBaselineMutationOptions(options));
     }
 
 export const getGetCountryReportUrl = (slug: string,) => {

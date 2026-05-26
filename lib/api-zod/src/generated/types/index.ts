@@ -7,6 +7,9 @@
  */
 
 export * from './confidence';
+export * from './countryBaseline';
+export * from './countryBaselineInput';
+export * from './countryBaselineWatchlistItem';
 export * from './countryReport';
 export * from './countryReportInput';
 export * from './countryReportUpdate';

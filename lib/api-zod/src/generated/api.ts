@@ -1398,6 +1398,73 @@ export const CreateCountryReportBody = zod.object({
 })
 
 
+export const GetCountryBaselineParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const GetCountryBaselineResponse = zod.object({
+  "slug": zod.string(),
+  "operatingEnvironment": zod.string(),
+  "securityContext": zod.string(),
+  "knownRiskAreas": zod.array(zod.string()),
+  "keyCitiesProvinces": zod.array(zod.string()),
+  "movementConstraints": zod.string(),
+  "infrastructureLimits": zod.string(),
+  "medicalEvac": zod.string(),
+  "resourceSectorExposure": zod.string(),
+  "locationWatchlist": zod.array(zod.object({
+  "label": zod.string(),
+  "note": zod.string(),
+  "match": zod.array(zod.string())
+})),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const UpsertCountryBaselineParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const UpsertCountryBaselineBody = zod.object({
+  "operatingEnvironment": zod.string().optional(),
+  "securityContext": zod.string().optional(),
+  "knownRiskAreas": zod.array(zod.string()).optional(),
+  "keyCitiesProvinces": zod.array(zod.string()).optional(),
+  "movementConstraints": zod.string().optional(),
+  "infrastructureLimits": zod.string().optional(),
+  "medicalEvac": zod.string().optional(),
+  "resourceSectorExposure": zod.string().optional(),
+  "locationWatchlist": zod.array(zod.object({
+  "label": zod.string(),
+  "note": zod.string(),
+  "match": zod.array(zod.string())
+})).optional()
+})
+
+export const UpsertCountryBaselineResponse = zod.object({
+  "slug": zod.string(),
+  "operatingEnvironment": zod.string(),
+  "securityContext": zod.string(),
+  "knownRiskAreas": zod.array(zod.string()),
+  "keyCitiesProvinces": zod.array(zod.string()),
+  "movementConstraints": zod.string(),
+  "infrastructureLimits": zod.string(),
+  "medicalEvac": zod.string(),
+  "resourceSectorExposure": zod.string(),
+  "locationWatchlist": zod.array(zod.object({
+  "label": zod.string(),
+  "note": zod.string(),
+  "match": zod.array(zod.string())
+})),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const DeleteCountryBaselineParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+
 export const GetCountryReportParams = zod.object({
   "slug": zod.coerce.string()
 })

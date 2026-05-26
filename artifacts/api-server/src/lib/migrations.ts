@@ -1,6 +1,7 @@
-import { db, incidentsTable, reportsTable } from "@workspace/db";
+import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable } from "@workspace/db";
 import { sql, eq, or } from "drizzle-orm";
 import { logger } from "./logger";
+import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
 
 // Topics that must each have at least one report card in the Report Builder.
 // Kept in sync with TOPIC_LABELS on the client.
@@ -138,6 +139,50 @@ export async function runDataMigrations(): Promise<void> {
         logger.error({ err: seedErr, topic: seed.topic }, "Failed to seed topic report");
       }
     }
+    // 4) Seed country baselines once. Maps each seed to a country
+    //    report by case-insensitive name match. Skips any seed whose
+    //    target slug already has a baseline so editor edits are never
+    //    overwritten on restart.
+    try {
+      const countries = await db
+        .select({ slug: countryReportsTable.slug, name: countryReportsTable.name })
+        .from(countryReportsTable);
+      const byName = new Map<string, string>();
+      for (const c of countries) byName.set(c.name.trim().toLowerCase(), c.slug);
+
+      for (const seed of COUNTRY_BASELINE_SEEDS) {
+        let slug: string | undefined;
+        for (const n of seed.countryNames) {
+          const hit = byName.get(n.trim().toLowerCase());
+          if (hit) { slug = hit; break; }
+        }
+        if (!slug) {
+          logger.info({ names: seed.countryNames }, "baseline seed: no country report found, skipping");
+          continue;
+        }
+        const [existing] = await db
+          .select({ id: countryBaselinesTable.id })
+          .from(countryBaselinesTable)
+          .where(eq(countryBaselinesTable.slug, slug));
+        if (existing) continue;
+        await db.insert(countryBaselinesTable).values({
+          slug,
+          operatingEnvironment: seed.operatingEnvironment,
+          securityContext: seed.securityContext,
+          knownRiskAreas: seed.knownRiskAreas,
+          keyCitiesProvinces: seed.keyCitiesProvinces,
+          movementConstraints: seed.movementConstraints,
+          infrastructureLimits: seed.infrastructureLimits,
+          medicalEvac: seed.medicalEvac,
+          resourceSectorExposure: seed.resourceSectorExposure,
+          locationWatchlist: seed.locationWatchlist,
+        });
+        logger.info({ slug }, "Seeded country baseline");
+      }
+    } catch (baseErr) {
+      logger.error({ err: baseErr }, "Country baseline seed failed");
+    }
+
     logger.info("runDataMigrations: finished");
   } catch (err) {
     logger.error({ err }, "Data migration failed (continuing startup)");

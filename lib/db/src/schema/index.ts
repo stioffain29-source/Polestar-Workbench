@@ -3,3 +3,4 @@ export * from "./strikes";
 export * from "./sources";
 export * from "./reports";
 export * from "./countryReports";
+export * from "./countryBaselines";
