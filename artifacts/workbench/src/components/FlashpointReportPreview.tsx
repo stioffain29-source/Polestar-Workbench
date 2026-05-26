@@ -497,9 +497,9 @@ export default function FlashpointReportPreview({
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
         </Section>
 
-        <Section title="Source Notes / Data Notes">
-          <Paragraphs text={ds.dataNote} />
-        </Section>
+        {/* Source Notes / Data Notes removed per editorial direction —
+            internal methodology must not appear in client-facing
+            Flashpoint reports. Preview and PDF stay aligned. */}
 
         <Section title="Disclaimer">
           <p className="text-[12px] leading-[1.7]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
