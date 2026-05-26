@@ -22,3 +22,7 @@ Civil-unrest live-hook gate: a record is allowed only if it contains a current p
 Related Incidents diversification: rank globally, then do a country-round-robin first pass (one record per country until cap), then fill remaining slots from the global ranking. Otherwise the strongest single country (PTI / Pakistan in this corpus) eats every slot.
 
 Forecast signal labels must never fall back to a bare "Protest mobilisation". Compose them as `actor + trigger + form` and append `(City)` when a city is detectable in title/summary. The country column already carries the country.
+
+Forecast table must also dedupe by `(country, signalLabel)` after shortSignalLabel is applied. Title-level dedupe alone is not enough: two distinct records (e.g. a Samsung pay-talks strike notice and a court injunction against the same union) can both collapse to "Union injunction ruling — sectoral strike risk" for South Korea and render twice. Collapse on the rendered label, not just the source title.
+
+Out-of-scope crime classifications (Armed robbery, Armed group activity, Crime / public safety, Piracy / armed robbery) must be hard-dropped at the dataset root — *before* enriched/countryCount/highestSeverity are computed — not only at the Related Incidents prioritiser. Filtering only at Related lets crime records skew the country chart, the highest-severity Fast Fact and the auto Executive Summary's "shaped by" driver line; the reader then sees an exec summary that talks about robbery in an activism brief.

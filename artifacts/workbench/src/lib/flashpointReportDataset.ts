@@ -451,6 +451,20 @@ const UNREST_ISSUES = new Set([
   "Roadblock / access disruption",
 ]);
 
+// Issues that are out of scope for Flashpoint — these are crime /
+// armed-group / public-safety classifications that the broader
+// classifier may assign but that have no business shaping an
+// activism / protests / civil-unrest brief.
+const OUT_OF_SCOPE_ISSUES = new Set([
+  "Armed robbery",
+  "Armed group activity",
+  "Crime / public safety",
+  "Piracy / armed robbery",
+]);
+function isOutOfScopeIssue(r: { issue: string }): boolean {
+  return OUT_OF_SCOPE_ISSUES.has(r.issue);
+}
+
 function bucketFor(issue: string): "activism" | "unrest" | "other" {
   if (ACTIVISM_ISSUES.has(issue)) return "activism";
   if (UNREST_ISSUES.has(issue)) return "unrest";
@@ -529,7 +543,14 @@ export function buildFlashpointReportDataset(
   const courtDropped = onTopic.filter((r) => isCourtOnly(r)).length;
   const scoped = onTopic.filter((r) => !isKineticOnly(r) && !isCourtOnly(r));
 
-  const enrichedAll = sortByDateDesc(enrich(scoped));
+  // Flashpoint is activism, protests and civil unrest only — not crime.
+  // Hard-drop armed-robbery, armed-group activity, generic crime and
+  // public-safety classifications at the dataset root so they cannot
+  // shape Fast Facts, the country chart, Executive Summary or Polestar
+  // View. (Previously these were only filtered at Related Incidents,
+  // which let crime records contaminate top-line counts.)
+  const enrichedAllUnfiltered = sortByDateDesc(enrich(scoped));
+  const enrichedAll = enrichedAllUnfiltered.filter((r) => !isOutOfScopeIssue(r));
   // Two-pass dedupe so syndicated rewrites of the same protest don't
   // dominate the operational read.
   const enriched = dedupeByTitle(enrichedAll);
@@ -592,13 +613,21 @@ export function buildFlashpointReportDataset(
   // Operational meaning table rather than a quoted paragraph dump.
   const futureRaw = extractFutureSignals([...activismRows, ...unrestRows])
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r) && !isWeakOperational(r));
-  const forecastFuture: ForecastFutureRow[] = dedupeByTitle(futureRaw)
-    .slice(0, 6)
-    .map((r) => ({
-      country: r.country?.trim() || "—",
-      signal: shortSignalLabel(r),
-      meaning: forecastMeaningFor(r),
-    }));
+  // Build forecast rows, then collapse any (country, signal) duplicate
+  // so the same operational signal cannot appear twice (e.g. two
+  // South Korea records that both reduce to "Union injunction ruling
+  // — sectoral strike risk" must render once).
+  const seenForecast = new Set<string>();
+  const forecastFuture: ForecastFutureRow[] = [];
+  for (const r of dedupeByTitle(futureRaw)) {
+    const country = r.country?.trim() || "—";
+    const signal = shortSignalLabel(r);
+    const key = `${country.toLowerCase()}|${signal.toLowerCase()}`;
+    if (seenForecast.has(key)) continue;
+    seenForecast.add(key);
+    forecastFuture.push({ country, signal, meaning: forecastMeaningFor(r) });
+    if (forecastFuture.length >= 6) break;
+  }
   const forecastRead = buildForecastRead({
     activismRows,
     unrestRows,
