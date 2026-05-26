@@ -403,15 +403,11 @@ export async function exportFlashpointReportPdf(
   void cadence;
   beginBodyPages(ctx);
 
+  const ds = buildFlashpointReportDataset(incidents, data.topic, data.issueDate);
+
   drawSectionHeading(ctx, "Executive Summary");
   const execText = (data.executiveSummary ?? "").trim();
-  renderProse(
-    ctx,
-    execText ||
-      `This briefing covers the activism, protest and civil-unrest picture across ${win.label}. The detailed operational read, country breakdown, forecast and analyst sections follow below.`,
-  );
-
-  const ds = buildFlashpointReportDataset(incidents, data.topic, data.issueDate);
+  renderProse(ctx, execText || ds.autoExecutiveSummary);
 
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);

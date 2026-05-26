@@ -1,4 +1,2 @@
-- [Flashpoint ingest pipeline](flashpoint-ingest.md) — there is no auto-scheduled scraper; all live ingest is manual `pnpm scrape:*`. Cleanup migrations on API-server boot are the only auto-running data layer.
-- [Flashpoint topic alias](flashpoint-topic-alias.md) — Flashpoint report is bound to topic='protests' but scraper writes topic='flashpoint'; every report-side filter must alias both buckets together or PDF silently undercounts.
-- [Flashpoint classifier tiers](flashpoint-classifier-tiers.md) — isTopicRelevant for flashpoint/protests is a 4-step gate (FLASHPOINT_EXCLUDE → student non-mobilisation → unambiguous REQUIRED → ambiguous + public-order companion). Do not flatten.
-- [Postgres POSIX regex in drizzle sql](pg-regex-in-drizzle.md) — use `\y` not `\b` for word boundaries inside `sql\`...\`` blocks; `\b` is backspace in JS template literals.
+- [Flashpoint prose rules](flashpoint-prose-rules.md) — count-led idioms ("N records", "highest severity of X", "mix breaks down as protest (N)") are banned in report prose; counts belong in tables/cards/charts only.
+- [Flashpoint preview/PDF parity](flashpoint-preview-pdf-parity.md) — every PDF section change must be mirrored in FlashpointReportPreview.tsx against the same dataset; user-forbidden: re-adding Source Notes / Data Notes section.

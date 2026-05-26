@@ -369,8 +369,7 @@ export default function FlashpointReportPreview({
     [incidents, topic, issueDate],
   );
 
-  const execText = (report.executiveSummary ?? "").trim() ||
-    `This briefing covers the activism, protest and civil-unrest picture across ${ds.reportingPeriodShort}. The detailed operational read, country breakdown, forecast and analyst sections follow below.`;
+  const execText = (report.executiveSummary ?? "").trim() || ds.autoExecutiveSummary;
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
