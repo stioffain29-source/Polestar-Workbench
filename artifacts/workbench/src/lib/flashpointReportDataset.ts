@@ -364,7 +364,14 @@ export function buildFlashpointReportDataset(
 ): FlashpointReportDataset {
   const win = resolveReportWindow(topic, issueDate);
 
-  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
+  // Flashpoint reports draw from BOTH `flashpoint` and `protests` topic
+  // buckets: legacy Civil-Unrest imports landed in `protests`, while the
+  // live regional scraper writes to `flashpoint`. Operationally they are
+  // the same bucket (activism, protest, strike, civil unrest), so filter
+  // by date here and let isTopicRelevant() do the content-level gating.
+  const isFlashpointBucket = (i: FlashpointReportIncident) =>
+    i.topic === "flashpoint" || i.topic === "protests";
+  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate).filter(isFlashpointBucket);
   const passesRelevance = (i: FlashpointReportIncident) =>
     isTopicRelevant(topic, {
       topic: i.topic,

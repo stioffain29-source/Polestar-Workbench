@@ -101,4 +101,16 @@ title = "Cargo Watch report"
 id = "90NJUPsCrHb4q1FjayEbB"
 uri = "file://attached_assets/flashpoint_data_coverage_audit.md"
 type = "text"
-title = "Flashpoint Data Coverage Audit"
+title = "Flashpoint data coverage audit"
+
+[[outputs]]
+id = "1Z7EUoe0E3-_nYsYROd8p"
+uri = "file://deliverables/flashpoint_proof.pdf"
+type = "pdf"
+title = "Flashpoint PDF — fresh export with post-cleanup data"
+
+[[outputs]]
+id = "QEcCxhigDqM5A45EnOEzB"
+uri = "file://screenshots/flashpoint_preview.jpg"
+type = "image"
+title = "Flashpoint preview pane (workbench /reports/13)"

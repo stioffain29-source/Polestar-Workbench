@@ -51,7 +51,15 @@ export function filterTopicReportIncidents(
   topic: string,
   issueDate: string,
 ): TopicFastFactsIncident[] {
-  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
+  // Flashpoint reports span BOTH `flashpoint` (live scraper) and `protests`
+  // (legacy) topic buckets — see flashpointReportDataset.ts for the same
+  // alias. Mirror it here so KPI cards in the editor match the PDF.
+  const isFlashpointTopic = topic === "flashpoint" || topic === "protests";
+  const rawWindow = isFlashpointTopic
+    ? filterIncidentsToWindow(incidents, topic, issueDate).filter(
+        (i) => i.topic === "flashpoint" || i.topic === "protests",
+      )
+    : filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
   return rawWindow.filter((i) =>
     isTopicRelevant(topic, {
       topic: i.topic,
