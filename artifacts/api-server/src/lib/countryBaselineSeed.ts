@@ -1027,6 +1027,318 @@ const NEW_ZEALAND: CountryBaselineSeed = {
   ],
   };
   
+const IRAN: CountryBaselineSeed = {
+    countryNames: ["iran", "islamic republic of iran", "i.r. iran"],
+    operatingEnvironment:
+      "Iran is a theocratic republic of roughly 88 million people across 31 provinces, with Tehran as the political, financial and media centre. Operating risk is shaped by deep US / EU / UK sanctions exposure, an opaque dual political structure (elected government plus the Supreme Leader / IRGC apparatus), recurring waves of nationwide protest (2009 Green Movement, 2017-18 economic protests, 2019 fuel-price unrest, 2022-23 Mahsa Amini / Woman-Life-Freedom protests), persistent state-led harassment of foreign nationals (arbitrary detention, dual-national hostage diplomacy), and direct involvement in regional kinetic activity via the IRGC-Quds Force and proxy network (Hezbollah, Houthis, Iraqi militias). Strait of Hormuz incidents — tanker seizures, GPS spoofing, mine and limpet attacks — are a recurring exposure.",
+    securityContext:
+      "Law Enforcement Command of the Islamic Republic of Iran (FARAJA) leads day-to-day policing; the IRGC and its Basij paramilitary handle internal political-security and protest suppression; Ministry of Intelligence (MOIS) and IRGC Intelligence Organisation run counter-espionage. Public assembly is tightly controlled; protest cycles cluster around hijab enforcement, fuel-subsidy cuts, water shortages (Khuzestan, Isfahan), labour disputes (Haft Tappeh, Iran Khodro, truckers' strikes), and execution / commemoration dates. Israeli and US kinetic exchanges (April 2024, October 2024, June 2025) shape the air-defence posture; recurring IRGC-attributed assassinations and detentions of Western nationals continue.",
+    knownRiskAreas: [
+    "Tehran — Azadi / Enghelab / Vali-Asr protest corridor, recurring Basij deployments, foreign-national arbitrary-detention exposure.",
+    "Sistan-Baluchistan — Zahedan, Saravan, Iranshahr: cross-border insurgency (Jaish al-Adl), Friday-prayer protest cycle, Pakistan-border friction.",
+    "Kurdistan / West Azerbaijan / Kermanshah — Mahabad, Sanandaj, Saqqez: epicentre of the 2022-23 protests, recurring IRGC operations against PJAK / Komala, periodic missile and drone strikes into Iraqi Kurdistan.",
+    "Khuzestan — Ahvaz, Abadan, Mahshahr: Arab-minority unrest, water-shortage protests, petrochemical and refining corridor.",
+    "Strait of Hormuz / Persian Gulf — IRGC-Navy tanker harassment, GPS spoofing, mine and limpet incidents on commercial shipping.",
+    "Border with Iraqi Kurdistan — recurring ballistic-missile and drone strikes on Erbil and Sulaymaniyah.",
+  ],
+    keyCitiesProvinces: [
+    "Tehran",
+    "Mashhad (Razavi Khorasan)",
+    "Isfahan",
+    "Shiraz (Fars)",
+    "Tabriz (East Azerbaijan)",
+    "Ahvaz (Khuzestan)",
+    "Bandar Abbas (Hormozgan)",
+    "Bushehr",
+  ],
+    movementConstraints:
+      "Western nationals — particularly dual nationals and journalists — face acute arbitrary-detention risk on entry; UK, US, Canadian and Australian travel advisories are at the highest level. Internal travel to Sistan-Baluchistan, the Iraqi and Afghan border zones, and the western Kurdish provinces is heavily restricted. Internet is routinely throttled or shut down during protest cycles; VPN dependency is the norm. Imam Khomeini (IKA, Tehran) is the principal international gateway; Mehrabad (THR) handles domestic; Bandar Abbas (BND) and Bushehr (BUZ) serve the south.",
+    infrastructureLimits:
+      "Power and gas supply are strained by underinvestment and sanctions; rolling blackouts and gas-rationing are seasonal. Banking sector is cut off from SWIFT for sanctioned entities; cash and informal hawala channels dominate. Fuel supply is heavily subsidised — adjustments are recurring protest triggers (November 2019). Bandar Abbas (Shahid Rajaee) is the principal container port; Bushehr, Imam Khomeini and Mahshahr serve the petrochemical and oil-export base. Kharg Island is the main crude-export terminal.",
+    medicalEvac:
+      "Tehran offers reasonable private capability (Pars, Tehran Heart Centre, Mehr) but sanctions complicate drug and equipment supply. Serious cases for foreign nationals typically route to Istanbul, Dubai or Doha — practical only when departure is unobstructed. Detained foreign nationals have no realistic medevac path. Air-ambulance access is sanctions-constrained.",
+    resourceSectorExposure:
+      "National Iranian Oil Company (NIOC), NIGC and NPC dominate upstream, midstream and petrochemicals; sanctions exclude most Western majors. Chinese independents ('teapots') are the principal crude buyer; ship-to-ship transfers off Sohar (Oman), Malaysia and Singapore route sanctioned barrels. South Pars (shared with Qatar's North Field) is the world's largest gas field. Mining (copper at Sarcheshmeh, iron at Gol-e-Gohar / Chadormalu) and steel are politically protected. IRGC-linked Khatam al-Anbiya is the dominant domestic EPC contractor.",
+    locationWatchlist: [
+    { label: "Tehran", note: "Capital, protest focal point, foreign-national detention exposure", match: ["tehran", "ika", "imam khomeini airport", "mehrabad", "thr", "azadi", "enghelab"] },
+    { label: "Mashhad", note: "Razavi Khorasan, religious centre", match: ["mashhad", "razavi khorasan", "mhd"] },
+    { label: "Isfahan", note: "Industrial and nuclear-research centre, Natanz nearby", match: ["isfahan", "esfahan", "natanz"] },
+    { label: "Sistan-Baluchistan", note: "Jaish al-Adl insurgency, Zahedan Friday-prayer protest", match: ["sistan", "baluchistan", "zahedan", "saravan", "iranshahr", "chabahar"] },
+    { label: "Kurdish provinces", note: "Epicentre of 2022-23 protests, PJAK / Komala operations", match: ["kurdistan", "sanandaj", "mahabad", "saqqez", "kermanshah", "west azerbaijan"] },
+    { label: "Khuzestan", note: "Arab-minority unrest, petrochemical corridor", match: ["khuzestan", "ahvaz", "abadan", "mahshahr"] },
+    { label: "Bandar Abbas / Hormozgan", note: "Strait of Hormuz, Shahid Rajaee port, IRGC-Navy base", match: ["bandar abbas", "hormozgan", "shahid rajaee", "bnd", "qeshm", "hormuz"] },
+    { label: "Bushehr", note: "Nuclear plant, Persian Gulf petrochemical hub", match: ["bushehr", "buz"] },
+    { label: "Kharg Island", note: "Principal crude-export terminal", match: ["kharg"] },
+    { label: "South Pars / Asaluyeh", note: "World's largest gas field, shared with Qatar's North Field", match: ["south pars", "asaluyeh", "pars special economic zone"] },
+    { label: "Strait of Hormuz", note: "IRGC-Navy tanker harassment, GPS spoofing", match: ["strait of hormuz", "hormuz strait", "persian gulf", "arabian gulf"] },
+  ],
+  };
+
+const IRAQ: CountryBaselineSeed = {
+    countryNames: ["iraq", "republic of iraq"],
+    operatingEnvironment:
+      "Iraq is a federal parliamentary republic of roughly 44 million people across 18 governorates, with the Kurdistan Region of Iraq (KRI — Erbil, Sulaymaniyah, Duhok, Halabja) operating under a separate executive. Operating risk is shaped by recurring Iran-aligned militia (Kata'ib Hezbollah, AAH, Harakat Hezbollah al-Nujaba) activity against US forces and Western interests, residual ISIS cells in the Hamrin Mountains and the Baghdad-Kirkuk-Diyala 'triangle', Iran-Israel kinetic spillover (ballistic missile and drone strikes into Erbil), the Turkish PKK campaign in northern KRI, and chronic protest cycles around basic services, jobs and electoral cycles. Oil-export infrastructure on the Faw Peninsula and the Gulf is a standing exposure.",
+    securityContext:
+      "Iraqi Security Forces (ISF), Federal Police, Counter-Terrorism Service (CTS) and the Popular Mobilisation Forces (PMF — formally integrated, in practice Iran-aligned in significant part) cover the federal area. Peshmerga and Asayish secure the KRI. Recurring risk drivers are PMF-attributed rocket / drone attacks on US bases (Ain al-Asad, Erbil, Conoco al-Tanf), Turkish air and ground operations against PKK in Duhok / Sinjar, periodic Iranian missile strikes on Erbil (March 2022, January 2024), and protest cycles in Basra (water, electricity, jobs), Baghdad (Tishreen anniversary, October) and Najaf / Karbala around religious calendars.",
+    knownRiskAreas: [
+    "Baghdad — Green Zone (International Zone) and embassy row: standing rocket / drone target; Tahrir Square protest corridor.",
+    "Anbar — Ain al-Asad airbase, Al-Qaim border crossing: US-coalition footprint, PMF rocket activity.",
+    "Kirkuk / Diyala / Salah ad-Din — Hamrin Mountains: residual ISIS cells, recurring IED and small-arms attacks on ISF.",
+    "Erbil / Sulaymaniyah (KRI) — Iranian ballistic-missile strikes, Turkish airstrikes on PKK in the surrounding mountains.",
+    "Sinjar / Duhok mountains — Turkish ground and air operations against PKK, Yazidi-area political contestation.",
+    "Basra — oil-export gateway (Khor al-Amaya, Basra Oil Terminal), recurring service-delivery protests, militia influence on port and logistics.",
+  ],
+    keyCitiesProvinces: [
+    "Baghdad",
+    "Basra",
+    "Mosul (Nineveh)",
+    "Erbil (KRI)",
+    "Sulaymaniyah (KRI)",
+    "Duhok (KRI)",
+    "Najaf",
+    "Karbala",
+    "Kirkuk",
+  ],
+    movementConstraints:
+      "Movement between the federal area and the KRI runs through fixed checkpoints (Khazir, Altun Kupri); document and PMF / Asayish posture vary. Baghdad International (BGW), Basra (BSR), Erbil (EBL) and Sulaymaniyah (ISU) are the principal gateways; Erbil and Sulaymaniyah have repeatedly been closed by Turkish airspace restrictions tied to Ankara-Erbil disputes. Western nationals operating outside the KRI typically require armoured movement and PSD. Internet shutdowns are routine during nationwide exam periods and protest peaks.",
+    infrastructureLimits:
+      "Power supply is chronically short (grid deficit, Iranian gas-import dependency, recurring sanctions-waiver friction); generator dependency is universal in the south during summer. Banking is largely cash-and-dollar; central bank dollar-auction reforms (2023 onwards) have squeezed informal channels. Basra Gulf terminals (BOT, KAAOT) carry 95%+ of crude exports. The Iraq-Turkey pipeline to Ceyhan has been intermittently shut since March 2023 over the ICC arbitration ruling. Mobile telecoms (Zain, Asiacell, Korek) are dense in cities.",
+    medicalEvac:
+      "In-country tier-1 capability is limited. Erbil offers the best private options (Zheen, PAR Hospital); Baghdad's Ibn Sina and a handful of private hospitals serve the federal area. Serious cases route to Amman, Istanbul, Dubai or Beirut by fixed-wing medevac. Air-ambulance access to KRI has been disrupted by Turkish airspace closures.",
+    resourceSectorExposure:
+      "Basra Oil Company (federal south) and KAR Group / DNO / Genel / Gulf Keystone (KRI) anchor upstream. Foreign majors active in the south include BP (Rumaila), ExxonMobil (West Qurna 1, exiting), TotalEnergies (Gas Growth Integrated Project), Lukoil (West Qurna 2), CNPC and Eni (Zubair). The KRI export route via the Iraq-Turkey pipeline to Ceyhan has been shut since the March 2023 ICC ruling, forcing trucked / domestic-sale workarounds. Petrochemicals, fertiliser and cement carry the rest of the industrial exposure.",
+    locationWatchlist: [
+    { label: "Baghdad / Green Zone", note: "International Zone, embassy row, rocket / drone target", match: ["baghdad", "green zone", "international zone", "bgw", "tahrir"] },
+    { label: "Basra", note: "Southern oil-export gateway, service-delivery protest hub", match: ["basra", "basrah", "bsr", "umm qasr", "faw", "al-faw", "khor al-amaya"] },
+    { label: "Erbil", note: "KRI capital, Iranian missile target, Turkish airspace exposure", match: ["erbil", "arbil", "hewler", "ebl", "kri capital"] },
+    { label: "Sulaymaniyah", note: "KRI, PUK area, Turkish airspace restrictions", match: ["sulaymaniyah", "sulaimaniyah", "slemani", "isu"] },
+    { label: "Duhok / Sinjar", note: "Turkish operations against PKK, Yazidi areas", match: ["duhok", "dohuk", "sinjar", "shingal", "zakho"] },
+    { label: "Mosul / Nineveh", note: "Post-ISIS reconstruction, residual cell activity", match: ["mosul", "nineveh", "ninawa"] },
+    { label: "Kirkuk / Hamrin belt", note: "Residual ISIS cells, disputed-territories friction", match: ["kirkuk", "hawija", "hamrin", "diyala", "salah ad-din", "tikrit"] },
+    { label: "Anbar / Ain al-Asad", note: "US-coalition footprint, PMF rocket activity", match: ["anbar", "ramadi", "fallujah", "ain al-asad", "al-qaim", "al qaim"] },
+    { label: "Najaf / Karbala", note: "Shia religious centres, Arba'een mass-gathering exposure", match: ["najaf", "karbala", "arbaeen", "arba'een"] },
+    { label: "Iraq-Turkey pipeline", note: "Ceyhan export route, shut since March 2023 ICC ruling", match: ["iraq-turkey pipeline", "itp", "ceyhan", "kirkuk-ceyhan"] },
+    { label: "Basra Gulf terminals", note: "BOT / KAAOT — 95%+ of crude exports", match: ["basra oil terminal", "bot", "kaaot", "khor al-amaya", "abot"] },
+  ],
+  };
+
+const SAUDI_ARABIA: CountryBaselineSeed = {
+    countryNames: ["saudi arabia", "kingdom of saudi arabia", "ksa"],
+    operatingEnvironment:
+      "Saudi Arabia is an absolute monarchy of roughly 36 million people across 13 administrative regions, with Riyadh as the political centre, Jeddah as the western commercial / Hajj gateway, and the Eastern Province (Dammam, Khobar, Dhahran, Jubail, Ras Tanura) as the oil and petrochemical core. Operating risk is shaped by the Vision 2030 reform programme (NEOM, Red Sea, Diriyah, Qiddiya, AlUla giga-projects), Houthi missile and drone exposure on the Aramco network and the southern border (Najran, Jizan, Asir), tightly controlled political-speech and dissent environment, and acute regulatory risk around blasphemy / morality / cyber-crime laws (Saudi-national and foreign-national detention exposure).",
+    securityContext:
+      "Ministry of Interior forces (Public Security, Mabahith state security) lead internal security; SANG (National Guard) handles regime protection and counter-insurgency; Royal Saudi Air Defence runs the Patriot / THAAD network against Houthi threats. Public protest is effectively prohibited. The 2019 Abqaiq / Khurais drone-and-missile strike on Aramco, recurring Houthi ballistic / cruise missile attacks on Riyadh, Jeddah and Aramco facilities (2019-2022) and the April / October 2024 Iran-Israel exchanges that overflew Saudi airspace continue to shape posture. Saudi-Houthi de-escalation since 2023 has materially reduced — but not eliminated — the cross-border threat.",
+    knownRiskAreas: [
+    "Najran / Jizan / Asir border belt — Houthi rocket / drone / shelling exposure during escalation cycles.",
+    "Eastern Province — Qatif / Awamiyah: residual Shia-minority unrest legacy; Aramco core infrastructure (Abqaiq, Khurais, Ras Tanura, Jubail, Yanbu) is the principal strategic-strike target.",
+    "Red Sea coast — Yanbu, Jeddah, Jizan: maritime exposure from Houthi / Iranian-proxy targeting of commercial shipping in the southern Red Sea / Bab al-Mandab.",
+    "NEOM / Red Sea giga-project corridor — Tabuk province: major construction footprint, mixed international workforce.",
+    "Mecca / Medina (Haramain) — Hajj and Umrah mass-gathering exposure (stampede, fire, heat-stress historical incidents).",
+  ],
+    keyCitiesProvinces: [
+    "Riyadh",
+    "Jeddah (Makkah Province)",
+    "Mecca / Makkah",
+    "Medina / Madinah",
+    "Dammam / Khobar / Dhahran (Eastern Province)",
+    "Jubail (Eastern Province)",
+    "Yanbu (Madinah Province)",
+    "Tabuk (NEOM)",
+    "Abha (Asir)",
+  ],
+    movementConstraints:
+      "Surface movement is generally safe but car-accident risk is high. King Khalid International (RUH), King Abdulaziz International (JED) and King Fahd International (DMM) are the principal gateways; Medina (MED) handles Umrah; Tabuk (TUU) serves NEOM. Mecca and Medina are closed to non-Muslims (Mecca strictly, Medina effectively). Hajj-season (Dhul Hijjah) and Umrah peak crowding routinely strains Jeddah and Medina logistics. Border zones with Yemen require security clearance.",
+    infrastructureLimits:
+      "Power, telecoms, water and transport are tier-1 in the main cities. SAR / Saudi Railway runs Riyadh-Dammam, Haramain High Speed (Mecca-Medina-Jeddah-KAEC) and the North-South line. Ras Tanura, Jubail, Yanbu, Jeddah Islamic and King Abdulaziz Port are the principal maritime nodes. Aramco's East-West Pipeline (Petroline) bypasses Hormuz to the Red Sea at Yanbu — a key continuity asset and a standing Houthi target. Banking and exchange are tier-1.",
+    medicalEvac:
+      "Riyadh (KFSH&RC, King Faisal Specialist Hospital), Jeddah (Dr Soliman Fakeeh, IMC) and Dhahran (Johns Hopkins Aramco Healthcare) offer tier-1 capability. Out-bound medevac to Dubai, Frankfurt or London is straightforward when required. Saudi Red Crescent operates extensive Hajj-period medical surge.",
+    resourceSectorExposure:
+      "Saudi Aramco (~10% global crude supply) is the centre of gravity — Abqaiq stabilisation, Khurais, Shaybah, Ghawar upstream, Ras Tanura / Jubail / Yanbu refining and export. SABIC, Ma'aden (mining — phosphate at Wa'ad al-Shamal, gold at Mansourah-Massarah), ACWA Power, and the PIF-backed giga-projects (NEOM, Red Sea Global, Diriyah, Qiddiya, ROSHN, AlUla) dominate the foreign-investment exposure. Construction concentrates Indian / Pakistani / Bangladeshi / Nepali workforce; Vision 2030 hospitality build-out brings rising Western expatriate presence.",
+    locationWatchlist: [
+    { label: "Riyadh", note: "Capital, political and financial centre, KAFD", match: ["riyadh", "ruh", "king khalid airport", "kafd", "diplomatic quarter", "dq"] },
+    { label: "Jeddah", note: "Western commercial / Hajj gateway, Red Sea port", match: ["jeddah", "jed", "king abdulaziz airport", "jeddah islamic port"] },
+    { label: "Mecca / Medina", note: "Hajj and Umrah mass-gathering exposure", match: ["mecca", "makkah", "medina", "madinah", "haramain"] },
+    { label: "Eastern Province (Dammam / Khobar / Dhahran)", note: "Oil core, Aramco HQ", match: ["dammam", "khobar", "al khobar", "dhahran", "eastern province", "dmm", "ash-sharqiyah"] },
+    { label: "Jubail / Yanbu", note: "Petrochemical complexes, East-West Pipeline terminus", match: ["jubail", "al-jubail", "yanbu", "ras tanura", "abqaiq", "khurais", "shaybah"] },
+    { label: "NEOM / Tabuk / Red Sea", note: "Vision 2030 giga-project corridor", match: ["neom", "tabuk", "tuu", "red sea project", "red sea global", "the line", "trojena", "sindalah"] },
+    { label: "Najran / Jizan / Asir", note: "Yemen border belt, Houthi rocket / drone exposure", match: ["najran", "jizan", "jazan", "asir", "abha", "khamis mushait"] },
+    { label: "Qatif / Awamiyah", note: "Eastern Province Shia-minority belt", match: ["qatif", "al-qatif", "awamiyah", "al-ahsa", "hasa"] },
+    { label: "Bahrain Causeway", note: "King Fahd Causeway to Bahrain", match: ["king fahd causeway", "bahrain causeway"] },
+    { label: "East-West Pipeline (Petroline)", note: "Hormuz-bypass crude line to Yanbu", match: ["east-west pipeline", "petroline", "abqaiq-yanbu"] },
+  ],
+  };
+
+const UAE: CountryBaselineSeed = {
+    countryNames: ["united arab emirates", "uae", "u.a.e.", "emirates"],
+    operatingEnvironment:
+      "The UAE is a federation of seven emirates — Abu Dhabi (federal capital and oil-producing weight), Dubai (commercial / aviation / logistics hub), Sharjah, Ajman, Umm al-Quwain, Ras al-Khaimah, Fujairah (east-coast bunkering and Strait-of-Hormuz-bypass terminus) — with a population of roughly 10 million, ~88% expatriate. Operating risk at street level is among the lowest globally — opportunistic crime is rare, public order is tightly managed — and is structurally shaped by Houthi missile / drone exposure (January 2022 strikes on Abu Dhabi, recurring threats), Iran-Israel kinetic spillover across UAE airspace, tightly controlled political-speech / cyber-crime / morality regulation (foreign-national detention exposure), and sanctions / AML scrutiny on Dubai's gold, real-estate and trade-finance corridors (FATF grey-listing 2022, removed 2024).",
+    securityContext:
+      "Federal Ministry of Interior coordinates emirate-level police forces (Abu Dhabi Police, Dubai Police lead). State Security Apparatus (Amn al-Dawla) handles intelligence. UAE Armed Forces operate a credible air-defence network (THAAD, Patriot, Pantsir, Barak-8). The January 2022 Houthi cruise-missile and drone strike on Mussafah / Abu Dhabi airport, the April / October 2024 Iran-Israel exchanges that overflew UAE airspace, and the standing Iran-aligned drone-threat picture continue to shape posture. Public protest is prohibited; cybercrime, terrorism-financing and 'insulting the state' laws are broadly drawn.",
+    knownRiskAreas: [
+    "Abu Dhabi — Mussafah industrial, Abu Dhabi International Airport (AUH): January 2022 Houthi strike site, standing air-defence target.",
+    "Fujairah — Port of Fujairah, FOTT terminals, Habshan-Fujairah pipeline terminus: Hormuz-bypass crude / bunkering hub, May 2019 limpet-mine incidents on tankers off the coast.",
+    "Dubai — DXB / DWC, JAFZA, DIFC: high-density commercial and aviation centre, terror-target hardening exposure.",
+    "Strait of Hormuz / Persian Gulf approaches — IRGC tanker harassment, GPS spoofing, vessel-boarding incidents (MSC Aries Apr 2024, Niovi 2023).",
+    "Northern emirates (RAK / UAQ) — quieter, but residual exposure as overflight / spillover corridor.",
+  ],
+    keyCitiesProvinces: [
+    "Abu Dhabi (Abu Dhabi Emirate)",
+    "Dubai",
+    "Sharjah",
+    "Fujairah",
+    "Ras al-Khaimah",
+    "Al Ain (Abu Dhabi)",
+    "Ruwais (Abu Dhabi, ADNOC refining hub)",
+  ],
+    movementConstraints:
+      "Surface movement is excellent. Dubai International (DXB) is the regional super-hub; Abu Dhabi (AUH), Sharjah (SHJ), Al Maktoum (DWC) and Ras al-Khaimah (RKT) provide additional capacity. Dubai Metro and Etihad Rail (now operational for freight, passenger phasing in) support the Dubai-Abu Dhabi corridor. Borders with Oman (Hatta, Al Ain / Buraimi) and Saudi Arabia (Ghuwaifat) are open and busy. Sandstorms, summer heat (45-50°C) and Shamal winds periodically degrade visibility and outdoor work.",
+    infrastructureLimits:
+      "Power, telecoms, water (desalination-dependent), transport and digital services are tier-1 globally. Banking, exchange and clearing are tier-1; DIFC operates a separate English-law jurisdiction. Jebel Ali (Dubai), Khalifa Port (Abu Dhabi), Fujairah and Khor Fakkan are the principal maritime nodes. Habshan-Fujairah pipeline carries Abu Dhabi crude to the Gulf of Oman, bypassing Hormuz — a key continuity asset.",
+    medicalEvac:
+      "Tier-1 capability in Abu Dhabi (Cleveland Clinic Abu Dhabi, Sheikh Khalifa Medical City) and Dubai (Mediclinic, American Hospital, King's College). UAE is itself a regional medevac destination; out-bound medevac is rarely required.",
+    resourceSectorExposure:
+      "ADNOC dominates upstream, midstream, refining (Ruwais) and petrochemicals (Borouge), with concession partners including TotalEnergies, BP, Eni, Inpex, CNPC, GS Energy and OMV. Mubadala, ADQ and ADIA anchor sovereign capital; PIF's Saudi-UAE rivalry shapes regional deal flow. Dubai concentrates the trade-finance, gold (DMCC), commodities, real-estate, MICE, hospitality and aviation (Emirates, flydubai, Etihad ex-AUH) base. Fujairah is the world's second-largest bunkering port. DP World runs Jebel Ali plus an extensive global port network.",
+    locationWatchlist: [
+    { label: "Abu Dhabi", note: "Federal capital, ADNOC HQ, Mussafah air-defence target", match: ["abu dhabi", "auh", "mussafah", "saadiyat", "yas island", "al reem"] },
+    { label: "Dubai", note: "Commercial / aviation hub, DXB / DWC / DIFC / JAFZA", match: ["dubai", "dxb", "dwc", "difc", "jafza", "jebel ali", "downtown dubai", "marina"] },
+    { label: "Fujairah", note: "Hormuz-bypass crude / bunkering hub, FOTT, May 2019 limpet incidents", match: ["fujairah", "fott", "khor fakkan", "habshan-fujairah", "habshan fujairah"] },
+    { label: "Sharjah", note: "Cargo aviation hub (SHJ), industrial base", match: ["sharjah", "shj", "hamriyah"] },
+    { label: "Ras al-Khaimah", note: "Northern emirate, RAK Ceramics, Mina Saqr", match: ["ras al-khaimah", "ras al khaimah", "rak", "rkt", "mina saqr"] },
+    { label: "Ruwais", note: "ADNOC refining and petrochemical complex", match: ["ruwais", "borouge", "shah gas", "habshan"] },
+    { label: "Al Ain / Buraimi", note: "Oman border crossing", match: ["al ain", "buraimi", "mezyad"] },
+    { label: "Strait of Hormuz / Gulf of Oman approaches", note: "IRGC tanker harassment, GPS spoofing", match: ["strait of hormuz", "hormuz strait", "gulf of oman", "persian gulf", "arabian gulf"] },
+    { label: "Etihad Rail corridor", note: "Ghuweifat-Fujairah freight and emerging passenger spine", match: ["etihad rail"] },
+  ],
+  };
+
+const QATAR: CountryBaselineSeed = {
+    countryNames: ["qatar", "state of qatar"],
+    operatingEnvironment:
+      "Qatar is a hereditary emirate of roughly 3 million people (~12% national, ~88% expatriate) on a peninsula in the Persian Gulf. Doha concentrates the political, financial and media weight (Al Jazeera, QIA, QatarEnergy HQ); Ras Laffan Industrial City anchors the LNG export base. Operating risk at street level is among the lowest globally — opportunistic crime is rare, public-order policing is tight — and is structurally shaped by the shared North Field (South Pars with Iran) gas-extraction concentration, US Al Udeid Air Base presence (CENTCOM forward HQ, January 2024 Iran-aligned threat picture), regional diplomatic exposure (Hamas / Taliban political office mediation), Iran-Israel kinetic spillover across Qatari airspace, and Strait-of-Hormuz LNG-export chokepoint exposure.",
+    securityContext:
+      "Ministry of Interior General Directorate of Public Security leads policing; State Security Bureau handles intelligence; Qatar Armed Forces operate with US air-defence integration via Al Udeid. Public assembly is restricted; political parties are not permitted. The June 2017 - January 2021 Saudi / UAE / Bahrain / Egypt blockade reshaped logistics permanently — Qatar built out independent food, dairy and air-route capacity. The 2022 FIFA World Cup hardened the security envelope around Doha. The April / October 2024 Iran-Israel exchanges that overflew Qatari airspace shape current air-defence posture.",
+    knownRiskAreas: [
+    "Doha — Corniche, West Bay, embassy row: high-footfall venue exposure, dignitary-protection footprint.",
+    "Al Udeid Air Base (Al Rayyan) — US CENTCOM forward HQ, standing Iran-aligned threat target.",
+    "Ras Laffan Industrial City — LNG export base (~20% of global LNG supply when North Field Expansion completes); the single largest piece of strategic infrastructure in the country.",
+    "Strait of Hormuz approaches — all Qatari LNG must transit Hormuz; standing exposure to IRGC harassment / GPS spoofing.",
+    "North Field offshore — shared with Iran's South Pars; jurisdictional sensitivity.",
+  ],
+    keyCitiesProvinces: [
+    "Doha",
+    "Al Rayyan",
+    "Al Wakrah",
+    "Al Khor",
+    "Lusail",
+    "Ras Laffan (Industrial City)",
+    "Mesaieed (Industrial City)",
+  ],
+    movementConstraints:
+      "Surface movement is excellent. Hamad International (DOH) is the principal gateway; Doha Metro (Red / Green / Gold lines) and Lusail Tram serve the urban core. Border with Saudi Arabia (Abu Samra) is reopened post-blockade. Hot-season (May-Sep, 45°C+) and recurring sandstorms periodically constrain outdoor work. Departure of foreign workers historically required exit-permit (kafala) — reforms since 2020 have eased but not eliminated employer-leverage risk.",
+    infrastructureLimits:
+      "Power, telecoms, water (desalination-dependent), transport and digital services are tier-1. Banking and clearing are tier-1; QFC offers separate English-law jurisdiction. Hamad Port (Mesaieed) replaced Doha Port as the principal container gateway during the blockade build-out. Ras Laffan is the LNG export terminal; Halul Island is the principal crude-export point.",
+    medicalEvac:
+      "Tier-1 capability at Hamad Medical Corporation (Hamad General, Sidra Medicine), Aspetar (sports medicine) and Al Ahli Hospital. Doha is itself a regional medevac destination; out-bound medevac is rarely required.",
+    resourceSectorExposure:
+      "QatarEnergy dominates upstream, LNG and petrochemicals; North Field Expansion partners include ExxonMobil, Shell, TotalEnergies, ConocoPhillips, Eni, Sinopec and CNPC. Qatar is the world's third-largest LNG exporter (and competing with Australia / US for the top position when expansion completes). Qatar Airways, QIA's global portfolio (Harrods, PSG, London / NYC / Paris real estate), Qatar National Bank and Ooredoo anchor the rest of the international footprint.",
+    locationWatchlist: [
+    { label: "Doha", note: "Capital, financial and media centre", match: ["doha", "doh", "hamad international", "corniche", "west bay", "msheireb"] },
+    { label: "Lusail", note: "Planned city, 2022 World Cup final venue, QIA / Qatar Foundation", match: ["lusail"] },
+    { label: "Al Udeid Air Base", note: "US CENTCOM forward HQ", match: ["al udeid", "udeid", "al rayyan", "rayyan"] },
+    { label: "Ras Laffan Industrial City", note: "LNG export base, North Field Expansion", match: ["ras laffan", "north field", "north field east", "north field south", "nfe", "nfs"] },
+    { label: "Mesaieed / Hamad Port", note: "Principal container gateway, petrochemicals", match: ["mesaieed", "umm said", "hamad port", "mwani qatar"] },
+    { label: "Halul Island", note: "Principal crude-export point", match: ["halul"] },
+    { label: "Al Khor / Al Wakrah", note: "Northern gas-services town / southern coastal town", match: ["al khor", "al wakrah", "wakrah", "khor"] },
+    { label: "Abu Samra crossing", note: "Saudi land border, reopened post-blockade", match: ["abu samra", "salwa"] },
+    { label: "Strait of Hormuz", note: "All Qatari LNG transits Hormuz", match: ["strait of hormuz", "hormuz strait", "persian gulf", "arabian gulf"] },
+  ],
+  };
+
+const KUWAIT: CountryBaselineSeed = {
+    countryNames: ["kuwait", "state of kuwait"],
+    operatingEnvironment:
+      "Kuwait is a constitutional emirate of roughly 4.3 million people (~30% national, ~70% expatriate) at the head of the Persian Gulf. Kuwait City concentrates the political, financial and media weight. Operating risk at street level is comparatively low — opportunistic crime is rare — and is structurally shaped by the most active parliament in the GCC (recurring National Assembly / cabinet stand-offs, suspensions and dissolutions), Iran-Israel kinetic spillover across Kuwaiti airspace, residual border sensitivity with Iraq (UN-demarcated since 1993, but recurring well-positioning friction over the shared Dorra / Arash gas field with Iran), and concentration of US Camp Arifjan / Ali Al Salem Air Base presence.",
+    securityContext:
+      "Ministry of Interior leads policing; Kuwait State Security handles intelligence; Kuwait Armed Forces operate with US Patriot integration. Public assembly is permitted under stricter framework than most GCC peers, with periodic stateless-Bidoon protests, opposition rallies (Diwaniyas, Erada Square) and labour mobilisation around the public-payroll system. The September 2024 Emir Sheikh Meshal dissolution of parliament and constitutional suspension materially shifted the political risk picture. 2015 Imam Sadiq mosque ISIS bombing is the reference point for sectarian-target hardening.",
+    knownRiskAreas: [
+    "Kuwait City — Erada Square / Justice Square: protest focal points; National Assembly area.",
+    "Iraq border / Bubiyan / Warba — UN demarcation line, Mubarak Al Kabeer Port build-out: recurring Iraq-side political friction.",
+    "Iran maritime border — Dorra / Arash gas field: standing demarcation friction with Iran.",
+    "Camp Arifjan / Ali Al Salem Air Base — US logistics and air footprint.",
+    "Ahmadi / Mina Al-Ahmadi — KOC / KNPC oil and refining concentration.",
+  ],
+    keyCitiesProvinces: [
+    "Kuwait City (Capital Governorate)",
+    "Hawalli",
+    "Farwaniya",
+    "Ahmadi",
+    "Mubarak Al-Kabeer",
+    "Jahra",
+  ],
+    movementConstraints:
+      "Surface movement is excellent. Kuwait International (KWI) is the principal gateway. Borders with Saudi Arabia (Nuwaiseeb) and Iraq (Abdali) are open; Iraq crossing is the principal land-freight route. Hot-season (May-Sep, 50°C+ peaks) and Shamal sandstorms periodically degrade outdoor work and aviation.",
+    infrastructureLimits:
+      "Power, telecoms, water (desalination-dependent) and transport are tier-1 in the urban core, with summer power-demand pressure on the grid. Banking and clearing are tier-1; KIA is one of the largest sovereign wealth funds globally. Shuwaikh, Shuaiba and the new Mubarak Al Kabeer Port (Bubiyan Island) are the principal maritime nodes. Mina Al-Ahmadi, Mina Abdullah and Shuaiba are the principal crude / refined export terminals.",
+    medicalEvac:
+      "Tier-1 capability at Dar Al Shifa, New Mowasat, Royale Hayat and the Sabah / Jaber / Mubarak public hospital network. Out-bound medevac to Dubai or London is straightforward when required.",
+    resourceSectorExposure:
+      "Kuwait Petroleum Corporation (KPC) — KOC upstream, KNPC refining (Mina Abdullah / Mina Al Ahmadi / Al Zour, the latter one of the largest single-train refineries globally), KPI international, PIC petrochemicals — dominates the energy base. Concession partners on the Partitioned Neutral Zone (Wafra / Khafji with Saudi Aramco / Saudi Arabian Chevron) resumed production in 2020. Banking (NBK, KFH) and contracting concentrate the rest of the international footprint.",
+    locationWatchlist: [
+    { label: "Kuwait City", note: "Capital, National Assembly, Erada Square protest focal point", match: ["kuwait city", "kwi", "erada square", "justice square", "sharq", "salmiya"] },
+    { label: "Ahmadi / Mina Al-Ahmadi", note: "KOC / KNPC oil and refining concentration", match: ["ahmadi", "mina al-ahmadi", "mina al ahmadi", "fahaheel"] },
+    { label: "Al Zour", note: "Major refinery and LNG-import terminal", match: ["al zour", "al-zour", "zour"] },
+    { label: "Camp Arifjan / Ali Al Salem", note: "US logistics and air footprint", match: ["arifjan", "ali al salem", "ali al-salem"] },
+    { label: "Bubiyan / Mubarak Al Kabeer Port", note: "New deepwater port, Iraq-border sensitivity", match: ["bubiyan", "mubarak al kabeer port", "warba"] },
+    { label: "Abdali / Iraq border", note: "Principal land-freight crossing", match: ["abdali", "safwan crossing"] },
+    { label: "Nuwaiseeb / Saudi border", note: "Saudi land crossing", match: ["nuwaiseeb", "khafji", "wafra"] },
+    { label: "Dorra / Arash gas field", note: "Standing demarcation friction with Iran", match: ["dorra", "arash", "al-durra"] },
+    { label: "Strait of Hormuz", note: "All Kuwaiti crude exports transit Hormuz", match: ["strait of hormuz", "hormuz strait", "persian gulf", "arabian gulf"] },
+  ],
+  };
+
+const OMAN: CountryBaselineSeed = {
+    countryNames: ["oman", "sultanate of oman"],
+    operatingEnvironment:
+      "Oman is an absolute monarchy of roughly 4.6 million people (~60% national, ~40% expatriate) across 11 governorates, stretching from the Musandam exclave on the Strait of Hormuz to Dhofar on the Yemeni border. Muscat concentrates the political, financial and media weight; Sohar, Duqm and Salalah anchor the industrial / port build-out. Operating risk at street level is the lowest in the GCC alongside Qatar — opportunistic crime is rare — and is structurally shaped by Oman's neutral mediation posture (Iran-US, Yemen / Houthi, Israel-Hamas back-channel), Strait-of-Hormuz exposure (Musandam controls the southern shore), Yemen border / Mahra Governorate spillover, and post-2021 fiscal-reform protest history (Sohar, Salalah youth-employment unrest).",
+    securityContext:
+      "Royal Oman Police (ROP) leads policing; Internal Security Service (ISS) handles intelligence; Sultan's Armed Forces (SAF) operate a credible defence posture with British training links. Public assembly is restricted but managed pragmatically — 2011 Sohar protests and 2021 youth-employment protests were resolved with a mix of state-employment surge and limited arrests. Sultan Haitham bin Tariq (since January 2020) has pushed Vision 2040 economic diversification. Maritime exposure dominates the kinetic picture: limpet-mine incidents in the Gulf of Oman (Fujairah anchorage), Galaxy Leader and MSC Aries seizures in the Bab al-Mandab / Strait of Hormuz, and Houthi missile / drone activity off the Yemen coast.",
+    knownRiskAreas: [
+    "Musandam Peninsula — Strait of Hormuz southern shore, Khasab: standing maritime-incident exposure.",
+    "Gulf of Oman approaches (off Fujairah / Khor Fakkan) — limpet-mine incidents (May / June 2019), GPS spoofing.",
+    "Dhofar / Mahra-border belt — Yemen border crossings (Sarfait, Mazyona), residual Houthi / AQAP spillover risk.",
+    "Sohar and Salalah industrial cities — recurring labour and youth-employment mobilisation; Chinese / Indian / Vietnamese workforce concentration.",
+    "Duqm Special Economic Zone — Sino-Omani / Indian / South Korean industrial build-out, including the OQ8 refinery.",
+  ],
+    keyCitiesProvinces: [
+    "Muscat",
+    "Sohar (Al Batinah North)",
+    "Salalah (Dhofar)",
+    "Nizwa (Ad Dakhiliyah)",
+    "Sur (Ash Sharqiyah South)",
+    "Duqm (Al Wusta)",
+    "Khasab (Musandam)",
+  ],
+    movementConstraints:
+      "Surface movement is excellent. Muscat International (MCT) is the principal gateway; Salalah (SLL), Sohar (OHS) and Duqm (DQM) provide secondary capacity. Borders with UAE (Hatta, Buraimi / Al Ain, Khatmat Milahah, Wajaja) and Saudi Arabia (Empty Quarter crossing at Ramlat Khaliya) are open; Yemen border is closed at Sarfait but smuggling continues via Mahra. Khareef monsoon (Jun-Sep) brings cool weather and crowds to Salalah but disrupts coastal aviation. Summer heat in the interior is severe.",
+    infrastructureLimits:
+      "Power, telecoms, water and transport are tier-1 in the urban core, with grid pressure in Duqm and Dhofar during build-out phases. Banking and clearing are tier-1; CMA regulates securities. Sohar, Salalah, Duqm and the new Khazaen dry port are the principal logistics nodes. Mina Al Fahal is the principal crude-export terminal; the strategic value of Oman's coastline is that all four major ports sit outside the Strait of Hormuz.",
+    medicalEvac:
+      "Tier-1 capability at Royal Hospital, Sultan Qaboos University Hospital, Muscat Private Hospital and Khoula Hospital. Out-bound medevac to Dubai is straightforward.",
+    resourceSectorExposure:
+      "Petroleum Development Oman (PDO — Shell / TotalEnergies / Partex partners) dominates upstream; OQ (state energy company) anchors midstream, refining (Sohar, OQ8 Duqm) and petrochemicals. BP operates the Khazzan / Ghazeer tight-gas development. Vale (Brazilian iron-ore pelletising at Sohar), Sebacic Oman, and the Chinese-anchored Sino-Oman Industrial City at Duqm carry the heavy-industry exposure. Tourism (Muscat, Musandam fjords, Salalah khareef, Wahiba Sands) is a growing diversification leg. Hyproc / OLNG runs the Qalhat LNG complex.",
+    locationWatchlist: [
+    { label: "Muscat", note: "Capital, financial centre", match: ["muscat", "mct", "mutrah", "ruwi", "seeb", "qurum"] },
+    { label: "Sohar", note: "Industrial / port / refinery hub, 2011 / 2021 protest history", match: ["sohar", "ohs", "al batinah"] },
+    { label: "Salalah", note: "Dhofar capital, container transhipment, khareef tourism", match: ["salalah", "sll", "dhofar"] },
+    { label: "Duqm SEZ", note: "Sino-Omani industrial build-out, OQ8 refinery, dry dock", match: ["duqm", "dqm", "ras markaz", "al wusta"] },
+    { label: "Musandam / Khasab", note: "Strait of Hormuz southern shore", match: ["musandam", "khasab", "kumzar"] },
+    { label: "Mahra border / Sarfait", note: "Yemen border, residual Houthi / AQAP spillover risk", match: ["sarfait", "mazyona", "mahra border", "rakhyut"] },
+    { label: "Mina Al Fahal / Qalhat", note: "Principal crude-export terminal / LNG complex", match: ["mina al fahal", "qalhat", "qalhat lng", "olng", "sur"] },
+    { label: "UAE border crossings", note: "Hatta / Khatmat Milahah / Wajaja / Buraimi", match: ["hatta crossing", "khatmat milahah", "wajaja", "buraimi crossing"] },
+    { label: "Strait of Hormuz / Gulf of Oman", note: "Limpet-mine, GPS-spoofing, tanker-seizure exposure", match: ["strait of hormuz", "hormuz strait", "gulf of oman", "persian gulf", "arabian gulf"] },
+  ],
+  };
+
 export const COUNTRY_BASELINE_SEEDS: CountryBaselineSeed[] = [
     PAPUA,
     PAPUA_NEW_GUINEA,
@@ -1051,5 +1363,12 @@ export const COUNTRY_BASELINE_SEEDS: CountryBaselineSeed[] = [
   TIMOR_LESTE,
   AUSTRALIA,
   NEW_ZEALAND,
+  IRAN,
+  IRAQ,
+  SAUDI_ARABIA,
+  UAE,
+  QATAR,
+  KUWAIT,
+  OMAN,
   ];
   
