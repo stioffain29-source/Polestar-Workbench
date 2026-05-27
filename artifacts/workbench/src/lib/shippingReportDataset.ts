@@ -8,6 +8,8 @@ import {
   classifyRegion, REGION_COLOR, type Region,
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
   type ChokepointKey,
+  isLowCredibilityShippingRecord,
+  FREIGHT_MARKET_INDEX_RE,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
 
@@ -140,49 +142,11 @@ function sortByDateDesc<T extends { date: Date }>(rows: T[]): T[] {
 }
 
 // --- Source-credibility helpers --------------------------------------------
-// Used to keep social-media-style, repatriation/human-interest, speculative
-// strike-claim and generic commentary items out of the surfaces where they
-// would otherwise drive the analyst narrative (chokepoint operational read;
-// Commercial Impact on Shipping; Vessel and Piracy reads).
-
-const SOCIAL_SOURCE_RE = /\b(twitter|x\.com|t\.co|instagram|tiktok|facebook|threads|youtube|reddit|telegram|t\.me|mastodon|truth\s*social|weibo|social\s*media)\b/i;
-const HANDLE_TITLE_RE = /^\s*[@#]/;
-
-// Repatriation, crew-welfare and human-interest items are real but they are
-// downstream of the maritime security picture, not operational drivers of it.
-// They should not lead a Chokepoint, Vessel or Piracy read. Stems are kept
-// open (no trailing word-boundary) so inflections like "repatriated" /
-// "repatriation" / "memorialised" all match.
-const HUMAN_INTEREST_RE = /(\brepatriat|\bseafarer welfare|\bcrew welfare|\bmemorial|\bfuneral|\brescued (and )?(repatriated|returned home)|\bbrought home\b|\breunion\b|\bwidow|\bmother of\b|\bfamily of\b|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\baboard us-?seized vessels?\b|\bcrew (members? )?(released|freed|safe|safely)|\bdetained crew (returned|released|repatriated)|\b(transfers?|transferred|transferring|hands? over|handed over|handover of|hand[- ]?over of|returns?|returned|returning|releases?|released|releasing|delivers?|delivered|delivering|flies? home|flown home) (the )?crew\b|\bcrew (of [^.,]{1,80} )?(transferred|handed over|repatriated|released|freed|returned|sent home|flown home|brought home))/i;
-
-// Speculative strike claims and unverified rumour traffic. "Iran claims
-// missile strike", "Houthis claim attack", "claims to have struck" — when
-// these dominate they push the read away from validated maritime security.
-// Also catches "X says it hit/targeted Y" style claim language and the
-// classic "may have / appears to have" hedge stack.
-const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ballegedly|\breportedly|\bclaim(s|ed)\b[^.]{0,40}\b(strike|attack|hit|missile|drone|target|targeted|fired|sank|downed|shot down|launched)|\bclaim(s|ed) to have\b|\bclaim(s|ed) responsibility|\brumou?red|\bpurportedly|\bmay have (been )?(struck|hit|attacked|targeted)|\bappears to have been|\b(says|said) it (hit|struck|targeted|attacked|launched|downed))/i;
-
-// Pure commentary, explainer and analysis-piece headlines with no
-// operational anchor ("explained", "what to know", "five things", "in
-// charts", "guide to", listicles). These dilute operational reads.
-const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
-
-// Pure freight-market index / rate-tracker commentary with no operational
-// anchor. Drewry WCI, Baltic indices, container freight rate weekly
-// updates, etc. Blocked outright unless the headline also carries an
-// operational anchor (port closure, strike, attack, seizure).
-const FREIGHT_MARKET_INDEX_RE = /\b(drewry|world container index|\bwci\b|baltic (dry|exchange|capesize|panamax|supramax|handysize) index|\bbdi\b|\bbci\b|\bbpi\b|harpex|shanghai containerized freight index|\bscfi\b|ningbo containerized freight index|\bncfi\b|container (rate|rates|spot rate|spot rates|index) (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer)|freight (rate|rates) (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer)|spot rates? (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer))\b/i;
-
-function isLowCredibilitySource(r: ShippingReportIncident): boolean {
-  if (HANDLE_TITLE_RE.test(r.title ?? "")) return true;
-  const src = (r.source ?? "") + " " + (r.sourceUrl ?? "");
-  if (SOCIAL_SOURCE_RE.test(src)) return true;
-  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  if (HUMAN_INTEREST_RE.test(text)) return true;
-  if (SPECULATIVE_CLAIM_RE.test(text)) return true;
-  if (GENERIC_COMMENTARY_RE.test(text)) return true;
-  return false;
-}
+// Noise / human-interest / low-credibility filters used to live here. They
+// now live in `shippingAnalysis.ts` as the single source of truth so the
+// Shipping page and the Shipping report PDF apply identical exclusions.
+// Local alias kept so the existing call sites read naturally.
+const isLowCredibilitySource = isLowCredibilityShippingRecord;
 
 // --- Dedupe helpers --------------------------------------------------------
 // Maritime stories get syndicated heavily — the same vessel attack or
@@ -443,6 +407,7 @@ export function buildShippingReportDataset(
 
   const piracyAll: PiracyRow[] = sortByDateDesc(
     enriched30
+      .filter((r) => !isLowCredibilitySource(r))
       .map((r) => ({ ...r, act: classifyPiracy(r) }))
       .filter((r): r is PiracyRow => r.act !== null),
   );
@@ -463,13 +428,23 @@ export function buildShippingReportDataset(
   const vAttackSeizeWeekly = vesselRowsWeekly
     .filter((r) => r.vesselType === "Attack" || r.vesselType === "Seized").length;
   const piracyRowsWeekly = enriched
+    .filter((r) => !isLowCredibilitySource(r))
     .map((r) => ({ ...r, act: classifyPiracy(r) }))
     .filter((r): r is PiracyRow => r.act !== null);
 
   const hsAll = highestSeverity(enriched);
   const latestDate = enriched.length > 0 ? dateMax(enriched.map((r) => r.date)) : null;
-  const latestSig = sortByDateDesc(enriched).find((r) => r.severity === "extreme" || r.severity === "high")
-    ?? sortByDateDesc(enriched)[0]
+  // Latest Significant Incident must skip repatriation / crew-return /
+  // social-handle / speculative-claim records so the headline can't be
+  // hijacked by a human-interest follow-up that happens to be tagged
+  // extreme. Falls back to the raw most-recent record only if the cleaned
+  // pool is empty.
+  const enrichedClean = enriched.filter((r) => !isLowCredibilitySource(r));
+  // Strict exclusion: if no credible record exists in the window, the
+  // Latest Significant Incident card reads "—" rather than falling back to
+  // a repatriation / human-interest / speculative-claim row.
+  const latestSig = sortByDateDesc(enrichedClean).find((r) => r.severity === "extreme" || r.severity === "high")
+    ?? sortByDateDesc(enrichedClean)[0]
     ?? null;
 
   // Single, deduplicated Fast Facts grid (7 cards).
@@ -506,30 +481,32 @@ export function buildShippingReportDataset(
   // If only low-credibility records exist for a chokepoint, fall back to a
   // low-confidence note instead of quoting them.
   const chokepointRows: ChokepointRow[] = CHOKEPOINTS.map((cp) => {
-    const records = enriched30.filter((r) => detectChokepoints(r).includes(cp));
-    const credible = records.filter((r) => !isLowCredibilitySource(r));
-    const hs = highestSeverity(records);
-    const sorted = sortByDateDesc(records);
+    // Use credible-only records for count, highest severity, latest date
+    // and latest title so the Chokepoint Watch row cannot quote a
+    // repatriation / social-handle / speculative-claim record. Page rows
+    // are built the same way (cleanEnriched) — the two surfaces must
+    // agree.
+    const credible = enriched30
+      .filter((r) => detectChokepoints(r).includes(cp))
+      .filter((r) => !isLowCredibilitySource(r));
+    const hs = highestSeverity(credible);
     const credibleSorted = sortByDateDesc(credible);
-    const latest = sorted[0] ?? null;
     const credibleLatest = credibleSorted[0] ?? null;
     let readText: string;
-    if (records.length === 0) {
+    if (credible.length === 0) {
       readText = "Quiet over the last 30 days; no qualifying activity on file.";
-    } else if (credibleLatest === null) {
-      readText = "Low-confidence reporting only; no validated maritime advisory or credible operational incident identified in the last 30 days.";
-    } else if (records.length === 1) {
-      readText = `Activity here was anchored by a single entry, "${credibleLatest.title}", over the last 30 days.`;
+    } else if (credible.length === 1) {
+      readText = `Activity here was anchored by a single entry, "${credibleLatest!.title}", over the last 30 days.`;
     } else {
-      readText = `Reporting was led by "${credibleLatest.title}", with ${records.length} qualifying records over the last 30 days.`;
+      readText = `Reporting was led by "${credibleLatest!.title}", with ${credible.length} qualifying records over the last 30 days.`;
     }
     return {
       name: cp,
-      count: records.length,
+      count: credible.length,
       highestSeverityKey: hs.key,
       highestSeverityLabel: hs.label,
-      latestDate: latest ? latest.date : null,
-      latestTitle: latest ? latest.title : null,
+      latestDate: credibleLatest ? credibleLatest.date : null,
+      latestTitle: credibleLatest ? credibleLatest.title : null,
       readText,
     };
   });

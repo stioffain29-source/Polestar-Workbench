@@ -51,6 +51,58 @@ export interface MaritimeRecordLike {
   title: string;
   summary?: string | null;
   location?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Shared noise / low-credibility filters
+//
+// Centralised here so the Shipping page and the Shipping report PDF apply
+// the same exclusion vocabulary to Latest Significant Incident, Vessel
+// Attacks, Piracy, Hormuz Chokepoint Status, Naval / security posture and
+// Chokepoint Watch. Previously these regexes lived only inside the PDF
+// dataset builder, which meant the on-screen monitor surfaced repatriation /
+// crew-return / social-media records that the PDF correctly suppressed.
+// ---------------------------------------------------------------------------
+
+// Social-media surfaces (handle-style titles, social source domains).
+export const SOCIAL_HANDLE_TITLE_RE = /^\s*[@#]/;
+export const SOCIAL_SOURCE_RE = /\b(twitter|x\.com|t\.co|instagram|tiktok|facebook|threads|youtube|reddit|telegram|t\.me|mastodon|truth\s*social|weibo|social\s*media)\b/i;
+
+// Repatriation, crew-welfare, hostage-return and human-interest follow-ups.
+// These are downstream of the maritime security picture, not operational
+// drivers of it — they must never classify as vessel attack, seizure,
+// confirmed kinetic incident or latest significant incident.
+export const HUMAN_INTEREST_RE = /(\brepatriat|\bseafarer welfare|\bcrew welfare|\bmemorial|\bfuneral|\brescued (and )?(repatriated|returned home)|\bbrought home\b|\breunion\b|\bwidow|\bmother of\b|\bfamily of\b|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\baboard us-?seized vessels?\b|\bcrew (members? )?(released|freed|safe|safely|returned|repatriated|sent home|flown home|brought home)|\bdetained crew (returned|released|repatriated)|\b(transfers?|transferred|transferring|hands? over|handed over|handover of|hand[- ]?over of|returns?|returned|returning|releases?|released|releasing|delivers?|delivered|delivering|flies? home|flown home) (the )?crew\b|\bcrew (of [^.,]{1,80} )?(transferred|handed over|repatriated|released|freed|returned|sent home|flown home|brought home))/i;
+
+// Speculative / unverified strike-claim language. Suppressed from the
+// hostile classifiers and from analyst-narrative surfaces.
+export const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ballegedly|\breportedly|\bclaim(s|ed)\b[^.]{0,40}\b(strike|attack|hit|missile|drone|target|targeted|fired|sank|downed|shot down|launched)|\bclaim(s|ed) to have\b|\bclaim(s|ed) responsibility|\brumou?red|\bpurportedly|\bmay have (been )?(struck|hit|attacked|targeted)|\bappears to have been|\b(says|said) it (hit|struck|targeted|attacked|launched|downed))/i;
+
+// Pure commentary, explainer and analysis-piece headlines with no
+// operational anchor.
+export const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
+
+// Pure freight-market index / rate-tracker commentary with no operational
+// anchor. Drewry WCI, Baltic indices, container freight rate weekly updates.
+export const FREIGHT_MARKET_INDEX_RE = /\b(drewry|world container index|\bwci\b|baltic (dry|exchange|capesize|panamax|supramax|handysize) index|\bbdi\b|\bbci\b|\bbpi\b|harpex|shanghai containerized freight index|\bscfi\b|ningbo containerized freight index|\bncfi\b|container (rate|rates|spot rate|spot rates|index) (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer)|freight (rate|rates) (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer)|spot rates? (rise|rises|risen|rose|edged|jump|jumped|fall|fell|drop|dropped|slide|slid|surge|surged|hold|holds|holding|steady|stable|flat|softer|firmer))\b/i;
+
+/**
+ * Returns true if a shipping record should be treated as low-credibility or
+ * human-interest noise. Records flagged here are kept in the underlying
+ * dataset but excluded from analyst-narrative surfaces (Latest Significant,
+ * Chokepoint operational read, Hormuz indicators, Vessel / Piracy tables).
+ */
+export function isLowCredibilityShippingRecord(i: MaritimeRecordLike): boolean {
+  if (SOCIAL_HANDLE_TITLE_RE.test(i.title ?? "")) return true;
+  const src = `${i.source ?? ""} ${i.sourceUrl ?? ""}`;
+  if (SOCIAL_SOURCE_RE.test(src)) return true;
+  const text = `${i.title ?? ""} ${i.summary ?? ""}`;
+  if (HUMAN_INTEREST_RE.test(text)) return true;
+  if (SPECULATIVE_CLAIM_RE.test(text)) return true;
+  if (GENERIC_COMMENTARY_RE.test(text)) return true;
+  return false;
 }
 
 function blob(i: MaritimeRecordLike): string {
@@ -124,6 +176,9 @@ export function classifyPiracy(i: MaritimeRecordLike): PiracyAct | null {
   if (LAND_CARGO_RE.test(text) && !/\b(at sea|at anchorage|on board|vessel|ship|tanker|dhow|crew)\b/i.test(text)) {
     return null;
   }
+  // Repatriation / crew-return / human-interest follow-ups are not piracy
+  // events even when the text mentions a previous hijacking or seizure.
+  if (HUMAN_INTEREST_RE.test(text)) return null;
   for (const r of PIRACY_RULES) {
     if (r.pattern.test(text)) return r.type;
   }
@@ -223,6 +278,16 @@ export function classifyVesselIncident(i: MaritimeRecordLike): VesselIncidentTyp
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
   if (COMMERCIAL_RE.test(text)) return null;
   if (DIPLOMATIC_FOLLOWUP_RE.test(text)) return null;
+  // Repatriation, crew-return and human-interest follow-ups are NEVER
+  // hostile vessel incidents — they are downstream of the maritime security
+  // picture, not operational drivers of it. This is the single change that
+  // also clears the Hormuz kinetic gate (which defers to this classifier)
+  // and the Vessel Attacks / Seizures KPI.
+  if (HUMAN_INTEREST_RE.test(text)) return null;
+  // Speculative / unverified strike-claim language is not a confirmed
+  // hostile incident either; let it fall to the issue classifier as
+  // commentary instead.
+  if (SPECULATIVE_CLAIM_RE.test(text)) return null;
   for (const r of VESSEL_RULES) if (r.pattern.test(text)) return r.type;
   return null;
 }

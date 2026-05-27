@@ -18,7 +18,11 @@
 //   GNSS / AIS interference, blockade, escort, war risk insurance, mine risk.
 
 import { differenceInDays, parseISO } from "date-fns";
-import { classifyVesselIncident, type MaritimeRecordLike } from "./shippingAnalysis";
+import {
+  classifyVesselIncident,
+  isLowCredibilityShippingRecord,
+  type MaritimeRecordLike,
+} from "./shippingAnalysis";
 
 // --- Geographic / contextual scope -----------------------------------------
 // A record is "Hormuz context" if it mentions a Hormuz-area location OR a
@@ -203,7 +207,14 @@ export function computeHormuzStatus(
   const windowDays = opts.kineticWindowDays ?? 7;
   const now = new Date();
 
-  const scoped = records.filter((r) => isHormuzContext(r));
+  // Drop repatriation / crew-return / social-handle / speculative-claim
+  // records before scoring any of the six indicator categories. Without
+  // this filter, the `posture` pattern (which includes "detained") and the
+  // `kinetic` pattern (which includes "seized") would both fire on
+  // "US-seized vessels repatriated"-style follow-ups and contradict the
+  // "no new kinetic incident" headline.
+  const credible = records.filter((r) => !isLowCredibilityShippingRecord(r));
+  const scoped = credible.filter((r) => isHormuzContext(r));
 
   const categories: HormuzCategoryResult[] = HORMUZ_CATEGORIES.map((def) => {
     const matches = scoped.filter((r) => categoryMatches(r, def));

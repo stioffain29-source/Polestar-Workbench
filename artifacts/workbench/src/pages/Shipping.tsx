@@ -17,6 +17,7 @@ import {
   classifyIssue, ISSUE_PALETTE,
   classifyVesselIncident, type VesselIncidentType, VESSEL_ACCENT,
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
+  isLowCredibilityShippingRecord,
 } from "@/lib/shippingAnalysis";
 import { computeHormuzStatus, HORMUZ_TONE_COLOR } from "@/lib/hormuzStatus";
 import { ExternalLink } from "lucide-react";
@@ -45,7 +46,7 @@ function darken(hex: string, amount = 0.18): string {
 // Temporary diagnostic constant. Bumped manually whenever the Shipping page
 // classifier / filter logic changes so the on-screen debug line proves the
 // browser is actually running the latest filter version, not a stale bundle.
-const SHIPPING_FILTER_VERSION = "shipping-page@v1 (no human-interest/repatriation filter)";
+const SHIPPING_FILTER_VERSION = "shipping-page@v2 (shared isLowCredibilityShippingRecord noise filter)";
 
 export default function Shipping() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "shipping" });
@@ -77,7 +78,25 @@ export default function Shipping() {
     [allEnriched],
   );
 
+  // Cleaned dataset — repatriation / crew-return / social-handle /
+  // speculative-claim / generic-commentary records dropped. Shared with the
+  // Shipping PDF via `isLowCredibilityShippingRecord` so the page and the
+  // exporter can never disagree about what counts as a credible operational
+  // record. Used to drive analyst-narrative surfaces only: Latest
+  // Significant Incident, Chokepoint Watch "latest" row, Hormuz indicators.
+  // Raw `enriched` is still used for the Total/Records-in-Window counts so
+  // the page does not silently shrink the underlying dataset.
+  const cleanEnriched = useMemo(
+    () => enriched.filter((i) => !isLowCredibilityShippingRecord(i)),
+    [enriched],
+  );
+  const cleanAllEnriched = useMemo(
+    () => allEnriched.filter((i) => !isLowCredibilityShippingRecord(i)),
+    [allEnriched],
+  );
+
   const total = enriched.length;
+  const totalClean = cleanEnriched.length;
 
   const last7 = useMemo(() => {
     const now = new Date();
@@ -180,20 +199,31 @@ export default function Shipping() {
   const highestSevCount = highestSev ? enriched.filter((i) => i.severity === highestSev).length : 0;
 
   const latestSignificant = useMemo(() => {
-    const sorted = [...enriched]
+    // Strict exclusion: repatriation / crew-return / social-handle /
+    // speculative-claim records are never eligible. If the cleaned pool
+    // is empty the card reads "—" rather than silently surfacing a
+    // human-interest follow-up.
+    const sortedClean = [...cleanEnriched]
       .filter((i) => !isNaN(i.occurredDate.getTime()))
       .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
-    return sorted.find((i) => i.severity === "extreme" || i.severity === "high") ?? sorted[0] ?? null;
-  }, [enriched]);
+    return (
+      sortedClean.find((i) => i.severity === "extreme" || i.severity === "high")
+      ?? sortedClean[0]
+      ?? null
+    );
+  }, [cleanEnriched]);
 
-  // Vessels Attacked — derive from the already-scoped `enriched` list so this
-  // section honours the same APAC + Middle East filter as the rest of the page.
+  // Vessels Attacked — derive from the cleaned in-scope list so social-media
+  // handles and human-interest follow-ups can never surface as hostile
+  // vessel incidents. (classifyVesselIncident already rejects repatriation
+  // / crew-return text; this drop also catches handle-style titles whose
+  // text alone would otherwise pass the regex.)
   const vesselIncidents = useMemo(() => {
-    return enriched
+    return cleanEnriched
       .map((i) => ({ ...i, vesselType: classifyVesselIncident(i) }))
       .filter((i): i is typeof i & { vesselType: VesselIncidentType } => i.vesselType !== null)
       .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
-  }, [enriched]);
+  }, [cleanEnriched]);
   const vesselCounts = useMemo(() => {
     const c: Record<VesselIncidentType, number> = { Attack: 0, "Near miss": 0, Seized: 0, Threat: 0 };
     for (const v of vesselIncidents) c[v.vesselType]++;
@@ -213,6 +243,15 @@ export default function Shipping() {
         .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
     [enriched],
   );
+  // Cleaned + date-sorted version. Used by Chokepoint Watch ("latest"
+  // record per chokepoint must not be a repatriation row) and by Piracy.
+  const sortedCleanEnriched = useMemo(
+    () =>
+      [...cleanEnriched]
+        .filter((i) => !isNaN(i.occurredDate.getTime()))
+        .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
+    [cleanEnriched],
+  );
 
   // TRANSIT_ISSUES / COMMERCIAL_ISSUES come from shippingAnalysis.ts so the
   // Shipping page and the Shipping report PDF share one vocabulary.
@@ -227,7 +266,7 @@ export default function Shipping() {
   // file in the window the row reads "No current records in selected window".
   const chokepointRows = useMemo(() => {
     return CHOKEPOINTS.map((cp) => {
-      const records = sortedEnriched.filter((i) => detectChokepoints(i).includes(cp));
+      const records = sortedCleanEnriched.filter((i) => detectChokepoints(i).includes(cp));
       if (records.length === 0) {
         return { key: cp, count: 0, highestSev: "", latest: null as typeof records[0] | null, records };
       }
@@ -254,16 +293,19 @@ export default function Shipping() {
   // the latest reporting window" reflects the active week, while category
   // counts cover the entire loaded window.
   const hormuzStatus = useMemo(
-    () => computeHormuzStatus(allEnriched, { kineticWindowDays: 7 }),
-    [allEnriched],
+    () => computeHormuzStatus(cleanAllEnriched, { kineticWindowDays: 7 }),
+    [cleanAllEnriched],
   );
 
   // --- Piracy and Armed Robbery -------------------------------------------
+  // classifyPiracy already rejects repatriation/crew-return text; we also
+  // drop social-handle / speculative-claim records up front via the cleaned
+  // pool so this surface stays symmetric with Vessel Attacks.
   const piracyIncidents = useMemo(() => {
-    return sortedEnriched
+    return sortedCleanEnriched
       .map((i) => ({ ...i, piracyAct: classifyPiracy(i) }))
       .filter((i): i is typeof i & { piracyAct: PiracyAct } => i.piracyAct !== null);
-  }, [sortedEnriched]);
+  }, [sortedCleanEnriched]);
 
   // Vessel attack / seizure count (excludes piracy — that has its own count).
   const vesselAttackOrSeizureCount = useMemo(
@@ -298,10 +340,10 @@ export default function Shipping() {
         <div className="font-bold uppercase tracking-wider text-[10px] mb-1">DEBUG — Shipping monitor data path</div>
         <div>data source: GET /api/incidents?topic=shipping (Postgres → Drizzle, order by occurred_at DESC) via useListIncidents (React Query default cache)</div>
         <div>
-          raw records: {incidents.length} · in-scope (APAC + ME + unattributed): {allEnriched.length - outOfScopeCount} · out-of-scope dropped: {outOfScopeCount} · loading: {String(isLoading)}
+          raw records: {incidents.length} · in-scope (APAC + ME + unattributed): {allEnriched.length - outOfScopeCount} · in-scope after noise filter: {totalClean} · dropped by noise filter: {total - totalClean} · out-of-scope dropped: {outOfScopeCount} · loading: {String(isLoading)}
         </div>
         <div>
-          latest record: {(() => {
+          latest record (raw, pre-filter): {(() => {
             const sorted = [...enriched]
               .filter((i) => !isNaN(i.occurredDate.getTime()))
               .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
@@ -312,7 +354,7 @@ export default function Shipping() {
           })()}
         </div>
         <div>
-          latestSignificant (current picker — no human-interest/repatriation filter): {latestSignificant
+          latestSignificant (shared noise filter applied): {latestSignificant
             ? `${format(latestSignificant.occurredDate, "yyyy-MM-dd")} · sev=${latestSignificant.severity} · id=${latestSignificant.id ?? "?"} · ${latestSignificant.title.slice(0, 90)}`
             : "—"}
         </div>
