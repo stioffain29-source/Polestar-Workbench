@@ -437,7 +437,7 @@ const FLASHPOINT: ReportPack = {
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
     const geoLead = lead
-      ? `${lead} is where the operational pressure sits this cycle${secondaries ? `, with the recurring picture filled in by ${secondaries}` : ""}`
+      ? `${lead} carries the heaviest concentration${secondaries ? `, with ${secondaries} as supporting watch areas` : ""}`
       : "no single country carries the read this cycle";
     const sevClause = sev
       ? ` Worst-case reporting reached the ${sev.toLowerCase()} tier, so the cycle cannot be read as routine.`
@@ -536,7 +536,7 @@ const PROTESTS: ReportPack = {
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
     const geoLead = lead
-      ? `${lead} is where the operational pressure sits this cycle${secondaries ? `, with the recurring picture filled in by ${secondaries}` : ""}`
+      ? `${lead} carries the heaviest concentration${secondaries ? `, with ${secondaries} as supporting watch areas` : ""}`
       : "no single country carries the read this cycle";
     const sevClause = sev
       ? ` Worst-case reporting reached the ${sev.toLowerCase()} tier, so the cycle cannot be read as routine.`

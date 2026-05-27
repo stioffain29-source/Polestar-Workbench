@@ -492,7 +492,7 @@ export default function FlashpointReportPreview({
           <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
         </Section>
 
-        <Section title="Related Incidents">
+        <Section title="Key Incidents">
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
         </Section>
 

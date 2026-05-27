@@ -579,7 +579,6 @@ export function buildFlashpointReportDataset(
     {
       label: "Records In Window",
       value: String(enriched.length),
-      note: `${activismRows.length} activism, ${unrestRows.length} civil unrest`,
     },
     {
       label: "Highest Severity",
@@ -1129,9 +1128,23 @@ function buildImplications(ctx: AutoCtx): string {
 // keyed off the current cycle's enforcement signals.
 function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const all = [...ctx.activismRows, ...ctx.unrestRows];
-  const future = extractFutureSignals(all)
-    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
-    .slice(0, 6);
+  const futureRaw = extractFutureSignals(all)
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
+  // Collapse (country, signal) duplicates so the same operational
+  // signal cannot appear twice (e.g. two South Korea records both
+  // reducing to "Union injunction ruling — sectoral strike risk").
+  // Mirrors the forecast-table dedupe used in buildFlashpointReportDataset.
+  const seen = new Set<string>();
+  const future: typeof futureRaw = [];
+  for (const r of futureRaw) {
+    const country = (r.country ?? "").trim() || "—";
+    const signal = shortSignalLabel(r);
+    const key = `${country.toLowerCase()}|${signal.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    future.push(r);
+    if (future.length >= 6) break;
+  }
   if (future.length > 0) {
     return future.map((r) => {
       const where = r.country ? `${r.country} — ` : "";
@@ -1306,10 +1319,6 @@ function buildWatchNext(ctx: AutoCtx): string {
 }
 
 function buildPolestarView(ctx: AutoCtx): string {
-  const lead = ctx.countryRows[0];
-  const second = ctx.countryRows[1];
-  const where = lead ? lead.label : "the covered geographies";
-  const spread = subregionSpread(ctx.countryRows);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const sectoral = ctx.activismRows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r))).length;
   const student = ctx.activismRows.filter((r) => /\b(student|university|campus|college|faculty)\b/i.test(text(r))).length;
@@ -1320,54 +1329,21 @@ function buildPolestarView(ctx: AutoCtx): string {
   // 1. Directional verdict. One sharp sentence up top.
   let verdict: string;
   if (mobVectors >= 2 && hasEnforcement) {
-    verdict = `Polestar's view: the cycle is firming up, not easing. Multiple independent organising vectors are running alongside visible state enforcement, and the next 7-14 days should be planned for further short-notice disruption rather than a return to quiet.`;
+    verdict = `Polestar's view: the cycle is firming up, not easing. Independent organising vectors are running alongside visible state enforcement, and the window should be planned for further short-notice disruption rather than a return to quiet.`;
   } else if (mobVectors >= 2) {
-    verdict = `Polestar's view: the cycle reads as broadly mobilised but not yet escalatory. Multiple organising vectors are active; the state response has stayed below visible enforcement, but the gap between announced rally and hardened policing has been routinely 24-72 hours historically.`;
+    verdict = `Polestar's view: the cycle reads as broadly mobilised but not yet escalatory. Multiple organising vectors are active; the state response has stayed below visible enforcement so far.`;
   } else if (hasEnforcement) {
     verdict = `Polestar's view: enforcement is leading the cycle. Visible state action is already on file ahead of fresh organising, which usually signals a contained but sustained crackdown rather than a one-off response.`;
   } else if (mobVectors >= 1) {
     verdict = `Polestar's view: the cycle is live but contained. Organising signal sits on the file without a hardened enforcement response yet — a stable picture that historically flips on a single political trigger.`;
   } else {
-    verdict = `Polestar's view: the cycle reads as a thin reporting window, not a structural easing. Organising infrastructure across the covered geographies remains intact and can reactivate on a single political trigger inside a week.`;
+    verdict = `Polestar's view: the cycle reads as a thin reporting window, not a structural easing. Organising infrastructure across the covered geographies remains intact and can reactivate on a single political trigger.`;
   }
-  const parts: string[] = [verdict];
 
-  // 2. Mobilisation capacity judgement (no parenthetical counts).
-  const mobBuckets: string[] = [];
-  if (named > 0) mobBuckets.push("named-movement organising");
-  if (sectoral > 0) mobBuckets.push("sectoral chamber and union action");
-  if (student > 0) mobBuckets.push("student and campus mobilisation");
-  parts.push(
-    mobBuckets.length > 0
-      ? `Mobilisation capacity across ${where} is drawing on ${joinList(mobBuckets)} — independent vectors with separate organising calendars, harder to contain than a single-issue wave.`
-      : `Mobilisation capacity across ${where} sits below its ceiling this cycle, but the organising infrastructure remains intact and can reactivate on a single political trigger inside a week.`,
-  );
+  // 2. Business disruption risk judgement.
+  const disruption = `Business disruption risk reads as moderate-to-elevated: short-notice transport disruption on protest days, public-facing site closures driven by Section 144 / curfew orders, and supply-chain friction from sectoral walkouts. The residual tail is a triggering event — adverse court ruling, fuel-price decision, security-force fatality — flipping the cycle into sustained unrest.`;
 
-  // 3. Speed of escalation judgement.
-  parts.push(
-    hasEnforcement
-      ? `Speed of escalation should be assumed fast: visible enforcement on the current file compresses the runway from announced rally to kinetic incident from days to hours.`
-      : `Speed of escalation looks measured, but the runway is short — historically 24-72 hours from a peaceful announced rally to a kinetic incident once a political trigger lands.`,
-  );
-
-  // 4. Likely protest geography — regional spread, not just lead+second.
-  const geoBits: string[] = [];
-  if (lead) geoBits.push(`${lead.label} sets the tempo`);
-  if (second) geoBits.push(`${second.label} is the most likely secondary flashpoint`);
-  const geoLead = geoBits.length > 0
-    ? `Likely protest geography over the next 7-14 days: ${joinList(geoBits)}.`
-    : `Likely protest geography is diffuse this cycle; a named opposition call or single policy trigger tends to reconcentrate activity into one or two capitals inside days.`;
-  const geoTail = spread.regions.length >= 2
-    ? ` Expect parallel activity across ${joinList(spread.regions)}, clustering around court complexes, party headquarters, ministry quarters, campuses and main commercial arteries.`
-    : ` Expect clustering around court complexes, party headquarters, ministry quarters, campuses and main commercial arteries.`;
-  parts.push(`${geoLead}${geoTail}`);
-
-  // 5. Business disruption risk judgement.
-  parts.push(
-    `Business disruption risk over the next window reads as moderate-to-elevated: short-notice transport disruption on protest days, public-facing site closures driven by Section 144 / curfew orders, and supply-chain friction from sectoral walkouts. The residual tail is a triggering event — adverse court ruling, fuel-price decision, security-force fatality — flipping the cycle into sustained unrest.`,
-  );
-
-  return parts.join("\n\n");
+  return [verdict, disruption].join("\n\n");
 }
 
 // Auto-generated Executive Summary. Used by the exporter and preview

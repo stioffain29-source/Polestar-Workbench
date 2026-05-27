@@ -27,7 +27,7 @@ import {
 //   Forecast 7-14 Days (prose) ->
 //   Regional and Country View (prose + country bar) ->
 //   What Matters -> Implications -> Watch Next -> Polestar View ->
-//   Related Incidents -> Source Notes -> Disclaimer.
+//   Key Incidents -> Source Notes -> Disclaimer.
 // Data and prose come from flashpointReportDataset so the preview and
 // exporter cannot drift.
 
@@ -295,10 +295,10 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
   ctx.y += 10;
 }
 
-// --- Related Incidents -----------------------------------------------------
+// --- Key Incidents ---------------------------------------------------------
 function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   ensureSpace(ctx, 24 + 18 + 40);
-  drawSectionHeading(ctx, "Related Incidents");
+  drawSectionHeading(ctx, "Key Incidents");
   if (rows.length === 0) {
     const { pdf, MX } = ctx;
     setText(pdf, DUSK);
@@ -468,24 +468,10 @@ export async function exportFlashpointReportPdf(
 
   // Source Notes / Data Notes removed per editorial direction — internal
   // methodology must not appear in client-facing Flashpoint exports.
-  // Disclaimer follows Related Incidents directly.
+  // Disclaimer follows Key Incidents directly.
 
   drawDisclaimer(ctx);
 
-  drawFooters(ctx.pdf, undefined, FLASHPOINT_EXPORT_PROOF);
+  drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }
-
-// --- Runtime-path proof marker --------------------------------------------
-// Visible diagnostic. Lets us prove from a rendered PDF exactly which
-// exporter file, dataset builder and bundle build produced it. The
-// build timestamp comes from Vite's `define` substitution (see
-// vite.config.ts); for the headless Node exporter it falls back to the
-// process start time. Increment EXPORTER_REVISION whenever the
-// Flashpoint exporter / dataset semantics change so a stale browser
-// bundle is immediately obvious in the rendered footer.
-const EXPORTER_REVISION = "v10-out-of-scope+forecast-dedupe+proofline";
-const BUILD_TIME: string =
-  typeof __BUILD_TIME__ !== "undefined" ? __BUILD_TIME__ : new Date().toISOString();
-export const FLASHPOINT_EXPORT_PROOF =
-  `FLASHPOINT EXPORT PATH: exportFlashpointReportPdf.ts \u2022 buildFlashpointReportDataset \u2022 ${EXPORTER_REVISION} \u2022 build ${BUILD_TIME}`;
