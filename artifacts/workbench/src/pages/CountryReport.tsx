@@ -74,6 +74,11 @@ const EMPTY_BASELINE: CountryBaseline = {
 export default function CountryReport() {
   const [, params] = useRoute("/countries/:slug");
   const slug = params?.slug ?? "";
+  // Debug gate for analyst-only blocks (Internal Source Coverage etc).
+  // Opt-in via `?debug=1` on the URL. Never on by default; never in PDFs.
+  const isDebugMode =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "1";
   const qc = useQueryClient();
   const { data: country, isLoading } = useGetCountryReport(slug);
   // Country reports must not depend only on the 7-day window. Pull a
@@ -666,48 +671,44 @@ export default function CountryReport() {
         )}
       </Section>
 
-      {/* 11. Source Notes */}
-      <Section title="Source Notes">
-        <Prose text={[
-          `Records sourced from the Polestar Workbench incident database for ${effective.name}.`,
-          `Current window is the rolling 7-day cycle, capped at 10 days for late-landing records. The 30-day and 90-day context sections widen the lookback to size the background operating picture without changing the current-window count.`,
-          `Locations are shown as reported and may use local-language spellings; coordinates, where present, are sourced with the record. The map plots current-window records only.`,
-        ].join("\n\n")} />
-      </Section>
+      {/* Source Notes — removed from the client-facing report per
+          editorial direction. Methodology, coverage windows and
+          attribution belong in internal documentation, not in the
+          recipient-visible output. */}
 
-      {/* Internal Source Coverage — screen-only, never in the PDF.
-          Surfaces the layer counts and any thin-data signal for the
-          analyst working in the Workbench, so they can decide whether
-          to dispatch a stringer or widen the source set on the Sources
-          page. Not for the client-facing report. */}
-      <div className="no-print" style={{
-        marginTop: 12,
-        border: `1px dashed ${POLAR}`,
-        background: "#fafafa",
-        padding: "12px 14px",
-        borderRadius: 2,
-      }}>
-        <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
-          Internal · Source coverage (not in PDF)
+      {/* Internal Source Coverage — gated behind ?debug=1 so it only
+          shows up for analysts who explicitly opt in. Never rendered
+          in the client-facing preview or in any PDF export. */}
+      {isDebugMode && (
+        <div className="no-print" style={{
+          marginTop: 12,
+          border: `1px dashed ${POLAR}`,
+          background: "#fafafa",
+          padding: "12px 14px",
+          borderRadius: 2,
+        }}>
+          <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
+            Internal · Source coverage (debug only · not in PDF)
+          </div>
+          <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
+            <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
+            <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
+            <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>
+            {layers.current.length < 3 && (
+              <li style={{ color: "#A33232" }}>
+                Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
+              </li>
+            )}
+            {!baseline && (
+              <li style={{ color: "#A33232" }}>
+                No country baseline curated for {effective.name}. The report falls back to live data only. Click <strong>Edit</strong> (top right) to add the operating environment, security context, key cities and the location watchlist.
+              </li>
+            )}
+          </ul>
         </div>
-        <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
-          <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
-          <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
-          <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>
-          {layers.current.length < 3 && (
-            <li style={{ color: "#A33232" }}>
-              Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
-            </li>
-          )}
-          {!baseline && (
-            <li style={{ color: "#A33232" }}>
-              No country baseline curated for {effective.name}. The report falls back to live data only. Click <strong>Edit</strong> (top right) to add the operating environment, security context, key cities and the location watchlist.
-            </li>
-          )}
-        </ul>
-      </div>
+      )}
 
-      {/* 12. Disclaimer */}
+      {/* Disclaimer */}
       <Section title="Disclaimer">
         <Prose text="This report is intended for the named recipient's internal operational use only. It draws on open-source and Polestar-curated reporting and represents Polestar Advisory's analytical judgement at the time of issue. It is not a directive, does not replace in-country security guidance and should be read alongside the recipient's own risk and travel policies." />
       </Section>
