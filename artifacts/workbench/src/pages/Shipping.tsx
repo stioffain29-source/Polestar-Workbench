@@ -42,6 +42,11 @@ function darken(hex: string, amount = 0.18): string {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
+// Temporary diagnostic constant. Bumped manually whenever the Shipping page
+// classifier / filter logic changes so the on-screen debug line proves the
+// browser is actually running the latest filter version, not a stale bundle.
+const SHIPPING_FILTER_VERSION = "shipping-page@v1 (no human-interest/repatriation filter)";
+
 export default function Shipping() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "shipping" });
 
@@ -283,6 +288,38 @@ export default function Shipping() {
           {outOfScopeCount} shipping record{outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East (e.g. North America, Europe, Africa, South America) are excluded from this view.
         </div>
       )}
+
+      {/* TEMP DEBUG — Shipping monitor data-path diagnosis. Remove once
+          the Shipping page is re-aligned to the PDF dataset filter logic. */}
+      <div
+        className="text-[11px] font-mono bg-yellow-50 border border-yellow-300 text-yellow-900 rounded-sm px-3 py-2 leading-snug"
+        data-testid="shipping-debug"
+      >
+        <div className="font-bold uppercase tracking-wider text-[10px] mb-1">DEBUG — Shipping monitor data path</div>
+        <div>data source: GET /api/incidents?topic=shipping (Postgres → Drizzle, order by occurred_at DESC) via useListIncidents (React Query default cache)</div>
+        <div>
+          raw records: {incidents.length} · in-scope (APAC + ME + unattributed): {allEnriched.length - outOfScopeCount} · out-of-scope dropped: {outOfScopeCount} · loading: {String(isLoading)}
+        </div>
+        <div>
+          latest record: {(() => {
+            const sorted = [...enriched]
+              .filter((i) => !isNaN(i.occurredDate.getTime()))
+              .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
+            const top = sorted[0];
+            return top
+              ? `${format(top.occurredDate, "yyyy-MM-dd")} · sev=${top.severity} · id=${top.id ?? "?"} · ${top.title.slice(0, 90)}`
+              : "—";
+          })()}
+        </div>
+        <div>
+          latestSignificant (current picker — no human-interest/repatriation filter): {latestSignificant
+            ? `${format(latestSignificant.occurredDate, "yyyy-MM-dd")} · sev=${latestSignificant.severity} · id=${latestSignificant.id ?? "?"} · ${latestSignificant.title.slice(0, 90)}`
+            : "—"}
+        </div>
+        <div>
+          filter version: {SHIPPING_FILTER_VERSION} · build: {typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : "(unset)"}
+        </div>
+      </div>
 
       {/* 2. Fast Facts */}
       <Section title="Fast Facts">
