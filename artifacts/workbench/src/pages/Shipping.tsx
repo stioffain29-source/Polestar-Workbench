@@ -18,6 +18,7 @@ import {
   classifyVesselIncident, type VesselIncidentType, VESSEL_ACCENT,
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
 } from "@/lib/shippingAnalysis";
+import { computeHormuzStatus, HORMUZ_TONE_COLOR } from "@/lib/hormuzStatus";
 import { ExternalLink } from "lucide-react";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
@@ -240,6 +241,18 @@ export default function Shipping() {
     return ranked[0] ?? null;
   }, [chokepointRows]);
 
+  // --- Strait of Hormuz Chokepoint Status ---------------------------------
+  // Reads from `allEnriched` (pre-region-filter) so generic market or
+  // diplomatic commentary tagged with a non-APAC/Middle-East country (FT,
+  // Reuters US byline, etc.) still feeds the market / diplomatic indicators.
+  // The kinetic headline uses a 7-day window so "no new kinetic incident in
+  // the latest reporting window" reflects the active week, while category
+  // counts cover the entire loaded window.
+  const hormuzStatus = useMemo(
+    () => computeHormuzStatus(allEnriched, { kineticWindowDays: 7 }),
+    [allEnriched],
+  );
+
   // --- Piracy and Armed Robbery -------------------------------------------
   const piracyIncidents = useMemo(() => {
     return sortedEnriched
@@ -347,6 +360,95 @@ export default function Shipping() {
             accent={latestSignificant ? ratingColor(latestSignificant.severity) : "#B8C2CC"}
             small
           />
+        </div>
+      </Section>
+
+      {/* 3a-pre. Strait of Hormuz — Chokepoint Status (six-indicator layer) */}
+      <Section title="Strait of Hormuz — Chokepoint Status">
+        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-3">
+          Layered read across six indicator categories. The chokepoint can read elevated even when no new attacks land in the latest week — traffic disruption, navigation interference, naval posture, market reaction and diplomatic signal all count.
+        </p>
+        <div
+          className="rounded-sm border p-4 mb-3"
+          style={{
+            backgroundColor: "#FFFFFF",
+            borderColor: HORMUZ_TONE_COLOR[hormuzStatus.tone],
+            borderLeftWidth: 4,
+          }}
+        >
+          <div
+            className="font-serif font-bold text-base mb-1"
+            style={{ color: HORMUZ_TONE_COLOR[hormuzStatus.tone] }}
+          >
+            {hormuzStatus.headline}
+          </div>
+          <div className="text-sm font-sans" style={{ color: "#303030" }}>
+            {hormuzStatus.detail}
+          </div>
+          {hormuzStatus.anyActivity && (
+            <div className="text-[11px] font-sans uppercase tracking-wider mt-2" style={{ color: "#303030" }}>
+              {hormuzStatus.activeCategoryLabels.length} of 6 categories active
+              {hormuzStatus.hasKineticInWindow
+                ? " · new kinetic incident in last 7 days"
+                : " · no new kinetic incident in last 7 days"}
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {hormuzStatus.categories.map((cat) => {
+            const active = cat.count > 0;
+            const accent = active ? "#4655FF" : "#E2E2E2";
+            return (
+              <div
+                key={cat.key}
+                className="rounded-sm border bg-white p-3"
+                style={{ borderColor: "#E2E2E2", borderLeftColor: accent, borderLeftWidth: 4 }}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <div
+                    className="font-serif font-bold text-sm"
+                    style={{ color: "#0B0B3D" }}
+                  >
+                    {cat.label}
+                  </div>
+                  <div
+                    className="font-mono text-sm"
+                    style={{ color: active ? "#0B0B3D" : "#303030" }}
+                  >
+                    {cat.count}
+                  </div>
+                </div>
+                <div className="text-[11px] font-sans mt-0.5" style={{ color: "#303030" }}>
+                  {cat.description}
+                </div>
+                {active ? (
+                  <ul className="mt-2 space-y-1">
+                    {cat.recent.slice(0, 3).map((r, idx) => (
+                      <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#303030" }}>
+                        <span className="font-mono mr-1.5" style={{ color: "#303030" }}>
+                          {r.occurredAt
+                            ? (() => {
+                                try { return format(parseISO(r.occurredAt), "dd MMM"); } catch { return "—"; }
+                              })()
+                            : "—"}
+                        </span>
+                        {r.title}
+                      </li>
+                    ))}
+                    {cat.count > 3 && (
+                      <li className="text-[11px] font-sans italic" style={{ color: "#303030" }}>
+                        +{cat.count - 3} more in window
+                      </li>
+                    )}
+                  </ul>
+                ) : (
+                  <div className="text-xs font-sans italic mt-2" style={{ color: "#303030" }}>
+                    Nothing on file for this category in the loaded window.
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </Section>
 
