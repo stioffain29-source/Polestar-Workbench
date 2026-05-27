@@ -1,0 +1,68 @@
+Papua country report is much improved, but needs final editorial/layout tightening.
+
+Keep:
+- cover
+- Fast Facts
+- Country Baseline
+- Location Watchlist
+- 30-day / 90-day context
+- map
+- no Source Notes
+- no internal coverage block
+
+Fix only these items:
+
+1. Executive Summary
+Expand slightly so it connects the two current armed robbery records to the broader PNG operating environment:
+- Port Moresby / Lae urban violent crime
+- staff movement and commercial-site exposure
+- thin current-window reporting
+- 30/90-day context showing wider background risk
+
+2. Situation / What Happened
+Do not imply fuel disruption, election unrest or Madang-Lae issues happened in the current 7-day window unless they did.
+Separate language clearly:
+- current 7-day window
+- 30-day context
+- 90-day background picture
+
+3. Implications for Business
+Convert to 5–7 short bullets.
+
+Cover:
+- review movement plans for Port Moresby and Lae
+- avoid predictable travel patterns around cash-handling sites
+- check local security support for commercial visits
+- confirm journey management for staff and contractors
+- review road movement assumptions outside main urban areas
+- maintain flexible routing and delay tolerance
+- confirm medical / evacuation arrangements for remote work
+
+4. Country Baseline readability
+Keep the content, but improve readability.
+Use shorter blocks, stronger subheads or tighter formatting so it does not look like a wall of text.
+
+5. Map
+Make the map more useful.
+If only two current-window points exist, either:
+- zoom tighter to show the two affected areas more clearly, or
+- keep the map compact and add a small location summary beside/below it.
+
+Do not let a large map area dominate when the data is light.
+
+6. Watch Next
+Replace the weak placeholder with operational watch indicators:
+- repeat armed robbery in Port Moresby or Lae
+- copycat activity around commercial premises
+- police response or arrests
+- movement disruption near markets, roads or cash-handling points
+- any shift from urban crime to route/corridor incidents
+- Highlands Highway or Lae corridor deterioration
+- fuel / port / road disruption in the 30-day context
+
+7. Polestar View
+Replace the placeholder with a proper judgement:
+PNG should be treated as a low-volume but high-friction operating environment. A quiet week does not equal low risk. Current incidents point to urban violent crime in Port Moresby and Lae, while the 30/90-day context keeps route security, Highlands instability and resource-sector exposure in view. Business users should focus on movement discipline, local security support, and escalation triggers for staff and contractor travel.
+
+Do not change fonts, colours, cover design or risk palette.
+Export again and inspect the PDF.

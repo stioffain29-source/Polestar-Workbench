@@ -106,8 +106,13 @@ export default function CountryReportMap({ incidents, domId }: CountryReportMapP
       latLngs.push([lat, lng]);
     }
 
+    // Thin data: zoom tighter so the affected areas are legible instead
+    // of being lost inside a large country outline. With one or two
+    // points a country-wide framing leaves the report looking empty.
     if (latLngs.length === 1) {
-      map.setView(latLngs[0] as L.LatLngTuple, 8);
+      map.setView(latLngs[0] as L.LatLngTuple, 10);
+    } else if (latLngs.length === 2) {
+      map.fitBounds(L.latLngBounds(latLngs), { padding: [40, 40], maxZoom: 11 });
     } else {
       map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24], maxZoom: 9 });
     }

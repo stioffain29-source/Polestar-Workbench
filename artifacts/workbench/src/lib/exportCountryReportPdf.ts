@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse,
-  drawFastFactsKpiCards, drawDisclaimer, drawFooters,
+  drawFastFactsKpiCards, drawBulletSection, parseBullets, drawDisclaimer, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, todayLabel, setRoboto, ensureRobotoLoaded,
@@ -260,45 +260,84 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
 
 function drawBaselineSection(ctx: Ctx, baseline: CountryBaseline) {
   drawSectionHeading(ctx, "Country Baseline");
+  // Split a long block into shorter visual paragraphs at sentence
+  // boundaries so the baseline reads as scannable blocks rather than a
+  // wall of text. The break is editorial: at roughly 220 characters,
+  // snap to the next sentence boundary. Single-paragraph blocks stay
+  // untouched.
+  const splitToParagraphs = (text: string): string[] => {
+    const t = (text ?? "").trim();
+    if (!t) return [];
+    if (t.length < 320) return [t];
+    const sentences = t.split(/(?<=[.!?])\s+(?=[A-Z(])/);
+    const out: string[] = [];
+    let buf = "";
+    for (const s of sentences) {
+      if (!buf) { buf = s; continue; }
+      if (buf.length + s.length + 1 > 260) {
+        out.push(buf);
+        buf = s;
+      } else {
+        buf = `${buf} ${s}`;
+      }
+    }
+    if (buf) out.push(buf);
+    return out;
+  };
   const labelled = (label: string, text: string) => {
-    ensureSpace(ctx, 28);
+    const paras = splitToParagraphs(text);
+    if (paras.length === 0) return;
+    ensureSpace(ctx, 32);
     const { pdf, MX, CW } = ctx;
+    // Stronger sub-head: 9pt bold navy, with a 22pt electric accent rule
+    // beneath. Tighter and more scannable than a plain bold line.
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
+    pdf.setFontSize(9);
     setText(pdf, NAVY);
     pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 9);
-    ctx.y += 12;
+    setFill(pdf, ELECTRIC);
+    pdf.rect(MX, ctx.y + 12, 22, 1.2, "F");
+    ctx.y += 17;
     setRoboto(pdf, "regular");
     pdf.setFontSize(10);
     setText(pdf, DUSK);
-    const lines: string[] = pdf.splitTextToSize(sanitize(text), CW);
-    for (const line of lines) {
-      ensureSpace(ctx, 13);
-      pdf.text(line, ctx.MX, ctx.y + 10);
-      ctx.y += 13;
-    }
-    ctx.y += 6;
+    paras.forEach((para, pi) => {
+      const lines: string[] = pdf.splitTextToSize(sanitize(para), CW);
+      for (const line of lines) {
+        ensureSpace(ctx, 13);
+        pdf.text(line, ctx.MX, ctx.y + 10);
+        ctx.y += 13;
+      }
+      if (pi < paras.length - 1) ctx.y += 4;
+    });
+    ctx.y += 10;
   };
   const bullets = (label: string, items: string[]) => {
-    ensureSpace(ctx, 28);
+    if (items.length === 0) return;
+    ensureSpace(ctx, 32);
     const { pdf, MX, CW } = ctx;
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
+    pdf.setFontSize(9);
     setText(pdf, NAVY);
     pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 9);
-    ctx.y += 12;
+    setFill(pdf, ELECTRIC);
+    pdf.rect(MX, ctx.y + 12, 22, 1.2, "F");
+    ctx.y += 17;
     setRoboto(pdf, "regular");
     pdf.setFontSize(10);
     setText(pdf, DUSK);
     for (const item of items) {
-      const lines: string[] = pdf.splitTextToSize(sanitize(`• ${item}`), CW - 6);
-      for (const line of lines) {
-        ensureSpace(ctx, 13);
-        pdf.text(line, MX + 6, ctx.y + 10);
+      const lines: string[] = pdf.splitTextToSize(sanitize(item), CW - 12);
+      const blockH = lines.length * 13 + 2;
+      if (ctx.y + blockH > ctx.H - ctx.BOTTOM) newPage(ctx);
+      pdf.text("\u2022", MX, ctx.y + 10);
+      for (let i = 0; i < lines.length; i++) {
+        pdf.text(lines[i], MX + 10, ctx.y + 10);
         ctx.y += 13;
       }
+      ctx.y += 2;
     }
-    ctx.y += 6;
+    ctx.y += 8;
   };
 
   labelled("Operating Environment", baseline.operatingEnvironment);
@@ -484,8 +523,18 @@ export async function exportCountryReportPdf(
   // 5. What Matters (auto)
   drawNarrative(ctx, "What Matters", extras.whatMatters);
 
-  // 6. Implications for Business (implications)
-  drawNarrative(ctx, "Implications for Business", country.implications);
+  // 6. Implications for Business — bullets where the source text carries
+  //    explicit "- "/"• " markers, otherwise fall back to prose so legacy
+  //    saved values still render.
+  {
+    const implText = (country.implications ?? "").trim();
+    const looksLikeBullets = /^([-*•])\s+/m.test(implText);
+    if (looksLikeBullets && parseBullets(implText).length > 0) {
+      drawBulletSection(ctx, "Implications for Business", implText, 7);
+    } else {
+      drawNarrative(ctx, "Implications for Business", implText);
+    }
+  }
 
   // 6a. Country Baseline (only if curated)
   if (extras.baseline) {

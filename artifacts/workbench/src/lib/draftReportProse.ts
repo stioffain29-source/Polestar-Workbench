@@ -736,6 +736,66 @@ export function draftCountryReportProse(opts: {
     ? `${name} reads as quiet for now, but the absence of records is the read worth challenging. Keep posture conservative until reporting returns.`
     : `${name} warrants steady-state monitoring with a tighter brief for staff and contractors moving through the affected areas. Adjust posture if the next cycle escalates rather than easing.`;
 
+  // -------------------------------------------------------------------------
+  // Country-specific editorial overrides
+  // -------------------------------------------------------------------------
+  // Some countries have a distinctive operating signature where the generic
+  // wording reads as a placeholder. For those countries we replace the
+  // weakest sections (Implications / Watch Next / Polestar View) with text
+  // that names the standing risk pattern. Keep this list short and only
+  // override when generic wording would mislead the reader.
+  const isPNG = /\bpapua new guinea\b/i.test(name) || /^png$/i.test(name);
+
+  if (isPNG) {
+    const currentSentence = total === 0
+      ? "No fresh records landed in the 7-day window."
+      : total === 1
+        ? "The 7-day window holds one record."
+        : `The 7-day window holds ${total} records.`;
+
+    const png = {
+      executiveSummary: `Papua New Guinea is a low-volume but high-friction operating environment. ${currentSentence} The current-cycle reporting is dominated by urban violent-crime indicators out of Port Moresby and Lae, which is the practical concern for any staff or contractor footprint in the two main cities. The 30-day and 90-day context sections widen the lookback to keep route security, Highlands instability and resource-sector exposure in view; treat them as background risk rather than as live events. Reporting volume on PNG is genuinely thin most weeks, so the weekly count should not be read as a measure of risk.`,
+
+      overview: `Papua New Guinea is shaped by urban opportunistic crime in Port Moresby and Lae, inter-clan violence in the highlands, recurring resource-sector disputes and severe interior infrastructure limits. The current cycle's read is the 7-day window only. ${currentSentence} ${total > 0 ? "Treat these as the active operational signal." : "Treat the silence as a reporting-coverage feature of PNG rather than a clean operating picture."} Anything older than seven days sits in the 30 / 90-day context sections below and should not be read as current activity.`,
+
+      trendSummary: total === 0
+        ? `Nothing fresh landed in the current 7-day window. The 30-day and 90-day context sections below carry the wider pattern — including any election-cycle unrest, fuel or port disruption, and Madang / Lae corridor incidents — but those are background, not current activity. Treat them as standing-risk reference, not as something that happened this week.`
+        : `The current 7-day window points to ${types || "urban violent-crime activity"} in or around Port Moresby and Lae. That is the active signal. Anything beyond this week — including election-cycle unrest, fuel or port disruption, Highlands Highway incidents and Madang / Lae corridor events — sits in the 30 / 90-day context sections and should be read as background pattern rather than current activity.`,
+
+      implications: [
+        "- Review movement plans for Port Moresby and Lae and refresh pre-movement briefings on the current incident types.",
+        "- Avoid predictable travel patterns around cash-handling sites, ATMs and end-of-shift cash runs.",
+        "- Check local security support is in place for any commercial site visit, including arrival / departure windows.",
+        "- Confirm journey management for staff and contractors, with a named on-call contact and a clear escalation path.",
+        "- Review road movement assumptions outside the main urban areas; default to air where the Highlands Highway is in play.",
+        "- Maintain flexible routing and a tolerance for delay; closures and protests can land at short notice.",
+        "- Confirm medical and evacuation arrangements for remote work, including the Cairns / Brisbane / Singapore medevac chain.",
+      ].join("\n"),
+
+      watchNext: [
+        "- Repeat armed-robbery or violent-crime activity in Port Moresby or Lae.",
+        "- Copycat or cluster activity around commercial premises, banks and cash-handling sites.",
+        "- Police response, arrests or any visible RPNGC posture change in the affected districts.",
+        "- Movement disruption near markets, main roads or cash-handling points in the two cities.",
+        "- Any shift from urban opportunistic crime to route or corridor incidents.",
+        "- Highlands Highway or Lae corridor deterioration — ambush, landslide, tribal-fight closure or strike action.",
+        "- Fuel, port or road disruption surfacing in the 30-day context that could spill into the current cycle.",
+      ].join("\n"),
+
+      polestarView: `PNG should be treated as a low-volume but high-friction operating environment. A quiet week does not equal low risk. The current incidents point to urban violent crime in Port Moresby and Lae, while the 30 / 90-day context keeps route security, Highlands instability and resource-sector exposure in view. Business users should focus on movement discipline, local security support, and clear escalation triggers for any staff or contractor travel.`,
+    };
+
+    return {
+      executiveSummary: png.executiveSummary,
+      whatMatters,
+      watchNext: png.watchNext,
+      polestarView: png.polestarView,
+      overview: png.overview,
+      trendSummary: png.trendSummary,
+      implications: png.implications,
+    };
+  }
+
   return {
     executiveSummary: total === 0
       ? `${name} reporting is light across the weekly window. The page captures what is on file, but the gap itself is the most important read — coverage rather than calm.`
