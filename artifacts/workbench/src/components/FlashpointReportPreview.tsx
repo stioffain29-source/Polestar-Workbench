@@ -21,9 +21,9 @@ import { SEV_COLOR } from "@/lib/pdfChrome";
 const DISCLAIMER_TEXT =
   "Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. " +
   "The information in this report is based on open sources and is assessed as accurate at the time of writing. " +
-  "Polestar Advisory accepts no liability for decisions taken on the basis of this report. " +
-  "This report is intended for the named recipient and may not be redistributed without prior written consent. " +
-  "© Polestar Advisory Pte. Ltd. All rights reserved.";
+  "It is provided for general informational purposes only and does not constitute advice or a comprehensive " +
+  "assessment of all risks. No reliance should be placed on this information for decision making without " +
+  "further independent verification.";
 
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
@@ -369,10 +369,12 @@ export default function FlashpointReportPreview({
     [incidents, topic, issueDate],
   );
 
-  const execText = (report.executiveSummary ?? "").trim() || ds.autoExecutiveSummary;
+  const execText = (report.executiveSummary ?? "").trim() ||
+    `This briefing covers the activism, protest and civil-unrest picture across ${ds.reportingPeriodShort}. The detailed operational read, country breakdown, forecast and analyst sections follow below.`;
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+      <div className="pdf-cover-page">
       <div
         className="flex items-center"
         style={{ background: BRAND_GRADIENT, color: "#fff", height: 64, paddingLeft: 24, paddingRight: 24 }}
@@ -395,7 +397,7 @@ export default function FlashpointReportPreview({
           className="mb-4"
           style={{
             fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 44,
-            lineHeight: 1.05, letterSpacing: "-0.01em", textTransform: "uppercase",
+            lineHeight: 1.05, letterSpacing: "0", textTransform: "uppercase",
           }}
         >
           {resolvedTitle || "Untitled report"}
@@ -409,6 +411,7 @@ export default function FlashpointReportPreview({
         <div className="uppercase" style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.18em", marginTop: 32 }}>
           polestar-advisory.com
         </div>
+      </div>
       </div>
 
       <div className="px-10 py-10">
@@ -492,7 +495,7 @@ export default function FlashpointReportPreview({
           <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
         </Section>
 
-        <Section title="Key Incidents">
+        <Section title="Related Incidents">
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
         </Section>
 
@@ -508,7 +511,7 @@ export default function FlashpointReportPreview({
       </div>
 
       <div
-        className="px-10 flex items-center justify-between"
+        className="pdf-preview-footer px-10 flex items-center justify-between"
         style={{ background: POLAR, color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 11, minHeight: 36 }}
       >
         <span>polestar-advisory.com</span>

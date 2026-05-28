@@ -12,15 +12,14 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import html2canvas from "html2canvas";
-import { TOPIC_LABELS } from "@/lib/topics";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { ArrowLeft, Download, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
-import { slugifyForFilename } from "@/lib/exportPdf";
-import { exportCountryReportPdf } from "@/lib/exportCountryReportPdf";
-import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
+import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
+import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
+import { resolveReportWindow } from "@/lib/reportWindow";
+import { computeCountryFastFacts, COUNTRY_WINDOW_TOPIC, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
@@ -32,6 +31,7 @@ const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const ROBOTO = "Roboto, sans-serif";
+const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
 const SEV_COLOR: Record<string, string> = {
   extreme: "#800000",
@@ -74,11 +74,6 @@ const EMPTY_BASELINE: CountryBaseline = {
 export default function CountryReport() {
   const [, params] = useRoute("/countries/:slug");
   const slug = params?.slug ?? "";
-  // Debug gate for analyst-only blocks (Internal Source Coverage etc).
-  // Opt-in via `?debug=1` on the URL. Never on by default; never in PDFs.
-  const isDebugMode =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("debug") === "1";
   const qc = useQueryClient();
   const { data: country, isLoading } = useGetCountryReport(slug);
   // Country reports must not depend only on the 7-day window. Pull a
@@ -107,7 +102,7 @@ export default function CountryReport() {
   const [baselineDirty, setBaselineDirty] = useState(false);
   const seededForSlug = useRef<string | null>(null);
   const baselineSeededForSlug = useRef<string | null>(null);
-  const mapRef = useRef<HTMLDivElement | null>(null);
+  const reportPreviewRef = useRef<HTMLDivElement | null>(null);
 
   const issueDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -227,48 +222,19 @@ export default function CountryReport() {
     : null;
 
   const coverUrl = effective ? countryCoverUrl(effective.name) : undefined;
+  const periodLabel = resolveReportWindow(COUNTRY_WINDOW_TOPIC, issueDate).label;
 
   const downloadPdf = async () => {
     if (!effective || !draftedProse) return;
     setExporting(true);
     try {
-      // Snapshot the map for the PDF. If html2canvas fails (CORS, missing
-      // tiles), the exporter falls back to a coords-only note instead of
-      // blocking the export.
-      let mapImage: string | undefined;
-      if (mapRef.current) {
-        try {
-          const canvas = await html2canvas(mapRef.current, {
-            useCORS: true,
-            backgroundColor: "#ffffff",
-            scale: 2,
-            logging: false,
-          });
-          mapImage = canvas.toDataURL("image/png");
-        } catch (err) {
-          console.warn("[CountryReport] map snapshot failed; PDF will skip the map image", err);
-        }
+      const reportElement = reportPreviewRef.current?.querySelector<HTMLElement>(".print-report") ?? reportPreviewRef.current;
+      if (!reportElement) {
+        throw new Error("PDF export failed: report preview is not ready.");
       }
-      await exportCountryReportPdf(
-        effective,
-        incidents,
-        TOPIC_LABELS,
+      await exportElementToPdf(
+        reportElement,
         `polestar-country-report-${slugifyForFilename(effective.name)}.pdf`,
-        {
-          executiveSummary: draftedProse.executiveSummary,
-          whatMatters: draftedProse.whatMatters,
-          watchNext: draftedProse.watchNext,
-          polestarView: draftedProse.polestarView,
-          mapImage,
-          baseline,
-          watchlist,
-          lookback,
-          layerCounts: {
-            current: layers.current.length,
-            thirtyDay: layers.thirtyDay.length,
-            ninetyDay: layers.ninetyDay.length,
-          },
-        },
       );
     } finally {
       setExporting(false);
@@ -421,8 +387,79 @@ export default function CountryReport() {
       </div>
 
       {/* Polestar header band — matches Watch report cover treatment */}
+      <div ref={reportPreviewRef} className="print-report bg-white" style={{ color: NAVY, fontFamily: ROBOTO }}>
+        <div className="pdf-cover-page">
+        <div
+          className="flex items-center"
+          style={{
+            background: BRAND_GRADIENT,
+            color: "#fff",
+            height: 64,
+            paddingLeft: 24,
+            paddingRight: 24,
+            WebkitPrintColorAdjust: "exact",
+            printColorAdjust: "exact",
+          }}
+        >
+          <img src={polestarLogo} alt="Polestar Advisory" style={{ height: 26, width: "auto", maxWidth: 180, display: "block" }} />
+        </div>
+        <div
+          style={{
+            width: "100%",
+            aspectRatio: "16 / 9",
+            background: BRAND_GRADIENT,
+            WebkitPrintColorAdjust: "exact",
+            printColorAdjust: "exact",
+            overflow: "hidden",
+          }}
+        >
+          {coverUrl && (
+            <img
+              src={coverUrl}
+              alt=""
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          )}
+        </div>
+        <div
+          style={{
+            background: BRAND_GRADIENT,
+            color: "#fff",
+            WebkitPrintColorAdjust: "exact",
+            printColorAdjust: "exact",
+            paddingLeft: 32,
+            paddingRight: 32,
+            paddingTop: 40,
+            paddingBottom: 28,
+          }}
+        >
+          <h1
+            className="mb-4"
+            style={{
+              fontFamily: ROBOTO,
+              fontWeight: 700,
+              fontSize: 44,
+              lineHeight: 1.05,
+              textTransform: "uppercase",
+            }}
+          >
+            {effective.name || "Country Report"}
+          </h1>
+          <div className="uppercase" style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 13, letterSpacing: "0.22em", marginBottom: 6 }}>
+            POLESTAR INSIGHTS
+          </div>
+          <div className="uppercase" style={{ fontFamily: ROBOTO, fontWeight: 400, fontSize: 12, letterSpacing: "0.18em", color: "rgba(255,255,255,0.92)" }}>
+            REPORTING PERIOD: {periodLabel.toUpperCase()}
+          </div>
+          <div className="uppercase" style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 11, letterSpacing: "0.18em", marginTop: 32 }}>
+            polestar-advisory.com
+          </div>
+        </div>
+        </div>
+
+        <div className="px-10 py-10 space-y-8">
       <div
-        className="px-10 py-8 text-white flex items-center justify-between gap-10"
+        className="hidden"
         style={{
           background: `linear-gradient(to right, ${NAVY} 0%, ${NAVY} 38%, ${ELECTRIC} 100%)`,
           borderRadius: 2,
@@ -458,7 +495,7 @@ export default function CountryReport() {
             <div style={{ fontFamily: ROBOTO, fontSize: 11, letterSpacing: "0.18em", opacity: 0.85 }} className="uppercase">
               Polestar Insights · Country Report
             </div>
-            <h1 style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 30, letterSpacing: "-0.01em", lineHeight: 1.1, marginTop: 6 }} className="uppercase">
+            <h1 style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 30, letterSpacing: "0", lineHeight: 1.1, marginTop: 6 }} className="uppercase">
               {effective.name}
             </h1>
             {effective.region && (
@@ -474,6 +511,7 @@ export default function CountryReport() {
       {coverUrl && (
         <div
           style={{
+            display: "none",
             backgroundImage: `url(${coverUrl})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
@@ -486,6 +524,25 @@ export default function CountryReport() {
       )}
 
       {/* 1. Executive Summary */}
+      {editing && (
+        <Section title="Report Details">
+          <div className="grid md:grid-cols-2 gap-3">
+            <input
+              value={draft.name}
+              onChange={(e) => setField("name", e.target.value)}
+              placeholder="Country name"
+              style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, padding: 10, color: DUSK }}
+            />
+            <input
+              value={draft.region}
+              onChange={(e) => setField("region", e.target.value)}
+              placeholder="Region"
+              style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, padding: 10, color: DUSK }}
+            />
+          </div>
+        </Section>
+      )}
+
       <Section title="Executive Summary">
         <Prose text={draftedProse?.executiveSummary ?? ""} />
       </Section>
@@ -570,7 +627,7 @@ export default function CountryReport() {
 
       {/* 7. Map */}
       <Section title="Map">
-        <div ref={mapRef}>
+        <div>
           <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" />
         </div>
         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
@@ -639,7 +696,7 @@ export default function CountryReport() {
           <EmptyNote>No related incidents recorded for {effective.name} in the weekly window.</EmptyNote>
         ) : (
           <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
-            <div className="grid" style={{ gridTemplateColumns: "180px 160px 1fr 110px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            <div className="grid" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
               <div className="p-2.5">Date</div>
               <div className="p-2.5">Type</div>
               <div className="p-2.5">Title</div>
@@ -649,16 +706,18 @@ export default function CountryReport() {
               const sk = (i.severity ?? "").toLowerCase();
               const sevColor = SEV_COLOR[sk] ?? "#999";
               return (
-                <div key={i.id} className="grid items-center" style={{ gridTemplateColumns: "180px 160px 1fr 110px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
-                  <div className="p-2.5" style={{ fontFamily: "monospace", fontSize: 11 }}>{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
+                <div key={i.id} className="grid items-center" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
+                  <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                   <div className="p-2.5">{classifyIncidentType(i)}</div>
                   <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{i.title}</div>
                   <div className="p-2.5">
                     <span
                       style={{
-                        background: sevColor, color: "#fff", padding: "2px 8px",
+                        background: sevColor, color: "#fff", padding: "0 10px",
+                        minWidth: 72, height: 24, lineHeight: "24px",
                         fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                        textTransform: "uppercase", borderRadius: 2, display: "inline-block",
+                        textTransform: "uppercase", borderRadius: 2, display: "inline-flex",
+                        alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", boxSizing: "border-box",
                       }}
                     >
                       {SEV_LABEL[sk] ?? i.severity}
@@ -671,47 +730,54 @@ export default function CountryReport() {
         )}
       </Section>
 
-      {/* Source Notes — removed from the client-facing report per
-          editorial direction. Methodology, coverage windows and
-          attribution belong in internal documentation, not in the
-          recipient-visible output. */}
-
-      {/* Internal Source Coverage — gated behind ?debug=1 so it only
-          shows up for analysts who explicitly opt in. Never rendered
-          in the client-facing preview or in any PDF export. */}
-      {isDebugMode && (
-        <div className="no-print" style={{
-          marginTop: 12,
-          border: `1px dashed ${POLAR}`,
-          background: "#fafafa",
-          padding: "12px 14px",
-          borderRadius: 2,
-        }}>
-          <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
-            Internal · Source coverage (debug only · not in PDF)
-          </div>
-          <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
-            <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
-            <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
-            <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>
-            {layers.current.length < 3 && (
-              <li style={{ color: "#A33232" }}>
-                Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
-              </li>
-            )}
-            {!baseline && (
-              <li style={{ color: "#A33232" }}>
-                No country baseline curated for {effective.name}. The report falls back to live data only. Click <strong>Edit</strong> (top right) to add the operating environment, security context, key cities and the location watchlist.
-              </li>
-            )}
-          </ul>
+      {/* Internal Source Coverage — screen-only, never in the PDF.
+          Surfaces the layer counts and any thin-data signal for the
+          analyst working in the Workbench, so they can decide whether
+          to dispatch a stringer or widen the source set on the Sources
+          page. Not for the client-facing report. */}
+      <div className="no-print" style={{
+        marginTop: 12,
+        border: `1px dashed ${POLAR}`,
+        background: "#fafafa",
+        padding: "12px 14px",
+        borderRadius: 2,
+      }}>
+        <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
+          Internal · Source coverage (not in PDF)
         </div>
-      )}
+        <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
+          <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
+          <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
+          <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>
+          {layers.current.length < 3 && (
+            <li style={{ color: "#A33232" }}>
+              Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
+            </li>
+          )}
+          {!baseline && (
+            <li style={{ color: "#A33232" }}>
+              No country baseline curated for {effective.name}. The report falls back to live data only. Click <strong>Edit</strong> (top right) to add the operating environment, security context, key cities and the location watchlist.
+            </li>
+          )}
+        </ul>
+      </div>
 
-      {/* Disclaimer */}
+      {/* 12. Disclaimer */}
       <Section title="Disclaimer">
-        <Prose text="This report is intended for the named recipient's internal operational use only. It draws on open-source and Polestar-curated reporting and represents Polestar Advisory's analytical judgement at the time of issue. It is not a directive, does not replace in-country security guidance and should be read alongside the recipient's own risk and travel policies." />
+        <Prose text={DISCLAIMER_TEXT} />
       </Section>
+
+        </div>
+
+      <div
+        className="pdf-preview-footer px-10 flex items-center justify-between"
+        style={{ background: POLAR, color: DUSK, fontFamily: ROBOTO, fontSize: 11, minHeight: 36 }}
+      >
+        <span>polestar-advisory.com</span>
+        <span>info@polestar-advisory.com</span>
+        <span style={{ opacity: 0.7 }}>Page numbers added at export</span>
+      </div>
+      </div>
     </div>
   );
 }
@@ -722,7 +788,7 @@ export default function CountryReport() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
+    <section className="report-section">
       <h2
         style={{
           fontFamily: ROBOTO,
@@ -835,19 +901,19 @@ function BaselineBlock({ baseline }: { baseline: CountryBaseline }) {
 function WatchlistTable({ rows }: { rows: WatchlistRow[] }) {
   return (
     <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
-      <div className="grid" style={{ gridTemplateColumns: "200px 1fr 70px 70px 70px 110px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+      <div className="grid" style={{ gridTemplateColumns: "170px minmax(0, 1fr) 48px 48px 48px 170px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
         <div className="p-2.5">Location</div>
         <div className="p-2.5">Note</div>
         <div className="p-2.5" style={{ textAlign: "right" }}>7d</div>
         <div className="p-2.5" style={{ textAlign: "right" }}>30d</div>
         <div className="p-2.5" style={{ textAlign: "right" }}>90d</div>
-        <div className="p-2.5">Worst (90d)</div>
+        <div className="p-2.5" style={{ whiteSpace: "nowrap" }}>Worst (90d)</div>
       </div>
       {rows.map((r) => {
         const sk = (r.worstSeverity ?? "").toLowerCase();
         const sevColor = SEV_COLOR[sk] ?? "#999";
         return (
-          <div key={r.label} className="grid items-center" style={{ gridTemplateColumns: "200px 1fr 70px 70px 70px 110px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
+          <div key={r.label} className="grid items-center" style={{ gridTemplateColumns: "170px minmax(0, 1fr) 48px 48px 48px 170px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
             <div className="p-2.5" style={{ fontWeight: 600, color: NAVY }}>{r.label}</div>
             <div className="p-2.5" style={{ fontSize: 11 }}>{r.note}</div>
             <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.currentCount}</div>
@@ -856,14 +922,16 @@ function WatchlistTable({ rows }: { rows: WatchlistRow[] }) {
             <div className="p-2.5">
               {r.worstSeverity ? (
                 <span style={{
-                  background: sevColor, color: "#fff", padding: "2px 8px",
+                  background: sevColor, color: "#fff", padding: "0 10px",
+                  minWidth: 92, height: 24, lineHeight: "24px",
                   fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                  textTransform: "uppercase", borderRadius: 2, display: "inline-block",
+                  textTransform: "uppercase", borderRadius: 2, display: "inline-flex",
+                  alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", boxSizing: "border-box",
                 }}>
                   {r.worstSeverityLabel}
                 </span>
               ) : (
-                <span style={{ fontStyle: "italic", color: DUSK, fontSize: 11 }}>No records</span>
+                <span style={{ fontStyle: "italic", color: DUSK, fontSize: 11, whiteSpace: "nowrap" }}>No records</span>
               )}
             </div>
           </div>

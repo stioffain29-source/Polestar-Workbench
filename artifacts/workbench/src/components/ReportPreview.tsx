@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
+import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import {
@@ -301,6 +302,7 @@ export default function ReportPreview({
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+      <div className="pdf-cover-page">
       {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div
         className="flex items-center"
@@ -361,7 +363,7 @@ export default function ReportPreview({
             fontWeight: 700,
             fontSize: 44,
             lineHeight: 1.05,
-            letterSpacing: "-0.01em",
+            letterSpacing: "0",
             textTransform: "uppercase",
           }}
         >
@@ -405,6 +407,7 @@ export default function ReportPreview({
         >
           polestar-advisory.com
         </div>
+      </div>
       </div>
 
       <div className="px-10 py-10">
@@ -476,12 +479,6 @@ export default function ReportPreview({
           <>
             <Section title="Fast Facts">
               <FastFactsGrid cards={fastFacts} />
-              <p
-                className="mt-3"
-                style={{ fontSize: 10, color: DUSK, fontFamily: "Roboto, sans-serif" }}
-              >
-                Live values are calculated against incidents on file when the PDF is generated.
-              </p>
             </Section>
 
             {(() => {
@@ -542,8 +539,14 @@ export default function ReportPreview({
       </div>
 
       {/* Full-bleed Polar Gray footer — website, email, page note */}
+      <div className="px-10 pb-10">
+        <Section title="Disclaimer">
+          <Paragraphs text={DISCLAIMER_TEXT} />
+        </Section>
+      </div>
+
       <div
-        className="px-10 flex items-center justify-between"
+        className="pdf-preview-footer px-10 flex items-center justify-between"
         style={{
           background: POLAR,
           color: DUSK,

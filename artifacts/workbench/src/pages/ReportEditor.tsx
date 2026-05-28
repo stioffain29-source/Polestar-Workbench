@@ -15,10 +15,7 @@ import ReportPreview from "@/components/ReportPreview";
 import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
-import { slugifyForFilename } from "@/lib/exportPdf";
-import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
-import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
-import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
+import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import {
@@ -31,7 +28,6 @@ import {
   type FuelMarketFormState,
   type FuelMarketCardForm,
 } from "@/lib/fuelWatchReport";
-import { FuelRequiredDataMissingError } from "@/lib/exportTopicReportPdf";
 
 const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
 
@@ -90,6 +86,7 @@ export default function ReportEditor() {
   const [exporting, setExporting] = useState(false);
   const { data: incidents } = useListIncidents({});
   const seededForId = useRef<number | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   // Fuel Watch market-data editor. `hardNumbersText` is the textarea
   // buffer; `hardNumbersEdited` is the last-validated object surfaced
   // to the preview so authors see their edits live before saving.
@@ -138,61 +135,26 @@ export default function ReportEditor() {
       }
     }
     try {
-      const reportData = {
-        title: form.title,
-        topic: form.topic,
-        issueDate: form.issueDate,
-        author: form.author,
-        executiveSummary: form.executiveSummary,
-        situation: form.situation,
-        whatHappened: form.whatHappened,
-        whatMatters: form.whatMatters,
-        implications: form.implications,
-        watchNext: form.watchNext,
-        polestarView: form.polestarView,
-        // Prefer the live editor buffer so the author sees their unsaved
-        // edits in the exported PDF.
-        hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
-      };
-      const mappedIncidents = incidentsForExport.map((i) => ({
-        id: i.id,
-        title: i.title,
-        topic: i.topic,
-        severity: i.severity,
-        occurredAt: i.occurredAt,
-        country: i.country,
-        summary: i.summary,
-        source: i.source,
-        sourceUrl: i.sourceUrl,
-        location: i.location,
-      }));
-      const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
-      // Shipping uses a bespoke section layout (Chokepoint Watch, Vessel
-      // Attacks, Piracy, Port/Route Disruption, Commercial Impact) so it
-      // does not run through the generic topic exporter.
-      if (form.topic === "shipping") {
-        await exportShippingReportPdf(reportData, mappedIncidents, filename);
-      } else if (form.topic === "flashpoint" || form.topic === "protests") {
-        await exportFlashpointReportPdf(reportData, mappedIncidents, filename);
-      } else {
-        try {
-          // forceAllowMissing wins so the override button can re-export
-          // in the same click without waiting for the async state update.
-          const allow = opts?.forceAllowMissing === true || allowMissingExport;
-          await exportTopicReportPdf(reportData, mappedIncidents, TOPIC_LABELS, filename, {
-            allowMissingMarketData: allow,
-          });
-          // Successful export clears the one-shot override so the next
-          // export attempt is gated again unless data is now sufficient.
-          setAllowMissingExport(false);
-        } catch (err) {
-          if (err instanceof FuelRequiredDataMissingError) {
-            setExportError(err.message);
-            return;
-          }
-          throw err;
-        }
+      const allow = opts?.forceAllowMissing === true || allowMissingExport;
+      if (
+        form.topic === "fuel" &&
+        liveFuelData &&
+        !liveFuelData.validation.hasRequiredFuelWatchData &&
+        !allow
+      ) {
+        setExportError(`Fuel Watch export requires market data. Missing: ${liveFuelData.validation.missingRequired.join(", ")}.`);
+        return;
       }
+
+      const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
+      const reportElement = previewRef.current?.querySelector<HTMLElement>(".print-report") ?? previewRef.current;
+      if (!reportElement) {
+        throw new Error("PDF export failed: report preview is not ready.");
+      }
+      await exportElementToPdf(reportElement, filename);
+      setAllowMissingExport(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "PDF export failed.");
     } finally {
       setExporting(false);
     }
@@ -780,7 +742,7 @@ export default function ReportEditor() {
           )}
         </div>
 
-        <div className="bg-white border border-border rounded-sm overflow-hidden">
+        <div ref={previewRef} className="bg-white border border-border rounded-sm overflow-hidden">
           {form.topic === "shipping" ? (
             <ShippingReportPreview report={form} incidents={incidentsForExport} />
           ) : (form.topic === "flashpoint" || form.topic === "protests") ? (

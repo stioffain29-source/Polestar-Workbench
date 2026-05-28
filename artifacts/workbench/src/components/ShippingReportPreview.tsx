@@ -21,9 +21,9 @@ import {
 const DISCLAIMER_TEXT =
   "Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. " +
   "The information in this report is based on open sources and is assessed as accurate at the time of writing. " +
-  "Polestar Advisory accepts no liability for decisions taken on the basis of this report. " +
-  "This report is intended for the named recipient and may not be redistributed without prior written consent. " +
-  "© Polestar Advisory Pte. Ltd. All rights reserved.";
+  "It is provided for general informational purposes only and does not constitute advice or a comprehensive " +
+  "assessment of all risks. No reliance should be placed on this information for decision making without " +
+  "further independent verification.";
 
 // Shipping-specific on-screen preview. Renders the same sections as
 // exportShippingReportPdf, in the same order, from the same dataset
@@ -462,6 +462,7 @@ export default function ShippingReportPreview({
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+      <div className="pdf-cover-page">
       {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div
         className="flex items-center"
@@ -497,7 +498,7 @@ export default function ShippingReportPreview({
             fontWeight: 700,
             fontSize: 44,
             lineHeight: 1.05,
-            letterSpacing: "-0.01em",
+            letterSpacing: "0",
             textTransform: "uppercase",
           }}
         >
@@ -539,6 +540,7 @@ export default function ShippingReportPreview({
         >
           polestar-advisory.com
         </div>
+      </div>
       </div>
 
       <div className="px-10 py-10">
@@ -649,7 +651,7 @@ export default function ShippingReportPreview({
       </div>
 
       <div
-        className="px-10 flex items-center justify-between"
+        className="pdf-preview-footer px-10 flex items-center justify-between"
         style={{ background: POLAR, color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 11, minHeight: 36 }}
       >
         <span>polestar-advisory.com</span>
