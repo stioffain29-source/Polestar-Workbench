@@ -1,0 +1,75 @@
+Stop treating this as a PNG-only issue.
+
+This needs to be investigated across the whole report suite. The whole purpose of the dashboard is to produce usable reports, so I need confidence that every report is using current data, that the cards and prose agree, and that what I see on screen is exactly what goes to PDF.
+
+Do not make isolated wording or layout fixes yet.
+
+Carry out a full report-suite audit covering:
+
+* Fuel Watch
+* Fertiliser Watch
+* Cargo Watch
+* Shipping Watch
+* Flashpoint
+* Energy Watch
+* Country reports
+* Missile Strike Tracker, as a dashboard/tracker only, not a report product
+
+For each product, confirm:
+
+1. Data source
+   What table, API route, scraper, import, or static dataset feeds it?
+
+2. Freshness
+   What is the newest record in development?
+   What is the newest record in production?
+   When was the last successful ingestion or update?
+
+3. Automation
+   Is ingestion automated, manual, or static?
+   If automated, where is the schedule configured?
+   If manual or static, say so clearly.
+
+4. Report window
+   What reporting window does it use?
+   Does the report clearly distinguish current-window data from 30/90-day context?
+
+5. Cards vs prose
+   Do the Fast Facts / KPI cards use the same filtered dataset as the narrative?
+   If not, explain the difference.
+
+6. Screen vs PDF
+   Does the PDF export the same rendered version that appears on screen?
+   Identify any report where preview and PDF can diverge.
+
+7. Saved text / stale text risk
+   Check whether any report uses saved manual prose, hardcoded templates, seed text, cached text, or database fields that can override live data.
+
+8. Source health
+   Check whether there is a visible last-updated / source-health signal for the product.
+   If there is not, identify where it should be added.
+
+9. Production readiness
+   For each report, classify it as:
+
+* reliable now
+* usable with caveats
+* not reliable until fixed
+
+10. Required output
+    Report back in a table with:
+
+* report name
+* data source
+* latest dev record
+* latest production record
+* automated/manual/static
+* cards/prose aligned yes/no
+* screen/PDF aligned yes/no
+* main fault
+* recommended smallest fix
+
+Do not change report copy, layouts, cards, PDFs, templates, or ingestion until this audit is complete.
+
+The objective is simple:
+Every report must be able to answer, “what data am I using, how fresh is it, and can I trust the PDF?”
