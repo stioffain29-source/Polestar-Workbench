@@ -114,3 +114,15 @@ id = "QEcCxhigDqM5A45EnOEzB"
 uri = "file://screenshots/flashpoint_preview.jpg"
 type = "image"
 title = "Flashpoint preview pane (workbench /reports/13)"
+
+[[outputs]]
+id = "3rYOh6yPsXuOcN0zZlLqK"
+uri = "file://exports/png-country-report-full.jpg"
+type = "image"
+title = "Papua New Guinea report — corrected (zero-count coverage-gap prose)"
+
+[[outputs]]
+id = "3mElQlhogKkcbhv5xvH35"
+uri = "file://exports/papua-country-report-full.jpg"
+type = "image"
+title = "Papua report — corrected (zero-count coverage-gap prose)"
