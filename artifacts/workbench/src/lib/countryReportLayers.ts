@@ -168,8 +168,8 @@ export function summariseLookback(
   // Client-safe wording only. Any framing around source health,
   // coverage gaps or feed staleness lives in the internal Source
   // Coverage screen-only block — never in client-facing prose.
-  const baselineRef30 = baseline ? " Read alongside the country baseline above for the standing operating picture." : "";
-  const baselineRef90 = baseline ? " The standing operating picture comes from the country baseline above." : "";
+  const baselineRef30 = "";
+  const baselineRef90 = "";
 
   const thirtyDay =
     thirty === 0
