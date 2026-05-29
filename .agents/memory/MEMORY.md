@@ -1,2 +1,3 @@
 - [Flashpoint weak-operational filters](flashpoint-weak-ops.md) — the noise classes the classifier keeps but the prose builders must drop (stock photo wires, sports-media protest, suspended strikes, court-only legal process, SEO comma-spam, non-APAC syndication).
 - [Headless PDF cover embedding](headless-pdf-cover.md) — `prepareCoverImage` must branch on `typeof Image` so Node tsx exports embed the cover photo instead of falling back to gradient.
+- [Country report data-driven prose](country-report-data-driven.md) — narrative sections render from live window prose (never stored), plus the PNG West Papua mis-tag guard and its cross-border exception (group alias list must stay in sync with the context regex).

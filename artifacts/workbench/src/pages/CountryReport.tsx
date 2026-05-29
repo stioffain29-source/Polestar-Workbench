@@ -20,7 +20,12 @@ import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { computeCountryFastFacts, COUNTRY_WINDOW_TOPIC, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
-import { incidentMatchesCountry } from "@/lib/countryMatch";
+import {
+  incidentMatchesCountry,
+  acceptedCountryTokens,
+  isIndonesianWestPapuaContext,
+  isCrossBorderPapuaPng,
+} from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
@@ -88,13 +93,24 @@ export default function CountryReport() {
   const { data: incidentsData } = useListIncidents(country ? { days: 90 } : {}, {
     query: { enabled: !!country },
   } as never);
-  const incidents = useMemo(
-    () =>
-      country
-        ? (incidentsData ?? []).filter((i) => incidentMatchesCountry(i.country, country.name))
-        : [],
-    [incidentsData, country],
-  );
+  const incidents = useMemo(() => {
+    if (!country) return [];
+    const name = country.name ?? "";
+    const isPng = acceptedCountryTokens(name).includes("papua new guinea");
+    return (incidentsData ?? []).filter((i) => {
+      if (!incidentMatchesCountry(i.country, name)) return false;
+      // Standing rule: Indonesian Papua / West Papua records must not
+      // populate the PNG report unless they are explicitly cross-border
+      // or directly PNG-relevant. Some West Papua items carry a stray
+      // "Papua New Guinea" country tag (e.g. RNZ "pacific_west-papua"
+      // stories); strip them from PNG using a content-aware guard.
+      if (isPng && !isCrossBorderPapuaPng(i.country)) {
+        const text = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
+        if (isIndonesianWestPapuaContext(text)) return false;
+      }
+      return true;
+    });
+  }, [incidentsData, country]);
   const update = useUpdateCountryReport();
 
   // Country baseline (editorial reference content stored in the DB).
@@ -261,9 +277,6 @@ export default function CountryReport() {
         data: {
           name: draft.name,
           region: draft.region,
-          overview: draft.overview,
-          trendSummary: draft.trendSummary,
-          implications: draft.implications,
         },
       });
       // Only touch the baseline row if the editor actually changed
@@ -564,37 +577,34 @@ export default function CountryReport() {
         <FastFactsGrid cards={facts.cards} />
       </Section>
 
-      {/* 3. Situation (editable: overview) */}
-      <EditableSection
-        title="Situation"
-        value={draft.overview}
-        savedValue={(editing ? draft.overview : effective.overview) ?? ""}
-        editing={editing}
-        onChange={(v) => setField("overview", v)}
-      />
+      {/* Sections 3-6 are all auto-derived from the window-aware drafted
+          prose (draftReportProse). They are intentionally NOT editable or
+          stored: persisted overview / trend_summary / implications rows
+          previously went stale and implied fresh weekly activity even when
+          the 7-day window was empty. Driving every narrative section from
+          the live dataset keeps the on-screen report, the captured PDF and
+          both the dev and prod environments in agreement regardless of any
+          legacy stored text. */}
 
-      {/* 4. What Happened (editable: trendSummary) */}
-      <EditableSection
-        title="What Happened"
-        value={draft.trendSummary}
-        savedValue={(editing ? draft.trendSummary : effective.trendSummary) ?? ""}
-        editing={editing}
-        onChange={(v) => setField("trendSummary", v)}
-      />
+      {/* 3. Situation (auto — window-aware) */}
+      <Section title="Situation">
+        <Prose text={draftedProse?.overview ?? ""} />
+      </Section>
+
+      {/* 4. What Happened (auto — window-aware) */}
+      <Section title="What Happened">
+        <Prose text={draftedProse?.trendSummary ?? ""} />
+      </Section>
 
       {/* 5. What Matters (auto) */}
       <Section title="What Matters">
         <Prose text={draftedProse?.whatMatters ?? ""} />
       </Section>
 
-      {/* 6. Implications for Business (editable: implications) */}
-      <EditableSection
-        title="Implications for Business"
-        value={draft.implications}
-        savedValue={(editing ? draft.implications : effective.implications) ?? ""}
-        editing={editing}
-        onChange={(v) => setField("implications", v)}
-      />
+      {/* 6. Implications for Business (auto — window-aware) */}
+      <Section title="Implications for Business">
+        <Prose text={draftedProse?.implications ?? ""} />
+      </Section>
 
       {/* 6a. Country Baseline (editorial reference content stored in
           the DB). When editing, the analyst can rewrite every field
@@ -950,35 +960,6 @@ function WatchlistTable({ rows }: { rows: WatchlistRow[] }) {
         );
       })}
     </div>
-  );
-}
-
-function EditableSection({
-  title, value, savedValue, editing, onChange,
-}: {
-  title: string;
-  value: string;
-  savedValue: string;
-  editing: boolean;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Section title={title}>
-      {editing ? (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          rows={Math.max(5, Math.min(20, value.split("\n").length + 2))}
-          style={{
-            width: "100%", background: "#fff", border: `1px solid ${POLAR}`, borderRadius: 2,
-            padding: 12, fontFamily: ROBOTO, fontSize: 14, color: DUSK, lineHeight: 1.55,
-            outline: "none",
-          }}
-        />
-      ) : (
-        <Prose text={savedValue} />
-      )}
-    </Section>
   );
 }
 

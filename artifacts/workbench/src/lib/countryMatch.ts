@@ -21,6 +21,7 @@ const COUNTRY_GROUPS: Record<string, string[]> = {
   papua: [
     "papua",
     "west papua",
+    "papua barat",
     "highland papua",
     "papua pegunungan",
     "central papua",
@@ -60,4 +61,51 @@ export function incidentMatchesCountry(
   if (accepted.length === 0) return false;
   const acceptedSet = new Set(accepted);
   return countryTokens(incidentCountry).some((t) => acceptedSet.has(t));
+}
+
+// Indonesian West Papua context markers (provinces, cities, Indonesian
+// state/security actors, and the RNZ "pacific_west-papua" feed path).
+const WEST_PAPUA_CONTEXT_RE =
+  /\b(west papua|papua barat|west[- ]papua|jayapura|biak|wamena|manokwari|sorong|merauke|nabire|timika|fakfak|free west papua|opm|tni|indonesian|indonesia)\b/i;
+
+// Genuine Papua New Guinea markers (the state, its cities, provinces and
+// institutions). If any of these appear, the record is directly relevant
+// to PNG and must NOT be stripped as Indonesian West Papua noise.
+const PNG_CONTEXT_RE =
+  /\b(papua new guinea|png|port moresby|lae|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
+
+/**
+ * True when a record's narrative is clearly about Indonesian West Papua
+ * rather than the independent state of Papua New Guinea. Used to keep
+ * mis-tagged West Papua items (e.g. RNZ "pacific_west-papua" stories that
+ * carry a stray "Papua New Guinea" country tag) out of the PNG country
+ * report, per the standing rule that Indonesian Papua / West Papua records
+ * must not populate PNG unless they are explicitly cross-border or
+ * directly PNG-relevant.
+ */
+export function isIndonesianWestPapuaContext(
+  text: string | null | undefined,
+): boolean {
+  const t = text ?? "";
+  return WEST_PAPUA_CONTEXT_RE.test(t) && !PNG_CONTEXT_RE.test(t);
+}
+
+const PNG_TOKEN_SET = new Set(COUNTRY_GROUPS["papua new guinea"]);
+const PAPUA_TOKEN_SET = new Set(COUNTRY_GROUPS["papua"]);
+
+/**
+ * True when an incident's `country` field explicitly spans both the Papua
+ * New Guinea group and the Indonesian Papua group (e.g.
+ * "West Papua; Papua New Guinea"). Such records are genuinely cross-border
+ * and must NOT be stripped from the PNG report by the West Papua content
+ * guard, per the standing "unless explicitly cross-border" exception.
+ */
+export function isCrossBorderPapuaPng(
+  incidentCountry: string | null | undefined,
+): boolean {
+  const toks = countryTokens(incidentCountry);
+  return (
+    toks.some((t) => PNG_TOKEN_SET.has(t)) &&
+    toks.some((t) => PAPUA_TOKEN_SET.has(t))
+  );
 }
