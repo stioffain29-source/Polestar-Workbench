@@ -86,6 +86,31 @@ const RETIRED_REPORT_TITLES: string[] = [
 export async function runDataMigrations(): Promise<void> {
   logger.info("runDataMigrations: starting");
   try {
+    // 0) Country report narrative is now fully data-driven: the Situation,
+    //    What Happened and Implications sections are generated from the live
+    //    7-day window at render time and the stored overview / trend_summary
+    //    / implications columns are no longer read anywhere. Legacy rows
+    //    still hold pre-written prose that implied fresh weekly activity even
+    //    when the window was empty, which would resurface in any older or
+    //    cached build that still rendered the stored text. Wipe them at the
+    //    source so no environment can ever serve the stale narrative again.
+    //    Idempotent: only touches rows that still hold non-empty values.
+    {
+      const res = await db.execute(sql`
+        UPDATE country_reports
+        SET overview = '', trend_summary = '', implications = ''
+        WHERE COALESCE(overview, '') <> ''
+           OR COALESCE(trend_summary, '') <> ''
+           OR COALESCE(implications, '') <> ''
+      `);
+      if (res.rowCount && res.rowCount > 0) {
+        logger.info(
+          { rows: res.rowCount },
+          "Cleared stale stored country report narrative (overview/trend_summary/implications)",
+        );
+      }
+    }
+
     // 1) Severity vocabulary: critical/elevated/moderate/low  →
     //    insignificant/low/moderate/high/extreme.
     //

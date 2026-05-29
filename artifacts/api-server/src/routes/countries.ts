@@ -43,9 +43,30 @@ router.patch("/countries/:slug", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  // The narrative columns overview/trend_summary/implications are no longer
+  // read anywhere — the report sections are generated from the live 7-day
+  // window at render time. Strip any incoming writes to these fields so the
+  // legacy stale prose can never be reintroduced into the database.
+  const { overview: _o, trendSummary: _t, implications: _i, ...updates } =
+    parsed.data as Record<string, unknown>;
+  void _o;
+  void _t;
+  void _i;
+  if (Object.keys(updates).length === 0) {
+    const [existing] = await db
+      .select()
+      .from(countryReportsTable)
+      .where(eq(countryReportsTable.slug, slug ?? ""));
+    if (!existing) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.json(existing);
+    return;
+  }
   const [row] = await db
     .update(countryReportsTable)
-    .set(parsed.data)
+    .set(updates)
     .where(eq(countryReportsTable.slug, slug ?? ""))
     .returning();
   if (!row) {

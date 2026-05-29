@@ -12,15 +12,25 @@ path only writes `name` + `region` (plus the separate Country Baseline block).
 
 **Why:** Persisted `overview` / `trend_summary` / `implications` rows went stale
 and implied fresh weekly activity even when the 7-day window had zero records.
-Only PNG + Papua ever had stored values and both were stale. Driving every
-section from the live dataset keeps on-screen report, captured PDF, and dev/prod
-in agreement regardless of legacy stored text (publishing deploys code, not
-data, so prod is fixed on deploy even though old rows remain).
+Only PNG + Papua ever had stored values and both were stale.
+
+**Display-ignore is NOT enough — clear at the DB source.** Making the frontend
+render from live prose only fixed dev. Production kept showing the stale text
+because the live `country_reports` rows still held the legacy prose and an older
+/ cached deployed bundle still rendered the stored columns. Code-only deploy did
+NOT fix prod. The durable fix is two-layered:
+1. A startup data migration in `runDataMigrations` (api-server `migrations.ts`,
+   step 0) that wipes `overview/trend_summary/implications` to '' for any
+   non-empty row. Idempotent, runs on every boot/deploy, fixes prod on publish
+   regardless of frontend build/cache. Consistent with the file's existing
+   startup data migrations (severity vocab, fertiliser).
+2. `PATCH /countries/:slug` strips these three fields from the update body so
+   they can never be reintroduced (guard against empty `.set()` after stripping).
 
 **How to apply:** Never reintroduce an editable/stored path for these four
-sections. If a section must reflect the window, derive it from the prose builder,
-not a DB column. Keep display and persistence semantics consistent — if a field
-is shown from live data, do not also write it.
+sections. If a field is shown from live data, do not also write it AND clear any
+legacy stored copy at the DB source — display-ignoring stale data leaves it
+live for older/cached clients.
 
 # West Papua mis-tag guard (PNG report)
 
