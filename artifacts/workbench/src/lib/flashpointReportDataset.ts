@@ -1,4 +1,4 @@
-import { format, parseISO, max as dateMax } from "date-fns";
+import { format, parseISO, max as dateMax, differenceInCalendarDays } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import { classifyIncidentType } from "./incidentClassifier";
@@ -606,8 +606,8 @@ export function buildFlashpointReportDataset(
     .slice(0, 12);
 
   // --- Reads ---------------------------------------------------------------
-  const activismRead = buildActivismRead(activismRows, win.shortLabel);
-  const civilUnrestRead = buildCivilUnrestRead(unrestRows, win.shortLabel);
+  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end);
+  const civilUnrestRead = buildCivilUnrestRead(unrestRows, win.shortLabel, win.end);
   // Forward-looking items rendered as a structured Country / Signal /
   // Operational meaning table rather than a quoted paragraph dump.
   const futureRaw = extractFutureSignals([...activismRows, ...unrestRows])
@@ -742,7 +742,20 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
   return safe[0] ?? rows[0] ?? null;
 }
 
-function buildActivismRead(rows: EnrichedIncident[], windowLabel: string): string {
+// Recency gate. When the most recent in-scope incident is several days
+// behind the window end (report Issue Date), the present-tense "live
+// activity" framing in the reads below is misleading. We prepend an
+// explicit residual-concern note so prose can never read as current
+// when the file has gone quiet. Returns "" when activity is fresh.
+function stalenessPrefix(rows: EnrichedIncident[], windowEnd: Date): string {
+  if (rows.length === 0) return "";
+  const latest = dateMax(rows.map((r) => r.date));
+  const daysOld = differenceInCalendarDays(windowEnd, latest);
+  if (daysOld < 4) return "";
+  return `The last reported incident was ${daysOld} days ago. No fresh activity is recorded since then. Treat this as residual concern unless new mobilisation, planned action, or unresolved disruption is confirmed.`;
+}
+
+function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, windowEnd: Date): string {
   if (rows.length === 0) {
     return `No qualifying protest, strike, student-activism or sit-in records reached the file across ${windowLabel}. Treat the quiet cycle as a reporting gap rather than a sustained easing: activism cadence in the covered geographies tends to be lumpy, with thin weeks routinely followed by a sharp escalation around a policy trigger or anniversary.\n\nKeep tracking opposition political calendars, union notifications, student-body statements and sectoral chambers (chemists, transporters, lawyers, traders) — those are the leading indicators that the next cycle will firm up rather than stay quiet.`;
   }
@@ -765,10 +778,12 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string): strin
     ? `The cycle is being driven by ${joinList(drivers)} — multiple independent organising vectors that are harder for the state to contain than a single-issue wave and that historically convert into rolling road action inside 24-72 hours of an announced date.`
     : `The cycle is running on background organising rather than any single named driver, which usually signals a thin reporting window rather than a structural easing.`;
   const operational = `Operationally, the pressure points to watch are city-centre commercial districts, court complexes, party headquarters, ministry quarters and the main intercity arteries. Staff movement, last-mile logistics and customer-facing footfall are the surfaces that feel the effect first; supply-chain friction from sectoral walkouts tracks one news cycle behind.`;
-  return `${headline}\n\n${driverLine}\n\n${operational}`;
+  const stale = stalenessPrefix(rows, windowEnd);
+  const body = `${headline}\n\n${driverLine}\n\n${operational}`;
+  return stale ? `${stale}\n\n${body}` : body;
 }
 
-function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string): string {
+function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, windowEnd: Date): string {
   if (rows.length === 0) {
     return `No qualifying riot, clash, crackdown, curfew or security-force operation records reached the file across ${windowLabel}. A blank civil-unrest cycle alongside activism reporting usually means the state response has stayed below the threshold of mass arrests or curfew orders — useful, but reversible inside a single news cycle if a protest crosses a policy line.\n\nKeep tracking police statements, district-administration orders, internet-shutdown notices and any military-aid-to-civil-power references. Those move ahead of curfew impositions and visible street-level enforcement.`;
   }
@@ -788,7 +803,9 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string): st
     ? `State posture this cycle is the operative signal: ${joinList(postureBits)}. That changes the runway from announced rally to kinetic incident from days to hours and raises the probability that the next mobilisation date attracts a hardened response rather than measured policing.`
     : `State posture this cycle reads as measured rather than escalatory — no curfew impositions, mass-arrest reporting or visible crackdowns on the file. That can flip inside a single news cycle once a high-visibility incident or political trigger lands.`;
   const operational = `For business users the read is that crackdowns, curfew orders and internet shutdowns matter more than the headline protest count: they signal where staff movement, commercial operations and venue access can be disrupted at short notice. Where enforcement clusters around a single city or district, expect rolling road closures, intermittent connectivity and same-day venue access restrictions.`;
-  return `${headline}\n\n${postureLine}\n\n${operational}`;
+  const stale = stalenessPrefix(rows, windowEnd);
+  const body = `${headline}\n\n${postureLine}\n\n${operational}`;
+  return stale ? `${stale}\n\n${body}` : body;
 }
 
 function buildForecastRead(opts: {
