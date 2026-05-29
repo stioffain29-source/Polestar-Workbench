@@ -1,0 +1,51 @@
+Country reports are showing zero records in the weekly window, but the narrative is still referring to fuel disruption, election unrest, cargo crime and other PNG issues. Before changing anything, investigate why the country report is not picking up records.
+
+Do not change the UI, PDF layout, report wording, cards, filters, or data model yet.
+
+Investigate the cause first.
+
+Check the following:
+
+1. What data source the country report is using
+Confirm whether the PNG country report is pulling from the live incidents table, a country-specific table, cached data, seeded text, or manually saved report fields.
+
+2. Whether PNG records exist in the database
+Check whether there are records for:
+- Papua New Guinea
+- PNG
+- Port Moresby
+- Lae
+- Highlands
+- Madang
+- Enga
+- Hela
+- Southern Highlands
+- Morobe
+
+3. Date window
+The report shows 23 May to 29 May 2026.
+Confirm whether records exist inside that window.
+If records exist outside the window only, say so clearly.
+
+4. Country matching
+Check whether records are being missed because the country field uses a different value, such as “PNG” instead of “Papua New Guinea”, or because incidents are tagged by city/province but not country.
+
+5. Topic filters
+Check whether the country report is filtering only certain issue types.
+Confirm whether fuel disruption, election unrest, cargo crime, public order, crime, and logistics incidents are being excluded by topic or relevance filters.
+
+6. Manual text versus calculated cards
+The Executive Summary and body text mention incidents, but Fast Facts shows zero records.
+Check whether the narrative is manually saved text or template text that is not linked to the calculated record set.
+
+7. API path
+Confirm which API endpoint the country report uses and whether it is passing the correct country slug, date range, and filters.
+
+8. Required answer
+Report back with:
+- the file or component responsible
+- whether the data exists in the database
+- whether the issue is ingestion, country matching, date filtering, topic filtering, saved manual text, or report generation
+- why the Fast Facts card shows zero while the narrative still discusses incidents
+
+Do not make code changes until the cause is identified.
