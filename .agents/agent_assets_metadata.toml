@@ -126,3 +126,15 @@ id = "3mElQlhogKkcbhv5xvH35"
 uri = "file://exports/papua-country-report-full.jpg"
 type = "image"
 title = "Papua report — corrected (zero-count coverage-gap prose)"
+
+[[outputs]]
+id = "UC40h51tHn1mJbQd1F0MS"
+uri = "file://screenshots/png_report.jpg"
+type = "image"
+title = "Papua New Guinea Report"
+
+[[outputs]]
+id = "YrIcT72QnveY33HD9_-JD"
+uri = "file://screenshots/papua_report.jpg"
+type = "image"
+title = "Papua Report"
