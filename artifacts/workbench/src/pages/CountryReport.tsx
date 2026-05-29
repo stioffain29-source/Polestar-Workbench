@@ -20,6 +20,7 @@ import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { computeCountryFastFacts, COUNTRY_WINDOW_TOPIC, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
+import { incidentMatchesCountry } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
@@ -78,11 +79,22 @@ export default function CountryReport() {
   const { data: country, isLoading } = useGetCountryReport(slug);
   // Country reports must not depend only on the 7-day window. Pull a
   // 90-day backstop so the report can layer current / 30-day / 90-day
-  // context even when the current window is thin.
-  const { data: incidentsData } = useListIncidents(country ? { country: country.name, days: 90 } : {}, {
+  // context even when the current window is thin. We fetch the 90-day
+  // feed unscoped and apply country matching client-side: the incidents
+  // `country` field is a semicolon-separated list, so server-side exact
+  // matching misses compound tags and cannot distinguish Indonesian
+  // Papua from Papua New Guinea. `incidentMatchesCountry` does token-
+  // exact group matching (see countryMatch.ts).
+  const { data: incidentsData } = useListIncidents(country ? { days: 90 } : {}, {
     query: { enabled: !!country },
   } as never);
-  const incidents = useMemo(() => incidentsData ?? [], [incidentsData]);
+  const incidents = useMemo(
+    () =>
+      country
+        ? (incidentsData ?? []).filter((i) => incidentMatchesCountry(i.country, country.name))
+        : [],
+    [incidentsData, country],
+  );
   const update = useUpdateCountryReport();
 
   // Country baseline (editorial reference content stored in the DB).
