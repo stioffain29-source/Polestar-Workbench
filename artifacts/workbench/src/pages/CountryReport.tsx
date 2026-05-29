@@ -606,30 +606,8 @@ export default function CountryReport() {
         <Prose text={draftedProse?.implications ?? ""} />
       </Section>
 
-      {/* 6a. Country Baseline (editorial reference content stored in
-          the DB). When editing, the analyst can rewrite every field
-          and tweak the location watchlist; when viewing, the block
-          renders the persisted baseline if one is curated. */}
-      {editing ? (
-        <Section title="Country Baseline">
-          <BaselineEditor
-            baseline={baselineDraft}
-            setField={setBaselineField}
-            onClear={persistedBaseline ? clearBaseline : undefined}
-            clearing={deleteBaseline.isPending}
-          />
-        </Section>
-      ) : (
-        baseline && (
-          <Section title="Country Baseline">
-            <BaselineBlock baseline={baseline} />
-          </Section>
-        )
-      )}
-
-      {/* 6b. Location Watchlist — in edit mode the editor lives
-          inside the Country Baseline section above. The read-only
-          breakdown only appears when a baseline is curated. */}
+      {/* 6b. Location Watchlist — read-only breakdown derived from the
+          curated location list, shown when one is available. */}
       {!editing && baseline && watchlist.length > 0 && (
         <Section title="Location Watchlist">
           <WatchlistTable rows={watchlist} />
@@ -653,7 +631,7 @@ export default function CountryReport() {
           <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" />
         </div>
         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
-          The map reflects current-window records only ({layers.current.length} record{layers.current.length === 1 ? "" : "s"} across the 7-day cycle). It is not the full risk picture — read it alongside the Country Baseline and the 30 / 90-day context sections above.
+          The map reflects current-window records only ({layers.current.length} record{layers.current.length === 1 ? "" : "s"} across the 7-day cycle). It is not the full risk picture — read it alongside the 30 / 90-day context sections above.
         </div>
       </Section>
 
@@ -774,11 +752,6 @@ export default function CountryReport() {
           {layers.current.length < 3 && (
             <li style={{ color: "#A33232" }}>
               Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
-            </li>
-          )}
-          {!baseline && (
-            <li style={{ color: "#A33232" }}>
-              No country baseline curated for {effective.name}. The report falls back to live data only. Click <strong>Edit</strong> (top right) to add the operating environment, security context, key cities and the location watchlist.
             </li>
           )}
         </ul>
