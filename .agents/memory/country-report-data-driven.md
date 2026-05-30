@@ -73,19 +73,33 @@ context sections (rendered separately by the component from the same country-fil
 dataset). Cards and prose already share one `incidents` array filtered by
 `incidentMatchesCountry`, so they stay aligned automatically.
 
-# Country report is ALWAYS weekly; an empty 7-day week is a data-quality signal
+# Country window: 7-day headline, falls back to 30/90-day when the week is empty
 
-The country report headline window is ALWAYS 7-day. `resolveActiveCountryWindow`
-no longer promotes to 30/90-day when the week is thin — it returns the 7-day
-window unconditionally (`basisDays:7`, `incidents: layers.current`,
-`expanded:false`). 30/90-day material renders ONLY as labelled CONTEXT sections,
-never as the weekly headline.
+`resolveActiveCountryWindow` picks the 7-day window when `layers.current` has
+records; otherwise it falls back to the narrowest wider window that holds
+records — 30-day (`basisDays:30`, `basisLabel:"30-day"`), then 90-day
+(`basisDays:90`, `basisLabel:"90-day context"`), each with `expanded:true`;
+only if even the 90-day window is empty does it return the honest empty 7-day
+window. Fast Facts, map, charts, table and prose all read `active.incidents` /
+`active.basisDays`, so the whole report (preview AND headless PDF — both call
+this) follows the chosen window and preview==PDF holds.
 
-**Why:** Promoting a thin week to a 30/90-day headline silently hid the real
-signal — that the weekly collection was empty. A zero-record week is itself
-information (either genuinely quiet OR a coverage failure), so it must be
-surfaced, not papered over with older data. An empty week must NEVER read as
-"nothing happened" unless that is health-confirmed.
+**Why:** Returning the empty 7-day window unconditionally (an earlier design)
+rendered every KPI card as a blank "—" / "0" on thin-reporting countries
+(PNG, West Papua routinely report 0 in 7 days). A domain-expert user rejected
+the report twice over the empty cards. The scaffolding for the fallback already
+existed (the `expanded` flag, `CountryWindowBasis = 7|30|90`, the `basisLabel`
+convention, `computeCountryFastFacts`'s `windowIncidents` override, and
+`draftCountryReportProse`'s `basisDays` 30/90 expanded prose) — it had just been
+neutered to always-7-day. Restoring it is the intended design.
+
+**Honesty is preserved, NOT a "calm week" claim:** an empty 7-day window is
+still a data-quality signal. The coverage banner (`computeCountryCoverageStatus`)
+keys independently off `layers.current`, so it STILL fires on an empty week even
+when the active facts draw on a 30/90-day fallback; and the drafted prose says
+"The 7-day window held no fresh records, so this read draws on the most recent
+30-day window." The basis label on the Reporting Period card marks the wider
+window explicitly. So an empty week is never read as "nothing happened".
 
 **Coverage status (`computeCountryCoverageStatus`)** decides what an empty week
 means. State is one of `active | coverage-problem` — there is deliberately NO

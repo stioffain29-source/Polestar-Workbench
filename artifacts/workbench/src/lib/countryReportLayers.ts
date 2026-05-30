@@ -114,13 +114,23 @@ function countryRangeLabels(end: Date, days: number): { label: string; shortLabe
 /**
  * The single active reporting window for a country report.
  *
- * Country reports are WEEKLY by contract. The 7-day window is ALWAYS the
- * headline — even when it holds zero records. A zero-record week is a
- * data-quality signal (see {@link computeCountryCoverageStatus}), NOT
- * evidence that nothing happened, so older 30/90-day records are never
- * promoted into the weekly headline. The 30/90-day buckets are surfaced
- * separately as clearly labelled CONTEXT (see {@link summariseLookback}
- * and the context sections in the report).
+ * Country reports are WEEKLY by contract: the 7-day window is the headline
+ * whenever it holds any records. For thin-reporting countries (e.g. PNG,
+ * West Papua) the week is routinely empty — and leaving the window empty
+ * rendered every Fast Facts KPI card blank, which is what the client
+ * rejected. So when the 7-day window is empty this falls back to the
+ * narrowest wider window that actually holds records (30-day, then 90-day),
+ * labelled as such via {@link ActiveCountryWindow.basisLabel} and the
+ * `expanded` flag, so the cards/map/charts/prose render the real standing
+ * picture instead of dashes.
+ *
+ * This is NOT a "calm week" claim. An empty 7-day window remains a
+ * data-quality signal: the coverage banner ({@link computeCountryCoverageStatus})
+ * keys independently off `layers.current`, so it still fires on an empty week
+ * even when the active facts draw on a 30/90-day fallback, and the drafted
+ * prose states plainly that the 7-day window held no fresh records. Only when
+ * even the 90-day window is empty does this return the honest empty 7-day
+ * window.
  *
  * The chosen window drives Fast Facts, the map, charts, the related-incidents
  * table AND the drafted prose, so the whole report reads against one window.
@@ -133,13 +143,62 @@ export function resolveActiveCountryWindow(
   try { end = parseISO(issueDate); } catch { end = new Date(); }
   if (isNaN(end.getTime())) end = new Date();
 
+  // The 7-day weekly window is the headline whenever it holds any records.
+  if (layers.current.length > 0) {
+    const { label, shortLabel } = countryRangeLabels(end, 7);
+    return {
+      basisDays: 7,
+      basisLabel: "7-day",
+      basisShort: "7-day",
+      incidents: layers.current,
+      expanded: false,
+      periodLabel: label,
+      periodShortLabel: shortLabel,
+    };
+  }
+
+  // Weekly window is empty. For thin-reporting countries (e.g. PNG, West
+  // Papua) that is the norm, and leaving the window empty rendered every Fast
+  // Facts KPI card as a blank "—". Fall back to the narrowest wider window
+  // that actually holds records so the cards, map, charts and prose render the
+  // real standing picture instead of dashes. This is honest, not a "calm
+  // week" claim: the empty-week coverage banner still fires independently
+  // (computeCountryCoverageStatus keys off layers.current), the basis label
+  // marks the read as 30/90-day context, and draftCountryReportProse states
+  // plainly that the 7-day window held no fresh records.
+  if (layers.thirtyDay.length > 0) {
+    const { label, shortLabel } = countryRangeLabels(end, 30);
+    return {
+      basisDays: 30,
+      basisLabel: "30-day",
+      basisShort: "30-day",
+      incidents: layers.thirtyDay,
+      expanded: true,
+      periodLabel: label,
+      periodShortLabel: shortLabel,
+    };
+  }
+  if (layers.ninetyDay.length > 0) {
+    const { label, shortLabel } = countryRangeLabels(end, 90);
+    return {
+      basisDays: 90,
+      basisLabel: "90-day context",
+      basisShort: "90-day",
+      incidents: layers.ninetyDay,
+      expanded: true,
+      periodLabel: label,
+      periodShortLabel: shortLabel,
+    };
+  }
+
+  // Genuinely nothing held for this country across the full 90-day pull —
+  // keep the honest empty 7-day window (cards show the empty-window note).
   const { label, shortLabel } = countryRangeLabels(end, 7);
   return {
     basisDays: 7,
     basisLabel: "7-day",
     basisShort: "7-day",
     incidents: layers.current,
-    // Retained for type/back-compat; the weekly window never "expands" now.
     expanded: false,
     periodLabel: label,
     periodShortLabel: shortLabel,

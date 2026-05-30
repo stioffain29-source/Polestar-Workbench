@@ -120,7 +120,7 @@ function drawSeverityChart(ctx: Ctx, facts: CountryFactsBreakdown) {
   ensureSpace(ctx, 32 + (total === 0 ? 34 : chartH));
   drawSectionHeading(ctx, "Severity Distribution");
   if (total === 0) {
-    renderProse(ctx, "No incidents in the weekly window to chart.");
+    renderProse(ctx, "No incidents in the active window to chart.");
     return;
   }
   const { pdf, MX, CW } = ctx;
@@ -157,7 +157,7 @@ function drawTypeChart(ctx: Ctx, facts: CountryFactsBreakdown) {
   ensureSpace(ctx, 32 + (data.length === 0 ? 34 : chartH));
   drawSectionHeading(ctx, "Incident Breakdown by Type");
   if (data.length === 0) {
-    renderProse(ctx, "No classifiable incident types in the weekly window.");
+    renderProse(ctx, "No classifiable incident types in the active window.");
     return;
   }
   const max = Math.max(...data.map((d) => d.n));
