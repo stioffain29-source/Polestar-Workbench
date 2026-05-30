@@ -175,6 +175,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/ingest':
+        specifier: workspace:*
+        version: link:../../lib/ingest
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -656,11 +659,30 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  lib/ingest:
+    dependencies:
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)
+      rss-parser:
+        specifier: ^3.13.0
+        version: 3.13.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+
   scripts:
     dependencies:
       '@workspace/db':
         specifier: workspace:*
         version: link:../lib/db
+      '@workspace/ingest':
+        specifier: workspace:*
+        version: link:../lib/ingest
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)

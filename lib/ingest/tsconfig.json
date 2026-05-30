@@ -1,20 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"]
   },
   "include": ["src"],
-  "references": [
-    {
-      "path": "../../lib/db"
-    },
-    {
-      "path": "../../lib/ingest"
-    },
-    {
-      "path": "../../lib/api-zod"
-    }
-  ]
+  "references": [{ "path": "../db" }]
 }

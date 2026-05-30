@@ -7,10 +7,12 @@ import reportsRouter from "./reports";
 import countriesRouter from "./countries";
 import baselinesRouter from "./baselines";
 import dashboardRouter from "./dashboard";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(adminRouter);
 router.use(incidentsRouter);
 router.use(strikesRouter);
 router.use(sourcesRouter);
