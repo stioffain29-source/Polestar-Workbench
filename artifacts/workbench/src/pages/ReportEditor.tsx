@@ -202,7 +202,16 @@ export default function ReportEditor() {
     // Saved content always wins; the draft only seeds blank fields so a new
     // report opens with usable prose rather than writing prompts.
     const topic = report.topic ?? "fuel";
-    const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
+    // A report's data window ends on its issue date, so a draft left at an old
+    // issue date shows permanently stale data. Drafts are living documents:
+    // advance their effective issue date to today so they always render the
+    // current window. Published reports keep their stored issue date (they are
+    // frozen snapshots). Nothing is written to the DB until the author Saves.
+    const today = new Date().toISOString().slice(0, 10);
+    const storedIssueDate = (report.issueDate ?? today).slice(0, 10);
+    const isDraft = (report.status ?? "draft") === "draft";
+    const draftAdvanced = isDraft && storedIssueDate < today;
+    const issueDate = draftAdvanced ? today : storedIssueDate;
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       topic: i.topic,
       title: i.title,
@@ -222,7 +231,11 @@ export default function ReportEditor() {
     // the freshly generated draft instead of the stored prose. Non-destructive:
     // nothing is written to the DB until the author clicks Save. The visible
     // warning banner is computed live below (so it tracks issue-date edits).
-    const proseIsStale = computeStale(topic, issueDate) != null;
+    // An auto-advanced draft's saved prose was written against the old window,
+    // so it is stale by definition — reseed it. Otherwise fall back to the
+    // live data-vs-issue-date staleness check.
+    const proseIsStale =
+      draftAdvanced || computeStale(topic, issueDate) != null;
 
     const pick = (saved: string | null | undefined, drafted: string) => {
       if (proseIsStale) return drafted;
