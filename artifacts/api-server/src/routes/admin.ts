@@ -1,33 +1,26 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
-import { pool } from "@workspace/db";
-import { runFlashpointIngest, runCargoWatchIngest, type IngestSummary } from "@workspace/ingest";
+import { type IngestSummary } from "@workspace/ingest";
+import { runIngestOnce } from "../lib/ingestRunner";
 
 const router: IRouter = Router();
 
 // Protected production ingestion trigger.
 //
 // Runs the exact same Flashpoint + Cargo Watch ingest code as the CLI
-// scrapers, but from inside the running server process — which, in the
+// scrapers and the automatic scheduler (via the shared runIngestOnce), but
+// on demand from inside the running server process — which, in the
 // deployment, is the only place DATABASE_URL points at the writable
 // production primary. This lets production data be refreshed with a single
-// authenticated request, without a scheduled deployment.
+// authenticated request, on top of the automatic schedule.
 //
 // Protection: requires INGEST_ADMIN_TOKEN to be set in the environment.
 // The caller must present it via `Authorization: Bearer <token>` or the
 // `x-ingest-token` header. If the token is not configured, the route is
 // disabled (503) so it can never run unauthenticated.
 //
-// Concurrency: serialised with a Postgres session-level advisory lock held
-// on a dedicated pooled connection for the duration of the run. Unlike an
-// in-memory flag, this holds across ALL autoscale instances — a second
-// concurrent request (same instance or another) gets 409. Because only one
-// ingest can run at a time globally, the in-application read-then-insert
-// dedupe in @workspace/ingest cannot race against a parallel writer.
-
-// Arbitrary but stable advisory-lock key ("Pole" in hex). Must match across
-// every instance so they contend on the same lock.
-const INGEST_LOCK_KEY = 0x506f6c65;
+// Concurrency: runIngestOnce serialises with a cross-instance Postgres
+// advisory lock — a second concurrent run gets 409.
 
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -80,45 +73,30 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
     return;
   }
 
-  // Dedicated connection so the session-level advisory lock is held by ONE
-  // connection for the whole run and released on that same connection.
-  const client = await pool.connect();
-  let locked = false;
   try {
-    const lockRes = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1) AS locked",
-      [INGEST_LOCK_KEY],
-    );
-    locked = lockRes.rows[0]?.locked === true;
-    if (!locked) {
+    req.log.info("admin ingest started");
+    const result = await runIngestOnce();
+    if (!result.ran) {
       res.status(409).json({ error: "ingestion_in_progress" });
       return;
     }
 
-    const startedAt = new Date();
-    req.log.info("admin ingest started");
-
-    // Sequential: both share the same DB pool and dedupe against the
-    // incidents table; running them one after another mirrors scrape:prod.
-    const flashpoint = await runFlashpointIngest({ commit: true });
-    const cargoWatch = await runCargoWatchIngest({ commit: true });
-    const finishedAt = new Date();
     req.log.info(
       {
-        flashpointInserted: flashpoint.inserted,
-        cargoWatchInserted: cargoWatch.inserted,
-        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        flashpointInserted: result.flashpoint.inserted,
+        cargoWatchInserted: result.cargoWatch.inserted,
+        durationMs: result.durationMs,
       },
       "admin ingest finished",
     );
     res.json({
       ok: true,
-      startedAt: startedAt.toISOString(),
-      finishedAt: finishedAt.toISOString(),
-      durationMs: finishedAt.getTime() - startedAt.getTime(),
-      totalInserted: flashpoint.inserted + cargoWatch.inserted,
-      flashpoint: trimmedSummary(flashpoint),
-      cargoWatch: trimmedSummary(cargoWatch),
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      totalInserted: result.flashpoint.inserted + result.cargoWatch.inserted,
+      flashpoint: trimmedSummary(result.flashpoint),
+      cargoWatch: trimmedSummary(result.cargoWatch),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -126,15 +104,6 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }
-  } finally {
-    if (locked) {
-      try {
-        await client.query("SELECT pg_advisory_unlock($1)", [INGEST_LOCK_KEY]);
-      } catch (unlockErr) {
-        req.log.error({ err: unlockErr }, "failed to release ingest advisory lock");
-      }
-    }
-    client.release();
   }
 });
 

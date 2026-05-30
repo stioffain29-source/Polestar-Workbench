@@ -34,3 +34,26 @@ in `finally`. A second caller (any instance) gets 409. Because only one ingest r
 at a time, the in-app dedupe is safe again without needing a new DB unique index.
 **How to apply:** any manually-triggered, expensive, non-idempotent server route in this
 autoscale app should use the advisory-lock pattern, not a module-level flag.
+
+## Root cause of "data is stale everywhere": nothing TRIGGERED ingestion
+The pipeline was never broken — the live RSS feeds return current items (a dry-run
+`scrape:flashpoint` with no `--commit` shows dozens of "New to insert"). Data froze because
+nothing ever RAN the scrapers; the DB just sat at the last manual run.
+**Rule:** when every topic looks frozen ~1–2 weeks back, suspect the TRIGGER, not the feeds.
+Confirm by running the scraper in DRY-RUN and reading "New to insert" / per-feed dates.
+**Fix shipped:** an automatic scheduler in the api-server (`lib/ingestScheduler.ts`, started
+from `index.ts` after `listen`) runs ingestion on boot IF data is stale beyond the interval,
+plus a recurring timer every `INGEST_INTERVAL_HOURS` (default 6). Both the scheduler and the
+admin route go through one shared `lib/ingestRunner.ts` (`runIngestOnce`) that holds the same
+advisory lock. On autoscale the boot catch-up is what matters (timers don't fire while scaled
+to zero): every cold start that finds stale data self-refreshes. The scheduler only reaches
+prod after a republish, and writes prod only inside the deployment (writable primary there).
+Disable with `INGEST_SCHEDULE_ENABLED=false`.
+
+## Only flashpoint + cargo_watch have scrapers; the rest are import-only
+fuel / energy / fertiliser / shipping / strikes have NO live feed — they are STATIC / IMPORT
+ONLY (the Fuel Watch report literally prints that). "Fix ingestion for every topic" is not
+possible as stated; there is nothing to pull for those. cargo_watch has a scraper but the
+APAC cargo-theft feeds are genuinely thin (few accepted items), so it moves slowly even when
+running. Cargo Map "0 geocoded" is a SEPARATE gap: the ingest inserts incidents with
+latitude/longitude = null (no geocoding step), so the map has nothing to plot.

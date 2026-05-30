@@ -8,8 +8,15 @@ import { cn } from "@/lib/utils";
 export default function Topic() {
   const [, params] = useRoute("/topics/:topic");
   const slug = params?.topic ?? "";
-  const topic = slug === "cargo-watch" ? "cargo_watch" : slug;
-  const label = TOPIC_LABELS[topic] ?? topic;
+  // Slug → label key (cargo-watch URL uses an underscored topic id).
+  const labelKey = slug === "cargo-watch" ? "cargo_watch" : slug;
+  // Data topic. The "protests" monitor is fed by the scraper under the
+  // "flashpoint" topic (the scraper writes topic='flashpoint'; "protests" is a
+  // legacy/manual snapshot with no live feed). Resolve it to the live topic so
+  // the monitor reflects fresh ingested data — consistent with the
+  // protests→flashpoint mapping the reports / data-status already use.
+  const topic = labelKey === "protests" ? "flashpoint" : labelKey;
+  const label = TOPIC_LABELS[labelKey] ?? topic;
 
   const { data: incidents = [], isLoading } = useListIncidents({ topic: topic as never });
   const { data: counts = [] } = useGetIncidentCountsByTopic({ days: 30 });
