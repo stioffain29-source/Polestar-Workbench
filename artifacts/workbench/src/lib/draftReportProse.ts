@@ -23,6 +23,7 @@
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
 import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
+import { selectFlashpointUsable } from "./flashpointReportDataset";
 
 export interface DraftableIncident extends ClassifiableIncident {
   severity: string;
@@ -602,22 +603,33 @@ export function draftTopicReportProse(opts: {
   incidents: DraftableIncident[];
 }): TopicReportProse {
   const { topic, issueDate, incidents } = opts;
-  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
-  const inWindow = rawWindow.filter((i) =>
-    isTopicRelevant(topic, {
-      topic: i.topic,
-      title: i.title ?? "",
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-      sourceUrl: null,
-      location: null,
-    }),
-  );
-  // Off-topic filter counts are internal Workbench bookkeeping and must
-  // never surface to the client. The executive summary is a judgement
-  // for the reader; "N off-topic records were filtered out before this
-  // read" is meta-commentary about the build pipeline.
-  void (rawWindow.length - inWindow.length);
+  // Flashpoint / protests reports share a single usable-incident selector
+  // with the report dataset (merged flashpoint+protests buckets, with
+  // kinetic / court / crime / novelty / weak-operational noise removed).
+  // Using it here guarantees the seeded prose's "quiet vs populated"
+  // decision — and the lead country it names — can never contradict the
+  // Fast Facts count or the Related Incidents table the report renders.
+  const isFlashpoint = topic === "flashpoint" || topic === "protests";
+  let inWindow: DraftableIncident[];
+  if (isFlashpoint) {
+    inWindow = selectFlashpointUsable(
+      incidents as unknown as Parameters<typeof selectFlashpointUsable>[0],
+      topic,
+      issueDate,
+    ).enriched as unknown as DraftableIncident[];
+  } else {
+    const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
+    inWindow = rawWindow.filter((i) =>
+      isTopicRelevant(topic, {
+        topic: i.topic,
+        title: i.title ?? "",
+        summary: i.summary ?? null,
+        source: i.source ?? null,
+        sourceUrl: null,
+        location: null,
+      }),
+    );
+  }
   const pack = packFor(topic);
   const total = inWindow.length;
   const ctx: BuildCtx = {

@@ -298,10 +298,33 @@ function titleWithoutSource(title: string): string {
 }
 const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|argentina|brazil|chile|peru|colombia|mexico|venezuela|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
 const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu)\b/i;
+// Defence procurement / weapons-system news (missile offers, arms deals,
+// fighter-jet / submarine acquisitions). The classifier keeps these on the
+// word "strike" ("precision strike", "strike range") but they carry no
+// public-order signal. Dropped unless a live public-order hook is present.
+const MILITARY_PROCUREMENT_RE = /\b(brahmos|s-400|rafale|missile (system|deal|export|offer|sale|test|launch|range|programme|program)|arms (deal|export|sale|package|race)|defen[cs]e (deal|export|pact|procurement|acquisition|ministry|budget)|fighter (jet|aircraft)|submarine (deal|deployment|acquisition)|warship (deal|commission)|weapons? (export|sale|deal|system|programme|program)|precision[- ]strike (range|capabilit))\b/i;
+// Legislative / parliamentary process (a bill passing, cabinet clearing a
+// law). Wire copy often mentions "opposition protests" rhetorically, so the
+// classifier files it as Protest, but it is not a street event. Dropped
+// unless a live public-order hook (crowd, march, tear gas, road closure) is
+// present in the same record.
+const LEGISLATIVE_PROCESS_RE = /\b(passes? (a |the )?bill|bill (to|that|which|on|aims?|seeks?)|parliament (passes|approves|clears|debates?|votes?|tables?)|cabinet (approves|clears|okays?|nods?|backs?)|tables? (a |the )?bill|ordinance (issued|promulgated|passed)|legislation (passed|cleared|tabled|introduced|approved)|enacts? (a )?law|signed into law|upper house|lower house|national assembly (passes|approves|clears)|diet (passes|approves|enacts)|senate (passes|approves|clears)|amendment (passed|cleared|approved)|co[- ]payments?)\b/i;
+// Sports reporting that trips the "strike / rally / march" keywords
+// (a striker's goal, a tennis rally, a title march). Broader than the
+// named-league filter above. Dropped unless a live public-order hook is
+// present.
+const SPORTS_CONTEXT_RE = /\b(football|soccer|cricket|rugby|hockey|tennis|basketball|baseball|golf|striker|goalkeeper|midfielder|free[- ]kick|penalty (kick|shoot[- ]?out)|equalis(er|e)|equaliz(er|e)|hat[- ]trick|grand slam|premier league|champions league|world cup|olympic|test match|t20|odi|\d+[- ]second strike|winning goal|scored? (the|a|his|her|twice|again))\b/i;
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (LICENSABLE_PHOTO_RE.test(text)) return true;
   if (SPORTS_LEAGUE_RE.test(text) && SPORTS_PROTEST_VERB_RE.test(text)) return true;
+  // Sports keyword noise ("striker", "rally", "title march") with no live
+  // public-order signal.
+  if (SPORTS_CONTEXT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Defence-procurement / weapons-system wire copy caught on "strike".
+  if (MILITARY_PROCUREMENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Legislative-process reporting ("passes bill") with no street event.
+  if (LEGISLATIVE_PROCESS_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (SUSPENDED_STRIKE_RE.test(text)) return true;
   if (SUSPENDED_STRIKE_REV_RE.test(text)) return true;
   // Martial-law legal-process: drop unless the same record carries a
@@ -514,18 +537,32 @@ function joinList(items: string[]): string {
 }
 
 // --- Dataset builder -------------------------------------------------------
-export function buildFlashpointReportDataset(
+export interface FlashpointSelection {
+  /** The single clean, usable incident set the report renders from:
+   *  merged flashpoint+protests buckets, in window, on-topic, with
+   *  kinetic-only, court-only, out-of-scope (crime), novelty and
+   *  weak-operational noise removed, and syndicated duplicates collapsed. */
+  enriched: EnrichedIncident[];
+  kineticDropped: number;
+  courtDropped: number;
+  dedupedDropped: number;
+  weakDropped: number;
+}
+
+/**
+ * Single source of truth for "which incidents are usable in a Flashpoint /
+ * Protests report". Used by BOTH the report dataset (Fast Facts, country
+ * chart, reads, Related Incidents) AND the draft-prose seeder, so the
+ * record count, the narrative and the table can never contradict each
+ * other.
+ */
+export function selectFlashpointUsable(
   incidents: FlashpointReportIncident[],
   topic: string,
   issueDate: string,
-): FlashpointReportDataset {
-  const win = resolveReportWindow(topic, issueDate);
-
-  // Flashpoint reports draw from BOTH `flashpoint` and `protests` topic
-  // buckets: legacy Civil-Unrest imports landed in `protests`, while the
-  // live regional scraper writes to `flashpoint`. Operationally they are
-  // the same bucket (activism, protest, strike, civil unrest), so filter
-  // by date here and let isTopicRelevant() do the content-level gating.
+): FlashpointSelection {
+  // Flashpoint reports draw from BOTH `flashpoint` (live scraper) and
+  // `protests` (legacy import) buckets — operationally the same bucket.
   const isFlashpointBucket = (i: FlashpointReportIncident) =>
     i.topic === "flashpoint" || i.topic === "protests";
   const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate).filter(isFlashpointBucket);
@@ -544,22 +581,41 @@ export function buildFlashpointReportDataset(
   const scoped = onTopic.filter((r) => !isKineticOnly(r) && !isCourtOnly(r));
 
   // Flashpoint is activism, protests and civil unrest only — not crime.
-  // Hard-drop armed-robbery, armed-group activity, generic crime and
-  // public-safety classifications at the dataset root so they cannot
-  // shape Fast Facts, the country chart, Executive Summary or Polestar
-  // View. (Previously these were only filtered at Related Incidents,
-  // which let crime records contaminate top-line counts.)
-  const enrichedAllUnfiltered = sortByDateDesc(enrich(scoped));
-  const enrichedAll = enrichedAllUnfiltered.filter((r) => !isOutOfScopeIssue(r));
+  // Drop armed-robbery / armed-group / generic-crime classifications.
+  const enrichedInScope = sortByDateDesc(enrich(scoped)).filter((r) => !isOutOfScopeIssue(r));
   // Two-pass dedupe so syndicated rewrites of the same protest don't
   // dominate the operational read.
-  const enriched = dedupeByTitle(enrichedAll);
+  const enrichedDeduped = dedupeByTitle(enrichedInScope);
+  // Single usable set: also strip novelty and weak-operational noise
+  // (sports "strikes", defence-procurement wire copy, legislative-process
+  // items, suspended strikes, stock-photo captions). This is what every
+  // surface counts and renders, so Fast Facts, prose and the Related
+  // Incidents table all agree.
+  const enriched = enrichedDeduped.filter((r) => !isWeakNovelty(r) && !isWeakOperational(r));
 
-  // Activism / civil-unrest views: hide novelty items from the
-  // operational reads and tables. They stay in `enriched` so totals
-  // remain honest but never reach the lead or the protest table.
-  const activismRows = enriched.filter((r) => r.bucket === "activism" && !isWeakNovelty(r) && !isWeakOperational(r));
-  const unrestRows = enriched.filter((r) => r.bucket === "unrest" && !isWeakNovelty(r) && !isWeakOperational(r));
+  return {
+    enriched,
+    kineticDropped,
+    courtDropped,
+    dedupedDropped: enrichedInScope.length - enrichedDeduped.length,
+    weakDropped: enrichedDeduped.length - enriched.length,
+  };
+}
+
+export function buildFlashpointReportDataset(
+  incidents: FlashpointReportIncident[],
+  topic: string,
+  issueDate: string,
+): FlashpointReportDataset {
+  const win = resolveReportWindow(topic, issueDate);
+
+  const { enriched, kineticDropped, courtDropped, dedupedDropped, weakDropped } =
+    selectFlashpointUsable(incidents, topic, issueDate);
+
+  // Bucketed views for the operational reads and tables. `enriched` is
+  // already clean, so these are simple bucket splits.
+  const activismRows = enriched.filter((r) => r.bucket === "activism");
+  const unrestRows = enriched.filter((r) => r.bucket === "unrest");
 
   // Fast Facts
   const hs = highestSeverity(enriched);
@@ -669,9 +725,11 @@ export function buildFlashpointReportDataset(
   if (courtDropped > 0) {
     noteParts.push(`${courtDropped} court-only legal-process record${courtDropped === 1 ? " was" : "s were"} excluded for lack of a civil-unrest hook.`);
   }
-  const dedupedDropped = enrichedAll.length - enriched.length;
   if (dedupedDropped > 0) {
     noteParts.push(`${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? " was" : "s were"} collapsed via two-pass title and topic-signature dedupe.`);
+  }
+  if (weakDropped > 0) {
+    noteParts.push(`${weakDropped} low-signal record${weakDropped === 1 ? " was" : "s were"} excluded — sports, defence-procurement, legislative-process and stock-photo items that carry the protest or strike keywords but no live public-order signal.`);
   }
   const dataNote = noteParts.length > 0
     ? noteParts.join(" ")
