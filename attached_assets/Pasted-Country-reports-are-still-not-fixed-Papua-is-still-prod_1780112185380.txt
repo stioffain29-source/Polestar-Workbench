@@ -1,0 +1,74 @@
+Country reports are still not fixed.
+
+Papua is still producing a generic country report rather than a Papua-specific operational report. This needs a root-cause fix, not another wording patch.
+
+Problem observed:
+The Papua report still reads like generic country-risk prose. It does not produce a useful Papua-specific report based on the actual Papua / West Papua operating environment, record set, or report purpose.
+
+Required outcome:
+Papua and PNG country reports must produce specific, evidence-based operational reports, not generic country templates.
+
+Investigate and fix the country-report engine.
+
+Check and fix the following:
+
+1. Country baseline
+Confirm whether Papua has a proper country baseline.
+If it does not, create one.
+The Papua baseline must be distinct from PNG and must cover Indonesian Papua / West Papua, not Papua New Guinea.
+
+2. Country matching
+Confirm that the Papua report is pulling:
+- Papua
+- West Papua
+- Papua Pegunungan / Highland Papua
+- Papua Tengah / Central Papua
+- Papua Selatan / South Papua
+- Papua Barat Daya / Southwest Papua
+- Papua Barat
+
+Confirm that PNG records are not leaking into the Papua report unless explicitly cross-border.
+
+3. Record evidence
+Show how many Papua-specific records exist in:
+- 7-day window
+- 30-day window
+- 90-day window
+
+If the 7-day window is thin, the report must clearly use 30/90-day context and say so.
+
+4. Remove generic fallback prose
+Do not allow generic country-risk template text to stand in for Papua.
+If there is not enough data, say “limited recent reporting” and use 30/90-day context. Do not invent bland country prose.
+
+5. Papua-specific report content
+The Papua report should include specific operational issues where supported by data, such as:
+- public order and protest activity
+- police / military activity
+- separatist or armed-group related disruption
+- mining and resource-sector exposure
+- road and air access constraints
+- localised unrest
+- arrests, crackdowns, demonstrations or community action
+- source coverage limitations
+
+6. Cards and prose alignment
+Fast Facts, 30-day context, 90-day background and prose must all use the same country-filtered dataset.
+If the cards show low or zero activity, the prose must not pretend the week was active.
+
+7. Production proof
+Do not prove this from dev only.
+After fixing, show:
+- live production Papua report screenshot
+- PDF exported from that same screen
+- 7/30/90-day record counts
+- latest record date
+- last updated date
+- confirmation that the report is Papua-specific, not generic
+
+8. PNG separately
+Do the same check for Papua New Guinea.
+PNG and Papua must remain separate reports with separate baselines, separate matching, and separate narrative logic.
+
+Do not change colours, branding, fonts, cover, or layout.
+Fix the data, baseline, matching and narrative generation so the country reports are actually country-specific.

@@ -50,3 +50,25 @@ That list must include every structured alias that can appear in a tag — Engli
 and Indonesian (`west papua` AND `papua barat`, plus the province pairs). If
 `WEST_PAPUA_CONTEXT_RE` knows an alias the group list doesn't, a real
 cross-border record using that alias gets over-stripped.
+
+# Per-country operational overrides vs the generic template
+
+`draftCountryReportProse` ends with a GENERIC template and a chain of per-country
+override blocks (each `if (isX) { ...; return; }`). Low-volume, restricted-reporting
+countries (PNG, Indonesian Papua) MUST have their own override or they fall through
+to bland placeholder prose ("X sits in {region}… coverage gap… journey-management
+discipline"). The trigger is a thin/empty **7-day** window: these countries routinely
+report 0 records in 7 days (Papua 7d=0, 30d≈39, 90d≈102), which lands them in the
+generic zero-state branch even though the baseline + 30/90-day layers are rich.
+
+**Why:** The complaint "Papua reads generic" was NOT a baseline/matching bug — both
+were correct. It was the missing override. PNG had one; Papua didn't.
+
+**How to apply:** Add the override AFTER any earlier early-returning block so the
+name regex can't collide (the `isPNG` block returns before `isPapua` is tested, so
+`/\bpapua\b/i` is safe — it never sees "Papua New Guinea"). The override must (a) be
+honest when 7d=0 ("No relevant incidents were recorded in the 7-day window"), never
+implying an active week, and (b) explicitly defer the standing pattern to the 30/90-day
+context sections (rendered separately by the component from the same country-filtered
+dataset). Cards and prose already share one `incidents` array filtered by
+`incidentMatchesCountry`, so they stay aligned automatically.

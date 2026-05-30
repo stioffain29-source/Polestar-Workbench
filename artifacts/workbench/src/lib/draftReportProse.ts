@@ -802,6 +802,71 @@ export function draftCountryReportProse(opts: {
     };
   }
 
+  // Indonesian Papua / West Papua — distinct from PNG above (which returns
+  // early). This is the Indonesian-administered western half of New Guinea
+  // (six provinces), NOT Papua New Guinea. Like PNG it is a low-volume,
+  // restricted-reporting environment where foreign press/NGO access is
+  // tightly controlled, so a thin or empty 7-day window is the norm and the
+  // generic country template reads as a placeholder. Name the standing
+  // operating signature and lean explicitly on the 30 / 90-day context
+  // sections rather than inventing bland country prose.
+  const isPapua = /\bpapua\b/i.test(name);
+  if (isPapua) {
+    const currentSentence = total === 0
+      ? "No relevant incidents were recorded in the 7-day window."
+      : total === 1
+        ? "The 7-day window holds one record."
+        : `The 7-day window holds ${total} records.`;
+
+    const papua = {
+      executiveSummary: total === 0
+        ? `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment spanning the six provinces of the Indonesian half of New Guinea. ${currentSentence} That is normal for a region where foreign press and NGO access is tightly controlled — read it as a coverage gap, not a calm operating picture. The standing operational signature — student and church-led protest out of Jayapura and Manokwari, TNI/POLRI security operations in the central highlands, TPNPB-OPM armed-group activity around Nduga, Intan Jaya and the Freeport Grasberg corridor at Timika, and severe highland access constraints — is carried in the 30-day and 90-day context sections below as background pattern, not as fresh weekly activity.`
+        : `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment spanning the six provinces of the Indonesian half of New Guinea. ${currentSentence} The current-cycle reporting points to ${types || "protest and security-operation activity"}, which is the practical concern for any footprint in the coastal cities or the resource corridors. The 30-day and 90-day context sections widen the lookback to keep highland insurgency, commemoration-date protest cycles and resource-sector exposure in view; treat them as background risk rather than live events. Reporting access in Papua is genuinely constrained, so the weekly count should not be read as a measure of risk.`,
+
+      overview: total === 0
+        ? `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation — these are the standing operating picture, not this week's events. ${currentSentence} Treat the silence as a feature of restricted reporting access rather than a clean operating picture. The named risks above and anything older than seven days sit in the 30 / 90-day context sections below and should not be read as current activity.`
+        : `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation. The current cycle's read is the 7-day window only. ${currentSentence} Treat these as the active operational signal.${areaSentence ? ` ${areaSentence}` : ""} Anything older than seven days sits in the 30 / 90-day context sections below and should not be read as current activity.`,
+
+      trendSummary: total === 0
+        ? `Nothing fresh landed in the current 7-day window. The 30-day and 90-day context sections below carry the wider pattern — protest activity around Jayapura and Manokwari campuses and commemoration dates, highland security operations and TPNPB-OPM clashes, and resource-corridor friction around the Timika–Tembagapura (Freeport) and Bintuni (Tangguh LNG) belts — but those are background, not current activity. Treat them as standing-risk reference, not as something that happened this week.`
+        : `The current 7-day window points to ${types || "protest and security-operation activity"} in or around ${leadArea || "the named areas"}. That is the active signal. Anything beyond this week — student protest cycles, highland clashes and TPNPB-OPM activity, Freeport convoy security and cross-border movement on the PNG frontier — sits in the 30 / 90-day context sections and should be read as background pattern rather than current activity.`,
+
+      implications: [
+        "- Confirm Surat Jalan / travel-permit status before any movement into the highlands; access can be withdrawn at short notice during security operations.",
+        "- Plan highland and interior travel by air via Sentani, Timika, Wamena, Manokwari or Sorong; treat road movement on the Trans-Papua corridor as weather- and security-dependent.",
+        "- Hold heightened journey management around Jayapura and Manokwari campuses and government sites on commemoration dates (1 May, 1 December, 19 December) and during student protest cycles.",
+        "- For resource-sector footprints, confirm convoy security and TNI/POLRI and contracted-security coordination on the Timika–Tembagapura (Freeport) and Bintuni Bay (Tangguh LNG) corridors.",
+        "- Build in tolerance for internet shutdowns and cellular blackspots; carry HF/VHF or satellite comms for highland and interior work.",
+        "- Confirm out-of-province medevac arrangements (Makassar / Jakarta / Singapore); in-province tier-1 care is not available and highland evacuation is weather-dependent.",
+        "- Treat thin weekly reporting as restricted access, not low risk; cross-check local-language and church / NGO sources before standing down posture.",
+      ].join("\n"),
+
+      watchNext: [
+        "- Renewed student or church-led protest out of Jayapura, Manokwari or Sorong, especially around commemoration dates.",
+        "- TNI/POLRI security operations or TPNPB-OPM clashes in Nduga, Intan Jaya, Puncak, Puncak Jaya or Yahukimo.",
+        "- Armed-group activity or convoy incidents on the Timika–Tembagapura (Freeport Grasberg) corridor.",
+        "- Labour or indigenous-rights friction around the Tangguh LNG / Bintuni Bay belt and South Papua plantation concessions.",
+        "- Highland access disruption — landslide closures on the Trans-Papua corridor, weather-grounded airstrips or operation-driven district lockdowns.",
+        "- Internet or communications shutdowns imposed in response to unrest.",
+        "- Cross-border movement or refugee flows on the Keerom / Pegunungan Bintang / Boven Digoel frontier with Papua New Guinea.",
+      ].join("\n"),
+
+      polestarView: total === 0
+        ? `${name} should be treated as a restricted-reporting, high-friction operating environment where a quiet week reflects access limits, not low risk. ${currentSentence} The standing concerns — highland insurgency and security operations, protest cycles in the coastal cities, and resource-corridor exposure at Freeport and Tangguh — sit in the 30 / 90-day context as background pattern, not current activity. Business users should focus on permit and movement discipline, air-first highland travel, resilient communications and clear out-of-province medevac triggers.`
+        : `${name} should be treated as a restricted-reporting, high-friction operating environment. A quiet week does not equal low risk. The current incidents point to ${types || "protest and security-operation activity"}, while the 30 / 90-day context keeps highland insurgency, protest cycles and resource-corridor exposure in view. Business users should focus on permit and movement discipline, air-first highland travel, resilient communications and clear out-of-province medevac triggers.`,
+    };
+
+    return {
+      executiveSummary: papua.executiveSummary,
+      whatMatters,
+      watchNext: papua.watchNext,
+      polestarView: papua.polestarView,
+      overview: papua.overview,
+      trendSummary: papua.trendSummary,
+      implications: papua.implications,
+    };
+  }
+
   return {
     executiveSummary: total === 0
       ? `${name} reporting is light across the weekly window. The page captures what is on file, but the gap itself is the most important read — coverage rather than calm.`
