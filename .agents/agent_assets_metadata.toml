@@ -234,3 +234,15 @@ id = "My1aCQpol0UEZX_VCzDyM"
 uri = "file://proof/8-papua-country.pdf"
 type = "pdf"
 title = "8 · Papua — PDF from that screen"
+
+[[outputs]]
+id = "GkObjBriDCXWpxxnc1tiC"
+uri = "file://screenshots/prod_proof/papua.png"
+type = "image"
+title = "LIVE Production — Papua report (Indonesian West Papua, specific prose)"
+
+[[outputs]]
+id = "EDtXH63yshNcDXkuqIylH"
+uri = "file://screenshots/prod_proof/papua-new-guinea.png"
+type = "image"
+title = "LIVE Production — Papua New Guinea report (separate, PNG-specific)"

@@ -181,23 +181,28 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
     if (title !== "LOCATION WATCHLIST" && title !== "RELATED INCIDENTS") return;
 
     const section = heading.closest("section");
-    const table = section?.querySelector<HTMLElement>("div[style*='overflow']");
-    if (!table) return;
+    if (!section) return;
 
-    const rows = Array.from(table.children).filter((child) =>
-      (child as HTMLElement).classList.contains("grid")
-    ) as HTMLElement[];
+    const isWatchlist = title === "LOCATION WATCHLIST";
+    const isRelated = title === "RELATED INCIDENTS";
+    const expectedCells = isWatchlist ? 6 : 4;
+    const rows = Array.from(section.querySelectorAll<HTMLElement>(".grid"))
+      .filter((row) => row.children.length === expectedCells);
+    if (rows.length === 0) return;
 
-    table.style.width = "100%";
-    table.style.overflow = "visible";
+    const table = rows[0].parentElement;
+    if (table) {
+      table.style.width = "100%";
+      table.style.overflow = "visible";
+      table.style.borderCollapse = "collapse";
+    }
+
+    const bodyRowMinHeight = isWatchlist ? "54px" : "58px";
 
     rows.forEach((row, rowIndex) => {
-      const isWatchlist = title === "LOCATION WATCHLIST";
-      const isRelated = title === "RELATED INCIDENTS";
-
       row.style.display = "grid";
       row.style.alignItems = "center";
-      row.style.minHeight = rowIndex === 0 ? "40px" : "54px";
+      row.style.minHeight = rowIndex === 0 ? "40px" : bodyRowMinHeight;
       row.style.overflow = "visible";
       if (isWatchlist) {
         row.style.gridTemplateColumns = "170px minmax(0, 1fr) 54px 54px 54px 170px";
@@ -207,25 +212,24 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
 
       const cells = Array.from(row.children) as HTMLElement[];
       cells.forEach((cell, cellIndex) => {
+        const isHeader = rowIndex === 0;
+        const isNumericCell = isWatchlist && cellIndex >= 2 && cellIndex <= 4;
+        const isBadgeCell = (isWatchlist && cellIndex === 5) || (isRelated && cellIndex === 3);
+        const isLeftCell = !isNumericCell && !isBadgeCell;
+
         cell.style.display = "flex";
         cell.style.alignItems = "center";
         cell.style.boxSizing = "border-box";
         cell.style.minHeight = row.style.minHeight;
         cell.style.height = "100%";
-        cell.style.padding = "10px 12px";
-        cell.style.lineHeight = "1.35";
+        cell.style.padding = isHeader ? "0 12px" : "10px 12px";
+        cell.style.lineHeight = isHeader ? "1" : "1.35";
         cell.style.overflow = "visible";
 
-        const isNumericCell = isWatchlist && cellIndex >= 2 && cellIndex <= 4;
-        const isBadgeCell = (isWatchlist && cellIndex === 5) || (isRelated && cellIndex === 3);
-
-        if (isNumericCell) {
+        if (isBadgeCell || isNumericCell) {
           cell.style.justifyContent = "center";
           cell.style.textAlign = "center";
-        } else if (isBadgeCell) {
-          cell.style.justifyContent = "center";
-          cell.style.textAlign = "center";
-        } else {
+        } else if (isLeftCell) {
           cell.style.justifyContent = "flex-start";
           cell.style.textAlign = "left";
         }
@@ -233,6 +237,10 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
         Array.from(cell.children).forEach((child) => {
           const el = child as HTMLElement;
           el.style.alignSelf = "center";
+          if (isBadgeCell) {
+            el.style.marginLeft = "auto";
+            el.style.marginRight = "auto";
+          }
         });
       });
     });
