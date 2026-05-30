@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
+import { classifySeverity } from "./severity";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Cargo Watch ingest core.
@@ -450,7 +451,7 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
     latitude: null,
     longitude: null,
     occurredAt: a.occurredAt,
-    severity: "low",
+    severity: classifySeverity(a.title, a.summary, "cargo_watch"),
     confidence: "low",
     source: a.source,
     sourceUrl: a.sourceUrl,

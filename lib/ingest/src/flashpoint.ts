@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import { db, incidentsTable, sourcesTable } from "@workspace/db";
 import { sql, eq, or, gte, isNotNull } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
+import { classifySeverity } from "./severity";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 const FEED_TIMEOUT_MS = 20000;
@@ -411,7 +412,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     latitude: null,
     longitude: null,
     occurredAt: a.occurredAt,
-    severity: "low",
+    severity: classifySeverity(a.title, a.summary, "flashpoint"),
     confidence: "low",
     source: a.source,
     sourceUrl: a.sourceUrl,

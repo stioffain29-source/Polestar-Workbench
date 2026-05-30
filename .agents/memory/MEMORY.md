@@ -5,3 +5,4 @@
 - [protests vs flashpoint topic split](topic-protests-vs-flashpoint.md) — the "Protests & Civil Unrest" monitor must read the live `flashpoint` topic; `protests` is a dead snapshot no feed writes.
 - [Report data provenance & PDF parity](report-data-provenance.md) — in-app PDF rasterises the on-screen DOM (screen==PDF free); data-status uses incident dates not the sources table; protests→flashpoint topic mapping; non-destructive stale-prose guard compares by calendar date.
 - [Live-prod report+PDF proof](live-prod-report-proof.md) — drive prod URL with Playwright (REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE) to click in-app Download PDF; screen==PDF is architectural, so prove prod renders current data.
+- [Incident severity classification](incident-severity-classification.md) — severity rated from text via shared classifySeverity (extreme reserved); a lib-level backfill re-rates historical auto-scraped rows because scraper dedupe never re-touches them.
