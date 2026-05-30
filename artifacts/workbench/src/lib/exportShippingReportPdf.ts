@@ -3,12 +3,13 @@ import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
   setRoboto, ensureRobotoLoaded,
   drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages, prepareCoverImage,
+  drawPolestarCover, beginBodyPages, prepareCoverImage, drawDataAsOf,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize,
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx,
 } from "./pdfChrome";
+import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
@@ -442,6 +443,7 @@ export async function exportShippingReportPdf(
   });
   void cadence;
   beginBodyPages(ctx);
+  drawDataAsOf(ctx, formatDataAsOfLine(computeDataAsOf({ topic: "shipping", incidents })));
 
   if (data.executiveSummary && data.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");

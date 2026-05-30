@@ -12,6 +12,8 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import DataAsOfBanner from "@/components/DataAsOfBanner";
+import { computeDataAsOf } from "@/lib/reportDataStatus";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { ArrowLeft, Download, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
@@ -483,6 +485,12 @@ export default function CountryReport() {
         </div>
 
         <div className="px-10 py-10 space-y-8">
+      <DataAsOfBanner
+        data={{
+          ...computeDataAsOf({ topic: "country", incidents, filterByTopic: false }),
+          modeLabel: "Mixed sources (live, manual & static)",
+        }}
+      />
       <div
         className="hidden"
         style={{

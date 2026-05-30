@@ -18,6 +18,8 @@ import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { latestRecordDate } from "@/lib/reportDataStatus";
+import { format, parseISO } from "date-fns";
 import {
   FUEL_MARKET_DATA_SAMPLE,
   validateFuelHardNumbersJson,
@@ -87,6 +89,28 @@ export default function ReportEditor() {
   const { data: incidents } = useListIncidents({});
   const seededForId = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  // Staleness check shared by the seeding effect and the live warning banner.
+  // A report's window ends on its issue DATE (day granularity). Prose is stale
+  // only when live data holds a record for the topic dated on a calendar day
+  // AFTER the issue date — a same-day-but-later timestamp is still in-window.
+  // Flashpoint reports carry topic "protests" but their incidents are stored
+  // under "flashpoint"; scope the freshness check to the data topic.
+  const computeStale = (
+    topic: string,
+    issueDate: string,
+  ): { latest: string; issueDate: string } | null => {
+    if (!issueDate) return null;
+    const dataTopic = topic === "protests" ? "flashpoint" : topic;
+    const latest = latestRecordDate(incidents ?? [], dataTopic);
+    if (!latest) return null;
+    const latestYmd = format(latest, "yyyy-MM-dd");
+    const issueYmd = issueDate.slice(0, 10);
+    if (latestYmd <= issueYmd) return null;
+    return {
+      latest: format(latest, "d MMM yyyy"),
+      issueDate: format(parseISO(issueYmd), "d MMM yyyy"),
+    };
+  };
   // Fuel Watch market-data editor. `hardNumbersText` is the textarea
   // buffer; `hardNumbersEdited` is the last-validated object surfaced
   // to the preview so authors see their edits live before saving.
@@ -191,7 +215,17 @@ export default function ReportEditor() {
       country: i.country,
     }));
     const draft = draftTopicReportProse({ topic, issueDate, incidents: inputs });
+
+    // Staleness guard: a report's window ends on its issue date. If live data
+    // holds records for this topic newer than the issue date, the saved prose
+    // was written against an older window and is stale. Seed the editor from
+    // the freshly generated draft instead of the stored prose. Non-destructive:
+    // nothing is written to the DB until the author clicks Save. The visible
+    // warning banner is computed live below (so it tracks issue-date edits).
+    const proseIsStale = computeStale(topic, issueDate) != null;
+
     const pick = (saved: string | null | undefined, drafted: string) => {
+      if (proseIsStale) return drafted;
       const s = (saved ?? "").trim();
       return s ? (saved as string) : drafted;
     };
@@ -454,6 +488,8 @@ export default function ReportEditor() {
   if (!report) return <div className="text-sm text-muted-foreground">Report not found.</div>;
 
   const scope = scopeFor(form.topic);
+  // Live freshness warning — recomputes as the author edits the issue date.
+  const staleProse = computeStale(form.topic, form.issueDate);
 
   return (
     <div className="max-w-[1900px] mx-auto space-y-4">
@@ -741,6 +777,19 @@ export default function ReportEditor() {
             </div>
           )}
         </div>
+
+        {staleProse && (
+          <div
+            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            style={{ borderColor: "#A33232", background: "#fbeeee", color: "#A33232" }}
+          >
+            <span style={{ fontWeight: 700 }}>Saved prose was stale.</span>{" "}
+            Newer records exist (latest {staleProse.latest}) than this report's issue
+            date ({staleProse.issueDate}). The editor has been reseeded from freshly
+            generated text for the current data. Review and Save to persist, or change
+            the issue date to re-cover the latest window.
+          </div>
+        )}
 
         <div ref={previewRef} className="bg-white border border-border rounded-sm overflow-hidden">
           {form.topic === "shipping" ? (

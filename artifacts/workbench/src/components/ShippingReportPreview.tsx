@@ -3,6 +3,8 @@ import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
+import DataAsOfBanner from "@/components/DataAsOfBanner";
+import { computeDataAsOf } from "@/lib/reportDataStatus";
 import {
   buildShippingReportDataset,
   type ShippingReportIncident,
@@ -544,6 +546,7 @@ export default function ShippingReportPreview({
       </div>
 
       <div className="px-10 py-10">
+        <DataAsOfBanner data={computeDataAsOf({ topic: "shipping", incidents })} />
         {report.executiveSummary && report.executiveSummary.trim() && (
           <Section title="Executive Summary">
             <Paragraphs text={report.executiveSummary} />

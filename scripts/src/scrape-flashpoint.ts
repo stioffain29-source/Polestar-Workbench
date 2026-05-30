@@ -188,7 +188,12 @@ async function main(): Promise<void> {
   const rejected: Rejected[] = [];
   const perFeed: Record<string, { found: number; accepted: number; rejected: number; error?: string }> = {};
 
-  for (const s of fetchable) {
+  // Feeds are fetched with bounded concurrency. Sequential fetching of
+  // ~39 feeds at a 20s-per-feed timeout can exceed two minutes, which is
+  // both slow for the scheduled deployment and unreliable to run from the
+  // workspace. Processing is otherwise identical and order-independent.
+  const CONCURRENCY = 8;
+  const processFeed = async (s: (typeof fetchable)[number]) => {
     perFeed[s.name] = { found: 0, accepted: 0, rejected: 0 };
     try {
       const parsed = await parser.parseURL(s.url!);
@@ -238,6 +243,9 @@ async function main(): Promise<void> {
           .where(eq(sourcesTable.id, s.id));
       }
     }
+  };
+  for (let i = 0; i < fetchable.length; i += CONCURRENCY) {
+    await Promise.allSettled(fetchable.slice(i, i + CONCURRENCY).map(processFeed));
   }
 
   // In-batch dedupe (key + URL).

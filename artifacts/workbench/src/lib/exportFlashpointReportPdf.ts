@@ -3,12 +3,13 @@ import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
   setRoboto, ensureRobotoLoaded,
   drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages, prepareCoverImage,
+  drawPolestarCover, beginBodyPages, prepareCoverImage, drawDataAsOf,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize,
   NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx,
 } from "./pdfChrome";
+import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
@@ -402,6 +403,15 @@ export async function exportFlashpointReportPdf(
   });
   void cadence;
   beginBodyPages(ctx);
+  drawDataAsOf(
+    ctx,
+    formatDataAsOfLine(
+      computeDataAsOf({
+        topic: data.topic === "protests" ? "flashpoint" : data.topic,
+        incidents,
+      }),
+    ),
+  );
 
   const ds = buildFlashpointReportDataset(incidents, data.topic, data.issueDate);
 

@@ -2,12 +2,13 @@ import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
   drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages, prepareCoverImage,
+  drawPolestarCover, beginBodyPages, prepareCoverImage, drawDataAsOf,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
   NAVY, POLAR, DUSK, WHITE, ELECTRIC, SEV_COLOR, SEV_LABEL, sevKey,
   type Ctx, type KpiCardData,
 } from "./pdfChrome";
+import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import {
   resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
 } from "./reportWindow";
@@ -531,6 +532,7 @@ export async function exportTopicReportPdf(
   void cadence;
   // Body pages start here, each with the gradient header band.
   beginBodyPages(ctx);
+  drawDataAsOf(ctx, formatDataAsOfLine(computeDataAsOf({ topic: data.topic, incidents })));
 
   if (data.executiveSummary && data.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");

@@ -2,6 +2,8 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import DataAsOfBanner from "@/components/DataAsOfBanner";
+import { computeDataAsOf } from "@/lib/reportDataStatus";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildFlashpointReportDataset,
@@ -415,6 +417,12 @@ export default function FlashpointReportPreview({
       </div>
 
       <div className="px-10 py-10">
+        <DataAsOfBanner
+          data={computeDataAsOf({
+            topic: report.topic === "protests" ? "flashpoint" : report.topic ?? "flashpoint",
+            incidents,
+          })}
+        />
         <Section title="Executive Summary">
           <Paragraphs text={execText} />
         </Section>

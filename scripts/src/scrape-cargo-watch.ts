@@ -291,7 +291,10 @@ async function main(): Promise<void> {
   const feedErrors: { feed: string; error: string }[] = [];
   const perFeed: Record<string, { found: number; accepted: number; rejected: number }> = {};
 
-  for (const feed of FEEDS) {
+  // Bounded concurrency: sequential fetching of all feeds at a 20s-per-feed
+  // timeout can exceed two minutes. Processing is order-independent.
+  const CONCURRENCY = 8;
+  const processFeed = async (feed: (typeof FEEDS)[number]) => {
     perFeed[feed.label] = { found: 0, accepted: 0, rejected: 0 };
     try {
       const parsed = await parser.parseURL(feed.url);
@@ -337,6 +340,9 @@ async function main(): Promise<void> {
       const msg = err instanceof Error ? err.message : String(err);
       feedErrors.push({ feed: feed.label, error: msg });
     }
+  };
+  for (let i = 0; i < FEEDS.length; i += CONCURRENCY) {
+    await Promise.allSettled(FEEDS.slice(i, i + CONCURRENCY).map(processFeed));
   }
 
   // In-batch dedupe (multiple feeds can return the same article).

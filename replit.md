@@ -22,11 +22,22 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Data-status model (live/manual/static + "Data as of" line): `artifacts/workbench/src/lib/reportDataStatus.ts` (`computeDataAsOf`, `formatDataAsOfLine`, `latestRecordDate`).
+- On-screen/in-PDF provenance strip: `artifacts/workbench/src/components/DataAsOfBanner.tsx`; headless equivalent `drawDataAsOf` in `src/lib/pdfChrome.ts`.
+- Scrapers (data ingestion): `scripts/src/scrape-flashpoint.ts`, `scripts/src/scrape-cargo-watch.ts` (run via `pnpm --filter @workspace/scripts run scrape:flashpoint|scrape:cargo-watch`, add `--commit` to write).
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The in-app "Download PDF" button (`ReportEditor.downloadPdf`) does NOT use the jsPDF builders — it rasterises the on-screen `.print-report` DOM via `exportElementToPdf`. So screen == in-app PDF is automatic. The jsPDF builders (`exportTopicReportPdf`/`exportShippingReportPdf`/`exportFlashpointReportPdf`/`exportCountryReportPdf`) are used ONLY by the headless scripts.
+- Because of the above, the "Data as of" line lives in the React previews (covers screen + in-app PDF at once) AND in the jsPDF builders via `drawDataAsOf` (covers headless export).
+- Ingestion status: flashpoint + cargo_watch + protests = "manual" (scraper-fed); fuel/fertiliser/shipping/energy/missile = "static" (import only). `latestRecord` = max(occurredAt); `lastUpdated` = max(createdAt) per topic — computed from the loaded incidents, not the `sources` table (the cargo scraper does not update `sources.lastSuccessAt`).
+- Flashpoint reports carry topic `protests` but their incidents are stored under `flashpoint`; the data-as-of and staleness logic maps `protests` → `flashpoint` for scoping.
+- Stale-prose guard: a report's window ends on its issue date. If live data holds records newer than the issue date, the editor reseeds prose from a fresh draft and shows a subdued-red (no-print) warning. Non-destructive — nothing persists until Save.
+
+## Production ingestion (read-only prod DB)
+
+- The production database is READ-ONLY from the workspace, so scrapers cannot write prod from here. Production data refresh must run INSIDE the deployment environment.
+- Mechanism: a Scheduled Deployment running, e.g. `pnpm --filter @workspace/scripts run scrape:flashpoint -- --commit && pnpm --filter @workspace/scripts run scrape:cargo-watch -- --commit`. This must be created/published by the user (see the `deployment` skill); it cannot be provisioned from the workspace.
 
 ## Product
 

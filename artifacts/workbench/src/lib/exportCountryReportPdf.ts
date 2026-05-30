@@ -11,6 +11,7 @@ import {
   drawFooters,
   drawPolestarCover,
   beginBodyPages,
+  drawDataAsOf,
   prepareCoverImage,
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
@@ -32,6 +33,7 @@ import {
   type Ctx,
   type KpiCardData,
 } from "./pdfChrome";
+import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import { COUNTRY_COVER_URLS } from "./coverImages";
 import { relatedIncidentsLimit, resolveReportWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
@@ -580,6 +582,13 @@ export async function exportCountryReportPdf(
     coverImage,
   });
   beginBodyPages(ctx);
+  drawDataAsOf(
+    ctx,
+    formatDataAsOfLine({
+      ...computeDataAsOf({ topic: "country", incidents, filterByTopic: false }),
+      modeLabel: "Mixed sources (live, manual & static)",
+    }),
+  );
 
   // 1. Executive Summary
   drawNarrative(

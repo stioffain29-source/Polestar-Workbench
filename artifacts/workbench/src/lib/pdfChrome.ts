@@ -177,6 +177,28 @@ export function beginBodyPages(ctx: Ctx) {
   drawPageHeader(ctx);
 }
 
+/**
+ * Draw the "Data as of" provenance strip at the top of the body. Mirrors the
+ * on-screen <DataAsOfBanner>: Polar-Gray field, Navy/Dusk text, Roboto only.
+ * Call once immediately after beginBodyPages(), before the first section.
+ */
+export function drawDataAsOf(ctx: Ctx, line: string) {
+  const { pdf, MX, CW } = ctx;
+  const padX = 8;
+  const boxH = 18;
+  setFill(pdf, "#f5f5f7");
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.6);
+  pdf.rect(MX, ctx.y, CW, boxH, "FD");
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  pdf.text(sanitize(line), MX + padX, ctx.y + boxH / 2 + 2.8);
+  ctx.y += boxH + 12;
+  setText(pdf, DUSK);
+  setFill(pdf, NAVY);
+}
+
 export function newPage(ctx: Ctx) {
   ctx.pdf.addPage();
   ctx.y = ctx.TOP;
