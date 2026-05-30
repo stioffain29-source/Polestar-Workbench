@@ -313,7 +313,7 @@ const LEGISLATIVE_PROCESS_RE = /\b(passes? (a |the )?bill|bill (to|that|which|on
 // (a striker's goal, a tennis rally, a title march). Broader than the
 // named-league filter above. Dropped unless a live public-order hook is
 // present.
-const SPORTS_CONTEXT_RE = /\b(football|soccer|cricket|rugby|hockey|tennis|basketball|baseball|golf|striker|goalkeeper|midfielder|free[- ]kick|penalty (kick|shoot[- ]?out)|equalis(er|e)|equaliz(er|e)|hat[- ]trick|grand slam|premier league|champions league|world cup|olympic|test match|t20|odi|\d+[- ]second strike|winning goal|scored? (the|a|his|her|twice|again))\b/i;
+const SPORTS_CONTEXT_RE = /\b(football|soccer|cricket|rugby|hockey|tennis|basketball|baseball|golf|striker|goalkeeper|midfielder|free[- ]kick|penalty (kick|shoot[- ]?out)|equalis(er|e)|equaliz(er|e)|hat[- ]trick|grand slam|premier league|champions league|world cup|olympic|test match|t20|odi|\d+[- ]second strike|winning goal|scored? (the|a|his|her|twice|again)|rally\s?[12]\b|wrc\b|dirtfish|autosport|motorsport|moto\s?gp|grand prix|formula\s?1\b|\bf1\b|special stage|\bss\d+\b)\b/i;
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (LICENSABLE_PHOTO_RE.test(text)) return true;

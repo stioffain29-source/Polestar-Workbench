@@ -178,42 +178,40 @@ function cellText(cell: Element | undefined): string {
   return (cell?.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
-function severityChip(label: string, color: string, width = 92, height = 20): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", String(width));
-  svg.setAttribute("height", String(height));
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.style.display = "block";
-  svg.style.margin = "0 auto";
-  svg.style.overflow = "visible";
+function severityChip(label: string, color: string, width = 92, height = 20): HTMLCanvasElement {
+  const displayLabel = label.toUpperCase();
+  const canvas = document.createElement("canvas");
+  const scale = 3;
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.style.display = "block";
+  canvas.style.margin = "0 auto";
 
-  const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  rect.setAttribute("x", "0");
-  rect.setAttribute("y", "0");
-  rect.setAttribute("width", String(width));
-  rect.setAttribute("height", String(height));
-  rect.setAttribute("rx", "2");
-  rect.setAttribute("fill", color || "#999999");
-  svg.appendChild(rect);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  ctx.scale(scale, scale);
+  ctx.fillStyle = color || "#999999";
+  ctx.fillRect(0, 0, width, height);
 
-  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  text.setAttribute("x", String(width / 2));
-  text.setAttribute("y", String(height / 2));
-  text.setAttribute("fill", WHITE);
-  text.setAttribute("text-anchor", "middle");
-  text.setAttribute("dominant-baseline", "central");
-  text.setAttribute("font-family", "Roboto, Arial, sans-serif");
-  text.setAttribute("font-size", "10");
-  text.setAttribute("font-weight", "700");
-  text.setAttribute("letter-spacing", "0.08em");
-  text.textContent = label.toUpperCase();
-  svg.appendChild(text);
+  let fontSize = displayLabel.length >= 8 ? 8.5 : 10;
+  ctx.font = `700 ${fontSize}px Roboto, Arial, sans-serif`;
+  while (ctx.measureText(displayLabel).width > width - 14 && fontSize > 7) {
+    fontSize -= 0.5;
+    ctx.font = `700 ${fontSize}px Roboto, Arial, sans-serif`;
+  }
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(displayLabel, width / 2, height / 2);
 
-  return svg;
+  return canvas;
 }
 
 function makeTableCell(text: string, options: {
   align?: "left" | "center" | "right";
+  valign?: "top" | "center";
   bold?: boolean;
   color?: string;
   fontSize?: string;
@@ -223,15 +221,15 @@ function makeTableCell(text: string, options: {
   const cell = document.createElement("div");
   cell.textContent = options.uppercase ? text.toUpperCase() : text;
   cell.style.display = "flex";
-  cell.style.alignItems = "center";
   cell.style.justifyContent = options.align === "center"
     ? "center"
     : options.align === "right"
       ? "flex-end"
       : "flex-start";
   cell.style.textAlign = options.align ?? "left";
+  cell.style.alignItems = options.valign === "top" ? "flex-start" : "center";
   cell.style.boxSizing = "border-box";
-  cell.style.padding = "0 10px";
+  cell.style.padding = options.valign === "top" ? "10px 10px 0 10px" : "0 10px";
   cell.style.minHeight = "100%";
   cell.style.height = "100%";
   cell.style.fontFamily = "Roboto, Arial, sans-serif";
@@ -301,9 +299,10 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
     if (isWatchlist) {
       const columns = "165px minmax(0, 1fr) 50px 50px 50px 200px";
       const header = makeExportRow(columns, "40px", true);
-      ["Location", "Note", "7d", "30d", "90d", "Worst (90d)"].forEach((label, index) => {
+      ["Location", "Note", "7d", "30d", "90d", "Worst (90d)"].forEach((label) => {
         header.appendChild(makeTableCell(label, {
-          align: index >= 2 ? "center" : "left",
+          align: "left",
+          valign: "center",
           bold: true,
           color: WHITE,
           fontSize: "10px",
@@ -314,14 +313,15 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
 
       parsedRows.forEach((row) => {
         const out = makeExportRow(columns, "54px");
-        out.appendChild(makeTableCell(cellText(row.cells[0]), { bold: true, color: NAVY }));
-        out.appendChild(makeTableCell(cellText(row.cells[1]), { fontSize: "11px" }));
-        out.appendChild(makeTableCell(cellText(row.cells[2]), { align: "center", bold: true }));
-        out.appendChild(makeTableCell(cellText(row.cells[3]), { align: "center", bold: true }));
-        out.appendChild(makeTableCell(cellText(row.cells[4]), { align: "center", bold: true }));
-        const sevCell = makeTableCell("", { align: "center" });
+        out.appendChild(makeTableCell(cellText(row.cells[0]), { bold: true, color: NAVY, valign: "top" }));
+        out.appendChild(makeTableCell(cellText(row.cells[1]), { fontSize: "11px", valign: "top" }));
+        out.appendChild(makeTableCell(cellText(row.cells[2]), { align: "left", bold: true, valign: "top" }));
+        out.appendChild(makeTableCell(cellText(row.cells[3]), { align: "left", bold: true, valign: "top" }));
+        out.appendChild(makeTableCell(cellText(row.cells[4]), { align: "left", bold: true, valign: "top" }));
+        const sevCell = makeTableCell("", { align: "left", valign: "top" });
+        sevCell.style.padding = "10px 18px 0 18px";
         if (row.severityLabel && row.severityLabel.toLowerCase() !== "no records") {
-          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 126, 20));
+          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 110, 20));
         } else {
           sevCell.textContent = row.severityLabel || "No records";
           sevCell.style.fontStyle = "italic";

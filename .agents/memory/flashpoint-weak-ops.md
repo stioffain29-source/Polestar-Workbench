@@ -14,7 +14,7 @@ The Flashpoint topic classifier is intentionally permissive on surface vocabular
 - Non-APAC headlines syndicated by an APAC outlet. Strip the trailing " - <Source>" suffix before testing geography; the source name is often the only APAC token.
 - Defence-procurement / weapons-system wire copy ("India offers BrahMos", arms/defence deals, fighter-jet/submarine acquisitions) — kept by the classifier on the word "strike" ("precision strike", "strike range") but it is not public-order risk.
 - Legislative / parliamentary process ("X passes bill", "cabinet clears law", "co-payment bill") — wire copy often says "opposition protests" rhetorically so it files as Protest, but it is not a street event.
-- Sports keyword noise ("striker", a "11-second strike", tennis "rally", title "march") beyond the named-league filter.
+- Sports keyword noise ("striker", a "11-second strike", tennis "rally", title "march") beyond the named-league filter. Motorsport is a sneaky case: "rally" is also a protest synonym, so a WRC headline ("Paddon's final Rally1 event - DirtFish") passes the protest gate. Catch it on motorsport-specific markers (rally1/rally2, WRC, DirtFish, Autosport, Motorsport, MotoGP, Grand Prix, F1/Formula 1, "special stage"/SSn), NOT the bare word "rally".
 
 All three new classes are gated on `!LIVE_PUBLIC_ORDER_RE`: a *genuine* protest against a bill or arms deal will mention a crowd/march/tear gas/road closure and is kept; rhetorical "opposition protests the bill" copy is not. Do NOT broaden the exemption to the bare word "protest" — that re-admits exactly the junk (e.g. the "Japan passes bill" item) the user flagged.
 
