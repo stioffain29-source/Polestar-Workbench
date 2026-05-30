@@ -20,8 +20,7 @@ import { ArrowLeft, Download, Loader2, Pencil, Plus, Save, Trash2, X } from "luc
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
-import { resolveReportWindow } from "@/lib/reportWindow";
-import { computeCountryFastFacts, COUNTRY_WINDOW_TOPIC, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
+import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import {
   incidentMatchesCountry,
   acceptedCountryTokens,
@@ -31,7 +30,7 @@ import {
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, type WatchlistRow, type CountryLayerBuckets } from "@/lib/countryReportLayers";
+import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, type WatchlistRow, type CountryLayerBuckets } from "@/lib/countryReportLayers";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -136,15 +135,6 @@ export default function CountryReport() {
 
   const issueDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Compute Fast Facts + windowed incidents once per render.
-  const facts = useMemo(
-    () => computeCountryFastFacts({
-      issueDate,
-      incidents: incidents as CountryFastFactsIncident[],
-    }),
-    [incidents, issueDate],
-  );
-
   // Country baseline + lookback layers. The baseline is editorial
   // reference content that does not depend on the incident feed; the
   // layers partition the 90-day pull into current / 30 / 90 buckets so
@@ -179,10 +169,30 @@ export default function CountryReport() {
     [layers, baseline, country?.name],
   );
 
+  // Active reporting window. Falls back from the empty 7-day window to the
+  // most recent 30-day (>=3 records) or 90-day context so the report never
+  // renders an empty headline when recent country data exists. Drives Fast
+  // Facts, map, charts, the related-incidents table and the drafted prose.
+  const active = useMemo(
+    () => resolveActiveCountryWindow(layers, issueDate),
+    [layers, issueDate],
+  );
+
+  // Compute Fast Facts against the active window once per render.
+  const facts = useMemo(
+    () => computeCountryFastFacts({
+      issueDate,
+      incidents: incidents as CountryFastFactsIncident[],
+      windowIncidents: active.incidents,
+      periodLabel: active.periodShortLabel,
+    }),
+    [incidents, issueDate, active],
+  );
+
   // Auto-derived prose (executiveSummary, whatMatters, watchNext, polestarView).
   const draftedProse = useMemo(() => {
     if (!country) return null;
-    const inputs: DraftableIncident[] = incidents.map((i) => ({
+    const inputs: DraftableIncident[] = active.incidents.map((i) => ({
       topic: i.topic, title: i.title, summary: i.summary,
       source: i.source, sourceUrl: i.sourceUrl, location: i.location,
       severity: i.severity, occurredAt: i.occurredAt, country: i.country,
@@ -192,8 +202,10 @@ export default function CountryReport() {
       region: country.region ?? "",
       incidents: inputs,
       issueDate,
+      windowIncidents: inputs,
+      basisDays: active.basisDays,
     });
-  }, [country, incidents, issueDate]);
+  }, [country, active, issueDate]);
 
   useEffect(() => {
     if (!country) return;
@@ -252,7 +264,7 @@ export default function CountryReport() {
     : null;
 
   const coverUrl = effective ? countryCoverUrl(effective.name) : undefined;
-  const periodLabel = resolveReportWindow(COUNTRY_WINDOW_TOPIC, issueDate).label;
+  const periodLabel = active.periodLabel;
 
   const downloadPdf = async () => {
     if (!effective || !draftedProse) return;
@@ -491,6 +503,13 @@ export default function CountryReport() {
           modeLabel: "Mixed sources (live, manual & static)",
         }}
       />
+      {active.expanded && (
+        <div style={{ border: `1px solid ${POLAR}`, background: "#fff", padding: "10px 14px", borderRadius: 2 }}>
+          <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, lineHeight: 1.5 }}>
+            No relevant incidents were recorded in the 7-day window; this report uses the most recent {active.basisShort} context.
+          </div>
+        </div>
+      )}
       <div
         className="hidden"
         style={{
@@ -639,14 +658,14 @@ export default function CountryReport() {
           <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" />
         </div>
         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
-          The map reflects current-window records only ({layers.current.length} record{layers.current.length === 1 ? "" : "s"} across the 7-day cycle). It is not the full risk picture — read it alongside the 30 / 90-day context sections above.
+          The map reflects the active reporting window — {active.incidents.length} {active.basisLabel} record{active.incidents.length === 1 ? "" : "s"}. It is not the full risk picture — read it alongside the 30 / 90-day context sections above.
         </div>
       </Section>
 
       {/* 8. Severity Distribution */}
       <Section title="Severity Distribution">
         {severityTotal === 0 ? (
-          <EmptyNote>No incidents in the weekly window to chart.</EmptyNote>
+          <EmptyNote>No incidents in the active window to chart.</EmptyNote>
         ) : (
           <div className="space-y-1.5">
             {SEV_ORDER.map((k) => {
@@ -669,7 +688,7 @@ export default function CountryReport() {
       {/* 9. Incident Breakdown by Type */}
       <Section title="Incident Breakdown by Type">
         {typeChartData.length === 0 ? (
-          <EmptyNote>No classifiable incident types in the weekly window.</EmptyNote>
+          <EmptyNote>No classifiable incident types in the active window.</EmptyNote>
         ) : (
           <div className="space-y-1.5">
             {typeChartData.map((d) => {
@@ -701,7 +720,7 @@ export default function CountryReport() {
       {/* 10. Related Incidents */}
       <Section title="Related Incidents">
         {totalInWindow === 0 ? (
-          <EmptyNote>No related incidents recorded for {effective.name} in the weekly window.</EmptyNote>
+          <EmptyNote>No related incidents recorded for {effective.name} in the active window.</EmptyNote>
         ) : (
           <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
             <div className="grid" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -754,6 +773,7 @@ export default function CountryReport() {
           Internal · Source coverage (not in PDF)
         </div>
         <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
+          <li>Active reporting basis: <strong>{active.basisLabel}</strong></li>
           <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
           <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
           <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>

@@ -151,14 +151,13 @@ function applySeverityBadgeExportLayout(root: HTMLElement): void {
     const bg = node.style.background || node.style.backgroundColor;
     if (!bg) return;
 
-    node.style.display = "inline-flex";
-    node.style.alignItems = "center";
-    node.style.justifyContent = "center";
+    node.style.display = "block";
     node.style.boxSizing = "border-box";
+    node.style.width = "112px";
     node.style.height = "24px";
-    node.style.minWidth = "104px";
-    node.style.padding = "0 12px";
-    node.style.lineHeight = "1";
+    node.style.minWidth = "112px";
+    node.style.padding = "0";
+    node.style.lineHeight = "24px";
     node.style.textAlign = "center";
     node.style.verticalAlign = "middle";
     node.style.whiteSpace = "nowrap";
@@ -173,6 +172,92 @@ function applySeverityBadgeExportLayout(root: HTMLElement): void {
       parent.style.boxSizing = "border-box";
     }
   });
+}
+
+function cellText(cell: Element | undefined): string {
+  return (cell?.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+function severityChip(label: string, color: string, width = 92, height = 20): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.style.display = "block";
+  svg.style.margin = "0 auto";
+  svg.style.overflow = "visible";
+
+  const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  rect.setAttribute("x", "0");
+  rect.setAttribute("y", "0");
+  rect.setAttribute("width", String(width));
+  rect.setAttribute("height", String(height));
+  rect.setAttribute("rx", "2");
+  rect.setAttribute("fill", color || "#999999");
+  svg.appendChild(rect);
+
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", String(width / 2));
+  text.setAttribute("y", String(height / 2));
+  text.setAttribute("fill", WHITE);
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("dominant-baseline", "central");
+  text.setAttribute("font-family", "Roboto, Arial, sans-serif");
+  text.setAttribute("font-size", "10");
+  text.setAttribute("font-weight", "700");
+  text.setAttribute("letter-spacing", "0.08em");
+  text.textContent = label.toUpperCase();
+  svg.appendChild(text);
+
+  return svg;
+}
+
+function makeTableCell(text: string, options: {
+  align?: "left" | "center" | "right";
+  bold?: boolean;
+  color?: string;
+  fontSize?: string;
+  italic?: boolean;
+  uppercase?: boolean;
+} = {}): HTMLDivElement {
+  const cell = document.createElement("div");
+  cell.textContent = options.uppercase ? text.toUpperCase() : text;
+  cell.style.display = "flex";
+  cell.style.alignItems = "center";
+  cell.style.justifyContent = options.align === "center"
+    ? "center"
+    : options.align === "right"
+      ? "flex-end"
+      : "flex-start";
+  cell.style.textAlign = options.align ?? "left";
+  cell.style.boxSizing = "border-box";
+  cell.style.padding = "0 10px";
+  cell.style.minHeight = "100%";
+  cell.style.height = "100%";
+  cell.style.fontFamily = "Roboto, Arial, sans-serif";
+  cell.style.fontSize = options.fontSize ?? "12px";
+  cell.style.fontWeight = options.bold ? "700" : "400";
+  cell.style.fontStyle = options.italic ? "italic" : "normal";
+  cell.style.color = options.color ?? DUSK;
+  cell.style.lineHeight = "1.32";
+  return cell;
+}
+
+function makeExportRow(columns: string, height: string, isHeader = false): HTMLDivElement {
+  const row = document.createElement("div");
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = columns;
+  row.style.alignItems = "center";
+  row.style.minHeight = height;
+  row.style.height = height;
+  row.style.boxSizing = "border-box";
+  if (isHeader) {
+    row.style.background = NAVY;
+    row.style.color = WHITE;
+  } else {
+    row.style.borderTop = `1px solid ${POLAR}`;
+  }
+  return row;
 }
 
 function applyCountryTableExportLayout(root: HTMLElement): void {
@@ -191,58 +276,83 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
     if (rows.length === 0) return;
 
     const table = rows[0].parentElement;
-    if (table) {
-      table.style.width = "100%";
-      table.style.overflow = "visible";
-      table.style.borderCollapse = "collapse";
+    if (!table) return;
+
+    const parsedRows = rows.slice(1).map((row) => {
+      const cells = Array.from(row.children);
+      const severityCell = cells[expectedCells - 1] as HTMLElement | undefined;
+      const severityNode = severityCell?.querySelector<HTMLElement>("span");
+      return {
+        cells,
+        severityLabel: cellText(severityNode ?? severityCell),
+        severityColor: severityNode?.style.background || severityNode?.style.backgroundColor || "",
+      };
+    });
+
+    table.innerHTML = "";
+    table.style.width = "100%";
+    table.style.overflow = "hidden";
+    table.style.background = WHITE;
+    table.style.border = `1px solid ${POLAR}`;
+    table.style.borderRadius = "2px";
+    table.style.boxSizing = "border-box";
+
+    if (isWatchlist) {
+      const columns = "170px minmax(0, 1fr) 54px 54px 54px 150px";
+      const header = makeExportRow(columns, "40px", true);
+      ["Location", "Note", "7d", "30d", "90d", "Worst (90d)"].forEach((label, index) => {
+        header.appendChild(makeTableCell(label, {
+          align: index >= 2 ? "center" : "left",
+          bold: true,
+          color: WHITE,
+          fontSize: "10px",
+          uppercase: true,
+        }));
+      });
+      table.appendChild(header);
+
+      parsedRows.forEach((row) => {
+        const out = makeExportRow(columns, "54px");
+        out.appendChild(makeTableCell(cellText(row.cells[0]), { bold: true, color: NAVY }));
+        out.appendChild(makeTableCell(cellText(row.cells[1]), { fontSize: "11px" }));
+        out.appendChild(makeTableCell(cellText(row.cells[2]), { align: "center", bold: true }));
+        out.appendChild(makeTableCell(cellText(row.cells[3]), { align: "center", bold: true }));
+        out.appendChild(makeTableCell(cellText(row.cells[4]), { align: "center", bold: true }));
+        const sevCell = makeTableCell("", { align: "center" });
+        if (row.severityLabel && row.severityLabel.toLowerCase() !== "no records") {
+          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 92, 20));
+        } else {
+          sevCell.textContent = row.severityLabel || "No records";
+          sevCell.style.fontStyle = "italic";
+        }
+        out.appendChild(sevCell);
+        table.appendChild(out);
+      });
+      return;
     }
 
-    const bodyRowMinHeight = isWatchlist ? "54px" : "58px";
+    const columns = "150px 120px minmax(0, 1fr) 130px";
+    const header = makeExportRow(columns, "40px", true);
+    ["Date", "Type", "Title", "Severity"].forEach((label, index) => {
+      header.appendChild(makeTableCell(label, {
+        align: index === 3 ? "center" : "left",
+        bold: true,
+        color: WHITE,
+        fontSize: "10px",
+        uppercase: true,
+      }));
+    });
+    table.appendChild(header);
 
-    rows.forEach((row, rowIndex) => {
-      row.style.display = "grid";
-      row.style.alignItems = "center";
-      row.style.minHeight = rowIndex === 0 ? "40px" : bodyRowMinHeight;
-      row.style.overflow = "visible";
-      if (isWatchlist) {
-        row.style.gridTemplateColumns = "170px minmax(0, 1fr) 54px 54px 54px 170px";
-      } else if (isRelated) {
-        row.style.gridTemplateColumns = "160px 130px minmax(0, 1fr) 150px";
-      }
-
-      const cells = Array.from(row.children) as HTMLElement[];
-      cells.forEach((cell, cellIndex) => {
-        const isHeader = rowIndex === 0;
-        const isNumericCell = isWatchlist && cellIndex >= 2 && cellIndex <= 4;
-        const isBadgeCell = (isWatchlist && cellIndex === 5) || (isRelated && cellIndex === 3);
-        const isLeftCell = !isNumericCell && !isBadgeCell;
-
-        cell.style.display = "flex";
-        cell.style.alignItems = "center";
-        cell.style.boxSizing = "border-box";
-        cell.style.minHeight = row.style.minHeight;
-        cell.style.height = "100%";
-        cell.style.padding = isHeader ? "0 12px" : "10px 12px";
-        cell.style.lineHeight = isHeader ? "1" : "1.35";
-        cell.style.overflow = "visible";
-
-        if (isBadgeCell || isNumericCell) {
-          cell.style.justifyContent = "center";
-          cell.style.textAlign = "center";
-        } else if (isLeftCell) {
-          cell.style.justifyContent = "flex-start";
-          cell.style.textAlign = "left";
-        }
-
-        Array.from(cell.children).forEach((child) => {
-          const el = child as HTMLElement;
-          el.style.alignSelf = "center";
-          if (isBadgeCell) {
-            el.style.marginLeft = "auto";
-            el.style.marginRight = "auto";
-          }
-        });
-      });
+    parsedRows.forEach((row) => {
+      const out = makeExportRow(columns, "58px");
+      out.appendChild(makeTableCell(cellText(row.cells[0]), { fontSize: "11px" }));
+      out.appendChild(makeTableCell(cellText(row.cells[1])));
+      out.appendChild(makeTableCell(cellText(row.cells[2]), { bold: true, color: NAVY }));
+      const sevCell = makeTableCell("", { align: "center" });
+      sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 78, 20));
+      out.appendChild(sevCell);
+      table.appendChild(out);
     });
   });
 }
@@ -252,27 +362,67 @@ function applyBarChartExportLayout(root: HTMLElement): void {
     const title = (heading.textContent ?? "").trim().toUpperCase();
     if (title !== "SEVERITY DISTRIBUTION" && title !== "INCIDENT BREAKDOWN BY TYPE") return;
     const section = heading.closest("section");
-    const rows = section?.querySelectorAll<HTMLElement>(".space-y-1\\.5 > div");
-    rows?.forEach((row) => {
-      row.style.display = "grid";
-      row.style.gridTemplateColumns = title === "SEVERITY DISTRIBUTION"
-        ? "150px minmax(0, 1fr) 44px"
-        : "190px minmax(0, 1fr) 44px";
-      row.style.alignItems = "center";
-      row.style.columnGap = "10px";
-      row.style.minHeight = "22px";
+    const container = section?.querySelector<HTMLElement>(".space-y-1\\.5");
+    if (!container) return;
+
+    const sourceRows = Array.from(container.children) as HTMLElement[];
+    const rows = sourceRows.map((row) => {
       const children = Array.from(row.children) as HTMLElement[];
-      children.forEach((child) => {
-        child.style.alignSelf = "center";
+      const track = children[1] as HTMLElement | undefined;
+      const bar = track?.firstElementChild as HTMLElement | null;
+      return {
+        label: cellText(children[0]),
+        count: cellText(children[2]),
+        width: bar?.style.width || "0%",
+        color: bar?.style.background || bar?.style.backgroundColor || ELECTRIC,
+      };
+    });
+    if (rows.length === 0) return;
+
+    container.innerHTML = "";
+    container.style.display = "grid";
+    container.style.rowGap = "6px";
+    container.style.width = "100%";
+    container.style.boxSizing = "border-box";
+
+    const columns = title === "SEVERITY DISTRIBUTION"
+      ? "150px minmax(0, 1fr) 44px"
+      : "190px minmax(0, 1fr) 44px";
+
+    rows.forEach((data) => {
+      const row = document.createElement("div");
+      row.style.display = "grid";
+      row.style.gridTemplateColumns = columns;
+      row.style.columnGap = "10px";
+      row.style.alignItems = "center";
+      row.style.minHeight = "22px";
+
+      const label = makeTableCell(data.label, { fontSize: "12px" });
+      label.style.padding = "0";
+      row.appendChild(label);
+
+      const track = document.createElement("div");
+      track.style.height = "12px";
+      track.style.background = POLAR;
+      track.style.borderRadius = "2px";
+      track.style.overflow = "hidden";
+      const bar = document.createElement("div");
+      bar.style.width = data.width;
+      bar.style.height = "100%";
+      bar.style.background = data.color;
+      track.appendChild(bar);
+      row.appendChild(track);
+
+      const count = makeTableCell(data.count, {
+        align: "right",
+        bold: true,
+        color: NAVY,
+        fontSize: "12px",
       });
-      if (children[1]) {
-        children[1].style.height = "12px";
-        children[1].style.overflow = "hidden";
-      }
-      if (children[2]) {
-        children[2].style.textAlign = "right";
-        children[2].style.lineHeight = "1";
-      }
+      count.style.padding = "0";
+      row.appendChild(count);
+
+      container.appendChild(row);
     });
   });
 }

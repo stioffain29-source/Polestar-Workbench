@@ -655,22 +655,46 @@ export function draftCountryReportProse(opts: {
   region: string;
   incidents: DraftableIncident[];
   issueDate?: string;
+  // Pre-resolved active-window incidents (already window + relevance filtered).
+  // When supplied, the prose reads against the same active window as the rest
+  // of the report instead of re-filtering to the 7-day window.
+  windowIncidents?: DraftableIncident[];
+  // Active reporting basis (7 / 30 / 90). Drives the window labels in the prose.
+  basisDays?: number;
 }): CountryReportProse {
   const name = opts.countryName || "this country";
   const region = opts.region || "the region";
   const issueDate = opts.issueDate ?? new Date().toISOString().slice(0, 10);
   // Use the country pseudo-topic window (7-day default, 10-day cap) — the
-  // country builder must never depend on another topic's cadence.
-  const rawWindow = filterIncidentsToWindow(opts.incidents, "country", issueDate);
-  const inWindow = rawWindow.filter((i) =>
-    isCountryRelevant({
-      topic: i.topic,
-      title: i.title ?? "",
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-    }),
-  );
+  // country builder must never depend on another topic's cadence. When the
+  // caller supplies a pre-resolved active window, use it directly so prose,
+  // Fast Facts, map and table all read against one window.
+  const inWindow = opts.windowIncidents ??
+    filterIncidentsToWindow(opts.incidents, "country", issueDate).filter((i) =>
+      isCountryRelevant({
+        topic: i.topic,
+        title: i.title ?? "",
+        summary: i.summary ?? null,
+        source: i.source ?? null,
+      }),
+    );
   const total = inWindow.length;
+
+  // Active reporting basis. When the 7-day window was empty and the report
+  // widened to 30/90 days, the prose must label the window it actually used.
+  const basisDays = opts.basisDays ?? 7;
+  const basisShort = basisDays === 30 ? "30-day" : basisDays === 90 ? "90-day" : "7-day";
+  const expanded = basisDays !== 7 && total > 0;
+  // Sentence framing which window the headline read is built from.
+  const activeFrame = expanded
+    ? `The 7-day window held no fresh records, so this read draws on the most recent ${basisShort} window.`
+    : "The current cycle's read is the 7-day window only.";
+  // Tail describing where older records sit relative to the active window.
+  const olderTail = basisDays === 30
+    ? "Records beyond the last 30 days sit in the 90-day background section below and should be read as deeper context."
+    : basisDays === 90
+      ? "This is the deepest lookback on file; read it as background pattern rather than current-week activity."
+      : "Anything older than seven days sits in the 30 / 90-day context sections below and should not be read as current activity.";
   const types = topTypesText(inWindow);
   const sev = highestSeverity(inWindow);
 
@@ -750,21 +774,21 @@ export function draftCountryReportProse(opts: {
     const currentSentence = total === 0
       ? "No fresh records landed in the 7-day window."
       : total === 1
-        ? "The 7-day window holds one record."
-        : `The 7-day window holds ${total} records.`;
+        ? `The ${basisShort} window holds one record.`
+        : `The ${basisShort} window holds ${total} records.`;
 
     const png = {
       executiveSummary: total === 0
         ? `Papua New Guinea is a low-volume but high-friction operating environment. No relevant incidents were recorded in the 7-day window. Urban violent crime in Port Moresby and Lae, route security, Highlands instability and resource-sector exposure remain the standing operating risks; these are carried in the 30-day and 90-day context sections below as background pattern, not as fresh weekly activity. Reporting volume on PNG is genuinely thin most weeks, so a zero weekly count should be read as a coverage gap rather than calm.`
-        : `Papua New Guinea is a low-volume but high-friction operating environment. ${currentSentence} The current-cycle reporting is dominated by urban violent-crime indicators out of Port Moresby and Lae, which is the practical concern for any staff or contractor footprint in the two main cities. The 30-day and 90-day context sections widen the lookback to keep route security, Highlands instability and resource-sector exposure in view; treat them as background risk rather than as live events. Reporting volume on PNG is genuinely thin most weeks, so the weekly count should not be read as a measure of risk.`,
+        : `Papua New Guinea is a low-volume but high-friction operating environment. ${currentSentence} The current-cycle reporting is dominated by urban violent-crime indicators out of Port Moresby and Lae, which is the practical concern for any staff or contractor footprint in the two main cities. The 30-day and 90-day context sections widen the lookback to keep route security, Highlands instability and resource-sector exposure in view; treat them as background risk rather than as live events. Reporting volume on PNG is genuinely thin most weeks, so the headline count should not be read as a measure of risk.`,
 
       overview: total === 0
         ? `Papua New Guinea is shaped by urban opportunistic crime in Port Moresby and Lae, inter-clan violence in the highlands, recurring resource-sector disputes and severe interior infrastructure limits — these are the standing operating picture, not this week's events. No relevant incidents were recorded in the 7-day window; treat the silence as a reporting-coverage feature of PNG rather than a clean operating picture. The named risks above and anything older than seven days sit in the 30 / 90-day context sections below and should not be read as current activity.`
-        : `Papua New Guinea is shaped by urban opportunistic crime in Port Moresby and Lae, inter-clan violence in the highlands, recurring resource-sector disputes and severe interior infrastructure limits. The current cycle's read is the 7-day window only. ${currentSentence} Treat these as the active operational signal. Anything older than seven days sits in the 30 / 90-day context sections below and should not be read as current activity.`,
+        : `Papua New Guinea is shaped by urban opportunistic crime in Port Moresby and Lae, inter-clan violence in the highlands, recurring resource-sector disputes and severe interior infrastructure limits. ${activeFrame} ${currentSentence} Treat these as the active operational signal. ${olderTail}`,
 
       trendSummary: total === 0
         ? `Nothing fresh landed in the current 7-day window. The 30-day and 90-day context sections below carry the wider pattern — including any election-cycle unrest, fuel or port disruption, and Madang / Lae corridor incidents — but those are background, not current activity. Treat them as standing-risk reference, not as something that happened this week.`
-        : `The current 7-day window points to ${types || "urban violent-crime activity"} in or around Port Moresby and Lae. That is the active signal. Anything beyond this week — including election-cycle unrest, fuel or port disruption, Highlands Highway incidents and Madang / Lae corridor events — sits in the 30 / 90-day context sections and should be read as background pattern rather than current activity.`,
+        : `The most recent ${basisShort} window points to ${types || "urban violent-crime activity"} in or around Port Moresby and Lae. That is the active signal. Anything beyond this week — including election-cycle unrest, fuel or port disruption, Highlands Highway incidents and Madang / Lae corridor events — sits in the 30 / 90-day context sections and should be read as background pattern rather than current activity.`,
 
       implications: [
         "- Review movement plans for Port Moresby and Lae and refresh pre-movement briefings on the current incident types.",
@@ -815,21 +839,21 @@ export function draftCountryReportProse(opts: {
     const currentSentence = total === 0
       ? "No relevant incidents were recorded in the 7-day window."
       : total === 1
-        ? "The 7-day window holds one record."
-        : `The 7-day window holds ${total} records.`;
+        ? `The ${basisShort} window holds one record.`
+        : `The ${basisShort} window holds ${total} records.`;
 
     const papua = {
       executiveSummary: total === 0
         ? `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment spanning the six provinces of the Indonesian half of New Guinea. ${currentSentence} That is normal for a region where foreign press and NGO access is tightly controlled — read it as a coverage gap, not a calm operating picture. The standing operational signature — student and church-led protest out of Jayapura and Manokwari, TNI/POLRI security operations in the central highlands, TPNPB-OPM armed-group activity around Nduga, Intan Jaya and the Freeport Grasberg corridor at Timika, and severe highland access constraints — is carried in the 30-day and 90-day context sections below as background pattern, not as fresh weekly activity.`
-        : `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment spanning the six provinces of the Indonesian half of New Guinea. ${currentSentence} The current-cycle reporting points to ${types || "protest and security-operation activity"}, which is the practical concern for any footprint in the coastal cities or the resource corridors. The 30-day and 90-day context sections widen the lookback to keep highland insurgency, commemoration-date protest cycles and resource-sector exposure in view; treat them as background risk rather than live events. Reporting access in Papua is genuinely constrained, so the weekly count should not be read as a measure of risk.`,
+        : `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment spanning the six provinces of the Indonesian half of New Guinea. ${currentSentence} The current-cycle reporting points to ${types || "protest and security-operation activity"}, which is the practical concern for any footprint in the coastal cities or the resource corridors. The 30-day and 90-day context sections widen the lookback to keep highland insurgency, commemoration-date protest cycles and resource-sector exposure in view; treat them as background risk rather than live events. Reporting access in Papua is genuinely constrained, so the headline count should not be read as a measure of risk.`,
 
       overview: total === 0
         ? `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation — these are the standing operating picture, not this week's events. ${currentSentence} Treat the silence as a feature of restricted reporting access rather than a clean operating picture. The named risks above and anything older than seven days sit in the 30 / 90-day context sections below and should not be read as current activity.`
-        : `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation. The current cycle's read is the 7-day window only. ${currentSentence} Treat these as the active operational signal.${areaSentence ? ` ${areaSentence}` : ""} Anything older than seven days sits in the 30 / 90-day context sections below and should not be read as current activity.`,
+        : `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation. ${activeFrame} ${currentSentence} Treat these as the active operational signal.${areaSentence ? ` ${areaSentence}` : ""} ${olderTail}`,
 
       trendSummary: total === 0
         ? `Nothing fresh landed in the current 7-day window. The 30-day and 90-day context sections below carry the wider pattern — protest activity around Jayapura and Manokwari campuses and commemoration dates, highland security operations and TPNPB-OPM clashes, and resource-corridor friction around the Timika–Tembagapura (Freeport) and Bintuni (Tangguh LNG) belts — but those are background, not current activity. Treat them as standing-risk reference, not as something that happened this week.`
-        : `The current 7-day window points to ${types || "protest and security-operation activity"} in or around ${leadArea || "the named areas"}. That is the active signal. Anything beyond this week — student protest cycles, highland clashes and TPNPB-OPM activity, Freeport convoy security and cross-border movement on the PNG frontier — sits in the 30 / 90-day context sections and should be read as background pattern rather than current activity.`,
+        : `The most recent ${basisShort} window points to ${types || "protest and security-operation activity"} in or around ${leadArea || "the named areas"}. That is the active signal. Anything beyond this week — student protest cycles, highland clashes and TPNPB-OPM activity, Freeport convoy security and cross-border movement on the PNG frontier — sits in the 30 / 90-day context sections and should be read as background pattern rather than current activity.`,
 
       implications: [
         "- Confirm Surat Jalan / travel-permit status before any movement into the highlands; access can be withdrawn at short notice during security operations.",
@@ -870,7 +894,7 @@ export function draftCountryReportProse(opts: {
   return {
     executiveSummary: total === 0
       ? `${name} reporting is light across the weekly window. The page captures what is on file, but the gap itself is the most important read — coverage rather than calm.`
-      : `${name} reporting for the weekly window is shaped by ${types || "a mix of operational events"}.${areaSentence ? ` ${areaSentence}` : ""} The brief below covers the operating picture, what changed, why it matters and what to watch next.`,
+      : `${name} reporting for the ${basisShort} window is shaped by ${types || "a mix of operational events"}.${areaSentence ? ` ${areaSentence}` : ""} The brief below covers the operating picture, what changed, why it matters and what to watch next.`,
     whatMatters,
     watchNext,
     polestarView,

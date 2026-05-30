@@ -6,7 +6,7 @@
 // breakdown so the report can read against named geographies even
 // when the current window is thin.
 
-import { parseISO, subDays } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 import { isCountryRelevant } from "./topicRelevance";
 import { resolveReportWindow } from "./reportWindow";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
@@ -85,6 +85,78 @@ export function buildCountryLayers(
   }
 
   return { current, thirtyDay, ninetyDay, windowLabel: win.label };
+}
+
+export type CountryWindowBasis = 7 | 30 | 90;
+
+export interface ActiveCountryWindow {
+  basisDays: CountryWindowBasis;
+  // Client-facing label for the active reporting basis.
+  basisLabel: string; // "7-day" | "30-day" | "90-day context"
+  // Bare basis name without the "context" suffix, for inline prose.
+  basisShort: string; // "7-day" | "30-day" | "90-day"
+  incidents: CountryFastFactsIncident[];
+  // True when the 7-day window was empty and the report fell back to a wider window.
+  expanded: boolean;
+  periodLabel: string; // "1 March 2026 - 30 May 2026"
+  periodShortLabel: string; // "1 Mar - 30 May 2026"
+}
+
+function countryRangeLabels(end: Date, days: number): { label: string; shortLabel: string } {
+  const start = subDays(end, days - 1);
+  return {
+    label: `${format(start, "d MMMM yyyy")} - ${format(end, "d MMMM yyyy")}`,
+    shortLabel: `${format(start, "d MMM")} - ${format(end, "d MMM yyyy")}`,
+  };
+}
+
+/**
+ * Pick the single active reporting window for a country report.
+ *
+ *   - 7-day  if the current weekly window holds any relevant records
+ *   - 30-day if the week is empty but the 30-day window has a usable sample (>=3)
+ *   - 90-day if 30 days is still thin but anything is on file across 90 days
+ *   - 7-day  (honest empty) if nothing is on file anywhere
+ *
+ * The chosen window drives Fast Facts, map, charts, the related-incidents
+ * table AND the drafted prose, so the whole report reads against one window
+ * and never renders an empty headline when recent country data exists.
+ */
+export function resolveActiveCountryWindow(
+  layers: CountryLayerBuckets,
+  issueDate: string,
+): ActiveCountryWindow {
+  let end: Date;
+  try { end = parseISO(issueDate); } catch { end = new Date(); }
+  if (isNaN(end.getTime())) end = new Date();
+
+  const make = (
+    basisDays: CountryWindowBasis,
+    incidents: CountryFastFactsIncident[],
+    expanded: boolean,
+  ): ActiveCountryWindow => {
+    const { label, shortLabel } = countryRangeLabels(end, basisDays);
+    const basisShort = basisDays === 30 ? "30-day" : basisDays === 90 ? "90-day" : "7-day";
+    const basisLabel = basisDays === 90 ? "90-day context" : basisShort;
+    return {
+      basisDays,
+      basisLabel,
+      basisShort,
+      incidents,
+      expanded,
+      periodLabel: label,
+      periodShortLabel: shortLabel,
+    };
+  };
+
+  const current = layers.current.length;
+  const thirty = layers.thirtyDay.length;
+  const ninety = layers.ninetyDay.length;
+
+  if (current >= 1) return make(7, layers.current, false);
+  if (thirty >= 3) return make(30, layers.thirtyDay, true);
+  if (ninety >= 1) return make(90, layers.ninetyDay, true);
+  return make(7, layers.current, false);
 }
 
 /**

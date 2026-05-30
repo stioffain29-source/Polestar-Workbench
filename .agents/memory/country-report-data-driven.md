@@ -72,3 +72,31 @@ implying an active week, and (b) explicitly defer the standing pattern to the 30
 context sections (rendered separately by the component from the same country-filtered
 dataset). Cards and prose already share one `incidents` array filtered by
 `incidentMatchesCountry`, so they stay aligned automatically.
+
+# Active reporting window fallback (never an empty headline)
+
+`resolveActiveCountryWindow(layers, issueDate)` picks the *active* window so a
+country report never shows an empty headline when recent data exists: 7-day if it
+has any record, else 30-day if it has ≥3, else 90-day if anything is on file, else
+an honest empty 7-day. It returns `basisDays/basisLabel/basisShort/incidents/
+expanded/periodLabel/periodShortLabel`.
+
+**The rule:** EVERY data-bearing surface must read the *same* active window —
+Fast Facts, map, severity/type charts, related-incidents table, cover reporting
+period, the on-screen note banner, AND the drafted prose. `computeCountryFastFacts`
+and `draftCountryReportProse` both take optional `windowIncidents`/`basisDays`; the
+prose's `total>0` branches must label the window via `basisShort` (e.g. "the 30-day
+window holds…"), while `total===0` branches keep "7-day" (they only fire when the
+window is genuinely empty = basis 7).
+
+**Why:** Papua's 7-day window is routinely empty (30d≈39, 90d≈102). Reading the
+empty 7-day everywhere produced a blank report even though rich recent context
+existed. Fall back, but never lie about which window the numbers came from.
+
+**How to apply:** When adding any new section/caption to the country report or its
+headless PDF builder, source it from `active.incidents` and label it with
+`active.basisShort`/`basisLabel`. The in-app "Download PDF" rasterises the DOM so
+screen==PDF for free, but `exportCountryReportPdf.ts` (headless, font-audit only)
+must independently call `resolveActiveCountryWindow` and thread `basisShort` into
+its map/plotted captions and exec-summary fallback, or those static strings say
+"weekly window" during a 30/90-day fallback.

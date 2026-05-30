@@ -112,10 +112,16 @@ export interface CountryFactsBreakdown {
 export function computeCountryFastFacts(opts: {
   issueDate: string;
   incidents: CountryFastFactsIncident[];
+  // Pre-resolved active-window incidents (already window + relevance filtered).
+  // When supplied, the caller's active window drives the cards instead of the
+  // default 7-day filter, so the report can fall back to 30/90-day data.
+  windowIncidents?: CountryFastFactsIncident[];
+  // Reporting-period label for the active window (overrides the 7-day range).
+  periodLabel?: string;
 }): CountryFactsBreakdown {
   const { issueDate } = opts;
   const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, issueDate);
-  const windowIncidents = filterCountryReportIncidents(opts.incidents, issueDate);
+  const windowIncidents = opts.windowIncidents ?? filterCountryReportIncidents(opts.incidents, issueDate);
   const total = windowIncidents.length;
 
   // Highest severity
@@ -207,7 +213,7 @@ export function computeCountryFastFacts(opts: {
       : topAreaLabel;
 
   const cards: CountryFastFactCard[] = [
-    { label: "Reporting Period", value: win.shortLabel },
+    { label: "Reporting Period", value: opts.periodLabel ?? win.shortLabel },
     {
       label: "Total Records",
       value: String(total),

@@ -35,7 +35,7 @@ import {
 } from "./pdfChrome";
 import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import { COUNTRY_COVER_URLS } from "./coverImages";
-import { relatedIncidentsLimit, resolveReportWindow } from "./reportWindow";
+import { relatedIncidentsLimit } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import {
   computeCountryFastFacts,
@@ -44,7 +44,11 @@ import {
   type CountryFactsBreakdown,
 } from "./countryFastFacts";
 import type { CountryBaseline } from "./countryBaselines";
-import type { WatchlistRow } from "./countryReportLayers";
+import {
+  buildCountryLayers,
+  resolveActiveCountryWindow,
+  type WatchlistRow,
+} from "./countryReportLayers";
 
 export interface PdfIncident {
   id: number | string;
@@ -178,7 +182,7 @@ function drawTypeChart(ctx: Ctx, facts: CountryFactsBreakdown) {
 
 function drawMapSection(
   ctx: Ctx,
-  opts: { mapImage?: string; plottedCount: number; totalInWindow: number },
+  opts: { mapImage?: string; plottedCount: number; totalInWindow: number; basisShort: string },
 ) {
   ensureSpace(ctx, opts.mapImage ? 192 : 88);
   drawSectionHeading(ctx, "Map");
@@ -218,9 +222,9 @@ function drawMapSection(
   setText(pdf, DUSK);
   const note =
     opts.totalInWindow === 0
-      ? "No records in the weekly window to plot."
+      ? `No records in the ${opts.basisShort} window to plot.`
       : opts.plottedCount === opts.totalInWindow
-        ? `All ${opts.plottedCount} record${opts.plottedCount === 1 ? "" : "s"} in the weekly window are plotted.`
+        ? `All ${opts.plottedCount} record${opts.plottedCount === 1 ? "" : "s"} in the ${opts.basisShort} window are plotted.`
         : `${opts.plottedCount} of ${opts.totalInWindow} record${opts.totalInWindow === 1 ? "" : "s"} plotted; records without coordinates are excluded from the map.`;
   pdf.text(sanitize(note), MX, ctx.y + 10);
   setRoboto(pdf, "regular");
@@ -547,10 +551,13 @@ export async function exportCountryReportPdf(
   await ensureRobotoLoaded(ctx.pdf);
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, todayIso);
+  const layers = buildCountryLayers(incidents as CountryFastFactsIncident[], todayIso);
+  const active = resolveActiveCountryWindow(layers, todayIso);
   const facts = computeCountryFastFacts({
     issueDate: todayIso,
     incidents: incidents as CountryFastFactsIncident[],
+    windowIncidents: active.incidents,
+    periodLabel: active.periodShortLabel,
   });
   const windowIncidents = facts.windowIncidents as PdfIncident[];
   const plottedCount = windowIncidents.filter(
@@ -578,7 +585,7 @@ export async function exportCountryReportPdf(
   drawPolestarCover(ctx, {
     title: country.name,
     subtitle: "POLESTAR INSIGHTS",
-    reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
+    reportingPeriod: `REPORTING PERIOD: ${active.periodLabel.toUpperCase()}`,
     coverImage,
   });
   beginBodyPages(ctx);
@@ -595,7 +602,7 @@ export async function exportCountryReportPdf(
     ctx,
     "Executive Summary",
     extras.executiveSummary,
-    `Brief for ${country.name} covering the weekly reporting window. See the sections below for the operating picture, what changed, why it matters, implications and what to watch next.`,
+    `Brief for ${country.name} covering the ${active.basisShort} reporting window. See the sections below for the operating picture, what changed, why it matters, implications and what to watch next.`,
   );
 
   // 2. Fast Facts
@@ -645,6 +652,7 @@ export async function exportCountryReportPdf(
     mapImage: extras.mapImage,
     plottedCount,
     totalInWindow: windowIncidents.length,
+    basisShort: active.basisShort,
   });
   // Honest caption so the map is never read as the full risk picture.
   {
@@ -655,7 +663,7 @@ export async function exportCountryReportPdf(
     setText(pdf, DUSK);
     pdf.text(
       sanitize(
-        "The map reflects current-window records only. The Country Baseline, Location Watchlist and 30 / 90-day context sections above carry the standing operating picture.",
+        `The map reflects ${active.basisShort} window records only. The Country Baseline, Location Watchlist and 30 / 90-day context sections above carry the standing operating picture.`,
       ),
       MX,
       ctx.y + 10,
