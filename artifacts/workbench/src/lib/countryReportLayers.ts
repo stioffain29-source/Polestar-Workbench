@@ -8,6 +8,7 @@
 
 import { format, parseISO, subDays } from "date-fns";
 import { isCountryRelevant } from "./topicRelevance";
+import { acceptedCountryTokens } from "./countryMatch";
 import { resolveReportWindow } from "./reportWindow";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
 import type { CountryBaseline } from "./countryBaselines";
@@ -249,19 +250,56 @@ export function summariseLookback(
 // ---------------------------------------------------------------------------
 // Coverage status — turns a zero-record weekly window into an explicit
 // data-quality determination instead of letting it read as "nothing
-// happened". Distinguishes a genuinely quiet week (feeds healthy AND
-// current, simply no qualifying incident) from a coverage problem (feeds
-// failing/stale, or no source attributable to the country at all).
+// happened". An empty week always resolves to a coverage problem, with the
+// detail line explaining which way: feeds failing/stale, no source
+// attributable to the country, healthy-but-silent collection, or no
+// qualifying incident clearing healthy feeds. There is no "quiet" outcome.
 // ---------------------------------------------------------------------------
 
-export type CountryCoverageState = "active" | "genuine-quiet" | "coverage-problem";
+// A country report's empty week is either "active" (window has records, no
+// banner) or "coverage-problem". There is deliberately NO "genuine-quiet"
+// outcome: in a high-threat operating environment an empty week is always a
+// collection signal, never a confirmation of calm.
+export type CountryCoverageState = "active" | "coverage-problem";
 
 /** Minimal source shape needed for the coverage determination. */
 export interface CoverageSourceLike {
+  name: string;
   topic: string;
   status: string;
   lastSuccessAt?: string | null;
   lastFailureAt?: string | null;
+}
+
+// Regional / wire feeds that materially cover a country but whose source
+// NAME carries no country token (so name-token matching alone misses them).
+// Keyed by the country-group key used in countryMatch.ts; each entry is
+// matched case-insensitively as a substring of the source name. This is what
+// scopes a country's coverage health to the feeds that actually serve it —
+// specialist, non-country feeds (e.g. the cargo-theft trackers) are
+// intentionally absent here and so can never trip a country's coverage
+// warning. Keep these names in sync with the catalogued sources table.
+const COUNTRY_COVERAGE_WIRES: Record<string, string[]> = {
+  "papua new guinea": ["rnz pacific", "abc news australia", "benar news"],
+  papua: ["rnz pacific", "abc news australia", "benar news", "jubi"],
+};
+
+/**
+ * True when a catalogued source materially covers the named country: either
+ * its name carries one of the country's accepted tokens (e.g.
+ * "Post-Courier (PNG)", "Jubi.id (West Papua)", "Google News — Nepal") or it
+ * is one of the regional wires explicitly mapped to that country. Coverage
+ * health is scoped to these feeds ONLY — never to every feed that happens to
+ * share the report's record topic.
+ */
+function sourceCoversCountry(sourceName: string, countryName: string): boolean {
+  const hay = (sourceName ?? "").toLowerCase();
+  if (!hay) return false;
+  for (const t of acceptedCountryTokens(countryName)) {
+    if (t && hay.includes(t)) return true;
+  }
+  const key = (countryName ?? "").trim().toLowerCase();
+  return (COUNTRY_COVERAGE_WIRES[key] ?? []).some((w) => hay.includes(w));
 }
 
 export interface CountryCoverageStatus {
@@ -293,11 +331,24 @@ function msOrNull(iso: string | null | undefined): number | null {
   }
 }
 
+// A feed is "unhealthy" if its status says so, its last success is older than
+// FEED_STALE_DAYS, or its most recent attempt was a failure. Module-level so
+// the empty-week determination and the internal separate-signals summary
+// apply the SAME definition of a working feed.
+function isFeedUnhealthy(s: CoverageSourceLike, endMs: number): boolean {
+  if (UNHEALTHY_STATUS.has((s.status ?? "").toLowerCase())) return true;
+  const succ = msOrNull(s.lastSuccessAt);
+  if (succ === null) return true;
+  if (endMs - succ > FEED_STALE_DAYS * DAY_MS) return true;
+  const fail = msOrNull(s.lastFailureAt);
+  return fail !== null && fail > succ;
+}
+
 /**
- * Decide whether an empty 7-day country window is a genuinely quiet week
- * or a coverage problem, using feed health + the staleness of the newest
- * record on file. Returns `state: "active"` (no banner) whenever the
- * weekly window holds records.
+ * Classify an empty 7-day country window as a coverage problem, using the
+ * health of the country's own collection sources + the staleness of the
+ * newest record on file to pick the explanation. Returns `state: "active"`
+ * (no banner) whenever the weekly window holds records.
  */
 export function computeCountryCoverageStatus(opts: {
   layers: CountryLayerBuckets;
@@ -327,35 +378,15 @@ export function computeCountryCoverageStatus(opts: {
   const daysSinceLatest =
     latestMs === -Infinity ? null : Math.floor((endMs - latestMs) / DAY_MS);
 
-  // Relevant feeds: the topics this country's recent records come from,
-  // falling back to the flashpoint/protest feeds that drive country reports
-  // when we hold nothing at all on file.
-  const topicsPresent = new Set(
-    layers.ninetyDay.map((r) => (r.topic ?? "").toLowerCase()).filter(Boolean),
-  );
-  const relevantTopics =
-    topicsPresent.size > 0 ? topicsPresent : new Set(["flashpoint", "protests"]);
-  const relevant = sources.filter((s) =>
-    relevantTopics.has((s.topic ?? "").toLowerCase()),
-  );
+  // Relevant feeds: the catalogued sources that actually cover THIS country,
+  // matched by source NAME (country token or mapped regional wire). Scoping
+  // by record topic was the defect — it pulled in every flashpoint/cargo feed
+  // (and a hard-coded fallback set), so one failing, unrelated feed could trip
+  // every country's coverage warning. Name scoping confines the determination
+  // to the feeds that genuinely serve the country in question.
+  const relevant = sources.filter((s) => sourceCoversCountry(s.name, name));
 
-  const feedStale = (s: CoverageSourceLike): boolean => {
-    const ms = msOrNull(s.lastSuccessAt);
-    if (ms === null) return true;
-    return endMs - ms > FEED_STALE_DAYS * DAY_MS;
-  };
-  const failingNow = (s: CoverageSourceLike): boolean => {
-    const fail = msOrNull(s.lastFailureAt);
-    if (fail === null) return false;
-    const succ = msOrNull(s.lastSuccessAt);
-    return succ === null ? true : fail > succ;
-  };
-  const unhealthy = relevant.filter(
-    (s) =>
-      UNHEALTHY_STATUS.has((s.status ?? "").toLowerCase()) ||
-      feedStale(s) ||
-      failingNow(s),
-  );
+  const unhealthy = relevant.filter((s) => isFeedUnhealthy(s, endMs));
 
   // No feed attributable to the country at all → coverage cannot be confirmed.
   if (relevant.length === 0) {
@@ -406,5 +437,66 @@ export function computeCountryCoverageStatus(opts: {
     title: "Coverage warning",
     detail: `All collection sources feeding ${name} report healthy, but no qualifying incident cleared the wire in the 7-day window. In a high-threat operating environment an empty week is read as a collection gap, not a quiet one — the operating picture is unconfirmed. Work the standing pattern in the 30 and 90-day context sections below.`,
   };
+}
+
+export interface SourceHealthSignal {
+  total: number;
+  healthy: number;
+  unhealthy: number;
+  unhealthyNames: string[];
+}
+
+// Topics whose feeds make up the news-wire basis a country report draws on.
+const COUNTRY_TOPIC_FEEDS = new Set(["flashpoint", "protests"]);
+// Topics whose feeds are specialist trackers, NOT part of country coverage.
+const SPECIALIST_TOPIC_FEEDS = new Set(["cargo_watch"]);
+
+function summariseHealth(
+  feeds: CoverageSourceLike[],
+  endMs: number,
+): SourceHealthSignal {
+  const unhealthy = feeds.filter((s) => isFeedUnhealthy(s, endMs));
+  return {
+    total: feeds.length,
+    healthy: feeds.length - unhealthy.length,
+    unhealthy: unhealthy.length,
+    unhealthyNames: unhealthy.map((s) => s.name),
+  };
+}
+
+/**
+ * Report country-coverage health, topic-feed health, and specialist-feed health
+ * as three SEPARATE signals so the analyst can tell them apart. A down
+ * specialist feed (e.g. a cargo-theft tracker) shows only in `specialist`, never
+ * inflating the country signal. Screen-only — for the internal Workbench strip.
+ *
+ * The three sets may overlap (a flashpoint wire that also covers the country
+ * appears in both `country` and `topic`); this is intentional — they are
+ * independent diagnostics, never summed into one metric, so do NOT dedupe them.
+ */
+export function computeCountrySourceSignals(opts: {
+  sources: CoverageSourceLike[];
+  issueDate: string;
+  countryName: string;
+}): { country: SourceHealthSignal; topic: SourceHealthSignal; specialist: SourceHealthSignal } {
+  const { sources, issueDate, countryName } = opts;
+  let end: Date;
+  try { end = parseISO(issueDate); } catch { end = new Date(); }
+  if (isNaN(end.getTime())) end = new Date();
+  const endMs = end.getTime();
+
+  const country = summariseHealth(
+    sources.filter((s) => sourceCoversCountry(s.name, countryName || "this country")),
+    endMs,
+  );
+  const topic = summariseHealth(
+    sources.filter((s) => COUNTRY_TOPIC_FEEDS.has((s.topic ?? "").toLowerCase())),
+    endMs,
+  );
+  const specialist = summariseHealth(
+    sources.filter((s) => SPECIALIST_TOPIC_FEEDS.has((s.topic ?? "").toLowerCase())),
+    endMs,
+  );
+  return { country, topic, specialist };
 }
 

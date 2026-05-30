@@ -88,17 +88,38 @@ surfaced, not papered over with older data. An empty week must NEVER read as
 "nothing happened" unless that is health-confirmed.
 
 **Coverage status (`computeCountryCoverageStatus`)** decides what an empty week
-means. State is one of `active | genuine-quiet | coverage-problem`:
+means. State is one of `active | coverage-problem` — there is deliberately NO
+"genuinely quiet" outcome for a country report (the old `genuine-quiet` state was
+removed). In a high-threat operating environment an empty week is ALWAYS read as
+a collection gap with the operating picture unconfirmed, never as calm:
 - window has records → `active`, no banner.
 - empty window + no feed attributable to the country, OR any relevant feed
-  unhealthy (status in UNHEALTHY_STATUS, `lastSuccess` older than
-  FEED_STALE_DAYS=10, or `lastFailure` newer than `lastSuccess`) → `coverage-problem`.
+  unhealthy → `coverage-problem`.
 - empty window + feeds healthy/current BUT the newest record on file is itself
   stale (`daysSinceLatest === null || > RECORD_STALE_DAYS=14`) → `coverage-problem`.
-  Latest-record staleness MUST flip the STATE, not just append caveat wording —
-  healthy-but-silent collection cannot confirm a quiet week.
-- only when feeds are healthy/current AND a record exists within RECORD_STALE_DAYS
-  → `genuine-quiet` (the single case allowed to state the week as quiet).
+- empty window + feeds healthy + recent record on file but nothing cleared the
+  wire this week → still `coverage-problem` (collection gap, not quiet).
+
+**Feed health is scoped by source NAME, not record topic.** The relevant feed set
+is `sources.filter(s => sourceCoversCountry(s.name, countryName))`, where
+`sourceCoversCountry` matches `acceptedCountryTokens` PLUS a `COUNTRY_COVERAGE_WIRES`
+map (regional wires whose NAME carries no country token, e.g. RNZ Pacific, ABC News
+Australia, Benar News for both Papua groups; Jubi.id for Papua only). The unhealthy
+predicate is the module-level `isFeedUnhealthy(s, endMs)` (status in UNHEALTHY_STATUS,
+`lastSuccess` older than FEED_STALE_DAYS=10, or `lastFailure` newer than `lastSuccess`).
+**Why:** the original code derived "relevant feeds" from whatever topics held records,
+so a failing specialist feed (cargo-theft tracker "TAPA Incident Reports",
+topic=cargo_watch) tripped a coverage warning on EVERY country including PNG, whose
+own news wires were all healthy. Name-scoping confines the determination to feeds that
+genuinely serve the country; specialist feeds are structurally excluded.
+
+**Three separate signals for the internal strip.** `computeCountrySourceSignals`
+returns `{country, topic, specialist}` health (healthy/total), where country = name-
+scoped set, topic = flashpoint+protests feeds, specialist = cargo_watch feeds. They
+intentionally OVERLAP (a flashpoint wire that covers the country is in both country
+and topic) and are NEVER summed — independent diagnostics, do not dedupe. Rendered
+only in the screen-only "Internal · Source coverage (not in PDF)" strip so a down
+specialist feed is visible but never conflated with country coverage.
 
 **Banner gating:** the on-screen coverage banner is gated on `!isLoading` of the
 sources query (NOT `isSuccess`). Gating on `isSuccess` would hide a legitimately

@@ -31,7 +31,7 @@ import {
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
+import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -96,7 +96,8 @@ export default function CountryReport() {
     query: { enabled: !!country },
   } as never);
   // Source health feeds the coverage-status determination for an empty
-  // weekly window (genuine-quiet vs coverage-problem). Gate the banner only
+  // weekly window (always a coverage-problem; the detail explains which).
+  // Gate the banner only
   // while the query is still loading, so we never flash a false "no source"
   // warning during the initial fetch — but if the query SETTLES with an error
   // (no source health available) we still surface the conservative coverage
@@ -198,6 +199,19 @@ export default function CountryReport() {
         countryName: country?.name ?? "",
       }),
     [layers, sourcesData, issueDate, country?.name],
+  );
+
+  // Country / topic / specialist feed health as three separate signals for the
+  // internal (screen-only) source-coverage strip, so a down specialist tracker
+  // is visible but never conflated with country coverage.
+  const sourceSignals = useMemo(
+    () =>
+      computeCountrySourceSignals({
+        sources: (sourcesData ?? []) as CoverageSourceLike[],
+        issueDate,
+        countryName: country?.name ?? "",
+      }),
+    [sourcesData, issueDate, country?.name],
   );
 
   // Compute Fast Facts against the active window once per render.
@@ -822,6 +836,26 @@ export default function CountryReport() {
           <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
           <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>
           <li>90-day background window: <strong>{layers.ninetyDay.length}</strong> record{layers.ninetyDay.length === 1 ? "" : "s"}</li>
+          <li style={{ marginTop: 6 }}>
+            Country coverage feeds:{" "}
+            <strong style={{ color: sourceSignals.country.unhealthy > 0 ? "#A33232" : DUSK }}>
+              {sourceSignals.country.healthy}/{sourceSignals.country.total} healthy
+            </strong>
+            {sourceSignals.country.unhealthy > 0 && ` — failing/stale: ${sourceSignals.country.unhealthyNames.join(", ")}`}
+          </li>
+          <li>
+            Flashpoint topic feeds:{" "}
+            <strong style={{ color: sourceSignals.topic.unhealthy > 0 ? "#A33232" : DUSK }}>
+              {sourceSignals.topic.healthy}/{sourceSignals.topic.total} healthy
+            </strong>
+          </li>
+          <li>
+            Specialist (cargo) feeds:{" "}
+            <strong style={{ color: sourceSignals.specialist.unhealthy > 0 ? "#A33232" : DUSK }}>
+              {sourceSignals.specialist.healthy}/{sourceSignals.specialist.total} healthy
+            </strong>
+            {sourceSignals.specialist.unhealthy > 0 && " — does not affect country coverage"}
+          </li>
           {layers.current.length < 3 && (
             <li style={{ color: "#A33232" }}>
               Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
