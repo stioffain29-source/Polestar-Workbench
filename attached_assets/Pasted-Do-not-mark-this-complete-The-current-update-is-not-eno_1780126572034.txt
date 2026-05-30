@@ -1,0 +1,59 @@
+Do not mark this complete.
+
+The current update is not enough.
+
+It proves some production ingestion happened for Flashpoint and Cargo, and it identifies useful issues, but it still relies on “dev equals post-republish prod.” That is not acceptable proof.
+
+I need live production proof after merge and republish.
+
+Before doing anything else, also fix or disable the unauthenticated POST /api/sources endpoint. That cannot remain open on production.
+
+Required next actions:
+
+1. Secure the sources endpoint
+- Protect POST /api/sources with authentication/admin token, or disable it in production.
+- Confirm unauthenticated source creation is no longer possible.
+
+2. Merge and republish
+- Merge the current changes.
+- Republish the production app.
+- Confirm the production build includes:
+  - admin ingestion route
+  - new source seed
+  - country coverage logic
+  - country report prose/data fixes
+
+3. Run production ingestion
+- Trigger production ingestion through the live admin route.
+- Confirm production row counts before and after.
+- Confirm records inserted.
+- Confirm latest production record dates.
+- Confirm last updated time.
+
+4. Prove live production reports
+For each of these:
+- Flashpoint
+- Cargo Watch
+- Papua
+- Papua New Guinea
+
+Provide:
+- live production screenshot
+- PDF exported from that same live production screen
+- production row count
+- latest production record date
+- last updated time
+- data status
+- confirmation screen and PDF match
+
+5. For Papua and Papua New Guinea specifically, confirm:
+- reports are country-specific, not generic
+- PNG and Papua remain separate
+- country coverage warnings use country-relevant feeds only
+- TAPA or other specialist topic feeds do not drive country-wide coverage warnings
+- Fast Facts, prose, map, charts and related incidents use the correct dataset
+
+Do not use dev proof.
+Do not use “dev equals post-republish prod.”
+Do not use typecheck or architect review as proof.
+Do not close the task until the live production reports prove the fix.
