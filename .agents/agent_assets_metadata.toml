@@ -396,3 +396,51 @@ id = "XwlfcjJ_JdcrUcYKaqkok"
 uri = "file://scripts/exports/proof/papua_page2.jpg"
 type = "image"
 title = "Papua report PDF (page 2) — no warning"
+
+[[outputs]]
+id = "Ziw0Ydjl2C2_K9oZofV9r"
+uri = "file://screenshots/prod_acceptance/flashpoint.pdf"
+type = "pdf"
+title = "Flashpoint — PDF from live prod screen"
+
+[[outputs]]
+id = "OuemwYq3VWUl7uPZyEdV1"
+uri = "file://screenshots/prod_acceptance/cargo_watch.pdf"
+type = "pdf"
+title = "Cargo Watch — PDF from live prod screen"
+
+[[outputs]]
+id = "ZVAELMLh1a3hT1hF-TGic"
+uri = "file://screenshots/prod_acceptance/papua.pdf"
+type = "pdf"
+title = "Papua — PDF from live prod screen"
+
+[[outputs]]
+id = "Ydqp0v9VDSBWkhwV2XTsy"
+uri = "file://screenshots/prod_acceptance/papua_new_guinea.pdf"
+type = "pdf"
+title = "Papua New Guinea — PDF from live prod screen"
+
+[[outputs]]
+id = "oEZpspSZ4uxxmgccldNPE"
+uri = "file://screenshots/prod_acceptance/papua.png"
+type = "image"
+title = "Papua — live prod screenshot"
+
+[[outputs]]
+id = "H7lgxgyiQQ3LqO76v2Gfz"
+uri = "file://screenshots/prod_acceptance/papua_new_guinea.png"
+type = "image"
+title = "Papua New Guinea — live prod screenshot"
+
+[[outputs]]
+id = "8kfoUUsc_B-VYEtPE1-nR"
+uri = "file://screenshots/prod_acceptance/cargo_watch.png"
+type = "image"
+title = "Cargo Watch — live prod screenshot"
+
+[[outputs]]
+id = "1hYCrlMZPoTD2xJAsXShc"
+uri = "file://screenshots/prod_acceptance/flashpoint.png"
+type = "image"
+title = "Flashpoint — live prod screenshot"
