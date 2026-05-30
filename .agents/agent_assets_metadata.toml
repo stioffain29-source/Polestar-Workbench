@@ -444,3 +444,27 @@ id = "1hYCrlMZPoTD2xJAsXShc"
 uri = "file://screenshots/prod_acceptance/flashpoint.png"
 type = "image"
 title = "Flashpoint — live prod screenshot"
+
+[[outputs]]
+id = "cJ2v-oPrC0WhfuOVrcSSh"
+uri = "file://artifacts/workbench/screenshots/Flashpoint_2026-05-30.pdf"
+type = "pdf"
+title = "Flashpoint / Protests — 24–30 May 2026 (22 records, cleaned)"
+
+[[outputs]]
+id = "u3Y0K44v9hGsrLsLUrNp-"
+uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_2026-05-30.pdf"
+type = "pdf"
+title = "Shipping — Hormuz Maritime Watch"
+
+[[outputs]]
+id = "eJvTqkZHI12VqiwC1_AfG"
+uri = "file://artifacts/workbench/screenshots/CargoWatch_2026-05-30.pdf"
+type = "pdf"
+title = "APAC Cargo Watch"
+
+[[outputs]]
+id = "D5kM6rnaWWj5BD9UnQSjT"
+uri = "file://artifacts/workbench/screenshots/FuelWatch_2026-05-30.pdf"
+type = "pdf"
+title = "Fuel Watch"
