@@ -245,6 +245,7 @@ function makeTableCell(text: string, options: {
 
 function makeExportRow(columns: string, height: string, isHeader = false): HTMLDivElement {
   const row = document.createElement("div");
+  row.dataset.pdfRow = "true";
   row.style.display = "grid";
   row.style.gridTemplateColumns = columns;
   row.style.alignItems = "center";
@@ -298,7 +299,7 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
     table.style.boxSizing = "border-box";
 
     if (isWatchlist) {
-      const columns = "165px minmax(0, 1fr) 50px 50px 50px 190px";
+      const columns = "165px minmax(0, 1fr) 50px 50px 50px 200px";
       const header = makeExportRow(columns, "40px", true);
       ["Location", "Note", "7d", "30d", "90d", "Worst (90d)"].forEach((label, index) => {
         header.appendChild(makeTableCell(label, {
@@ -320,7 +321,7 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
         out.appendChild(makeTableCell(cellText(row.cells[4]), { align: "center", bold: true }));
         const sevCell = makeTableCell("", { align: "center" });
         if (row.severityLabel && row.severityLabel.toLowerCase() !== "no records") {
-          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 120, 20));
+          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 126, 20));
         } else {
           sevCell.textContent = row.severityLabel || "No records";
           sevCell.style.fontStyle = "italic";
@@ -434,6 +435,7 @@ function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): numbe
     ".report-section",
     ".report-kpi",
     "table",
+    "[data-pdf-row]",
     "[data-pdf-break-before]",
   ].join(",");
   const candidates = new Set<number>([0, root.scrollHeight]);

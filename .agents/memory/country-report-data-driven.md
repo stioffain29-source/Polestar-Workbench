@@ -73,30 +73,44 @@ context sections (rendered separately by the component from the same country-fil
 dataset). Cards and prose already share one `incidents` array filtered by
 `incidentMatchesCountry`, so they stay aligned automatically.
 
-# Active reporting window fallback (never an empty headline)
+# Country report is ALWAYS weekly; an empty 7-day week is a data-quality signal
 
-`resolveActiveCountryWindow(layers, issueDate)` picks the *active* window so a
-country report never shows an empty headline when recent data exists: 7-day if it
-has any record, else 30-day if it has ≥3, else 90-day if anything is on file, else
-an honest empty 7-day. It returns `basisDays/basisLabel/basisShort/incidents/
-expanded/periodLabel/periodShortLabel`.
+The country report headline window is ALWAYS 7-day. `resolveActiveCountryWindow`
+no longer promotes to 30/90-day when the week is thin — it returns the 7-day
+window unconditionally (`basisDays:7`, `incidents: layers.current`,
+`expanded:false`). 30/90-day material renders ONLY as labelled CONTEXT sections,
+never as the weekly headline.
 
-**The rule:** EVERY data-bearing surface must read the *same* active window —
-Fast Facts, map, severity/type charts, related-incidents table, cover reporting
-period, the on-screen note banner, AND the drafted prose. `computeCountryFastFacts`
-and `draftCountryReportProse` both take optional `windowIncidents`/`basisDays`; the
-prose's `total>0` branches must label the window via `basisShort` (e.g. "the 30-day
-window holds…"), while `total===0` branches keep "7-day" (they only fire when the
-window is genuinely empty = basis 7).
+**Why:** Promoting a thin week to a 30/90-day headline silently hid the real
+signal — that the weekly collection was empty. A zero-record week is itself
+information (either genuinely quiet OR a coverage failure), so it must be
+surfaced, not papered over with older data. An empty week must NEVER read as
+"nothing happened" unless that is health-confirmed.
 
-**Why:** Papua's 7-day window is routinely empty (30d≈39, 90d≈102). Reading the
-empty 7-day everywhere produced a blank report even though rich recent context
-existed. Fall back, but never lie about which window the numbers came from.
+**Coverage status (`computeCountryCoverageStatus`)** decides what an empty week
+means. State is one of `active | genuine-quiet | coverage-problem`:
+- window has records → `active`, no banner.
+- empty window + no feed attributable to the country, OR any relevant feed
+  unhealthy (status in UNHEALTHY_STATUS, `lastSuccess` older than
+  FEED_STALE_DAYS=10, or `lastFailure` newer than `lastSuccess`) → `coverage-problem`.
+- empty window + feeds healthy/current BUT the newest record on file is itself
+  stale (`daysSinceLatest === null || > RECORD_STALE_DAYS=14`) → `coverage-problem`.
+  Latest-record staleness MUST flip the STATE, not just append caveat wording —
+  healthy-but-silent collection cannot confirm a quiet week.
+- only when feeds are healthy/current AND a record exists within RECORD_STALE_DAYS
+  → `genuine-quiet` (the single case allowed to state the week as quiet).
 
-**How to apply:** When adding any new section/caption to the country report or its
-headless PDF builder, source it from `active.incidents` and label it with
-`active.basisShort`/`basisLabel`. The in-app "Download PDF" rasterises the DOM so
-screen==PDF for free, but `exportCountryReportPdf.ts` (headless, font-audit only)
-must independently call `resolveActiveCountryWindow` and thread `basisShort` into
-its map/plotted captions and exec-summary fallback, or those static strings say
-"weekly window" during a 30/90-day fallback.
+**Banner gating:** the on-screen coverage banner is gated on `!isLoading` of the
+sources query (NOT `isSuccess`). Gating on `isSuccess` would hide a legitimately
+needed warning when the sources query *errors*; gating on `!isLoading` only
+suppresses the initial-fetch flash, and a settled-but-errored query still falls
+through to the conservative `coverage-problem` banner (sources=[] → no relevant
+feed).
+
+**How to apply:** The banner lives inside `.print-report`, so the in-app
+"Download PDF" (DOM raster) carries it for free — screen==PDF automatically.
+`exportCountryReportPdf.ts` (headless, font-audit path only) takes a `coverage`
+field on `CountryPdfExtras` + `drawCoverageBanner` for logic parity; it is not
+exercised by the country path at runtime but keep it in sync. Brand: banner uses
+POLAR border / ELECTRIC left accent / NAVY title / DUSK body — NO red (reserved
+for the Extreme tier only).

@@ -48,6 +48,7 @@ import {
   buildCountryLayers,
   resolveActiveCountryWindow,
   type WatchlistRow,
+  type CountryCoverageStatus,
 } from "./countryReportLayers";
 
 export interface PdfIncident {
@@ -99,6 +100,9 @@ export interface CountryPdfExtras {
   lookback?: { thirtyDay: string; ninetyDay: string };
   /** Bucket sizes so the PDF can word the map caption honestly. */
   layerCounts?: { current: number; thirtyDay: number; ninetyDay: number };
+  /** Coverage status for an empty weekly window. Rendered as a banner just
+   *  below the data-as-of strip, mirroring the on-screen report. */
+  coverage?: CountryCoverageStatus;
 }
 
 const SEV_ORDER = [
@@ -527,6 +531,38 @@ function drawNarrative(
   drawSectionWithProse(ctx, heading, text || "Not populated for this cycle.");
 }
 
+// Coverage banner — mirrors the on-screen printable banner (POLAR border
+// with an ELECTRIC left accent, NAVY title, DUSK body). No red: subdued red
+// is reserved for the Extreme severity tier only.
+function drawCoverageBanner(ctx: Ctx, coverage: CountryCoverageStatus) {
+  if (!coverage.showBanner) return;
+  const { pdf, MX, W } = ctx;
+  const padX = 8;
+  const innerW = W - MX * 2 - padX * 2;
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  const lines = pdf.splitTextToSize(sanitize(coverage.detail), innerW) as string[];
+  const boxH = 12 + 4 + lines.length * 11 + 8;
+  ensureSpace(ctx, boxH + 8);
+  const top = ctx.y;
+  setFill(pdf, WHITE);
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.5);
+  pdf.rect(MX, top, W - MX * 2, boxH, "FD");
+  setFill(pdf, ELECTRIC);
+  pdf.rect(MX, top, 3, boxH, "F");
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(8);
+  setText(pdf, NAVY);
+  pdf.text(sanitize(coverage.title.toUpperCase()), MX + padX, top + 11);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  setText(pdf, DUSK);
+  pdf.text(lines, MX + padX, top + 24);
+  setRoboto(pdf, "regular");
+  ctx.y = top + boxH + 10;
+}
+
 function buildKpiCards(facts: CountryFactsBreakdown): KpiCardData[] {
   return facts.cards.map((c) => ({
     label: c.label,
@@ -596,6 +632,9 @@ export async function exportCountryReportPdf(
       modeLabel: "Mixed sources (live, manual & static)",
     }),
   );
+
+  // Coverage banner — only renders when the weekly window is empty.
+  if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
 
   // 1. Executive Summary
   drawNarrative(

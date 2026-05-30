@@ -4,6 +4,35 @@ import { sql, eq, or, gte, isNotNull } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
+const FEED_TIMEOUT_MS = 20000;
+const FEED_UA = "Mozilla/5.0 (PolestarWorkbench FlashpointScraper)";
+
+// Fetch + parse a feed robustly. rss-parser's parseURL does not reliably
+// decompress gzip/br responses — some feeds (e.g. Jubi.id, the dedicated
+// Indonesian West Papua source) return gzipped bytes that surface as a
+// "Non-whitespace before first tag, Char: \x1F" XML error (\x1F is the
+// gzip magic byte). Node's global fetch auto-decompresses gzip/deflate/br,
+// so we fetch the body ourselves and hand the decoded text to parseString.
+async function fetchFeed(parser: Parser, url: string) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FEED_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": FEED_UA,
+        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+      },
+      signal: ctrl.signal,
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`Status code ${res.status}`);
+    const body = await res.text();
+    return await parser.parseString(body);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Flashpoint ingest core.
 //
 // Reads catalogued sources where topic='flashpoint' from the sources
@@ -87,13 +116,45 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Myanmar",           aliases: ["myanmar", "burma", "yangon", "mandalay", "naypyidaw"] },
   { canonical: "Nepal",             aliases: ["nepal", "kathmandu", "pokhara"] },
   { canonical: "Pakistan",          aliases: ["pakistan", "karachi", "lahore", "islamabad", "rawalpindi", "peshawar"] },
-  { canonical: "Papua New Guinea",  aliases: ["papua new guinea", "png", "port moresby", "lae", "mt hagen", "mount hagen", "jayapura", "west papua", "papua"] },
+  // NOTE: Papua New Guinea and Indonesian West Papua are resolved by
+  // resolvePapuaPng() (below), NOT by this alias table, because they share
+  // the ambiguous word "papua". Do not re-add a "papua"/"png" alias here.
   { canonical: "Philippines",       aliases: ["philippines", "manila", "cebu", "davao", "quezon city"] },
   { canonical: "South Korea",       aliases: ["south korea", "seoul", "busan", "incheon", "daegu"] },
   { canonical: "Sri Lanka",         aliases: ["sri lanka", "colombo", "kandy", "jaffna"] },
   { canonical: "Thailand",          aliases: ["thailand", "bangkok", "chiang mai", "phuket"] },
   { canonical: "Vietnam",           aliases: ["vietnam", "viet nam", "hanoi", "ho chi minh", "haiphong"] },
 ];
+
+// Papua / PNG disambiguation. The Indonesian province of Papua / West Papua
+// and the independent state of Papua New Guinea share the word "papua"; a
+// naive alias list mis-routes Jayapura / West-Papua stories to "Papua New
+// Guinea", which then drops them from BOTH country reports (wrong token for
+// the Papua report; stripped from PNG by the West-Papua content guard).
+// Resolve them explicitly. Keep these markers in sync with the report-side
+// guards in artifacts/workbench/src/lib/countryMatch.ts
+// (WEST_PAPUA_CONTEXT_RE / PNG_CONTEXT_RE).
+const PNG_MARKERS =
+  /\b(papua new guinea|png|port moresby|lae|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
+const WEST_PAPUA_MARKERS =
+  /\b(west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|papua pegunungan|papua tengah|papua selatan|papua barat daya|highland papua)\b/i;
+const INDONESIA_CONTEXT = /\b(indonesia|indonesian|tni|polri|jakarta)\b/i;
+
+/**
+ * Resolve a Papua-region country tag, or null when the text is not about
+ * either Papua. Cross-border records (both PNG and West Papua markers) are
+ * tagged with both so they appear in both country reports.
+ */
+function resolvePapuaPng(hay: string): string | null {
+  const png = PNG_MARKERS.test(hay);
+  const wp = WEST_PAPUA_MARKERS.test(hay);
+  if (png && wp) return "West Papua; Papua New Guinea";
+  if (png) return "Papua New Guinea";
+  if (wp) return "West Papua";
+  // Bare "papua" with Indonesian context but no province marker -> West Papua.
+  if (/\bpapua\b/i.test(hay) && INDONESIA_CONTEXT.test(hay)) return "West Papua";
+  return null;
+}
 
 function classify(title: string, summary: string): {
   kept: boolean;
@@ -111,13 +172,16 @@ function classify(title: string, summary: string): {
   // Country must appear in TITLE or SUMMARY (broader than cargo-watch
   // because Flashpoint headlines often omit the country, e.g.
   // "Students hold protest against fee hike" with the country only in
-  // the summary's dateline).
-  const countryMatch = COUNTRY_ALIASES.find((c) =>
-    c.aliases.some((a) => hasWord(hay, a)),
-  );
-  if (!countryMatch) return { kept: false, reason: "no-apac-country", country: null };
+  // the summary's dateline). Papua / PNG are resolved first by
+  // resolvePapuaPng so Indonesian West Papua is not mis-routed to PNG.
+  let country = resolvePapuaPng(hay);
+  if (!country) {
+    const m = COUNTRY_ALIASES.find((c) => c.aliases.some((a) => hasWord(hay, a)));
+    country = m ? m.canonical : null;
+  }
+  if (!country) return { kept: false, reason: "no-apac-country", country: null };
 
-  return { kept: true, reason: `allow:${allowHit.source.slice(0, 30)}`, country: countryMatch.canonical };
+  return { kept: true, reason: `allow:${allowHit.source.slice(0, 30)}`, country };
 }
 
 function dedupeKey(title: string, when: Date, country: string): string {
@@ -188,7 +252,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const processFeed = async (s: (typeof fetchable)[number]) => {
     perFeed[s.name] = { name: s.name, found: 0, accepted: 0, rejected: 0 };
     try {
-      const parsed = await parser.parseURL(s.url!);
+      const parsed = await fetchFeed(parser, s.url!);
       const items = parsed.items ?? [];
       perFeed[s.name].found = items.length;
       for (const item of items) {

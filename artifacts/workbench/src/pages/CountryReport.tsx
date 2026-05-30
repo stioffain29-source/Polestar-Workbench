@@ -3,6 +3,7 @@ import { useRoute, Link } from "wouter";
 import {
   useGetCountryReport,
   useListIncidents,
+  useListSources,
   useUpdateCountryReport,
   useGetCountryBaseline,
   useUpsertCountryBaseline,
@@ -30,7 +31,7 @@ import {
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, type WatchlistRow, type CountryLayerBuckets } from "@/lib/countryReportLayers";
+import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -94,6 +95,13 @@ export default function CountryReport() {
   const { data: incidentsData } = useListIncidents(country ? { days: 90 } : {}, {
     query: { enabled: !!country },
   } as never);
+  // Source health feeds the coverage-status determination for an empty
+  // weekly window (genuine-quiet vs coverage-problem). Gate the banner only
+  // while the query is still loading, so we never flash a false "no source"
+  // warning during the initial fetch — but if the query SETTLES with an error
+  // (no source health available) we still surface the conservative coverage
+  // warning rather than silently hiding it.
+  const { data: sourcesData, isLoading: sourcesLoading } = useListSources();
   const incidents = useMemo(() => {
     if (!country) return [];
     const name = country.name ?? "";
@@ -169,13 +177,27 @@ export default function CountryReport() {
     [layers, baseline, country?.name],
   );
 
-  // Active reporting window. Falls back from the empty 7-day window to the
-  // most recent 30-day (>=3 records) or 90-day context so the report never
-  // renders an empty headline when recent country data exists. Drives Fast
-  // Facts, map, charts, the related-incidents table and the drafted prose.
+  // Active reporting window. ALWAYS the 7-day weekly window — even when
+  // empty. A zero-record week is a data-quality signal (see `coverage`
+  // below), never a reason to promote older 30/90-day records into the
+  // headline. Drives Fast Facts, map, charts, the related-incidents table
+  // and the drafted prose; 30/90-day material stays as labelled context.
   const active = useMemo(
     () => resolveActiveCountryWindow(layers, issueDate),
     [layers, issueDate],
+  );
+
+  // Coverage status for an empty 7-day window. Drives the printable
+  // coverage banner; "active" (window has records) renders nothing.
+  const coverage = useMemo(
+    () =>
+      computeCountryCoverageStatus({
+        layers,
+        sources: (sourcesData ?? []) as CoverageSourceLike[],
+        issueDate,
+        countryName: country?.name ?? "",
+      }),
+    [layers, sourcesData, issueDate, country?.name],
   );
 
   // Compute Fast Facts against the active window once per render.
@@ -503,10 +525,33 @@ export default function CountryReport() {
           modeLabel: "Mixed sources (live, manual & static)",
         }}
       />
-      {active.expanded && (
-        <div style={{ border: `1px solid ${POLAR}`, background: "#fff", padding: "10px 14px", borderRadius: 2 }}>
+      {!sourcesLoading && coverage.showBanner && (
+        <div
+          style={{
+            border: `1px solid ${POLAR}`,
+            borderLeft: `4px solid ${ELECTRIC}`,
+            background: "#fff",
+            padding: "12px 16px",
+            borderRadius: 2,
+            WebkitPrintColorAdjust: "exact",
+            printColorAdjust: "exact",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: ROBOTO,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: NAVY,
+              marginBottom: 4,
+            }}
+          >
+            {coverage.title}
+          </div>
           <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, lineHeight: 1.5 }}>
-            No relevant incidents were recorded in the 7-day window; this report uses the most recent {active.basisShort} context.
+            {coverage.detail}
           </div>
         </div>
       )}

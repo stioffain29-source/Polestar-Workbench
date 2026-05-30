@@ -257,7 +257,7 @@ title = "Papua — full report body (live screen)"
 id = "yiiHYP0gU9rUgVtBjQzT8"
 uri = "file://exports/polestar-country-report-papua.pdf"
 type = "pdf"
-title = "Papua — PDF exported from the live screen"
+title = "Papua — full PDF (exported from live screen)"
 
 [[outputs]]
 id = "3cpQvm_1VSoYxKKVeAica"
@@ -269,4 +269,94 @@ title = "Papua New Guinea — full report body (live screen)"
 id = "dSxBP0vsELp-iVkKizNJm"
 uri = "file://exports/polestar-country-report-papua-new-guinea.pdf"
 type = "pdf"
-title = "Papua New Guinea — PDF exported from the live screen"
+title = "Papua New Guinea — full PDF (exported from live screen)"
+
+[[outputs]]
+id = "DU2asJVZC45AGdXvNS9Ro"
+uri = "file://exports/papua-pages/page-1.png"
+type = "image"
+title = "Papua — p1: Data status, Exec summary, Fast Facts"
+
+[[outputs]]
+id = "dywA4V8k2YOlxw-c-LuNN"
+uri = "file://exports/papua-pages/page-2.png"
+type = "image"
+title = "Papua — p2: 30/90-day context, Map, Severity"
+
+[[outputs]]
+id = "rE9UzK-Fs88topvVnBuUi"
+uri = "file://exports/papua-pages/page-3.png"
+type = "image"
+title = "Papua — p3: Implications, Location Watchlist"
+
+[[outputs]]
+id = "sS_q4Kk2RY9JpTQ-8et9C"
+uri = "file://exports/papua-pages/page-4.png"
+type = "image"
+title = "Papua — p4: Incident breakdown, Watch Next, Polestar View"
+
+[[outputs]]
+id = "irpazG1z3emH6c7VNQGZa"
+uri = "file://exports/papua-pages/page-5.png"
+type = "image"
+title = "Papua — p5: Related Incidents (1 of 3)"
+
+[[outputs]]
+id = "_YwXLxFv-ya-edS9q3yJT"
+uri = "file://exports/papua-pages/page-6.png"
+type = "image"
+title = "Papua — p6: Related Incidents (2 of 3)"
+
+[[outputs]]
+id = "CmKju1yMc9INtzfDHB_pg"
+uri = "file://exports/papua-pages/page-7.png"
+type = "image"
+title = "Papua — p7: Related Incidents (3 of 3)"
+
+[[outputs]]
+id = "rC1mJvAFNRFUuLkwgcvqr"
+uri = "file://exports/papua-pages/page-8.png"
+type = "image"
+title = "Papua — p8: cover"
+
+[[outputs]]
+id = "hoC-2B79i6akjzWaGLjXH"
+uri = "file://exports/png-pages/page-1.png"
+type = "image"
+title = "Papua New Guinea — p1: Data status, Exec summary, Fast Facts"
+
+[[outputs]]
+id = "KuOuoVp20zJ5bgdp7liMp"
+uri = "file://exports/png-pages/page-2.png"
+type = "image"
+title = "Papua New Guinea — p2: 30/90-day context, Map, Severity"
+
+[[outputs]]
+id = "wOY6YPdCWQZ456MjRV2SQ"
+uri = "file://exports/png-pages/page-3.png"
+type = "image"
+title = "Papua New Guinea — p3: Implications, Location Watchlist"
+
+[[outputs]]
+id = "ZD4_3DwxcjTticbZ6gfCw"
+uri = "file://exports/png-pages/page-4.png"
+type = "image"
+title = "Papua New Guinea — p4: Incident breakdown, Watch Next, Polestar View"
+
+[[outputs]]
+id = "kjAyVc1MKHq0QKe_TzWiS"
+uri = "file://exports/png-pages/page-5.png"
+type = "image"
+title = "Papua New Guinea — p5: Related Incidents (1 of 2)"
+
+[[outputs]]
+id = "yvUQ7Blw0FhKNxqHEX9PZ"
+uri = "file://exports/png-pages/page-6.png"
+type = "image"
+title = "Papua New Guinea — p6: Related Incidents (2 of 2)"
+
+[[outputs]]
+id = "5HkVaJz1C1o46QT_lCpqC"
+uri = "file://exports/png-pages/page-7.png"
+type = "image"
+title = "Papua New Guinea — p7: cover"

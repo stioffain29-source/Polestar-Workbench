@@ -1,0 +1,237 @@
+You're right — you haven't seen the actual report body. Let me check production status first, then produce the complete reports with everything populated.
+
+
+2 actions
+Important finding: REPLIT_DOMAINS contains only the development domain — there is no published production deployment yet, so a literal "live production" URL doesn't exist until the app is published (a step you control). What I can do right now is produce the complete live report from the running application, fully populated, plus the real exported PDF. Let me set that up properly — full-page capture + the actual Download-PDF output via browser automation.
+
+
+2 actions
+Playwright 1.60.0 is available, and the country report's Download PDF uses exportElementToPdf — the DOM raster of the live screen (exactly the in-app PDF). I'll drive a real browser to capture the full report body and the actual PDF download for both reports.
+
+
+3 actions
+Playwright browsers aren't installed. Let me install chromium, then write the capture script.
+
+
+6 actions
+The Playwright download keeps timing out (likely network-restricted). Let me check for a system Chromium I can point Playwright at, and check whether a headless country PDF harness already exists.
+
+
+2 actions
+There's a Replit-provided Chromium at REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE. I'll point Playwright at it and capture both reports end to end — full-page body + the actual Download-PDF output.
+
+
+Created capture-country-reports.cjs
+Now let me run the capture:
+
+
+Ran cd
+Both reports captured. Let me verify the output files and inspect the screenshots to confirm every section is populated before presenting.
+
+
+3 actions
+Full-page PNGs and multi-page PDFs (8 and 7 pages) are captured via the actual Download-PDF button. The displayed read only showed the top — let me verify the lower sections (map, charts, incident table) actually rendered by slicing the full Papua screenshot.
+
+
+3 actions
+The image is only 1000 logical px tall — that's the viewport height, meaning the report scrolls inside a container and fullPage didn't capture it. The PDFs are complete (8/7 pages, via the real DOM raster), but I need the screenshots to capture the entire .print-report element. Let me fix that.
+
+
+Edited capture-country-reports.cjs
+Now let me re-run the capture with the element-level screenshot:
+
+
+2 actions
+Full reports now captured (papua 1952×14998, png 1952×13040). Let me verify the map tiles, charts, and incident table actually rendered by slicing the Papua screenshot into bands.
+
+
+5 actions
+The bands are blank — the report renders with tall print-page whitespace, so fixed offsets miss the content. Let me make a full-height thumbnail to see where content actually sits.
+
+
+3 actions
+The element screenshot is mostly blank below the cover — the report's charts/map/table render lazily (only when scrolled into view), so an off-screen element capture misses them. But the PDF (exportElementToPdf) forces full layout. Let me verify the PDF has real content by rendering its pages.
+
+
+6 actions
+The PDF is fully populated — cover, prose, location watchlist table with 7D/30D/90D counts + risk badges, incident-breakdown chart, Watch Next, Polestar View. Let me confirm the remaining pages (Fast Facts, map, and the Data-as-of metadata line).
+
+
+5 actions
+The Papua PDF is complete and faithful — every section populated from the active 30-day window: Data Status line (Mixed sources live/manual/static), Latest Record 21 May 2026, Last Updated 23 May 2026, the 7-day→30-day fallback banner, Fast Facts (39 records, Extreme), Executive Summary, Situation, 30/90-day context, Map (Leaflet/CARTO tiles + severity markers), Severity Distribution, Implications, Location Watchlist, Incident Breakdown chart, Watch Next, Polestar View, and the full Related Incidents table.
+
+Since exportElementToPdf rasterises the live on-screen .print-report DOM, this PDF is the live screen. Let me confirm the PNG (Papua New Guinea) report is equally complete, then produce stitched full-body images.
+
+
+4 actions
+Both reports are confirmed complete and faithful — PNG report (7 pages) shows Data Status (Mixed sources), Latest Record 21 May 2026, Last Updated 23 May 2026, the 7→30-day fallback banner, Fast Facts (30 records, High), map with tiles + markers, severity distribution, and all prose/tables. Now let me build stitched full-body images and clean up the blank element captures.
+
+
+2 actions
+Both reports are complete and verified. Presenting the deliverables: the full report bodies and the PDFs exported from those same live screens.
+
+
+4 output files
+
+Papua — full report body (live screen)
+Image
+
+Open
+papua-report-fullbody.png
+
+Papua — PDF exported from the live screen
+PDF
+
+Open
+
+Papua New Guinea — full report body (live screen)
+Image
+
+Open
+papua-new-guinea-report-fullbody.png
+
+Papua New Guinea — PDF exported from the live screen
+PDF
+
+Open
+
+3 messages & 4 actions
+
+Checkpoint made
+5 minutes ago
+
+Worked for 12 minutes
+they are like fucking postage stamp size how the fuck to i read them
+
+4 minutes ago
+
+Planning PDF page rendering strategy
+You're right — those stitched images are one tall column, so they shrink to nothing. Let me render each report as individual full-size pages you can actually read.
+
+
+Ran cd
+Now each page is full size (1241×1754, standard portrait). Presenting them individually so they're readable.
+
+
+9 output files
+
+Papua — p1: Data status, Exec summary, Fast Facts
+Image
+
+Open
+page-1.png
+
+Papua — p2: 30/90-day context, Map, Severity
+Image
+
+Open
+page-2.png
+
+Papua — p3: Implications, Location Watchlist
+Image
+
+Open
+page-3.png
+
+Papua — p4: Incident breakdown, Watch Next, Polestar View
+Image
+
+Open
+page-4.png
+
+Papua — p5: Related Incidents (1 of 3)
+Image
+
+Open
+page-5.png
+
+Papua — p6: Related Incidents (2 of 3)
+Image
+
+Open
+page-6.png
+
+Papua — p7: Related Incidents (3 of 3)
+Image
+
+Open
+page-7.png
+
+Papua — p8: cover
+Image
+
+Open
+page-8.png
+
+Papua — full PDF (exported from live screen)
+PDF
+
+Open
+Now the Papua New Guinea pages:
+
+
+8 output files
+
+Papua New Guinea — p1: Data status, Exec summary, Fast Facts
+Image
+
+Open
+page-1.png
+
+Papua New Guinea — p2: 30/90-day context, Map, Severity
+Image
+
+Open
+page-2.png
+
+Papua New Guinea — p3: Implications, Location Watchlist
+Image
+
+Open
+page-3.png
+
+Papua New Guinea — p4: Incident breakdown, Watch Next, Polestar View
+Image
+
+Open
+page-4.png
+
+Papua New Guinea — p5: Related Incidents (1 of 2)
+Image
+
+Open
+page-5.png
+
+Papua New Guinea — p6: Related Incidents (2 of 2)
+Image
+
+Open
+page-6.png
+
+Papua New Guinea — p7: cover
+Image
+
+Open
+page-7.png
+
+Papua New Guinea — full PDF (exported from live screen)
+PDF
+
+Open
+Each report is now split into full-size, readable pages (1241×1754 each) plus the complete PDF. Open any page card and it'll display at proper size — no more postage stamps.
+
+Papua — 8 pages, plus the PDF
+Papua New Guinea — 7 pages, plus the PDF
+The pages are titled by what's on them (Data status/Fast Facts, Map/Severity, Watchlist, Incident breakdown, Related Incidents, etc.), so you can jump straight to whatever you want to check. If even these are rendering small in your view, click the card to open the file directly, or download the PDF and read it full-screen.
+
+
+Couldn't make checkpoint
+
+Worked for 1 minute
+
+Scroll to latest
+
+Make, test, iterate…
+
+
+
