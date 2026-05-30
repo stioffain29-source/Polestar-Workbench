@@ -16,6 +16,19 @@ The Flashpoint topic classifier is intentionally permissive on surface vocabular
 - Legislative / parliamentary process ("X passes bill", "cabinet clears law", "co-payment bill") — wire copy often says "opposition protests" rhetorically so it files as Protest, but it is not a street event.
 - Sports keyword noise ("striker", a "11-second strike", tennis "rally", title "march") beyond the named-league filter. Motorsport is a sneaky case: "rally" is also a protest synonym, so a WRC headline ("Paddon's final Rally1 event - DirtFish") passes the protest gate. Catch it on motorsport-specific markers (rally1/rally2, WRC, DirtFish, Autosport, Motorsport, MotoGP, Grand Prix, F1/Formula 1, "special stage"/SSn), NOT the bare word "rally".
 
+**"rally"/"strike" are the single worst noise source — keyword filtering alone is never "done." Verify with a live KEPT-vs-DROPPED audit, not a self-checking harness: `pnpm --filter @workspace/workbench run audit:flashpoint` dumps both lists straight from `/api/incidents` so a human can eyeball them. The first homonym pass still leaked ~9/34; these are the senses that survive a naive "needs an instrument/league word" filter:**
+- Market rallies signalled by a RESULT word, not a named instrument: rout / valuation / profit / "N% rally" / "AI infrastructure rally" / "tin rally lifts profit".
+- Sports match-report vocab the league list misses: a goal "strike" at half/full-time, "players rally" behind a team-mate, "protest the referee's call", regional sports (sepak takraw, kabaddi, etc.).
+- Business "strike a deal" (commercial agreement, not industrial action).
+- Fact-check / debunk pieces that say it is NOT a protest.
+- Opinion-poll / approval-rating stories (a survey result, not an event).
+- Public-health outbreaks (bird flu / dengue / etc.).
+- Non-APAC protests syndicated by an APAC outlet ("...EU on Georgia's independence day - Free Malaysia Today").
+
+**Where each belongs (layer matters):** topic-irrelevance homonyms (market/sports/deal/fact-check/poll/health) go in `FLASHPOINT_EXCLUDE` (`topicRelevance.ts`) — a hard exclusion that runs before the relevance tiers, so it cleans the report dataset AND the generic seeding path at once. Geography drops stay in `NON_APAC_FOCUS_RE` (`flashpointReportDataset.ts`), which strips the trailing " - <Source>" suffix first.
+**Two anti-over-match rules learned the hard way:** (1) broad lexical tokens like "full-time" are unsafe at the hard-exclusion layer ("full-time workers rally" is real) — anchor them to an adjacent sports word. (2) Do NOT geo-drop on `ukraine`/`russia`: APAC solidarity protests are real public-order events; keep `georgia` only, and keep `APAC_HOOK_RE` stocked with major APAC *cities* (Tokyo, Seoul, Manila…) so a city-named solidarity headline survives even when it names a non-APAC cause.
+**Consciously-kept borderline records (do NOT keyword-filter — the cure is worse):** a genuine labour strike with a wrong country tag (Icelandic "Eimskip" mislabelled Philippines — needs entity resolution, not regex) and awareness stunts ("amplify voices of Gaza Children" — filtering "Gaza" would drop real pro-Palestine APAC protests).
+
 All three new classes are gated on `!LIVE_PUBLIC_ORDER_RE`: a *genuine* protest against a bill or arms deal will mention a crowd/march/tear gas/road closure and is kept; rhetorical "opposition protests the bill" copy is not. Do NOT broaden the exemption to the bare word "protest" — that re-admits exactly the junk (e.g. the "Japan passes bill" item) the user flagged.
 
 **Why:** the classifier sees the report as a corpus; the reader sees one record at a time. A "protest" record with no place, no actor, no impact and no time-of-day is worse than no record. It signals to the reader that the brief is keyword-driven, not analyst-driven.

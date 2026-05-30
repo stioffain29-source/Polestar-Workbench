@@ -158,6 +158,52 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\b(concert|fan|gig|tour|album|product launch|launch|promotional|promo|brand|sale|crowdfund|donation drive) rally\b/,
   /\brally (for|to see|to meet|to support|to celebrate) .{0,30}(concert|gig|tour|album|launch|artist|singer|band|actor|star|celebrity|idol)/,
   /\b(anne curtis|taylor swift|bts|blackpink|gracie abrams|ed sheeran|coldplay|harry styles|olivia rodrigo|sabrina carpenter)\b/i,
+
+  // Finance / markets, second pass. The patterns above key on an explicit
+  // instrument word adjacent to "rally"; these catch the cases where the
+  // market signal is a *result* word (rout, valuation, profit, earnings,
+  // a percentage move) rather than a named instrument — e.g. "Japan cable
+  // maker rout exposes cracks in AI infrastructure rally", "Nokia's 140%
+  // rally turns AI comeback into valuation puzzle", "tin rally lifts profit
+  // fivefold".
+  /\b\d+(\.\d+)?%\s+rally\b/,
+  /\b(ai|tech|chip|semiconductor|infrastructure|valuation|earnings|ipo|listing) (\w+ ){0,2}rally\b/,
+  /\b(rout|sell[- ]?off|valuation|profit|profits|earnings|fivefold|record (high|low)|investors?) .{0,40}rally\b/,
+  /\brally\b .{0,40}(rout|valuation|profit|profits|earnings|fivefold|investors?|record (high|low)|shares?)/,
+  /\b(tin|copper|aluminium|aluminum|nickel|zinc|steel|smelting|smelter|palm oil|crude|brent|wti) (\w+ ){0,2}rally\b/,
+  /\brally lifts? (profit|profits|earnings|shares?|sales|stock)/,
+
+  // Sports, second pass. Match-report vocabulary that the named-league
+  // list above misses: a goal "strike" reported at half/full time, players
+  // "rallying" behind a team-mate, a "protest" over a referee's call, and
+  // the regional sports the league list omits (sepak takraw, kabaddi, etc).
+  // "half-time"/"full-time" only when a match-report word is adjacent —
+  // bare "full-time workers rally" is a legitimate labour headline and must
+  // NOT be dropped.
+  /\b(half|full)[- ]time\b.{0,40}\b(goal|score|scored|leads?|ahead|trail|equalis|equaliz|against|kick[- ]?off|win|won|beat|draw|drawn|nil|penalty|striker)\b/,
+  /\b(goal|score|scored|leads?|ahead|trail|equalis|equaliz|kick[- ]?off|striker|midfield|winger|keeper)\b.{0,40}\b(half|full)[- ]time\b/,
+  /\bplayers rally\b/,
+  /\brally behind .{0,30}(player|team|club|coach|captain|striker|side|squad)/,
+  /\b(sepak )?takraw\b|\b(kabaddi|badminton|volleyball|netball|handball|futsal|sepaktakraw)\b/,
+  /\b(protest|protests|protested|protesting) .{0,20}(referee|umpire|umpiring|the call|the decision|the result|the score|penalty|red card|offside|\bvar\b|disqualif)/,
+  /\breferee.?s? (call|decision|ruling)\b/,
+
+  // Business "strike a deal" — commercial agreement, not industrial action.
+  /\bstrik(e|es|ing) (a |the |an |new |fresh |landmark |historic )?(deal|agreement|accord|pact|partnership|bargain|alliance|truce)\b/,
+
+  // Fact-check / debunk pieces that explicitly say the footage is NOT a
+  // protest, plus generic misinformation framing.
+  /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
+  /\b(fact[- ]check|misleading|false(ly)? (claim|shared)|debunk(ed|s)?|no evidence|misrepresent|old (video|clip|footage)|unrelated (video|clip|footage|event))\b/,
+
+  // Opinion-poll / approval-rating stories — a survey result, not an event.
+  /\b(net satisfaction|satisfaction rating|approval rating|disapproval rating|net trust|opinion poll|pollster|\bsws\b|pulse asia|survey (shows|finds|reveals|said|found))\b/,
+
+  // Public-health outbreaks caught on "outbreak" co-occurring with civil
+  // unrest vocabulary elsewhere in the feed. A disease outbreak is not
+  // civil unrest.
+  /\b(bird flu|avian (influenza|flu)|h5n1|swine flu|dengue|malaria|cholera|measles|nipah|covid|coronavirus) (outbreak|case|cases|confirmed|detected|spread|death|deaths)\b/,
+  /\b(disease|virus|flu) outbreak\b/,
 ];
 
 const SHIPPING_EXCLUDE: RegExp[] = [

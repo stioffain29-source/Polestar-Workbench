@@ -296,8 +296,14 @@ function titleWithoutSource(title: string): string {
   if (suffix.length > 80 || /[,.]/.test(suffix)) return title;
   return title.slice(0, idx);
 }
-const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|argentina|brazil|chile|peru|colombia|mexico|venezuela|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
-const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu)\b/i;
+// `ukraine`/`russia` deliberately excluded: APAC solidarity protests
+// ("Seoul rally against Russia's war", "Manila vigil for Ukraine") are real
+// public-order events and must not be geo-dropped. `georgia` (the country)
+// is retained for the EU-accession/independence-day homonym; the APAC hook
+// below now includes major cities so an APAC-city solidarity headline still
+// survives even when it names a non-APAC country as the cause.
+const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|argentina|brazil|chile|peru|colombia|mexico|venezuela|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
+const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu|tokyo|seoul|manila|jakarta|bangkok|new delhi|delhi|mumbai|kolkata|chennai|bengaluru|hyderabad|dhaka|kathmandu|colombo|karachi|lahore|islamabad|kuala lumpur|hanoi|ho chi minh|taipei|beijing|shanghai|yangon|phnom penh|kabul|sydney|melbourne|wellington|auckland)\b/i;
 // Defence procurement / weapons-system news (missile offers, arms deals,
 // fighter-jet / submarine acquisitions). The classifier keeps these on the
 // word "strike" ("precision strike", "strike range") but they carry no

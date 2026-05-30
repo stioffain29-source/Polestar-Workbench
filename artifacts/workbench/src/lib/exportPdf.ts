@@ -187,7 +187,7 @@ function severityChip(label: string, color: string, width = 92, height = 20): HT
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   canvas.style.display = "block";
-  canvas.style.margin = "0 auto";
+  canvas.style.margin = "0";
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
