@@ -28,7 +28,7 @@ import {
 //   Forecast 7-14 Days (prose) ->
 //   Regional and Country View (prose + country bar) ->
 //   What Matters -> Implications -> Watch Next -> Polestar View ->
-//   Key Incidents -> Source Notes -> Disclaimer.
+//   Related Incidents -> Disclaimer.
 // Data and prose come from flashpointReportDataset so the preview and
 // exporter cannot drift.
 
@@ -296,10 +296,12 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
   ctx.y += 10;
 }
 
-// --- Key Incidents ---------------------------------------------------------
+// --- Related Incidents -----------------------------------------------------
 function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   ensureSpace(ctx, 24 + 18 + 40);
-  drawSectionHeading(ctx, "Key Incidents");
+  // Must match FlashpointReportPreview's "Related Incidents" heading — the
+  // in-app PDF rasterises the preview, so the headless heading must agree.
+  drawSectionHeading(ctx, "Related Incidents");
   if (rows.length === 0) {
     const { pdf, MX } = ctx;
     setText(pdf, DUSK);
@@ -478,7 +480,7 @@ export async function exportFlashpointReportPdf(
 
   // Source Notes / Data Notes removed per editorial direction — internal
   // methodology must not appear in client-facing Flashpoint exports.
-  // Disclaimer follows Key Incidents directly.
+  // Disclaimer follows Related Incidents directly.
 
   drawDisclaimer(ctx);
 
