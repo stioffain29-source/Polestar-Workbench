@@ -1,0 +1,98 @@
+[
+  {
+    "name": "1-fuel-watch",
+    "label": "Fuel Watch",
+    "url": "/reports/9",
+    "fields": {
+      "status": "Static / import only",
+      "latestRecord": "23 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/1-fuel-watch.pdf",
+    "pdfBytes": 6778294
+  },
+  {
+    "name": "2-fertiliser-watch",
+    "label": "Fertiliser Watch",
+    "url": "/reports/10",
+    "fields": {
+      "status": "Static / import only",
+      "latestRecord": "22 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/2-fertiliser-watch.pdf",
+    "pdfBytes": 6590533
+  },
+  {
+    "name": "3-cargo-watch",
+    "label": "Cargo Watch",
+    "url": "/reports/11",
+    "fields": {
+      "status": "Manual scraper",
+      "latestRecord": "21 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/3-cargo-watch.pdf",
+    "pdfBytes": 5350715
+  },
+  {
+    "name": "4-shipping-watch",
+    "label": "Shipping Watch",
+    "url": "/reports/12",
+    "fields": {
+      "status": "Static / import only",
+      "latestRecord": "22 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/4-shipping-watch.pdf",
+    "pdfBytes": 11462459
+  },
+  {
+    "name": "5-flashpoint",
+    "label": "Flashpoint",
+    "url": "/reports/13",
+    "fields": {
+      "status": "Manual scraper",
+      "latestRecord": "22 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/5-flashpoint.pdf",
+    "pdfBytes": 7507873
+  },
+  {
+    "name": "6-energy-watch",
+    "label": "Energy Watch",
+    "url": "/reports/8",
+    "fields": {
+      "status": "Static / import only",
+      "latestRecord": "23 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/6-energy-watch.pdf",
+    "pdfBytes": 6291427
+  },
+  {
+    "name": "7-png-country",
+    "label": "Papua New Guinea",
+    "url": "/countries/papua-new-guinea",
+    "fields": {
+      "status": "Mixed sources (live, manual & static)",
+      "latestRecord": "21 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/7-png-country.pdf",
+    "pdfBytes": 6321328
+  },
+  {
+    "name": "8-papua-country",
+    "label": "Papua",
+    "url": "/countries/papua",
+    "fields": {
+      "status": "Mixed sources (live, manual & static)",
+      "latestRecord": "21 May 2026",
+      "lastUpdated": "23 May 2026"
+    },
+    "pdf": "/home/runner/workspace/proof/8-papua-country.pdf",
+    "pdfBytes": 6060150
+  }
+]

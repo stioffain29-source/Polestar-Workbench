@@ -138,3 +138,99 @@ id = "YrIcT72QnveY33HD9_-JD"
 uri = "file://screenshots/papua_report.jpg"
 type = "image"
 title = "Papua Report"
+
+[[outputs]]
+id = "upgucgCee04SNIvtHxUcL"
+uri = "file://proof/1-fuel-watch-screen.png"
+type = "image"
+title = "1 · Fuel Watch — LIVE prod screen"
+
+[[outputs]]
+id = "KZNUpSb053sLDLLo-w01R"
+uri = "file://proof/1-fuel-watch.pdf"
+type = "pdf"
+title = "1 · Fuel Watch — PDF from that screen"
+
+[[outputs]]
+id = "PmcIiSphY3TqyBAYIqxR6"
+uri = "file://proof/2-fertiliser-watch-screen.png"
+type = "image"
+title = "2 · Fertiliser Watch — LIVE prod screen"
+
+[[outputs]]
+id = "0u-pm78ZZtoImTAZeye1e"
+uri = "file://proof/2-fertiliser-watch.pdf"
+type = "pdf"
+title = "2 · Fertiliser Watch — PDF from that screen"
+
+[[outputs]]
+id = "rfXgLVRxGQex2QLVnjP5h"
+uri = "file://proof/3-cargo-watch-screen.png"
+type = "image"
+title = "3 · Cargo Watch — LIVE prod screen"
+
+[[outputs]]
+id = "_GUzHTnFWw_ZBNIQcwHlJ"
+uri = "file://proof/3-cargo-watch.pdf"
+type = "pdf"
+title = "3 · Cargo Watch — PDF from that screen"
+
+[[outputs]]
+id = "0lrH1os4CiBXO4SIgtcHL"
+uri = "file://proof/4-shipping-watch-screen.png"
+type = "image"
+title = "4 · Shipping Watch — LIVE prod screen"
+
+[[outputs]]
+id = "HW9pR6CPC0hGBVUVSoo9m"
+uri = "file://proof/4-shipping-watch.pdf"
+type = "pdf"
+title = "4 · Shipping Watch — PDF from that screen"
+
+[[outputs]]
+id = "11HlNCn7cnF16BOCmceG_"
+uri = "file://proof/5-flashpoint-screen.png"
+type = "image"
+title = "5 · Flashpoint — LIVE prod screen"
+
+[[outputs]]
+id = "dEAswblZnToo8wNn7fPG9"
+uri = "file://proof/5-flashpoint.pdf"
+type = "pdf"
+title = "5 · Flashpoint — PDF from that screen"
+
+[[outputs]]
+id = "LFfUhPcfozjDL_T5ZV7cZ"
+uri = "file://proof/6-energy-watch-screen.png"
+type = "image"
+title = "6 · Energy Watch — LIVE prod screen"
+
+[[outputs]]
+id = "RnI8rlX-tfHTrpVLFXsDD"
+uri = "file://proof/6-energy-watch.pdf"
+type = "pdf"
+title = "6 · Energy Watch — PDF from that screen"
+
+[[outputs]]
+id = "cqsskv-Y5dkThebr0PF-P"
+uri = "file://proof/7-png-country-screen.png"
+type = "image"
+title = "7 · Papua New Guinea — LIVE prod screen"
+
+[[outputs]]
+id = "Zg9L0VeBsXWsjrtpzUvOD"
+uri = "file://proof/7-png-country.pdf"
+type = "pdf"
+title = "7 · Papua New Guinea — PDF from that screen"
+
+[[outputs]]
+id = "vNE-onuXJrSI0eAK0PO5l"
+uri = "file://proof/8-papua-country-screen.png"
+type = "image"
+title = "8 · Papua — LIVE prod screen"
+
+[[outputs]]
+id = "My1aCQpol0UEZX_VCzDyM"
+uri = "file://proof/8-papua-country.pdf"
+type = "pdf"
+title = "8 · Papua — PDF from that screen"
