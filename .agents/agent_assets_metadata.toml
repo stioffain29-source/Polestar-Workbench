@@ -384,3 +384,15 @@ id = "F22lZy20WRoRapEkwMWwm"
 uri = "file://scripts/exports/papua-report.png"
 type = "image"
 title = "Papua report — full-page screenshot"
+
+[[outputs]]
+id = "9xcShd3g3mqiS7BbLWJUB"
+uri = "file://scripts/exports/proof/png_page2.jpg"
+type = "image"
+title = "PNG report PDF (page 2) — COVERAGE WARNING, 0 records in weekly window"
+
+[[outputs]]
+id = "XwlfcjJ_JdcrUcYKaqkok"
+uri = "file://scripts/exports/proof/papua_page2.jpg"
+type = "image"
+title = "Papua report PDF (page 2) — no warning"
