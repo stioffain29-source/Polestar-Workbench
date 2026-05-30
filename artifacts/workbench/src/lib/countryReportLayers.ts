@@ -395,14 +395,16 @@ export function computeCountryCoverageStatus(opts: {
     };
   }
 
-  // Feeds are healthy and current AND we hold a recent record, but nothing
-  // qualifying landed this week. This is the only case where the week may be
-  // stated as genuinely quiet.
+  // Feeds report healthy and we hold a recent record, yet nothing cleared the
+  // wire this week. In a high-threat operating environment an empty week is
+  // NEVER asserted as calm — it is treated as a collection gap with the
+  // operating picture unconfirmed. There is deliberately no "genuinely quiet"
+  // outcome for a country report.
   return {
-    state: "genuine-quiet",
+    state: "coverage-problem",
     showBanner: true,
-    title: "No reportable activity this week",
-    detail: `Collection sources feeding ${name} are current and reporting normally, and no qualifying incident was recorded in the 7-day window. This is read as a genuinely quiet week, not a coverage gap. Standing risks remain — see the 30 and 90-day context sections below.`,
+    title: "Coverage warning",
+    detail: `All collection sources feeding ${name} report healthy, but no qualifying incident cleared the wire in the 7-day window. In a high-threat operating environment an empty week is read as a collection gap, not a quiet one — the operating picture is unconfirmed. Work the standing pattern in the 30 and 90-day context sections below.`,
   };
 }
 

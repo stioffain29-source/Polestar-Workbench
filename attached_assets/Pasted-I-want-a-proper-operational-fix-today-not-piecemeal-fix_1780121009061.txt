@@ -1,0 +1,103 @@
+I want a proper operational fix today, not piecemeal fixes.
+
+The workbench exists to produce reports. Fix the report production engine end to end.
+
+Do this in order:
+
+1. Production ingestion first
+Run the production ingestion trigger for all products that currently have scrapers.
+
+At minimum:
+- Flashpoint
+- Cargo Watch
+
+Confirm:
+- production row count before and after
+- records inserted
+- latest production record date
+- last updated time
+
+Do not use dev proof.
+
+2. Confirm report product status
+For every report product, state clearly whether it is:
+- live ingestion
+- manual ingestion
+- static/import-only
+
+Products:
+- Fuel Watch
+- Fertiliser Watch
+- Cargo Watch
+- Shipping Watch
+- Flashpoint
+- Energy Watch
+- Country reports
+- Missile Strike Tracker as tracker only
+
+If a product is static/import-only, label it honestly in the report. Do not present it as current live reporting.
+
+3. Fix country report coverage logic
+Country reports must use country-relevant source coverage, not generic topic feeds.
+
+For PNG and Papua:
+- define the country-relevant source set
+- confirm those feeds are running
+- confirm whether they returned records
+- confirm whether records were saved
+- confirm whether records were filtered out
+- confirm whether country matching worked
+
+Do not trigger a PNG country coverage warning because a cargo-theft feed like TAPA is down unless that source is genuinely part of PNG country coverage.
+
+Separate:
+- country coverage health
+- topic feed health
+- specialist feed health
+
+4. Weekly report logic
+Country reports remain weekly.
+
+If the 7-day window has records:
+- use them as the weekly report
+
+If the 7-day window has zero records:
+- do not assume nothing happened
+- first check ingestion, source coverage, filters, country matching and date parsing
+- show a coverage warning if confidence is weak
+- use 30/90-day data only as clearly labelled context
+
+5. Report content alignment
+For every report:
+- Fast Facts
+- prose
+- map
+- charts
+- related incidents
+
+must use the same relevant filtered dataset unless a section is clearly labelled as 30/90-day context.
+
+No cards showing zero while prose implies activity.
+No generic country prose.
+No stale saved text overriding current generated content.
+
+6. Proof required today
+For each report, provide:
+- live production screenshot
+- PDF exported from that same screen
+- latest production record date
+- last updated time
+- data status
+- whether ingestion is live/manual/static
+- confirmation screen and PDF match
+- confirmation cards, prose, map and tables are aligned
+
+Do not come back with:
+- typecheck only
+- architect review only
+- dev screenshots
+- “publish and it should work”
+- another narrow single-report fix
+
+The objective is simple:
+Relevant information must be ingested into production and placed into the reports in the correct structure, with proof from the live report output.
