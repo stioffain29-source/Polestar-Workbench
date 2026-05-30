@@ -6,6 +6,7 @@ import {
   UpdateSourceBody,
   ListSourcesQueryParams,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
 
@@ -51,7 +52,7 @@ router.get("/sources/health", async (_req, res): Promise<void> => {
   });
 });
 
-router.post("/sources", async (req, res): Promise<void> => {
+router.post("/sources", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = CreateSourceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -61,7 +62,7 @@ router.post("/sources", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/sources/:id", async (req, res): Promise<void> => {
+router.patch("/sources/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateSourceBody.safeParse(req.body);
   if (!parsed.success) {
@@ -80,7 +81,7 @@ router.patch("/sources/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.delete("/sources/:id", async (req, res): Promise<void> => {
+router.delete("/sources/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(sourcesTable).where(eq(sourcesTable.id, id));
   res.status(204).end();
