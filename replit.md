@@ -37,7 +37,7 @@ _Replace the heading above with the project's name, and this line with one sente
 ## Production ingestion (read-only prod DB)
 
 - The production database is READ-ONLY from the workspace, so scrapers cannot write prod from here. Production data refresh must run INSIDE the deployment environment.
-- Mechanism: a Scheduled Deployment running, e.g. `pnpm --filter @workspace/scripts run scrape:flashpoint -- --commit && pnpm --filter @workspace/scripts run scrape:cargo-watch -- --commit`. This must be created/published by the user (see the `deployment` skill); it cannot be provisioned from the workspace.
+- Mechanism: a Scheduled Deployment running `pnpm --filter @workspace/scripts run scrape:prod` (combined script = flashpoint + cargo-watch, both with `--commit`). This must be created/published by the user (see the `deployment` skill); it cannot be provisioned from the workspace. The deployment runtime is the only place `DATABASE_URL` points at the writable production primary — from the workspace it points at dev, and `executeSql(environment:"production")` is a read-only replica (SELECT only). Verified empirically: dev and prod are separate databases.
 
 ## Product
 
