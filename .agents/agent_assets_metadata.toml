@@ -360,3 +360,27 @@ id = "5HkVaJz1C1o46QT_lCpqC"
 uri = "file://exports/png-pages/page-7.png"
 type = "image"
 title = "Papua New Guinea — p7: cover"
+
+[[outputs]]
+id = "PkTw6oJQJCAa8y_s0bt37"
+uri = "file://scripts/exports/polestar-country-report-papua-new-guinea.pdf"
+type = "pdf"
+title = "PNG report PDF — empty week → COVERAGE WARNING"
+
+[[outputs]]
+id = "wUlzGhNA7qWrrpiEUZJ5R"
+uri = "file://scripts/exports/polestar-country-report-papua.pdf"
+type = "pdf"
+title = "Papua report PDF — week has records → no warning"
+
+[[outputs]]
+id = "wmEDrj3DieuSUCg--wQ3X"
+uri = "file://scripts/exports/papua-new-guinea-report.png"
+type = "image"
+title = "PNG report — full-page screenshot"
+
+[[outputs]]
+id = "F22lZy20WRoRapEkwMWwm"
+uri = "file://scripts/exports/papua-report.png"
+type = "image"
+title = "Papua report — full-page screenshot"
