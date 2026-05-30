@@ -34,6 +34,43 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "Google News — Philippines (Civil Unrest)",   url: "https://news.google.com/rss/search?q=%22Philippines%22+OR+%22Manila%22+protest+OR+rally+OR+strike&hl=en-PH&gl=PH&ceid=PH:en", sourceType: "rss", reliability: 3, notes: "Owner: PH desk. Country and Manila civil unrest aggregator." },
   { name: "Google News — Japan (Civil Unrest)",         url: "https://news.google.com/rss/search?q=%22Japan%22+OR+%22Tokyo%22+protest+OR+rally+OR+demonstration&hl=en-JP&gl=JP&ceid=JP:en", sourceType: "rss", reliability: 3, notes: "Owner: JP desk. Country and Tokyo civil unrest aggregator." },
   { name: "Google News — Nepal (Civil Unrest)",         url: "https://news.google.com/rss/search?q=%22Nepal%22+OR+%22Kathmandu%22+protest+OR+strike+OR+rally&hl=en-NP&gl=NP&ceid=NP:en",   sourceType: "rss", reliability: 3, notes: "Owner: South Asia desk. Country and Kathmandu civil unrest aggregator." },
+  // Pacific desk — Papua New Guinea and Indonesian West Papua wires. These
+  // are the ONLY collection sources that feed the PNG and Papua country
+  // reports; without them those reports have no live data on this
+  // environment. Catalogued in the audit but previously only present in the
+  // development database, so prod produced empty PNG/Papua reports until
+  // seeded here.
+  { name: "ABC News Australia",      url: "https://www.abc.net.au/news/feed/45910/rss.xml",                                 sourceType: "rss",  reliability: 4, notes: "Owner: ANZ desk. National broadcaster — protest, industrial action and policing across capitals." },
+  { name: "Benar News",              url: "https://www.benarnews.org/english/rss2.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: Asia desk. SE Asia regional desk — Philippines, Indonesia, Bangladesh." },
+  { name: "Jubi.id (West Papua)",    url: "https://jubi.id/feed/",                                                          sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Jayapura / Indonesian Papua — community protest and security operations. Manual translation review required." },
+  { name: "Post-Courier (PNG)",      url: "https://www.postcourier.com.pg/feed/",                                           sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Port Moresby — political demonstrations, sectoral strike action." },
+  { name: "RNZ Pacific",             url: "https://www.rnz.co.nz/rss/pacific.xml",                                          sourceType: "rss",  reliability: 4, notes: "Owner: Pacific desk. Regional coverage for PNG, Solomons, Fiji and Indonesian Papua." },
+  // Direct publisher RSS — regional national dailies and broadcasters.
+  { name: "Daily Mirror Sri Lanka",  url: "http://www.dailymirror.lk/RSS_Feeds/news",                                       sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Sri Lanka — Colombo national daily." },
+  { name: "Nepal Republica",         url: "https://myrepublica.nagariknetwork.com/feed/",                                   sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Secondary Nepal national — corroborates Kathmandu Post." },
+  { name: "New Age Bangladesh",      url: "https://www.newagebd.net/rss.xml",                                               sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Bangladesh — labour and student coverage." },
+  { name: "Sunday Times Sri Lanka",  url: "https://www.sundaytimes.lk/feed",                                                sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Sri Lanka — Colombo weekly, political coverage." },
+  { name: "The Kathmandu Post",      url: "https://kathmandupost.com/rss",                                                  sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Kathmandu — political mobilisation, student unions, transport strikes." },
+  { name: "Philippine Daily Inquirer", url: "https://www.inquirer.net/fullfeed",                                            sourceType: "rss",  reliability: 4, notes: "Owner: PH desk. National daily — city-disruption and protest calendaring across Metro Manila." },
+  { name: "Rappler",                 url: "https://www.rappler.com/feed/",                                                  sourceType: "rss",  reliability: 4, notes: "Owner: PH desk. Manila protest activity, union calls, student mobilisation." },
+  { name: "Prachatai English",       url: "https://prachatai.com/english/rss.xml",                                          sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Thailand — civic-space, student mobilisation." },
+  { name: "Tempo English",           url: "https://en.tempo.co/rss",                                                        sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — investigative weekly, civic-space coverage." },
+  { name: "The Jakarta Post",        url: "https://www.thejakartapost.com/feed",                                            sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — Jakarta-Java national daily." },
+  { name: "Kyodo News (English)",    url: "https://english.kyodonews.net/rss/news.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. Tokyo wire — labour disputes, civic protest and policing." },
+  { name: "NHK World Japan",         url: "https://www3.nhk.or.jp/nhkworld/en/news/feeds/",                                 sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. Japan — national broadcaster English wire." },
+  { name: "The Japan Times",         url: "https://www.japantimes.co.jp/feed/",                                             sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. National daily — Tokyo and Osaka mobilisation, union action." },
+  // Thematic / cross-regional desks (civic-space, labour, education) and
+  // wires. Several are non-RSS catalogue entries that fail to parse from the
+  // container — retained so Source Health mirrors the verified development
+  // catalogue and coverage warnings count the full source set.
+  { name: "AFP Asia-Pacific",        url: "https://www.afp.com/en/news-hub",                                                sourceType: "news", reliability: 5, notes: "Owner: Asia desk. Secondary wire — corroborates Reuters and adds French-language coverage." },
+  { name: "Reuters Asia Pacific Wire", url: "https://www.reuters.com/world/asia-pacific/",                                  sourceType: "news", reliability: 5, notes: "Owner: Asia desk. Primary wire for breaking protest, strike and security-force activity." },
+  { name: "CIVICUS Monitor",         url: "https://monitor.civicus.org/api/",                                               sourceType: "api",  reliability: 5, notes: "Owner: Civic-space desk. Live tracker of assembly bans, detentions, internet shutdowns." },
+  { name: "Human Rights Watch Asia", url: "https://www.hrw.org/asia",                                                       sourceType: "rss",  reliability: 4, notes: "Owner: Civic-space desk. Crackdown reporting, mass arrests, security-force conduct." },
+  { name: "ITUC Global Rights Index", url: "https://www.ituc-csi.org/spip.php?page=backend",                                sourceType: "rss",  reliability: 4, notes: "Owner: Labour desk. International Trade Union Confederation — strike calls and labour-rights restrictions." },
+  { name: "IndustriALL Global Union", url: "https://www.industriall-union.org/rss.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: Labour desk. Sectoral union action (manufacturing, mining, energy)." },
+  { name: "Education International APAC", url: "https://www.ei-ie.org/en/region/asia-pacific",                               sourceType: "rss",  reliability: 3, notes: "Owner: Education desk. Teacher and faculty mobilisation across APAC." },
+  { name: "University World News Asia", url: "https://www.universityworldnews.com/region.php?region=Asia&format=rss",       sourceType: "rss",  reliability: 3, notes: "Owner: Education desk. Campus protests, student union activity, faculty walkouts." },
 ];
 
 // Self-heal seed URLs on every startup. The seed loop below only inserts
