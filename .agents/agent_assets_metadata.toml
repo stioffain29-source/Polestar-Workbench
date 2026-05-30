@@ -246,3 +246,27 @@ id = "EDtXH63yshNcDXkuqIylH"
 uri = "file://screenshots/prod_proof/papua-new-guinea.png"
 type = "image"
 title = "LIVE Production — Papua New Guinea report (separate, PNG-specific)"
+
+[[outputs]]
+id = "zQcncY2aI68P5rX3PGUhU"
+uri = "file://exports/papua-report-fullbody.png"
+type = "image"
+title = "Papua — full report body (live screen)"
+
+[[outputs]]
+id = "yiiHYP0gU9rUgVtBjQzT8"
+uri = "file://exports/polestar-country-report-papua.pdf"
+type = "pdf"
+title = "Papua — PDF exported from the live screen"
+
+[[outputs]]
+id = "3cpQvm_1VSoYxKKVeAica"
+uri = "file://exports/papua-new-guinea-report-fullbody.png"
+type = "image"
+title = "Papua New Guinea — full report body (live screen)"
+
+[[outputs]]
+id = "dSxBP0vsELp-iVkKizNJm"
+uri = "file://exports/polestar-country-report-papua-new-guinea.pdf"
+type = "pdf"
+title = "Papua New Guinea — PDF exported from the live screen"

@@ -298,7 +298,7 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
     table.style.boxSizing = "border-box";
 
     if (isWatchlist) {
-      const columns = "170px minmax(0, 1fr) 54px 54px 54px 150px";
+      const columns = "165px minmax(0, 1fr) 50px 50px 50px 190px";
       const header = makeExportRow(columns, "40px", true);
       ["Location", "Note", "7d", "30d", "90d", "Worst (90d)"].forEach((label, index) => {
         header.appendChild(makeTableCell(label, {
@@ -320,7 +320,7 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
         out.appendChild(makeTableCell(cellText(row.cells[4]), { align: "center", bold: true }));
         const sevCell = makeTableCell("", { align: "center" });
         if (row.severityLabel && row.severityLabel.toLowerCase() !== "no records") {
-          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 92, 20));
+          sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 120, 20));
         } else {
           sevCell.textContent = row.severityLabel || "No records";
           sevCell.style.fontStyle = "italic";
@@ -331,7 +331,7 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
       return;
     }
 
-    const columns = "150px 120px minmax(0, 1fr) 130px";
+    const columns = "150px 120px minmax(0, 1fr) 150px";
     const header = makeExportRow(columns, "40px", true);
     ["Date", "Type", "Title", "Severity"].forEach((label, index) => {
       header.appendChild(makeTableCell(label, {
@@ -350,7 +350,7 @@ function applyCountryTableExportLayout(root: HTMLElement): void {
       out.appendChild(makeTableCell(cellText(row.cells[1])));
       out.appendChild(makeTableCell(cellText(row.cells[2]), { bold: true, color: NAVY }));
       const sevCell = makeTableCell("", { align: "center" });
-      sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 78, 20));
+      sevCell.appendChild(severityChip(row.severityLabel, row.severityColor, 112, 20));
       out.appendChild(sevCell);
       table.appendChild(out);
     });
