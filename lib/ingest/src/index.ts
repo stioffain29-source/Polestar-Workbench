@@ -4,6 +4,8 @@ export { classifySeverity } from "./severity";
 export type { Severity } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";
 export type { SeverityBackfillSummary } from "./backfillSeverity";
+export { geocode } from "./geocode";
+export type { GeoResult } from "./geocode";
 export type {
   IngestTopic,
   IngestOptions,

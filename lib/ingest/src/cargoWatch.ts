@@ -3,6 +3,7 @@ import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
+import { geocode } from "./geocode";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Cargo Watch ingest core.
@@ -442,21 +443,34 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
     return { ...summaryBase, inserted: 0, ...stats, logLines };
   }
 
-  const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => ({
-    topic: "cargo_watch",
-    title: a.title,
-    summary: a.summary,
-    country: a.country,
-    location: null,
-    latitude: null,
-    longitude: null,
-    occurredAt: a.occurredAt,
-    severity: classifySeverity(a.title, a.summary, "cargo_watch"),
-    confidence: "low",
-    source: a.source,
-    sourceUrl: a.sourceUrl,
-    analystNotes: `auto-scraped:${a.feedLabel}`,
-  }));
+  let geocoded = 0;
+  const ungeocoded: string[] = [];
+  const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
+    const geo = geocode(a.country, `${a.title} ${a.summary}`);
+    if (geo) geocoded++;
+    else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
+    return {
+      topic: "cargo_watch",
+      title: a.title,
+      summary: a.summary,
+      country: a.country,
+      location: geo?.location ?? null,
+      latitude: geo?.latitude ?? null,
+      longitude: geo?.longitude ?? null,
+      occurredAt: a.occurredAt,
+      severity: classifySeverity(a.title, a.summary, "cargo_watch"),
+      confidence: "low",
+      source: a.source,
+      sourceUrl: a.sourceUrl,
+      analystNotes: `auto-scraped:${a.feedLabel}`,
+    };
+  });
+
+  log(`\nGeocoded ${geocoded}/${rows.length} new rows.`);
+  if (ungeocoded.length > 0) {
+    log(`  WARNING: ${ungeocoded.length} row(s) could not be geocoded (inserted without coordinates):`);
+    for (const u of ungeocoded) log(`    - ${u}`);
+  }
 
   await db.insert(incidentsTable).values(rows);
   const stats = await topicStats();

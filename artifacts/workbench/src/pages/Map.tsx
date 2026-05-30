@@ -25,11 +25,24 @@ function topicToCategory(topic: string): string {
     case "fuel": return "Fuel";
     case "fertiliser": return "Fertiliser";
     case "protests": return "Civil Unrest";
+    case "flashpoint": return "Civil Unrest";
     case "energy": return "Energy / Grid";
     case "shipping": return "Shipping";
     case "cargo_watch": return "Cargo";
     default: return "Other";
   }
+}
+
+// Deterministic small offset so many incidents sharing a country centroid do
+// not stack into a single unreadable marker. Keyed on the incident id, the
+// jitter is stable across renders (no random flicker) and tiny (~±0.25°) so
+// markers stay within their country.
+function jitter(seed: number): [number, number] {
+  const a = Math.sin(seed * 12.9898) * 43758.5453;
+  const b = Math.sin(seed * 78.233) * 43758.5453;
+  const fa = a - Math.floor(a);
+  const fb = b - Math.floor(b);
+  return [(fa - 0.5) * 0.5, (fb - 0.5) * 0.5];
 }
 
 function munitionRating(munition: string): string {
@@ -77,10 +90,12 @@ export default function MapPage() {
     if (view === "incidents") {
       return incidents
         .filter((i) => i.latitude != null && i.longitude != null)
-        .map<Point>((i) => ({
+        .map<Point>((i) => {
+          const [dLat, dLng] = jitter(i.id);
+          return {
           id: `i-${i.id}`,
-          lat: i.latitude!,
-          lng: i.longitude!,
+          lat: i.latitude! + dLat,
+          lng: i.longitude! + dLng,
           title: i.title,
           category: topicToCategory(i.topic),
           country: i.country,
@@ -88,7 +103,8 @@ export default function MapPage() {
           when: i.occurredAt,
           rating: i.severity,
           summary: i.summary,
-        }));
+          };
+        });
     }
     const strikes = view === "maritime" ? maritime : land;
     const fixedCat = view === "maritime" ? "Maritime Strike" : "Land Strike";
