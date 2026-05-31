@@ -1,10 +1,23 @@
 ---
-name: Live fuel-market prices (FRED)
-description: Why Fuel report Brent/WTI/jet prices must be a live ingest (not a hardcoded sample), and the freshness/horizon constraints that keep every report covered.
+name: Live fuel-market prices (Yahoo crude + FRED jet)
+description: Why Fuel report Brent/WTI/jet prices must be a live ingest (not a hardcoded sample), which source feeds each card, and the freshness/horizon constraints that keep every report covered.
 ---
 
-Fuel Watch market prices (Brent/WTI/jet fuel) MUST come from the live FRED
-ingest, never a hardcoded constant.
+Fuel Watch market prices (Brent/WTI/jet fuel) MUST come from a live ingest,
+never a hardcoded constant.
+
+**Source per card (load-bearing):** Brent/WTI come from Yahoo Finance front-month
+futures (BZ=F / CL=F) PRIMARY, with FRED EIA spot (DCOILBRENTEU/DCOILWTICO) as an
+automatic fallback if Yahoo fails — crude must never go empty. Jet fuel stays on
+FRED's EIA Gulf Coast kerosene series (DJFUELUSGULF) with no substitute.
+**Why:** FRED's EIA SPOT series publish with a multi-business-day lag, so a
+FRED-only crude card genuinely missed real price moves (e.g. Brent ~99.6→92.05
+over 27-29 May) and the client correctly called it stale; Yahoo futures carry the
+most recent daily CLOSE (incl. the Friday close). There is no honest daily
+jet-fuel future, so jet legitimately tracks its own slower FRED cadence — do NOT
+fabricate a jet proxy to make the dates match; a jet asOf older than crude asOf is
+expected and truthful. Each series carries its own `source` string so the price-card
+attribution always names the source that actually served the data.
 
 **Why:** the original prices were a fixed sample constant that never changed
 across republishes; the client saw identical numbers every week and called it

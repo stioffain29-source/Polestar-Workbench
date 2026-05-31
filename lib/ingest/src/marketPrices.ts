@@ -10,21 +10,32 @@ import { eq } from "drizzle-orm";
 // already cites, "EIA / FRED"), and writes them into each fuel report's
 // hard_numbers jsonb so preview, PDF and Fast Facts all read live data.
 //
-// FRED's fredgraph.csv endpoint is public and needs no API key. Series:
-//   * Brent crude  — DCOILBRENTEU (USD/bbl, daily)
-//   * WTI crude    — DCOILWTICO   (USD/bbl, daily)
-//   * Jet fuel     — DJFUELUSGULF (USD/gal, weekly, US Gulf Coast kerosene)
+// Headline CRUDE prices (Brent/WTI) come from Yahoo Finance front-month futures,
+// because they carry the most recent market CLOSE (e.g. Friday's settle) — the
+// FRED EIA spot series lag by several business days, so a FRED-only report shows
+// crude prices that are genuinely a week old and miss real intervening moves.
+// Yahoo is the primary crude source; FRED is the fallback if Yahoo is down, so
+// crude never goes empty.
+//   * Brent crude — Yahoo BZ=F  (fallback FRED DCOILBRENTEU), USD/bbl, daily
+//   * WTI crude   — Yahoo CL=F  (fallback FRED DCOILWTICO),   USD/bbl, daily
+//   * Jet fuel    — FRED DJFUELUSGULF (US Gulf Coast kerosene), USD/gal — kept
+//     on its native EIA/FRED series; there is no honest daily jet-fuel future to
+//     substitute, so jet legitimately tracks its own (slower) publication date.
 //
-// The NEWEST fuel report is the live product, so it tracks the LATEST available
-// FRED prices (anchored to today). Older/archived reports stay frozen at their
-// own issue date so historical issues keep date-appropriate numbers. Re-running
-// is idempotent. Like the other ingest modules, this NEVER closes the shared DB
-// pool — only the CLI wrapper does.
+// FRED's fredgraph.csv and Yahoo's chart endpoint are both public and need no
+// API key. The NEWEST fuel report is the live product, so it tracks the LATEST
+// available prices (anchored to today). Older/archived reports stay frozen at
+// their own issue date so historical issues keep date-appropriate numbers.
+// Re-running is idempotent. Like the other ingest modules, this NEVER closes the
+// shared DB pool — only the CLI wrapper does.
 
 const FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv";
+const YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
 
 type Series = {
   id: string;
+  /** Human-readable provenance shown on the price card (must match the data actually used). */
+  source: string;
   /** Ascending by date, missing values dropped. */
   points: { date: string; value: number }[];
 };
@@ -70,7 +81,7 @@ const FETCH_ATTEMPTS = 3;
  * run; a hard failure still throws so the caller records it and a later cold
  * start re-attempts.
  */
-async function fetchSeries(id: string, startDate: string): Promise<Series> {
+async function fetchSeries(id: string, source: string, startDate: string): Promise<Series> {
   const url = `${FRED_CSV}?id=${encodeURIComponent(id)}&cosd=${startDate}`;
   let lastErr: unknown;
   for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
@@ -80,7 +91,7 @@ async function fetchSeries(id: string, startDate: string): Promise<Series> {
       });
       if (!res.ok) throw new Error(`FRED ${id} HTTP ${res.status}`);
       const text = await res.text();
-      return { id, points: parseFredCsv(id, text) };
+      return { id, source, points: parseFredCsv(id, text) };
     } catch (err) {
       lastErr = err;
       if (attempt < FETCH_ATTEMPTS) {
@@ -89,6 +100,87 @@ async function fetchSeries(id: string, startDate: string): Promise<Series> {
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/** Parse Yahoo Finance chart JSON into ascending daily close points. */
+function parseYahooChart(symbol: string, text: string): { date: string; value: number }[] {
+  const json = JSON.parse(text) as {
+    chart?: { result?: { timestamp?: number[]; indicators?: { quote?: { close?: (number | null)[] }[] } }[] };
+  };
+  const result = json.chart?.result?.[0];
+  const ts = result?.timestamp;
+  const close = result?.indicators?.quote?.[0]?.close;
+  if (!ts || !close) throw new Error(`Yahoo ${symbol}: no timestamp/close in payload`);
+  const byDate = new Map<string, number>();
+  for (let i = 0; i < ts.length; i++) {
+    const v = close[i];
+    if (v == null || !Number.isFinite(v)) continue;
+    const date = new Date(ts[i] * 1000).toISOString().slice(0, 10);
+    byDate.set(date, v); // last write wins → keeps the final close for a given day
+  }
+  return [...byDate.entries()]
+    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Fetch one Yahoo Finance daily series (front-month future), retrying transient
+ * failures. The window is anchored to `startDate` via period1/period2 (NOT a
+ * hardcoded `range=1y`) so the series always reaches back far enough to price the
+ * OLDEST fuel report — a fixed 1-year range silently truncated history and would
+ * blank crude on any report older than a year.
+ */
+async function fetchYahooSeries(symbol: string, source: string, startDate: string): Promise<Series> {
+  const period1 = Math.floor(new Date(`${startDate}T00:00:00Z`).getTime() / 1000);
+  const period2 = Math.floor(Date.now() / 1000) + 86400; // +1d so today's close is included
+  const url = `${YAHOO_CHART}/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=1d`;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
+      });
+      if (!res.ok) throw new Error(`Yahoo ${symbol} HTTP ${res.status}`);
+      const text = await res.text();
+      const points = parseYahooChart(symbol, text);
+      if (!points.length) throw new Error(`Yahoo ${symbol}: empty series`);
+      return { id: symbol, source, points };
+    } catch (err) {
+      lastErr = err;
+      if (attempt < FETCH_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/**
+ * Crude (Brent/WTI) prefers Yahoo front-month futures (carries the latest market
+ * close) and falls back to the FRED EIA spot series if Yahoo is unavailable, so
+ * the headline crude price is as fresh as possible but never goes empty. The
+ * returned series carries the source actually used, so the card attribution is
+ * always truthful.
+ */
+async function fetchCrudeSeries(
+  yahoo: { symbol: string; source: string },
+  fred: { id: string; source: string },
+  startDate: string,
+  log: (s: string) => void,
+): Promise<Series> {
+  try {
+    const s = await fetchYahooSeries(yahoo.symbol, yahoo.source, startDate);
+    const last = s.points.at(-1);
+    log(`  ${yahoo.symbol.padEnd(14)} points=${s.points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"} [Yahoo]`);
+    return s;
+  } catch (yErr) {
+    const ymsg = yErr instanceof Error ? yErr.message : String(yErr);
+    log(`  ${yahoo.symbol.padEnd(14)} Yahoo failed (${ymsg}) → falling back to FRED ${fred.id}`);
+    const s = await fetchSeries(fred.id, fred.source, startDate);
+    const last = s.points.at(-1);
+    log(`  ${fred.id.padEnd(14)} points=${s.points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"} [FRED fallback]`);
+    return s;
+  }
 }
 
 /** Latest observation on or before `onOrBefore` (ISO date). */
@@ -133,17 +225,17 @@ function buildHardNumbers(
   let asOf: string | null = null;
   if (b) {
     const change = changePct(brent, b.date, b.value);
-    prices.push({ label: "Brent crude", value: b.value, unit: "USD/bbl", ...(change ? { change } : {}), asOf: b.date, source: "FRED (DCOILBRENTEU)" });
+    prices.push({ label: "Brent crude", value: b.value, unit: "USD/bbl", ...(change ? { change } : {}), asOf: b.date, source: brent.source });
     asOf = b.date;
   }
   if (w) {
     const change = changePct(wti, w.date, w.value);
-    prices.push({ label: "WTI crude", value: w.value, unit: "USD/bbl", ...(change ? { change } : {}), asOf: w.date, source: "FRED (DCOILWTICO)" });
+    prices.push({ label: "WTI crude", value: w.value, unit: "USD/bbl", ...(change ? { change } : {}), asOf: w.date, source: wti.source });
     if (!asOf || w.date > asOf) asOf = w.date;
   }
   if (j) {
     const change = changePct(jet, j.date, j.value);
-    prices.push({ label: "Jet fuel", benchmark: "US Gulf Coast kerosene-type", value: j.value, unit: "USD/gal", ...(change ? { change } : {}), asOf: j.date, source: "EIA / FRED (DJFUELUSGULF)" });
+    prices.push({ label: "Jet fuel", benchmark: "US Gulf Coast kerosene-type", value: j.value, unit: "USD/gal", ...(change ? { change } : {}), asOf: j.date, source: jet.source });
     if (!asOf || j.date > asOf) asOf = j.date;
   }
 
@@ -179,7 +271,7 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   const commit = opts.commit ?? false;
   const logLines: string[] = [];
   const log = (s: string) => logLines.push(s);
-  log(`Market price ingest (FRED) — mode=${commit ? "COMMIT" : "DRY-RUN"}`);
+  log(`Market price ingest (Yahoo crude + FRED jet) — mode=${commit ? "COMMIT" : "DRY-RUN"}`);
 
   // Load the fuel reports first so the fetch horizon can reach back far enough
   // to rehydrate the OLDEST report, not just recent ones. A fixed 70-day window
@@ -202,26 +294,71 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   const startDate = start.toISOString().slice(0, 10);
   log(`  fetch horizon: from ${startDate} (oldest fuel issue ${oldestIssue} − 70d buffer)`);
 
-  const seriesIds = ["DCOILBRENTEU", "DCOILWTICO", "DJFUELUSGULF"];
-  const fetched: Record<string, Series> = {};
   const seriesErrors: { id: string; error: string }[] = [];
-  await Promise.all(
-    seriesIds.map(async (id) => {
-      try {
-        fetched[id] = await fetchSeries(id, startDate);
-        const last = fetched[id].points.at(-1);
-        log(`  ${id.padEnd(14)} points=${fetched[id].points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"}`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        seriesErrors.push({ id, error: msg });
-        log(`  ${id.padEnd(14)} ERROR: ${msg}`);
-      }
-    }),
-  );
+  let seriesFetched = 0;
+  const safe = async (id: string, fn: () => Promise<Series>, empty: Series): Promise<Series> => {
+    try {
+      const s = await fn();
+      seriesFetched++;
+      return s;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      seriesErrors.push({ id, error: msg });
+      log(`  ${id.padEnd(14)} ERROR: ${msg}`);
+      return empty;
+    }
+  };
 
-  const brent = fetched["DCOILBRENTEU"] ?? { id: "DCOILBRENTEU", points: [] };
-  const wti = fetched["DCOILWTICO"] ?? { id: "DCOILWTICO", points: [] };
-  const jet = fetched["DJFUELUSGULF"] ?? { id: "DJFUELUSGULF", points: [] };
+  // Crude prefers Yahoo (latest market close), falls back to FRED. Jet stays on
+  // its native FRED Gulf Coast series. All run in parallel.
+  const [brent, wti, jet] = await Promise.all([
+    safe(
+      "BZ=F",
+      () =>
+        fetchCrudeSeries(
+          { symbol: "BZ=F", source: "ICE Brent front-month (Yahoo Finance)" },
+          { id: "DCOILBRENTEU", source: "FRED (DCOILBRENTEU)" },
+          startDate,
+          log,
+        ),
+      { id: "BZ=F", source: "ICE Brent front-month (Yahoo Finance)", points: [] },
+    ),
+    safe(
+      "CL=F",
+      () =>
+        fetchCrudeSeries(
+          { symbol: "CL=F", source: "NYMEX WTI front-month (Yahoo Finance)" },
+          { id: "DCOILWTICO", source: "FRED (DCOILWTICO)" },
+          startDate,
+          log,
+        ),
+      { id: "CL=F", source: "NYMEX WTI front-month (Yahoo Finance)", points: [] },
+    ),
+    safe(
+      "DJFUELUSGULF",
+      async () => {
+        const s = await fetchSeries("DJFUELUSGULF", "EIA / FRED (DJFUELUSGULF)", startDate);
+        const last = s.points.at(-1);
+        log(`  ${"DJFUELUSGULF".padEnd(14)} points=${s.points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"} [FRED]`);
+        return s;
+      },
+      { id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)", points: [] },
+    ),
+  ]);
+
+  // Partial-overwrite guard: a crude series with no points means BOTH Yahoo and
+  // its FRED fallback failed for that benchmark. Committing anyway would write a
+  // payload missing Brent/WTI and CLOBBER previously-valid crude on disk with a
+  // blank — the exact "crude went empty" failure this change exists to prevent.
+  // So when crude is degraded we DRY-RUN only (compute + log, never write); the
+  // existing good data is preserved and the next cold start retries the fetch.
+  const crudeDegraded = brent.points.length === 0 || wti.points.length === 0;
+  const writesEnabled = commit && !crudeDegraded;
+  if (commit && crudeDegraded) {
+    log(
+      `  CRUDE DEGRADED (Brent points=${brent.points.length}, WTI points=${wti.points.length}) — both Yahoo and FRED failed for a crude benchmark; SKIPPING all writes to avoid clobbering valid prices with a blank.`,
+    );
+  }
 
   log(`\n=== Fuel reports: ${fuelReports.length} ===`);
 
@@ -261,7 +398,7 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     log(
       `  report ${r.id} (${issueDate}): Brent ${built.brent ?? "—"} · WTI ${built.wti ?? "—"} · Jet ${built.jet ?? "—"} (asOf ${built.asOf ?? "—"})`,
     );
-    if (commit) {
+    if (writesEnabled) {
       await db
         .update(reportsTable)
         .set({ hardNumbers: built.hardNumbers as never })
@@ -270,16 +407,18 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     }
   }
 
-  if (!commit) {
-    log(`\nDRY-RUN — no rows written. Re-run with --commit to write live prices.`);
+  if (writesEnabled) {
+    log(`\nUpdated ${reportsUpdated} fuel report(s) with live market prices.`);
+  } else if (commit && crudeDegraded) {
+    log(`\nNO ROWS WRITTEN — crude degraded; existing prices preserved. Next run will retry.`);
   } else {
-    log(`\nUpdated ${reportsUpdated} fuel report(s) with live FRED prices.`);
+    log(`\nDRY-RUN — no rows written. Re-run with --commit to write live prices.`);
   }
 
   return {
     topic: "fuel_prices",
     mode: commit ? "commit" : "dry-run",
-    seriesFetched: Object.keys(fetched).length,
+    seriesFetched,
     seriesErrors,
     reportsConsidered: fuelReports.length,
     reportsUpdated,
