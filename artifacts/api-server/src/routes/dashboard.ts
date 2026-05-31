@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, incidentsTable, sourcesTable, reportsTable } from "@workspace/db";
 import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
+import { defaultRelevanceCondition } from "../lib/relevanceFilter";
 
 const router: IRouter = Router();
 
@@ -23,7 +24,7 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
       critical: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
     })
     .from(incidentsTable)
-    .where(gte(incidentsTable.occurredAt, since7d));
+    .where(and(gte(incidentsTable.occurredAt, since7d), defaultRelevanceCondition()));
 
   const [sourceCounts] = await db
     .select({
@@ -41,18 +42,18 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
       const [total] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(incidentsTable)
-        .where(eq(incidentsTable.topic, topic));
+        .where(and(eq(incidentsTable.topic, topic), defaultRelevanceCondition()));
       const [agg7d] = await db
         .select({
           count: sql<number>`count(*)::int`,
           critical: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
         })
         .from(incidentsTable)
-        .where(and(eq(incidentsTable.topic, topic), gte(incidentsTable.occurredAt, since7d)));
+        .where(and(eq(incidentsTable.topic, topic), gte(incidentsTable.occurredAt, since7d), defaultRelevanceCondition()));
       const [latest] = await db
         .select()
         .from(incidentsTable)
-        .where(eq(incidentsTable.topic, topic))
+        .where(and(eq(incidentsTable.topic, topic), defaultRelevanceCondition()))
         .orderBy(desc(incidentsTable.occurredAt))
         .limit(1);
       return {
@@ -67,14 +68,15 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
     }),
   );
 
-  // Over-fetch: the client applies the report-grade relevance gate to these
-  // rows (sports/finance/pageant noise is dropped there), then slices to the
-  // top few. A raw LIMIT 8 here would leave too few genuine rows after filtering.
+  // Server now applies the shared relevance gate (see relevanceFilter), so
+  // these rows are already clean. The client keeps its own gate as
+  // defense-in-depth; the modest over-fetch leaves headroom for it.
   const recentIncidents = await db
     .select()
     .from(incidentsTable)
+    .where(defaultRelevanceCondition())
     .orderBy(desc(incidentsTable.occurredAt))
-    .limit(80);
+    .limit(40);
 
   const sourceAlerts = await db
     .select()

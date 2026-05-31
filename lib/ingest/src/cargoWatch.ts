@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
+import { evaluateIncidentRelevance } from "@workspace/relevance";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Cargo Watch ingest core.
@@ -449,6 +450,14 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
     const geo = geocode(a.country, `${a.title} ${a.summary}`);
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
+    const rel = evaluateIncidentRelevance("cargo_watch", {
+      topic: "cargo_watch",
+      title: a.title,
+      summary: a.summary,
+      source: a.source,
+      sourceUrl: a.sourceUrl,
+      location: geo?.location ?? null,
+    });
     return {
       topic: "cargo_watch",
       title: a.title,
@@ -463,6 +472,11 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
       source: a.source,
       sourceUrl: a.sourceUrl,
       analystNotes: `auto-scraped:${a.feedLabel}`,
+      relevanceStatus: rel.status,
+      relevanceScore: rel.score,
+      relevanceReason: rel.reason,
+      relevanceVersion: rel.version,
+      relevanceEvaluatedAt: new Date(),
     };
   });
 

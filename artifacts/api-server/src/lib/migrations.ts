@@ -1,5 +1,6 @@
 import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable } from "@workspace/db";
-import { sql, eq, or } from "drizzle-orm";
+import { sql, eq, or, ne, isNull } from "drizzle-orm";
+import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
 
@@ -392,8 +393,84 @@ export async function runDataMigrations(): Promise<void> {
       logger.error({ err: srcErr }, "Flashpoint regional source seed failed");
     }
 
+    try {
+      await backfillRelevance();
+    } catch (relErr) {
+      logger.error({ err: relErr }, "Relevance backfill failed");
+    }
+
     logger.info("runDataMigrations: finished");
   } catch (err) {
     logger.error({ err }, "Data migration failed (continuing startup)");
   }
+}
+
+/**
+ * Evaluate every incident whose stored relevance version is null or stale
+ * against the shared @workspace/relevance engine and persist the verdict.
+ * Runs on boot (dev + prod); re-runs only the rows that need it, so it is a
+ * no-op once the DB is current. Bumping RELEVANCE_RULE_VERSION re-cleans the
+ * whole table on the next boot. The API default-filter then hides the rows
+ * marked 'irrelevant' across every read surface.
+ */
+async function backfillRelevance(): Promise<void> {
+  const rows = await db
+    .select({
+      id: incidentsTable.id,
+      topic: incidentsTable.topic,
+      title: incidentsTable.title,
+      summary: incidentsTable.summary,
+      source: incidentsTable.source,
+      sourceUrl: incidentsTable.sourceUrl,
+      location: incidentsTable.location,
+    })
+    .from(incidentsTable)
+    .where(
+      or(
+        isNull(incidentsTable.relevanceVersion),
+        ne(incidentsTable.relevanceVersion, RELEVANCE_RULE_VERSION),
+      ),
+    );
+
+  if (rows.length === 0) {
+    logger.info("backfillRelevance: nothing to evaluate (DB current)");
+    return;
+  }
+
+  const now = new Date();
+  const perTopic = new Map<string, { relevant: number; irrelevant: number }>();
+  let updated = 0;
+
+  // Sequential UPDATEs keep memory flat and the advisory-free path simple;
+  // this only does real work when the rule version changes.
+  for (const r of rows) {
+    const v = evaluateIncidentRelevance(r.topic, {
+      topic: r.topic,
+      title: r.title,
+      summary: r.summary ?? "",
+      source: r.source ?? "",
+      sourceUrl: r.sourceUrl ?? "",
+      location: r.location ?? null,
+    });
+    await db
+      .update(incidentsTable)
+      .set({
+        relevanceStatus: v.status,
+        relevanceScore: v.score,
+        relevanceReason: v.reason,
+        relevanceVersion: v.version,
+        relevanceEvaluatedAt: now,
+      })
+      .where(eq(incidentsTable.id, r.id));
+    updated++;
+    const bucket = perTopic.get(r.topic) ?? { relevant: 0, irrelevant: 0 };
+    if (v.relevant) bucket.relevant++;
+    else bucket.irrelevant++;
+    perTopic.set(r.topic, bucket);
+  }
+
+  logger.info(
+    { updated, version: RELEVANCE_RULE_VERSION, perTopic: Object.fromEntries(perTopic) },
+    "backfillRelevance: evaluated rows",
+  );
 }

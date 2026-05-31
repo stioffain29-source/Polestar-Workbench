@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
+    "@workspace/relevance": "workspace:*",
     "drizzle-orm": "catalog:",
     "rss-parser": "^3.13.0"
   },

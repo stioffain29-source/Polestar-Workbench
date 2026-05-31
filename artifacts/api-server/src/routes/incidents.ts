@@ -8,6 +8,8 @@ import {
   GetRecentIncidentsQueryParams,
   GetIncidentCountsByTopicQueryParams,
 } from "@workspace/api-zod";
+import { defaultRelevanceCondition, wantsRaw } from "../lib/relevanceFilter";
+import { evaluateIncidentRelevance } from "@workspace/relevance";
 
 const router: IRouter = Router();
 
@@ -41,6 +43,7 @@ router.get("/incidents", async (req, res): Promise<void> => {
       )!,
     );
   }
+  if (!wantsRaw(req.query)) conditions.push(defaultRelevanceCondition());
   const rows = await db
     .select()
     .from(incidentsTable)
@@ -55,6 +58,7 @@ router.get("/incidents/recent", async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(incidentsTable)
+    .where(wantsRaw(req.query) ? undefined : defaultRelevanceCondition())
     .orderBy(desc(incidentsTable.occurredAt))
     .limit(limit);
   res.json(rows);
@@ -64,6 +68,8 @@ router.get("/incidents/by-topic", async (req, res): Promise<void> => {
   const parsed = GetIncidentCountsByTopicQueryParams.safeParse({ ...req.query, days: req.query.days ? Number(req.query.days) : undefined });
   const days = parsed.success ? parsed.data.days ?? 30 : 30;
   const since = new Date(Date.now() - days * 86400000);
+  const byTopicConds = [gte(incidentsTable.occurredAt, since)];
+  if (!wantsRaw(req.query)) byTopicConds.push(defaultRelevanceCondition());
   const rows = await db
     .select({
       topic: incidentsTable.topic,
@@ -71,7 +77,7 @@ router.get("/incidents/by-topic", async (req, res): Promise<void> => {
       criticalCount: sql<number>`sum(case when ${incidentsTable.severity} = 'extreme' then 1 else 0 end)::int`,
     })
     .from(incidentsTable)
-    .where(gte(incidentsTable.occurredAt, since))
+    .where(and(...byTopicConds))
     .groupBy(incidentsTable.topic);
   res.json(rows);
 });
@@ -92,7 +98,25 @@ router.post("/incidents", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [row] = await db.insert(incidentsTable).values(parsed.data).returning();
+  const rel = evaluateIncidentRelevance(parsed.data.topic, {
+    topic: parsed.data.topic,
+    title: parsed.data.title,
+    summary: parsed.data.summary ?? "",
+    source: parsed.data.source ?? "",
+    sourceUrl: parsed.data.sourceUrl ?? "",
+    location: parsed.data.location ?? null,
+  });
+  const [row] = await db
+    .insert(incidentsTable)
+    .values({
+      ...parsed.data,
+      relevanceStatus: rel.status,
+      relevanceScore: rel.score,
+      relevanceReason: rel.reason,
+      relevanceVersion: rel.version,
+      relevanceEvaluatedAt: new Date(),
+    })
+    .returning();
   res.status(201).json(row);
 });
 

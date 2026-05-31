@@ -178,6 +178,9 @@ importers:
       '@workspace/ingest':
         specifier: workspace:*
         version: link:../../lib/ingest
+      '@workspace/relevance':
+        specifier: workspace:*
+        version: link:../../lib/relevance
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -537,6 +540,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/relevance':
+        specifier: workspace:*
+        version: link:../../lib/relevance
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -664,12 +670,21 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../db
+      '@workspace/relevance':
+        specifier: workspace:*
+        version: link:../relevance
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)
       rss-parser:
         specifier: ^3.13.0
         version: 3.13.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+
+  lib/relevance:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

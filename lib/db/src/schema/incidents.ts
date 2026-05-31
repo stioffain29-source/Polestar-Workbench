@@ -16,6 +16,13 @@ export const incidentsTable = pgTable("incidents", {
   sourceUrl: text("source_url"),
   analystNotes: text("analyst_notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Persisted relevance verdict (see @workspace/relevance). Nullable so
+  // legacy rows read fail-open until the boot backfill evaluates them.
+  relevanceStatus: text("relevance_status"),
+  relevanceScore: doublePrecision("relevance_score"),
+  relevanceReason: text("relevance_reason"),
+  relevanceVersion: text("relevance_version"),
+  relevanceEvaluatedAt: timestamp("relevance_evaluated_at", { withTimezone: true }),
 });
 
 export type Incident = typeof incidentsTable.$inferSelect;
