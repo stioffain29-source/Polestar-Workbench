@@ -54,31 +54,6 @@ async function hoursSinceLastIngest(): Promise<number | null> {
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
 }
 
-/**
- * How many fuel reports are missing live market prices (hard_numbers null, or
- * present but with an empty Fast Facts price list). This is checked SEPARATELY
- * from incident freshness: the FRED endpoint is flaky, so a single boot whose
- * incident scrape succeeded but whose price fetch failed would otherwise leave
- * a report permanently un-priced — every later cold start would see "incidents
- * fresh" and skip the whole run. When this is > 0 we re-attempt the (cheap,
- * idempotent) price ingest even though incidents are fresh.
- */
-async function fuelReportsMissingPrices(): Promise<number> {
-  const res = await db.execute(sql`
-    SELECT count(*)::int AS n
-    FROM reports
-    WHERE topic = 'fuel'
-      AND (
-        hard_numbers IS NULL
-        OR jsonb_array_length(
-             coalesce(hard_numbers -> 'fastFacts' -> 'prices', '[]'::jsonb)
-           ) = 0
-      )
-  `);
-  const row = res.rows[0] as { n: number } | undefined;
-  return row?.n ?? 0;
-}
-
 async function tick(reason: string): Promise<void> {
   try {
     const result = await runIngestOnce();
@@ -155,23 +130,17 @@ export function startIngestScheduler(): void {
         await tick("boot");
         return;
       }
-      // Incidents are fresh, so skip the expensive scrape — but the FRED price
-      // fetch is flaky and may have failed on an earlier boot. If any fuel
-      // report is still un-priced, re-attempt JUST the prices so a transient
-      // failure doesn't become permanently empty market data.
-      const missingPrices = await fuelReportsMissingPrices();
-      if (missingPrices > 0) {
-        logger.info(
-          { ageHours: Math.round(age), fuelReportsMissingPrices: missingPrices },
-          "boot ingest: incidents fresh but fuel prices missing, running price top-up",
-        );
-        await priceTick("boot-prices");
-      } else {
-        logger.info(
-          { ageHours: Math.round(age) },
-          "boot ingest: data fresh, skipping",
-        );
-      }
+      // Incidents are fresh, so skip the expensive scrape. But the fuel-price
+      // feed is cheap (a few small FRED CSVs, ~0.5s) and the live report must
+      // always show the LATEST prices — never a week-old snapshot. So refresh
+      // prices on every boot. This also self-heals an earlier flaky FRED failure
+      // (which used to leave prices permanently empty when incidents stayed
+      // fresh). Runs under the same advisory lock as the full ingest.
+      logger.info(
+        { ageHours: Math.round(age) },
+        "boot ingest: incidents fresh, refreshing live fuel prices",
+      );
+      await priceTick("boot-prices");
     } catch (err) {
       logger.error({ err }, "boot ingest freshness check failed");
     }

@@ -15,10 +15,11 @@ import { eq } from "drizzle-orm";
 //   * WTI crude    — DCOILWTICO   (USD/bbl, daily)
 //   * Jet fuel     — DJFUELUSGULF (USD/gal, weekly, US Gulf Coast kerosene)
 //
-// Each fuel report is anchored to its own issue date: we use the latest
-// observation on or before the issue date, so a report keeps date-appropriate
-// numbers and re-running is idempotent. Like the other ingest modules, this
-// NEVER closes the shared DB pool — only the CLI wrapper does.
+// The NEWEST fuel report is the live product, so it tracks the LATEST available
+// FRED prices (anchored to today). Older/archived reports stay frozen at their
+// own issue date so historical issues keep date-appropriate numbers. Re-running
+// is idempotent. Like the other ingest modules, this NEVER closes the shared DB
+// pool — only the CLI wrapper does.
 
 const FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv";
 
@@ -111,21 +112,21 @@ function changePct(series: Series, asOf: string, value: number): string | null {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% 7d`;
 }
 
-/** The most recent weekly trajectory points on or before the issue date. */
+/** The most recent weekly trajectory points on or before the anchor date. */
 function trajectoryAsOf(series: Series, onOrBefore: string, count: number): { date: string; value: number }[] {
   const eligible = series.points.filter((p) => p.date <= onOrBefore);
   return eligible.slice(-count).map((p) => ({ date: p.date, value: p.value }));
 }
 
 function buildHardNumbers(
-  issueDate: string,
+  anchorDate: string,
   brent: Series,
   wti: Series,
   jet: Series,
 ): { hardNumbers: Record<string, unknown>; brent: number | null; wti: number | null; jet: number | null; asOf: string | null } | null {
-  const b = valueAsOf(brent, issueDate);
-  const w = valueAsOf(wti, issueDate);
-  const j = valueAsOf(jet, issueDate);
+  const b = valueAsOf(brent, anchorDate);
+  const w = valueAsOf(wti, anchorDate);
+  const j = valueAsOf(jet, anchorDate);
   if (!b && !w && !j) return null;
 
   const prices: Record<string, unknown>[] = [];
@@ -146,7 +147,7 @@ function buildHardNumbers(
     if (!asOf || j.date > asOf) asOf = j.date;
   }
 
-  const trajPoints = trajectoryAsOf(jet, issueDate, 6);
+  const trajPoints = trajectoryAsOf(jet, anchorDate, 6);
   const hardNumbers: Record<string, unknown> = {
     fastFacts: { prices },
   };
@@ -230,12 +231,27 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
 
   // Sort newest issue date first so `latest` reflects the most recent report.
   const sorted = [...fuelReports].sort((a, b) => (b.issueDate ?? "").localeCompare(a.issueDate ?? ""));
+  // The current report(s) are the live product → anchor them to today (latest
+  // FRED observation). "Current" = every report sharing the MAX issue date that
+  // is ON OR BEFORE today. Excluding future dates is deliberate: a future-dated
+  // draft (e.g. next week's report being prepared) must NOT steal the "current"
+  // designation from the live published report and freeze it on stale prices.
+  // Ties resolve deterministically, and prod has exactly one fuel report so it
+  // is always the live one. Older issues stay frozen at their own issue date.
+  const maxIssue = sorted.reduce(
+    (m, r) => (r.issueDate && r.issueDate <= today && r.issueDate > m ? r.issueDate : m),
+    "",
+  );
 
   for (const r of sorted) {
-    const issueDate = r.issueDate ?? new Date().toISOString().slice(0, 10);
-    const built = buildHardNumbers(issueDate, brent, wti, jet);
+    const issueDate = r.issueDate ?? today;
+    const isCurrent = !!r.issueDate && r.issueDate === maxIssue;
+    // Current tracks live: anchor to today. Non-current reports (older archives,
+    // or future-dated drafts) stay frozen at their own issue date.
+    const anchorDate = isCurrent ? today : issueDate;
+    const built = buildHardNumbers(anchorDate, brent, wti, jet);
     if (!built) {
-      log(`  report ${r.id} (${issueDate}): no price data on or before issue date — skipped`);
+      log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);
       continue;
     }
     if (r.issueDate && r.issueDate > latestIssue) {
