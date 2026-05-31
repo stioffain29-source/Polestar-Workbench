@@ -492,3 +492,39 @@ id = "i1L7c4WMfteSlT5T-DRgx"
 uri = "file://artifacts/workbench/screenshots/EnergyWatch_2026-05-30.pdf"
 type = "pdf"
 title = "Energy PDF"
+
+[[outputs]]
+id = "FwFr6wbIRwK_wzym92dFB"
+uri = "file://artifacts/workbench/screenshots/Flashpoint_Protests_live_2026-05-30.png"
+type = "image"
+title = "Flashpoint (Protests) — live report"
+
+[[outputs]]
+id = "NNO-0OLsMiSS4f3n7dJmu"
+uri = "file://artifacts/workbench/screenshots/CargoWatch_live_2026-05-30.png"
+type = "image"
+title = "Cargo Watch — live report"
+
+[[outputs]]
+id = "EVnThl0SwhSNYqKvRpMBY"
+uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_live_2026-05-30.png"
+type = "image"
+title = "Shipping (Hormuz) — live report"
+
+[[outputs]]
+id = "P0ilHsZVINwWwYtdBChLU"
+uri = "file://artifacts/workbench/screenshots/FuelWatch_live_2026-05-30.png"
+type = "image"
+title = "Fuel Watch — live report"
+
+[[outputs]]
+id = "8nKbncrfKR6OglYurFpI9"
+uri = "file://artifacts/workbench/screenshots/FertiliserWatch_live_2026-05-30.png"
+type = "image"
+title = "Fertiliser — live report"
+
+[[outputs]]
+id = "61zqK6BMQN5ZVYAhoyTZ3"
+uri = "file://artifacts/workbench/screenshots/EnergyWatch_live_2026-05-30.png"
+type = "image"
+title = "Energy — live report"
