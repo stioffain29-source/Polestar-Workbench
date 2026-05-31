@@ -36,13 +36,38 @@ export type IngestRunResult =
     }
   | { ran: false; reason: "locked" };
 
+export type MarketPricesRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      marketPrices: MarketPriceSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+function emptyMarketPrices(err: unknown): MarketPriceSummary {
+  return {
+    topic: "fuel_prices",
+    mode: "commit",
+    seriesFetched: 0,
+    seriesErrors: [{ id: "all", error: err instanceof Error ? err.message : String(err) }],
+    reportsConsidered: 0,
+    reportsUpdated: 0,
+    latest: { brent: null, wti: null, jet: null, asOf: null },
+    logLines: [],
+  };
+}
+
 /**
- * Run the Flashpoint + Cargo Watch ingest once, committing to the database.
- * Returns `{ ran: false, reason: "locked" }` if another ingest is already in
- * progress (anywhere). Never closes the shared pool — the long-lived server
- * must keep it open.
+ * Run `fn` while holding the cross-instance advisory lock on a dedicated pooled
+ * connection. Returns `{ ran: false, reason: "locked" }` when another ingest
+ * (anywhere) already holds the lock. Never closes the shared pool — the
+ * long-lived server must keep it open.
  */
-export async function runIngestOnce(): Promise<IngestRunResult> {
+async function withIngestLock<T>(
+  fn: () => Promise<T>,
+): Promise<{ ran: true; value: T } | { ran: false; reason: "locked" }> {
   const client = await pool.connect();
   let locked = false;
   try {
@@ -52,41 +77,8 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     );
     locked = lockRes.rows[0]?.locked === true;
     if (!locked) return { ran: false, reason: "locked" };
-
-    const startedAt = new Date();
-    // Sequential: both share the same DB pool and dedupe against the incidents
-    // table; running them one after another mirrors scrape:prod.
-    const flashpoint = await runFlashpointIngest({ commit: true });
-    const cargoWatch = await runCargoWatchIngest({ commit: true });
-    // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
-    // can never fail the incident ingest — it just reports the error.
-    let marketPrices;
-    try {
-      marketPrices = await runMarketPricesIngest({ commit: true });
-    } catch (err) {
-      logger.error({ err }, "market price ingest failed");
-      marketPrices = {
-        topic: "fuel_prices" as const,
-        mode: "commit" as const,
-        seriesFetched: 0,
-        seriesErrors: [{ id: "all", error: err instanceof Error ? err.message : String(err) }],
-        reportsConsidered: 0,
-        reportsUpdated: 0,
-        latest: { brent: null, wti: null, jet: null, asOf: null },
-        logLines: [],
-      };
-    }
-    const finishedAt = new Date();
-
-    return {
-      ran: true,
-      startedAt,
-      finishedAt,
-      durationMs: finishedAt.getTime() - startedAt.getTime(),
-      flashpoint,
-      cargoWatch,
-      marketPrices,
-    };
+    const value = await fn();
+    return { ran: true, value };
   } finally {
     if (locked) {
       try {
@@ -100,4 +92,68 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     }
     client.release();
   }
+}
+
+/**
+ * Run the Flashpoint + Cargo Watch incident ingest AND the fuel-market price
+ * ingest once, committing to the database. Returns
+ * `{ ran: false, reason: "locked" }` if another ingest is already in progress
+ * (anywhere).
+ */
+export async function runIngestOnce(): Promise<IngestRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    // Sequential: both share the same DB pool and dedupe against the incidents
+    // table; running them one after another mirrors scrape:prod.
+    const flashpoint = await runFlashpointIngest({ commit: true });
+    const cargoWatch = await runCargoWatchIngest({ commit: true });
+    // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
+    // can never fail the incident ingest — it just reports the error.
+    let marketPrices: MarketPriceSummary;
+    try {
+      marketPrices = await runMarketPricesIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "market price ingest failed");
+      marketPrices = emptyMarketPrices(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      flashpoint,
+      cargoWatch,
+      marketPrices,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the fuel-market price ingest (FRED), committing to the database.
+ * Used by the scheduler's boot top-up so a report missing prices gets re-priced
+ * on a cold start WITHOUT re-running the expensive incident scrape. Shares the
+ * same advisory lock so it can never collide with a full run.
+ */
+export async function runMarketPricesOnce(): Promise<MarketPricesRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let marketPrices: MarketPriceSummary;
+    try {
+      marketPrices = await runMarketPricesIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "market price ingest failed");
+      marketPrices = emptyMarketPrices(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      marketPrices,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
 }

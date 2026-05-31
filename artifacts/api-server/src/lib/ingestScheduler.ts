@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { runIngestOnce } from "./ingestRunner";
+import { runIngestOnce, runMarketPricesOnce } from "./ingestRunner";
 import { logger } from "./logger";
 
 // Automatic ingestion scheduler.
@@ -54,6 +54,31 @@ async function hoursSinceLastIngest(): Promise<number | null> {
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
 }
 
+/**
+ * How many fuel reports are missing live market prices (hard_numbers null, or
+ * present but with an empty Fast Facts price list). This is checked SEPARATELY
+ * from incident freshness: the FRED endpoint is flaky, so a single boot whose
+ * incident scrape succeeded but whose price fetch failed would otherwise leave
+ * a report permanently un-priced — every later cold start would see "incidents
+ * fresh" and skip the whole run. When this is > 0 we re-attempt the (cheap,
+ * idempotent) price ingest even though incidents are fresh.
+ */
+async function fuelReportsMissingPrices(): Promise<number> {
+  const res = await db.execute(sql`
+    SELECT count(*)::int AS n
+    FROM reports
+    WHERE topic = 'fuel'
+      AND (
+        hard_numbers IS NULL
+        OR jsonb_array_length(
+             coalesce(hard_numbers -> 'fastFacts' -> 'prices', '[]'::jsonb)
+           ) = 0
+      )
+  `);
+  const row = res.rows[0] as { n: number } | undefined;
+  return row?.n ?? 0;
+}
+
 async function tick(reason: string): Promise<void> {
   try {
     const result = await runIngestOnce();
@@ -75,6 +100,33 @@ async function tick(reason: string): Promise<void> {
     );
   } catch (err) {
     logger.error({ err, reason }, "scheduled ingest failed");
+  }
+}
+
+/**
+ * Run ONLY the fuel-price ingest (no incident scrape). Used when incidents are
+ * already fresh but a fuel report is missing prices, so a flaky FRED fetch gets
+ * retried on the next cold start instead of being skipped forever.
+ */
+async function priceTick(reason: string): Promise<void> {
+  try {
+    const result = await runMarketPricesOnce();
+    if (!result.ran) {
+      logger.info({ reason }, "price top-up skipped (already running)");
+      return;
+    }
+    logger.info(
+      {
+        reason,
+        fuelReportsPriced: result.marketPrices.reportsUpdated,
+        fuelPriceAsOf: result.marketPrices.latest.asOf,
+        seriesErrors: result.marketPrices.seriesErrors,
+        durationMs: result.durationMs,
+      },
+      "price top-up finished",
+    );
+  } catch (err) {
+    logger.error({ err, reason }, "price top-up failed");
   }
 }
 
@@ -101,6 +153,19 @@ export function startIngestScheduler(): void {
           "boot ingest: data stale, running catch-up",
         );
         await tick("boot");
+        return;
+      }
+      // Incidents are fresh, so skip the expensive scrape — but the FRED price
+      // fetch is flaky and may have failed on an earlier boot. If any fuel
+      // report is still un-priced, re-attempt JUST the prices so a transient
+      // failure doesn't become permanently empty market data.
+      const missingPrices = await fuelReportsMissingPrices();
+      if (missingPrices > 0) {
+        logger.info(
+          { ageHours: Math.round(age), fuelReportsMissingPrices: missingPrices },
+          "boot ingest: incidents fresh but fuel prices missing, running price top-up",
+        );
+        await priceTick("boot-prices");
       } else {
         logger.info(
           { ageHours: Math.round(age) },

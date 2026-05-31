@@ -40,13 +40,7 @@ export type MarketPriceSummary = {
   logLines: string[];
 };
 
-async function fetchSeries(id: string, startDate: string): Promise<Series> {
-  const url = `${FRED_CSV}?id=${encodeURIComponent(id)}&cosd=${startDate}`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
-  });
-  if (!res.ok) throw new Error(`FRED ${id} HTTP ${res.status}`);
-  const text = await res.text();
+function parseFredCsv(id: string, text: string): { date: string; value: number }[] {
   const lines = text.trim().split(/\r?\n/);
   const points: { date: string; value: number }[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -61,7 +55,39 @@ async function fetchSeries(id: string, startDate: string): Promise<Series> {
     points.push({ date, value });
   }
   points.sort((a, b) => a.date.localeCompare(b.date));
-  return { id, points };
+  return points;
+}
+
+const FETCH_ATTEMPTS = 3;
+
+/**
+ * Fetch one FRED series, retrying transient failures. FRED's public
+ * fredgraph.csv endpoint is intermittently flaky (HTTP/2 stream resets, brief
+ * 5xx/429), and in a deployment a SINGLE swallowed failure here used to leave a
+ * report permanently un-priced (the freshness gate then skipped every retry).
+ * Retrying with backoff makes the common transient case self-heal within one
+ * run; a hard failure still throws so the caller records it and a later cold
+ * start re-attempts.
+ */
+async function fetchSeries(id: string, startDate: string): Promise<Series> {
+  const url = `${FRED_CSV}?id=${encodeURIComponent(id)}&cosd=${startDate}`;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
+      });
+      if (!res.ok) throw new Error(`FRED ${id} HTTP ${res.status}`);
+      const text = await res.text();
+      return { id, points: parseFredCsv(id, text) };
+    } catch (err) {
+      lastErr = err;
+      if (attempt < FETCH_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /** Latest observation on or before `onOrBefore` (ISO date). */

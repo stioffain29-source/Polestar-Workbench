@@ -21,10 +21,18 @@ incident-only, so there was nothing fabricated to replace there.
   jet trajectory), NOT a fixed recent window — a fixed window silently skips
   older reports and leaves them on stale data. Prices anchor to each report's
   issue date (latest observation ≤ issue date), so re-running is idempotent.
-- FRESHNESS GATE TRAP: the scheduler's boot catch-up gate is keyed on the
-  incident scrapers' freshness. If incidents are fresh but prices are stale, a
-  cold start skips the whole run and prices lag until the next gate trip / warm
-  6h timer. Acceptable for weekly commodity reads; add a price-specific gate
-  only if per-cold-start price freshness is ever required.
+- FRESHNESS GATE TRAP (FIXED): the scheduler's boot catch-up gate is keyed on
+  the incident scrapers' freshness. The trap: FRED is flaky, so a boot whose
+  incident scrape succeeded but whose price fetch failed leaves a report
+  permanently un-priced — every later cold start sees "incidents fresh" and
+  skips the whole run, so FRED is never retried and prices stay NULL forever
+  (this is what shipped empty Brent/WTI/jet to prod). FIX: the boot gate now,
+  when incidents are fresh, additionally checks whether any fuel report is
+  missing prices (hard_numbers NULL or empty fastFacts.prices) and if so runs a
+  price-ONLY top-up under the same advisory lock. Plus the FRED fetch itself now
+  retries (a few attempts with backoff) so a single transient INTERNAL_ERROR no
+  longer zeroes the run. Verified by reproducing the exact prod state in dev
+  (blank one fuel report's hard_numbers, restart) and watching the boot self-heal
+  it. Reaches prod only after a republish.
 - Never re-introduce an auto-seeded fabricated sample into the preview/PDF. An
   unseeded report shows empty market fields, not fake numbers.
