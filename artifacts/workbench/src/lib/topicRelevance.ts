@@ -54,6 +54,27 @@ const CARGO_EXCLUDE: RegExp[] = [
   /\b(home|house|residential) (burglary|invasion)/,
   /\b(share price|stock price|equity|earnings|quarterly (result|results)|dividend|buyback|ipo|market cap) .{0,40}(logistics|freight|transport|shipping|cargo)/,
   /^other cargo incident$/i,
+  // Advisory, explainer, conference and enforcement-commentary pieces.
+  // Cargo Watch reports concrete in-region theft/hijack EVENTS — not
+  // op-eds about cargo-theft trends, agency warnings, industry-body
+  // lobbying or conference agendas, even when they say "cargo theft".
+  /\b(cargo|freight) (theft|crime) (scheme|schemes|recovery|prevention|awareness|trend|trends|statistics|report|conference|summit|meeting|playbook|enforcement)\b/,
+  /\b(to tackle|tackling|combat(?:ing)?|fight(?:ing)?|crack(?:ing)? down on) .{0,20}(cargo|freight) (theft|crime)\b/,
+  /\b(valid carrier authorities|carrier authority|double[- ]brokering|fictitious pickup|strategic theft)\b/,
+  /\bbusiness meeting\b/,
+  /\b(fbi|interpol|europol|homeland security|\bdhs\b)\b.{0,30}(warn|warns|warning|alert|advisory)/,
+  // US-jurisdiction agency advisories (incl. foreign-language syndication of
+  // them) are not APAC cargo-operational incidents. Gate FBI on advisory/
+  // warning framing (incl. CJK "경고"/"警告") so a genuine APAC hijack that
+  // merely mentions FBI assistance is NOT dropped.
+  /\bfbi\b.{0,20}(warn|warns|warning|alert|alerts|advisory|advises?|caution|경고|警告)/i,
+  /(경고|警告).{0,10}\bfbi\b/i,
+  // Out-of-region (Nigeria) leak: this is the APAC cargo report, so an Ogun
+  // State incident is out of scope. Gate on Nigeria/police context rather
+  // than a bare "ogun" token so an APAC record can never be hard-dropped.
+  /\bogun\b.{0,30}(nigeria|nigerian|police|state)|(nigeria|nigerian).{0,30}\bogun\b/i,
+  /\b(association|federation|council|chamber|industry body)\b.{0,40}(urges?|calls? on|requests?|asks?|press(?:es)?|demands?).{0,30}(govern|justice|ministry|department|police|\bdoj\b|authorities)/,
+  /\bshows what enforcement can do\b/,
 ];
 
 // Fuel-specific exclusions. Pure market speculation, equity/finance news
@@ -87,6 +108,14 @@ const FUEL_EXCLUDE: RegExp[] = [
   // "Other fuel incident" bucket carry no operational signal and must
   // not lead a Fuel Watch.
   /^other fuel incident$/i,
+  // EV / demand-shift commentary. "Oil shock sparks surge in EV sales"
+  // is a demand-substitution story, not a fuel-supply incident, even
+  // though it mentions oil.
+  /\b(ev|electric vehicle|electric[- ]car|electric[- ]vehicle) sales?\b/,
+  /\bsurge in ev\b/,
+  // PR / booster commentary — subsidy-leadership praise and industry-
+  // dialogue applause are promotional, not operational fuel signal.
+  /\b(applauds?|lauds?|praises?|hails?|welcomes?|congratulates?)\b.{0,40}(leadership|reform|initiative|vision|dialogue|effort|stewardship)/,
 ];
 
 // Shipping-specific exclusions. Food-price commentary, airline fuel cost
@@ -215,6 +244,20 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   /\bjet fuel (cost|price|prices|surcharge)/,
   /\b(grain|wheat|rice|corn|soybean|edible oil) (price|prices|market|outlook)\b/,
   /\bcommodity price index\b/,
+  // Vessel sale-and-purchase / newbuild / ship-finance deals. Commercial
+  // tonnage trading ("suezmax newbuilds", "cashes in on ageing suezmax
+  // pair", "lands $65m for ageing suezmax", "pockets $29m gain from
+  // veteran suezmax disposal") is not a maritime-security or disruption
+  // incident, even though it names a vessel class. Gate "newbuild" on
+  // commercial/orderbook framing so a genuine attack/seizure of a newly
+  // built tanker is NOT dropped (EXCLUDE runs before REQUIRED).
+  /\b(heads? back to|returns? to|back in|reverts? to|orders?|orderbook|order book|fleet renewal|invests? in|expands?.{0,15}fleet|signs?|inks?|places?|cancels?|delivery of|delivered)\b.{0,25}newbuild/i,
+  /\bnewbuild(s|ing)?\b.{0,25}(order|orders|orderbook|order book|programme|program|deal|contract|delivery|delivered|christen|named|spree|push|tally|wave)/i,
+  /\b(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership) (pair|trio|duo|disposal|sale|resale)\b/,
+  /\b(cashes? in|pockets?|nets?|bags?|lands?|snaps? up|offloads?|disposes?|sells?|buys?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
+  /\b(ageing|aging|veteran|elderly|second[- ]hand|secondhand) (suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|pair|trio|duo|tonnage)\b/,
+  /\b\$\d+\s*m?\s*(gain|profit) from\b/,
+  /\bgain from .{0,20}(disposal|sale|vessel|tanker)\b/,
 ];
 
 const REQUIRED: Record<string, RegExp[]> = {

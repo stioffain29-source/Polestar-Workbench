@@ -229,7 +229,7 @@ function isLowCredibility(r: FlashpointReportIncident): boolean {
 // no mobilisation signal and make a serious brief look unserious if used
 // as a lead. They are excluded from leads and from Related Incidents and
 // only kept in the broader file so counts remain honest.
-const NOVELTY_RE = /\b(cockroach|parody party|joke party|meme party|viral (post|meme|reel|tweet|video)|going viral|founder responds?|spokesperson responds?|satir(e|ical|ised|ized)|spoof|prank|publicity stunt|fan club|tongue[- ]in[- ]cheek)\b/i;
+const NOVELTY_RE = /\b(cockroach|parody party|joke party|meme party|viral (post|meme|reel|tweet|video)|going viral|founder responds?|spokesperson responds?|satir(e|ical|ised|ized)|spoof|prank|publicity stunt|fan club|tongue[- ]in[- ]cheek|kite of dreams|amplify (the )?voices of|reaches? .{0,25}summit to (amplify|raise|honour|honor))\b/i;
 function isWeakNovelty(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   // Unconditional: novelty / parody / "founder responds" items are
@@ -264,7 +264,28 @@ const MARTIAL_LAW_RE = /\bmartial law\b/i;
 // (sentencing, suspended terms, indictments). Filtered out unless a
 // live public-order hook is also present.
 const COURT_VERDICT_RE = /\b(suspended (term|sentence)s?|get suspended|sentenc(ed|ing)|acquitt(ed|al)|indict(ed|ment)|conviction|guilty plea|plea bargain|appeal (filed|dismissed|granted))\b/i;
-const LIVE_PUBLIC_ORDER_RE = /\b(protest(s|ers|ing)? today|rally today|crowd|crowds|tear[- ]?gas|water cannon|baton|road closure|roadblock|blockad|curfew imposed|curfew extended|curfew lifted|troops deployed|martial law (imposed|declared|extended)|clash(es|ed)?|fatalit|injur(ed|ies)|mass arrest|detained at|arrested at|sit[- ]?in|march(ed|ing) on)\b/i;
+const LIVE_PUBLIC_ORDER_RE = /\b(protest(s|ers|ing)? today|rally today|crowd|crowds|demonstrators|protest(s)? (erupt|erupts|erupted|break|breaks|broke) out|(violence|unrest|clashes) (erupt|erupts|erupted|flare|flares|flared)|ongoing protest|tear[- ]?gas|water cannon|baton|stone[- ]?pelt|road closure|roadblock|blockad|curfew imposed|curfew extended|curfew lifted|troops deployed|martial law (imposed|declared|extended)|clash(es|ed)?|fatalit|injur(ed|ies)|mass arrest|detained at|arrested at|sit[- ]?in|march(ed|ing) on)\b/i;
+// Retrospective accountability / legal-aftermath reporting about a PAST
+// public-order event. These are the dominant Flashpoint noise class: a
+// rights body recommending charges, an ex-official arrested or summoned
+// over an old crackdown, a probe / commission of inquiry, a dispute over
+// a death-toll report, "faces raps", "under lens". They carry the protest
+// vocabulary (so the relevance gate keeps them) but describe legal process
+// and political commentary, not a LIVE operational incident. The user is
+// explicit: generic political/accountability commentary is not an incident
+// unless there is a current security/movement/access/protest/unrest angle.
+const RETRO_ACCOUNTABILITY_RE =
+  /\b(urges?\s+(?:the\s+)?(?:un|government|state|authorities|court|police)?\s*to\s+(?:retract|charge|prosecute|act|probe|investigate)|to\s+retract\b|recommends?\s+(?:action|charges?|prosecution|a\s+probe|an?\s+(?:probe|investigation|inquiry|case))|face(?:s|d)?\s+(?:raps|charges|trial|prosecution|a\s+probe|an?\s+inquiry)|under\s+(?:lens|investigation|probe|scrutiny|the\s+scanner)|(?:arrested|detained|held|summoned|indicted|booked|charged)\s+(?:over|in\s+connection\s+with|in\s+a\s+case)|(?:case|complaint|fir|charges?)\s+(?:filed|registered|lodged|framed|pressed|laid)?\s*against|files?\s+(?:a\s+|an\s+)?(?:case|complaint|fir)\s+against|probe\s+(?:into|against|ordered|launched)|investigation\s+(?:into|against|ordered|launched)|commission\s+of\s+inquiry|fact[- ]finding\s+(?:team|mission|report|panel)|human\s+rights\s+commission|\bnhrc\b|rights\s+body|rights\s+commission|\bun\s+report\b|death\s+(?:toll|count)\s+(?:report|dispute|disputed|figure|inquiry|probe)|accountability\s+(?:for|over))\b/i;
+// Post-event normalisation: a calm election / peaceful polling happening
+// after an unrest cycle is the absence of a live incident, not an incident.
+const AFTERMATH_NORMALISATION_RE =
+  /\b(peaceful\s+(?:polling|poll|election|elections|vote|voting)|polling\s+(?:underway|begins|began|concludes|concluded|peacefully)|returns?\s+to\s+(?:normal|normalcy|calm)|calm\s+(?:returns?|restored|prevails))\b/i;
+// Foreign labour action carrying a stray APAC country tag because an APAC
+// outlet syndicated it. The Icelandic "Eimskip" seafarers' dispute is the
+// recurring case — it is mislabelled Philippines and pollutes that country
+// count. Entity-anchored, not geography-anchored, so it survives the
+// trailing-source strip.
+const FOREIGN_ENTITY_MISLABEL_RE = /\b(eimskip)\b/i;
 // Spammy SEO keyword-stuffed photo captions. Real headlines almost
 // never carry 3+ commas, and they don't mix Devanagari / CJK script
 // fragments with English keyword runs. Either pattern alone is a
@@ -342,6 +363,16 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // of "rioters" / "courthouse" vocabulary — drop unless live public
   // order is present.
   if (COURT_VERDICT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Retrospective accountability / legal-aftermath about a PAST event
+  // (rights-body charge recommendations, ex-officials arrested over an
+  // old crackdown, probes, death-toll-report disputes). Drop unless the
+  // same record describes a current live public-order event.
+  if (RETRO_ACCOUNTABILITY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Post-event normalisation (peaceful polling / calm restored) — the
+  // absence of an incident, not an incident.
+  if (AFTERMATH_NORMALISATION_RE.test(text)) return true;
+  // Foreign labour action mislabelled into an APAC country (Eimskip).
+  if (FOREIGN_ENTITY_MISLABEL_RE.test(text)) return true;
   // SEO comma-spam / multi-script keyword-stuffed captions.
   if (isSpamCaption(r.title ?? "")) return true;
   // Non-APAC focus headlines syndicated by an APAC source. Strip the
@@ -735,7 +766,7 @@ export function buildFlashpointReportDataset(
     noteParts.push(`${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? " was" : "s were"} collapsed via two-pass title and topic-signature dedupe.`);
   }
   if (weakDropped > 0) {
-    noteParts.push(`${weakDropped} low-signal record${weakDropped === 1 ? " was" : "s were"} excluded — sports, defence-procurement, legislative-process and stock-photo items that carry the protest or strike keywords but no live public-order signal.`);
+    noteParts.push(`${weakDropped} low-signal record${weakDropped === 1 ? " was" : "s were"} excluded — retrospective accountability and legal-aftermath reporting (charge recommendations, probes, arrests over past events), post-event normalisation, sports, defence-procurement, legislative-process and stock-photo items that carry the protest or strike keywords but no live public-order signal.`);
   }
   const dataNote = noteParts.length > 0
     ? noteParts.join(" ")

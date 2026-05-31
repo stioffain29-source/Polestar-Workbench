@@ -1,0 +1,95 @@
+The Flashpoint report proves the wider issue is still not fixed.
+
+This is not a single-report problem. The same content-quality checks must apply across all reports.
+
+The current Flashpoint PDF is not client-ready. It has poor prose, internal contradictions, weak filtering and irrelevant records. Examples include the report saying the most affected country is the Philippines while later suggesting Bangladesh is the leading source, and incident tables containing noise such as rally/sports betting/word-match “strike” items. That means the report engine is still accepting bad or weak records and then generating generic prose from them.
+
+Fix this across the whole report suite, not just Flashpoint.
+
+Scope:
+
+* Flashpoint
+* Cargo Watch
+* Fuel Watch
+* Fertiliser Watch
+* Shipping Watch
+* Energy Watch
+* Papua
+* Papua New Guinea
+* Missile Strike Tracker as tracker/dashboard only
+
+Required fix:
+
+1. Relevance filtering
+   Tighten filtering so irrelevant word matches do not enter reports.
+   Examples:
+
+* rally as motorsport must not become protest
+* sports betting “strike” must not become labour action
+* military strike, missile strike or product/market wording must not become labour action
+* generic political commentary must not become an operational incident unless there is a clear security, movement, access, protest, strike, unrest or business-disruption angle
+
+2. Classification
+   Fix issue classification so records are assigned correctly.
+   Do not rely on single keyword matching.
+   Each record used in a report must be classified by operational meaning, not just words in the headline.
+
+3. Cards, prose and tables must agree
+   Fast Facts, executive summary, country view, What Matters, Polestar View, Watch Next and Related Incidents must all agree with the same filtered dataset.
+   No report should say one country leads in the cards and a different country leads in the prose unless that is clearly explained.
+
+4. Prose quality
+   Stop generic boilerplate.
+   The prose must state:
+
+* what actually happened
+* where it happened
+* why it matters operationally
+* what the business impact is
+* what to watch next
+
+Do not use reusable filler such as “operational tempo, not headline severity” unless it is directly supported by the records.
+
+5. Related incidents
+   Related incidents must be clean, relevant and defensible.
+   Do not include noisy records just to fill the table.
+   If there are only a few usable records, show fewer records and say the signal is thin.
+
+6. Country reports
+   Papua and Papua New Guinea must remain country-specific.
+   Do not produce generic country prose.
+   Use relevant country records, source coverage and 30/90-day context only where clearly labelled.
+
+7. Product status
+   For every report, clearly show whether the product is:
+
+* live
+* manual
+* static/import-only
+
+Do not present static or stale products as current live reporting.
+
+8. Proof required
+   Do not claim this is fixed with typecheck, code review or dev screenshots.
+
+For each report product, provide:
+
+* live production screenshot
+* PDF exported from that same screen
+* latest record date
+* last updated time
+* data status
+* list of included records
+* list of rejected noisy records with rejection reason
+* confirmation cards, prose, maps/charts and tables use the same filtered dataset
+
+9. Acceptance test
+   A report is only accepted if:
+
+* no obvious irrelevant records appear
+* cards and prose agree
+* the prose is specific and operational
+* the PDF matches the live screen
+* the report can be read by a client without embarrassment
+
+Do not close this task until the live production reports prove the content engine is working across the suite.

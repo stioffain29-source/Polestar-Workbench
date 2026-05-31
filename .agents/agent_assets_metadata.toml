@@ -455,22 +455,40 @@ title = "Flashpoint / Protests — 24–30 May 2026 (22 records, cleaned)"
 id = "u3Y0K44v9hGsrLsLUrNp-"
 uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_2026-05-30.pdf"
 type = "pdf"
-title = "Shipping — Hormuz (24–30 May 2026)"
+title = "Shipping (Hormuz) PDF"
 
 [[outputs]]
 id = "eJvTqkZHI12VqiwC1_AfG"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_2026-05-30.pdf"
 type = "pdf"
-title = "Cargo Watch (24–30 May 2026)"
+title = "Cargo Watch PDF"
 
 [[outputs]]
 id = "D5kM6rnaWWj5BD9UnQSjT"
 uri = "file://artifacts/workbench/screenshots/FuelWatch_2026-05-30.pdf"
 type = "pdf"
-title = "Fuel Watch (24–30 May 2026)"
+title = "Fuel Watch PDF"
 
 [[outputs]]
 id = "B93-lzuRVEpatwaadgFqj"
 uri = "file://artifacts/workbench/screenshots/Flashpoint_Protests_2026-05-30.pdf"
 type = "pdf"
-title = "Flashpoint — Protests & Civil Unrest (24–30 May 2026)"
+title = "Flashpoint (Protests) PDF"
+
+[[outputs]]
+id = "M5_ZmWxr4zQERLvor3lkJ"
+uri = "file://artifacts/workbench/screenshots/PROOF_PACK.md"
+type = "text"
+title = "Report Suite Proof Pack"
+
+[[outputs]]
+id = "RyO3r0yIdNvxtjkCnqhau"
+uri = "file://artifacts/workbench/screenshots/FertiliserWatch_2026-05-30.pdf"
+type = "pdf"
+title = "Fertiliser PDF"
+
+[[outputs]]
+id = "i1L7c4WMfteSlT5T-DRgx"
+uri = "file://artifacts/workbench/screenshots/EnergyWatch_2026-05-30.pdf"
+type = "pdf"
+title = "Energy PDF"

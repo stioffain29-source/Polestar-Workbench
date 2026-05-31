@@ -8,7 +8,9 @@ const REPORTS = [
   { id: 13, name: "Flashpoint_Protests" },
   { id: 12, name: "Shipping_Hormuz" },
   { id: 11, name: "CargoWatch" },
-  { id: 19, name: "FuelWatch" },
+  { id: 9, name: "FuelWatch" },
+  { id: 10, name: "FertiliserWatch" },
+  { id: 8, name: "EnergyWatch" },
 ];
 
 const browser = await chromium.launch({
