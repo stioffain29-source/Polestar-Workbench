@@ -1,0 +1,98 @@
+Here are the notes across the reports checked.
+
+Overall position
+
+The report engine is not consistently client ready.
+
+The layout/export is mostly working, and some products are now usable, but the content quality varies sharply by report. The strongest reports are Cargo Watch and Fuel Watch. Shipping Watch is usable but dated/static. Flashpoint remains the weak point because filtering and prose quality are still not good enough.
+
+Flashpoint
+
+Status: Not acceptable yet.
+
+What improved:
+
+The worst obvious junk has reduced.
+Records dropped from 25 to 6 in the latest version.
+The country count now aligns better: Philippines 4, Bangladesh 2.
+The previous obvious noise such as sports betting and some rally/strike keyword rubbish is mostly gone.
+
+What still fails:
+
+Prose is still generic and templated.
+Executive Summary does not give a sharp operational read.
+Polestar View still uses filler: “Operational tempo, not headline severity.”
+Forecast still highlights Bangladesh while the report says Philippines carries the heaviest concentration. That needs a clear explanation.
+Watch Next is weak.
+The report still feels generated, not assessed.
+
+Verdict: Cleaner dataset, weak writing layer. Not client ready.
+
+Fuel Watch
+
+Status: Usable with caveats.
+
+What works:
+
+Stronger structure than Flashpoint.
+Prose is more operational.
+It links price, availability, route pressure, generator exposure, supplier resilience and continuity.
+Data status is clear: Static / Import Only.
+Latest record is clearly shown as 23 May 2026, so it is not pretending to be live.
+
+Issues:
+
+Fast Facts says “No supply, policy or route indicators supplied”, but the body discusses shortages, policy pressure and route disruption. That contradiction needs fixing.
+Some severity language may be too strong for the evidence shown.
+Static/import-only means it should be treated as an as-of report, not current live reporting.
+
+Verdict: Usable with caveats. Fix the Fast Facts contradiction.
+
+Shipping Watch
+
+Status: Usable with caveat.
+
+What works:
+
+Clearly labelled Static / Import Only.
+Latest record 22 May 2026, last updated 23 May 2026.
+Internally coherent: Hormuz is the lead, vessel/piracy counts are zero, regional split is Middle East led.
+Related incidents mostly match the shipping theme.
+Prose is a bit flat but serviceable.
+
+Issues:
+
+It is static/import-only, not live.
+The line about Hormuz disruption helping drive an 8% rise in Panama Canal transits is odd and should be checked.
+Some sections are thin, but at least they are not padded with obvious rubbish.
+
+Verdict: Usable with caveat.
+
+Cargo Watch
+
+Status: Usable.
+
+What works:
+
+Clearly labelled Manual Scraper.
+Latest record 21 May 2026, last updated 30 May 2026.
+Report is coherent: truck hijack, theft/loss, warehouse theft.
+Indonesia lead is consistent across cards and prose.
+PNG and Malaysia are sensible secondary geographies.
+Prose is practical and operational.
+It is short, but not padded.
+
+Issues:
+
+Could use more depth if the dataset allows it.
+Latest incident is dated 15 May, so the report should not be treated as “fresh” without that caveat.
+
+Verdict: Usable.
+
+Bottom line
+Cargo Watch: usable
+Fuel Watch: usable with caveats
+Shipping Watch: usable with caveat
+Flashpoint: not acceptable yet
+
+The remaining major issue is not PDF layout. It is content judgement: filtering, prose generation and report-specific analysis. Flashpoint still needs the most work.
