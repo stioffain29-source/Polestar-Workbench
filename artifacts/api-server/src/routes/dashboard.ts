@@ -67,11 +67,14 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
     }),
   );
 
+  // Over-fetch: the client applies the report-grade relevance gate to these
+  // rows (sports/finance/pageant noise is dropped there), then slices to the
+  // top few. A raw LIMIT 8 here would leave too few genuine rows after filtering.
   const recentIncidents = await db
     .select()
     .from(incidentsTable)
     .orderBy(desc(incidentsTable.occurredAt))
-    .limit(8);
+    .limit(80);
 
   const sourceAlerts = await db
     .select()

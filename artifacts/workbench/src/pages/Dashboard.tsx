@@ -1,11 +1,13 @@
 import { useGetDashboardOverview, useGetIncidentCountsByTopic, type DashboardTopicCard } from "@workspace/api-client-react";
 import { AlertTriangle, Activity, CheckCircle2, XCircle, FileText, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { severityBadgeStyle } from "@/lib/topics";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { isTopicRelevant } from "@/lib/topicRelevance";
+import { selectFlashpointUsable } from "@/lib/flashpointReportDataset";
 
 const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
   { label: "24h", days: 1 },
@@ -20,6 +22,58 @@ const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
 
 export default function Dashboard() {
   const { data: overview, isLoading, isError } = useGetDashboardOverview();
+
+  // The server returns the raw most-recent incidents with no relevance gate,
+  // so sports/finance/pageant noise leaks straight onto the dashboard. Apply
+  // the SAME selection used by the reports: flashpoint/protests rows go
+  // through the report-grade selectFlashpointUsable, every other topic through
+  // isTopicRelevant. Conservative by design (signal thin > noise in).
+  const { recentIncidents, latestRelevantByTopic } = useMemo(() => {
+    const all = overview?.recentIncidents ?? [];
+    if (all.length === 0) {
+      return { recentIncidents: [], latestRelevantByTopic: new Map<string, { headline: string; at: string }>() };
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const flashpointRows = all.filter((i) => i.topic === "flashpoint" || i.topic === "protests");
+    const keptFlashpointIds = new Set(
+      selectFlashpointUsable(
+        flashpointRows.map((i) => ({
+          id: i.id,
+          title: i.title,
+          topic: i.topic,
+          severity: i.severity,
+          occurredAt: i.occurredAt,
+          country: i.country,
+          summary: i.summary,
+          source: i.source,
+          sourceUrl: i.sourceUrl,
+          location: i.location ?? i.country,
+        })),
+        "flashpoint",
+        today,
+      ).enriched.map((e) => e.id),
+    );
+    // Full relevance-gated list (rows already arrive ordered newest-first).
+    const relevant = all.filter((i) =>
+      i.topic === "flashpoint" || i.topic === "protests"
+        ? keptFlashpointIds.has(i.id)
+        : isTopicRelevant(i.topic, {
+            topic: i.topic,
+            title: i.title,
+            summary: i.summary,
+            source: i.source,
+            location: i.location ?? i.country,
+          }),
+    );
+    // Latest *relevant* headline per topic — overrides the server's raw
+    // latestHeadline on the topic cards so sports/finance noise can't be the
+    // card's headline either.
+    const latest = new Map<string, { headline: string; at: string }>();
+    for (const i of relevant) {
+      if (!latest.has(i.topic)) latest.set(i.topic, { headline: i.title, at: i.occurredAt });
+    }
+    return { recentIncidents: relevant.slice(0, 8), latestRelevantByTopic: latest };
+  }, [overview?.recentIncidents]);
 
   if (isLoading) {
     return (
@@ -71,7 +125,7 @@ export default function Dashboard() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {overview.topicCards.map((topic) => (
-              <TopicCard key={topic.topic} topic={topic} />
+              <TopicCard key={topic.topic} topic={topic} latestOverride={latestRelevantByTopic.get(topic.topic)} />
             ))}
           </div>
 
@@ -81,13 +135,13 @@ export default function Dashboard() {
           </h2>
           
           <div className="bg-card border border-border rounded-sm overflow-hidden">
-            {overview.recentIncidents.length === 0 ? (
+            {recentIncidents.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground font-sans">
                 No priority incidents recorded.
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {overview.recentIncidents.map((incident) => (
+                {recentIncidents.map((incident) => (
                   <Link key={incident.id} href={`/incidents?id=${incident.id}`} className="block hover:bg-muted/30 transition-colors p-4 group">
                     <div className="flex justify-between items-start gap-4">
                       <div>
@@ -224,12 +278,16 @@ export default function Dashboard() {
   );
 }
 
-function TopicCard({ topic }: { topic: DashboardTopicCard }) {
+function TopicCard({ topic, latestOverride }: { topic: DashboardTopicCard; latestOverride?: { headline: string; at: string } }) {
   const [days, setDays] = useState(7);
   const { data: counts = [] } = useGetIncidentCountsByTopic({ days });
   const windowCount = counts.find((c) => c.topic === topic.topic)?.count ?? 0;
   const windowLabel = WINDOW_OPTIONS.find((w) => w.days === days)?.label ?? `${days}d`;
   const href = `/topics/${topic.topic.replace(/_/g, "-")}`;
+  // Prefer the relevance-gated headline (kills sports/finance slop on the card);
+  // fall back to the server's raw latest when no relevant row was fetched.
+  const latestHeadline = latestOverride?.headline ?? topic.latestHeadline;
+  const latestAt = latestOverride?.at ?? topic.latestAt;
 
   return (
     <div className="bg-card border border-border p-4 rounded-sm hover:border-accent/50 transition-colors group h-full flex flex-col relative overflow-hidden">
@@ -266,14 +324,14 @@ function TopicCard({ topic }: { topic: DashboardTopicCard }) {
         <div className="text-[9px] text-muted-foreground font-mono mt-1 text-right">showing last {windowLabel}</div>
       </div>
 
-      {topic.latestHeadline ? (
+      {latestHeadline ? (
         <Link href={href} className="mt-auto pt-2 border-t border-border/50 block">
           <p className="text-sm font-sans line-clamp-2 text-foreground/80 group-hover:text-foreground">
-            {topic.latestHeadline}
+            {latestHeadline}
           </p>
-          {topic.latestAt && (
+          {latestAt && (
             <p className="text-xs text-muted-foreground mt-1 font-mono">
-              {formatDistanceToNow(new Date(topic.latestAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(latestAt), { addSuffix: true })}
             </p>
           )}
         </Link>

@@ -194,6 +194,13 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\b(strike|strikes|struck|striking) .{0,30}(provinces?|districts?|villages?|towns?|cities|coast|region) .{0,40}(rain|thunder|lightning|storm|cyclone|typhoon|hurricane|monsoon|flood)/,
   /\brain and thunder\b/,
 
+  // Ceremonial / military parades. "Soldiers march in annual Independence
+  // parade", "troops parade", "Republic Day parade". A ceremonial march is
+  // not civil unrest. Targeted at military/ceremonial context only so that
+  // genuine "march in <city>" protests and labour marches are untouched.
+  /\b(military|army|armed forces|troops|soldiers|naval|navy|air force|veterans?|honou?r guard|guard of honou?r|cadets?|regiment|battalion|ceremonial|independence day|national day|republic day|victory day|founding|coronation) .{0,40}parade\b/,
+  /\bparade .{0,40}(soldiers|troops|military|tanks|missiles?|regiment|battalion|cadets?|veterans?|marching band)\b/,
+
   // Military / kinetic homonyms. "Drone strike", "missile strike",
   // "air strike", "airstrike", "Ukrainian strike", "Russian strike",
   // "Israeli strike", "junta strike", "military strike", "IBO",
@@ -388,13 +395,31 @@ const REQUIRED: Record<string, RegExp[]> = {
   // tier; the ambiguous tier is enforced separately in
   // `isTopicRelevant` for `protests` and `flashpoint`.
   protests: [
-    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    /\b(protest|demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    // "march" alone is a calendar month ("flat from 50.4 in March"). Only the
+    // inflected protest forms (marches/marchers/marching/marched) or an
+    // explicit protest-march phrase count; bare "march" needs a companion
+    // (handled by the FARMERS/WORKERS line below and the ambiguous tier).
+    /\bmarch(es|ers?|ing|ed)\b/,
+    /\b(protest|peace|long|million|freedom|solidarity|hunger|silent|torch(?:light)?|candle ?light) march(es)?\b/,
+    /\bmarch(es)? (on|onto|into|through|past|towards?|against)\b/,
+    /\bmarch(es)? in (?!(parade|formation|step|uniform|honou?r|memory|lockstep)\b)/,
+    /\bmarch(es)? to (?!(the )?(final|finals|semi|semis|semifinals?|quarterfinals?|title|trophy|cup|playoffs?|championships?|crown|glory|victory|knockout|top|promotion)\b)/,
     /\b(farmers|workers|union|opposition|civil society|activists) .{0,30}(protest|march|gather|demonstrate|mobilis(e|ed)|mobiliz(e|ed))/,
     /\b(police|security forces?) .{0,30}(clash|crackdown|tear gas|baton|rubber bullet|water cannon) .{0,30}(protest|demonstration|march|crowd|mob|sit[- ]?in)/,
     /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
   ],
   flashpoint: [
-    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    /\b(protest|demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    // "march" alone is a calendar month ("flat from 50.4 in March"). Only the
+    // inflected protest forms (marches/marchers/marching/marched) or an
+    // explicit protest-march phrase count; bare "march" needs a companion
+    // (handled by the FARMERS/WORKERS line below and the ambiguous tier).
+    /\bmarch(es|ers?|ing|ed)\b/,
+    /\b(protest|peace|long|million|freedom|solidarity|hunger|silent|torch(?:light)?|candle ?light) march(es)?\b/,
+    /\bmarch(es)? (on|onto|into|through|past|towards?|against)\b/,
+    /\bmarch(es)? in (?!(parade|formation|step|uniform|honou?r|memory|lockstep)\b)/,
+    /\bmarch(es)? to (?!(the )?(final|finals|semi|semis|semifinals?|quarterfinals?|title|trophy|cup|playoffs?|championships?|crown|glory|victory|knockout|top|promotion)\b)/,
     /\b(farmers|workers|union|opposition|civil society|activists) .{0,30}(protest|march|gather|demonstrate|mobilis(e|ed)|mobiliz(e|ed))/,
     /\b(police|security forces?|military) .{0,30}(clash|crackdown|tear gas|baton|rubber bullet|water cannon) .{0,30}(protest|demonstration|march|crowd|mob|sit[- ]?in)/,
     /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
