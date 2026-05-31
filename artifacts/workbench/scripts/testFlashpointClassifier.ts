@@ -15,6 +15,7 @@ interface Case {
   name: string;
   title: string;
   summary?: string;
+  source?: string;
   expect: boolean;
 }
 
@@ -96,6 +97,28 @@ const cases: Case[] = [
     title: "Opposition rally turns violent as police use tear gas",
     summary: "Riot police fired tear gas at demonstrators during an opposition rally in the capital.",
     expect: true },
+
+  // ── Client-flagged production noise (regression) ─────────────────
+  { name: "Motorsport / Taklimakan rally-raid (client-flagged)",
+    title: "Taklimakan Rally 2026: GWM TANK Dominates the Unforgiving Desert - The Manila Times",
+    source: "Google News — Philippines (Civil Unrest)",
+    expect: false },
+  { name: "Sports betting / NBA strike deal (client-flagged)",
+    title: "ArenaPlus, NBA strike sports betting deal in Philippines - Philstar.com",
+    source: "Google News — Philippines (Civil Unrest)",
+    expect: false },
+  // Feed-category poison: the source label "(Civil Unrest)" must NOT by
+  // itself satisfy the public-order tier. A space-industry "rally" with no
+  // real public-order cue in title/summary must be dropped even when it
+  // arrives on the Civil-Unrest feed.
+  { name: "Feed-category poison / space rally on Civil-Unrest feed",
+    title: "Space rally gets reality check with Blue Origin blowup - The Japan Times",
+    source: "Google News — Japan (Civil Unrest)",
+    expect: false },
+  { name: "Feed-category poison / market 'strike' on Civil-Unrest feed",
+    title: "Zelensky says Russia preparing 'new massive strike' - BSS",
+    source: "Google News — Bangladesh (Civil Unrest)",
+    expect: false },
 ];
 
 let passed = 0;
@@ -107,7 +130,7 @@ for (const c of cases) {
     topic: "flashpoint",
     title: c.title,
     summary: c.summary ?? null,
-    source: null,
+    source: c.source ?? null,
     sourceUrl: null,
     location: null,
   });

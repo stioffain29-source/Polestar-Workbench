@@ -1,0 +1,77 @@
+Do not close this.
+
+The latest Flashpoint PDF is still not acceptable.
+
+The layout and export are working, but the content engine is still failing.
+
+Specific faults visible in the PDF:
+
+1. Noise is still entering the report
+The incident tables still include irrelevant records such as:
+- Taklimakan Rally 2026
+- ArenaPlus / NBA strike sports betting deal
+
+These are not Flashpoint public-order incidents. They should never appear in the report.
+
+2. Prose is still generic
+The Executive Summary, What Matters and Polestar View still read like reusable template text. They do not give a sharp operational assessment based on the actual records.
+
+3. Cards and prose still do not fully align
+Fast Facts says Philippines is the most affected country, but the narrative and Forecast shift between Philippines, Bangladesh and Nepal without explaining why.
+
+4. Polestar View is still filler
+“Operational tempo, not headline severity” is not sufficient. It needs to state the actual operational read.
+
+Required fix across the report suite:
+
+A. Stop bad records entering reports
+Fix the relevance gate so obvious keyword collisions are excluded before report generation:
+- motorsport rally
+- sports betting strike
+- military strike
+- product/market strike
+- stock/photo/licensable picture items
+- retrospective commentary with no live operational signal
+
+B. Make Related Incidents defensible
+Do not pad the table with weak or irrelevant records.
+If there are only six valid records, show six.
+If the signal is thin, say the signal is thin.
+
+C. Make prose derive from the cleaned dataset only
+Executive Summary, What Matters, Watch Next and Polestar View must be generated from the same cleaned records used in Fast Facts and Related Incidents.
+
+D. Force consistency checks before export
+Before a report can be considered usable, check:
+- top country in cards matches the prose, or any difference is explained
+- latest incident matches the dataset
+- Related Incidents contains no rejected noise
+- Watch Next uses only genuine forward-looking operational signals
+- Polestar View is specific to this report, not generic boilerplate
+
+E. Apply this across:
+- Flashpoint
+- Cargo Watch
+- Fuel Watch
+- Fertiliser Watch
+- Shipping Watch
+- Energy Watch
+- Papua
+- Papua New Guinea
+
+Missile Strike Tracker remains a tracker/dashboard only.
+
+Proof required:
+For each fixed report, provide:
+- live production screenshot
+- PDF exported from that same screen
+- included records list
+- rejected records list with reasons
+- confirmation that no excluded records appear in Related Incidents
+- confirmation that cards, prose and tables all use the same cleaned dataset
+
+Do not come back with dev proof only.
+Do not come back with “typecheck passes”.
+Do not come back with another generic statement that the filter was improved.
+
+Show the cleaned live production report and the rejected noise list.

@@ -315,7 +315,13 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
     );
   }
   return (
-    <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
+    <div className="w-full">
+      {rows.length < 4 && (
+        <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13, marginBottom: 8 }}>
+          Signal is thin this cycle: only {rows.length} qualifying incident{rows.length === 1 ? "" : "s"} cleared the relevance and operational filters. The table is intentionally short — low-signal items are excluded rather than used to pad it.
+        </p>
+      )}
+      <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
       <div
         className="grid uppercase tracking-widest"
         style={{
@@ -350,6 +356,7 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 }

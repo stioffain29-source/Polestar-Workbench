@@ -161,6 +161,14 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/,
   /\b(wrc|world rally championship|rally championship|rally cross|rallycross|dakar rally|paris[- ]dakar)\b/,
   /\bround \d+ [-–] rally\b/,
+  // Motorsport rally-raid / cross-country events the country list above
+  // misses. "Taklimakan Rally 2026: GWM TANK Dominates the Unforgiving
+  // Desert" leaked in because the event name was not enumerated. Match
+  // named rally-raids plus rally co-occurring with motorsport-raid
+  // vocabulary (desert/dunes/co-driver/special stage/works-team marques).
+  /\b(taklimakan|silk way|gobi|kunlun|baja|china grand|rally raid|rally[- ]raid|cross[- ]country) rally\b/,
+  /\brally\b.{0,60}\b(desert|dunes|dakar|baja|cross[- ]country|rally[- ]raid|co[- ]driver|navigator|bivouac|special stage|stage win|overall (lead|win|victory|standings)|shakedown|gwm|gazoo|hilux|land cruiser|4x4|off[- ]road|unforgiving)\b/,
+  /\b(desert|dunes|dakar|baja|cross[- ]country|rally[- ]raid|co[- ]driver|bivouac|special stage|gwm tank|gazoo|hilux|unforgiving)\b.{0,60}\brally\b/,
   /\b(rays|yankees|mets|red sox|cubs|dodgers|giants|astros|orioles|phillies|braves|cardinals|marlins|blue jays|royals|tigers|twins|rangers|mariners|angels|athletics|padres|rockies|nationals|brewers|pirates|reds|guardians|white sox|d[- ]?backs|diamondbacks) (rally|rallied|rallies)/,
 
   // Finance / markets: stock, share, equity, bond, currency, FX,
@@ -237,6 +245,11 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
 
   // Business "strike a deal" — commercial agreement, not industrial action.
   /\bstrik(e|es|ing) (a |the |an |new |fresh |landmark |historic )?(deal|agreement|accord|pact|partnership|bargain|alliance|truce)\b/,
+  // Sports betting / gambling commercial stories. "ArenaPlus, NBA strike
+  // sports betting deal in Philippines" leaked because the "strike … deal"
+  // pattern above needs "deal" to follow "strike" immediately. A gambling
+  // commercial story is never industrial action regardless of word order.
+  /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
 
   // Fact-check / debunk pieces that explicitly say the footage is NOT a
   // protest, plus generic misinformation framing.
@@ -385,13 +398,100 @@ const STUDENT_NON_MOBILISATION_RE =
   /\b((attack|attacked|attacks|bomb|bombed|bombing|shooting|stabbing|shot dead|killed|raped|abducted|kidnapped|missing) .{0,40}(student|students|pupil|pupils|schoolchildren|schoolgirl|schoolboy|college|university|campus)|(student|pupil|schoolchildren|schoolgirl|schoolboy) .{0,30}(raped|killed|abducted|kidnapped|stabbed|shot dead|missing|murdered)|education (policy|reform|budget|act|bill|board exam|board examination|results)|(strike|airstrike|missile|drone) (on|hits|kills|killed|destroyed) .{0,30}(college|school|university|campus|hostel)|exam (scandal|leak|cheating|fraud|controversy|results)|admission (deadline|policy|quota))\b/;
 
 function haystack(i: RelevanceInput): string {
+  // Strip the Google News feed-category label from the source. Feed names
+  // are "Google News — <Country> (Civil Unrest)" / "(Protests)" / "(Fuel)"
+  // etc. — the parenthetical is the TOPIC the feed was queried under, not
+  // evidence the record is on-topic. Leaving it in injected the topic
+  // keyword (e.g. "civil unrest") into EVERY record's haystack, which
+  // satisfied the unambiguous public-order tier for free and defeated the
+  // ambiguous-token gate (a motorsport "rally" or market "strike" from the
+  // Civil-Unrest feed was kept purely because its source said "civil
+  // unrest"). Relevance must be judged on the record's own title/summary.
+  const cleanSource = (i.source ?? "").replace(/\([^)]*\)/g, " ");
   return [
     i.title ?? "",
     i.summary ?? "",
-    i.source ?? "",
+    cleanSource,
     (i.sourceUrl ?? "").replace(/[-_/]/g, " "),
     i.location ?? "",
   ].join(" ").toLowerCase();
+}
+
+export interface RelevanceResult {
+  relevant: boolean;
+  reason: string;
+}
+
+function firstMatch(text: string, patterns: RegExp[]): RegExp | null {
+  for (const re of patterns) if (re.test(text)) return re;
+  return null;
+}
+
+/**
+ * Decide AND explain whether a record is genuinely about the report's
+ * topic. Returns the keep/drop verdict plus a human-readable reason that
+ * names the rule (and pattern) that fired. This is the single source of
+ * truth for relevance; `isTopicRelevant` is a thin boolean wrapper. The
+ * reason string powers the pre-export consistency audit and the
+ * rejected-records list shown in the proof pack.
+ */
+export function explainRelevance(topic: string, i: RelevanceInput): RelevanceResult {
+  const text = haystack(i);
+
+  const general = firstMatch(text, EXCLUDE_PHRASES);
+  if (general) return { relevant: false, reason: `excluded: general-news noise (/${general.source}/)` };
+
+  if (topic === "shipping") {
+    const m = firstMatch(text, SHIPPING_EXCLUDE);
+    if (m) return { relevant: false, reason: `excluded: shipping off-topic (/${m.source}/)` };
+  }
+  if (topic === "fuel") {
+    const m = firstMatch(text, FUEL_EXCLUDE);
+    if (m) return { relevant: false, reason: `excluded: fuel off-topic (/${m.source}/)` };
+  }
+  if (topic === "cargo_watch") {
+    const m = firstMatch(text, CARGO_EXCLUDE);
+    if (m) return { relevant: false, reason: `excluded: cargo off-topic (/${m.source}/)` };
+  }
+
+  if (topic === "flashpoint" || topic === "protests") {
+    // 1. Hard exclusions first — sports/finance/weather/military/
+    //    entertainment/betting homonyms of "rally" / "strike" / "student".
+    const hom = firstMatch(text, FLASHPOINT_EXCLUDE);
+    if (hom) return { relevant: false, reason: `excluded: flashpoint homonym (/${hom.source}/)` };
+    // 2. Non-mobilisation student stories (school attacks, crime
+    //    stories, education policy) are never flashpoint, even if
+    //    the public-order cue regex incidentally matches.
+    if (STUDENT_NON_MOBILISATION_RE.test(text)) {
+      return { relevant: false, reason: "excluded: student non-mobilisation (attack/crime/policy, not protest)" };
+    }
+    // 3. Unambiguous-tier match: any REQUIRED.flashpoint phrase
+    //    qualifies on its own.
+    const unambiguous = REQUIRED[topic] ?? [];
+    const u = firstMatch(text, unambiguous);
+    if (u) return { relevant: true, reason: `kept: unambiguous public-order phrase (/${u.source}/)` };
+    // 4. Ambiguous-tier match: bare "rally" / "strike" needs a
+    //    public-order companion; bare "student(s)" needs a student-
+    //    mobilisation phrase.
+    if (FLASHPOINT_AMBIGUOUS_RE.test(text)) {
+      const mentionsStudent = /\bstudents?\b/.test(text);
+      if (mentionsStudent && !STUDENT_MOBILISATION_RE.test(text)) {
+        const otherAmbiguous = /\b(rally|rallies|rallied|strike|strikes|striking|struck)\b/.test(text);
+        if (!otherAmbiguous) return { relevant: false, reason: "dropped: 'student' token without mobilisation signal" };
+      }
+      if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) {
+        return { relevant: true, reason: "kept: ambiguous token (rally/strike) + public-order cue" };
+      }
+      return { relevant: false, reason: "dropped: ambiguous token (rally/strike) without public-order cue" };
+    }
+    return { relevant: false, reason: "dropped: no flashpoint public-order signal" };
+  }
+
+  const required = REQUIRED[topic];
+  if (!required || required.length === 0) return { relevant: true, reason: "kept: no relevance rule for topic (default allow)" };
+  const r = firstMatch(text, required);
+  if (r) return { relevant: true, reason: `kept: required topic phrase (/${r.source}/)` };
+  return { relevant: false, reason: "dropped: no required topic phrase matched" };
 }
 
 /**
@@ -400,62 +500,7 @@ function haystack(i: RelevanceInput): string {
  * unknown report families do not silently empty their tables.
  */
 export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
-  const text = haystack(i);
-  for (const re of EXCLUDE_PHRASES) {
-    if (re.test(text)) return false;
-  }
-  if (topic === "shipping") {
-    for (const re of SHIPPING_EXCLUDE) {
-      if (re.test(text)) return false;
-    }
-  }
-  if (topic === "fuel") {
-    for (const re of FUEL_EXCLUDE) {
-      if (re.test(text)) return false;
-    }
-  }
-  if (topic === "cargo_watch") {
-    for (const re of CARGO_EXCLUDE) {
-      if (re.test(text)) return false;
-    }
-  }
-  if (topic === "flashpoint" || topic === "protests") {
-    // 1. Hard exclusions first — sports/finance/weather/military/
-    //    entertainment homonyms of "rally" / "strike" / "student".
-    for (const re of FLASHPOINT_EXCLUDE) {
-      if (re.test(text)) return false;
-    }
-    // 2. Non-mobilisation student stories (school attacks, crime
-    //    stories, education policy) are never flashpoint, even if
-    //    the public-order cue regex incidentally matches.
-    if (STUDENT_NON_MOBILISATION_RE.test(text)) return false;
-    // 3. Unambiguous-tier match: any REQUIRED.flashpoint phrase
-    //    qualifies on its own.
-    const unambiguous = REQUIRED[topic] ?? [];
-    for (const re of unambiguous) {
-      if (re.test(text)) return true;
-    }
-    // 4. Ambiguous-tier match: bare "rally" / "strike" needs a
-    //    public-order companion; bare "student(s)" needs a student-
-    //    mobilisation phrase.
-    if (FLASHPOINT_AMBIGUOUS_RE.test(text)) {
-      const mentionsStudent = /\bstudents?\b/.test(text);
-      if (mentionsStudent && !STUDENT_MOBILISATION_RE.test(text)) {
-        // Has "student" but no mobilisation — needs another non-
-        // student ambiguous trigger plus a public-order cue.
-        const otherAmbiguous = /\b(rally|rallies|rallied|strike|strikes|striking|struck)\b/.test(text);
-        if (!otherAmbiguous) return false;
-      }
-      if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) return true;
-    }
-    return false;
-  }
-  const required = REQUIRED[topic];
-  if (!required || required.length === 0) return true;
-  for (const re of required) {
-    if (re.test(text)) return true;
-  }
-  return false;
+  return explainRelevance(topic, i).relevant;
 }
 
 /**

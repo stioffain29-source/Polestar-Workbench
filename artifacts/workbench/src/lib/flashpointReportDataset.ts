@@ -341,9 +341,33 @@ const LEGISLATIVE_PROCESS_RE = /\b(passes? (a |the )?bill|bill (to|that|which|on
 // named-league filter above. Dropped unless a live public-order hook is
 // present.
 const SPORTS_CONTEXT_RE = /\b(football|soccer|cricket|rugby|hockey|tennis|basketball|baseball|golf|striker|goalkeeper|midfielder|free[- ]kick|penalty (kick|shoot[- ]?out)|equalis(er|e)|equaliz(er|e)|hat[- ]trick|grand slam|premier league|champions league|world cup|olympic|test match|t20|odi|\d+[- ]second strike|winning goal|scored? (the|a|his|her|twice|again)|rally\s?[12]\b|wrc\b|dirtfish|autosport|motorsport|moto\s?gp|grand prix|formula\s?1\b|\bf1\b|special stage|\bss\d+\b)\b/i;
+// Diplomatic protest (a state lodging a formal complaint with an embassy /
+// high commission / envoy) is a homonym of a street protest. "Lodge / file /
+// register / issue a protest", "protest note", "note verbale", "démarche",
+// "summons the ambassador" are diplomatic acts, not public-order incidents.
+// (Real street action reads "protesters", "rally", "stage/hold a protest".)
+// NOTE (narrowed): the verb-stem branch ("lodge/file/register/raise ... a
+// protest") only fires when an explicit DIPLOMATIC OBJECT follows within the
+// same sentence window (embassy / high commission / ambassador / envoy /
+// consulate / chargé / foreign ministry / note verbale / démarche). Without
+// that object the phrase is a real street protest ("students raise a protest
+// over fees", "workers file a protest against layoffs") and must be KEPT.
+const DIPLOMATIC_PROTEST_RE = /\b(?:lodg|fil|register|registr|convey|issu|rais|submit|deliver|hand(?:ed|s)? over)\w*\s+(?:a\s+|an\s+|its\s+|strong\s+|formal\s+|official\s+|diplomatic\s+|stern\s+|firm\s+)*protests?\b(?=[^.]{0,60}\b(?:embass(?:y|ies)|high commission|ambassador|envoy|consulate|charg[eé](?:\s+d['’]affaires)?|foreign ministry|ministry of (?:external|foreign) affairs|diplomatic (?:note|channel|protest)|note verbale|d[ée]marche)\b)|\b(protest note|note verbale|d[ée]marche)\b|\bsummon(?:s|ed)?\s+(?:the\s+)?(?:[a-z]+\s+){0,2}(ambassador|envoy|high commissioner|charg[eé])\b/i;
+// Head-of-state / diplomatic-visit reporting that only mentions a protest as
+// historical background ("junta chief ... heads to India ... sparking a 2021
+// protest movement"). The travel framing plus an absent live public-order
+// hook marks it as foreign-policy commentary, not a current incident. The
+// "with an eye on <power>" geopolitical framing is bound to a preceding
+// head-of-state subject + travel verb (no standalone branch) so it cannot
+// fire on unrelated street-protest records that merely mention a great power.
+const DIPLOMATIC_VISIT_RE = /\b(president|prime minister|\bpm\b|premier|foreign minister|\bfm\b|junta chief|chancellor|monarch|crown prince|defen[cs]e minister|delegation|envoy)\b.{0,60}\b(heads? to|head to|visits?|arrives? in|to visit|pays? a\b.{0,20}\bvisit|state visit|official visit|bilateral (talks|meeting|summit))\b/i;
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (LICENSABLE_PHOTO_RE.test(text)) return true;
+  // Diplomatic protest (démarche / note verbale / lodge a protest with an
+  // embassy) and head-of-state visit framing — homonyms, not street events.
+  if (DIPLOMATIC_PROTEST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (DIPLOMATIC_VISIT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (SPORTS_LEAGUE_RE.test(text) && SPORTS_PROTEST_VERB_RE.test(text)) return true;
   // Sports keyword noise ("striker", "rally", "title march") with no live
   // public-order signal.
