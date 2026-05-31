@@ -97,6 +97,13 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       totalInserted: result.flashpoint.inserted + result.cargoWatch.inserted,
       flashpoint: trimmedSummary(result.flashpoint),
       cargoWatch: trimmedSummary(result.cargoWatch),
+      marketPrices: {
+        seriesFetched: result.marketPrices.seriesFetched,
+        seriesErrors: result.marketPrices.seriesErrors,
+        reportsConsidered: result.marketPrices.reportsConsidered,
+        reportsUpdated: result.marketPrices.reportsUpdated,
+        latest: result.marketPrices.latest,
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

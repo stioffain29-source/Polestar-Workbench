@@ -2,7 +2,9 @@ import { pool } from "@workspace/db";
 import {
   runFlashpointIngest,
   runCargoWatchIngest,
+  runMarketPricesIngest,
   type IngestSummary,
+  type MarketPriceSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 
@@ -30,6 +32,7 @@ export type IngestRunResult =
       durationMs: number;
       flashpoint: IngestSummary;
       cargoWatch: IngestSummary;
+      marketPrices: MarketPriceSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -55,6 +58,24 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // table; running them one after another mirrors scrape:prod.
     const flashpoint = await runFlashpointIngest({ commit: true });
     const cargoWatch = await runCargoWatchIngest({ commit: true });
+    // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
+    // can never fail the incident ingest — it just reports the error.
+    let marketPrices;
+    try {
+      marketPrices = await runMarketPricesIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "market price ingest failed");
+      marketPrices = {
+        topic: "fuel_prices" as const,
+        mode: "commit" as const,
+        seriesFetched: 0,
+        seriesErrors: [{ id: "all", error: err instanceof Error ? err.message : String(err) }],
+        reportsConsidered: 0,
+        reportsUpdated: 0,
+        latest: { brent: null, wti: null, jet: null, asOf: null },
+        logLines: [],
+      };
+    }
     const finishedAt = new Date();
 
     return {
@@ -64,6 +85,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       flashpoint,
       cargoWatch,
+      marketPrices,
     };
   } finally {
     if (locked) {

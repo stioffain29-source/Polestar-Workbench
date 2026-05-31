@@ -314,21 +314,18 @@ export default function ReportEditor() {
     if (!report) return;
     if (hardNumbersSeededForId.current === report.id) return;
     hardNumbersSeededForId.current = report.id;
-    const topic = report.topic ?? "fuel";
-    const isFuel = topic === "fuel";
     const hasPersisted = report.hardNumbers != null;
-    const effectiveHardNumbers = hasPersisted
-      ? report.hardNumbers
-      : (isFuel ? FUEL_MARKET_DATA_SAMPLE : null);
+    // Honesty rule: never auto-inject fabricated placeholder prices into the
+    // preview/PDF. Live prices are written into report.hardNumbers by the
+    // FRED market-price ingest (lib/ingest/marketPrices). A report with no
+    // saved data renders empty market fields rather than fake numbers; the
+    // author can still click "Load sample" to populate a template explicitly.
+    const effectiveHardNumbers = hasPersisted ? report.hardNumbers : null;
     setHardNumbersText(
       effectiveHardNumbers ? JSON.stringify(effectiveHardNumbers, null, 2) : "",
     );
     setHardNumbersError(null);
-    // For a fuel report with no saved payload, push the sample into the
-    // live editor buffer so preview and PDF see it without requiring
-    // any click. For saved reports, leave the buffer undefined so the
-    // canonical view reads from `report.hardNumbers` directly.
-    setHardNumbersEdited(isFuel && !hasPersisted ? FUEL_MARKET_DATA_SAMPLE : undefined);
+    setHardNumbersEdited(undefined);
     const seeded = buildFuelWatchReportData(
       { issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10), hardNumbers: effectiveHardNumbers },
       [],
@@ -337,7 +334,7 @@ export default function ReportEditor() {
     setFuelFormErrors([]);
     setAllowMissingExport(false);
     setExportError(null);
-    setSampleAutoSeeded(isFuel && !hasPersisted);
+    setSampleAutoSeeded(false);
   }, [report]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));

@@ -66,6 +66,8 @@ async function tick(reason: string): Promise<void> {
         reason,
         flashpointInserted: result.flashpoint.inserted,
         cargoWatchInserted: result.cargoWatch.inserted,
+        fuelReportsPriced: result.marketPrices.reportsUpdated,
+        fuelPriceAsOf: result.marketPrices.latest.asOf,
         durationMs: result.durationMs,
         flashpointLatest: result.flashpoint.latestRecord,
       },

@@ -75,6 +75,24 @@ const CARGO_EXCLUDE: RegExp[] = [
   /\bogun\b.{0,30}(nigeria|nigerian|police|state)|(nigeria|nigerian).{0,30}\bogun\b/i,
   /\b(association|federation|council|chamber|industry body)\b.{0,40}(urges?|calls? on|requests?|asks?|press(?:es)?|demands?).{0,30}(govern|justice|ministry|department|police|\bdoj\b|authorities)/,
   /\bshows what enforcement can do\b/,
+  // Non-APAC (US-jurisdiction) cargo stories syndicated in CJK languages
+  // are out of scope for the APAC Cargo Watch. Each is gated TIGHTLY on
+  // US/lobbying context so a genuine APAC record can never be hard-dropped
+  // — note a bare "米" must NEVER be excluded (it also means "rice", a real
+  // APAC cargo commodity), so we gate on 司法省 (US DOJ) instead:
+  //  - JP lobbying of the US justice ministry (司法省) to strengthen the
+  //    cargo-theft RESPONSE (対応/対策/取締 + 強化) by formal request (要請/
+  //    要望) — the CJK twin of the English "association urges government to
+  //    act" line above. Gated on the full response-strengthening-lobby frame
+  //    (not bare 司法省 + a request verb) so a genuine APAC cargo incident
+  //    that merely references the justice ministry can never be hard-dropped.
+  /司法省.{0,24}(対応|対策|取締|取り締まり).{0,8}(強化|要請|要望)|(対応|対策|取締|取り締まり).{0,8}(強化|要請|要望).{0,24}司法省/,
+  //  - KR "in LA … (stolen|seized|arrested) cargo" stories (LA서 = "in LA").
+  /la서.{0,24}(화물|도난|압수|체포)|(화물|도난|압수|체포).{0,24}la서/i,
+  // Petty school-canteen burglary mislabelled as a depot break-in
+  // (Indonesian "kantin sekolah" = school canteen). Not a logistics-node
+  // cargo crime even though a "gudang"/warehouse is mentioned.
+  /kantin sekolah/i,
 ];
 
 // Fuel-specific exclusions. Pure market speculation, equity/finance news

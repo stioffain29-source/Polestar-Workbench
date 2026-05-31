@@ -9,3 +9,4 @@
 - [Incident severity classification](incident-severity-classification.md) — severity rated from text via shared classifySeverity (extreme reserved); a lib-level backfill re-rates historical auto-scraped rows because scraper dedupe never re-touches them.
 - [Incident geocoding](incident-geocoding.md) — incidents geocoded from curated lookup table (city→country centroid), not an API; centroid keys must match classifier country aliases or markers silently drop; jitter at render not in DB.
 - [Option A static-report window](option-a-static-window.md) — static/import-only reports dated to their data window; clamp issue date at seed AND manual edit; killing a rolling window means purging all "30-day" prose/labels; banner reads spaced in pdftotext.
+- [Live fuel prices (FRED)](live-fuel-prices.md) — fuel Brent/WTI/jet are a live FRED ingest into hardNumbers, NOT the old hardcoded sample; rides runIngestOnce; cold-start freshness gated on incident sources.
