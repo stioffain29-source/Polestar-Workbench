@@ -240,8 +240,17 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\bplayers rally\b/,
   /\brally behind .{0,30}(player|team|club|coach|captain|striker|side|squad)/,
   /\b(sepak )?takraw\b|\b(kabaddi|badminton|volleyball|netball|handball|futsal|sepaktakraw)\b/,
+  /\b(awarded|wins?|won|clinch(es|ed)?|bags?|title|trophy|medal|gold|silver|bronze|championship)\b.{0,40}\b(referee|umpire|umpiring)\b/,
   /\b(protest|protests|protested|protesting) .{0,20}(referee|umpire|umpiring|the call|the decision|the result|the score|penalty|red card|offside|\bvar\b|disqualif)/,
   /\breferee.?s? (call|decision|ruling)\b/,
+
+  // Photo galleries / photo-essay sections. A "| Photos |" or "(Photos)"
+  // section marker (GMA, Inquirer, Rappler galleries) is a picture set, not
+  // an incident report, and recurs as a near-duplicate of the real article
+  // ("Protest held vs tree cutting in Manila | Photos | GMA News Online").
+  /\|\s*photos?\s*\|/,
+  /\(\s*photos?\s*\)/,
+  /\b(in|look)\s+photos:\s/,
 
   // Business "strike a deal" — commercial agreement, not industrial action.
   /\bstrik(e|es|ing) (a |the |an |new |fresh |landmark |historic )?(deal|agreement|accord|pact|partnership|bargain|alliance|truce)\b/,
@@ -264,6 +273,30 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   // civil unrest.
   /\b(bird flu|avian (influenza|flu)|h5n1|swine flu|dengue|malaria|cholera|measles|nipah|covid|coronavirus) (outbreak|case|cases|confirmed|detected|spread|death|deaths)\b/,
   /\b(disease|virus|flu) outbreak\b/,
+];
+
+// Homonyms that can NEVER be part of a genuine civil-unrest headline even
+// when the headline literally contains the word "protest" — sports-result
+// vocabulary, photo galleries, betting commerce, and fact-check debunks.
+// This subset is the ONLY exclude list applied to the TITLE *before* the
+// title-rescue, so it drops the takraw/referee + photo-gallery leaks
+// without endangering genuine protests whose headline shares an *ambiguous*
+// token (anti-war "protest against air strike", "protest after cyclone
+// strikes", "protesters extend rally") — those ambiguous classes stay in
+// FLASHPOINT_EXCLUDE, which runs only AFTER the rescue, so the rescue still
+// protects them.
+const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
+  /\brally (past|to (beat|defeat|win|tie|overcome)|caps|seals|secures|stuns|sinks|past the|from \d+)/,
+  /\b(wins?|won|beats?|beat|stuns?|stunned|tops|topped|edges?|edged) .{0,40}(after|with|on) .{0,20}rally\b/,
+  /\b(sepak )?takraw\b|\b(kabaddi|badminton|volleyball|netball|handball|futsal|sepaktakraw)\b/,
+  /\b(awarded|wins?|won|clinch(es|ed)?|bags?|title|trophy|medal|gold|silver|bronze|championship)\b.{0,40}\b(referee|umpire|umpiring)\b/,
+  /\b(protest|protests|protested|protesting) .{0,20}(referee|umpire|umpiring|the call|the decision|the result|the score|penalty|red card|offside|\bvar\b|disqualif)/,
+  /\breferee.?s? (call|decision|ruling)\b/,
+  /\|\s*photos?\s*\|/,
+  /\(\s*photos?\s*\)/,
+  /\b(in|look)\s+photos:\s/,
+  /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
+  /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
 ];
 
 const SHIPPING_EXCLUDE: RegExp[] = [
@@ -489,6 +522,19 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     //    ("rally" / "march" / bare "strike"), so noise headlines never
     //    qualify; pure-kinetic or court-only items are still stripped by
     //    the dataset layer downstream.
+    // 0a. A hard homonym IN THE HEADLINE always wins: a sports / finance /
+    //     betting / photo-gallery headline is noise even when it contains the
+    //     word "protest" ("Malaysia awarded takraw title after Thailand
+    //     protest referee's call", "Protest held vs tree cutting | Photos |").
+    //     This MUST run before the title-rescue, otherwise the bare word
+    //     "protest" in the title rescues the record before the homonym can
+    //     drop it. Use only the UNAMBIGUOUS-noise subset (sports/photo/
+    //     betting/fact-check) so a real protest headline that shares an
+    //     ambiguous token (air strike / cyclone strike / extend rally) is
+    //     still rescued below; those ambiguous classes stay in the full
+    //     FLASHPOINT_EXCLUDE which runs only AFTER the rescue.
+    const titleHom = firstMatch(titleHaystack(i), FLASHPOINT_TITLE_HARD_EXCLUDE);
+    if (titleHom) return { relevant: false, reason: `excluded: flashpoint homonym in headline (/${titleHom.source}/)` };
     if (FLASHPOINT_TITLE_RESCUE_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The
       // absolute general-news exclude already ran above, so keep it here —
