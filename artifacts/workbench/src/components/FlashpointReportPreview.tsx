@@ -7,6 +7,7 @@ import { computeDataAsOf } from "@/lib/reportDataStatus";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildFlashpointReportDataset,
+  isGenericFlashpointProse,
   type FlashpointReportIncident,
   type KpiCard,
   type BarRow,
@@ -54,13 +55,17 @@ function sevKey(s: string | null | undefined): string {
 }
 
 // Match exportFlashpointReportPdf.pickProse: editor text wins only when
-// it carries substance (>= 240 chars); thin stubs (one-line generic
-// fallback prose left over from an older report draft) get replaced by
-// the dataset's substantive auto-prose so preview and PDF agree.
+// it carries substance (>= 240 chars) AND is not a recognised generic
+// seed. Canned template prose (from the legacy draftReportProse packs,
+// e.g. "Operational tempo, not headline severity") is always replaced
+// by the dataset's data-driven auto-prose — even when it is long enough
+// to clear the substance bar — so already-saved reports stop showing
+// the boilerplate without a reseed. Genuine short analyst notes are
+// preserved (appended ahead of the auto-prose).
 function pickProse(editor: string | null | undefined, auto: string): string {
   const t = (editor ?? "").trim();
+  if (!t || isGenericFlashpointProse(t)) return auto;
   if (t.length >= 240) return t;
-  if (t.length === 0) return auto;
   return `${t}\n\n${auto}`;
 }
 
@@ -378,8 +383,11 @@ export default function FlashpointReportPreview({
     [incidents, topic, issueDate],
   );
 
-  const execText = (report.executiveSummary ?? "").trim() ||
-    `This briefing covers the activism, protest and civil-unrest picture across ${ds.reportingPeriodShort}. The detailed operational read, country breakdown, forecast and analyst sections follow below.`;
+  // Mirror the PDF: the Executive Summary renders the data-driven
+  // ds.autoExecutiveSummary unless the analyst has written a genuine
+  // (non-generic) override. Previously the preview used a thin one-liner
+  // fallback that never matched the PDF — a preview==PDF violation.
+  const execText = pickProse(report.executiveSummary, ds.autoExecutiveSummary);
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>

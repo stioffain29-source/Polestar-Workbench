@@ -15,6 +15,7 @@ import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import {
   buildFlashpointReportDataset,
+  isGenericFlashpointProse,
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
@@ -417,9 +418,21 @@ export async function exportFlashpointReportPdf(
 
   const ds = buildFlashpointReportDataset(incidents, data.topic, data.issueDate);
 
+  // Shared prose selector: generic seed prose is replaced by the
+  // data-driven auto prose even when it clears the substance bar (see
+  // isGenericFlashpointProse); genuine short analyst notes (<240) are
+  // preserved and appended ahead of the auto-prose. Defined once here so
+  // EVERY section — including Executive Summary — uses identical logic to
+  // FlashpointReportPreview.tsx, keeping preview and PDF in lockstep.
+  const pickProse = (editor: string | null | undefined, auto: string): string => {
+    const t = (editor ?? "").trim();
+    if (!t || isGenericFlashpointProse(t)) return auto;
+    if (t.length >= 240) return t;
+    return `${t}\n\n${auto}`;
+  };
+
   drawSectionHeading(ctx, "Executive Summary");
-  const execText = (data.executiveSummary ?? "").trim();
-  renderProse(ctx, execText || ds.autoExecutiveSummary);
+  renderProse(ctx, pickProse(data.executiveSummary, ds.autoExecutiveSummary));
 
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);
@@ -463,14 +476,8 @@ export async function exportFlashpointReportPdf(
     },
   );
 
-  // Editor-authored analyst sections. Editor text wins only when it
-  // carries substance; thin stubs get the auto-prose appended.
-  const pickProse = (editor: string | null | undefined, auto: string): string => {
-    const t = (editor ?? "").trim();
-    if (t.length >= 240) return t;
-    if (t.length === 0) return auto;
-    return `${t}\n\n${auto}`;
-  };
+  // Editor-authored analyst sections, using the shared pickProse defined
+  // above so every section follows identical preview/PDF selection logic.
   drawSectionWithProse(ctx, "What Matters", pickProse(data.whatMatters, ds.autoWhatMatters));
   drawBulletSection(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));
   drawBulletSection(ctx, "Watch Next", pickProse(data.watchNext, ds.autoWatchNext), 8);

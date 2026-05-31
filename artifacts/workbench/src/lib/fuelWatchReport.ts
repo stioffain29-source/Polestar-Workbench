@@ -265,8 +265,16 @@ export function buildFuelWatchReportData(
   if (hasJetFuel && !hasJetFuelTrajectory) {
     warnings.push("Jet fuel trajectory needs at least two dated points to render the chart.");
   }
-  if (!hasSupplyOrPolicy) {
-    warnings.push("No supply, policy or route indicators supplied.");
+  // Only flag missing supply/policy/route indicators when the incident
+  // layer is ALSO empty. When related fuel incidents are present the
+  // narrative (Market Read / operational read) already covers supply,
+  // policy and route pressure, so a bare "none supplied" note read as a
+  // contradiction of the body. Reworded to point at the Fast Facts grid
+  // and incident layer specifically rather than asserting an absence.
+  if (!hasSupplyOrPolicy && !hasRelatedIncidents) {
+    warnings.push(
+      "No supply, policy or route indicators in the Fast Facts grid or the incident layer this cycle.",
+    );
   }
   if (!hasRelatedIncidents) {
     warnings.push("No related fuel incidents in the reporting window.");

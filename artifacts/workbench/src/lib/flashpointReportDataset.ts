@@ -149,6 +149,46 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
   return { key, label: key ? (SEV_LABEL[key] ?? key) : "—" };
 }
 
+// The single highest-severity incident in a set (ties resolved by first
+// seen). Used to separate the SEVERITY lead (escalation ceiling) from
+// the VOLUME lead (record count) so the prose can reconcile the two
+// instead of letting the country chart and forecast table contradict.
+function topSeverityIncident(rows: EnrichedIncident[]): EnrichedIncident | null {
+  let best: EnrichedIncident | null = null;
+  let rank = 0;
+  for (const r of rows) {
+    const v = SEV_RANK[sevKey(r.severity)] ?? 0;
+    if (v > rank) { rank = v; best = r; }
+  }
+  return best;
+}
+
+// Signature phrases lifted from the legacy generic prose templates
+// (draftReportProse.ts FLASHPOINT / PROTESTS packs). Saved report prose
+// that still matches one of these is canned seed text, never an analyst
+// edit, so the renderer (preview + PDF) replaces it with the
+// data-driven auto-prose instead of showing or prepending the filler.
+// This is what lets cleaned-up reports stop displaying stale boilerplate
+// ("Operational tempo, not headline severity") without a manual reseed.
+const GENERIC_FLASHPOINT_PROSE: string[] = [
+  "operational-tempo issue rather than a single headline event",
+  "what the incident layer adds is speed",
+  "operational tempo, not headline severity",
+  "the story this cycle is operational tempo rather than headline severity",
+  "speed is the issue: these events move from notice to road closure",
+  "these events move quickly from notice to disruption",
+  "hold journey management at short notice",
+  "review staff movement plans, journey management for affected cities",
+  "track planned political dates, calls to mobilise",
+  "track planned protest dates, university and union calls",
+];
+
+export function isGenericFlashpointProse(text: string | null | undefined): boolean {
+  const t = (text ?? "").toLowerCase();
+  if (!t) return false;
+  return GENERIC_FLASHPOINT_PROSE.some((sig) => t.includes(sig));
+}
+
 // --- Scope filter ----------------------------------------------------------
 // Flashpoint = activism, public order, civil unrest. Kinetic armed-conflict
 // / militant kinetic reporting (drone strikes, missile strikes, ambushes,
@@ -749,6 +789,8 @@ export function buildFlashpointReportDataset(
     unrestRows,
     countryRows,
     hasFutureTable: forecastFuture.length > 0,
+    forecastLeadCountry: forecastFuture[0]?.country ?? null,
+    forecastLeadSignal: forecastFuture[0]?.signal ?? null,
   });
   const regionalCountryRead = buildRegionalCountryRead({
     enriched,
@@ -932,8 +974,12 @@ function buildForecastRead(opts: {
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
   hasFutureTable: boolean;
+  forecastLeadCountry?: string | null;
+  forecastLeadSignal?: string | null;
 }): string {
   const { activismRows, unrestRows, countryRows, hasFutureTable } = opts;
+  const forecastLeadCountry = (opts.forecastLeadCountry ?? "").trim();
+  const forecastLeadSignal = (opts.forecastLeadSignal ?? "").trim();
   const lead = countryRows[0];
   const total = activismRows.length + unrestRows.length;
   // The structured forward-looking table is rendered above this prose
@@ -949,9 +995,46 @@ function buildForecastRead(opts: {
     lines.push(`Forecast for the next 7-14 days is for a continued thin reporting cycle, with limited fresh activism or civil-unrest reporting expected on current signals. The risk increases if a policy trigger lands (court ruling, fuel-price decision, election-calendar event) or a named opposition movement publishes a fresh protest schedule. The risk eases if political calendars stay quiet and sectoral chambers remain unmobilised.`);
     return lines.join("\n\n");
   }
-  if (lead) {
+  const allRows = [...activismRows, ...unrestRows];
+  const sevInc = topSeverityIncident(allRows);
+  const sevHs = highestSeverity(allRows);
+  const sevCountry = (sevInc?.country ?? "").trim();
+  // A severity lead is only worth calling out when it is genuinely
+  // elevated (Moderate or higher). A "highest" that is still Low is not
+  // an escalation and must not be dressed up as one.
+  const sevOutranksLead =
+    !!lead && !!sevInc && !!sevCountry && sevCountry !== lead.label &&
+    (SEV_RANK[sevKey(sevInc.severity)] ?? 0) >= 3;
+  // The forward-looking TABLE is ranked by confirmed future-dated
+  // signals, so its lead country can differ from the volume chart's
+  // leader. That divergence is exactly what reads as a contradiction to
+  // a client ("why does the forecast highlight X when the chart leads
+  // with Y?"), so reconcile it explicitly whenever it occurs.
+  const tableLeadDiffers =
+    !!lead && !!forecastLeadCountry && forecastLeadCountry !== lead.label;
+  if (lead && sevOutranksLead) {
+    // Volume lead and an elevated severity lead are different countries.
+    // Only tie the severity lead to the forward-looking table when the
+    // table actually exists AND its lead row is that same country;
+    // otherwise the table claim would be false.
+    const sevLeadsTable =
+      hasFutureTable && !!forecastLeadCountry && forecastLeadCountry === sevCountry;
+    const tableClause = sevLeadsTable
+      ? `, which is why it leads the forward-looking table even though it is not the busiest country`
+      : ``;
     lines.push(
-      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file. Adjacent cities and university campuses are possible secondary flashpoints.`,
+      `Two distinct leads sit in this file and they must be read together. On volume, ${lead.label} carries the heaviest concentration (${lead.value} of ${total} record${total === 1 ? "" : "s"}) and is the most likely source of recurring, lower-intensity disruption. On severity, the sharper signal is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — a smaller count but a higher escalation ceiling${tableClause}. A higher record count is not the same as a higher ceiling: plan for breadth of disruption across ${lead.label} and for escalation depth in ${sevCountry}.`,
+    );
+  } else if (lead && tableLeadDiffers) {
+    // Volume leader and forecast-table leader differ, but on count not
+    // severity. Explain the table is a scheduling signal, not a ranking.
+    const sig = forecastLeadSignal ? ` (${forecastLeadSignal})` : "";
+    lines.push(
+      `Read the forward-looking table and the country chart together. ${lead.label} carries the heaviest concentration on the file this cycle (${lead.value} of ${total} record${total === 1 ? "" : "s"}) and remains the most likely source of recurring disruption. The forecast table leads with ${forecastLeadCountry}${sig} only because it holds the clearest confirmed future-dated item — a scheduling signal for the next 7-14 days, not an indication that ${forecastLeadCountry} outranks ${lead.label} on volume or severity. Plan for sustained, broad-based disruption in ${lead.label} and treat the ${forecastLeadCountry} entry as a dated calendar item to action on the day.`,
+    );
+  } else if (lead) {
+    lines.push(
+      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file (${lead.value} of ${total} record${total === 1 ? "" : "s"}). Adjacent cities and university campuses are possible secondary flashpoints.`,
     );
   } else {
     lines.push(
@@ -1281,21 +1364,48 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
     future.push(r);
     if (future.length >= 6) break;
   }
-  if (future.length > 0) {
-    return future.map((r) => {
-      const where = r.country ? `${r.country} — ` : "";
-      return `- ${where}${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`;
-    }).join("\n");
+  // Watch Next leads with any confirmed future-dated signals, then ALWAYS
+  // tops up with cycle-specific and standing operational triggers so the
+  // section is never a single thin line when only one future item exists
+  // (the previous behaviour, which the client flagged as weak).
+  const lead = ctx.countryRows[0];
+  const sevInc = topSeverityIncident(all);
+  const sevCountry = (sevInc?.country ?? "").trim();
+  const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
+
+  const bullets: string[] = [];
+  for (const r of future) {
+    const where = r.country ? `${r.country} — ` : "";
+    bullets.push(`${where}${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`);
   }
-  const bullets: string[] = [
-    `Opposition or movement protest calls naming a date: road closures and venue-access friction.`,
-    `Union or chamber strike notices: supply-chain friction 24-72 hours ahead.`,
-    `Section 144 / curfew orders or assembly bans: trigger WFH and close public-facing sites.`,
-    `Court hearings or detention rulings on political figures: prep same-day customer-comms.`,
-    `Arrests, injuries or fatalities in a protest context: expect retaliatory mobilisation inside 48 hours.`,
-    `Student-union or campus mobilisation calls: leading indicator of a sustained cycle.`,
-  ];
-  return bullets.map((b) => `- ${b}`).join("\n");
+  if (lead) {
+    bullets.push(
+      `${lead.label} — the next dated opposition, sectoral or court call. As the heaviest-concentration geography this cycle (${lead.value} record${lead.value === 1 ? "" : "s"}), a fresh trigger here converts fastest into road closures and venue-access friction.`,
+    );
+  }
+  if (sevInc && sevCountry && sevElevated && (!lead || sevCountry !== lead.label)) {
+    bullets.push(
+      `${sevCountry} — follow-through after ${shortSignalLabel(sevInc)}, the sharpest incident on file: watch for retaliatory mobilisation, further arrests or injuries inside 48 hours.`,
+    );
+  }
+  bullets.push(
+    `Union or chamber strike notices: supply-chain friction 24-72 hours ahead of any visible street activity.`,
+    `Section 144 / curfew orders or assembly bans in a city of operation: trigger WFH and close public-facing sites the same day.`,
+    `Court hearings or detention rulings on political figures: an adverse decision converts into same-day rallies near the court complex.`,
+    `Student-union or campus mobilisation calls: a leading indicator that the cycle is firming into a sustained rather than one-off run.`,
+  );
+  // De-dupe on the leading clause so a future signal and a standing
+  // bullet about the same theme do not both appear.
+  const out: string[] = [];
+  const seenLine = new Set<string>();
+  for (const b of bullets) {
+    const k = b.slice(0, 40).toLowerCase();
+    if (seenLine.has(k)) continue;
+    seenLine.add(k);
+    out.push(b);
+    if (out.length >= 6) break;
+  }
+  return out.map((b) => `- ${b}`).join("\n");
 }
 
 // Detect a city / location cue in the text so forecast labels can
@@ -1527,11 +1637,31 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
       : `Severity grading is thin this cycle; read the picture from the issue mix rather than a top-line severity number.`;
   void hs;
 
-  const closing = hasEnforcement
-    ? `The operational read for the next 7-14 days is to plan for further short-notice disruption around named flashpoints rather than a return to quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
-    : `The operational read for the next 7-14 days is that the runway from announced mobilisation to street-level disruption stays short — historically 24-72 hours once a policy trigger lands. Detailed activism, civil-unrest, forecast and country sections follow.`;
+  // Sharp operational opener: lead with the judgement, then name the
+  // volume lead and the severity lead explicitly (and reconcile them
+  // when they diverge) so the summary reads as a decision, not a recap.
+  const allRows = [...ctx.activismRows, ...ctx.unrestRows];
+  const sevInc = topSeverityIncident(allRows);
+  const sevCountry = (sevInc?.country ?? "").trim();
+  const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
+  const volClause = lead
+    ? `${lead.label} carries the most records (${lead.value} of ${total})`
+    : `no single country dominates the ${total}-record file`;
+  // Only name a separate severity lead when it is genuinely elevated
+  // (Moderate+) and in a different country; otherwise just report the
+  // ceiling. A "highest" that is still Low is not an escalation.
+  const sevClause = sevInc && sevCountry && lead && sevCountry !== lead.label && sevElevated
+    ? `, while the sharpest single escalation sits in ${sevCountry} — ${shortSignalLabel(sevInc)}, rated ${hs.label}`
+    : hs.key
+      ? `, with severity topping out at ${hs.label} on the activism and public-order band`
+      : ``;
+  const opener = `The operational read this cycle is to plan for short-notice protest disruption, not a return to quiet: ${volClause}${sevClause}. ${driverLine}`;
 
-  return `This briefing covers the activism, protest and civil-unrest picture across APAC for ${windowLabel}. ${driverLine} ${geoLine}\n\n${severityLine}\n\n${closing}`;
+  const closing = hasEnforcement
+    ? `Bottom line for the next 7-14 days: plan for further short-notice disruption around named flashpoints rather than a return to quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
+    : `Bottom line for the next 7-14 days: the runway from announced mobilisation to street-level disruption stays short — historically 24-72 hours once a policy trigger lands. Detailed activism, civil-unrest, forecast and country sections follow.`;
+
+  return `${opener}\n\n${geoLine} ${severityLine}\n\n${closing}`;
 }
 
 export const FLASHPOINT_SEV_LABEL = SEV_LABEL;
