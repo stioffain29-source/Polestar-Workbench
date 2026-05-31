@@ -1,4 +1,4 @@
-import { format, parseISO, max as dateMax, subDays } from "date-fns";
+import { format, parseISO, max as dateMax } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import {
@@ -63,18 +63,18 @@ export interface BarRow { label: string; value: number; color?: string }
 export interface ShippingReportDataset {
   reportingPeriodShort: string;
   reportingPeriodLong: string;
-  /** Short label for the rolling 30-day window used by Chokepoint / Vessel / Piracy. */
+  /** Short date-range label for the report window (Chokepoint / Vessel / Piracy). */
   thirtyDayShortLabel: string;
   enriched: EnrichedIncident[];
   outOfScopeCount: number;
   fastFacts: KpiCard[];
   /** Count of records in the weekly window whose incident location could not be identified. */
   locationNotIdentifiedCount: number;
-  /** Chokepoint Watch over the last 30 days (not the weekly window). */
+  /** Chokepoint Watch over the report window. */
   chokepointRows: ChokepointRow[];
-  /** Vessel attacks over the last 30 days. */
+  /** Vessel attacks over the report window. */
   vesselRows: VesselRow[];
-  /** Piracy / armed robbery over the last 30 days. */
+  /** Piracy / armed robbery over the report window. */
   piracyRows: PiracyRow[];
   regionRows: BarRow[];
   countryRows: BarRow[];
@@ -324,14 +324,13 @@ export function buildShippingReportDataset(
   const enriched = enrichedAll.filter((r) => r.region !== "Out of scope");
   const outOfScopeCount = enrichedAll.length - enriched.length;
 
-  // Rolling 30-day window for Chokepoint Watch, Vessel Attacks and
-  // Piracy / Armed Robbery. These sections look back further than the
-  // weekly briefing window so the reader has a fuller picture of
-  // hostile maritime activity even on quiet weeks.
-  let endDate: Date;
-  try { endDate = parseISO(issueDate); } catch { endDate = new Date(); }
-  if (isNaN(endDate.getTime())) endDate = new Date();
-  const start30 = subDays(endDate, 29);
+  // Chokepoint Watch, Vessel Attacks and Piracy / Armed Robbery are bounded to
+  // the SAME report window as every other section. They previously used a
+  // rolling 30-day look-back, which surfaced pre-window incidents beneath a
+  // current-dated cover. Option A: a report describes one window only, so the
+  // reader never sees stale records presented as part of the current cycle.
+  const endDate = win.end;
+  const start30 = win.start;
   const start30Ms = start30.getTime();
   const end30Ms = endDate.getTime();
   const raw30 = incidents.filter((i) => {
@@ -347,7 +346,7 @@ export function buildShippingReportDataset(
   const enriched30 = sortByDateDesc(enrich(windowed30)).filter((r) => r.region !== "Out of scope");
   const thirtyDayShortLabel = `${format(start30, "d MMM")} - ${format(endDate, "d MMM yyyy")}`;
 
-  // Chokepoint counts — derived from the 30-day window so the headline
+  // Chokepoint counts — derived from the report window so the headline
   // "Main Affected Chokepoint" matches the Chokepoint Watch table below.
   const cpCounts = new Map<ChokepointKey, number>();
   for (const r of enriched30) for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
@@ -363,8 +362,8 @@ export function buildShippingReportDataset(
     if (v > topRegionN) { topRegionN = v; topRegion = k; }
   }
 
-  // Vessel / piracy — 30-day window so the dedicated sections show a
-  // meaningful operational picture even on a quiet weekly cycle.
+  // Vessel / piracy — bounded to the report window so the dedicated
+  // sections describe the same cycle as every other section.
   //
   // Two passes:
   //   1. Syndicated dupes (same headline picked up by five wires on the
@@ -414,24 +413,6 @@ export function buildShippingReportDataset(
   const PIRACY_TABLE_CAP = 12;
   const piracyRows: PiracyRow[] = dedupeByTitle(piracyAll).slice(0, PIRACY_TABLE_CAP);
 
-  // Weekly-window vessel/piracy counts. Same credibility / dedupe rules
-  // as the 30-day pipeline so the prose cannot quote a weekly figure
-  // that includes records the table has filtered out.
-  const vesselRowsWeekly = dedupeByEventKey(
-    dedupeByTitle(
-      enriched
-        .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
-        .filter((r): r is VesselRow => r.vesselType !== null)
-        .filter((r) => !isLowCredibilitySource(r)),
-    ),
-  );
-  const vAttackSeizeWeekly = vesselRowsWeekly
-    .filter((r) => r.vesselType === "Attack" || r.vesselType === "Seized").length;
-  const piracyRowsWeekly = enriched
-    .filter((r) => !isLowCredibilitySource(r))
-    .map((r) => ({ ...r, act: classifyPiracy(r) }))
-    .filter((r): r is PiracyRow => r.act !== null);
-
   const hsAll = highestSeverity(enriched);
   const latestDate = enriched.length > 0 ? dateMax(enriched.map((r) => r.date)) : null;
   // Latest Significant Incident must skip repatriation / crew-return /
@@ -453,15 +434,15 @@ export function buildShippingReportDataset(
     { label: "Records In Window", value: String(enriched.length) },
     { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
     {
-      label: "Main Affected Chokepoint (30d)",
+      label: "Main Affected Chokepoint",
       value: topCp || "—",
       note: topCpN > 0
         ? `${topCpN} record${topCpN === 1 ? "" : "s"}`
-        : (topRegion ? `Fallback to region: ${topRegion} (${topRegionN})` : "No chokepoint mention in last 30 days"),
+        : (topRegion ? `Fallback to region: ${topRegion} (${topRegionN})` : "No chokepoint mention in window"),
     },
-    { label: "Vessel Attacks / Seizures (30d)", value: String(vAttackSeize) },
+    { label: "Vessel Attacks / Seizures", value: String(vAttackSeize) },
     {
-      label: "Piracy / Armed Robbery (30d)",
+      label: "Piracy / Armed Robbery",
       value: String(piracyRows.length),
       note: `Latest record in window: ${latestDate ? format(latestDate, "dd MMM yyyy") : "—"}`,
     },
@@ -473,7 +454,7 @@ export function buildShippingReportDataset(
     },
   ];
 
-  // Chokepoint Watch rows — 30-day window.
+  // Chokepoint Watch rows — report window.
   // The lead "operational read" must come from a credible maritime / security /
   // industry / news source. Social-media-style records (e.g. titles starting
   // with "@" or sources matching twitter/x.com/instagram/etc.) may still sit
@@ -494,11 +475,11 @@ export function buildShippingReportDataset(
     const credibleLatest = credibleSorted[0] ?? null;
     let readText: string;
     if (credible.length === 0) {
-      readText = "Quiet over the last 30 days; no qualifying activity on file.";
+      readText = "Quiet across the reporting window; no qualifying activity on file.";
     } else if (credible.length === 1) {
-      readText = `Activity here was anchored by a single entry, "${credibleLatest!.title}", over the last 30 days.`;
+      readText = `Activity here was anchored by a single entry, "${credibleLatest!.title}", in the reporting window.`;
     } else {
-      readText = `Reporting was led by "${credibleLatest!.title}", with ${credible.length} qualifying records over the last 30 days.`;
+      readText = `Reporting was led by "${credibleLatest!.title}", with ${credible.length} qualifying records in the reporting window.`;
     }
     return {
       name: cp,
@@ -553,10 +534,7 @@ export function buildShippingReportDataset(
     vesselTableShown: vesselRows.length,
     vesselRows30: vesselRows,
     piracyRows30: piracyRows,
-    vesselRowsWeekly,
-    piracyRowsWeekly,
     vAttackSeize30: vAttackSeize,
-    vAttackSeizeWeekly,
     thirtyDayLabel: thirtyDayShortLabel,
   });
 
@@ -703,7 +681,7 @@ function buildShippingWhatMatters(ctx: ShippingAutoCtx): string {
   }
   if (ctx.vesselHostile.length > 0 || ctx.piracyRows.length > 0) {
     lines.push(
-      `Hostile activity against vessels still anchors the risk picture, with ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} on file over the trailing 30 days (${ctx.thirtyDayLabel}). Any operator running through the affected lanes should be reviewing crew-change locations, war-risk and P&I premium exposure, and the threshold at which their advisory partners would recommend re-routing.`,
+      `Hostile activity against vessels still anchors the risk picture, with ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} on file across the reporting window (${ctx.thirtyDayLabel}). Any operator running through the affected lanes should be reviewing crew-change locations, war-risk and P&I premium exposure, and the threshold at which their advisory partners would recommend re-routing.`,
     );
   } else {
     lines.push(
@@ -778,8 +756,7 @@ function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
 
 // Polestar View: a concise two-paragraph judgement, not a five-bullet
 // recap. Paragraph 1 names the dominant pressure point (typically
-// Hormuz on the trailing 30 days) and contrasts the thin weekly
-// vessel-side cadence with the still-live 30-day vessel threat
+// Hormuz) across the reporting window and frames the vessel threat
 // picture. Paragraph 2 frames the cycle as a routing / insurance /
 // advisory-monitoring problem — not a broad maritime shutdown — and
 // names the practical business levers (war-risk, P&I, crew change,
@@ -790,11 +767,11 @@ function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const pressurePoint = cp ? cp.name : "Hormuz and the Red Sea corridor";
 
   const para1Pressure = cp
-    ? `${pressurePoint} remains the dominant shipping pressure point on the trailing 30-day file (${cp.count} qualifying record${cp.count === 1 ? "" : "s"}), and that is where the structural risk continues to sit regardless of any individual week's cadence.`
-    : `${pressurePoint} remains the dominant shipping pressure point on the trailing 30-day file, and that is where the structural risk continues to sit regardless of any individual week's cadence.`;
+    ? `${pressurePoint} remains the dominant shipping pressure point across the reporting window (${cp.count} qualifying record${cp.count === 1 ? "" : "s"}), and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`
+    : `${pressurePoint} remains the dominant shipping pressure point across the reporting window, and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`;
   const para1Vessel = vesselThreat30 > 0
-    ? ` Fresh weekly vessel-side activity is limited, but the trailing 30-day vessel threat picture — ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} — still matters. A quiet week against a heavier month is the normal pattern in this geography, not a benign trend.`
-    : ` Fresh weekly vessel-side activity is limited, but the trailing 30-day vessel threat picture still matters: the same lanes have not been clean for long, so a thin week should be read as cycle noise rather than a sustained easing.`;
+    ? ` The vessel threat picture across the window — ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} — still matters. A quiet cycle in this geography is the normal pattern, not a benign trend, so it should be read as a reporting gap rather than a sustained easing.`
+    : ` Vessel-side activity is limited this cycle, but the threat picture still matters: the same lanes have not been clean for long, so a thin window should be read as cycle noise rather than a sustained easing.`;
   const para1 = `${para1Pressure}${para1Vessel}`;
 
   const para2 = `Operators should treat the current cycle as a routing, insurance and advisory-monitoring problem rather than a broad maritime shutdown. The practical business levers sit with war-risk and P&I premium reviews, crew-change locations on voyages transiting ${pressurePoint}, and the port-call sequencing decisions that follow from fresh advisories — not with any expectation of a regional standstill.`;
@@ -826,19 +803,19 @@ function buildChokepointRouteRead(opts: {
 }): string {
   const { cpRanked, transitRecords, weeklyEnriched, thirtyDayLabel } = opts;
   if (cpRanked.length === 0 && transitRecords.length === 0) {
-    return `No qualifying chokepoint or route-disruption records reached the file over the last 30 days (${thirtyDayLabel}). Read this as a coverage gap rather than confirmation that pressure has eased — chokepoint advisories tend to be lumpy and a quiet cycle does not redefine the underlying risk picture on Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep tracking maritime advisories, naval movement and any operator decisions on routing or war-risk premium. A return of activity is usually visible in advisory traffic before it shows up in commercial freight rates.`;
+    return `No qualifying chokepoint or route-disruption records reached the file across the reporting window (${thirtyDayLabel}). Read this as a coverage gap rather than confirmation that pressure has eased — chokepoint advisories tend to be lumpy and a quiet cycle does not redefine the underlying risk picture on Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep tracking maritime advisories, naval movement and any operator decisions on routing or war-risk premium. A return of activity is usually visible in advisory traffic before it shows up in commercial freight rates.`;
   }
   const lead = cpRanked[0];
   const second = cpRanked[1];
   const cpPhrase = lead
-    ? `The 30-day picture is led by ${lead.name}, which carries ${lead.count} qualifying record${lead.count === 1 ? "" : "s"}${lead.highestSeverityKey ? ` and a highest severity of ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} follows with ${second.count} record${second.count === 1 ? "" : "s"}.` : ""}`
+    ? `The reporting window is led by ${lead.name}, which carries ${lead.count} qualifying record${lead.count === 1 ? "" : "s"}${lead.highestSeverityKey ? ` and a highest severity of ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} follows with ${second.count} record${second.count === 1 ? "" : "s"}.` : ""}`
     : "Chokepoint coverage is thin this cycle but transit-side activity still warrants attention.";
   const weeklyTransit = weeklyEnriched.filter((r) =>
     TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   ).length;
   const transitLine = weeklyTransit > 0
-    ? `Inside the weekly briefing window, ${weeklyTransit} record${weeklyTransit === 1 ? "" : "s"} pointed at transit, diversion or advisory pressure — a tighter view of what shippers actually felt across the cycle.`
-    : `Inside the weekly briefing window itself, no fresh transit-side advisories landed, so the cycle leans on the trailing 30-day picture for context.`;
+    ? `Across the window, ${weeklyTransit} record${weeklyTransit === 1 ? "" : "s"} pointed specifically at transit, diversion or advisory pressure — a tighter view of what shippers actually felt across the cycle.`
+    : `No fresh transit-side advisories landed inside the window, so the read leans on the broader chokepoint picture above for context.`;
   const watch = lead
     ? `Watch for new naval advisories on ${lead.name}, any war-risk premium adjustments and operator commentary on rerouting. Those are the early indicators of escalation; commercial freight rates lag them by days.`
     : `Watch for fresh advisory traffic and any operator decisions on diversion — those move ahead of headline freight rates and signal where pressure is building.`;
@@ -850,15 +827,12 @@ function buildVesselPiracyRead(opts: {
   vesselTableShown: number;
   vesselRows30: VesselRow[];
   piracyRows30: PiracyRow[];
-  vesselRowsWeekly: VesselRow[];
-  piracyRowsWeekly: PiracyRow[];
   vAttackSeize30: number;
-  vAttackSeizeWeekly: number;
   thirtyDayLabel: string;
 }): string {
-  const { vesselThreat30Total, vesselTableShown, vesselRows30, piracyRows30, vesselRowsWeekly, piracyRowsWeekly, vAttackSeize30, vAttackSeizeWeekly, thirtyDayLabel } = opts;
+  const { vesselThreat30Total, vesselTableShown, vesselRows30, piracyRows30, vAttackSeize30, thirtyDayLabel } = opts;
   if (vesselThreat30Total + piracyRows30.length === 0) {
-    return `Nothing hostile against vessels and no piracy or armed-robbery records reached the file over the last 30 days (${thirtyDayLabel}). The underlying threat picture in the region has not been benign for long, so treat the quiet cycle as a reporting gap and keep crew-change, advisory and naval-patrol signals on the watchlist.\n\nA return to hostile activity is usually announced first by naval forces, then by maritime risk bulletins, before it shows up in P&I or war-risk premium movement.`;
+    return `Nothing hostile against vessels and no piracy or armed-robbery records reached the file across the reporting window (${thirtyDayLabel}). The underlying threat picture in the region has not been benign for long, so treat the quiet cycle as a reporting gap and keep crew-change, advisory and naval-patrol signals on the watchlist.\n\nA return to hostile activity is usually announced first by naval forces, then by maritime risk bulletins, before it shows up in P&I or war-risk premium movement.`;
   }
   // Lead-title quotes must come from a credible maritime / security /
   // industry / news source. The vessel pipeline is already filtered for
@@ -874,18 +848,13 @@ function buildVesselPiracyRead(opts: {
     ? ` The table below shows the top ${vesselTableShown} of these, prioritising attack and seizure events.`
     : "";
   const vesselSegment = vesselThreat30Total > 0
-    ? `Vessel-threat reporting over the last 30 days carries ${vesselThreat30Total} qualifying event${vesselThreat30Total === 1 ? "" : "s"} after dedupe, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${capNote}${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ""}`
-    : `No vessel-attack or seizure records landed in the 30-day window, even with piracy activity still on the file.`;
+    ? `Vessel-threat reporting across the reporting window carries ${vesselThreat30Total} qualifying event${vesselThreat30Total === 1 ? "" : "s"} after dedupe, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${capNote}${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ""}`
+    : `No vessel-attack or seizure records landed in the reporting window, even with piracy activity still on the file.`;
   const piracySegment = piracyRows30.length > 0
     ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window${piracyLead ? `, with "${piracyLead.title}" as the lead entry.` : `; no credible single lead is quoted as the file leans on low-credibility or speculative reporting.`}`
-    : `Piracy and armed-robbery reporting is empty across the 30-day window, which is unusual rather than reassuring for this geography.`;
-  const weeklyV = vesselRowsWeekly.length;
-  const weeklyP = piracyRowsWeekly.length;
-  const weeklySegment = (weeklyV + weeklyP) > 0
-    ? `Inside the weekly briefing cycle, ${weeklyV} vessel-side record${weeklyV === 1 ? "" : "s"} (${vAttackSeizeWeekly} attack or seizure) and ${weeklyP} piracy or armed-robbery entr${weeklyP === 1 ? "y" : "ies"} were filed — useful for sizing momentum against the trailing month.`
-    : `Inside the weekly briefing cycle itself, no fresh vessel-side or piracy records were filed; the read leans on the trailing 30-day picture.`;
+    : `Piracy and armed-robbery reporting is empty across the reporting window, which is unusual rather than reassuring for this geography.`;
   const watch = `Track maritime advisories, naval-force statements and any movement in war-risk or P&I premiums on affected routes. Those are the cleanest early indicators that hostile activity is firming or easing.`;
-  return `${vesselSegment} ${piracySegment}\n\n${weeklySegment}\n\n${watch}`;
+  return `${vesselSegment} ${piracySegment}\n\n${watch}`;
 }
 
 function buildCommercialImpactRead(commercialRecords: EnrichedIncident[]): string {

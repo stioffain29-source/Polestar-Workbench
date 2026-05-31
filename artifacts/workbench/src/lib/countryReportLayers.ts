@@ -157,42 +157,14 @@ export function resolveActiveCountryWindow(
     };
   }
 
-  // Weekly window is empty. For thin-reporting countries (e.g. PNG, West
-  // Papua) that is the norm, and leaving the window empty rendered every Fast
-  // Facts KPI card as a blank "—". Fall back to the narrowest wider window
-  // that actually holds records so the cards, map, charts and prose render the
-  // real standing picture instead of dashes. This is honest, not a "calm
-  // week" claim: the empty-week coverage banner still fires independently
-  // (computeCountryCoverageStatus keys off layers.current), the basis label
-  // marks the read as 30/90-day context, and draftCountryReportProse states
-  // plainly that the 7-day window held no fresh records.
-  if (layers.thirtyDay.length > 0) {
-    const { label, shortLabel } = countryRangeLabels(end, 30);
-    return {
-      basisDays: 30,
-      basisLabel: "30-day",
-      basisShort: "30-day",
-      incidents: layers.thirtyDay,
-      expanded: true,
-      periodLabel: label,
-      periodShortLabel: shortLabel,
-    };
-  }
-  if (layers.ninetyDay.length > 0) {
-    const { label, shortLabel } = countryRangeLabels(end, 90);
-    return {
-      basisDays: 90,
-      basisLabel: "90-day context",
-      basisShort: "90-day",
-      incidents: layers.ninetyDay,
-      expanded: true,
-      periodLabel: label,
-      periodShortLabel: shortLabel,
-    };
-  }
-
-  // Genuinely nothing held for this country across the full 90-day pull —
-  // keep the honest empty 7-day window (cards show the empty-window note).
+  // Weekly window is empty. Option A: the caller has already clamped the issue
+  // date back to the country's newest record, so an empty 7-day window here
+  // means the country genuinely holds no incidents at all. We do NOT promote
+  // older 30/90-day records into the headline — that presented stale data as
+  // current, which the client rejected. The 30/90-day buckets remain available
+  // to the lookback/context sections; the headline window stays honestly empty
+  // and the coverage banner (computeCountryCoverageStatus, keyed off
+  // layers.current) fires independently.
   const { label, shortLabel } = countryRangeLabels(end, 7);
   return {
     basisDays: 7,

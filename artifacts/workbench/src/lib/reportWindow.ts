@@ -1,4 +1,5 @@
 import { format, parseISO, subDays } from "date-fns";
+import { latestRecordDate } from "./reportDataStatus";
 
 // Central window rules for every report builder (topic reports + country reports).
 // Dashboard pages, archive views, map views and the full database are NOT subject
@@ -60,6 +61,25 @@ export function resolveReportWindow(topic: string, issueDate: string): ReportWin
     label: `${format(start, "d MMMM yyyy")} - ${format(end, "d MMMM yyyy")}`,
     shortLabel: `${format(start, "d MMM")} - ${format(end, "d MMM yyyy")}`,
   };
+}
+
+// Option A — honest dating for topics with no live feed.
+// A report's window must never extend past the latest real record for its
+// data topic. A draft auto-advanced to "today" on a static/import-only topic
+// (whose data stops earlier) would otherwise present an empty or stale window
+// as current. Clamping the issue date down to the newest available record
+// dates the report to the period its data actually covers, so the cover,
+// prose, every incident table and the data-status line all describe ONE
+// window. Returns `issueDate` unchanged when the topic's data is already
+// current (latest record on/after the issue date) or when no records exist.
+export function clampIssueDateToLatestRecord<
+  T extends { occurredAt: string; topic?: string },
+>(issueDate: string, incidents: T[], scopeTopic?: string): string {
+  const issueStr = issueDate.slice(0, 10);
+  const latest = latestRecordDate(incidents, scopeTopic);
+  if (!latest) return issueStr;
+  const latestStr = format(latest, "yyyy-MM-dd");
+  return latestStr < issueStr ? latestStr : issueStr;
 }
 
 export function filterIncidentsToWindow<T extends { occurredAt: string; topic?: string }>(

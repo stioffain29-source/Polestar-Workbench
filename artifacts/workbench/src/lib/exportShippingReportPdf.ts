@@ -83,7 +83,7 @@ export type { ShippingReportIncident };
 // Chokepoint Watch -----------------------------------------------------------
 
 function drawChokepointWatch(ctx: Ctx, rows: ChokepointRow[], windowLabel: string) {
-  drawSectionHeading(ctx, `Chokepoint Watch, last 30 days (${windowLabel})`);
+  drawSectionHeading(ctx, `Chokepoint Watch (${windowLabel})`);
   const { pdf, MX, CW } = ctx;
   const colNameW = 130;
   const colCountW = 50;
@@ -459,17 +459,17 @@ export async function exportShippingReportPdf(
   drawSectionWithProse(ctx, "Chokepoint / Route Read", ds.chokepointRouteRead);
   drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
 
-  // Vessel Threat and Piracy Read — prose leads both 30-day tables.
+  // Vessel Threat and Piracy Read — prose leads both window tables.
   drawSectionWithProse(ctx, "Vessel Threat and Piracy Read", ds.vesselPiracyRead);
-  drawIncidentTable<VesselRow>(ctx, `Vessel Attacks, last 30 days (${ds.thirtyDayShortLabel})`, ds.vesselRows, {
+  drawIncidentTable<VesselRow>(ctx, `Vessel Attacks (${ds.thirtyDayShortLabel})`, ds.vesselRows, {
     showActColumn: true,
     actFor: (r) => r.vesselType,
-    emptyMessage: "No hostile vessel incidents on file in the last 30 days.",
+    emptyMessage: "No hostile vessel incidents on file in this window.",
   });
-  drawIncidentTable<PiracyRow>(ctx, `Piracy and Armed Robbery, last 30 days (${ds.thirtyDayShortLabel})`, ds.piracyRows, {
+  drawIncidentTable<PiracyRow>(ctx, `Piracy and Armed Robbery (${ds.thirtyDayShortLabel})`, ds.piracyRows, {
     showActColumn: true,
     actFor: (r) => r.act,
-    emptyMessage: "No piracy or armed-robbery records in the last 30 days.",
+    emptyMessage: "No piracy or armed-robbery records in this window.",
   });
 
   // Commercial Impact on Shipping — prose leads the operational

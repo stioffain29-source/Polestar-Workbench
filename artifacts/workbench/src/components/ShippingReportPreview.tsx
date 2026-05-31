@@ -570,25 +570,25 @@ export default function ShippingReportPreview({
             className="uppercase mb-2 mt-4"
             style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
           >
-            Vessel Attacks, last 30 days ({ds.thirtyDayShortLabel})
+            Vessel Attacks ({ds.thirtyDayShortLabel})
           </div>
           <IncidentTable
             rows={ds.vesselRows}
             actLabel="Act"
             actFor={(r) => r.vesselType}
-            emptyMessage="No hostile vessel incidents on file in the last 30 days."
+            emptyMessage="No hostile vessel incidents on file in this window."
           />
           <div
             className="uppercase mb-2 mt-4"
             style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
           >
-            Piracy and Armed Robbery, last 30 days ({ds.thirtyDayShortLabel})
+            Piracy and Armed Robbery ({ds.thirtyDayShortLabel})
           </div>
           <IncidentTable
             rows={ds.piracyRows}
             actLabel="Act"
             actFor={(r) => r.act}
-            emptyMessage="No piracy or armed-robbery records in the last 30 days."
+            emptyMessage="No piracy or armed-robbery records in this window."
           />
         </Section>
 

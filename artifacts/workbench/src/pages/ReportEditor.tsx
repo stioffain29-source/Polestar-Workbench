@@ -19,6 +19,7 @@ import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { latestRecordDate } from "@/lib/reportDataStatus";
+import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 import { format, parseISO } from "date-fns";
 import {
   FUEL_MARKET_DATA_SAMPLE,
@@ -211,7 +212,19 @@ export default function ReportEditor() {
     const storedIssueDate = (report.issueDate ?? today).slice(0, 10);
     const isDraft = (report.status ?? "draft") === "draft";
     const draftAdvanced = isDraft && storedIssueDate < today;
-    const issueDate = draftAdvanced ? today : storedIssueDate;
+    const renderIssueDate = draftAdvanced ? today : storedIssueDate;
+    // Option A: never date a report past the latest real record for its data
+    // topic. Topics with a live feed (flashpoint/protests) stay on the current
+    // date; static/import-only topics (fuel/shipping/cargo/etc.) clamp back to
+    // their newest record so the prose, cover, incident tables and data-status
+    // line all describe the SAME window the data actually covers — instead of
+    // presenting an empty/stale current week as if it were live.
+    const dataTopic = topic === "protests" ? "flashpoint" : topic;
+    const issueDate = clampIssueDateToLatestRecord(
+      renderIssueDate,
+      incidents ?? [],
+      dataTopic,
+    );
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       topic: i.topic,
       title: i.title,
@@ -503,6 +516,17 @@ export default function ReportEditor() {
   const scope = scopeFor(form.topic);
   // Live freshness warning — recomputes as the author edits the issue date.
   const staleProse = computeStale(form.topic, form.issueDate);
+  // Option A enforcement on manual edits: a report must never be dated past
+  // the latest real record for its data topic. The seed clamps the date; this
+  // keeps it clamped when the author edits the Issue Date field by hand, so a
+  // static/import-only report can't be re-dated forward to present stale data
+  // as current. `max` blocks the native picker; the onChange clamp catches
+  // typed input. Returns "" (no cap) when no records exist for the topic.
+  const issueDateMax = (() => {
+    const dataTopic = form.topic === "protests" ? "flashpoint" : form.topic;
+    const latest = latestRecordDate(incidents ?? [], dataTopic);
+    return latest ? format(latest, "yyyy-MM-dd") : "";
+  })();
 
   return (
     <div className="max-w-[1900px] mx-auto space-y-4">
@@ -550,7 +574,7 @@ export default function ReportEditor() {
                 <SelectContent>{REPORT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => set("issueDate", e.target.value)} className="rounded-sm" /></Field>
+            <Field label="Issue Date"><Input type="date" value={form.issueDate} max={issueDateMax || undefined} onChange={(e) => set("issueDate", clampIssueDateToLatestRecord(e.target.value, incidents ?? [], form.topic === "protests" ? "flashpoint" : form.topic))} className="rounded-sm" /></Field>
           </div>
           <Field label="Author"><Input value={form.author} onChange={(e) => set("author", e.target.value)} className="rounded-sm" /></Field>
           <Field label="Executive Summary"><Textarea rows={4} value={form.executiveSummary} onChange={(e) => set("executiveSummary", e.target.value)} className="rounded-sm" /></Field>

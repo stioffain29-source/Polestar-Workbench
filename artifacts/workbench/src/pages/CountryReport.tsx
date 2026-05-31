@@ -32,6 +32,7 @@ import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
+import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -142,7 +143,17 @@ export default function CountryReport() {
   const baselineSeededForSlug = useRef<string | null>(null);
   const reportPreviewRef = useRef<HTMLDivElement | null>(null);
 
-  const issueDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Option A: date the country report to the period its data actually covers.
+  // Clamp the issue date back to the country's newest incident so the headline
+  // 7-day window sits on real records instead of an empty current week (which
+  // previously forced a 30/90-day fallback that read old data as current).
+  const issueDate = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return clampIssueDateToLatestRecord(
+      today,
+      (incidents ?? []) as { occurredAt: string; topic?: string }[],
+    );
+  }, [incidents]);
 
   // Country baseline + lookback layers. The baseline is editorial
   // reference content that does not depend on the incident feed; the
