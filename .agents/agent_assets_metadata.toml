@@ -528,3 +528,9 @@ id = "61zqK6BMQN5ZVYAhoyTZ3"
 uri = "file://artifacts/workbench/screenshots/EnergyWatch_live_2026-05-30.png"
 type = "image"
 title = "Energy — live report"
+
+[[outputs]]
+id = "t3mxLoZG4tPTFmWzsUPRO"
+uri = "file://artifacts/workbench/screenshots/flashpoint_selection_proof.txt"
+type = "text"
+title = "Flashpoint Weekly — Selection Proof (included + rejected with reasons)"

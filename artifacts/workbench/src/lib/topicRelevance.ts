@@ -355,13 +355,13 @@ const REQUIRED: Record<string, RegExp[]> = {
   // tier; the ambiguous tier is enforced separately in
   // `isTopicRelevant` for `protests` and `flashpoint`.
   protests: [
-    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)\b/,
+    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
     /\b(farmers|workers|union|opposition|civil society|activists) .{0,30}(protest|march|gather|demonstrate|mobilis(e|ed)|mobiliz(e|ed))/,
     /\b(police|security forces?) .{0,30}(clash|crackdown|tear gas|baton|rubber bullet|water cannon) .{0,30}(protest|demonstration|march|crowd|mob|sit[- ]?in)/,
     /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
   ],
   flashpoint: [
-    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)\b/,
+    /\b(protest|demonstration|march|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
     /\b(farmers|workers|union|opposition|civil society|activists) .{0,30}(protest|march|gather|demonstrate|mobilis(e|ed)|mobiliz(e|ed))/,
     /\b(police|security forces?|military) .{0,30}(clash|crackdown|tear gas|baton|rubber bullet|water cannon) .{0,30}(protest|demonstration|march|crowd|mob|sit[- ]?in)/,
     /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
@@ -373,6 +373,15 @@ const REQUIRED: Record<string, RegExp[]> = {
 // an explicit public-order companion in the same record.
 const FLASHPOINT_AMBIGUOUS_RE =
   /\b(rally|rallies|rallied|strike|strikes|striking|struck|students?)\b/;
+
+// Title-rescue set: phrases so unmistakably about public order that their
+// presence in the HEADLINE overrides the body-scanning context excludes
+// (military-strike homonym, student-crime). Deliberately EXCLUDES the
+// ambiguous sports/finance homonyms ("rally", "march", bare "strike") so a
+// motorsport rally or stock-market strike headline can never be rescued —
+// those still fall through to the homonym/ambiguous gates.
+const FLASHPOINT_TITLE_RESCUE_RE =
+  /\b(protest(s|ers?|ing|ed)?|demonstration(s)?|demonstrators?|sit[- ]?in|picket(s|ing|ed)?|walkout|stoppage|hartal|bandh|gherao|chakka jam|wheel[- ]?jam|shutter[- ]?down|industrial action|strike notice|civil unrest|public disorder|crackdown|gen[- ]?z protest)\b/i;
 
 // Public-order companion. If a record's only flashpoint signal is an
 // ambiguous token (rally/strike/student), one of these cues must also
@@ -417,6 +426,20 @@ function haystack(i: RelevanceInput): string {
   ].join(" ").toLowerCase();
 }
 
+// Headline-only text for the title-rescue check. Strips a trailing
+// " - <Source>" wire-attribution suffix so a source name never injects a
+// rescue keyword, then lowercases. (No source-paren handling needed — the
+// suffix here is the editorial attribution, not the feed category.)
+function titleHaystack(i: RelevanceInput): string {
+  let t = i.title ?? "";
+  const idx = t.lastIndexOf(" - ");
+  if (idx > 0) {
+    const suffix = t.slice(idx + 3);
+    if (suffix.length <= 80 && !/[,.]/.test(suffix)) t = t.slice(0, idx);
+  }
+  return t.toLowerCase();
+}
+
 export interface RelevanceResult {
   relevant: boolean;
   reason: string;
@@ -455,6 +478,25 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   }
 
   if (topic === "flashpoint" || topic === "protests") {
+    // 0. Title-rescue: an UNMISTAKABLE public-order phrase in the headline
+    //    itself (protest / demonstration / picket / walkout / strike notice
+    //    / hartal / crackdown ...) is decisive. The two context excludes
+    //    below scan the whole body, so a genuine "PTI workers stage
+    //    protests" or "Teachers protest abduction" headline was being
+    //    dropped because the SUMMARY happened to mention an "air strike"
+    //    (military homonym) or because the record read as a student/crime
+    //    story. The rescue set deliberately omits sports/finance homonyms
+    //    ("rally" / "march" / bare "strike"), so noise headlines never
+    //    qualify; pure-kinetic or court-only items are still stripped by
+    //    the dataset layer downstream.
+    if (FLASHPOINT_TITLE_RESCUE_RE.test(titleHaystack(i))) {
+      // The headline itself is an unmistakable public-order event. The
+      // absolute general-news exclude already ran above, so keep it here —
+      // this both rescues genuine protests from the body-scanning context
+      // excludes below AND covers plural/inflected forms ("protests",
+      // "demonstrations") that the \b-anchored REQUIRED patterns miss.
+      return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
+    }
     // 1. Hard exclusions first — sports/finance/weather/military/
     //    entertainment/betting homonyms of "rally" / "strike" / "student".
     const hom = firstMatch(text, FLASHPOINT_EXCLUDE);

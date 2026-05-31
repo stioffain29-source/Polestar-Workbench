@@ -303,7 +303,7 @@ const MARTIAL_LAW_RE = /\bmartial law\b/i;
 // emergency order) but which carry only a judicial-outcome narrative
 // (sentencing, suspended terms, indictments). Filtered out unless a
 // live public-order hook is also present.
-const COURT_VERDICT_RE = /\b(suspended (term|sentence)s?|get suspended|sentenc(ed|ing)|acquitt(ed|al)|indict(ed|ment)|conviction|guilty plea|plea bargain|appeal (filed|dismissed|granted))\b/i;
+const COURT_VERDICT_RE = /\b(suspended (term|sentence)s?|get suspended|sentenc(ed|ing)|acquitt(ed|al)|indict(ed|ment)|conviction|guilty plea|plea bargain|plead(s|ed)? guilty|found guilty|guilty of (riot|rioting)|appeal (filed|dismissed|granted))\b/i;
 const LIVE_PUBLIC_ORDER_RE = /\b(protest(s|ers|ing)? today|rally today|crowd|crowds|demonstrators|protest(s)? (erupt|erupts|erupted|break|breaks|broke) out|(violence|unrest|clashes) (erupt|erupts|erupted|flare|flares|flared)|ongoing protest|tear[- ]?gas|water cannon|baton|stone[- ]?pelt|road closure|roadblock|blockad|curfew imposed|curfew extended|curfew lifted|troops deployed|martial law (imposed|declared|extended)|clash(es|ed)?|fatalit|injur(ed|ies)|mass arrest|detained at|arrested at|sit[- ]?in|march(ed|ing) on)\b/i;
 // Retrospective accountability / legal-aftermath reporting about a PAST
 // public-order event. These are the dominant Flashpoint noise class: a
@@ -316,6 +316,13 @@ const LIVE_PUBLIC_ORDER_RE = /\b(protest(s|ers|ing)? today|rally today|crowd|cro
 // unless there is a current security/movement/access/protest/unrest angle.
 const RETRO_ACCOUNTABILITY_RE =
   /\b(urges?\s+(?:the\s+)?(?:un|government|state|authorities|court|police)?\s*to\s+(?:retract|charge|prosecute|act|probe|investigate)|to\s+retract\b|recommends?\s+(?:action|charges?|prosecution|a\s+probe|an?\s+(?:probe|investigation|inquiry|case))|face(?:s|d)?\s+(?:raps|charges|trial|prosecution|a\s+probe|an?\s+inquiry)|under\s+(?:lens|investigation|probe|scrutiny|the\s+scanner)|(?:arrested|detained|held|summoned|indicted|booked|charged)\s+(?:over|in\s+connection\s+with|in\s+a\s+case)|(?:case|complaint|fir|charges?)\s+(?:filed|registered|lodged|framed|pressed|laid)?\s*against|files?\s+(?:a\s+|an\s+)?(?:case|complaint|fir)\s+against|probe\s+(?:into|against|ordered|launched)|investigation\s+(?:into|against|ordered|launched)|commission\s+of\s+inquiry|fact[- ]finding\s+(?:team|mission|report|panel)|human\s+rights\s+commission|\bnhrc\b|rights\s+body|rights\s+commission|\bun\s+report\b|death\s+(?:toll|count)\s+(?:report|dispute|disputed|figure|inquiry|probe)|accountability\s+(?:for|over))\b/i;
+// Anticipatory / negated non-events: an authority asking that a protest
+// NOT be held ("government requests opposition not to stage protests",
+// "police urge groups not to march") describes a request, not a street
+// event. Drop unless the record also carries a live public-order hook
+// (i.e. the protest went ahead despite the request).
+const ANTICIPATORY_NEGATED_RE =
+  /\b(request|requests|requested|urge|urges|urged|appeal|appeals|appealed|asks?|asked|warn|warns|warned|directs?|directed|told)\b.{0,40}\bnot to\b.{0,20}\b(stage|hold|call|launch|organis|organiz|join|attend)\w*\b.{0,15}\b(protest|demonstration|strike|march|rally|sit[- ]?in|agitation)/i;
 // Post-event normalisation: a calm election / peaceful polling happening
 // after an unrest cycle is the absence of a live incident, not an incident.
 const AFTERMATH_NORMALISATION_RE =
@@ -332,14 +339,28 @@ const FOREIGN_ENTITY_MISLABEL_RE = /\b(eimskip)\b/i;
 // reliable spam signal in this corpus.
 const SPAM_CAPTION_COMMAS_RE = /,\s*,|,\s+-\s+|(?:\b[A-Z]{2,5}\b[ ,]+){3,}/;
 const NON_LATIN_SCRIPT_RE = /[\u0900-\u097F\u3040-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\uAC00-\uD7AF]/;
+// Unmistakable public-order terms that a legitimate multi-city strike /
+// bandh headline carries while listing affected cities with commas
+// ("Cab, auto strike ... Chakka jam in Capital, Noida, Gurugram and
+// Ghaziabad"). When present, the comma-count spam branch must NOT fire —
+// it was misclassifying real industrial action as SEO caption spam. Sports
+// homonyms are already stripped earlier in isWeakOperational, so "strike"
+// is trustworthy here.
+const PUBLIC_ORDER_TITLE_RE = /\b(chakka jam|wheel[- ]?jam|bandh|hartal|gherao|strike|protest(s|ers?)?|walkout|stoppage|sit[- ]?in|picket|blockade|roadblock|shutter[- ]?down)\b/i;
 function isSpamCaption(title: string): boolean {
   if (!title) return false;
+  // Non-Latin script mixed with ASCII letters in the same title is a hard
+  // spam signal (Devanagari/CJK keyword-stuffed video captions) and fires
+  // regardless of public-order vocabulary.
+  if (NON_LATIN_SCRIPT_RE.test(title) && /[A-Za-z]{3,}/.test(title)) return true;
+  // Comma-spam branches catch SEO keyword-stuffed captions, but a real
+  // multi-city strike/bandh headline lists cities with commas — don't drop
+  // those when a genuine public-order keyword is present.
+  if (PUBLIC_ORDER_TITLE_RE.test(title)) return false;
   if (SPAM_CAPTION_COMMAS_RE.test(title)) return true;
   // 3+ commas in title.
   const commas = (title.match(/,/g) ?? []).length;
   if (commas >= 3) return true;
-  // Non-Latin script mixed with ASCII letters in same title.
-  if (NON_LATIN_SCRIPT_RE.test(title) && /[A-Za-z]{3,}/.test(title)) return true;
   return false;
 }
 
@@ -363,7 +384,7 @@ function titleWithoutSource(title: string): string {
 // is retained for the EU-accession/independence-day homonym; the APAC hook
 // below now includes major cities so an APAC-city solidarity headline still
 // survives even when it names a non-APAC country as the cause.
-const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|argentina|brazil|chile|peru|colombia|mexico|venezuela|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
+const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|argentina|brazil|chile|peru|colombia|mexico|venezuela|bolivia|bolivian|ecuador|paraguay|uruguay|guatemala|honduras|nicaragua|panama|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
 const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu|tokyo|seoul|manila|jakarta|bangkok|new delhi|delhi|mumbai|kolkata|chennai|bengaluru|hyderabad|dhaka|kathmandu|colombo|karachi|lahore|islamabad|kuala lumpur|hanoi|ho chi minh|taipei|beijing|shanghai|yangon|phnom penh|kabul|sydney|melbourne|wellington|auckland)\b/i;
 // Defence procurement / weapons-system news (missile offers, arms deals,
 // fighter-jet / submarine acquisitions). The classifier keeps these on the
@@ -393,6 +414,18 @@ const SPORTS_CONTEXT_RE = /\b(football|soccer|cricket|rugby|hockey|tennis|basket
 // that object the phrase is a real street protest ("students raise a protest
 // over fees", "workers file a protest against layoffs") and must be KEPT.
 const DIPLOMATIC_PROTEST_RE = /\b(?:lodg|fil|register|registr|convey|issu|rais|submit|deliver|hand(?:ed|s)? over)\w*\s+(?:a\s+|an\s+|its\s+|strong\s+|formal\s+|official\s+|diplomatic\s+|stern\s+|firm\s+)*protests?\b(?=[^.]{0,60}\b(?:embass(?:y|ies)|high commission|ambassador|envoy|consulate|charg[eé](?:\s+d['’]affaires)?|foreign ministry|ministry of (?:external|foreign) affairs|diplomatic (?:note|channel|protest)|note verbale|d[ée]marche)\b)|\b(protest note|note verbale|d[ée]marche)\b|\bsummon(?:s|ed)?\s+(?:the\s+)?(?:[a-z]+\s+){0,2}(ambassador|envoy|high commissioner|charg[eé])\b/i;
+// State-to-state diplomatic protest over a foreign incident that names no
+// embassy object ("Malaysia lodges strong protest after Israeli interception
+// of Gaza flotilla"). The distinguishing signal is the diplomatic REGISTER:
+// a government "lodges/conveys" a STRONG / formal / official / stern /
+// strongly-worded protest (a démarche). The register adjective is REQUIRED —
+// bare "residents lodged a protest at the collectorate" or "workers lodged a
+// protest demanding wages" carries no such adjective and must be KEPT as a
+// genuine domestic incident. Deliberately scoped to lodge/convey ONLY (the
+// diplomatic verbs); file/register/raise are left to the narrow object-gated
+// DIPLOMATIC_PROTEST_RE above. Still gated at the call site on no live
+// public-order hook so a démarche that triggers street action stays.
+const LODGE_DIPLOMATIC_PROTEST_RE = /\b(?:lodg|convey)\w*\s+(?:a\s+|an\s+|its\s+)?(?:strong|formal|official|diplomatic|stern|firm|strongly[- ]worded)\s+protests?\b/i;
 // Head-of-state / diplomatic-visit reporting that only mentions a protest as
 // historical background ("junta chief ... heads to India ... sparking a 2021
 // protest movement"). The travel framing plus an absent live public-order
@@ -407,6 +440,7 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // Diplomatic protest (démarche / note verbale / lodge a protest with an
   // embassy) and head-of-state visit framing — homonyms, not street events.
   if (DIPLOMATIC_PROTEST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (LODGE_DIPLOMATIC_PROTEST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (DIPLOMATIC_VISIT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (SPORTS_LEAGUE_RE.test(text) && SPORTS_PROTEST_VERB_RE.test(text)) return true;
   // Sports keyword noise ("striker", "rally", "title march") with no live
@@ -432,6 +466,10 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // old crackdown, probes, death-toll-report disputes). Drop unless the
   // same record describes a current live public-order event.
   if (RETRO_ACCOUNTABILITY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Anticipatory / negated non-events ("government requests opposition not
+  // to stage protests") — a request, not a street event. Drop unless the
+  // protest actually went ahead (live public-order hook present).
+  if (ANTICIPATORY_NEGATED_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   // Post-event normalisation (peaceful polling / calm restored) — the
   // absence of an incident, not an incident.
   if (AFTERMATH_NORMALISATION_RE.test(text)) return true;
@@ -638,6 +676,22 @@ function joinList(items: string[]): string {
 }
 
 // --- Dataset builder -------------------------------------------------------
+export type FlashpointRejectStage =
+  | "off-topic"
+  | "kinetic-only"
+  | "court-only"
+  | "out-of-scope-crime"
+  | "duplicate"
+  | "weak-novelty"
+  | "weak-operational";
+
+export interface FlashpointRejectedRecord {
+  stage: FlashpointRejectStage;
+  country: string;
+  title: string;
+  date: string;
+}
+
 export interface FlashpointSelection {
   /** The single clean, usable incident set the report renders from:
    *  merged flashpoint+protests buckets, in window, on-topic, with
@@ -648,6 +702,10 @@ export interface FlashpointSelection {
   courtDropped: number;
   dedupedDropped: number;
   weakDropped: number;
+  /** How many records were in the window+bucket before any filtering. */
+  rawWindowCount: number;
+  /** Every record dropped at any stage, with the reason — the proof set. */
+  rejected: FlashpointRejectedRecord[];
 }
 
 /**
@@ -676,23 +734,58 @@ export function selectFlashpointUsable(
       sourceUrl: i.sourceUrl ?? null,
       location: i.location ?? null,
     });
-  const onTopic = rawWindow.filter(passesRelevance);
-  const kineticDropped = onTopic.filter((r) => isKineticOnly(r)).length;
-  const courtDropped = onTopic.filter((r) => isCourtOnly(r)).length;
-  const scoped = onTopic.filter((r) => !isKineticOnly(r) && !isCourtOnly(r));
+  const rejected: FlashpointRejectedRecord[] = [];
+  const reject = (
+    stage: FlashpointRejectStage,
+    r: FlashpointReportIncident,
+  ) => {
+    rejected.push({
+      stage,
+      country: primaryCountry(r.country) || "—",
+      title: r.title ?? "",
+      date: (r.occurredAt ?? "").slice(0, 10),
+    });
+  };
+
+  const onTopic: FlashpointReportIncident[] = [];
+  for (const r of rawWindow) {
+    if (passesRelevance(r)) onTopic.push(r);
+    else reject("off-topic", r);
+  }
+
+  let kineticDropped = 0;
+  let courtDropped = 0;
+  const scoped: FlashpointReportIncident[] = [];
+  for (const r of onTopic) {
+    if (isKineticOnly(r)) { kineticDropped++; reject("kinetic-only", r); continue; }
+    if (isCourtOnly(r)) { courtDropped++; reject("court-only", r); continue; }
+    scoped.push(r);
+  }
 
   // Flashpoint is activism, protests and civil unrest only — not crime.
   // Drop armed-robbery / armed-group / generic-crime classifications.
-  const enrichedInScope = sortByDateDesc(enrich(scoped)).filter((r) => !isOutOfScopeIssue(r));
+  const enrichedAll = sortByDateDesc(enrich(scoped));
+  const enrichedInScope: EnrichedIncident[] = [];
+  for (const r of enrichedAll) {
+    if (isOutOfScopeIssue(r)) reject("out-of-scope-crime", r);
+    else enrichedInScope.push(r);
+  }
   // Two-pass dedupe so syndicated rewrites of the same protest don't
   // dominate the operational read.
   const enrichedDeduped = dedupeByTitle(enrichedInScope);
+  const keptIds = new Set(enrichedDeduped.map((r) => r.id));
+  for (const r of enrichedInScope) if (!keptIds.has(r.id)) reject("duplicate", r);
   // Single usable set: also strip novelty and weak-operational noise
   // (sports "strikes", defence-procurement wire copy, legislative-process
   // items, suspended strikes, stock-photo captions). This is what every
   // surface counts and renders, so Fast Facts, prose and the Related
   // Incidents table all agree.
-  const enriched = enrichedDeduped.filter((r) => !isWeakNovelty(r) && !isWeakOperational(r));
+  const enriched: EnrichedIncident[] = [];
+  for (const r of enrichedDeduped) {
+    if (isWeakNovelty(r)) { reject("weak-novelty", r); continue; }
+    if (isWeakOperational(r)) { reject("weak-operational", r); continue; }
+    enriched.push(r);
+  }
 
   return {
     enriched,
@@ -700,6 +793,8 @@ export function selectFlashpointUsable(
     courtDropped,
     dedupedDropped: enrichedInScope.length - enrichedDeduped.length,
     weakDropped: enrichedDeduped.length - enriched.length,
+    rawWindowCount: rawWindow.length,
+    rejected,
   };
 }
 
@@ -788,6 +883,7 @@ export function buildFlashpointReportDataset(
     activismRows,
     unrestRows,
     countryRows,
+    fileTotal: enriched.length,
     hasFutureTable: forecastFuture.length > 0,
     forecastLeadCountry: forecastFuture[0]?.country ?? null,
     forecastLeadSignal: forecastFuture[0]?.signal ?? null,
@@ -973,6 +1069,7 @@ function buildForecastRead(opts: {
   activismRows: EnrichedIncident[];
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
+  fileTotal: number;
   hasFutureTable: boolean;
   forecastLeadCountry?: string | null;
   forecastLeadSignal?: string | null;
@@ -982,6 +1079,11 @@ function buildForecastRead(opts: {
   const forecastLeadSignal = (opts.forecastLeadSignal ?? "").trim();
   const lead = countryRows[0];
   const total = activismRows.length + unrestRows.length;
+  // Denominator for the "X of Y records" headline counts. Uses the full
+  // count of records on the file (enriched.length) so it matches the
+  // executive summary, rather than the activism+unrest split `total` (which
+  // omits records bucketed as neither and would read one short).
+  const fileTotal = opts.fileTotal;
   // The structured forward-looking table is rendered above this prose
   // by the exporter when at least one credible future-dated record is
   // present. Prose then carries trajectory commentary only.
@@ -1023,18 +1125,18 @@ function buildForecastRead(opts: {
       ? `, which is why it leads the forward-looking table even though it is not the busiest country`
       : ``;
     lines.push(
-      `Two distinct leads sit in this file and they must be read together. On volume, ${lead.label} carries the heaviest concentration (${lead.value} of ${total} record${total === 1 ? "" : "s"}) and is the most likely source of recurring, lower-intensity disruption. On severity, the sharper signal is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — a smaller count but a higher escalation ceiling${tableClause}. A higher record count is not the same as a higher ceiling: plan for breadth of disruption across ${lead.label} and for escalation depth in ${sevCountry}.`,
+      `Two distinct leads sit in this file and they must be read together. On volume, ${lead.label} carries the heaviest concentration (${lead.value} of ${fileTotal} record${fileTotal === 1 ? "" : "s"}) and is the most likely source of recurring, lower-intensity disruption. On severity, the sharper signal is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — a smaller count but a higher escalation ceiling${tableClause}. A higher record count is not the same as a higher ceiling: plan for breadth of disruption across ${lead.label} and for escalation depth in ${sevCountry}.`,
     );
   } else if (lead && tableLeadDiffers) {
     // Volume leader and forecast-table leader differ, but on count not
     // severity. Explain the table is a scheduling signal, not a ranking.
     const sig = forecastLeadSignal ? ` (${forecastLeadSignal})` : "";
     lines.push(
-      `Read the forward-looking table and the country chart together. ${lead.label} carries the heaviest concentration on the file this cycle (${lead.value} of ${total} record${total === 1 ? "" : "s"}) and remains the most likely source of recurring disruption. The forecast table leads with ${forecastLeadCountry}${sig} only because it holds the clearest confirmed future-dated item — a scheduling signal for the next 7-14 days, not an indication that ${forecastLeadCountry} outranks ${lead.label} on volume or severity. Plan for sustained, broad-based disruption in ${lead.label} and treat the ${forecastLeadCountry} entry as a dated calendar item to action on the day.`,
+      `Read the forward-looking table and the country chart together. ${lead.label} carries the heaviest concentration on the file this cycle (${lead.value} of ${fileTotal} record${fileTotal === 1 ? "" : "s"}) and remains the most likely source of recurring disruption. The forecast table leads with ${forecastLeadCountry}${sig} only because it holds the clearest confirmed future-dated item — a scheduling signal for the next 7-14 days, not an indication that ${forecastLeadCountry} outranks ${lead.label} on volume or severity. Plan for sustained, broad-based disruption in ${lead.label} and treat the ${forecastLeadCountry} entry as a dated calendar item to action on the day.`,
     );
   } else if (lead) {
     lines.push(
-      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file (${lead.value} of ${total} record${total === 1 ? "" : "s"}). Adjacent cities and university campuses are possible secondary flashpoints.`,
+      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file (${lead.value} of ${fileTotal} record${fileTotal === 1 ? "" : "s"}). Adjacent cities and university campuses are possible secondary flashpoints.`,
     );
   } else {
     lines.push(

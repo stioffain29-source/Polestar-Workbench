@@ -1,0 +1,120 @@
+# Flashpoint Weekly — Selection Proof
+Issue date: 2026-05-24   |   7-day window: 2026-05-18 → 2026-05-24
+Raw in-window records (flashpoint + protests buckets): 76
+INCLUDED in report: 18   |   REJECTED: 58
+
+================================================================
+INCLUDED — every in-scope country with genuine activity this week
+================================================================
+
+Pakistan (8)
+   • 2026-05-23  PTI launches protest drive for Imran’s release
+   • 2026-05-22  PTI workers stage protests in various cities, defy Section 144 in Islamabad
+   • 2026-05-21  Pakistan : Students hold protest in Balochistan against delay in laptop distribution , internet disruption
+   • 2026-05-20  Afridi, Aleema claim shots were fired at Adiala sit-in participants
+   • 2026-05-19  TTAP, PTI announces countrywide protests on Friday against Imran's imprisonment, rising inflation
+   • 2026-05-19  Over 200 protesting metro bus employees demand salaries in Rawalpindi
+   • 2026-05-19  Teachers protest abduction of Gwadar University VC, others
+   • 2026-05-18  JI emir challenges petroleum levy in FCC, terms it 'unconstitutional'
+
+Bangladesh (3)
+   • 2026-05-22  Bangladesh Labour Congress-BNC holds a protest march in front of the National Press Club in the capital on Friday, demanding justice for the brutal murder and rape of all daughters and women, including Ramisa. - The New Nation
+   • 2026-05-22  Rights organisations protest over brutal rape-murder of minor girl in Bangladesh - The Assam Tribune
+   • 2026-05-22  Dhaka Protests Demanding Justice For Ramisa Akhter |  Were living in fear for our children : Dhaka protests Ramisa killing
+
+India (3)
+   • 2026-05-21  Cab , auto strike in Delhi - NCR : Three - day Chakka jam in Capital , Noida , Gurugram and Ghaziabad begins today ; check what affected for commuters
+   • 2026-05-20  Chemists strike on May 20: Why Indian pharmacists are protesting e-pharmacies over rules, pricing and safety
+   • 2026-05-18  Bhopal ‘dowry death’: Twisha Sharma's kin protests in front of MP CM's house; seeks AIIMS post-mortem | What we know
+
+South Korea (2)
+   • 2026-05-18  (2nd LD) Court mostly grants Samsung Electronics' injunction request against union strike
+   • 2026-05-18  Court partially accepts Samsung Electronics' injunction request against union strike
+
+Australia (1)
+   • 2026-05-21  ACT public schools : May 22 strike to delay morning traffic | The Canberra Times
+
+Philippines (1)
+   • 2026-05-20  Samsung faces strike after pay talks with union fall apart - Manila Bulletin
+
+Country spread (ranked): Pakistan 8  ·  Bangladesh 3  ·  India 3  ·  South Korea 2  ·  Australia 1  ·  Philippines 1
+
+================================================================
+REJECTED — with reason (proof that noise was removed deliberately)
+================================================================
+
+[off-topic] — 32
+   reason: Off-topic — failed the public-order relevance gate (sports/finance/weather/military/entertainment homonym of rally/strike, or no protest/strike/unrest signal at all).
+   ✕ [Philippines] 2026-05-23  Rays rally past Yankees for 16th win in 19 games - The Manila Times
+   ✕ [Nepal] 2026-05-23  Rain and thunder strike four provinces; heat wave alert issued for West Nepal - Nepalnews.com
+   ✕ [Bangladesh] 2026-05-23  Stocks extend rally for fourth straight session ahead of Eid - Bangladesh Sangbad Sangstha (BSS)
+   ✕ [Malaysia] 2026-05-23  10 dead in Ukrainian strike on college in Russian-occupied town - Free Malaysia Today
+   ✕ [Malaysia] 2026-05-23  Hundreds rally in Taipei for defence spending after parliament cuts funds - Yahoo News Malaysia
+   ✕ [Philippines] 2026-05-23  Anne Curtis, Filipino fans rally for Gracie Abrams Manila concert as singer announces new album - ABS-CBN
+   ✕ [Japan] 2026-05-22  Preview: Round 7 – Rally Japan - Hyundai Motorsport
+   ✕ [Malaysia] 2026-05-22  Ringgit ends 3-day rally against greenback amid geopolitical concerns - Free Malaysia Today
+   ✕ [Indonesia] 2026-05-22  JCI Gains 1.1% Following Regional Rally, Export Policy Risks Remain - Jakarta Globe
+   ✕ [Japan] 2026-05-22  Katsuta prepared for “full attack” at FORUM8 Rally Japan - WRC.com
+   ✕ [Bangladesh] 2026-05-22  Israeli strike kills 2 in south Lebanon: military - Bangladesh Sangbad Sangstha (BSS)
+   ✕ [Philippines] 2026-05-22  Recto sparks rally as Mindoro survives Bataan scare - Manila Bulletin
+   ✕ [United Arab Emirates] 2026-05-22  UAE deportations issue referred to Senate panel
+   ✕ [Myanmar] 2026-05-22  Two civilians killed as Myanmar junta escalates offensives north of Monywa - Myanmar Now
+   ✕ [Philippines] 2026-05-21  PSEi rebounds above 5,900 on Wall Street rally - Manila Standard
+   ✕ [Saudi Arabia] 2026-05-21  Trump's Iran Dilemma Can Only Be Delayed for So Long
+   ✕ [Pakistan] 2026-05-21  Quadcopter attack kills two school children in KP's Bajaur
+   ✕ [Pakistan] 2026-05-21  Quadcopter attack kills two schoolchildren in KP's Bajaur
+   ✕ [Papua New Guinea] 2026-05-21  Armed robbery at Manu Cash and Carry; one suspect shot by police during pursuit
+   ✕ [Japan] 2026-05-20  Result Predictor - WRC FORUM8 Rally Japan 2026 - WRC.com
+   ✕ [United Arab Emirates] 2026-05-20  UAE says drone that hit near its nuclear plant was launched from Iraq
+   ✕ [Malaysia] 2026-05-19  Mohamed Khaled: Royal Malaysian Navy to explore alternatives after Norway’s Naval Strike Missile system cancellation - The Edge Malaysia
+   ✕ [Qatar] 2026-05-19  🇺🇸🕊🇸🇦🇮🇷 — United States President Donald J. Trump says that, at request from Arabian Peninsula princes, he cancelled planned strik...
+   ✕ [Saudi Arabia] 2026-05-19  Trump Says Iran Strike Called Off After Gulf Allies Appealed
+   ✕ [Myanmar] 2026-05-19  Buddhist abbot detained, beaten for defying Myanmar junta ally in Kachin State - myanmar-now.org
+   ✕ [Papua] 2026-05-19  TPNPB claims retaliatory attack killed 1 Indonesian soldier in Yahukimo after 2 fighters die
+   ✕ [Japan] 2026-05-18  The mental challenge WRC leader Elfyn Evans faces at Rally Japan - Motorsport.com
+   ✕ [Philippines] 2026-05-18  Rights group, EJK victims’ kin rally outside Senate - Manila Standard
+   ✕ [Saudi Arabia] 2026-05-18  🇺🇸🕊🇸🇦🇮🇷 — United States President Donald J. Trump says that, at request from Arabian Peninsula princes, he cancelled planned strik...
+   ✕ [Papua] 2026-05-18  Two TPNPB fighters killed in clash; group claims retaliatory killing of one soldier in Yahukimo
+   ✕ [Papua] 2026-05-18  Intan Jaya regent calls for protection of civilians after church compound shooting
+   ✕ [India] 2026-05-18  ‘I proudly declare India is now Naxal-free,’ says Amit Shah in Bastar
+
+[weak-operational] — 18
+   reason: Weak-operational — surface keyword only, no live operational signal (stock-photo caption, suspended/cancelled strike, diplomatic démarche, legislative process, legal aftermath, anticipatory/negated non-event, or a non-APAC story syndicated by an APAC outlet).
+   ✕ [Bangladesh] 2026-05-22  Licensable picture: Protest Against Child Rape In Dhaka, Bangladesh - Reuters Connect
+   ✕ [Bangladesh] 2026-05-22  Licensable picture: Protest In Bangladesh - Reuters Connect
+   ✕ [Bangladesh] 2026-05-22  Greenlanders protest outside US consulate's new office - Bangladesh Sangbad Sangstha (BSS)
+   ✕ [India] 2026-05-22  Bangladesh Anti India Protest BJP TMC , बांग्लादेश में भारत विरोधी प्रदर्शन , पश्चिम बंगाल में BJP की जीत से खफा कट्टरपंथियों ने उगला जहर , वीडियो - anti india procession in bangladesh comment bjp vic
+   ✕ [South Korea] 2026-05-22  (LEAD) Ex-NIS deputy chief denies allegations of delivering message backing Yoon's martial law
+   ✕ [South Korea] 2026-05-22  Probe under way over alleged irregular drone acquisition linked to Yoon's martial law bid
+   ✕ [Philippines] 2026-05-21  Samsung workers’ union suspends planned strike - The Manila Times
+   ✕ [Philippines] 2026-05-21  French Open players plan media protest over prize money share - The Manila Times
+   ✕ [Indonesia] 2026-05-21  Licensable picture: Protest in solidarity with Palestinians and Global Sumud Flotilla in Jakarta - Reuters Connect
+   ✕ [China] 2026-05-21  Chinese delegation arrives at the National Assembly ; government requests opposition not to stage protests
+   ✕ [South Korea] 2026-05-21  (LEAD) Ex-spy chief Cho Tae-yong sentenced to 1 1/2 yrs in prison for perjury in martial law trial
+   ✕ [Pakistan] 2026-05-21  Imran’s cases will be fixed after Eid, CJP assures PTI
+   ✕ [China] 2026-05-20  Bolivia’s capital under siege as protests and blockades deepen crisis for president
+   ✕ [Malaysia] 2026-05-19  Malaysia lodges strong protest after 16 citizens detained in Israeli interception of Gaza humanitarian flotilla - The Vibes
+   ✕ [Pakistan] 2026-05-18  Opposition lawmakers stage protest in National Assembly, demand medical care for Imran
+   ✕ [South Korea] 2026-05-18  (LEAD) Lee says 1980 pro-democracy movement was reborn in thwarting 2024 martial law forces
+   ✕ [South Korea] 2026-05-18  4 courthouse rioters get suspended terms for attacking reporters
+   ✕ [China] 2026-05-18  4 plead guilty to rioting during 2019 PolyU siege in Hong Kong
+
+[weak-novelty] — 3
+   reason: Weak/novelty — parody, meme, satire or 'founder responds' commentary with no mobilisation signal.
+   ✕ [Bangladesh] 2026-05-21  Will Cockroach Janata Party Trigger a Nepal-Bangladesh Style Gen Z Protest in India? Inside the Viral Youth Movement Shaking Social Media - The Sunday Guardian
+   ✕ [China] 2026-05-21  Young Indians protest through parody ‘cockroach’ party
+   ✕ [India] 2026-05-21  Will Cockroach Janta Party spark a Nepal, Bangladesh-style Gen Z protest in India? Founder Abhijeet Dipke responds
+
+[duplicate] — 3
+   reason: Duplicate — a syndicated rewrite of another kept incident (deduped so one event is not double-counted).
+   ✕ [China] 2026-05-21  Young Indians protest through parody  cockroach  party | South China Morning Post
+   ✕ [South Korea] 2026-05-18  Lee says 1980 pro-democracy movement was reborn in thwarting 2024 martial law forces
+   ✕ [South Korea] 2026-05-18  (LEAD) Court partially accepts Samsung Electronics' injunction request against union strike
+
+[court-only] — 1
+   reason: Court-only — pure legal-process reporting (verdict/sentencing/plea) with no live civil-unrest hook.
+   ✕ [India] 2026-05-18  Supreme Court disapproves own ruling denying bail to Umar Khalid in Delhi riots case - ‘Bail is rule, jail exception’
+
+[out-of-scope-crime] — 1
+   reason: Out-of-scope crime — armed robbery / generic crime, not activism or civil unrest.
+   ✕ [Papua New Guinea] 2026-05-21  Lae armed robbery leaves three dead, two wounded; child hit by stray bullet

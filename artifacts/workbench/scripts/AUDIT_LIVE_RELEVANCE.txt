@@ -1,14 +1,12 @@
 
 ==============================================================================
-TOPIC: flashpoint   total=877  KEPT=335  DROPPED=542
+TOPIC: flashpoint   total=877  KEPT=478  DROPPED=399
 ==============================================================================
 
 DROP REASON SUMMARY:
-   220  excluded: flashpoint homonym (…pattern…)
-   192  dropped: ambiguous token (rally/strike) without public-order cue
-   126  dropped: no flashpoint public-order signal
-     3  dropped: 'student' token without mobilisation signal
-     1  excluded: student non-mobilisation (attack/crime/policy, not protest)
+   205  excluded: flashpoint homonym (…pattern…)
+   171  dropped: ambiguous token (rally/strike) without public-order cue
+    23  dropped: no flashpoint public-order signal
 
 CLIENT-FLAGGED NOISE IN THIS TOPIC:
   [DROPPED] "Taklimakan Rally 2026: GWM TANK Dominates the Unforgiving Desert - The Manila Times"
@@ -16,7 +14,7 @@ CLIENT-FLAGGED NOISE IN THIS TOPIC:
   [DROPPED] "ArenaPlus, NBA strike sports betting deal in Philippines - Philstar.com"
             reason: excluded: flashpoint homonym (/\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/)
 
-INCLUDED RECORDS (showing up to 12 of 335, newest first):
+INCLUDED RECORDS (showing up to 12 of 478, newest first):
   KEEP  2026-05-30  [Bangladesh]  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
   KEEP  2026-05-30  [China]  Myanmar’s junta chief turned president heads to India, with an eye on China
   KEEP  2026-05-29  [Nepal]  Nepal Rights Body Urges Charges Against Ex-PM Over Gen Z Protest Deaths - Organized Crime and Corruption Reporting Project | OCCRP
@@ -27,10 +25,10 @@ INCLUDED RECORDS (showing up to 12 of 335, newest first):
   KEEP  2026-05-28  [Bangladesh]  Bangladesh Editors, Media Owners to Protest Mob Attacks on Press and Cultural Institutions - News On AIR
   KEEP  2026-05-28  [Philippines]  Fisherfolk protest rising commercial fishing in municipal waters - The Manila Times
   KEEP  2026-05-28  [Nepal]  Use of lethal force, Oli & Lamichhane under lens—Nepal’s NHRC on Gen Z protest that toppled govt - ThePrint
+  KEEP  2026-05-28  [Nepal]  Can Nepal actually enforce its Human Rights Commission’s findings?
   KEEP  2026-05-28  [Bangladesh]  Violence Erupts in Bangladesh as Police Clash with Dhaka University Students During Quota Reform Protest - Newsonair
-  KEEP  2026-05-27  [Nepal]  NHRC recommends action against Oli, Lekhak, Gurung over Gen Z protest rights violations - The Kathmandu Post
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 542, newest first):
+REJECTED RECORDS WITH REASONS (showing up to 20 of 399, newest first):
   DROP  2026-05-30  [Japan]  Gauff’s French Open title defence ends, Sabalenka, Osaka set up last-16 clash
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-30  [Japan]  Paddon 7th as Evans leads Ogier into FORUM8 Rally Japan finale - Talk Motorsport
@@ -75,16 +73,18 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 542, newest first):
 ------------------------------------------------------------------------------
 FULL REPORT PIPELINE — Flashpoint/Protests merged (gate -> operational -> report set)
 ------------------------------------------------------------------------------
-  relevance-kept=449 (flashpoint+protests buckets)  ->  in window+deduped, minus kinetic(0) court(0) dedupe(0) weak/novelty(12)  =>  FINAL REPORT SET=5
+  relevance-kept=615 (flashpoint+protests buckets)  ->  in window+deduped, minus kinetic(0) court(0) dedupe(1) weak/novelty(13)  =>  FINAL REPORT SET=7
 
-FINAL REPORT RECORDS (what cards/prose/tables share, up to 15 of 5, newest first):
+FINAL REPORT RECORDS (what cards/prose/tables share, up to 15 of 7, newest first):
   IN   2026-05-28  [Bangladesh]  Bangladesh Editors, Media Owners to Protest Mob Attacks on Press and Cultural Institutions - News On AIR
   IN   2026-05-28  [Philippines]  Fisherfolk protest rising commercial fishing in municipal waters - The Manila Times
   IN   2026-05-28  [Bangladesh]  Violence Erupts in Bangladesh as Police Clash with Dhaka University Students During Quota Reform Protest - Newsonair
+  IN   2026-05-26  [Bangladesh]  Video shows procession in Bangladesh, not protest over West Bengal's roadside prayer ban - Yahoo
   IN   2026-05-26  [Philippines]  Protest vs tree cutting in Manila - Daily Tribune
   IN   2026-05-26  [Philippines]  Protest held vs tree cutting in Manila | Photos | GMA News Online - GMA Network
+  IN   2026-05-25  [Malaysia]  Malaysia awarded takraw title after Thailand protest referee’s call - Thai PBS World
 
-SECOND-STAGE DROPS (relevance-kept but removed before the report; up to 20 of 444):
+SECOND-STAGE DROPS (relevance-kept but removed before the report; up to 20 of 608):
   CUT  2026-05-30  [Bangladesh]  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
   CUT  2026-05-30  [China]  Myanmar’s junta chief turned president heads to India, with an eye on China
   CUT  2026-05-29  [Nepal]  Nepal Rights Body Urges Charges Against Ex-PM Over Gen Z Protest Deaths - Organized Crime and Corruption Reporting Project | OCCRP
@@ -93,48 +93,45 @@ SECOND-STAGE DROPS (relevance-kept but removed before the report; up to 20 of 44
   CUT  2026-05-29  [Japan]  Japan passes bill to raise co-payments for prescription drugs similar to OTC counterparts
   CUT  2026-05-28  [Nepal]  Peaceful Polling underway in Nepal after countrywide GenZ protest - Newsonair
   CUT  2026-05-28  [Nepal]  Use of lethal force, Oli & Lamichhane under lens—Nepal’s NHRC on Gen Z protest that toppled govt - ThePrint
+  CUT  2026-05-28  [Nepal]  Can Nepal actually enforce its Human Rights Commission’s findings?
   CUT  2026-05-27  [Nepal]  NHRC recommends action against Oli, Lekhak, Gurung over Gen Z protest rights violations - The Kathmandu Post
   CUT  2026-05-27  [Philippines]  BAYAN, labor leaders face raps over May 1 rally in Manila - ABS-CBN
   CUT  2026-05-27  [Nepal]  Former Nepal PM K P Sharma Oli arrested over Gen Z protest crackdown | Akashvani News - Newsonair
+  CUT  2026-05-26  [Bangladesh]  Video shows procession in Bangladesh, not protest over West Bengal's roadside prayer ban - Yahoo News Malaysia
   CUT  2026-05-25  [Sri Lanka]  Former Sri Lankan IGP arrested in connection with May 2022 attack on protest site in Colombo - Newsonair
   CUT  2026-05-24  [Philippines]  Benguet students protest against Villanueva as Senate education chair - The Manila Times
   CUT  2026-05-22  [Bangladesh]  Licensable picture: Protest Against Child Rape In Dhaka, Bangladesh - reutersconnect.com
+  CUT  2026-05-22  [Bangladesh]  Dhaka Protests Demanding Justice For Ramisa Akhter |  Were living in fear for our children : Dhaka protests Ramisa killing
   CUT  2026-05-22  [India]  Bangladesh Anti India Protest BJP TMC , बांग्लादेश में भारत विरोधी प्रदर्शन , पश्चिम बंगाल में BJP की जीत से खफा कट्टरपंथियों ने उगला जहर , वीडियो - anti india procession in bangladesh comment bjp vic
   CUT  2026-05-21  [Indonesia]  Licensable picture: Protest in solidarity with Palestinians and Global Sumud Flotilla in Jakarta - reutersconnect.com
   CUT  2026-05-21  [Malaysia]  Top UN court says right to strike protected in key labour treaty - Free Malaysia Today
-  CUT  2026-05-21  [India]  Cab , auto strike in Delhi - NCR : Three - day Chakka jam in Capital , Noida , Gurugram and Ghaziabad begins today ; check what affected for commuters
-  CUT  2026-05-21  [Pakistan]  Pakistan : Students hold protest in Balochistan against delay in laptop distribution , internet disruption
-  CUT  2026-05-21  [China]  Young Indians protest through parody  cockroach  party | South China Morning Post
 
 ==============================================================================
-TOPIC: protests   total=427  KEPT=114  DROPPED=313
+TOPIC: protests   total=427  KEPT=137  DROPPED=290
 ==============================================================================
 
 DROP REASON SUMMARY:
-   290  dropped: no flashpoint public-order signal
-    10  dropped: ambiguous token (rally/strike) without public-order cue
-     7  excluded: flashpoint homonym (…pattern…)
-     4  excluded: student non-mobilisation (attack/crime/policy, not protest)
-     1  dropped: 'student' token without mobilisation signal
+   272  dropped: no flashpoint public-order signal
+     8  dropped: ambiguous token (rally/strike) without public-order cue
+     6  excluded: flashpoint homonym (…pattern…)
+     3  excluded: student non-mobilisation (attack/crime/policy, not protest)
      1  excluded: general-news noise (…pattern…)
 
-INCLUDED RECORDS (showing up to 12 of 114, newest first):
+INCLUDED RECORDS (showing up to 12 of 137, newest first):
   KEEP  2026-05-23  [Pakistan]  PTI launches protest drive for Imran’s release
   KEEP  2026-05-22  [South Korea]  (LEAD) Ex-NIS deputy chief denies allegations of delivering message backing Yoon's martial law
+  KEEP  2026-05-22  [Pakistan]  PTI workers stage protests in various cities, defy Section 144 in Islamabad
   KEEP  2026-05-22  [South Korea]  Probe under way over alleged irregular drone acquisition linked to Yoon's martial law bid
   KEEP  2026-05-21  [India; Bangladesh; Sri Lanka; Nepal]  Will Cockroach Janta Party spark a Nepal, Bangladesh-style Gen Z protest in India? Founder Abhijeet Dipke responds
   KEEP  2026-05-21  [Pakistan]  Imran’s cases will be fixed after Eid, CJP assures PTI
   KEEP  2026-05-21  [Papua New Guinea]  Lae armed robbery leaves three dead, two wounded; child hit by stray bullet
   KEEP  2026-05-21  [China]  Young Indians protest through parody ‘cockroach’ party
   KEEP  2026-05-21  [South Korea]  (LEAD) Ex-spy chief Cho Tae-yong sentenced to 1 1/2 yrs in prison for perjury in martial law trial
+  KEEP  2026-05-20  [China]  Bolivia’s capital under siege as protests and blockades deepen crisis for president
   KEEP  2026-05-20  [India]  Chemists strike on May 20: Why Indian pharmacists are protesting e-pharmacies over rules, pricing and safety
   KEEP  2026-05-20  [Pakistan]  Afridi, Aleema claim shots were fired at Adiala sit-in participants
-  KEEP  2026-05-19  [Pakistan]  Over 200 protesting metro bus employees demand salaries in Rawalpindi
-  KEEP  2026-05-19  [Pakistan]  TTAP, PTI announces countrywide protests on Friday against Imran's imprisonment, rising inflation
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 313, newest first):
-  DROP  2026-05-22  [Pakistan]  PTI workers stage protests in various cities, defy Section 144 in Islamabad
-        -> excluded: flashpoint homonym (/\b(drone|missile|air|artillery|naval|precision|cruise|ballistic|hypersonic|stealth|tactical|surgical|retaliatory|pre[- ]?emptive|joint|coalition|allied) (strike|strikes|struck|striking)/)
+REJECTED RECORDS WITH REASONS (showing up to 20 of 290, newest first):
   DROP  2026-05-22  [Myanmar]  Two civilians killed as Myanmar junta escalates offensives north of Monywa - Myanmar Now
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-21  [Pakistan]  Quadcopter attack kills two school children in KP's Bajaur
@@ -143,21 +140,13 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 313, newest first):
         -> excluded: student non-mobilisation (attack/crime/policy, not protest)
   DROP  2026-05-21  [Papua New Guinea]  Armed robbery at Manu Cash and Carry; one suspect shot by police during pursuit
         -> dropped: no flashpoint public-order signal
-  DROP  2026-05-20  [China]  Bolivia’s capital under siege as protests and blockades deepen crisis for president
-        -> dropped: no flashpoint public-order signal
   DROP  2026-05-19  [Papua]  TPNPB claims retaliatory attack killed 1 Indonesian soldier in Yahukimo after 2 fighters die
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-19  [Myanmar]  Buddhist abbot detained, beaten for defying Myanmar junta ally in Kachin State - myanmar-now.org
         -> dropped: no flashpoint public-order signal
-  DROP  2026-05-19  [Pakistan]  Teachers protest abduction of Gwadar University VC, others
-        -> excluded: student non-mobilisation (attack/crime/policy, not protest)
-  DROP  2026-05-18  [China]  4 plead guilty to rioting during 2019 PolyU siege in Hong Kong
-        -> dropped: no flashpoint public-order signal
   DROP  2026-05-18  [India]  ‘I proudly declare India is now Naxal-free,’ says Amit Shah in Bastar
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-18  [Papua]  Intan Jaya regent calls for protection of civilians after church compound shooting
-        -> dropped: no flashpoint public-order signal
-  DROP  2026-05-18  [India]  Supreme Court disapproves own ruling denying bail to Umar Khalid in Delhi riots case - ‘Bail is rule, jail exception’
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-18  [Papua]  Two TPNPB fighters killed in clash; group claims retaliatory killing of one soldier in Yahukimo
         -> dropped: no flashpoint public-order signal
@@ -165,14 +154,24 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 313, newest first):
         -> excluded: flashpoint homonym (/\b(intelligence[- ]based operation|\bibo\b|counter[- ]?terror(ism)? (operation|raid|action)|search (and|&) (cordon|destroy) operation|cordon and search)/)
   DROP  2026-05-17  [Pakistan]  TTP commander responsible for Fatehkhel bombing killed in Bannu
         -> excluded: flashpoint homonym (/\b(intelligence[- ]based operation|\bibo\b|counter[- ]?terror(ism)? (operation|raid|action)|search (and|&) (cordon|destroy) operation|cordon and search)/)
-  DROP  2026-05-16  [India]  NEET UG 2026 paper leak: Youth Congress protests in Delhi; chief Uday Bhanu Chib detained
-        -> dropped: 'student' token without mobilisation signal
-  DROP  2026-05-16  [Thailand]  Delta Goodrem wows Eurovision, fatal Thai bus crash and London protests | ABC News Top Stories - Australian Broadcasting Corporation
-        -> dropped: no flashpoint public-order signal
   DROP  2026-05-15  [Myanmar]  Myanmar junta intensifies attacks along Chin-Magway border - Myanmar Now
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-15  [Pakistan]  In setback for SPSC, Sindh High Court suspends competitive exam results
         -> excluded: student non-mobilisation (attack/crime/policy, not protest)
+  DROP  2026-05-14  [India]  Is Modi ‘coup-proofing’ India’s military?
+        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-14  [India]  Red Fort area blast case: NIA’s 7,500-page chargesheet says all 10 accused were linked to Al-Qaida offshoot
+        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-14  [Philippines]  Chaos after gunfire in Philippines Senate - Australian Broadcasting Corporation
+        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-14  [Myanmar]  Rival resistance forces launch joint attacks to repel junta advance in southern Magway - Myanmar Now
+        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-14  [Papua]  TNI-TPNPB armed contact in Sugapa and Hitadipa leaves civilians wounded
+        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-13  [Philippines]  Philippine Senate rocked by gunfire during arrest attempt of ICC-wanted senator Ronald dela Rosa
+        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-13  [Australia; Papua New Guinea]  PNG Chiefs eye cross-code coup with Pritchard brothers
+        -> dropped: no flashpoint public-order signal
 
 ==============================================================================
 TOPIC: strikes   total=336  KEPT=333  DROPPED=3
@@ -525,6 +524,6 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 42, newest first):
         -> dropped: no required topic phrase matched
 
 ##############################################################################
-GRAND TOTAL  KEPT=1680  DROPPED=1673  of 3353
+GRAND TOTAL  KEPT=1846  DROPPED=1507  of 3353
 CLIENT-FLAGGED SURVIVORS: NONE (all flagged noise dropped)
 ##############################################################################
