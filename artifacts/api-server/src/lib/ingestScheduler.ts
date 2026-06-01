@@ -21,9 +21,9 @@ import { logger } from "./logger";
 //
 // Config:
 //   INGEST_SCHEDULE_ENABLED  set to "false" to disable entirely (default on)
-//   INGEST_INTERVAL_HOURS    refresh cadence in hours (default 6)
+//   INGEST_INTERVAL_HOURS    refresh cadence in hours (default 12)
 
-const DEFAULT_INTERVAL_HOURS = 6;
+const DEFAULT_INTERVAL_HOURS = 12;
 const MS_PER_HOUR = 60 * 60 * 1000;
 
 function intervalHours(): number {
