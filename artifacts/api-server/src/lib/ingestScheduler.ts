@@ -151,9 +151,18 @@ export function startIngestScheduler(): void {
 
   const hours = intervalHours();
 
+  // Delay the boot catch-up so the server can answer startup health probes
+  // first. On a fresh deploy the data is stale, so the catch-up would otherwise
+  // fire a full scrape during the exact window the deployer is probing for
+  // readiness — heavy boot work can delay the health response past the probe
+  // timeout and fail the promote step (seen on reserved-VM promote). A short
+  // deferral keeps the event loop free until the VM is marked ready; the timer
+  // is unref()'d so it never holds the process open on its own.
+  const BOOT_INGEST_DELAY_MS = 60_000;
+
   // Boot catch-up: only scrape if data is already stale, so repeated cold
   // starts on autoscale stay cheap.
-  void (async () => {
+  const bootTimer = setTimeout(() => void (async () => {
     try {
       const age = await hoursSinceLastIngest();
       const landAges = await hoursSinceNewestPerLandTopic();
@@ -191,7 +200,8 @@ export function startIngestScheduler(): void {
     } catch (err) {
       logger.error({ err }, "boot ingest freshness check failed");
     }
-  })();
+  })(), BOOT_INGEST_DELAY_MS);
+  bootTimer.unref();
 
   // Recurring refresh for warm/always-on processes. unref() so the timer never
   // blocks process shutdown (the server's listen handle keeps the process up).
