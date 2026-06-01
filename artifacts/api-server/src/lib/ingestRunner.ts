@@ -2,6 +2,7 @@ import { pool } from "@workspace/db";
 import {
   runFlashpointIngest,
   runCargoWatchIngest,
+  runShippingIngest,
   runMarketPricesIngest,
   type IngestSummary,
   type MarketPriceSummary,
@@ -32,6 +33,7 @@ export type IngestRunResult =
       durationMs: number;
       flashpoint: IngestSummary;
       cargoWatch: IngestSummary;
+      shipping: IngestSummary;
       marketPrices: MarketPriceSummary;
     }
   | { ran: false; reason: "locked" };
@@ -107,6 +109,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // table; running them one after another mirrors scrape:prod.
     const flashpoint = await runFlashpointIngest({ commit: true });
     const cargoWatch = await runCargoWatchIngest({ commit: true });
+    const shipping = await runShippingIngest({ commit: true });
     // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
     // can never fail the incident ingest — it just reports the error.
     let marketPrices: MarketPriceSummary;
@@ -123,6 +126,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       flashpoint,
       cargoWatch,
+      shipping,
       marketPrices,
     };
   });

@@ -1,4 +1,4 @@
-export type IngestTopic = "flashpoint" | "cargo_watch";
+export type IngestTopic = "flashpoint" | "cargo_watch" | "shipping";
 
 export type FeedStat = {
   name: string;

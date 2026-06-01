@@ -48,16 +48,20 @@ const INSIGNIFICANT: RegExp[] = [
 /**
  * Rate an incident's severity from its text.
  *
- * @param topic  "flashpoint" (civil unrest) or "cargo_watch" (cargo crime).
+ * @param topic  "flashpoint" (civil unrest), "cargo_watch" (cargo crime) or
+ *               "shipping" (maritime security / disruption).
  *               Cargo incidents describe a completed theft, so their floor
  *               is "low" (pilferage) rising to "moderate" for a substantive
  *               theft; civil-unrest items default to "low" (peaceful/planned
- *               protest) absent stronger signal.
+ *               protest) absent stronger signal. Shipping rates a kinetic
+ *               vessel/port attack as "high" and a seizure / closure /
+ *               disruption as "moderate" — extreme stays reserved for the
+ *               casualty/emergency signals in the EXTREME tier above.
  */
 export function classifySeverity(
   title: string,
   summary: string,
-  topic: "flashpoint" | "cargo_watch",
+  topic: "flashpoint" | "cargo_watch" | "shipping",
 ): Severity {
   const hay = `${title}\n${summary}`;
 
@@ -71,6 +75,26 @@ export function classifySeverity(
   if (topic === "cargo_watch") {
     if (/\b(pilferage|petty|attempted|foiled|recovered|minor)\b/i.test(hay)) return "low";
     if (/\b(theft|stolen|stole|robbery|robbed|burglary|burgl|heist|loot|cargo crime)\b/i.test(hay)) {
+      return "moderate";
+    }
+  }
+
+  // Shipping: a kinetic strike on a vessel or port (missile / drone /
+  // projectile / explosion / fire / sinking) is a high-severity maritime
+  // incident even without confirmed casualties (those escalate to extreme
+  // via the EXTREME tier). A seizure / boarding / hijack / detention or a
+  // chokepoint closure / blockade / major disruption is a moderate
+  // operational event. Forward-looking / advisory framing falls through to
+  // the INSIGNIFICANT / low default below.
+  if (topic === "shipping") {
+    if (
+      /\b(missile|drone|projectile|torpedo|rocket|explosion|explosive|blast|struck|set (on )?fire|set ablaze|ablaze|sinking|sank|sunk|limpet mine|mine attack)\b/i.test(hay)
+    ) {
+      return "high";
+    }
+    if (
+      /\b(seiz(e|ed|ure|ing)|board(ed|ing)|hijack(ed|ing)?|detain(ed|ment)?|captured|impound(ed)?|commandeer(ed)?|closure|closed|blockad(e|ed)|shutdown|congestion|backlog|reroute|re-?route|divert(ed|s)?|diversion|stoppage|suspend(ed|s)?)\b/i.test(hay)
+    ) {
       return "moderate";
     }
   }

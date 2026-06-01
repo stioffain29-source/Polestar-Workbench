@@ -85,6 +85,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       {
         flashpointInserted: result.flashpoint.inserted,
         cargoWatchInserted: result.cargoWatch.inserted,
+        shippingInserted: result.shipping.inserted,
         durationMs: result.durationMs,
       },
       "admin ingest finished",
@@ -94,9 +95,11 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       startedAt: result.startedAt.toISOString(),
       finishedAt: result.finishedAt.toISOString(),
       durationMs: result.durationMs,
-      totalInserted: result.flashpoint.inserted + result.cargoWatch.inserted,
+      totalInserted:
+        result.flashpoint.inserted + result.cargoWatch.inserted + result.shipping.inserted,
       flashpoint: trimmedSummary(result.flashpoint),
       cargoWatch: trimmedSummary(result.cargoWatch),
+      shipping: trimmedSummary(result.shipping),
       marketPrices: {
         seriesFetched: result.marketPrices.seriesFetched,
         seriesErrors: result.marketPrices.seriesErrors,
