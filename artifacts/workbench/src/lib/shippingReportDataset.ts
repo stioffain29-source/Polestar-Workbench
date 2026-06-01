@@ -202,14 +202,17 @@ function topicSignature(title: string, date: Date): string {
   return `${bucket}|${top.join(" ")}`;
 }
 
-// Event-key dedupe for vessel rows. The same UAE/Hormuz seizure routinely
-// shows up under five or six rewrites on the same day with different
-// noun ordering ("Vessel seized off UAE coast", "UKMTO says vessel
-// seized off UAE", "Honduran-flagged vessel seized by Iran near UAE",
-// "Hormuz Crisis: Vessel Seized Off UAE Heading to Iran") — `dedupeByTitle`
-// keeps them apart because the first 6 significant words diverge. This
-// pass collapses anything sharing the same {day, act, chokepoint/country
-// anchor} so the table shows one clean row per actual incident.
+// Event-key dedupe for vessel rows — CONSERVATIVE, shared by the REPORT.
+// The same UAE/Hormuz seizure often shows up under five or six rewrites on the
+// same day with different noun ordering ("Vessel seized off UAE coast", "UKMTO
+// says vessel seized off UAE", "Hormuz Crisis: Vessel Seized Off UAE Heading to
+// Iran") — `dedupeByTitle` keeps them apart because the first 6 significant
+// words diverge. This pass collapses anything sharing the same {day, act,
+// chokepoint/country anchor-set}. It deliberately keys on the EXACT calendar day
+// and EXACT anchor subset so it only ever merges near-identical same-day copies
+// — the report's vessel section is the comprehensive product, so it must not
+// risk collapsing two genuinely distinct incidents. (The monitor uses the wider
+// `dedupeVesselEventsClustered` below for one-event-one-card summary cards.)
 function vesselEventKey<T extends { title: string; date: Date; vesselType: VesselIncidentType }>(r: T): string {
   const day = r.date.toISOString().slice(0, 10);
   const text = (r.title ?? "").toLowerCase();
@@ -251,6 +254,89 @@ function dedupeByEventKey<T extends { title: string; date: Date; severity: strin
   return Array.from(out.values());
 }
 
+// Coarse maritime theatre of a vessel headline. The fine-grained anchors
+// (hormuz / uae / iran / gulf of oman ...) all describe ONE chokepoint complex,
+// so a single seizure picked up by different wires cites different subsets ("off
+// UAE", "near Strait of Hormuz", "heading to Iran"). Used ONLY by the monitor's
+// aggressive clusterer below.
+const COARSE_REGION_TESTS: [RegExp, string][] = [
+  [/\bhormuz\b|\bgulf\s+of\s+oman\b|\bpersian\s+gulf|arabian\s+gulf\b|\buae\b|emirates|abu\s+dhabi|dubai|fujairah|\biran(ian)?\b|\boman\b|\bqatar\b|\bdoha\b/, "gulf"],
+  [/\bbab[\s-]?el[\s-]?mandeb\b|\bred\s*sea\b|\byemen|houthi\b|\baden\b/, "redsea"],
+  [/\bsuez\b/, "suez"],
+  [/\bmalacca\b|\bsingapore\s+strait\b/, "malacca"],
+  [/\bsomalia(n)?\b/, "somalia"],
+];
+function coarseRegion(title: string): string {
+  const text = (title ?? "").toLowerCase();
+  for (const [re, tag] of COARSE_REGION_TESTS) if (re.test(text)) return tag;
+  return "";
+}
+
+// Aggressive vessel-event clustering — MONITOR ONLY. The same seizure drifts
+// across several calendar days as wires re-pick it up ("13 May Hormuz Crisis:
+// Vessel Seized Off UAE Heading to Iran", "14 May Vessel seized off UAE coast,
+// moved toward Iranian waters", "15 May UKMTO Reports Vessel Seized Near Strait
+// of Hormuz"), and each wire names a different anchor subset, so neither
+// `dedupeByTitle` nor the exact-day `dedupeByEventKey` collapses them. The
+// monitor's vessel cards are an explicit SUMMARY ("Full records remain available
+// in the incident table"), so here we group by {act, coarse theatre} and
+// single-link in time: rows of the same act in the same theatre within a few
+// days of each other collapse to ONE row (most severe / most recent), so the
+// same incident can never show as both Extreme and Low. This is intentionally
+// more aggressive than the report path and is NOT used by the report, which must
+// stay comprehensive. Headlines with no recognised theatre pass through
+// untouched — only the earlier title/signature passes can merge those.
+const EVENT_GAP_DAYS = 3; // max gap between consecutive copies in a cluster
+const EVENT_SPAN_DAYS = 6; // max total spread of one cluster (anti-chaining)
+function dedupeVesselEventsClustered<T extends { title: string; date: Date; severity: string; vesselType: VesselIncidentType }>(rows: T[]): T[] {
+  const better = (a: T, b: T) => {
+    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+    if (sa !== sb) return sa > sb;
+    return a.date.getTime() >= b.date.getTime();
+  };
+  const DAY = 86_400_000;
+  const groups = new Map<string, T[]>();
+  const passthrough: T[] = [];
+  for (const r of rows) {
+    const region = coarseRegion(r.title);
+    if (!region) { passthrough.push(r); continue; }
+    const gk = `${r.vesselType.toLowerCase()}|${region}`;
+    const arr = groups.get(gk);
+    if (arr) arr.push(r); else groups.set(gk, [r]);
+  }
+  const out: T[] = [...passthrough];
+  for (const grp of groups.values()) {
+    const sorted = [...grp].sort((a, b) => a.date.getTime() - b.date.getTime());
+    let cluster: T[] = [];
+    let prevMs = -Infinity;
+    let startMs = -Infinity;
+    const flush = () => {
+      if (!cluster.length) return;
+      out.push(cluster.reduce((best, r) => (better(r, best) ? r : best)));
+      cluster = [];
+    };
+    for (const r of sorted) {
+      const t = r.date.getTime();
+      const sameCluster =
+        cluster.length > 0 &&
+        t - prevMs <= EVENT_GAP_DAYS * DAY &&
+        t - startMs <= EVENT_SPAN_DAYS * DAY;
+      if (sameCluster) {
+        cluster.push(r);
+        prevMs = t;
+      } else {
+        flush();
+        cluster.push(r);
+        startMs = t;
+        prevMs = t;
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
 function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
   // Two-pass: exact-title-key dedupe (catches direct republishing), then
   // date+nouns signature dedupe (catches reworded syndication). Keeps
@@ -278,15 +364,16 @@ function dedupeByTitle<T extends { title: string; date: Date; severity: string }
 }
 
 // Monitor-side deduplication. The Shipping monitor page (Shipping.tsx) renders
-// the same cleaned + deduplicated dataset as the report so the two surfaces can
-// never disagree. This mirrors the report recipe exactly:
-//   - vessel incidents (classifyVesselIncident !== null) get the event-key pass
-//     on top of title dedupe, so same-day seizure/attack rewrites under five or
-//     six wire headlines collapse to a single row (keeping the most severe /
-//     most recent version);
-//   - everything else gets title + signature dedupe only.
-// Event-key dedupe is applied ONLY to vessel rows — running it across all rows
-// would wrongly merge unrelated same-day items that share a chokepoint anchor.
+// a cleaned + deduplicated SUMMARY — one card per real event. It runs the same
+// noise filter and title/signature dedupe as the report, but for vessel rows it
+// uses the wider `dedupeVesselEventsClustered` (same act + coarse theatre within
+// a few days collapses to one) instead of the report's conservative exact-day
+// `dedupeByEventKey`. This is deliberate: the same seizure drifts across several
+// calendar days under different wire headlines, and the monitor must show it as
+// ONE card (never both Extreme and Low). The report keeps the conservative pass
+// because it is the comprehensive product and must not risk merging two distinct
+// incidents. Clustering is applied ONLY to vessel rows — running it across all
+// rows would wrongly merge unrelated same-theatre items.
 export function dedupeShippingMonitorRows<
   T extends {
     title: string;
@@ -315,7 +402,7 @@ export function dedupeShippingMonitorRows<
   );
   const nonVessel = datable.filter((r) => r.vesselType === null);
   const deduped = [
-    ...dedupeByEventKey(dedupeByTitle(vessel)),
+    ...dedupeVesselEventsClustered(dedupeByTitle(vessel)),
     ...dedupeByTitle(nonVessel),
     ...undatable,
   ];
