@@ -211,15 +211,7 @@ export default function ReportEditor() {
 
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
 
-      if (form.topic === "shipping") {
-        const reportElement =
-          previewRef.current?.querySelector<HTMLElement>(".print-report") ??
-          previewRef.current;
-        if (!reportElement) {
-          throw new Error("PDF export failed: report preview is not ready.");
-        }
-        await exportElementToPdf(reportElement, filename);
-      } else if (form.topic === "flashpoint" || form.topic === "protests") {
+      if (form.topic === "flashpoint" || form.topic === "protests") {
         await exportFlashpointReportPdf(
           {
             title: form.title,
