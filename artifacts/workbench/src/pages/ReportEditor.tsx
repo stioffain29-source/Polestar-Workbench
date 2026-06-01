@@ -25,6 +25,7 @@ import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
+import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import {
