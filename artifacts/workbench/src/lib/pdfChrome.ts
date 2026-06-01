@@ -5,10 +5,10 @@ import { setRoboto, ensureRobotoLoaded } from "./pdfFonts";
 export { setRoboto, ensureRobotoLoaded } from "./pdfFonts";
 
 // Polestar core brand palette.
-export const NAVY = "#0b0a3d";       // Midnight Blue
-export const ELECTRIC = "#465bff";   // Electric Blue
-export const POLAR = "#e2e2e2";      // Polar Gray
-export const DUSK = "#363636";       // Dusk Gray
+export const NAVY = "#0b0a3d"; // Midnight Blue
+export const ELECTRIC = "#465bff"; // Electric Blue
+export const POLAR = "#e2e2e2"; // Polar Gray
+export const DUSK = "#363636"; // Dusk Gray
 export const WHITE = "#FFFFFF";
 export const CARD_BG = "#FFFFFF";
 export const PAGE_BG = "#FFFFFF";
@@ -24,7 +24,11 @@ export const SEV_COLOR: Record<string, string> = {
   insignificant: "#B8C2CC",
 };
 export const SEV_RANK: Record<string, number> = {
-  insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
+  insignificant: 1,
+  low: 2,
+  moderate: 3,
+  high: 4,
+  extreme: 5,
 };
 export const SEV_LABEL: Record<string, string> = {
   extreme: "Extreme",
@@ -55,15 +59,17 @@ export const POLESTAR_EMAIL = "info@polestar-advisory.com";
 /** Replace non-WinAnsi typographic characters so jsPDF Helvetica renders cleanly. */
 export function sanitize(s: string | null | undefined): string {
   if (!s) return "";
-  return String(s)
-    .replace(/\u2018|\u2019|\u02BC/g, "'")
-    .replace(/\u201C|\u201D/g, '"')
-    .replace(/\u2013|\u2014/g, "-")
-    .replace(/\u2026/g, "...")
-    .replace(/\u00A0/g, " ")
-    .replace(/\u2022/g, "-")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "");
+  return (
+    String(s)
+      .replace(/\u2018|\u2019|\u02BC/g, "'")
+      .replace(/\u201C|\u201D/g, '"')
+      .replace(/\u2013|\u2014/g, "-")
+      .replace(/\u2026/g, "...")
+      .replace(/\u00A0/g, " ")
+      .replace(/\u2022/g, "-")
+      // eslint-disable-next-line no-control-regex
+      .replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "")
+  );
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -92,7 +98,13 @@ export function setText(pdf: jsPDF, hex: string) {
  * here as a smooth horizontal navy-left to electric-right interpolation,
  * which reads as the same brand band in print.
  */
-export function drawBrandGradient(pdf: jsPDF, x: number, y: number, w: number, h: number) {
+export function drawBrandGradient(
+  pdf: jsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
   const [r1, g1, b1] = hexToRgb(NAVY);
   const [r2, g2, b2] = hexToRgb(ELECTRIC);
   const steps = Math.max(40, Math.ceil(w));
@@ -141,7 +153,17 @@ export function createCtx(header: HeaderOpts): Ctx {
   // TOP leaves clearance under the gradient header; BOTTOM clears the Polar footer.
   const TOP = HEADER_BAND_H + 22;
   const BOTTOM = FOOTER_BAND_H + 12;
-  const ctx: Ctx = { pdf, W, H, MX, TOP, BOTTOM, CW: W - MX * 2, y: TOP, header };
+  const ctx: Ctx = {
+    pdf,
+    W,
+    H,
+    MX,
+    TOP,
+    BOTTOM,
+    CW: W - MX * 2,
+    y: TOP,
+    header,
+  };
   return ctx;
 }
 
@@ -154,12 +176,25 @@ export function drawPageHeader(ctx: Ctx) {
   drawBrandGradient(pdf, 0, 0, W, HEADER_BAND_H);
   try {
     // Logo height ~22, vertically centred in the band.
-    pdf.addImage(polestarLogo, "PNG", 18, (HEADER_BAND_H - 22) / 2, 132, 22, undefined, "FAST");
-  } catch { /* ignore */ }
+    pdf.addImage(
+      polestarLogo,
+      "PNG",
+      18,
+      (HEADER_BAND_H - 22) / 2,
+      132,
+      22,
+      undefined,
+      "FAST",
+    );
+  } catch {
+    /* ignore */
+  }
   setText(pdf, WHITE);
   setRoboto(pdf, "bold");
   pdf.setFontSize(10);
-  pdf.text(sanitize(header.kind.toUpperCase()), W - 18, HEADER_BAND_H / 2 + 4, { align: "right" });
+  pdf.text(sanitize(header.kind.toUpperCase()), W - 18, HEADER_BAND_H / 2 + 4, {
+    align: "right",
+  });
   // Reset fill/text color to body defaults so any prose drawn immediately
   // after a page break does not inherit the white header color.
   setText(pdf, DUSK);
@@ -174,6 +209,7 @@ export function drawPageHeader(ctx: Ctx) {
 export function beginBodyPages(ctx: Ctx) {
   ctx.pdf.addPage();
   ctx.y = ctx.TOP;
+  ctx.suppressHeader = false;
   drawPageHeader(ctx);
 }
 
@@ -242,7 +278,10 @@ export function drawSectionWithProse(ctx: Ctx, title: string, body: string) {
   setRoboto(pdf, "regular");
   pdf.setFontSize(10);
   const lineH = 14;
-  const paragraphs = sanitize(body).split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const paragraphs = sanitize(body)
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   if (paragraphs.length === 0) {
     drawSectionHeading(ctx, title);
     return;
@@ -266,7 +305,10 @@ export function renderProse(ctx: Ctx, body: string) {
   pdf.setFontSize(10);
   setText(pdf, DUSK);
   const lineH = 14;
-  const paragraphs = sanitize(body).split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const paragraphs = sanitize(body)
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   for (const p of paragraphs) {
     const lines: string[] = pdf.splitTextToSize(p, CW);
     const paraH = lines.length * lineH + 6;
@@ -344,7 +386,10 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
     pdf.setFontSize(15);
-    const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), cardW - PAD_L - 10);
+    const valueLines: string[] = pdf.splitTextToSize(
+      sanitize(c.value),
+      cardW - PAD_L - 10,
+    );
     const baseY = yy + 36;
     pdf.text(valueLines.slice(0, 2), x + PAD_L, baseY);
 
@@ -360,7 +405,10 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
       pdf.setFontSize(6.5);
-      const asOfLines: string[] = pdf.splitTextToSize(sanitize(`As of ${c.asOf}`), cardW - PAD_L - 10);
+      const asOfLines: string[] = pdf.splitTextToSize(
+        sanitize(`As of ${c.asOf}`),
+        cardW - PAD_L - 10,
+      );
       pdf.text(asOfLines.slice(0, 1), x + PAD_L, captionY);
       captionY -= 9;
     }
@@ -368,7 +416,10 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
       pdf.setFontSize(6.5);
-      const srcLines: string[] = pdf.splitTextToSize(sanitize(c.source), cardW - PAD_L - 10);
+      const srcLines: string[] = pdf.splitTextToSize(
+        sanitize(c.source),
+        cardW - PAD_L - 10,
+      );
       pdf.text(srcLines.slice(0, 1), x + PAD_L, captionY);
       captionY -= 9;
     }
@@ -376,7 +427,10 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
       pdf.setFontSize(7);
-      const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), cardW - PAD_L - 10);
+      const noteLines: string[] = pdf.splitTextToSize(
+        sanitize(c.note),
+        cardW - PAD_L - 10,
+      );
       pdf.text(noteLines.slice(0, 2), x + PAD_L, captionY);
     }
   }
@@ -403,7 +457,7 @@ export function measureDisclaimerHeight(ctx: Ctx): number {
   pdf.setFontSize(10);
   const wrapped: string[] = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
   pdf.setFontSize(prevSize);
-  const headingBlockH = 6 + 14 + 8;   // pre-heading pad + heading line + post-heading pad
+  const headingBlockH = 6 + 14 + 8; // pre-heading pad + heading line + post-heading pad
   const bodyH = wrapped.length * 14 + 6 + 6; // line height matches renderProse
   // 8pt lead-in plus a small safety margin.
   return 8 + headingBlockH + bodyH + 4;
@@ -427,7 +481,8 @@ export function drawDisclaimer(ctx: Ctx) {
  * older call sites compile while we remove them.
  */
 export function drawSourceNotes(_ctx: Ctx, _extra?: string) {
-  void _ctx; void _extra;
+  void _ctx;
+  void _extra;
 }
 
 // --- Bullets ---------------------------------------------------------------
@@ -482,7 +537,10 @@ export function drawBulletSection(
   const bulletIndent = 12;
   const gapBetween = 4;
   // Pre-measure to keep heading + first bullet together.
-  const firstLines: string[] = pdf.splitTextToSize(bullets[0], CW - bulletIndent);
+  const firstLines: string[] = pdf.splitTextToSize(
+    bullets[0],
+    CW - bulletIndent,
+  );
   const headingBlockH = 6 + 14 + 8;
   const firstParaH = firstLines.length * lineH + gapBetween;
   const need = headingBlockH + firstParaH + 10;
@@ -513,7 +571,11 @@ export function drawBulletSection(
  * full-bleed cover). Polar Gray band, flush to the bottom edge.
  * Contents: website left, email centre, "Page X of Y" right. Nothing else.
  */
-export function drawFooters(pdf: jsPDF, _reportDate?: string, debugLine?: string) {
+export function drawFooters(
+  pdf: jsPDF,
+  _reportDate?: string,
+  debugLine?: string,
+) {
   void _reportDate; // intentionally unused — date no longer in footer per brand spec
   const pageCount = pdf.getNumberOfPages();
   const W = pdf.internal.pageSize.getWidth();
@@ -529,7 +591,9 @@ export function drawFooters(pdf: jsPDF, _reportDate?: string, debugLine?: string
     const ty = H - FOOTER_BAND_H / 2 + 3;
     pdf.text(sanitize(POLESTAR_URL), 18, ty);
     pdf.text(sanitize(POLESTAR_EMAIL), W / 2, ty, { align: "center" });
-    pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, { align: "right" });
+    pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, {
+      align: "right",
+    });
     // Temporary diagnostic proof line, sits just above the footer band.
     // Used to verify which exporter / dataset / build is actually
     // producing the rendered PDF. Removable once the runtime path is
@@ -588,13 +652,33 @@ export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   try {
     // Logo vertically centred in the top band, flush-left with 24pt inset.
     const logoH = 26;
-    pdf.addImage(polestarLogo, "PNG", 24, (topH - logoH) / 2, 156, logoH, undefined, "FAST");
-  } catch { /* ignore */ }
+    pdf.addImage(
+      polestarLogo,
+      "PNG",
+      24,
+      (topH - logoH) / 2,
+      156,
+      logoH,
+      undefined,
+      "FAST",
+    );
+  } catch {
+    /* ignore */
+  }
 
   // 2. Hero image (or gradient fallback) — full width, no borders.
   if (opts.coverImage) {
     try {
-      pdf.addImage(opts.coverImage.dataUrl, opts.coverImage.format, 0, heroY, W, heroH, undefined, "FAST");
+      pdf.addImage(
+        opts.coverImage.dataUrl,
+        opts.coverImage.format,
+        0,
+        heroY,
+        W,
+        heroH,
+        undefined,
+        "FAST",
+      );
     } catch {
       drawBrandGradient(pdf, 0, heroY, W, heroH);
     }
@@ -627,12 +711,16 @@ export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   // Subtitle (e.g. POLESTAR INSIGHTS).
   setRoboto(pdf, "bold");
   pdf.setFontSize(12);
-  pdf.text(sanitize(opts.subtitle.toUpperCase()), padL, ty + 6, { charSpace: 1.6 });
+  pdf.text(sanitize(opts.subtitle.toUpperCase()), padL, ty + 6, {
+    charSpace: 1.6,
+  });
 
   // Reporting period.
   setRoboto(pdf, "regular");
   pdf.setFontSize(11);
-  pdf.text(sanitize(opts.reportingPeriod.toUpperCase()), padL, ty + 28, { charSpace: 1.2 });
+  pdf.text(sanitize(opts.reportingPeriod.toUpperCase()), padL, ty + 28, {
+    charSpace: 1.2,
+  });
 
   // Website at bottom left, flush above the bottom edge.
   setRoboto(pdf, "bold");
@@ -672,7 +760,11 @@ export async function prepareCoverImage(
   if (typeof Image === "undefined" || typeof document === "undefined") {
     const buf = Buffer.from(await blob.arrayBuffer());
     const head = buf.subarray(0, 4);
-    const isPng = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47;
+    const isPng =
+      head[0] === 0x89 &&
+      head[1] === 0x50 &&
+      head[2] === 0x4e &&
+      head[3] === 0x47;
     const format: "JPEG" | "PNG" = isPng ? "PNG" : "JPEG";
     const mime = isPng ? "image/png" : "image/jpeg";
     return { dataUrl: `data:${mime};base64,${buf.toString("base64")}`, format };
@@ -682,7 +774,8 @@ export async function prepareCoverImage(
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const i = new Image();
       i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error(`prepareCoverImage: decode failed for ${src}`));
+      i.onerror = () =>
+        reject(new Error(`prepareCoverImage: decode failed for ${src}`));
       i.src = blobUrl;
     });
     // Render at 2x for crisp print output.

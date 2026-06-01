@@ -210,11 +210,7 @@ export default function ReportEditor() {
 
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
 
-      if (
-        form.topic === "shipping" ||
-        form.topic === "flashpoint" ||
-        form.topic === "protests"
-      ) {
+      if (form.topic === "shipping") {
         const reportElement =
           previewRef.current?.querySelector<HTMLElement>(".print-report") ??
           previewRef.current;
@@ -299,8 +295,16 @@ export default function ReportEditor() {
     // has no market data yet.
     const issueDate =
       topic === "fuel"
-        ? resolveFuelPeriodEnd(renderIssueDate, report.hardNumbers, incidents ?? [])
-        : clampIssueDateToLatestRecord(renderIssueDate, incidents ?? [], dataTopic);
+        ? resolveFuelPeriodEnd(
+            renderIssueDate,
+            report.hardNumbers,
+            incidents ?? [],
+          )
+        : clampIssueDateToLatestRecord(
+            renderIssueDate,
+            incidents ?? [],
+            dataTopic,
+          );
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       topic: i.topic,
       title: i.title,
@@ -630,7 +634,9 @@ export default function ReportEditor() {
     // close it carries, not the latest incident. Falls through to the
     // incident cap only when no market data is present yet.
     if (form.topic === "fuel") {
-      const market = fuelMarketLatestDate(hardNumbersEdited ?? report?.hardNumbers);
+      const market = fuelMarketLatestDate(
+        hardNumbersEdited ?? report?.hardNumbers,
+      );
       if (market) return market;
     }
     const dataTopic = form.topic === "protests" ? "flashpoint" : form.topic;
