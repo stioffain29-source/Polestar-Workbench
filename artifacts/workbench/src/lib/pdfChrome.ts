@@ -392,16 +392,26 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
 // measure the wrapped body at the actual text width so the block
 // estimate matches what `renderProse` will draw.
 
-export function drawDisclaimer(ctx: Ctx) {
+// Measure the full Disclaimer block (lead-in + heading + wrapped body) at the
+// exact metrics `drawDisclaimer` will use. Callers that keep an earlier section
+// together with the disclaimer (e.g. Related Incidents) reserve this height so
+// the disclaimer is guaranteed to land on the same page rather than orphaning.
+export function measureDisclaimerHeight(ctx: Ctx): number {
   const { pdf, CW } = ctx;
-  // Match renderProse setup so splitTextToSize uses the same metrics.
+  const prevSize = pdf.getFontSize();
   setRoboto(pdf, "regular");
   pdf.setFontSize(10);
   const wrapped: string[] = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
+  pdf.setFontSize(prevSize);
   const headingBlockH = 6 + 14 + 8;   // pre-heading pad + heading line + post-heading pad
   const bodyH = wrapped.length * 14 + 6 + 6; // line height matches renderProse
-  // 8pt lead-in (the else branch below) plus a small safety margin.
-  const need = 8 + headingBlockH + bodyH + 4;
+  // 8pt lead-in plus a small safety margin.
+  return 8 + headingBlockH + bodyH + 4;
+}
+
+export function drawDisclaimer(ctx: Ctx) {
+  // Match renderProse setup so splitTextToSize uses the same metrics.
+  const need = measureDisclaimerHeight(ctx);
   if (ctx.y + need > ctx.H - ctx.BOTTOM) {
     newPage(ctx);
   } else {

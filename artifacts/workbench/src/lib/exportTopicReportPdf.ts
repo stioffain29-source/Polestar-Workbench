@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import {
   createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
-  drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
+  drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, measureDisclaimerHeight, drawFooters,
   drawPolestarCover, beginBodyPages, prepareCoverImage, drawDataAsOf,
   COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
   setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
@@ -258,7 +258,7 @@ function measureProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow
   const colCatW = Math.round(CW * 0.18);
   const colReadW = Math.round(CW * 0.30);
   const colActionW = CW - colActorW - colCatW - colReadW;
-  const headerH = 18;
+  const headerH = 20;
   const padX = 6;
   const lineH = 11;
 
@@ -272,7 +272,7 @@ function measureProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow
     const actionLines: string[] = pdf.splitTextToSize(sanitize(actionText), colActionW - padX * 2);
     const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
     const maxLines = Math.max(actorLines.length, catLines.length, actionLines.length, readLines.length);
-    total += Math.max(20, maxLines * lineH + 8);
+    total += Math.max(22, maxLines * lineH + 10);
   }
   pdf.setFontSize(prevSize);
   return total + 8;
@@ -285,7 +285,7 @@ function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[])
   const colCatW = Math.round(CW * 0.18);
   const colReadW = Math.round(CW * 0.30);
   const colActionW = CW - colActorW - colCatW - colReadW;
-  const headerH = 18;
+  const headerH = 20;
   const padX = 6;
   const lineH = 11;
 
@@ -314,7 +314,7 @@ function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[])
     const actionLines: string[] = pdf.splitTextToSize(sanitize(actionText), colActionW - padX * 2);
     const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
     const maxLines = Math.max(actorLines.length, catLines.length, actionLines.length, readLines.length);
-    const rh = Math.max(20, maxLines * lineH + 8);
+    const rh = Math.max(22, maxLines * lineH + 10);
 
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
@@ -442,7 +442,8 @@ function drawRelatedIncidents(
   const colTypeW = 120;
   const colSevW = 64;
   const colTitleW = CW - colDateW - colTypeW - colSevW - 6;
-  const rowH = 18;
+  const rowH = 20;
+  const ROW_PAD = 10;
 
   // Keep the whole table together. Pre-measure the header plus every row
   // (with the same regular 8pt metrics used to render the titles) and also
@@ -453,13 +454,36 @@ function drawRelatedIncidents(
   // together on one page.
   setRoboto(pdf, "regular");
   pdf.setFontSize(8);
-  let tableH = rowH; // column header band
-  for (const i of rows) {
-    const tl: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-    tableH += Math.max(rowH, tl.length * 11 + 8);
-  }
+  const measureTable = (rs: TopicReportIncident[]): number => {
+    let h = rowH; // column header band
+    for (const i of rs) {
+      const tl: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
+      h += Math.max(rowH, tl.length * 11 + ROW_PAD);
+    }
+    return h;
+  };
   const HEADING_BLOCK_H = 50;     // pre-pad + heading line + divider + lead
-  const DISCLAIMER_RESERVE_H = 170; // keep the disclaimer on the same page
+  // Reserve the disclaimer's ACTUAL measured height (wrapped at the real width)
+  // so the keep-together estimate matches what drawDisclaimer will draw, rather
+  // than a fixed guess that can drift if the legal text or margins change.
+  const DISCLAIMER_RESERVE_H = measureDisclaimerHeight(ctx);
+  const usable = ctx.H - ctx.TOP - ctx.BOTTOM;
+  // Row-reduction fallback: if the heading + full table + disclaimer cannot
+  // fit even on a fresh page, drop rows from the bottom until the whole block
+  // fits, so the section and its disclaimer always sit together on one page.
+  let drawnRows = rows.slice();
+  let tableH = measureTable(drawnRows);
+  while (
+    drawnRows.length > 0 &&
+    HEADING_BLOCK_H + tableH + 8 + DISCLAIMER_RESERVE_H > usable
+  ) {
+    drawnRows = drawnRows.slice(0, -1);
+    tableH = measureTable(drawnRows);
+  }
+  // `measureTable` was called after the loop with the regular 8pt font already
+  // set; re-assert it before the render loop runs splitTextToSize again.
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
   ensureSpace(ctx, HEADING_BLOCK_H + tableH + 8 + DISCLAIMER_RESERVE_H);
 
   drawSectionHeading(ctx, "Related Incidents");
@@ -482,9 +506,9 @@ function drawRelatedIncidents(
   ensureSpace(ctx, rowH + 4);
   drawHeader();
 
-  for (const i of rows) {
+  for (const i of drawnRows) {
     const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-    const rh = Math.max(rowH, titleLines.length * 11 + 8);
+    const rh = Math.max(rowH, titleLines.length * 11 + ROW_PAD);
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
