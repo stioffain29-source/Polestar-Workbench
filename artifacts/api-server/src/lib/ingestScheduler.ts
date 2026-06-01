@@ -54,28 +54,34 @@ async function hoursSinceLastIngest(): Promise<number | null> {
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
 }
 
+// The scraper-fed land topics that have no `sources.last_success_at` heartbeat
+// (only flashpoint stamps one). Each has its own live Google-News scraper now,
+// so the boot catch-up must force a full run whenever ANY of them is stale —
+// otherwise a fresh flashpoint heartbeat would wrongly suppress the catch-up
+// while these sit weeks behind (exactly the "first boot after newly deploying
+// the scraper" gap that already applied to shipping).
+const SCRAPED_LAND_TOPICS = ["shipping", "energy", "fertiliser", "fuel"] as const;
+
 /**
- * Hours since the newest SHIPPING incident was inserted, or null when there are
- * none. Shipping has no `sources.last_success_at` heartbeat (only flashpoint
- * stamps one), so the flashpoint heartbeat above is normally a fine proxy for
- * "a full run happened recently" — every full run scrapes shipping too.
- *
- * The exception is the FIRST boot after shipping ingestion is newly deployed:
- * flashpoint may have run recently under code that did NOT yet scrape shipping,
- * so its heartbeat reads "fresh" while shipping is in fact weeks stale and the
- * boot catch-up would wrongly skip. This direct check forces a full run in that
- * case. Uses created_at (insertion time, advances on every committed insert),
- * not occurred_at (the news date, which can be backdated).
+ * For each scraped land topic, hours since its newest inserted incident (or
+ * null when it has none). Uses created_at (insertion time), mirroring the
+ * shipping check. Returned per-topic so the boot gate can flag a single stale
+ * topic even when the others are fresh.
  */
-async function hoursSinceNewestShipping(): Promise<number | null> {
+async function hoursSinceNewestPerLandTopic(): Promise<Record<string, number | null>> {
   const res = await db.execute(sql`
-    SELECT MAX(created_at) AS last
+    SELECT topic, MAX(created_at) AS last
     FROM incidents
-    WHERE topic = 'shipping'
+    WHERE topic IN ('shipping', 'energy', 'fertiliser', 'fuel')
+    GROUP BY topic
   `);
-  const row = res.rows[0] as { last: Date | string | null } | undefined;
-  if (!row?.last) return null;
-  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+  const rows = res.rows as Array<{ topic: string; last: Date | string | null }>;
+  const out: Record<string, number | null> = {};
+  for (const t of SCRAPED_LAND_TOPICS) out[t] = null;
+  for (const r of rows) {
+    out[r.topic] = r.last ? (Date.now() - new Date(r.last).getTime()) / MS_PER_HOUR : null;
+  }
+  return out;
 }
 
 async function tick(reason: string): Promise<void> {
@@ -91,6 +97,9 @@ async function tick(reason: string): Promise<void> {
         flashpointInserted: result.flashpoint.inserted,
         cargoWatchInserted: result.cargoWatch.inserted,
         shippingInserted: result.shipping.inserted,
+        energyInserted: result.energy.inserted,
+        fertiliserInserted: result.fertiliser.inserted,
+        fuelInserted: result.fuel.inserted,
         fuelReportsPriced: result.marketPrices.reportsUpdated,
         fuelPriceAsOf: result.marketPrices.latest.asOf,
         durationMs: result.durationMs,
@@ -147,14 +156,21 @@ export function startIngestScheduler(): void {
   void (async () => {
     try {
       const age = await hoursSinceLastIngest();
-      const shippingAge = await hoursSinceNewestShipping();
-      const shippingStale = shippingAge === null || shippingAge >= hours;
-      if (age === null || age >= hours || shippingStale) {
+      const landAges = await hoursSinceNewestPerLandTopic();
+      // A land topic is stale if it has no rows or its newest insert is older
+      // than the interval. ANY stale land topic forces a full run.
+      const staleLandTopics = SCRAPED_LAND_TOPICS.filter((t) => {
+        const a = landAges[t];
+        return a === null || a >= hours;
+      });
+      if (age === null || age >= hours || staleLandTopics.length > 0) {
         logger.info(
           {
             ageHours: age === null ? null : Math.round(age),
-            shippingAgeHours: shippingAge === null ? null : Math.round(shippingAge),
-            shippingStale,
+            landAgeHours: Object.fromEntries(
+              SCRAPED_LAND_TOPICS.map((t) => [t, landAges[t] === null ? null : Math.round(landAges[t]!)]),
+            ),
+            staleLandTopics,
           },
           "boot ingest: data stale, running catch-up",
         );

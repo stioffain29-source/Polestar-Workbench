@@ -3,6 +3,9 @@ import {
   runFlashpointIngest,
   runCargoWatchIngest,
   runShippingIngest,
+  runEnergyIngest,
+  runFertiliserIngest,
+  runFuelIngest,
   runMarketPricesIngest,
   type IngestSummary,
   type MarketPriceSummary,
@@ -34,6 +37,9 @@ export type IngestRunResult =
       flashpoint: IngestSummary;
       cargoWatch: IngestSummary;
       shipping: IngestSummary;
+      energy: IngestSummary;
+      fertiliser: IngestSummary;
+      fuel: IngestSummary;
       marketPrices: MarketPriceSummary;
     }
   | { ran: false; reason: "locked" };
@@ -110,6 +116,9 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const flashpoint = await runFlashpointIngest({ commit: true });
     const cargoWatch = await runCargoWatchIngest({ commit: true });
     const shipping = await runShippingIngest({ commit: true });
+    const energy = await runEnergyIngest({ commit: true });
+    const fertiliser = await runFertiliserIngest({ commit: true });
+    const fuel = await runFuelIngest({ commit: true });
     // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
     // can never fail the incident ingest — it just reports the error.
     let marketPrices: MarketPriceSummary;
@@ -127,6 +136,9 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       flashpoint,
       cargoWatch,
       shipping,
+      energy,
+      fertiliser,
+      fuel,
       marketPrices,
     };
   });

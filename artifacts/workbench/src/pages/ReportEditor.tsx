@@ -229,6 +229,24 @@ export default function ReportEditor() {
           incidentsForExport,
           filename,
         );
+      } else if (form.topic === "shipping") {
+        await exportShippingReportPdf(
+          {
+            title: form.title,
+            topic: form.topic,
+            issueDate: form.issueDate,
+            author: form.author,
+            executiveSummary: form.executiveSummary,
+            situation: form.situation,
+            whatHappened: form.whatHappened,
+            whatMatters: form.whatMatters,
+            implications: form.implications,
+            watchNext: form.watchNext,
+            polestarView: form.polestarView,
+          },
+          incidentsForExport,
+          filename,
+        );
       } else {
         await exportTopicReportPdf(
           {

@@ -13,6 +13,15 @@
 
 export type Severity = "insignificant" | "low" | "moderate" | "high" | "extreme";
 
+// Topics whose incidents are content-classified by classifySeverity.
+export type SeverityTopic =
+  | "flashpoint"
+  | "cargo_watch"
+  | "shipping"
+  | "energy"
+  | "fertiliser"
+  | "fuel";
+
 // Fatalities, mass casualties, emergency rule. Reserved tier — drives the
 // subdued-red marker only.
 const EXTREME: RegExp[] = [
@@ -61,7 +70,7 @@ const INSIGNIFICANT: RegExp[] = [
 export function classifySeverity(
   title: string,
   summary: string,
-  topic: "flashpoint" | "cargo_watch" | "shipping",
+  topic: SeverityTopic,
 ): Severity {
   const hay = `${title}\n${summary}`;
 
@@ -94,6 +103,56 @@ export function classifySeverity(
     }
     if (
       /\b(seiz(e|ed|ure|ing)|board(ed|ing)|hijack(ed|ing)?|detain(ed|ment)?|captured|impound(ed)?|commandeer(ed)?|closure|closed|blockad(e|ed)|shutdown|congestion|backlog|reroute|re-?route|divert(ed|s)?|diversion|stoppage|suspend(ed|s)?)\b/i.test(hay)
+    ) {
+      return "moderate";
+    }
+  }
+
+  // Energy: a kinetic strike on grid infrastructure (substation / pipeline /
+  // transmission / power plant + fire / explosion / attack / sabotage) is a
+  // high-severity event even without confirmed casualties (those escalate via
+  // EXTREME). A blackout / outage / load-shedding / shortage / rationing / cut
+  // / crisis is a moderate operational disruption. Tariff-only / advisory
+  // framing falls through to insignificant / low.
+  if (topic === "energy") {
+    if (
+      /\b(substation|transmission|pipeline|power (plant|station)|grid|powerline|power line) .{0,30}(fire|explosion|blast|attack|sabotag|struck|bomb|destroyed)\b/i.test(hay) ||
+      /\b(substation fire|pipeline attack|pipeline sabotage|substation attack)\b/i.test(hay)
+    ) {
+      return "high";
+    }
+    if (
+      /\b(blackout|power outage|power cut|load[ -]?shedd|grid (failure|collapse)|electricity (shortage|crisis)|power (shortage|crisis|rationing)|outage|blackouts?)\b/i.test(hay)
+    ) {
+      return "moderate";
+    }
+  }
+
+  // Fuel: a kinetic strike on a refinery / depot / pipeline / tanker (fire /
+  // explosion / attack) is high. A shortage / rationing / queue / stockout /
+  // closure / halt / supply cut / disruption is a moderate operational event.
+  // Price-only commentary falls through to insignificant / low.
+  if (topic === "fuel") {
+    if (
+      /\b(refinery|fuel depot|oil depot|pipeline|tanker|fuel terminal) .{0,30}(fire|explosion|blast|attack|sabotag|struck|ablaze|bomb)\b/i.test(hay) ||
+      /\b(refinery fire|refinery attack|depot fire)\b/i.test(hay)
+    ) {
+      return "high";
+    }
+    if (
+      /\b(shortage|rationing|stockout|queue|queues|dry pump|ran out|closure|closed|halt(ed|s)?|outage|supply (cut|halt|squeeze|disruption)|disruption|panic buying)\b/i.test(hay)
+    ) {
+      return "moderate";
+    }
+  }
+
+  // Fertiliser: a shortage / stockout / supply crisis / export ban / plant
+  // closure or outage is a moderate operational event. Violent farmer-protest
+  // clashes are already escalated by the shared HIGH / MODERATE tiers above.
+  // Price-only or subsidy-debate framing falls through to insignificant / low.
+  if (topic === "fertiliser") {
+    if (
+      /\b(shortage|stockout|supply (crisis|cut|halt|squeeze|disruption)|export ban|export halt|black market|panic buying|plant (closure|shutdown|outage|halt)|rationing)\b/i.test(hay)
     ) {
       return "moderate";
     }

@@ -1,4 +1,10 @@
-export type IngestTopic = "flashpoint" | "cargo_watch" | "shipping";
+export type IngestTopic =
+  | "flashpoint"
+  | "cargo_watch"
+  | "shipping"
+  | "energy"
+  | "fertiliser"
+  | "fuel";
 
 export type FeedStat = {
   name: string;
