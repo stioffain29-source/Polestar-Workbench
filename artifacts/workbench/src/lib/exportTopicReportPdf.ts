@@ -26,7 +26,7 @@ import {
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
-import type { ProducerBuyerActionRow } from "./fuelNarratives";
+import { capFuelMarketSeverity, type ProducerBuyerActionRow } from "./fuelNarratives";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 import {
   buildCargoSecurityRead,
@@ -246,6 +246,38 @@ function drawJetFuelEmptyCard(ctx: Ctx, benchmark: string) {
  * Read. Header bar in Navy with white text; rows separated by a thin
  * Polar Gray rule. Each row's height is the tallest wrapped cell.
  */
+/**
+ * Pre-measure the full Producer/Buyer Actions table (header + all rows +
+ * trailing gap) so the caller can keep the whole block together and avoid
+ * orphaning a row onto the next page.
+ */
+function measureProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[]): number {
+  if (rows.length === 0) return 0;
+  const { pdf, CW } = ctx;
+  const colActorW = Math.round(CW * 0.16);
+  const colCatW = Math.round(CW * 0.18);
+  const colReadW = Math.round(CW * 0.30);
+  const colActionW = CW - colActorW - colCatW - colReadW;
+  const headerH = 18;
+  const padX = 6;
+  const lineH = 11;
+
+  const prevSize = pdf.getFontSize();
+  pdf.setFontSize(8);
+  let total = headerH;
+  for (const r of rows) {
+    const actionText = r.date ? `${r.action}\n${r.date}` : r.action;
+    const actorLines: string[] = pdf.splitTextToSize(sanitize(r.actor), colActorW - padX * 2);
+    const catLines: string[] = pdf.splitTextToSize(sanitize(r.category), colCatW - padX * 2);
+    const actionLines: string[] = pdf.splitTextToSize(sanitize(actionText), colActionW - padX * 2);
+    const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
+    const maxLines = Math.max(actorLines.length, catLines.length, actionLines.length, readLines.length);
+    total += Math.max(20, maxLines * lineH + 8);
+  }
+  pdf.setFontSize(prevSize);
+  return total + 8;
+}
+
 function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[]) {
   if (rows.length === 0) return;
   const { pdf, MX, CW } = ctx;
@@ -398,7 +430,7 @@ function drawRelatedIncidents(
   // be pulled back onto the same page rather than orphaned on a near-
   // empty final page.
   const effectiveMax =
-    topic === "fuel" ? Math.min(max, 8)
+    topic === "fuel" ? Math.min(max, 6)
     : topic === "cargo_watch" ? Math.min(max, 10)
     : Math.min(max, 10);
   const rows = sorted.slice(0, effectiveMax);
@@ -454,7 +486,11 @@ function drawRelatedIncidents(
     setText(pdf, NAVY);
     pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
 
-    const sk = sevKey(i.severity);
+    const effectiveSeverity =
+      topic === "fuel"
+        ? capFuelMarketSeverity(i.severity, i.title, i.summary ?? "")
+        : i.severity;
+    const sk = sevKey(effectiveSeverity);
     const sevColor = SEV_COLOR[sk] ?? "#999999";
     setFill(pdf, sevColor);
     const chipX = MX + colDateW + colTypeW + colTitleW + 6;
@@ -626,19 +662,19 @@ export async function exportTopicReportPdf(
     renderProseSection("Operational Read", fuelData.incidentData.operationalRead);
     renderProseSection("Regional Highlights", fuelData.incidentData.regionalHighlights);
     if (fuelData.incidentData.producerBuyerActions.length > 0) {
-      // Guard against an orphaned section heading: if there isn't room
-      // for the heading + table header + a couple of rows, push the
-      // whole block to the next page before drawing the heading.
-      ensureSpace(ctx, 24 + 18 + 60);
+      // Keep the whole block together: measure the heading + full table and
+      // push it onto the next page if it would otherwise orphan a row.
+      const tableH = measureProducerBuyerActionsTable(ctx, fuelData.incidentData.producerBuyerActions);
+      ensureSpace(ctx, 30 + tableH);
       drawSectionHeading(ctx, "Producer and Buyer Actions");
       drawProducerBuyerActionsTable(ctx, fuelData.incidentData.producerBuyerActions);
     }
     renderProseSection("What Matters", data.whatMatters);
-    if (data.implications && data.implications.trim()) {
-      drawBulletSection(ctx, "Implications for Business", data.implications);
+    if (fuelData.narrativeData.implications && fuelData.narrativeData.implications.trim()) {
+      drawBulletSection(ctx, "Implications for Business", fuelData.narrativeData.implications);
     }
-    if (data.watchNext && data.watchNext.trim()) {
-      drawBulletSection(ctx, "Watch Next", data.watchNext, 8);
+    if (fuelData.narrativeData.watchNext && fuelData.narrativeData.watchNext.trim()) {
+      drawBulletSection(ctx, "Watch Next", fuelData.narrativeData.watchNext, 8);
     }
     renderProseSection("Polestar View", data.polestarView);
   } else {

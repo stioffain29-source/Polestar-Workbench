@@ -356,6 +356,36 @@ export interface ProducerBuyerActionRow {
   date: string;
 }
 
+// Significant-token set for an action title, used for near-duplicate
+// detection. Drops short filler words so syndicated re-writes of the
+// same story ("New UAE Pipeline Bypassing Hormuz Now 50% Complete,
+// ADNOC CEO Says" vs "UAE crude oil pipeline bypassing Hormuz 50%
+// complete, ADNOC says") collapse to one row.
+const DEDUPE_STOP = new Set([
+  "the", "and", "for", "with", "from", "into", "over", "amid", "after",
+  "says", "say", "said", "now", "new", "via", "per", "out", "off", "near",
+  "could", "may", "will", "would", "this", "that", "are", "was", "has",
+  "have", "its", "his", "her", "their", "not", "but", "yet", "all",
+]);
+function sigTokens(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !DEDUPE_STOP.has(w)),
+  );
+}
+function nearDuplicate(a: Set<string>, b: Set<string>): boolean {
+  let overlap = 0;
+  for (const x of a) if (b.has(x)) overlap++;
+  const smaller = Math.min(a.size, b.size);
+  if (smaller === 0) return false;
+  // Same story when the titles share a strong block of content words, or
+  // when most of the shorter title's content is contained in the other.
+  return overlap >= 4 || overlap >= Math.ceil(0.7 * smaller);
+}
+
 /**
  * Classified producer / buyer / government / infrastructure / market
  * actions referenced in the window. Returns ordered table rows or an
@@ -368,7 +398,7 @@ export function buildFuelProducerBuyerActions(opts: {
   const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
   if (window.length === 0) return [];
 
-  const raw: ProducerBuyerActionRow[] = [];
+  const raw: (ProducerBuyerActionRow & { tokens: Set<string> })[] = [];
   const seen = new Set<string>();
   for (const i of window) {
     const t = haystack(i);
@@ -377,6 +407,14 @@ export function buildFuelProducerBuyerActions(opts: {
     const action = i.title.trim().replace(/\.$/, "");
     const dedupeKey = action.toLowerCase();
     if (seen.has(dedupeKey)) continue;
+    // Near-duplicate guard: collapse syndicated re-writes of the same
+    // story within a category (e.g. the ADNOC / UAE Hormuz-bypass
+    // pipeline reported under several different headlines) so the table
+    // never lists the same action twice.
+    const tokens = sigTokens(action);
+    if (raw.some((r) => r.category === category && nearDuplicate(tokens, r.tokens))) {
+      continue;
+    }
     seen.add(dedupeKey);
     raw.push({
       actor: pickActor(i, category),
@@ -384,6 +422,7 @@ export function buildFuelProducerBuyerActions(opts: {
       action,
       operationalRead: deriveOperationalRead(t, category),
       date: fmtDate(i.occurredAt),
+      tokens,
     });
   }
   if (raw.length === 0) return [];
@@ -400,13 +439,22 @@ export function buildFuelProducerBuyerActions(opts: {
     "Market / supply signal",
   ];
   const PER_CATEGORY = 2;
-  const TOTAL_CAP = 6;
+  // Capped at 4 rows so the table stays on a single page block and never
+  // spills an orphaned row onto the next page.
+  const TOTAL_CAP = 4;
   const out: ProducerBuyerActionRow[] = [];
   for (const cat of ORDER) {
     const items = raw.filter((r) => r.category === cat).slice(0, PER_CATEGORY);
     for (const r of items) {
       if (out.length >= TOTAL_CAP) break;
-      out.push(r);
+      // Drop the internal token set from the emitted row.
+      out.push({
+        actor: r.actor,
+        category: r.category,
+        action: r.action,
+        operationalRead: r.operationalRead,
+        date: r.date,
+      });
     }
     if (out.length >= TOTAL_CAP) break;
   }
@@ -479,4 +527,130 @@ export function buildFuelOperationalRead(opts: {
   const closingPara = `${watchLines.join(" ")}${where}`.trim();
 
   return `${driverPara}\n\n${closingPara}`;
+}
+
+// ---------------------------------------------------------------------------
+// Bullet-section minimums (Watch Next / Implications for Business)
+//
+// The Fuel Watch "Watch Next" and "Implications for Business" sections render
+// as bullet lists. When an analyst saves a thin report (one or two bullets)
+// the section reads as an afterthought, so we top each list up to a minimum
+// with evergreen, fuel-relevant defaults. Stored bullets always lead; the
+// defaults only fill the gap up to the minimum and never beyond the cap.
+// ---------------------------------------------------------------------------
+
+export const FUEL_DEFAULT_WATCH_NEXT: string[] = [
+  "Subsidy or levy decisions — a single gazette notice can reset pump price and contract economics overnight.",
+  "Rationing or forecourt disruption — queue formation, allocation cuts or station closures are the fastest operational tells.",
+  "Refinery outages or force-majeure declarations — these feed into crack spreads and downstream pricing within days.",
+  "Tanker and route disruption — fresh Gulf, Hormuz or Red Sea advisories, naval movement or vessel reroutes shift war-risk premium and transit time.",
+  "Generator fuel availability — diesel and LPG stock cover at high-fuel-use sites is the continuity tell when forecourts tighten.",
+];
+
+export const FUEL_DEFAULT_IMPLICATIONS: string[] = [
+  "Revisit contract pricing on bulk fuel and surcharge pass-through clauses in freight and logistics agreements before the next billing cycle reprices them.",
+  "Forward-cover the bulk and aviation fuel lines you depend on rather than waiting for the spot move to be confirmed.",
+  "Check on-site fuel stock cover and generator runtime assumptions, and pull commercial-allocation conversations forward with suppliers.",
+  "Agree escalation triggers in advance — queues, allocation cuts, station closures — so mitigations fire automatically rather than after the fact.",
+  "Where Gulf or Red Sea routing matters, treat route diversification as a live mitigation, not a future option.",
+];
+
+function bulletNormKey(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((w) => w.length > 2 && !DEDUPE_STOP.has(w))
+    .slice(0, 6)
+    .join(" ");
+}
+
+/** Split stored bullet/prose text into discrete items, tolerant of
+ *  "- "/"*"/"•" markers, blank-line paragraphs, or single-newline lists. */
+function splitStoredBullets(text: string | null | undefined): string[] {
+  const s = (text ?? "").trim();
+  if (!s) return [];
+  const lines = s.split(/\r?\n/).map((l) => l.trim());
+  const marked = lines
+    .filter((l) => /^[-*\u2022]\s+/.test(l))
+    .map((l) => l.replace(/^[-*\u2022]\s+/, "").trim())
+    .filter(Boolean);
+  if (marked.length > 0) return marked;
+  const byBlank = s.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (byBlank.length > 1) return byBlank;
+  return lines.filter(Boolean);
+}
+
+/**
+ * Return a "- " bulleted block built from the stored text, topped up with
+ * fuel-relevant defaults until it holds at least `min` items (never more
+ * than `max`). Stored items lead and are de-duplicated against the defaults.
+ */
+export function topUpFuelBullets(
+  stored: string | null | undefined,
+  defaults: string[],
+  min: number,
+  max: number,
+): string {
+  const items = splitStoredBullets(stored).slice(0, max);
+  const seen = new Set(items.map(bulletNormKey));
+  for (const d of defaults) {
+    if (items.length >= min || items.length >= max) break;
+    const k = bulletNormKey(d);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    items.push(d);
+  }
+  return items.map((b) => `- ${b}`).join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Fuel severity normalisation
+//
+// EXTREME (the reserved subdued-red tier) is restricted to casualty-grade or
+// emergency events. A lot of imported Fuel Watch records are pure market /
+// price / policy / forecast signals (e.g. "StanChart Says Record SPR
+// Withdrawals…") that were stored as "extreme", which is wrong for a market
+// indicator. capFuelMarketSeverity downgrades those to "moderate" while
+// leaving genuine physical disruptions (shutdown, attack, fire, blockade…)
+// and any casualty-bearing record untouched.
+// ---------------------------------------------------------------------------
+
+const SEV_RANK: Record<string, number> = {
+  insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
+};
+const FUEL_CASUALTY_RE =
+  /\b(killed|dead|deaths?|died|fatal(it(y|ies))?|casualt(y|ies)|injur(y|ies|ed)|wounded|massacre|martial law|state of emergency)\b/i;
+const FUEL_OPERATIONAL_RE =
+  /\b(shutdown|shut down|closure|closed|attack|drone|missile|blockade|seizure|seized|sabotage|fire|explosion|outage|halt(ed)?)\b/i;
+const FUEL_NONPHYSICAL_RE: RegExp[] = [
+  /\b(spr|strategic (petroleum )?reserve|petroleum reserve|reserves?|buffers?)\b/i,
+  /\b(price|prices|pricing)\b/i,
+  /\b(output|production|supply|demand|inventory|inventories|stockpile)\b/i,
+  /\b(import|imports|export|exports)\b/i,
+  /\b(subsidy|subsidies|levy|levies|duty|excise|tax)\b/i,
+  /\b(forecast|outlook|survey|target|guidance)\b/i,
+  /\b(crack spread|refining margin|refinery margin|backwardation|contango)\b/i,
+  /\b(stocks?)\b/i,
+];
+
+/**
+ * Cap a fuel incident's severity at "moderate" when it is a market / price /
+ * policy / forecast indicator rather than a physical disruption or casualty
+ * event. Only downgrades (never raises) and only touches "high"/"extreme".
+ */
+export function capFuelMarketSeverity(
+  severity: string | null | undefined,
+  title: string,
+  summary: string,
+): string {
+  const sev = (severity ?? "").toLowerCase();
+  if ((SEV_RANK[sev] ?? 0) <= SEV_RANK.moderate) return severity ?? "";
+  const hay = `${title}\n${summary}`;
+  if (FUEL_CASUALTY_RE.test(hay)) return severity ?? "";
+  if (FUEL_OPERATIONAL_RE.test(hay)) return severity ?? "";
+  if (FUEL_NONPHYSICAL_RE.some((re) => re.test(hay))) return "moderate";
+  return severity ?? "";
 }

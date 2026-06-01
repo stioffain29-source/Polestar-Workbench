@@ -27,6 +27,9 @@ import {
   buildFuelRegionalHighlights,
   buildFuelProducerBuyerActions,
   buildFuelOperationalRead,
+  topUpFuelBullets,
+  FUEL_DEFAULT_WATCH_NEXT,
+  FUEL_DEFAULT_IMPLICATIONS,
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
 
@@ -317,9 +320,12 @@ export function buildFuelWatchReportData(
       situation: report.situation,
       whatHappened: report.whatHappened,
       whatMatters: report.whatMatters,
-      implications: report.implications,
+      // Top up the bullet sections to a useful minimum so a thinly saved
+      // report does not render a one-line Watch Next / two-line Implications.
+      // Stored content always leads; defaults only fill the gap.
+      implications: topUpFuelBullets(report.implications, FUEL_DEFAULT_IMPLICATIONS, 4, 6),
       polestarView: report.polestarView,
-      watchNext: report.watchNext,
+      watchNext: topUpFuelBullets(report.watchNext, FUEL_DEFAULT_WATCH_NEXT, 5, 6),
     },
     validation: {
       hasPrices,

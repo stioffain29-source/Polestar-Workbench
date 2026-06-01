@@ -3,9 +3,9 @@ name: Report data provenance & PDF parity
 description: How "Data as of" provenance, screen==PDF parity, and the stale-prose guard work in the workbench reports.
 ---
 
-- The in-app "Download PDF" button rasterises the on-screen `.print-report` DOM (`exportElementToPdf`), so screen == in-app PDF is automatic. The jsPDF builders (`exportTopicReportPdf`/`Shipping`/`Flashpoint`/`Country`) are used ONLY by headless scripts.
-  **Why:** parity work and any "appears on screen but not PDF" expectation must target the React previews for the user-facing path; the jsPDF builders only matter for headless exports.
-  **How to apply:** put shared report UI (e.g. the data-as-of strip) in the React previews AND mirror it in the jsPDF builders via a `pdfChrome` helper when headless output must match.
+- The in-app "Download PDF" button rasterises the on-screen `.print-report` DOM (`exportElementToPdf`) for SOME topics only — verify the routing in `ReportEditor.downloadPdf` before assuming. As of the Fuel Watch fixes, only shipping/flashpoint/protests use DOM rasterise; **FUEL routes through the jsPDF `exportTopicReportPdf` builder for the in-app download too** (not just headless). So a fuel-PDF fix must land in `exportTopicReportPdf.ts` + the shared fuel dataset, and you must separately mirror it in the React preview to keep parity.
+  **Why:** the older blanket assumption "in-app PDF == DOM rasterise, jsPDF builders are headless-only" is FALSE for fuel — editing only the preview leaves the fuel download unchanged, and editing only the jsPDF builder breaks preview==PDF parity.
+  **How to apply:** for parity, drive BOTH the preview and the jsPDF fuel path from the same shared dataset (`buildFuelWatchReportData` → `fuelData.narrativeData/incidentData`), never from raw `report.*`. Keep-together for jsPDF tables = pre-measure total height + `ensureSpace` BEFORE the section heading (heading is drawn outside the table fn).
 
 - Data-status model lives in `reportDataStatus.ts`: `latestRecord` = max(occurredAt), `lastUpdated` = max(createdAt), computed from the loaded incidents — NOT the `sources` table (the cargo scraper never updates `sources.lastSuccessAt`). `createdAt` is absent at the TS type level but present at runtime (server does `select *`).
 

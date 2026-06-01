@@ -474,8 +474,8 @@ export default function ReportPreview({
               </Section>
             )}
             <NarrativeSection title="What Matters" text={report.whatMatters} />
-            <BulletsSection title="Implications for Business" text={report.implications} />
-            <BulletsSection title="Watch Next" text={report.watchNext} max={8} />
+            <BulletsSection title="Implications for Business" text={fuelData.narrativeData.implications} />
+            <BulletsSection title="Watch Next" text={fuelData.narrativeData.watchNext} max={8} />
             <NarrativeSection title="Polestar View" text={report.polestarView} />
           </>
         ) : (
