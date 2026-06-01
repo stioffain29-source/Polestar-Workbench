@@ -20,7 +20,15 @@ function fmt(d: Date | null): string {
 export default function DataAsOfBanner({ data }: { data: DataAsOf }) {
   const items: [string, string][] = [
     ["Data status", data.modeLabel],
-    ["Latest record", fmt(data.latestRecord)],
+    ...(data.marketAsOf
+      ? // Market-driven product (Fuel Watch): the period ends on the market
+        // close; incident records are reported separately so any gap is
+        // explicit (e.g. market to 26 May, incidents only to 23 May).
+        ([
+          ["Market data", fmt(data.marketAsOf)],
+          ["Incident records", fmt(data.latestRecord)],
+        ] as [string, string][])
+      : ([["Latest record", fmt(data.latestRecord)]] as [string, string][])),
     ["Last updated", fmt(data.lastUpdated)],
   ];
   return (

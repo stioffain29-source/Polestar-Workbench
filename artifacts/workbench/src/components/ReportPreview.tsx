@@ -16,6 +16,7 @@ import {
 import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
   buildFuelWatchReportData,
+  fuelMarketLatestDate,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "@/lib/fuelWatchReport";
@@ -277,14 +278,23 @@ export default function ReportPreview({
     ? resolveReportTitle(report.topic, report.title)
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
+  // Fuel Watch is a MARKET product: its reporting-period END is the latest
+  // market close the report carries, NOT the stored issue date. Deriving the
+  // render date here keeps the cover date, period label, incident window and
+  // chart anchored to the same market close (matches exportTopicReportPdf).
+  // A fuel draft with no dated market data yet falls back to the issue date.
+  const renderIssueDate =
+    isFuel && report.issueDate
+      ? (fuelMarketLatestDate(report.hardNumbers) ?? report.issueDate)
+      : report.issueDate;
   const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
   // Canonical Fuel Watch payload. Preview, PDF and the editor debug
   // panel all consume this — no renderer parses hardNumbers on its own.
-  const fuelData = isFuel && report.issueDate
+  const fuelData = isFuel && renderIssueDate
     ? buildFuelWatchReportData(
         {
           title: report.title,
-          issueDate: report.issueDate,
+          issueDate: renderIssueDate,
           executiveSummary: report.executiveSummary,
           situation: report.situation,
           whatHappened: report.whatHappened,
@@ -297,8 +307,8 @@ export default function ReportPreview({
         incidents,
       )
     : null;
-  const periodLabel = report.topic && report.issueDate
-    ? resolveReportWindow(report.topic, report.issueDate).label
+  const periodLabel = report.topic && renderIssueDate
+    ? resolveReportWindow(report.topic, renderIssueDate).label
     : "";
   const coverUrl = topicCoverUrl(report.topic);
 
@@ -413,7 +423,16 @@ export default function ReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        <DataAsOfBanner data={computeDataAsOf({ topic: report.topic ?? "fuel", incidents })} />
+        <DataAsOfBanner
+          data={computeDataAsOf({
+            topic: report.topic ?? "fuel",
+            incidents,
+            marketAsOf:
+              report.topic === "fuel"
+                ? fuelMarketLatestDate(report.hardNumbers)
+                : null,
+          })}
+        />
         {report.executiveSummary && report.executiveSummary.trim() && (
           <Section title="Executive Summary">
             <Paragraphs text={report.executiveSummary} />

@@ -1,5 +1,5 @@
-import { db, reportsTable, incidentsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { db, reportsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 // Live fuel-market price ingest.
 //
@@ -285,15 +285,6 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     .from(reportsTable)
     .where(eq(reportsTable.topic, "fuel"));
 
-  // The window end a fuel report DISPLAYS is its issue date clamped down to the
-  // latest available fuel record, so prices must anchor to the same date or the
-  // "as of" line would run past the report's period. Resolve that record once.
-  const [latestRow] = await db
-    .select({ latest: sql<string | null>`max(${incidentsTable.occurredAt})::date::text` })
-    .from(incidentsTable)
-    .where(eq(incidentsTable.topic, "fuel"));
-  const latestFuelRecord = latestRow?.latest ?? null;
-
   const today = new Date().toISOString().slice(0, 10);
   const oldestIssue = fuelReports.reduce(
     (min, r) => (r.issueDate && r.issueDate < min ? r.issueDate : min),
@@ -381,14 +372,17 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
 
   for (const r of sorted) {
     const issueDate = r.issueDate ?? today;
-    // Anchor each report's prices to the END OF ITS REPORTING WINDOW, not to
-    // today. The window end is the issue date clamped down to the latest
-    // available fuel record (mirrors clampIssueDateToLatestRecord in the
-    // workbench). This keeps the Brent/WTI/jet "as of" dates and the jet
-    // trajectory inside the report's stated period instead of tracking the
-    // live close.
-    const anchorDate =
-      latestFuelRecord && latestFuelRecord < issueDate ? latestFuelRecord : issueDate;
+    // Anchor each report's prices to the END OF ITS REPORTING WINDOW = its
+    // issue date. Fuel Watch is a MARKET product: the reporting period is
+    // driven by the market close, NOT pulled back to the latest incident
+    // (incidents are reported separately as incident data status, and may
+    // stop earlier). valueAsOf() already returns the latest close on/before
+    // the anchor — FRED/Yahoo lag means that may be a day or two earlier —
+    // so an older report still shows ITS period's close, never today's, and
+    // the newest report shows the newest close. The workbench reads these
+    // same dates back out of hardNumbers to set the cover/period, so cover,
+    // Fast Facts and the jet chart can never disagree.
+    const anchorDate = issueDate;
     const built = buildHardNumbers(anchorDate, brent, wti, jet);
     if (!built) {
       log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);

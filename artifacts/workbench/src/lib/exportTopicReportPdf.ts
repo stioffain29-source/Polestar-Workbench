@@ -23,6 +23,7 @@ import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { computeTopicFastFacts } from "./topicFastFacts";
 import {
   buildFuelWatchReportData,
+  fuelMarketLatestDate,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
@@ -572,8 +573,18 @@ export async function exportTopicReportPdf(
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const cadence = `${canon.cadence} Briefing`;
-  let headerDate = data.issueDate;
-  try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
+  // Fuel Watch is a MARKET product: its reporting-period END is the latest
+  // market close the report carries, NOT the stored issue date (which may
+  // sit a few days past the last available market close). Deriving the
+  // render date here keeps the cover date, reporting-period label, incident
+  // window and chart all anchored to the same market close. Other topics —
+  // and a fuel draft with no dated market data yet — keep the stored date.
+  const renderIssueDate =
+    data.topic === "fuel"
+      ? (fuelMarketLatestDate(data.hardNumbers) ?? data.issueDate)
+      : data.issueDate;
+  let headerDate = renderIssueDate;
+  try { headerDate = format(parseISO(renderIssueDate), "yyyy-MM-dd"); } catch { /* keep */ }
 
   const ctx = createCtx({
     kind: resolvedTitle,
@@ -588,7 +599,7 @@ export async function exportTopicReportPdf(
   // shipping report does and pass it through; otherwise fall back to the
   // gradient hero. The image load is wrapped in try/catch so a missing or
   // unreadable asset never blocks PDF export.
-  const win = resolveReportWindow(data.topic, data.issueDate);
+  const win = resolveReportWindow(data.topic, renderIssueDate);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   const topicCoverUrl = TOPIC_COVER_URLS[data.topic];
   if (topicCoverUrl) {
@@ -610,14 +621,24 @@ export async function exportTopicReportPdf(
   void cadence;
   // Body pages start here, each with the gradient header band.
   beginBodyPages(ctx);
-  drawDataAsOf(ctx, formatDataAsOfLine(computeDataAsOf({ topic: data.topic, incidents })));
+  drawDataAsOf(
+    ctx,
+    formatDataAsOfLine(
+      computeDataAsOf({
+        topic: data.topic,
+        incidents,
+        marketAsOf:
+          data.topic === "fuel" ? fuelMarketLatestDate(data.hardNumbers) : null,
+      }),
+    ),
+  );
 
   if (data.executiveSummary && data.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, data.executiveSummary);
   }
 
-  const rawWindow = filterIncidentsToWindow(incidents, data.topic, data.issueDate, { byTopic: true });
+  const rawWindow = filterIncidentsToWindow(incidents, data.topic, renderIssueDate, { byTopic: true });
   // Strip records that match the topic field but are not operationally on
   // topic (e.g. hiking obituary that happens to mention "fuel"). The filter
   // is applied once and used for Fast Facts, prose data and the table.
@@ -637,7 +658,7 @@ export async function exportTopicReportPdf(
     const fuelData = buildFuelWatchReportData(
       {
         title: data.title,
-        issueDate: data.issueDate,
+        issueDate: renderIssueDate,
         author: data.author,
         executiveSummary: data.executiveSummary,
         situation: data.situation,

@@ -40,6 +40,8 @@ import {
   buildFuelWatchReportData,
   buildHardNumbersFromForm,
   fuelMarketFormFromData,
+  fuelMarketLatestDate,
+  resolveFuelPeriodEnd,
   EMPTY_FUEL_MARKET_FORM,
   type FuelMarketFormState,
   type FuelMarketCardForm,
@@ -122,6 +124,12 @@ export default function ReportEditor() {
     issueDate: string,
   ): { latest: string; issueDate: string } | null => {
     if (!issueDate) return null;
+    // Fuel Watch is a MARKET product: its window ends on the latest market
+    // close, which is routinely EARLIER than the newest incident. That gap is
+    // expected and is reported in the data-status strip (Market data vs
+    // Incident records), not as stale prose — so the incident-vs-issue-date
+    // staleness check does not apply to fuel.
+    if (topic === "fuel") return null;
     const dataTopic = topic === "protests" ? "flashpoint" : topic;
     const latest = latestRecordDate(incidents ?? [], dataTopic);
     if (!latest) return null;
@@ -283,11 +291,16 @@ export default function ReportEditor() {
     // line all describe the SAME window the data actually covers — instead of
     // presenting an empty/stale current week as if it were live.
     const dataTopic = topic === "protests" ? "flashpoint" : topic;
-    const issueDate = clampIssueDateToLatestRecord(
-      renderIssueDate,
-      incidents ?? [],
-      dataTopic,
-    );
+    // Fuel Watch is a MARKET product: its reporting period ends on the latest
+    // market close the report carries (from hardNumbers), NOT on the latest
+    // incident. Incident records — which may stop earlier — are reported
+    // separately in the data-status strip. Other topics keep the incident
+    // clamp. resolveFuelPeriodEnd falls back to that clamp when a fresh draft
+    // has no market data yet.
+    const issueDate =
+      topic === "fuel"
+        ? resolveFuelPeriodEnd(renderIssueDate, report.hardNumbers, incidents ?? [])
+        : clampIssueDateToLatestRecord(renderIssueDate, incidents ?? [], dataTopic);
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       topic: i.topic,
       title: i.title,
@@ -613,6 +626,13 @@ export default function ReportEditor() {
   // as current. `max` blocks the native picker; the onChange clamp catches
   // typed input. Returns "" (no cap) when no records exist for the topic.
   const issueDateMax = (() => {
+    // Fuel Watch is market-driven: cap the issue date at the latest market
+    // close it carries, not the latest incident. Falls through to the
+    // incident cap only when no market data is present yet.
+    if (form.topic === "fuel") {
+      const market = fuelMarketLatestDate(hardNumbersEdited ?? report?.hardNumbers);
+      if (market) return market;
+    }
     const dataTopic = form.topic === "protests" ? "flashpoint" : form.topic;
     const latest = latestRecordDate(incidents ?? [], dataTopic);
     return latest ? format(latest, "yyyy-MM-dd") : "";
@@ -728,11 +748,17 @@ export default function ReportEditor() {
                 onChange={(e) =>
                   set(
                     "issueDate",
-                    clampIssueDateToLatestRecord(
-                      e.target.value,
-                      incidents ?? [],
-                      form.topic === "protests" ? "flashpoint" : form.topic,
-                    ),
+                    form.topic === "fuel"
+                      ? resolveFuelPeriodEnd(
+                          e.target.value,
+                          hardNumbersEdited ?? report?.hardNumbers,
+                          incidents ?? [],
+                        )
+                      : clampIssueDateToLatestRecord(
+                          e.target.value,
+                          incidents ?? [],
+                          form.topic === "protests" ? "flashpoint" : form.topic,
+                        ),
                   )
                 }
                 className="rounded-sm"

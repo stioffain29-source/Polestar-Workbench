@@ -29,7 +29,29 @@ incident-only, so there was nothing fabricated to replace there.
   incident scrapers) in its own try/catch, so the scheduler, the admin route and
   the combined prod scrape all refresh prices and a FRED outage can't fail the
   incident ingest.
-- WINDOW-END ANCHOR (supersedes the earlier "newest report tracks today" rule):
+- PERIOD = MARKET CLOSE (supersedes BOTH "newest report tracks today" AND the
+  later "anchor prices to the incident-clamped issue date"). Fuel Watch is a
+  MARKET product: the reporting-period END is the latest MARKET-CLOSE date the
+  report carries (`fuelMarketLatestDate(hardNumbers)` = max of price asOf, jet
+  snapshot asOf, jet trajectory point dates), NOT the latest incident. The
+  ingest now anchors prices to the issue date UNCLAMPED (`anchorDate =
+  issueDate`); the workbench DERIVES the render period from the market close.
+  Cover date, REPORTING PERIOD label, Fast Facts asOf, jet chart latest, and the
+  incident window ALL flow from this one date (`renderIssueDate` in
+  ReportPreview.tsx + exportTopicReportPdf.ts; `resolveFuelPeriodEnd` in the
+  editor's issue-date clamp/onChange/max), so they cannot disagree. The
+  incident-vs-issue-date STALE-PROSE guard (`computeStale`) MUST exempt fuel, or
+  it fires on every fuel report (period routinely earlier than newest incident)
+  and falsely reseeds prose. Incident/market gaps (either direction — markets
+  close Fri, incidents arrive over the weekend; or dev's stale market trails
+  incidents) are EXPECTED and reported as TWO data-status lines (`Market data:`
+  vs `Incident records:` via `marketAsOf`), never folded into the period. Fall
+  back to the incident clamp ONLY for a fresh draft with no dated market data.
+  **Why (superseded rule kept for context):** the now-removed clamp anchored
+  the period to the latest INCIDENT, so a report whose prices ran to 26 May
+  showed a 23-May cover/period — the client flagged "23 May period with 26 May
+  market data." A market product's horizon is the market close, not the incident.
+- (HISTORICAL, superseded by the above) WINDOW-END ANCHOR rule:
   EVERY fuel report (including the newest) anchors its prices to the END OF ITS
   REPORTING WINDOW = its issue date clamped DOWN to the latest available fuel
   record (max occurredAt where topic='fuel'), mirroring

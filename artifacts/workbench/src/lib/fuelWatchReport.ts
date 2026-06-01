@@ -32,6 +32,7 @@ import {
   FUEL_DEFAULT_IMPLICATIONS,
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
+import { clampIssueDateToLatestRecord } from "./reportWindow";
 
 export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
 
@@ -141,6 +142,49 @@ export interface FuelWatchReportData {
   incidentData: FuelIncidentData;
   narrativeData: FuelNarrativeData;
   validation: FuelValidation;
+}
+
+/**
+ * The latest market-close date a Fuel Watch report carries — the max ISO
+ * date across its price cards' `asOf` values, the jet-fuel snapshot `asOf`,
+ * and the jet-fuel trajectory points. Fuel Watch is a MARKET product, so
+ * this date is its reporting-period end: the cover, period label, Fast
+ * Facts "as of" dates and the jet chart's latest point all resolve to it,
+ * which is why they can never disagree. Returns null when the report
+ * carries no dated market data yet (e.g. a brand-new draft before ingest).
+ */
+export function fuelMarketLatestDate(hardNumbers: unknown): string | null {
+  const parsed = parseFuelHardNumbers(hardNumbers);
+  let max: string | null = null;
+  const consider = (raw: string | undefined | null) => {
+    if (!raw) return;
+    const m = raw.match(/^\d{4}-\d{2}-\d{2}/);
+    if (!m) return;
+    if (max === null || m[0] > max) max = m[0];
+  };
+  for (const c of parsed.prices) consider(c.asOf);
+  consider(parsed.jetFuel?.asOf);
+  for (const p of parsed.jetFuelTrajectory.points) consider(p.date);
+  return max;
+}
+
+/**
+ * The Fuel Watch reporting-period END date. Fuel Watch is anchored to the
+ * MARKET close, not to the latest incident: the period ends on the newest
+ * market-close date the report carries (`fuelMarketLatestDate`). Incident
+ * records — which may stop earlier — are reported separately in the
+ * data-status strip, never as the overall reporting period. Falls back to
+ * the incident-clamped issue date only when the report has no dated market
+ * data yet (a fresh draft before the FRED ingest has run).
+ */
+export function resolveFuelPeriodEnd(
+  renderIssueDate: string,
+  hardNumbers: unknown,
+  incidents: { occurredAt: string; topic?: string }[],
+): string {
+  const market = fuelMarketLatestDate(hardNumbers);
+  if (market) return market;
+  return clampIssueDateToLatestRecord(renderIssueDate, incidents, "fuel");
 }
 
 /**

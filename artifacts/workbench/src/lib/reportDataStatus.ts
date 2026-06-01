@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 // Single source of truth for "what data is behind this report, how fresh
 // is it, and how does it get here". Consumed by every on-screen report
@@ -51,6 +51,14 @@ export interface DataAsOf {
   latestRecord: Date | null;
   /** When rows for this topic were last written to the database (max createdAt). */
   lastUpdated: Date | null;
+  /**
+   * For market-driven products (Fuel Watch): the latest market-close date the
+   * report carries — the reporting period ends here. When set, the banner
+   * reports it as "Market data" and relabels `latestRecord` as "Incident
+   * records", making any gap between the two explicit (e.g. market data to
+   * 26 May while incidents only run to 23 May).
+   */
+  marketAsOf?: Date | null;
 }
 
 interface IncidentLike {
@@ -93,15 +101,34 @@ export function computeDataAsOf(opts: {
   incidents: IncidentLike[];
   /** Pass false when the incidents are already scoped to the topic. */
   filterByTopic?: boolean;
+  /**
+   * ISO date (YYYY-MM-DD) of the latest market close for market-driven
+   * products (Fuel Watch). When set, the banner reports it as the reporting
+   * basis and relabels the incident date as "Incident records".
+   */
+  marketAsOf?: string | null;
 }): DataAsOf {
   const mode = ingestionMode(opts.topic);
   const scope = opts.filterByTopic === false ? undefined : opts.topic;
+  let marketAsOf: Date | null = null;
+  if (opts.marketAsOf) {
+    // Parse with date-fns parseISO (local midnight) — the SAME parser the
+    // cover/period rendering uses (resolveReportWindow → parseISO). Date.parse
+    // treats a bare YYYY-MM-DD as UTC midnight, which format() then renders in
+    // local time and can shift the market date back a day in negative
+    // timezones — reintroducing the very date mismatch this strip exists to
+    // expose. parseISO keeps the data-status market date aligned with the
+    // cover/period for every timezone.
+    const d = parseISO(opts.marketAsOf);
+    if (!Number.isNaN(d.getTime())) marketAsOf = d;
+  }
   return {
     topic: opts.topic,
     mode,
     modeLabel: ingestionModeLabel(mode),
     latestRecord: maxDate(opts.incidents, "occurredAt", scope),
     lastUpdated: maxDate(opts.incidents, "createdAt", scope),
+    marketAsOf,
   };
 }
 
@@ -114,9 +141,16 @@ function fmtDate(d: Date | null): string {
  * separators so the PDF sanitiser cannot strip or substitute characters.
  */
 export function formatDataAsOfLine(d: DataAsOf): string {
-  return [
-    `Data status: ${d.modeLabel}`,
-    `Latest record: ${fmtDate(d.latestRecord)}`,
-    `Last updated: ${fmtDate(d.lastUpdated)}`,
-  ].join("   |   ");
+  const parts = [`Data status: ${d.modeLabel}`];
+  if (d.marketAsOf) {
+    // Market-driven product: the period ends on the market close. Report
+    // the incident latest separately so any gap is explicit on screen and
+    // in the PDF (e.g. market to 26 May, incidents only to 23 May).
+    parts.push(`Market data: ${fmtDate(d.marketAsOf)}`);
+    parts.push(`Incident records: ${fmtDate(d.latestRecord)}`);
+  } else {
+    parts.push(`Latest record: ${fmtDate(d.latestRecord)}`);
+  }
+  parts.push(`Last updated: ${fmtDate(d.lastUpdated)}`);
+  return parts.join("   |   ");
 }
