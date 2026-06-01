@@ -277,6 +277,51 @@ function dedupeByTitle<T extends { title: string; date: Date; severity: string }
   return Array.from(bySig.values());
 }
 
+// Monitor-side deduplication. The Shipping monitor page (Shipping.tsx) renders
+// the same cleaned + deduplicated dataset as the report so the two surfaces can
+// never disagree. This mirrors the report recipe exactly:
+//   - vessel incidents (classifyVesselIncident !== null) get the event-key pass
+//     on top of title dedupe, so same-day seizure/attack rewrites under five or
+//     six wire headlines collapse to a single row (keeping the most severe /
+//     most recent version);
+//   - everything else gets title + signature dedupe only.
+// Event-key dedupe is applied ONLY to vessel rows — running it across all rows
+// would wrongly merge unrelated same-day items that share a chokepoint anchor.
+export function dedupeShippingMonitorRows<
+  T extends {
+    title: string;
+    severity: string;
+    occurredDate: Date;
+    summary?: string | null;
+    location?: string | null;
+    source?: string | null;
+    sourceUrl?: string | null;
+  },
+>(rows: T[]): T[] {
+  const tagged = rows.map((r) => ({
+    ...r,
+    date: r.occurredDate,
+    vesselType: classifyVesselIncident(r),
+  }));
+  // Rows with an unparseable date can't be keyed (the dedupe helpers call
+  // `date.toISOString()`, which throws on an invalid Date). They were never
+  // deduped under the old monitor pipeline either, so pass them through
+  // untouched rather than dropping them or crashing.
+  const validDate = (r: { date: Date }) => !isNaN(r.date.getTime());
+  const undatable = tagged.filter((r) => !validDate(r));
+  const datable = tagged.filter(validDate);
+  const vessel = datable.filter(
+    (r): r is typeof r & { vesselType: VesselIncidentType } => r.vesselType !== null,
+  );
+  const nonVessel = datable.filter((r) => r.vesselType === null);
+  const deduped = [
+    ...dedupeByEventKey(dedupeByTitle(vessel)),
+    ...dedupeByTitle(nonVessel),
+    ...undatable,
+  ];
+  return deduped as unknown as T[];
+}
+
 // Pure shipping-market / corporate-finance items with no operational hook
 // (vessel S&P stories, newbuild orders, earnings, fleet finance, etc.).
 // These get filtered out of the Commercial Impact table unless the title or

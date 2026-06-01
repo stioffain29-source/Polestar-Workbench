@@ -20,6 +20,7 @@ import {
   isLowCredibilityShippingRecord,
 } from "@/lib/shippingAnalysis";
 import { computeHormuzStatus, HORMUZ_TONE_COLOR } from "@/lib/hormuzStatus";
+import { dedupeShippingMonitorRows } from "@/lib/shippingReportDataset";
 import { ExternalLink } from "lucide-react";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
@@ -42,11 +43,6 @@ function darken(hex: string, amount = 0.18): string {
   const b = Math.max(0, Math.round(parseInt(h.slice(4, 6), 16) * (1 - amount)));
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
-
-// Temporary diagnostic constant. Bumped manually whenever the Shipping page
-// classifier / filter logic changes so the on-screen debug line proves the
-// browser is actually running the latest filter version, not a stale bundle.
-const SHIPPING_FILTER_VERSION = "shipping-page@v2 (shared isLowCredibilityShippingRecord noise filter)";
 
 export default function Shipping() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "shipping" });
@@ -73,30 +69,44 @@ export default function Shipping() {
     [incidents],
   );
   const outOfScopeCount = allEnriched.filter((i) => i.region === "Out of scope").length;
-  const enriched = useMemo(
-    () => allEnriched.filter((i) => i.region !== "Out of scope"),
+
+  // The monitor renders the SAME cleaned + deduplicated dataset the Shipping
+  // report produces, so the two surfaces can never disagree. Pipeline:
+  //   1. scope to APAC + Middle East (drop Out of scope);
+  //   2. drop noise via `isLowCredibilityShippingRecord` (social handles,
+  //      repatriation / crew-return, speculative claims, generic commentary);
+  //   3. collapse syndication via `dedupeShippingMonitorRows` — the same wire
+  //      story republished under five or six headlines on the same day becomes
+  //      a single row, keeping the most severe / most recent version.
+  // Every count and card on this page is therefore one-event-one-row, not raw
+  // wire volume, and a single event can never show as both Extreme and Low.
+  const inScopeClean = useMemo(
+    () =>
+      allEnriched
+        .filter((i) => i.region !== "Out of scope")
+        .filter((i) => !isLowCredibilityShippingRecord(i)),
     [allEnriched],
   );
-
-  // Cleaned dataset — repatriation / crew-return / social-handle /
-  // speculative-claim / generic-commentary records dropped. Shared with the
-  // Shipping PDF via `isLowCredibilityShippingRecord` so the page and the
-  // exporter can never disagree about what counts as a credible operational
-  // record. Used to drive analyst-narrative surfaces only: Latest
-  // Significant Incident, Chokepoint Watch "latest" row, Hormuz indicators.
-  // Raw `enriched` is still used for the Total/Records-in-Window counts so
-  // the page does not silently shrink the underlying dataset.
-  const cleanEnriched = useMemo(
-    () => enriched.filter((i) => !isLowCredibilityShippingRecord(i)),
-    [enriched],
+  const enriched = useMemo(
+    () => dedupeShippingMonitorRows(inScopeClean),
+    [inScopeClean],
   );
+  // `cleanEnriched` is retained as an alias so the analyst-narrative surfaces
+  // (Latest Significant Incident, Chokepoint Watch, Vessel / Piracy tables)
+  // keep their names; cleaned + deduped is now the single base for the page.
+  const cleanEnriched = enriched;
+  // Pre-region-filter clean + deduped set — feeds the Strait of Hormuz status
+  // indicators, which intentionally read across regions (FT / Reuters US
+  // bylines etc.) rather than the APAC + ME scope.
   const cleanAllEnriched = useMemo(
-    () => allEnriched.filter((i) => !isLowCredibilityShippingRecord(i)),
+    () =>
+      dedupeShippingMonitorRows(
+        allEnriched.filter((i) => !isLowCredibilityShippingRecord(i)),
+      ),
     [allEnriched],
   );
 
   const total = enriched.length;
-  const totalClean = cleanEnriched.length;
 
   const last7 = useMemo(() => {
     const now = new Date();
@@ -330,38 +340,6 @@ export default function Shipping() {
           {outOfScopeCount} shipping record{outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East (e.g. North America, Europe, Africa, South America) are excluded from this view.
         </div>
       )}
-
-      {/* TEMP DEBUG — Shipping monitor data-path diagnosis. Remove once
-          the Shipping page is re-aligned to the PDF dataset filter logic. */}
-      <div
-        className="text-[11px] font-mono bg-yellow-50 border border-yellow-300 text-yellow-900 rounded-sm px-3 py-2 leading-snug"
-        data-testid="shipping-debug"
-      >
-        <div className="font-bold uppercase tracking-wider text-[10px] mb-1">DEBUG — Shipping monitor data path</div>
-        <div>data source: GET /api/incidents?topic=shipping (Postgres → Drizzle, order by occurred_at DESC) via useListIncidents (React Query default cache)</div>
-        <div>
-          raw records: {incidents.length} · in-scope (APAC + ME + unattributed): {allEnriched.length - outOfScopeCount} · in-scope after noise filter: {totalClean} · dropped by noise filter: {total - totalClean} · out-of-scope dropped: {outOfScopeCount} · loading: {String(isLoading)}
-        </div>
-        <div>
-          latest record (raw, pre-filter): {(() => {
-            const sorted = [...enriched]
-              .filter((i) => !isNaN(i.occurredDate.getTime()))
-              .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
-            const top = sorted[0];
-            return top
-              ? `${format(top.occurredDate, "yyyy-MM-dd")} · sev=${top.severity} · id=${top.id ?? "?"} · ${top.title.slice(0, 90)}`
-              : "—";
-          })()}
-        </div>
-        <div>
-          latestSignificant (shared noise filter applied): {latestSignificant
-            ? `${format(latestSignificant.occurredDate, "yyyy-MM-dd")} · sev=${latestSignificant.severity} · id=${latestSignificant.id ?? "?"} · ${latestSignificant.title.slice(0, 90)}`
-            : "—"}
-        </div>
-        <div>
-          filter version: {SHIPPING_FILTER_VERSION} · build: {typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : "(unset)"}
-        </div>
-      </div>
 
       {/* 2. Fast Facts */}
       <Section title="Fast Facts">
