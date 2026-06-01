@@ -19,31 +19,128 @@ function storeToken(token: string): void {
   }
 }
 
-export default function TokenGate({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(getStoredToken);
-  const [input, setInput] = useState("");
-  const [error, setError] = useState(false);
+function clearStoredToken(): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
+type CheckResult = "ok" | "invalid" | "disabled" | "error";
+
+// Validate a candidate token against the server's zero-cost auth-check route.
+// The header is passed explicitly so we can verify a token BEFORE storing it.
+async function validateToken(candidate: string): Promise<CheckResult> {
+  try {
+    const res = await fetch("/api/admin/check", {
+      headers: { Authorization: `Bearer ${candidate}` },
+    });
+    if (res.ok) return "ok";
+    if (res.status === 401) return "invalid";
+    if (res.status === 503) return "disabled";
+    return "error";
+  } catch {
+    return "error";
+  }
+}
+
+type Status = "checking" | "needauth" | "authed";
+
+export default function TokenGate({ children }: { children: ReactNode }) {
+  const [status, setStatus] = useState<Status>(() =>
+    getStoredToken() ? "checking" : "needauth",
+  );
+  const [input, setInput] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // On mount, register the token getter and verify any stored token. A stored
+  // token that no longer matches the server is cleared so the operator is
+  // returned to the login screen instead of a half-broken workbench where
+  // every request 401s.
   useEffect(() => {
     setAuthTokenGetter(() => getStoredToken());
+    const stored = getStoredToken();
+    if (!stored) {
+      setStatus("needauth");
+      return;
+    }
+    let cancelled = false;
+    void validateToken(stored).then((result) => {
+      if (cancelled) return;
+      if (result === "ok") {
+        setStatus("authed");
+        return;
+      }
+      if (result === "invalid") {
+        clearStoredToken();
+        setMessage("Your saved access token is no longer valid. Please sign in again.");
+      } else if (result === "disabled") {
+        setMessage("Workbench access is not configured on the server.");
+      } else {
+        setMessage("Could not reach the server. Check your connection and try again.");
+      }
+      setStatus("needauth");
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
-      setError(true);
+      setMessage("Token is required.");
       return;
     }
-    storeToken(trimmed);
-    setAuthTokenGetter(() => getStoredToken());
-    setToken(trimmed);
-    setError(false);
+    setSubmitting(true);
+    setMessage(null);
+    const result = await validateToken(trimmed);
+    setSubmitting(false);
+    if (result === "ok") {
+      storeToken(trimmed);
+      setAuthTokenGetter(() => getStoredToken());
+      setMessage(null);
+      setStatus("authed");
+      return;
+    }
+    if (result === "invalid") {
+      setMessage("That token was not accepted.");
+    } else if (result === "disabled") {
+      setMessage("Workbench access is not configured on the server.");
+    } else {
+      setMessage("Could not reach the server. Check your connection and try again.");
+    }
   }
 
-  if (token) {
+  if (status === "authed") {
     return <>{children}</>;
   }
+
+  if (status === "checking") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0B0B3D",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#9ca3af",
+          fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+          fontSize: "0.8rem",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+        }}
+      >
+        Checking access…
+      </div>
+    );
+  }
+
+  const showError = message != null;
 
   return (
     <div
@@ -105,13 +202,14 @@ export default function TokenGate({ children }: { children: ReactNode }) {
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
-              setError(false);
+              setMessage(null);
             }}
             autoFocus
+            disabled={submitting}
             style={{
               width: "100%",
               background: "#0B0B3D",
-              border: error ? "1px solid #A33232" : "1px solid #4655FF",
+              border: showError ? "1px solid #A33232" : "1px solid #4655FF",
               color: "#E2E2E2",
               padding: "0.6rem 0.75rem",
               fontSize: "0.9rem",
@@ -122,7 +220,7 @@ export default function TokenGate({ children }: { children: ReactNode }) {
             }}
             placeholder="Enter admin token"
           />
-          {error && (
+          {showError && (
             <div
               style={{
                 color: "#A33232",
@@ -130,11 +228,12 @@ export default function TokenGate({ children }: { children: ReactNode }) {
                 marginBottom: "0.75rem",
               }}
             >
-              Token is required.
+              {message}
             </div>
           )}
           <button
             type="submit"
+            disabled={submitting}
             style={{
               marginTop: "1rem",
               width: "100%",
@@ -147,10 +246,11 @@ export default function TokenGate({ children }: { children: ReactNode }) {
               textTransform: "uppercase",
               fontFamily: "inherit",
               fontWeight: 700,
-              cursor: "pointer",
+              cursor: submitting ? "default" : "pointer",
+              opacity: submitting ? 0.7 : 1,
             }}
           >
-            Access Workbench
+            {submitting ? "Verifying…" : "Access Workbench"}
           </button>
         </form>
       </div>
