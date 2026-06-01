@@ -594,14 +594,27 @@ export function topUpFuelBullets(
   min: number,
   max: number,
 ): string {
-  const items = splitStoredBullets(stored).slice(0, max);
-  const seen = new Set(items.map(bulletNormKey));
+  const items: string[] = [];
+  const keys = new Set<string>();
+  const tokenSets: Set<string>[] = [];
+  // Accept a candidate only if it is neither an exact normalised duplicate
+  // nor a near-duplicate (heavy token overlap) of anything already kept.
+  const tryAdd = (candidate: string): void => {
+    if (items.length >= max) return;
+    const c = candidate.trim();
+    if (!c) return;
+    const k = bulletNormKey(c);
+    if (k && keys.has(k)) return;
+    const toks = sigTokens(c);
+    if (tokenSets.some((t) => nearDuplicate(toks, t))) return;
+    items.push(c);
+    if (k) keys.add(k);
+    tokenSets.push(toks);
+  };
+  for (const s of splitStoredBullets(stored)) tryAdd(s);
   for (const d of defaults) {
-    if (items.length >= min || items.length >= max) break;
-    const k = bulletNormKey(d);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    items.push(d);
+    if (items.length >= min) break;
+    tryAdd(d);
   }
   return items.map((b) => `- ${b}`).join("\n");
 }
@@ -622,24 +635,31 @@ const SEV_RANK: Record<string, number> = {
   insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
 };
 const FUEL_CASUALTY_RE =
-  /\b(killed|dead|deaths?|died|fatal(it(y|ies))?|casualt(y|ies)|injur(y|ies|ed)|wounded|massacre|martial law|state of emergency)\b/i;
+  /\b(killed|dead|deaths?|died|fatal(it(y|ies))?|casualt(y|ies)|injur(y|ies|ed)|wounded|massacre|martial law|state of emergency|hostage|kidnap(ped|ping)?)\b/i;
+// DIRECT operational disruption only — physical events that have actually
+// occurred and impede fuel production, movement or supply. A market/price/
+// policy headline that merely "warns" of or comments on these has no such
+// keyword (or is caught by the speculative guard below) and is downgraded.
+// Note: the over-broad "disruption" token is deliberately NOT here — it
+// matches market/supply commentary ("supply disruption could lift prices")
+// rather than a concrete physical event.
 const FUEL_OPERATIONAL_RE =
-  /\b(shutdown|shut down|closure|closed|attack|drone|missile|blockade|seizure|seized|sabotage|fire|explosion|outage|halt(ed)?)\b/i;
-const FUEL_NONPHYSICAL_RE: RegExp[] = [
-  /\b(spr|strategic (petroleum )?reserve|petroleum reserve|reserves?|buffers?)\b/i,
-  /\b(price|prices|pricing)\b/i,
-  /\b(output|production|supply|demand|inventory|inventories|stockpile)\b/i,
-  /\b(import|imports|export|exports)\b/i,
-  /\b(subsidy|subsidies|levy|levies|duty|excise|tax)\b/i,
-  /\b(forecast|outlook|survey|target|guidance)\b/i,
-  /\b(crack spread|refining margin|refinery margin|backwardation|contango)\b/i,
-  /\b(stocks?)\b/i,
-];
+  /\b(shutdown|shut down|closure|closed|attack(ed|ing)?|drone|missile|rocket|blockade[d]?|seizure|seized|sabotage[d]?|fire|explosion|blast|outage|halt(ed)?|strike|walkout|spill|leak|derail(ed|ment)?|ambush|raid(ed)?|hijack(ed)?|damaged|destroyed)\b/i;
+// Speculative / commentary / policy-warning framing. When a record is phrased
+// as a warning, forecast, risk or proposal rather than a concrete event, it is
+// market commentary or policy signalling — NOT an "extreme"/"high" operational
+// disruption — even if it name-drops an operational word ("strike could worsen
+// markets", "warns supply may halt"). Casualty records bypass this guard.
+const FUEL_SPECULATIVE_RE =
+  /\b(warn(s|ed|ing)?|could|may|might|likely|risk(s|ing)?|threat(en(s|ed|ing)?)?|fear(s|ed)?|set to|expected to|forecast(s|ed)?|outlook|propos(e|ed|al|als)|plan(s|ned)? to|weigh(s|ed)?|mull(s|ed)?|eye(s|ing)?|consider(s|ing)?|sceptic|skeptic|postpone)\b/i;
 
 /**
- * Cap a fuel incident's severity at "moderate" when it is a market / price /
- * policy / forecast indicator rather than a physical disruption or casualty
- * event. Only downgrades (never raises) and only touches "high"/"extreme".
+ * Cap a fuel incident's severity at "moderate" UNLESS it reports a concrete,
+ * already-occurred operational disruption or carries casualties. Market
+ * commentary, price moves, policy/levy warnings, forecasts and "could/may"
+ * speculation are NOT "extreme"/"high" by default — they are downgraded, even
+ * when they mention an operational word in passing. Only downgrades (never
+ * raises) and only touches "high"/"extreme".
  */
 export function capFuelMarketSeverity(
   severity: string | null | undefined,
@@ -649,8 +669,12 @@ export function capFuelMarketSeverity(
   const sev = (severity ?? "").toLowerCase();
   if ((SEV_RANK[sev] ?? 0) <= SEV_RANK.moderate) return severity ?? "";
   const hay = `${title}\n${summary}`;
+  // Casualties always keep the elevated rating.
   if (FUEL_CASUALTY_RE.test(hay)) return severity ?? "";
+  // Warning / forecast / policy-proposal framing is commentary → downgrade.
+  if (FUEL_SPECULATIVE_RE.test(hay)) return "moderate";
+  // A concrete physical disruption keeps the elevated rating.
   if (FUEL_OPERATIONAL_RE.test(hay)) return severity ?? "";
-  if (FUEL_NONPHYSICAL_RE.some((re) => re.test(hay))) return "moderate";
-  return severity ?? "";
+  // Everything else (pure market/price/policy signal) → downgrade.
+  return "moderate";
 }

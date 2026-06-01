@@ -291,12 +291,19 @@ const FUEL: ReportPack = {
     const para2 = `Where the two reinforce each other — high prices meeting tight supply or chokepoint disruption — the operational impact compounds. Freight rates lift, surcharge clauses fire, generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against this cycle.`;
     return `${para1}\n\n${para2}`;
   },
-  // Implications for Business: practical and client-useful, explaining why
-  // each action matters rather than listing a generic checklist.
+  // Implications for Business: practical and client-useful, one distinct
+  // action per bullet. Emitted as discrete "- " bullets (not dense
+  // paragraphs) so each point reads as a separate action and the section
+  // never collapses into two long blocks or repeats itself.
   implications: () => {
-    const para1 = `On the cost side, revisit contract pricing on bulk fuel and any surcharge pass-through clauses in freight and logistics agreements — elevated indicators usually mean the next invoice cycle reflects this, not the current one. Forward-cover the bulk and aviation lines you depend on rather than waiting for the spot move to be confirmed.`;
-    const para2 = `On the continuity side, check fuel stock at site, generator runtime assumptions and the fuel routes you rely on for resupply. Rationing reports and forecourt disruption should pull commercial-allocation conversations forward with suppliers, and escalation triggers (queues, allocation cuts, station closures) should be agreed in advance so they fire automatically rather than after the fact. Where Gulf or Red Sea routing matters, treat route diversification as a live mitigation, not a future option.`;
-    return `${para1}\n\n${para2}`;
+    const lines = [
+      "Revisit bulk-fuel contract pricing and surcharge pass-through clauses now — elevated indicators usually hit the next invoice cycle, not the current one.",
+      "Forward-cover the bulk and aviation fuel lines you depend on rather than waiting for the spot move to confirm.",
+      "Check on-site fuel stock cover and generator runtime assumptions against a short-notice availability shock.",
+      "Pull commercial-allocation conversations forward with suppliers where rationing or forecourt disruption is being reported.",
+      "Agree escalation triggers in advance (queues, allocation cuts, station closures), and where Gulf or Red Sea routing matters treat route diversification as a live mitigation.",
+    ];
+    return lines.map((l) => `- ${l}`).join("\n");
   },
   // Watch Next: 3-5 forward-looking indicators, one short sentence each.
   watchNext: () => {

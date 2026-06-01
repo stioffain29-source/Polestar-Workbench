@@ -437,14 +437,32 @@ function drawRelatedIncidents(
   const truncated = sorted.length - rows.length;
   if (rows.length === 0) return;
 
-  drawSectionHeading(ctx, "Related Incidents");
-
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
   const colTypeW = 120;
   const colSevW = 64;
   const colTitleW = CW - colDateW - colTypeW - colSevW - 6;
   const rowH = 18;
+
+  // Keep the whole table together. Pre-measure the header plus every row
+  // (with the same regular 8pt metrics used to render the titles) and also
+  // reserve room for the Disclaimer block that follows, then break to a
+  // fresh page UP-FRONT if the combined block will not fit on the current
+  // page. This prevents a "heading + one orphan row" at the foot of the
+  // previous page and keeps the table and disclaimer sitting cleanly
+  // together on one page.
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  let tableH = rowH; // column header band
+  for (const i of rows) {
+    const tl: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
+    tableH += Math.max(rowH, tl.length * 11 + 8);
+  }
+  const HEADING_BLOCK_H = 50;     // pre-pad + heading line + divider + lead
+  const DISCLAIMER_RESERVE_H = 170; // keep the disclaimer on the same page
+  ensureSpace(ctx, HEADING_BLOCK_H + tableH + 8 + DISCLAIMER_RESERVE_H);
+
+  drawSectionHeading(ctx, "Related Incidents");
 
   const drawHeader = () => {
     setFill(pdf, NAVY);

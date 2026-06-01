@@ -325,7 +325,7 @@ export function buildFuelWatchReportData(
       // Stored content always leads; defaults only fill the gap.
       implications: topUpFuelBullets(report.implications, FUEL_DEFAULT_IMPLICATIONS, 4, 6),
       polestarView: report.polestarView,
-      watchNext: topUpFuelBullets(report.watchNext, FUEL_DEFAULT_WATCH_NEXT, 5, 6),
+      watchNext: topUpFuelBullets(report.watchNext, FUEL_DEFAULT_WATCH_NEXT, 5, 5),
     },
     validation: {
       hasPrices,
