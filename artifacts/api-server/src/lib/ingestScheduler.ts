@@ -54,6 +54,30 @@ async function hoursSinceLastIngest(): Promise<number | null> {
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
 }
 
+/**
+ * Hours since the newest SHIPPING incident was inserted, or null when there are
+ * none. Shipping has no `sources.last_success_at` heartbeat (only flashpoint
+ * stamps one), so the flashpoint heartbeat above is normally a fine proxy for
+ * "a full run happened recently" — every full run scrapes shipping too.
+ *
+ * The exception is the FIRST boot after shipping ingestion is newly deployed:
+ * flashpoint may have run recently under code that did NOT yet scrape shipping,
+ * so its heartbeat reads "fresh" while shipping is in fact weeks stale and the
+ * boot catch-up would wrongly skip. This direct check forces a full run in that
+ * case. Uses created_at (insertion time, advances on every committed insert),
+ * not occurred_at (the news date, which can be backdated).
+ */
+async function hoursSinceNewestShipping(): Promise<number | null> {
+  const res = await db.execute(sql`
+    SELECT MAX(created_at) AS last
+    FROM incidents
+    WHERE topic = 'shipping'
+  `);
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
 async function tick(reason: string): Promise<void> {
   try {
     const result = await runIngestOnce();
@@ -123,9 +147,15 @@ export function startIngestScheduler(): void {
   void (async () => {
     try {
       const age = await hoursSinceLastIngest();
-      if (age === null || age >= hours) {
+      const shippingAge = await hoursSinceNewestShipping();
+      const shippingStale = shippingAge === null || shippingAge >= hours;
+      if (age === null || age >= hours || shippingStale) {
         logger.info(
-          { ageHours: age === null ? null : Math.round(age) },
+          {
+            ageHours: age === null ? null : Math.round(age),
+            shippingAgeHours: shippingAge === null ? null : Math.round(shippingAge),
+            shippingStale,
+          },
           "boot ingest: data stale, running catch-up",
         );
         await tick("boot");
