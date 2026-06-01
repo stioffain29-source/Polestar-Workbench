@@ -708,6 +708,25 @@ export async function exportTopicReportPdf(
       drawJetFuelEmptyCard(ctx, fuelData.marketData.jetFuelBenchmarkLabel);
     }
 
+    // In-period jet-fuel lag note (only when jet data stops before the
+    // period end). Mirrors the subdued note under the chart in the preview.
+    if (fuelData.marketData.jetDataNote) {
+      const { pdf, MX, CW } = ctx;
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8);
+      const noteLines = pdf.splitTextToSize(
+        fuelData.marketData.jetDataNote,
+        CW,
+      ) as string[];
+      ensureSpace(ctx, noteLines.length * 10 + 6);
+      for (const line of noteLines) {
+        pdf.text(line, MX, ctx.y + 8);
+        ctx.y += 10;
+      }
+      ctx.y += 2;
+    }
+
     // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
     // Operational Read, Regional Highlights, Producer and Buyer Actions)
     // sit alongside the editor-authored prose so the report reads 60%

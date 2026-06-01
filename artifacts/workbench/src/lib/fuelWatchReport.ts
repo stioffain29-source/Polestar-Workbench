@@ -33,8 +33,18 @@ import {
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
+import { format, parseISO } from "date-fns";
 
 export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
+
+/** Format a bare/leading ISO date as e.g. "26 May 2026" for prose notes. */
+function formatFuelNoteDate(iso: string): string {
+  const m = iso.match(/^\d{4}-\d{2}-\d{2}/);
+  if (!m) return iso;
+  const d = parseISO(m[0]);
+  if (Number.isNaN(d.getTime())) return iso;
+  return format(d, "d MMM yyyy");
+}
 
 export const FUEL_MISSING_REQUIRED_NOTE =
   "Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.";
@@ -98,6 +108,13 @@ export interface FuelMarketData {
   /** Auto-derived 2-paragraph Market Read prose. Null when no market
    *  data is available (caller renders nothing). */
   marketRead: string | null;
+  /** Set when the jet-fuel series (EIA/FRED, published on a lag) stops
+   *  BEFORE the reporting-period end (which is anchored to the freshest
+   *  market close — usually Brent/WTI). The note explains the in-period
+   *  date gap so the jet chart's earlier "Latest" date never reads as a
+   *  contradiction of the cover/period. Null when jet fuel is current to
+   *  the period end (the dates already agree). */
+  jetDataNote: string | null;
 }
 
 export interface FuelIncidentData {
@@ -327,6 +344,32 @@ export function buildFuelWatchReportData(
     warnings.push("No related fuel incidents in the reporting window.");
   }
 
+  // Jet-fuel lag note. The reporting period ends on the freshest market
+  // close the report carries (fuelMarketLatestDate — usually Brent/WTI from
+  // the daily futures feed). The EIA/FRED jet-fuel series publishes on a
+  // lag, so its latest dated point can fall a few days inside that period.
+  // When it does, surface an explicit in-period note so the jet chart's
+  // earlier "Latest" date is explained, not perceived as a mismatch.
+  const periodEnd = fuelMarketLatestDate(report.hardNumbers);
+  const jetDates: string[] = [];
+  const pushJet = (raw: string | undefined | null) => {
+    if (!raw) return;
+    const m = raw.match(/^\d{4}-\d{2}-\d{2}/);
+    if (m) jetDates.push(m[0]);
+  };
+  pushJet(jetFuel?.asOf);
+  for (const p of trajectoryPoints) pushJet(p.date);
+  const jetLatest = jetDates.length
+    ? jetDates.reduce((a, b) => (b > a ? b : a))
+    : null;
+  let jetDataNote: string | null = null;
+  if (periodEnd && jetLatest && jetLatest < periodEnd) {
+    jetDataNote =
+      `Jet fuel data (EIA/FRED) publishes on a lag — latest available ` +
+      `${formatFuelNoteDate(jetLatest)}; Brent and WTI run to ` +
+      `${formatFuelNoteDate(periodEnd)} (the period end).`;
+  }
+
   return {
     reportMeta: {
       ...(report.id !== undefined ? { id: report.id } : {}),
@@ -352,6 +395,7 @@ export function buildFuelWatchReportData(
         jetFuel,
         trajectory: trajectoryPoints,
       }),
+      jetDataNote,
     },
     incidentData: {
       fuelIncidents,

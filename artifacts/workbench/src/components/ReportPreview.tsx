@@ -480,6 +480,18 @@ export default function ReportPreview({
                 data={fuelData.marketData.jetFuelTrajectory.length >= 2 ? fuelData.marketData.jetFuelTrajectory : null}
                 benchmarkLabel={fuelData.marketData.jetFuelBenchmarkLabel}
               />
+              {fuelData.marketData.jetDataNote && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontFamily: "Roboto, sans-serif",
+                    fontSize: 11,
+                    color: "#303030",
+                  }}
+                >
+                  {fuelData.marketData.jetDataNote}
+                </div>
+              )}
             </Section>
 
             <NarrativeSection title="Market Read" text={fuelData.marketData.marketRead} />

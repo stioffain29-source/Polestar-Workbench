@@ -47,6 +47,20 @@ incident-only, so there was nothing fabricated to replace there.
   incidents) are EXPECTED and reported as TWO data-status lines (`Market data:`
   vs `Incident records:` via `marketAsOf`), never folded into the period. Fall
   back to the incident clamp ONLY for a fresh draft with no dated market data.
+- CRUDE WINS THE PERIOD END; JET LAG IS LABELLED, NOT CLAMPED. When crude
+  (Yahoo, daily) is fresher than jet (FRED, lagged) — e.g. crude 29 May, jet
+  26 May — the user decided the period END = the LATEST CRUDE close (29 May).
+  Do NOT clamp crude DOWN to the jet date to force full alignment: that
+  re-shows an older crude value and re-triggers the "stale crude / you are
+  lying" complaint (the two demands "crude must be freshest" and "all dates
+  must match" are mathematically incompatible while jet lags, so the user
+  chose freshest-crude). Instead the canonical builder emits
+  `marketData.jetDataNote` (set ONLY when jetLatest < periodEnd) explaining the
+  in-period gap; it renders under the Jet Fuel Trajectory in BOTH the preview
+  and the PDF builder. Each card still shows its own asOf, so 29-May crude and
+  26-May jet on the same page read as labelled per-series dates, not a
+  contradiction. **Why:** asked which wins, the user said "29th is when the
+  market closes that should be the last date."
   **Why (superseded rule kept for context):** the now-removed clamp anchored
   the period to the latest INCIDENT, so a report whose prices ran to 26 May
   showed a 23-May cover/period — the client flagged "23 May period with 26 May
