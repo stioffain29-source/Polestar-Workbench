@@ -16,7 +16,7 @@ function parseId(raw: string | string[] | undefined): number {
   return Number.isNaN(n) ? -1 : n;
 }
 
-router.get("/sources", requireAdminToken, async (req, res): Promise<void> => {
+router.get("/sources", async (req, res): Promise<void> => {
   const parsed = ListSourcesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -34,7 +34,7 @@ router.get("/sources", requireAdminToken, async (req, res): Promise<void> => {
   res.json(rows);
 });
 
-router.get("/sources/health", requireAdminToken, async (_req, res): Promise<void> => {
+router.get("/sources/health", async (_req, res): Promise<void> => {
   const [totals] = await db
     .select({
       total: sql<number>`count(*)::int`,

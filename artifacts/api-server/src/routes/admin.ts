@@ -2,16 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { type IngestSummary } from "@workspace/ingest";
 import { runIngestOnce } from "../lib/ingestRunner";
-import { requireAdminToken } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
-
-// Lightweight credential check used by the workbench TokenGate to validate an
-// operator token before granting access (zero DB work). Returns 200 only when
-// the presented token matches; 401 otherwise; 503 if the token is unconfigured.
-router.get("/admin/check", requireAdminToken, (_req: Request, res: Response) => {
-  res.json({ ok: true });
-});
 
 // Protected production ingestion trigger.
 //

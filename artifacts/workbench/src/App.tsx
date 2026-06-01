@@ -4,7 +4,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "./components/Layout";
-import TokenGate from "./components/TokenGate";
 import Dashboard from "./pages/Dashboard";
 import Incidents from "./pages/Incidents";
 import MapPage from "./pages/Map";
@@ -48,16 +47,14 @@ function Router() {
 
 function App() {
   return (
-    <TokenGate>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </TokenGate>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <Router />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 

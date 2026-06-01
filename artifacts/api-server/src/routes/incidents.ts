@@ -10,7 +10,6 @@ import {
 } from "@workspace/api-zod";
 import { defaultRelevanceCondition, wantsRaw } from "../lib/relevanceFilter";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
-import { requireAdminToken } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
 
@@ -93,7 +92,7 @@ router.get("/incidents/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/incidents", requireAdminToken, async (req, res): Promise<void> => {
+router.post("/incidents", async (req, res): Promise<void> => {
   const parsed = CreateIncidentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -121,7 +120,7 @@ router.post("/incidents", requireAdminToken, async (req, res): Promise<void> => 
   res.status(201).json(row);
 });
 
-router.patch("/incidents/:id", requireAdminToken, async (req, res): Promise<void> => {
+router.patch("/incidents/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateIncidentBody.safeParse(req.body);
   if (!parsed.success) {
@@ -140,7 +139,7 @@ router.patch("/incidents/:id", requireAdminToken, async (req, res): Promise<void
   res.json(row);
 });
 
-router.delete("/incidents/:id", requireAdminToken, async (req, res): Promise<void> => {
+router.delete("/incidents/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(incidentsTable).where(eq(incidentsTable.id, id));
   res.status(204).end();
