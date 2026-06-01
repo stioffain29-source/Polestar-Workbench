@@ -26,6 +26,7 @@ import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
+import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import {
   draftTopicReportProse,
   type DraftableIncident,
@@ -218,6 +219,24 @@ export default function ReportEditor() {
           throw new Error("PDF export failed: report preview is not ready.");
         }
         await exportElementToPdf(reportElement, filename);
+      } else if (form.topic === "flashpoint" || form.topic === "protests") {
+        await exportFlashpointReportPdf(
+          {
+            title: form.title,
+            topic: form.topic,
+            issueDate: form.issueDate,
+            author: form.author,
+            executiveSummary: form.executiveSummary,
+            situation: form.situation,
+            whatHappened: form.whatHappened,
+            whatMatters: form.whatMatters,
+            implications: form.implications,
+            watchNext: form.watchNext,
+            polestarView: form.polestarView,
+          },
+          incidentsForExport,
+          filename,
+        );
       } else {
         await exportTopicReportPdf(
           {
