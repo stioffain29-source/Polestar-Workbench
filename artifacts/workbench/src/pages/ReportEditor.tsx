@@ -211,38 +211,33 @@ export default function ReportEditor() {
 
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
 
+      // Common payload shared by all PDF exporters.
+      const pdfPayload = {
+        title: form.title,
+        topic: form.topic,
+        issueDate: form.issueDate,
+        author: form.author,
+        executiveSummary: form.executiveSummary,
+        situation: form.situation,
+        whatHappened: form.whatHappened,
+        whatMatters: form.whatMatters,
+        implications: form.implications,
+        watchNext: form.watchNext,
+        polestarView: form.polestarView,
+      };
+
       if (form.topic === "flashpoint" || form.topic === "protests") {
         await exportFlashpointReportPdf(
-          {
-            title: form.title,
-            topic: form.topic,
-            issueDate: form.issueDate,
-            author: form.author,
-            executiveSummary: form.executiveSummary,
-            situation: form.situation,
-            whatHappened: form.whatHappened,
-            whatMatters: form.whatMatters,
-            implications: form.implications,
-            watchNext: form.watchNext,
-            polestarView: form.polestarView,
-          },
+          pdfPayload,
           incidentsForExport,
           filename,
         );
+      } else if (form.topic === "shipping") {
+        await exportShippingReportPdf(pdfPayload, incidentsForExport, filename);
       } else {
         await exportTopicReportPdf(
           {
-            title: form.title,
-            topic: form.topic,
-            issueDate: form.issueDate,
-            author: form.author,
-            executiveSummary: form.executiveSummary,
-            situation: form.situation,
-            whatHappened: form.whatHappened,
-            whatMatters: form.whatMatters,
-            implications: form.implications,
-            watchNext: form.watchNext,
-            polestarView: form.polestarView,
+            ...pdfPayload,
             hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
           },
           incidentsForExport,
