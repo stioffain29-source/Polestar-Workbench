@@ -7,6 +7,7 @@ import {
   UpdateReportBody,
   ListReportsQueryParams,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
 
@@ -40,7 +41,7 @@ function normalizeHardNumbers(value: unknown): FuelHardNumbers | undefined {
   return JSON.parse(JSON.stringify(value)) as FuelHardNumbers;
 }
 
-router.get("/reports", async (req, res): Promise<void> => {
+router.get("/reports", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = ListReportsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -58,7 +59,7 @@ router.get("/reports", async (req, res): Promise<void> => {
   res.json(rows);
 });
 
-router.get("/reports/:id", async (req, res): Promise<void> => {
+router.get("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const [row] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
   if (!row) {
@@ -68,7 +69,7 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/reports", async (req, res): Promise<void> => {
+router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = CreateReportBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -84,7 +85,7 @@ router.post("/reports", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/reports/:id", async (req, res): Promise<void> => {
+router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateReportBody.safeParse(req.body);
   if (!parsed.success) {
@@ -111,7 +112,7 @@ router.patch("/reports/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.delete("/reports/:id", async (req, res): Promise<void> => {
+router.delete("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(reportsTable).where(eq(reportsTable.id, id));
   res.status(204).end();

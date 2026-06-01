@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, incidentsTable, sourcesTable, reportsTable } from "@workspace/db";
 import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { defaultRelevanceCondition } from "../lib/relevanceFilter";
+import { requireAdminToken } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
 
@@ -15,7 +16,7 @@ const TOPICS: Record<string, string> = {
   cargo_watch: "Cargo Watch",
 };
 
-router.get("/dashboard/overview", async (_req, res): Promise<void> => {
+router.get("/dashboard/overview", requireAdminToken, async (_req, res): Promise<void> => {
   const since7d = new Date(Date.now() - 7 * 86400000);
 
   const [totals] = await db

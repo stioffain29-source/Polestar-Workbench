@@ -5,6 +5,7 @@ import {
   CreateCountryReportBody,
   UpdateCountryReportBody,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
 
@@ -26,7 +27,7 @@ router.get("/countries/:slug", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/countries", async (req, res): Promise<void> => {
+router.post("/countries", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = CreateCountryReportBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -36,7 +37,7 @@ router.post("/countries", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/countries/:slug", async (req, res): Promise<void> => {
+router.patch("/countries/:slug", requireAdminToken, async (req, res): Promise<void> => {
   const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
   const parsed = UpdateCountryReportBody.safeParse(req.body);
   if (!parsed.success) {
