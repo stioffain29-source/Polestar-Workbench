@@ -1,5 +1,5 @@
-import { db, reportsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, reportsTable, incidentsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 
 // Live fuel-market price ingest.
 //
@@ -23,11 +23,12 @@ import { eq } from "drizzle-orm";
 //     substitute, so jet legitimately tracks its own (slower) publication date.
 //
 // FRED's fredgraph.csv and Yahoo's chart endpoint are both public and need no
-// API key. The NEWEST fuel report is the live product, so it tracks the LATEST
-// available prices (anchored to today). Older/archived reports stay frozen at
-// their own issue date so historical issues keep date-appropriate numbers.
-// Re-running is idempotent. Like the other ingest modules, this NEVER closes the
-// shared DB pool — only the CLI wrapper does.
+// API key. Every fuel report is priced AS OF THE END OF ITS REPORTING WINDOW
+// (its issue date, clamped down to the latest available fuel record) rather than
+// "live today", so the Brent/WTI/jet "as of" dates and the jet trajectory always
+// fall inside the period the report covers — a Fuel Watch issue must read as an
+// AS-OF report, not a live ticker. Re-running is idempotent. Like the other
+// ingest modules, this NEVER closes the shared DB pool — only the CLI wrapper does.
 
 const FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv";
 const YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
@@ -284,6 +285,15 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     .from(reportsTable)
     .where(eq(reportsTable.topic, "fuel"));
 
+  // The window end a fuel report DISPLAYS is its issue date clamped down to the
+  // latest available fuel record, so prices must anchor to the same date or the
+  // "as of" line would run past the report's period. Resolve that record once.
+  const [latestRow] = await db
+    .select({ latest: sql<string | null>`max(${incidentsTable.occurredAt})::date::text` })
+    .from(incidentsTable)
+    .where(eq(incidentsTable.topic, "fuel"));
+  const latestFuelRecord = latestRow?.latest ?? null;
+
   const today = new Date().toISOString().slice(0, 10);
   const oldestIssue = fuelReports.reduce(
     (min, r) => (r.issueDate && r.issueDate < min ? r.issueDate : min),
@@ -368,24 +378,17 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
 
   // Sort newest issue date first so `latest` reflects the most recent report.
   const sorted = [...fuelReports].sort((a, b) => (b.issueDate ?? "").localeCompare(a.issueDate ?? ""));
-  // The current report(s) are the live product → anchor them to today (latest
-  // FRED observation). "Current" = every report sharing the MAX issue date that
-  // is ON OR BEFORE today. Excluding future dates is deliberate: a future-dated
-  // draft (e.g. next week's report being prepared) must NOT steal the "current"
-  // designation from the live published report and freeze it on stale prices.
-  // Ties resolve deterministically, and prod has exactly one fuel report so it
-  // is always the live one. Older issues stay frozen at their own issue date.
-  const maxIssue = sorted.reduce(
-    (m, r) => (r.issueDate && r.issueDate <= today && r.issueDate > m ? r.issueDate : m),
-    "",
-  );
 
   for (const r of sorted) {
     const issueDate = r.issueDate ?? today;
-    const isCurrent = !!r.issueDate && r.issueDate === maxIssue;
-    // Current tracks live: anchor to today. Non-current reports (older archives,
-    // or future-dated drafts) stay frozen at their own issue date.
-    const anchorDate = isCurrent ? today : issueDate;
+    // Anchor each report's prices to the END OF ITS REPORTING WINDOW, not to
+    // today. The window end is the issue date clamped down to the latest
+    // available fuel record (mirrors clampIssueDateToLatestRecord in the
+    // workbench). This keeps the Brent/WTI/jet "as of" dates and the jet
+    // trajectory inside the report's stated period instead of tracking the
+    // live close.
+    const anchorDate =
+      latestFuelRecord && latestFuelRecord < issueDate ? latestFuelRecord : issueDate;
     const built = buildHardNumbers(anchorDate, brent, wti, jet);
     if (!built) {
       log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);

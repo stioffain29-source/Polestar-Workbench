@@ -229,6 +229,23 @@ function thinTail(thin: boolean, total: number): string {
   return " Volume is light, so the read is directional rather than firm.";
 }
 
+// Fuel Watch tracks cost-and-continuity pressure, not casualty-grade events.
+// The shared severity classifier tags individual price/policy wire headlines
+// (e.g. a fuel-levy debate, a postponed price hike, a pipeline part-complete)
+// as "extreme", which overstates operational severity for a market watch. So
+// the Fuel pack reports OPERATING PRESSURE, capped at "high", instead of echoing
+// a per-record "Severity peaked at extreme" label the evidence does not support.
+function fuelPressureTail(sev: string): string {
+  if (!sev) return "";
+  const level =
+    sev === "extreme" || sev === "high"
+      ? "high"
+      : sev === "moderate"
+        ? "elevated"
+        : "contained";
+  return ` Operating pressure across the window reads as ${level}.`;
+}
+
 // ---------------------------------------------------------------------------
 // Fuel Watch
 // ---------------------------------------------------------------------------
@@ -240,7 +257,7 @@ const FUEL: ReportPack = {
     const geo = lead
       ? ` ${lead} produced the clearest country signal${countries && countries !== lead ? `, with further reporting from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    const para1 = `Fuel risk this ${cadence} cycle reads as a cost-and-continuity issue rather than a single dramatic event. Pressure across the window was driven by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    const para1 = `Fuel risk this ${cadence} cycle reads as a cost-and-continuity issue rather than a single dramatic event. Pressure across the window was driven by ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total)}`;
     const para2 = `Cost indicators are holding above easy-budget levels, and the incident picture adds operational stress — shortages, forecourt disruption, subsidy moves and route pressure where they appear — rather than relief.`;
     const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
@@ -249,14 +266,14 @@ const FUEL: ReportPack = {
   // matters. No section cross-references, no meta-report wording.
   situation: ({ lead }) => {
     const where = lead ? ` ${lead} is the country carrying the most weight.` : "";
-    return `Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream. The cycle matters because the cost shock and the access shock are arriving together, which is when contract economics and operational continuity stop being separate problems.${where}`;
+    return `Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream. The cycle matters because cost pressure and availability pressure are showing up together this period, which is when contract economics and operational continuity stop being separate concerns.${where}`;
   },
   // What Happened: short — what changed or was reported. No
   // cross-references to Market Read / Operational Read, no "table
   // below" language.
   whatHappened: ({ types, countries, sev, lead }) => {
     if (!types) {
-      return `Classifiable fuel reporting was light this cycle, with no single pattern dominating the window.${sevTail(sev)}`;
+      return `Classifiable fuel reporting was light this cycle, with no single pattern dominating the window.${fuelPressureTail(sev)}`;
     }
     const secondaries = countries && countries !== lead
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
@@ -264,7 +281,7 @@ const FUEL: ReportPack = {
     const geo = lead
       ? ` concentrated on ${lead}${secondaries ? `, with secondary reporting from ${secondaries}` : ""}`
       : "";
-    return `Reporting this cycle was led by ${types}${geo}.${sevTail(sev)}`;
+    return `Reporting this cycle was led by ${types}${geo}.${fuelPressureTail(sev)}`;
   },
   // What Matters: two analytical paragraphs connecting prices, jet movement,
   // shortage / route pressure and business continuity.

@@ -29,18 +29,22 @@ incident-only, so there was nothing fabricated to replace there.
   incident scrapers) in its own try/catch, so the scheduler, the admin route and
   the combined prod scrape all refresh prices and a FRED outage can't fail the
   incident ingest.
-- LIVE-vs-FROZEN ANCHOR: the CURRENT report (every fuel report sharing the MAX
-  issue date that is ON OR BEFORE today — in prod there is exactly one) anchors to
-  TODAY (latest FRED observation), so the live product always shows the latest
-  prices, NOT a week-old snapshot tied to its issue date. Older/archived issues
-  stay frozen at their own issue date for historical accuracy. The "on or before
-  today" qualifier is load-bearing: a future-dated DRAFT (next week's report being
-  prepared) must not steal the "current" designation and freeze the live report on
-  stale prices — so do NOT key "current" on a global max or on report status. Why: a report dated last week was
-  showing last week's prices and the client (rightly) called it stale — the live
-  product must track current prices. FRED has a few days' reporting lag, so
-  "latest" may legitimately be ~2-4 days old; that is the freshest published, not
-  a bug.
+- WINDOW-END ANCHOR (supersedes the earlier "newest report tracks today" rule):
+  EVERY fuel report (including the newest) anchors its prices to the END OF ITS
+  REPORTING WINDOW = its issue date clamped DOWN to the latest available fuel
+  record (max occurredAt where topic='fuel'), mirroring
+  clampIssueDateToLatestRecord in the workbench. So the Brent/WTI/jet "as of"
+  dates and the weekly jet trajectory always fall INSIDE the period the report
+  displays; a report is an AS-OF document, never a live ticker. Why: the prior
+  rule anchored the newest report to TODAY, which pushed the price "as of" dates
+  (and a jet trajectory point) PAST the report's stated reporting period (e.g. a
+  17-23 May Fuel Watch showed Brent/WTI "as of 31 May" and a 26 May jet point) —
+  the client flagged the date mismatch. The window end, not today, is the only
+  date that keeps prices consistent with the rest of the report (cover period,
+  data-status banner, incident window). Do NOT special-case the newest report or
+  key anything on report status. FRED/Yahoo lag means the anchored close may be a
+  couple of days before the window end (latest observation ≤ anchor); that is the
+  freshest published on or before the window end, not a bug.
 - PRICE REFRESH IS UNGATED ON BOOT: prices are cheap (a few small FRED CSVs,
   ~0.1-0.6s) so the scheduler boot ALWAYS refreshes them when incidents are fresh
   (not only when missing). The expensive INCIDENT scrape keeps its 6h freshness

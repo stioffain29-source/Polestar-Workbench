@@ -1,22 +1,35 @@
 import { useEffect, useRef, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
-  useGetReport, useUpdateReport, useListIncidents,
-  getGetReportQueryKey, getListReportsQueryKey,
+  useGetReport,
+  useUpdateReport,
+  useListIncidents,
+  getGetReportQueryKey,
+  getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, REPORT_STATUSES } from "@/lib/topics";
 import ReportPreview from "@/components/ReportPreview";
 import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
-import { draftTopicReportProse, type DraftableIncident } from "@/lib/draftReportProse";
+import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
+import {
+  draftTopicReportProse,
+  type DraftableIncident,
+} from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { latestRecordDate } from "@/lib/reportDataStatus";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
@@ -32,7 +45,8 @@ import {
   type FuelMarketCardForm,
 } from "@/lib/fuelWatchReport";
 
-const execSummaryStorageKey = (id: number) => `polestar:exec-summary:report:${id}`;
+const execSummaryStorageKey = (id: number) =>
+  `polestar:exec-summary:report:${id}`;
 
 // Short scope reminders shown above the editor. Kept tight on purpose so
 // they read as a topic map, not a writing prompt.
@@ -41,8 +55,7 @@ const TOPIC_SCOPE: Record<string, string> = {
     "Shipping covers vessel attack, port and chokepoint disruption, route diversion, naval advisories and freight pressure. Theft and pilferage sit in Cargo Watch.",
   cargo_watch:
     "Cargo Watch covers cargo theft, hijack, pilferage, warehouse and depot loss, seal tampering and insider crime. Port and vessel disruption sit in Shipping.",
-  fuel:
-    "Fuel covers shortage, price moves, subsidy change, refinery and transport disruption, and fuel related unrest.",
+  fuel: "Fuel covers shortage, price moves, subsidy change, refinery and transport disruption, and fuel related unrest.",
   fertiliser:
     "Fertiliser covers supply, price, export controls, production disruption and farmer pressure.",
   energy:
@@ -73,10 +86,18 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  title: "", topic: "fuel", status: "draft", issueDate: new Date().toISOString().slice(0, 10),
+  title: "",
+  topic: "fuel",
+  status: "draft",
+  issueDate: new Date().toISOString().slice(0, 10),
   executiveSummary: "",
-  situation: "", whatHappened: "",
-  whatMatters: "", implications: "", polestarView: "", watchNext: "", author: "",
+  situation: "",
+  whatHappened: "",
+  whatMatters: "",
+  implications: "",
+  polestarView: "",
+  watchNext: "",
+  author: "",
 };
 
 export default function ReportEditor() {
@@ -117,11 +138,15 @@ export default function ReportEditor() {
   // to the preview so authors see their edits live before saving.
   const [hardNumbersText, setHardNumbersText] = useState<string>("");
   const [hardNumbersError, setHardNumbersError] = useState<string | null>(null);
-  const [hardNumbersEdited, setHardNumbersEdited] = useState<unknown | undefined>(undefined);
+  const [hardNumbersEdited, setHardNumbersEdited] = useState<
+    unknown | undefined
+  >(undefined);
   const hardNumbersSeededForId = useRef<number | null>(null);
   // Form-based Fuel Market Data panel state. JSON advanced view is
   // kept as an escape hatch but the normal path is the form below.
-  const [fuelForm, setFuelForm] = useState<FuelMarketFormState>(EMPTY_FUEL_MARKET_FORM);
+  const [fuelForm, setFuelForm] = useState<FuelMarketFormState>(
+    EMPTY_FUEL_MARKET_FORM,
+  );
   const [showFuelJson, setShowFuelJson] = useState(false);
   const [fuelFormErrors, setFuelFormErrors] = useState<string[]>([]);
   // Override flag for the "fail closed" export gate. Reset on every
@@ -154,7 +179,9 @@ export default function ReportEditor() {
         (formHasNow.wti && !builderHas.wti) ||
         (formHasNow.jet && !builderHas.jet)
       ) {
-        setExportError("Fuel market form values are not reaching the report builder.");
+        setExportError(
+          "Fuel market form values are not reaching the report builder.",
+        );
         setExporting(false);
         return;
       }
@@ -167,16 +194,48 @@ export default function ReportEditor() {
         !liveFuelData.validation.hasRequiredFuelWatchData &&
         !allow
       ) {
-        setExportError(`Fuel Watch export requires market data. Missing: ${liveFuelData.validation.missingRequired.join(", ")}.`);
+        setExportError(
+          `Fuel Watch export requires market data. Missing: ${liveFuelData.validation.missingRequired.join(", ")}.`,
+        );
         return;
       }
 
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
-      const reportElement = previewRef.current?.querySelector<HTMLElement>(".print-report") ?? previewRef.current;
-      if (!reportElement) {
-        throw new Error("PDF export failed: report preview is not ready.");
+
+      if (
+        form.topic === "shipping" ||
+        form.topic === "flashpoint" ||
+        form.topic === "protests"
+      ) {
+        const reportElement =
+          previewRef.current?.querySelector<HTMLElement>(".print-report") ??
+          previewRef.current;
+        if (!reportElement) {
+          throw new Error("PDF export failed: report preview is not ready.");
+        }
+        await exportElementToPdf(reportElement, filename);
+      } else {
+        await exportTopicReportPdf(
+          {
+            title: form.title,
+            topic: form.topic,
+            issueDate: form.issueDate,
+            author: form.author,
+            executiveSummary: form.executiveSummary,
+            situation: form.situation,
+            whatHappened: form.whatHappened,
+            whatMatters: form.whatMatters,
+            implications: form.implications,
+            watchNext: form.watchNext,
+            polestarView: form.polestarView,
+            hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+          },
+          incidentsForExport,
+          TOPIC_LABELS,
+          filename,
+          { allowMissingMarketData: allow },
+        );
       }
-      await exportElementToPdf(reportElement, filename);
       setAllowMissingExport(false);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "PDF export failed.");
@@ -194,10 +253,14 @@ export default function ReportEditor() {
     seededForId.current = report.id;
     let exec = "";
     try {
-      exec = (typeof window !== "undefined" && window.localStorage)
-        ? (window.localStorage.getItem(execSummaryStorageKey(report.id)) ?? "")
-        : "";
-    } catch { exec = ""; }
+      exec =
+        typeof window !== "undefined" && window.localStorage
+          ? (window.localStorage.getItem(execSummaryStorageKey(report.id)) ??
+            "")
+          : "";
+    } catch {
+      exec = "";
+    }
 
     // Generate an operational draft for any section that is still empty.
     // Saved content always wins; the draft only seeds blank fields so a new
@@ -236,7 +299,11 @@ export default function ReportEditor() {
       occurredAt: i.occurredAt,
       country: i.country,
     }));
-    const draft = draftTopicReportProse({ topic, issueDate, incidents: inputs });
+    const draft = draftTopicReportProse({
+      topic,
+      issueDate,
+      incidents: inputs,
+    });
 
     // Staleness guard: a report's window ends on its issue date. If live data
     // holds records for this topic newer than the issue date, the saved prose
@@ -280,7 +347,10 @@ export default function ReportEditor() {
     if (seededForId.current !== null && seededForId.current !== id) {
       seededForId.current = null;
     }
-    if (hardNumbersSeededForId.current !== null && hardNumbersSeededForId.current !== id) {
+    if (
+      hardNumbersSeededForId.current !== null &&
+      hardNumbersSeededForId.current !== id
+    ) {
       hardNumbersSeededForId.current = null;
       setHardNumbersText("");
       setHardNumbersError(null);
@@ -327,7 +397,10 @@ export default function ReportEditor() {
     setHardNumbersError(null);
     setHardNumbersEdited(undefined);
     const seeded = buildFuelWatchReportData(
-      { issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10), hardNumbers: effectiveHardNumbers },
+      {
+        issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
+        hardNumbers: effectiveHardNumbers,
+      },
       [],
     );
     setFuelForm(fuelMarketFormFromData(seeded));
@@ -337,15 +410,21 @@ export default function ReportEditor() {
     setSampleAutoSeeded(false);
   }, [report]);
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   const save = () => {
     const { executiveSummary, ...persistable } = form;
     try {
       if (typeof window !== "undefined" && window.localStorage) {
-        window.localStorage.setItem(execSummaryStorageKey(id), executiveSummary);
+        window.localStorage.setItem(
+          execSummaryStorageKey(id),
+          executiveSummary,
+        );
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     // Fuel Watch market-data save semantics:
     //   * Advanced JSON view dirty → validate the textarea content and
     //     persist that. Blocks on invalid JSON rather than silently
@@ -385,20 +464,23 @@ export default function ReportEditor() {
         payload.hardNumbers = mergeFuelHardNumbers(result.payload, prior);
       }
     }
-    update.mutate({ id, data: payload as never }, {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetReportQueryKey(id) });
-        qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
-        // After a successful save, drop the in-memory override and let
-        // the next report refetch reseed the form from DB truth. This
-        // is what the persistence test exercises: save → reseed → the
-        // form should show what was just written.
-        hardNumbersSeededForId.current = null;
-        setHardNumbersEdited(undefined);
-        setSampleAutoSeeded(false);
+    update.mutate(
+      { id, data: payload as never },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetReportQueryKey(id) });
+          qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+          // After a successful save, drop the in-memory override and let
+          // the next report refetch reseed the form from DB truth. This
+          // is what the persistence test exercises: save → reseed → the
+          // form should show what was just written.
+          hardNumbersSeededForId.current = null;
+          setHardNumbersEdited(undefined);
+          setSampleAutoSeeded(false);
+        },
       },
-    });
+    );
   };
 
   // Form-driven rebuild — every field edit re-assembles the canonical
@@ -427,9 +509,15 @@ export default function ReportEditor() {
     key: keyof FuelMarketCardForm,
     value: string,
   ) => {
-    applyFuelForm({ ...fuelForm, [section]: { ...fuelForm[section], [key]: value } });
+    applyFuelForm({
+      ...fuelForm,
+      [section]: { ...fuelForm[section], [key]: value },
+    });
   };
-  const setFuelJetField = (key: keyof FuelMarketFormState["jet"], value: string) => {
+  const setFuelJetField = (
+    key: keyof FuelMarketFormState["jet"],
+    value: string,
+  ) => {
     applyFuelForm({ ...fuelForm, jet: { ...fuelForm.jet, [key]: value } });
   };
   const setFuelTrajectoryText = (value: string) => {
@@ -488,27 +576,32 @@ export default function ReportEditor() {
   // Live canonical view of the report — drives the editor banner and the
   // PDF export gate. We pass an empty incident list when incidents are
   // still loading so the banner doesn't flicker into "no related incidents".
-  const liveFuelData = form.topic === "fuel" && form.issueDate
-    ? buildFuelWatchReportData(
-        {
-          title: form.title,
-          issueDate: form.issueDate,
-          author: form.author,
-          executiveSummary: form.executiveSummary,
-          situation: form.situation,
-          whatHappened: form.whatHappened,
-          whatMatters: form.whatMatters,
-          implications: form.implications,
-          polestarView: form.polestarView,
-          watchNext: form.watchNext,
-          hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
-        },
-        incidentsForExport,
-      )
-    : null;
+  const liveFuelData =
+    form.topic === "fuel" && form.issueDate
+      ? buildFuelWatchReportData(
+          {
+            title: form.title,
+            issueDate: form.issueDate,
+            author: form.author,
+            executiveSummary: form.executiveSummary,
+            situation: form.situation,
+            whatHappened: form.whatHappened,
+            whatMatters: form.whatMatters,
+            implications: form.implications,
+            polestarView: form.polestarView,
+            watchNext: form.watchNext,
+            hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+          },
+          incidentsForExport,
+        )
+      : null;
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading...</div>;
-  if (!report) return <div className="text-sm text-muted-foreground">Report not found.</div>;
+  if (isLoading)
+    return <div className="text-sm text-muted-foreground">Loading...</div>;
+  if (!report)
+    return (
+      <div className="text-sm text-muted-foreground">Report not found.</div>
+    );
 
   const scope = scopeFor(form.topic);
   // Live freshness warning — recomputes as the author edits the issue date.
@@ -529,18 +622,41 @@ export default function ReportEditor() {
     <div className="max-w-[1900px] mx-auto space-y-4">
       <div className="flex items-end justify-between no-print">
         <div>
-          <Link href="/reports" className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1">
+          <Link
+            href="/reports"
+            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1"
+          >
             <ArrowLeft className="w-3 h-3" /> All Reports
           </Link>
-          <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mt-2">Polestar Insights</div>
-          <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-0.5">{form.title || "Untitled report"}</h1>
+          <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mt-2">
+            Polestar Insights
+          </div>
+          <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-0.5">
+            {form.title || "Untitled report"}
+          </h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { void downloadPdf(); }} disabled={exporting} className="rounded-sm">
-            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+          <Button
+            variant="outline"
+            onClick={() => {
+              void downloadPdf();
+            }}
+            disabled={exporting}
+            className="rounded-sm"
+          >
+            {exporting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
             {exporting ? "Generating PDF..." : "Download PDF"}
           </Button>
-          <Button onClick={save} className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"><Save className="w-4 h-4 mr-2" /> Save</Button>
+          <Button
+            onClick={save}
+            className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
+          >
+            <Save className="w-4 h-4 mr-2" /> Save
+          </Button>
         </div>
       </div>
 
@@ -549,48 +665,166 @@ export default function ReportEditor() {
           {scope && (
             <div
               className="text-[12px] leading-snug p-3 rounded-sm border"
-              style={{ background: "#f3f4fa", borderColor: "#465bff", color: "#0b0a3d", fontFamily: "Roboto, sans-serif" }}
+              style={{
+                background: "#f3f4fa",
+                borderColor: "#465bff",
+                color: "#0b0a3d",
+                fontFamily: "Roboto, sans-serif",
+              }}
             >
-              <div className="uppercase tracking-widest font-bold text-[10px] mb-1" style={{ color: "#465bff" }}>
+              <div
+                className="uppercase tracking-widest font-bold text-[10px] mb-1"
+                style={{ color: "#465bff" }}
+              >
                 {TOPIC_LABELS[form.topic]} scope
               </div>
               {scope}
             </div>
           )}
-          <Field label="Title"><Input value={form.title} onChange={(e) => set("title", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Title">
+            <Input
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Topic">
               <Select value={form.topic} onValueChange={(v) => set("topic", v)}>
-                <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>{TOPICS.map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TOPICS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TOPIC_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
             <Field label="Status">
-              <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>{REPORT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              <Select
+                value={form.status}
+                onValueChange={(v) => set("status", v)}
+              >
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPORT_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
-            <Field label="Issue Date"><Input type="date" value={form.issueDate} max={issueDateMax || undefined} onChange={(e) => set("issueDate", clampIssueDateToLatestRecord(e.target.value, incidents ?? [], form.topic === "protests" ? "flashpoint" : form.topic))} className="rounded-sm" /></Field>
+            <Field label="Issue Date">
+              <Input
+                type="date"
+                value={form.issueDate}
+                max={issueDateMax || undefined}
+                onChange={(e) =>
+                  set(
+                    "issueDate",
+                    clampIssueDateToLatestRecord(
+                      e.target.value,
+                      incidents ?? [],
+                      form.topic === "protests" ? "flashpoint" : form.topic,
+                    ),
+                  )
+                }
+                className="rounded-sm"
+              />
+            </Field>
           </div>
-          <Field label="Author"><Input value={form.author} onChange={(e) => set("author", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Executive Summary"><Textarea rows={4} value={form.executiveSummary} onChange={(e) => set("executiveSummary", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Situation"><Textarea rows={4} value={form.situation} onChange={(e) => set("situation", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="What Happened"><Textarea rows={5} value={form.whatHappened} onChange={(e) => set("whatHappened", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="What Matters"><Textarea rows={4} value={form.whatMatters} onChange={(e) => set("whatMatters", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Implications for Business"><Textarea rows={4} value={form.implications} onChange={(e) => set("implications", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Watch Next"><Textarea rows={3} value={form.watchNext} onChange={(e) => set("watchNext", e.target.value)} className="rounded-sm" /></Field>
-          <Field label="Polestar View"><Textarea rows={3} value={form.polestarView} onChange={(e) => set("polestarView", e.target.value)} className="rounded-sm" /></Field>
+          <Field label="Author">
+            <Input
+              value={form.author}
+              onChange={(e) => set("author", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="Executive Summary">
+            <Textarea
+              rows={4}
+              value={form.executiveSummary}
+              onChange={(e) => set("executiveSummary", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="Situation">
+            <Textarea
+              rows={4}
+              value={form.situation}
+              onChange={(e) => set("situation", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="What Happened">
+            <Textarea
+              rows={5}
+              value={form.whatHappened}
+              onChange={(e) => set("whatHappened", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="What Matters">
+            <Textarea
+              rows={4}
+              value={form.whatMatters}
+              onChange={(e) => set("whatMatters", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="Implications for Business">
+            <Textarea
+              rows={4}
+              value={form.implications}
+              onChange={(e) => set("implications", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="Watch Next">
+            <Textarea
+              rows={3}
+              value={form.watchNext}
+              onChange={(e) => set("watchNext", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
+          <Field label="Polestar View">
+            <Textarea
+              rows={3}
+              value={form.polestarView}
+              onChange={(e) => set("polestarView", e.target.value)}
+              className="rounded-sm"
+            />
+          </Field>
 
           {form.topic === "fuel" && (
             <div className="border-t border-border pt-4 mt-2 space-y-3">
               {sampleAutoSeeded && (
                 <div
                   className="text-[11px] leading-snug p-2 rounded-sm border"
-                  style={{ background: "#f3f4fa", borderColor: "#465bff", color: "#0b0a3d", fontFamily: "Roboto, sans-serif" }}
+                  style={{
+                    background: "#f3f4fa",
+                    borderColor: "#465bff",
+                    color: "#0b0a3d",
+                    fontFamily: "Roboto, sans-serif",
+                  }}
                 >
-                  <span className="font-bold uppercase tracking-widest text-[10px] mr-2" style={{ color: "#465bff" }}>Sample data</span>
-                  This report has no saved market data, so sample values are loaded in the form and preview. Edit the fields below and click Save to persist your own numbers, or Save as-is to keep the sample.
+                  <span
+                    className="font-bold uppercase tracking-widest text-[10px] mr-2"
+                    style={{ color: "#465bff" }}
+                  >
+                    Sample data
+                  </span>
+                  This report has no saved market data, so sample values are
+                  loaded in the form and preview. Edit the fields below and
+                  click Save to persist your own numbers, or Save as-is to keep
+                  the sample.
                 </div>
               )}
               <div className="flex items-end justify-between gap-2">
@@ -599,11 +833,18 @@ export default function ReportEditor() {
                     Fuel Market Data
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                    Brent, WTI and jet fuel are required market indicators. Trajectory points drive the Jet Fuel Price Trajectory chart (minimum two dated points).
+                    Brent, WTI and jet fuel are required market indicators.
+                    Trajectory points drive the Jet Fuel Price Trajectory chart
+                    (minimum two dated points).
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Button type="button" variant="outline" className="rounded-sm h-8 text-xs" onClick={loadSampleFuelData}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-sm h-8 text-xs"
+                    onClick={loadSampleFuelData}
+                  >
                     Load sample
                   </Button>
                   <Button
@@ -620,15 +861,27 @@ export default function ReportEditor() {
               {/* Validation banner — surfaces fail-closed missing-data
                   reasons inline above the form so authors see exactly what
                   is required before they hit Save / Download PDF. */}
-              {liveFuelData && !liveFuelData.validation.hasRequiredFuelWatchData && (
-                <div
-                  className="text-[12px] p-3 rounded-sm border space-y-1"
-                  style={{ background: "#fdecec", borderColor: "#a33232", color: "#a33232", fontFamily: "Roboto, sans-serif" }}
-                >
-                  <div className="font-bold">Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.</div>
-                  <div>Missing: {liveFuelData.validation.missingRequired.join(", ")}.</div>
-                </div>
-              )}
+              {liveFuelData &&
+                !liveFuelData.validation.hasRequiredFuelWatchData && (
+                  <div
+                    className="text-[12px] p-3 rounded-sm border space-y-1"
+                    style={{
+                      background: "#fdecec",
+                      borderColor: "#a33232",
+                      color: "#a33232",
+                      fontFamily: "Roboto, sans-serif",
+                    }}
+                  >
+                    <div className="font-bold">
+                      Fuel Watch is missing required market data. Add Brent, WTI
+                      and jet fuel data before export.
+                    </div>
+                    <div>
+                      Missing:{" "}
+                      {liveFuelData.validation.missingRequired.join(", ")}.
+                    </div>
+                  </div>
+                )}
 
               <FuelMarketCardFields
                 title="Brent crude"
@@ -642,36 +895,63 @@ export default function ReportEditor() {
               />
 
               <div className="border border-border rounded-sm p-3 space-y-2">
-                <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Jet fuel</div>
+                <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+                  Jet fuel
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Benchmark">
-                    <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.benchmark}
-                      onChange={(e) => setFuelJetField("benchmark", e.target.value)}
-                      placeholder="e.g. US Gulf Coast kerosene-type jet fuel" />
+                    <Input
+                      className="rounded-sm h-8 text-xs"
+                      value={fuelForm.jet.benchmark}
+                      onChange={(e) =>
+                        setFuelJetField("benchmark", e.target.value)
+                      }
+                      placeholder="e.g. US Gulf Coast kerosene-type jet fuel"
+                    />
                   </Field>
                   <Field label="Source">
-                    <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.source}
-                      onChange={(e) => setFuelJetField("source", e.target.value)}
-                      placeholder="e.g. EIA / FRED" />
+                    <Input
+                      className="rounded-sm h-8 text-xs"
+                      value={fuelForm.jet.source}
+                      onChange={(e) =>
+                        setFuelJetField("source", e.target.value)
+                      }
+                      placeholder="e.g. EIA / FRED"
+                    />
                   </Field>
                   <Field label="Value">
-                    <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.value}
+                    <Input
+                      className="rounded-sm h-8 text-xs"
+                      value={fuelForm.jet.value}
                       onChange={(e) => setFuelJetField("value", e.target.value)}
-                      placeholder="e.g. 4.152" />
+                      placeholder="e.g. 4.152"
+                    />
                   </Field>
                   <Field label="Unit">
-                    <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.unit}
+                    <Input
+                      className="rounded-sm h-8 text-xs"
+                      value={fuelForm.jet.unit}
                       onChange={(e) => setFuelJetField("unit", e.target.value)}
-                      placeholder="e.g. USD/gal" />
+                      placeholder="e.g. USD/gal"
+                    />
                   </Field>
                   <Field label="Change">
-                    <Input className="rounded-sm h-8 text-xs" value={fuelForm.jet.change}
-                      onChange={(e) => setFuelJetField("change", e.target.value)}
-                      placeholder="e.g. +2.5% 7d" />
+                    <Input
+                      className="rounded-sm h-8 text-xs"
+                      value={fuelForm.jet.change}
+                      onChange={(e) =>
+                        setFuelJetField("change", e.target.value)
+                      }
+                      placeholder="e.g. +2.5% 7d"
+                    />
                   </Field>
                   <Field label="As of">
-                    <Input type="date" className="rounded-sm h-8 text-xs" value={fuelForm.jet.asOf}
-                      onChange={(e) => setFuelJetField("asOf", e.target.value)} />
+                    <Input
+                      type="date"
+                      className="rounded-sm h-8 text-xs"
+                      value={fuelForm.jet.asOf}
+                      onChange={(e) => setFuelJetField("asOf", e.target.value)}
+                    />
                   </Field>
                 </div>
                 <Field label='Trajectory points (one per line, "YYYY-MM-DD, value")'>
@@ -679,16 +959,25 @@ export default function ReportEditor() {
                     rows={6}
                     value={fuelForm.trajectoryText}
                     onChange={(e) => setFuelTrajectoryText(e.target.value)}
-                    placeholder={"2026-04-17, 3.709\n2026-04-24, 3.906\n2026-05-01, 4.160"}
+                    placeholder={
+                      "2026-04-17, 3.709\n2026-04-24, 3.906\n2026-05-01, 4.160"
+                    }
                     className="rounded-sm font-mono text-[11px]"
                   />
                 </Field>
                 {fuelFormErrors.length > 0 && (
                   <div
                     className="text-[11px] p-2 rounded-sm border"
-                    style={{ background: "#fdecec", borderColor: "#a33232", color: "#a33232", fontFamily: "Roboto, sans-serif" }}
+                    style={{
+                      background: "#fdecec",
+                      borderColor: "#a33232",
+                      color: "#a33232",
+                      fontFamily: "Roboto, sans-serif",
+                    }}
                   >
-                    {fuelFormErrors.map((e, i) => <div key={i}>{e}</div>)}
+                    {fuelFormErrors.map((e, i) => (
+                      <div key={i}>{e}</div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -699,12 +988,20 @@ export default function ReportEditor() {
                     <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
                       Advanced: hardNumbers JSON
                     </div>
-                    <Button type="button" variant="outline" className="rounded-sm h-7 text-[11px]" onClick={validateFuelData}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-sm h-7 text-[11px]"
+                      onClick={validateFuelData}
+                    >
                       Validate &amp; sync form
                     </Button>
                   </div>
                   <div className="text-[11px] text-muted-foreground leading-snug">
-                    Accepts <code>fastFacts</code>, top-level <code>prices/supply/policy/routes</code>, <code>jetFuel</code> snapshot, and <code>jetFuelTrajectory</code>. Leave empty to clear.
+                    Accepts <code>fastFacts</code>, top-level{" "}
+                    <code>prices/supply/policy/routes</code>,{" "}
+                    <code>jetFuel</code> snapshot, and{" "}
+                    <code>jetFuelTrajectory</code>. Leave empty to clear.
                   </div>
                   <Textarea
                     rows={10}
@@ -720,7 +1017,12 @@ export default function ReportEditor() {
                   {hardNumbersError && (
                     <div
                       className="text-[11px] p-2 rounded-sm border"
-                      style={{ background: "#fdecec", borderColor: "#a33232", color: "#a33232", fontFamily: "Roboto, sans-serif" }}
+                      style={{
+                        background: "#fdecec",
+                        borderColor: "#a33232",
+                        color: "#a33232",
+                        fontFamily: "Roboto, sans-serif",
+                      }}
                     >
                       {hardNumbersError}
                     </div>
@@ -733,7 +1035,14 @@ export default function ReportEditor() {
               {(() => {
                 const md = liveFuelData?.marketData;
                 const hints: string[] = [];
-                const check = (prefix: string, card: { asOf?: string; source?: string; unit?: string } | null) => {
+                const check = (
+                  prefix: string,
+                  card: {
+                    asOf?: string;
+                    source?: string;
+                    unit?: string;
+                  } | null,
+                ) => {
                   if (!card) return;
                   if (!card.asOf) hints.push(`${prefix} as-of date missing`);
                   if (!card.source) hints.push(`${prefix} source missing`);
@@ -743,17 +1052,28 @@ export default function ReportEditor() {
                 check("WTI", md?.wti ?? null);
                 check("Jet fuel", md?.jetFuel ?? null);
                 if (md && md.jetFuel && md.jetFuelTrajectory.length < 2) {
-                  hints.push("Jet fuel trajectory needs at least two dated points");
+                  hints.push(
+                    "Jet fuel trajectory needs at least two dated points",
+                  );
                 }
                 if (hints.length === 0) return null;
                 return (
                   <div
                     className="text-[11px] p-2 rounded-sm border"
-                    style={{ background: "#f3f4fa", borderColor: "#465bff", color: "#0b0a3d", fontFamily: "Roboto, sans-serif" }}
+                    style={{
+                      background: "#f3f4fa",
+                      borderColor: "#465bff",
+                      color: "#0b0a3d",
+                      fontFamily: "Roboto, sans-serif",
+                    }}
                   >
-                    <div className="font-bold mb-1">Recommended provenance fields</div>
+                    <div className="font-bold mb-1">
+                      Recommended provenance fields
+                    </div>
                     <ul className="list-disc list-inside leading-snug">
-                      {hints.map((h, i) => <li key={i}>{h}</li>)}
+                      {hints.map((h, i) => (
+                        <li key={i}>{h}</li>
+                      ))}
                     </ul>
                   </div>
                 );
@@ -763,30 +1083,64 @@ export default function ReportEditor() {
                   inside `.no-print` ancestors. Shows the live form ↔
                   builder agreement so an author can see at a glance
                   whether their edits are reaching the report builder. */}
-              {liveFuelData && (() => {
-                const md = liveFuelData.marketData;
-                const hardNumbersSource =
-                  hardNumbersEdited !== undefined ? "live form"
-                  : report?.hardNumbers ? "saved DB"
-                  : "empty";
-                const yn = (b: boolean) => (b ? "yes" : "no");
-                return (
-                  <div
-                    className="text-[11px] p-2 rounded-sm border font-mono"
-                    style={{ background: "#f7f7fa", borderColor: "#e2e2e2", color: "#363636" }}
-                  >
-                    <div className="uppercase tracking-widest text-[10px] font-bold mb-1" style={{ fontFamily: "Roboto, sans-serif", color: "#465bff" }}>
-                      Fuel debug
+              {liveFuelData &&
+                (() => {
+                  const md = liveFuelData.marketData;
+                  const hardNumbersSource =
+                    hardNumbersEdited !== undefined
+                      ? "live form"
+                      : report?.hardNumbers
+                        ? "saved DB"
+                        : "empty";
+                  const yn = (b: boolean) => (b ? "yes" : "no");
+                  return (
+                    <div
+                      className="text-[11px] p-2 rounded-sm border font-mono"
+                      style={{
+                        background: "#f7f7fa",
+                        borderColor: "#e2e2e2",
+                        color: "#363636",
+                      }}
+                    >
+                      <div
+                        className="uppercase tracking-widest text-[10px] font-bold mb-1"
+                        style={{
+                          fontFamily: "Roboto, sans-serif",
+                          color: "#465bff",
+                        }}
+                      >
+                        Fuel debug
+                      </div>
+                      <div>
+                        hardNumbers source: <b>{hardNumbersSource}</b>
+                      </div>
+                      <div>
+                        form Brent value: <b>{fuelForm.brent.value || "—"}</b> ·
+                        builder Brent found: <b>{yn(md.brent != null)}</b>
+                      </div>
+                      <div>
+                        form WTI value: <b>{fuelForm.wti.value || "—"}</b> ·
+                        builder WTI found: <b>{yn(md.wti != null)}</b>
+                      </div>
+                      <div>
+                        form jet fuel value: <b>{fuelForm.jet.value || "—"}</b>{" "}
+                        · builder jet fuel found:{" "}
+                        <b>{yn(md.jetFuel != null)}</b>
+                      </div>
+                      <div>
+                        trajectory lines in form:{" "}
+                        <b>{formHas.trajectoryLines}</b> · trajectory points in
+                        builder: <b>{md.jetFuelTrajectory.length}</b>
+                      </div>
+                      <div>
+                        gate hasRequiredFuelWatchData:{" "}
+                        <b>
+                          {yn(liveFuelData.validation.hasRequiredFuelWatchData)}
+                        </b>
+                      </div>
                     </div>
-                    <div>hardNumbers source: <b>{hardNumbersSource}</b></div>
-                    <div>form Brent value: <b>{fuelForm.brent.value || "—"}</b> · builder Brent found: <b>{yn(md.brent != null)}</b></div>
-                    <div>form WTI value: <b>{fuelForm.wti.value || "—"}</b> · builder WTI found: <b>{yn(md.wti != null)}</b></div>
-                    <div>form jet fuel value: <b>{fuelForm.jet.value || "—"}</b> · builder jet fuel found: <b>{yn(md.jetFuel != null)}</b></div>
-                    <div>trajectory lines in form: <b>{formHas.trajectoryLines}</b> · trajectory points in builder: <b>{md.jetFuelTrajectory.length}</b></div>
-                    <div>gate hasRequiredFuelWatchData: <b>{yn(liveFuelData.validation.hasRequiredFuelWatchData)}</b></div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
               {/* Export gate. The exporter throws when required data is
                   missing; this banner gives the author the explicit
@@ -794,7 +1148,12 @@ export default function ReportEditor() {
               {exportError && (
                 <div
                   className="text-[12px] p-3 rounded-sm border space-y-2"
-                  style={{ background: "#fdecec", borderColor: "#a33232", color: "#a33232", fontFamily: "Roboto, sans-serif" }}
+                  style={{
+                    background: "#fdecec",
+                    borderColor: "#a33232",
+                    color: "#a33232",
+                    fontFamily: "Roboto, sans-serif",
+                  }}
                 >
                   <div className="font-bold">PDF export blocked.</div>
                   <div>{exportError}</div>
@@ -802,7 +1161,11 @@ export default function ReportEditor() {
                     type="button"
                     variant="outline"
                     className="rounded-sm h-8 text-xs"
-                    onClick={() => { setAllowMissingExport(true); setExportError(null); void downloadPdf({ forceAllowMissing: true }); }}
+                    onClick={() => {
+                      setAllowMissingExport(true);
+                      setExportError(null);
+                      void downloadPdf({ forceAllowMissing: true });
+                    }}
                   >
                     Export with missing market data
                   </Button>
@@ -815,24 +1178,40 @@ export default function ReportEditor() {
         {staleProse && (
           <div
             className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
-            style={{ borderColor: "#A33232", background: "#fbeeee", color: "#A33232" }}
+            style={{
+              borderColor: "#A33232",
+              background: "#fbeeee",
+              color: "#A33232",
+            }}
           >
             <span style={{ fontWeight: 700 }}>Saved prose was stale.</span>{" "}
-            Newer records exist (latest {staleProse.latest}) than this report's issue
-            date ({staleProse.issueDate}). The editor has been reseeded from freshly
-            generated text for the current data. Review and Save to persist, or change
-            the issue date to re-cover the latest window.
+            Newer records exist (latest {staleProse.latest}) than this report's
+            issue date ({staleProse.issueDate}). The editor has been reseeded
+            from freshly generated text for the current data. Review and Save to
+            persist, or change the issue date to re-cover the latest window.
           </div>
         )}
 
-        <div ref={previewRef} className="bg-white border border-border rounded-sm overflow-hidden">
+        <div
+          ref={previewRef}
+          className="bg-white border border-border rounded-sm overflow-hidden"
+        >
           {form.topic === "shipping" ? (
-            <ShippingReportPreview report={form} incidents={incidentsForExport} />
-          ) : (form.topic === "flashpoint" || form.topic === "protests") ? (
-            <FlashpointReportPreview report={form} incidents={incidentsForExport} />
+            <ShippingReportPreview
+              report={form}
+              incidents={incidentsForExport}
+            />
+          ) : form.topic === "flashpoint" || form.topic === "protests" ? (
+            <FlashpointReportPreview
+              report={form}
+              incidents={incidentsForExport}
+            />
           ) : (
             <ReportPreview
-              report={{ ...form, hardNumbers: hardNumbersEdited ?? report?.hardNumbers }}
+              report={{
+                ...form,
+                hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+              }}
               incidents={incidentsForExport}
             />
           )}
@@ -854,27 +1233,49 @@ function FuelMarketCardFields({
 }) {
   return (
     <div className="border border-border rounded-sm p-3 space-y-2">
-      <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">{title}</div>
+      <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+        {title}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Value">
-          <Input className="rounded-sm h-8 text-xs" value={form.value}
-            onChange={(e) => onChange("value", e.target.value)} placeholder="e.g. 109.26" />
+          <Input
+            className="rounded-sm h-8 text-xs"
+            value={form.value}
+            onChange={(e) => onChange("value", e.target.value)}
+            placeholder="e.g. 109.26"
+          />
         </Field>
         <Field label="Unit">
-          <Input className="rounded-sm h-8 text-xs" value={form.unit}
-            onChange={(e) => onChange("unit", e.target.value)} placeholder="e.g. USD/bbl" />
+          <Input
+            className="rounded-sm h-8 text-xs"
+            value={form.unit}
+            onChange={(e) => onChange("unit", e.target.value)}
+            placeholder="e.g. USD/bbl"
+          />
         </Field>
         <Field label="Change">
-          <Input className="rounded-sm h-8 text-xs" value={form.change}
-            onChange={(e) => onChange("change", e.target.value)} placeholder="e.g. +7.9% 7d" />
+          <Input
+            className="rounded-sm h-8 text-xs"
+            value={form.change}
+            onChange={(e) => onChange("change", e.target.value)}
+            placeholder="e.g. +7.9% 7d"
+          />
         </Field>
         <Field label="As of">
-          <Input type="date" className="rounded-sm h-8 text-xs" value={form.asOf}
-            onChange={(e) => onChange("asOf", e.target.value)} />
+          <Input
+            type="date"
+            className="rounded-sm h-8 text-xs"
+            value={form.asOf}
+            onChange={(e) => onChange("asOf", e.target.value)}
+          />
         </Field>
         <Field label="Source">
-          <Input className="rounded-sm h-8 text-xs" value={form.source}
-            onChange={(e) => onChange("source", e.target.value)} placeholder="e.g. Manual" />
+          <Input
+            className="rounded-sm h-8 text-xs"
+            value={form.source}
+            onChange={(e) => onChange("source", e.target.value)}
+            placeholder="e.g. Manual"
+          />
         </Field>
       </div>
     </div>
@@ -894,10 +1295,14 @@ function mergeFuelHardNumbers(
 ): Record<string, unknown> | null {
   if (!prior || typeof prior !== "object") return built;
   const out: Record<string, unknown> = { ...prior };
-  const builtFastFacts = (built?.fastFacts as Record<string, unknown> | undefined) ?? undefined;
-  const priorFastFacts = (prior.fastFacts as Record<string, unknown> | undefined) ?? undefined;
+  const builtFastFacts =
+    (built?.fastFacts as Record<string, unknown> | undefined) ?? undefined;
+  const priorFastFacts =
+    (prior.fastFacts as Record<string, unknown> | undefined) ?? undefined;
   if (priorFastFacts || builtFastFacts) {
-    const mergedFastFacts: Record<string, unknown> = { ...(priorFastFacts ?? {}) };
+    const mergedFastFacts: Record<string, unknown> = {
+      ...(priorFastFacts ?? {}),
+    };
     // Form owns `prices`; clearing the form clears the field.
     if (builtFastFacts && "prices" in builtFastFacts) {
       mergedFastFacts.prices = builtFastFacts.prices;
@@ -917,10 +1322,18 @@ function mergeFuelHardNumbers(
   return out;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground block mb-1">{label}</label>
+      <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground block mb-1">
+        {label}
+      </label>
       {children}
     </div>
   );
