@@ -517,7 +517,14 @@ export function buildShippingReportDataset(
   const vesselAll: VesselRow[] = sortByDateDesc(
     enriched30
       .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
-      .filter((r): r is VesselRow => r.vesselType !== null)
+      // The "Vessel Attacks" table is for confirmed hostile vessel
+      // incidents only. A bare advisory ("Threat" — e.g. a UKMTO
+      // "threat to shipping remains critical" warning) is not an attack:
+      // it describes elevated risk, not a physical event, and rates LOW on
+      // the incident-severity scale, so listing it as an "attack" reads as a
+      // contradiction (critical-sounding headline, LOW chip). Keep only the
+      // concrete physical types (Attack / Near miss / Seized).
+      .filter((r): r is VesselRow => r.vesselType !== null && r.vesselType !== "Threat")
       // Drop repatriation / crew-return human-interest items, speculative
       // "X claims missile strike" rumour traffic, generic commentary and
       // social/handle sources before they reach the table or the prose.
