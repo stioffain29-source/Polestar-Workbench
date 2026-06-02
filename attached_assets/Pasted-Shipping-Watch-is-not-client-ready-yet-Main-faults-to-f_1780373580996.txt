@@ -1,0 +1,78 @@
+Shipping Watch is not client-ready yet.
+
+Main faults to fix:
+
+1. Related incidents are too noisy
+   The report includes speculative or media-framed items as operational incidents, including:
+
+* “Iran Says the Strait of Hormuz Will Stay Closed. What Happens to the US Economy Next?”
+* “Iran vows to completely shut Strait of Hormuz as UK mortgage rates face fresh threat”
+* “Latest AP News Video…”
+
+These read as commentary, claims or video/news packaging, not confirmed operational shipping incidents.
+
+2. Claims need handling properly
+   Iranian statements about closing Hormuz or Bab el-Mandeb should not be treated as confirmed disruption unless there is supporting operational evidence.
+
+Classify these as:
+
+* rhetoric / threat
+* advisory watch item
+* claim pending confirmation
+
+Do not present them as firm disruption.
+
+3. Country logic is inconsistent
+   Regional and country view says the cycle is led by:
+
+* Iran
+* Singapore
+* Malaysia
+
+But Polestar View says lower volumes are linked to:
+
+* China
+* South Korea
+
+That does not align. Fix the country mapping and prose.
+
+4. Chokepoint logic needs tightening
+   Hormuz can lead the report, but the report must separate:
+
+* actual vessel attacks
+* verified route disruption
+* naval/advisory activity
+* political threats or claims
+* media commentary
+
+Do not let all of these collapse into the same operational category.
+
+5. Latest significant incident is weak
+   “Defender-Viper: Royal Navy’s new minehunting drone…” is not a strong latest significant incident for Shipping Watch unless directly tied to current route risk.
+
+Choose a real operational incident, or label it as capability/advisory context.
+
+6. Vessel threat section is better than before
+   The attack records are more useful, especially:
+
+* suspected Iranian drone attack on tanker off Oman
+* missile likely involved in attack on ship in Strait of Hormuz
+
+Keep this style: specific, operational, maritime-relevant.
+
+7. Commercial impact is thin
+   Only one qualifying commercial impact record appears. That is fine, but do not overstate it. Say the commercial signal is limited.
+
+8. Proof required after fix
+   Provide:
+
+* revised Shipping Watch PDF
+* included records list
+* rejected records list with reasons
+* confirmation claims/commentary/video items are excluded or labelled correctly
+* confirmation country chart and Polestar View use the same dataset
+* confirmation Related Incidents contains only operationally relevant records
+
+Do not change branding or layout.
+
+Fix classification, filtering, country consistency and claim handling.
