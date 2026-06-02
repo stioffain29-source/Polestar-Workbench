@@ -332,7 +332,7 @@ const SCOPE_CANON: Record<string, string> = {
   "papua new guinea": "Papua New Guinea",
 };
 
-function canonScopeCountry(raw: string | null): string | null {
+export function canonScopeCountry(raw: string | null): string | null {
   if (!raw) return null;
   return SCOPE_CANON[raw.trim().toLowerCase()] ?? null;
 }

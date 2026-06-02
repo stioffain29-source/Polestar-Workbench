@@ -10,6 +10,8 @@ export { classifySeverity } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";
 export type { SeverityBackfillSummary } from "./backfillSeverity";
+export { runCargoCountryBackfill } from "./backfillCargoCountry";
+export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { geocode } from "./geocode";
 export type { GeoResult } from "./geocode";
 export type {
