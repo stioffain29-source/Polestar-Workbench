@@ -49,6 +49,13 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
   Bahrain: [26.07, 50.56],
   Kuwait: [29.31, 47.48],
   Jordan: [30.59, 36.24],
+  Iran: [32.43, 53.69],
+  Iraq: [33.22, 43.68],
+  Yemen: [15.55, 48.52],
+  Israel: [31.05, 34.85],
+  Lebanon: [33.85, 35.86],
+  Syria: [34.8, 39.0],
+  Taiwan: [23.7, 120.96],
   Singapore: [1.35, 103.82],
   // Additional countries present in legacy / imported incident rows so they
   // also plot on the map rather than being dropped as ungeocodable.
@@ -173,6 +180,31 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   manama: { lat: 26.23, lng: 50.59 },
   amman: { lat: 31.95, lng: 35.93 },
   aqaba: { lat: 29.53, lng: 35.0 },
+  // Levant / Gulf (local-language Cargo Watch feeds)
+  beirut: { lat: 33.89, lng: 35.5 },
+  damascus: { lat: 33.51, lng: 36.29 },
+  aleppo: { lat: 36.2, lng: 37.16 },
+  idlib: { lat: 35.93, lng: 36.63 },
+  baghdad: { lat: 33.31, lng: 44.36 },
+  basra: { lat: 30.51, lng: 47.78 },
+  tehran: { lat: 35.69, lng: 51.39 },
+  "tel aviv": { lat: 32.08, lng: 34.78, name: "Tel Aviv" },
+  aden: { lat: 12.79, lng: 45.02 },
+  sanaa: { lat: 15.37, lng: 44.19 },
+  // Taiwan
+  taipei: { lat: 25.03, lng: 121.57 },
+  kaohsiung: { lat: 22.63, lng: 120.3 },
+  // Thailand (local-language feed)
+  "nakhon ratchasima": { lat: 14.97, lng: 102.1, name: "Nakhon Ratchasima" },
+  korat: { lat: 14.97, lng: 102.1, name: "Korat" },
+  // Indonesia (local-language feed)
+  medan: { lat: 3.59, lng: 98.67 },
+  makassar: { lat: -5.15, lng: 119.43 },
+  semarang: { lat: -6.97, lng: 110.42 },
+  palembang: { lat: -2.98, lng: 104.76 },
+  tangerang: { lat: -6.18, lng: 106.63 },
+  madiun: { lat: -7.63, lng: 111.52 },
+  "soekarno-hatta": { lat: -6.13, lng: 106.66, name: "Soekarno-Hatta" },
 };
 
 function titleCase(s: string): string {

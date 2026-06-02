@@ -33,7 +33,7 @@ export type ScreenVerdict = {
 
 export type ScreenOutcome =
   | { ok: true; verdict: ScreenVerdict }
-  | { ok: false; error: string };
+  | { ok: false; error: string; retryAfterMs?: number };
 
 /** True when the Replit OpenAI integration env vars are present. */
 export function isLlmAvailable(): boolean {
@@ -72,7 +72,17 @@ async function callOnce(input: ScreenInput): Promise<ScreenOutcome> {
     });
 
     if (res.status === 429 || res.status >= 500) {
-      return { ok: false, error: `http-${res.status}` };
+      const ra = res.headers.get("retry-after");
+      let retryAfterMs: number | undefined;
+      if (ra) {
+        const secs = Number(ra);
+        if (Number.isFinite(secs)) retryAfterMs = secs * 1000;
+        else {
+          const when = Date.parse(ra);
+          if (Number.isFinite(when)) retryAfterMs = Math.max(0, when - Date.now());
+        }
+      }
+      return { ok: false, error: `http-${res.status}`, retryAfterMs };
     }
     if (!res.ok) {
       return { ok: false, error: `http-${res.status}` };
@@ -123,7 +133,13 @@ export async function screenItem(input: ScreenInput, retries = 3): Promise<Scree
     if (last.ok) return last;
     const retryable = RETRYABLE.has(last.error) || last.error.startsWith("http-");
     if (!retryable || attempt === retries) return last;
-    await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    // Honour a server Retry-After when present (429); otherwise exponential
+    // backoff. Jitter spreads concurrent workers so they don't retry in lockstep
+    // and re-trigger the same rate-limit burst (thundering herd).
+    const serverHint = !last.ok ? last.retryAfterMs : undefined;
+    const backoff = serverHint ?? 1000 * Math.pow(2, attempt);
+    const jitter = Math.random() * 500;
+    await new Promise((r) => setTimeout(r, Math.min(backoff, 15000) + jitter));
   }
   return last;
 }

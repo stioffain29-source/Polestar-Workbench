@@ -563,7 +563,9 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
         perFeed[feed.label].accepted++;
       }
     };
-    // Sequential: each feed already screens at concurrency 4 internally.
+    // Sequential: each feed screens at its own internal concurrency. Running the
+    // feeds one at a time keeps the combined request burst gentle on the LLM
+    // proxy (the Retry-After backoff still covers transient throttling).
     for (const feed of LOCAL_FEEDS) {
       await processLocalFeed(feed);
     }
