@@ -23,3 +23,9 @@ Durable rules learned making the Shipping Watch report client-ready (Cargo Watch
 
 ## Proof harness
 - `artifacts/workbench/scripts/proveShippingSelection.ts` reads dumped incidents + report text and prints included/rejected-with-reasons + country/chokepoint/commercial reconciliation. Mirror this pattern when a distrustful user demands evidence a selection is correct.
+
+## Saved prose overrides the live dataset until reset (the real fault-2 trap)
+- Seeding parity (above) only governs a FRESH draft. Once a report is saved, `ReportEditor.pick()` returns the SAVED `what_matters/implications/polestar_view/watch_next` verbatim whenever the report is not flagged stale (`computeStale` only fires when live data is newer than the issue date). So a stale saved Polestar View ("China and South Korea") keeps contradicting the live country chart even after the seeding code is fixed and the app is redeployed.
+- **Fix:** a ONE-TIME, marker-gated DB reset blanks those four stored sections for `topic='shipping'` so the frontend falls back to the live dataset. Marker-gated (not every-boot) because the shipping editor DOES persist those fields — an every-boot wipe would destroy deliberate analyst edits on each cold start.
+- **Why marker, not content-heuristic or every-boot:** code review flagged the every-boot version as a data-loss regression. Use `app_migration_markers(key,applied_at)` (registered in the Drizzle schema so `drizzle push` won't drop it); check key before the destructive UPDATE, insert after. Bump the key (`shipping_prose_reset_v1`→v2) to re-run. This is the runtime-migration counterpart to `RELEVANCE_RULE_VERSION`.
+- Do NOT clear `situation`/`what_happened` — the shipping preview/PDF never render them, so blanking them is destructive for no gain.

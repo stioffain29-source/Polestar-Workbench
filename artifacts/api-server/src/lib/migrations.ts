@@ -249,6 +249,57 @@ export async function runDataMigrations(): Promise<void> {
         logger.error({ err: seedErr, topic: seed.topic }, "Failed to seed topic report");
       }
     }
+    // 3b) ONE-TIME reset of legacy shipping report prose.
+    //
+    //     The Shipping preview/PDF render What Matters, Implications, Watch
+    //     Next and Polestar View through the editor's pick(): saved prose is
+    //     shown verbatim when present and not flagged stale, otherwise it
+    //     falls back to the live Shipping dataset (buildShippingReportDataset
+    //     → countryRows / chokepoint / vessel reads). Legacy rows still hold
+    //     pre-written prose (e.g. a Polestar View naming "China and South
+    //     Korea" while the live country chart shows Iran / Singapore), which
+    //     made the Executive Summary, chart and Polestar View disagree.
+    //
+    //     Blank those four stored sections ONCE so the report falls back to
+    //     the single live dataset and the three surfaces reconcile. This is
+    //     marker-gated (NOT an every-boot wipe) so deliberate analyst edits
+    //     made AFTER this reset are preserved across restarts. Bump the
+    //     marker key if a future change ever requires re-resetting. We do
+    //     NOT touch situation / what_happened — the shipping preview/PDF do
+    //     not render them, so clearing them would be destructive for no gain.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "shipping_prose_reset_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          UPDATE reports
+          SET what_matters = '', implications = '', polestar_view = '', watch_next = ''
+          WHERE topic = 'shipping'
+            AND (
+                 COALESCE(what_matters, '')  <> ''
+              OR COALESCE(implications, '')   <> ''
+              OR COALESCE(polestar_view, '')  <> ''
+              OR COALESCE(watch_next, '')     <> ''
+            )
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time shipping report prose reset (now rendered from live dataset)",
+        );
+      }
+    }
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never

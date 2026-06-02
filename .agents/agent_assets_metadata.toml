@@ -540,3 +540,9 @@ id = "GeL3B8pWSyihX5XE16AmD"
 uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_revised_2026-06-01.pdf"
 type = "pdf"
 title = "Shipping Watch — revised, client-ready (report #12)"
+
+[[outputs]]
+id = "A8qb5fodR9EhJZiSKNhpp"
+uri = "file://artifacts/workbench/screenshots/Shipping_Watch_revised.pdf"
+type = "pdf"
+title = "Shipping Watch — revised (all 7 faults fixed)"

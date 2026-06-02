@@ -590,7 +590,9 @@ export function buildShippingReportDataset(
     {
       label: "Piracy / Armed Robbery",
       value: String(piracyRows.length),
-      note: `Latest record in window: ${latestDate ? format(latestDate, "dd MMM yyyy") : "—"}`,
+      note: piracyRows.length > 0
+        ? `Latest record in window: ${format(piracyRows[0].date, "dd MMM yyyy")}`
+        : "No qualifying piracy record in window",
     },
     {
       label: "Latest Significant Incident",

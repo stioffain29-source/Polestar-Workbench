@@ -23,7 +23,7 @@ const INGESTION_MODE: Record<string, IngestionMode> = {
   cargo_watch: "manual",
   fuel: "static",
   fertiliser: "static",
-  shipping: "static",
+  shipping: "manual",
   energy: "static",
   strikes: "static",
 };
