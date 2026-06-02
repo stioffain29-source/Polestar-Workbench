@@ -5,6 +5,7 @@ import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { isLlmAvailable, screenBatch } from "./translateScreen";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Cargo Watch ingest core.
@@ -36,6 +37,49 @@ function gnews(query: string): string {
   const q = encodeURIComponent(query);
   return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 }
+
+// Local-language Google News editions. These surface genuine in-scope cargo
+// incidents the English edition never carries. Items are translated + screened by
+// the LLM stage (see translateScreen.ts) instead of the regex classifier.
+function gnewsLocale(query: string, hl: string, gl: string, ceid: string): string {
+  const q = encodeURIComponent(query);
+  return `https://news.google.com/rss/search?q=${q}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+}
+
+type LocalFeed = { label: string; lang: string; url: string };
+
+const LOCAL_FEEDS: LocalFeed[] = [
+  {
+    label: "Local · Bahasa",
+    lang: "Indonesian",
+    url: gnewsLocale(
+      `("pencurian kargo" OR "pembajakan truk" OR "perampokan truk" OR "pencurian gudang" OR "pencurian kontainer" OR "pembobolan gudang")`,
+      "id",
+      "ID",
+      "ID:id",
+    ),
+  },
+  {
+    label: "Local · Arabic",
+    lang: "Arabic",
+    url: gnewsLocale(
+      `("سرقة شحنة" OR "سرقة بضائع" OR "سرقة مستودع" OR "سطو على شاحنة")`,
+      "ar",
+      "AE",
+      "AE:ar",
+    ),
+  },
+  {
+    label: "Local · Thai",
+    lang: "Thai",
+    url: gnewsLocale(`("ขโมยสินค้า" OR "ปล้นรถบรรทุก" OR "โจรกรรมสินค้า")`, "th", "TH", "TH:th"),
+  },
+];
+
+// Cap on the number of NEW (unseen) items screened per local feed per run. The LLM
+// screen is the only paid step; deduping by URL before screening keeps steady-state
+// runs cheap, and this caps the cost of the first cold run.
+const MAX_SCREEN_PER_FEED = 50;
 
 const ME_COUNTRIES = [
   "United Arab Emirates",
@@ -237,6 +281,62 @@ function dedupeKey(title: string, when: Date, country: string): string {
   ].join("||");
 }
 
+// Canonicalises an LLM-returned country name to the exact in-scope name used by
+// the workbench scope sets (artifacts/workbench/src/lib/cargoAnalysis.ts) and the
+// geocoder. Returns null for anything OUTSIDE the APAC + Middle East scope, which
+// drops the item — so a translated incident can never widen the page's scope.
+const SCOPE_CANON: Record<string, string> = {
+  // Middle East
+  uae: "UAE",
+  "united arab emirates": "UAE",
+  emirates: "UAE",
+  "saudi arabia": "Saudi Arabia",
+  saudi: "Saudi Arabia",
+  ksa: "Saudi Arabia",
+  qatar: "Qatar",
+  oman: "Oman",
+  bahrain: "Bahrain",
+  kuwait: "Kuwait",
+  jordan: "Jordan",
+  iran: "Iran",
+  iraq: "Iraq",
+  yemen: "Yemen",
+  israel: "Israel",
+  lebanon: "Lebanon",
+  syria: "Syria",
+  // APAC
+  singapore: "Singapore",
+  malaysia: "Malaysia",
+  indonesia: "Indonesia",
+  thailand: "Thailand",
+  vietnam: "Vietnam",
+  "viet nam": "Vietnam",
+  philippines: "Philippines",
+  cambodia: "Cambodia",
+  laos: "Laos",
+  myanmar: "Myanmar",
+  burma: "Myanmar",
+  india: "India",
+  pakistan: "Pakistan",
+  bangladesh: "Bangladesh",
+  "sri lanka": "Sri Lanka",
+  china: "China",
+  "hong kong": "China",
+  taiwan: "Taiwan",
+  "south korea": "South Korea",
+  korea: "South Korea",
+  "republic of korea": "South Korea",
+  japan: "Japan",
+  australia: "Australia",
+  "new zealand": "New Zealand",
+  "papua new guinea": "Papua New Guinea",
+};
+
+function canonScopeCountry(raw: string | null): string | null {
+  if (!raw) return null;
+  return SCOPE_CANON[raw.trim().toLowerCase()] ?? null;
+}
+
 type Accepted = {
   title: string;
   summary: string;
@@ -287,6 +387,26 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   const rejected: Rejected[] = [];
   const feedErrors: { feed: string; error: string }[] = [];
   const perFeed: Record<string, FeedStat> = {};
+
+  // DB dedupe set is built up-front: the local-language stage uses existingUrls to
+  // skip already-ingested items BEFORE spending an LLM call on them.
+  const existing = await db
+    .select({
+      title: incidentsTable.title,
+      occurredAt: incidentsTable.occurredAt,
+      country: incidentsTable.country,
+      topic: incidentsTable.topic,
+      sourceUrl: incidentsTable.sourceUrl,
+    })
+    .from(incidentsTable);
+
+  const existingKeys = new Set<string>();
+  const existingUrls = new Set<string>();
+  for (const row of existing) {
+    if (row.topic !== "cargo_watch") continue;
+    existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
+    if (row.sourceUrl) existingUrls.add(row.sourceUrl);
+  }
 
   // Bounded concurrency: sequential fetching at 20s-per-feed can exceed
   // two minutes. Processing is order-independent.
@@ -339,8 +459,114 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
       perFeed[feed.label].error = msg;
     }
   };
+  const dbg = (s: string) => {
+    if (process.env.CARGO_DEBUG) process.stderr.write(`[cargo ${new Date().toISOString().slice(11, 19)}] ${s}\n`);
+  };
+  dbg(`existing cargo rows: urls=${existingUrls.size}`);
+  dbg(`english feeds starting (${FEEDS.length})`);
   for (let i = 0; i < FEEDS.length; i += CONCURRENCY) {
     await Promise.allSettled(FEEDS.slice(i, i + CONCURRENCY).map(processFeed));
+    dbg(`english batch done ${Math.min(i + CONCURRENCY, FEEDS.length)}/${FEEDS.length}`);
+  }
+  dbg(`english accepted=${accepted.length}`);
+
+  // Local-language stage. Each candidate is translated + screened by the LLM, then
+  // its country is canonicalised to the in-scope set. If the LLM integration is
+  // unavailable the stage is skipped entirely — the English pipeline is unaffected.
+  const llmReady = isLlmAvailable();
+  if (!llmReady) {
+    log("\nLocal-language feeds skipped: OpenAI integration not configured.");
+  } else {
+    const localSeen = new Set<string>();
+    const processLocalFeed = async (feed: LocalFeed) => {
+      perFeed[feed.label] = { name: feed.label, found: 0, accepted: 0, rejected: 0 };
+      dbg(`local "${feed.label}" fetching`);
+      let parsed;
+      try {
+        parsed = await parser.parseURL(feed.url);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        feedErrors.push({ feed: feed.label, error: msg });
+        perFeed[feed.label].error = msg;
+        return;
+      }
+      const items = parsed.items ?? [];
+      perFeed[feed.label].found = items.length;
+
+      // Collect NEW (unseen) candidates only, so the LLM screen never pays to
+      // re-read items already in the DB or already seen this run.
+      type Candidate = { headline: string; summary: string; when: Date; link: string; sourceName: string };
+      const candidates: Candidate[] = [];
+      for (const item of items) {
+        const rawTitle = cleanText(item.title);
+        const summary = cleanText(item.contentSnippet || item.content || "");
+        const when = parseDate(item.isoDate || item.pubDate);
+        const link = item.link?.trim();
+        if (!rawTitle || !when || !link) {
+          rejected.push({ title: rawTitle || "(no title)", reason: "missing-required-field", feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+        if (existingUrls.has(link) || localSeen.has(link)) {
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+        localSeen.add(link);
+        const dashIdx = rawTitle.lastIndexOf(" - ");
+        const sourceName = dashIdx > 0 ? rawTitle.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
+        const headline = dashIdx > 0 ? rawTitle.slice(0, dashIdx).trim() : rawTitle;
+        candidates.push({ headline, summary, when, link, sourceName });
+        if (candidates.length >= MAX_SCREEN_PER_FEED) break;
+      }
+
+      dbg(`local "${feed.label}" found=${items.length} screening=${candidates.length}`);
+      const verdicts = await screenBatch(
+        candidates.map((c) => ({ title: c.headline, summary: c.summary })),
+        { concurrency: 4 },
+      );
+      dbg(`local "${feed.label}" screened`);
+
+      for (let i = 0; i < candidates.length; i++) {
+        const c = candidates[i];
+        const v = verdicts[i];
+        if (!v.ok) {
+          rejected.push({ title: c.headline, reason: `llm-error:${v.error}`, feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+        const ver = v.verdict;
+        if (!ver.inScope) {
+          rejected.push({ title: c.headline, reason: `slop:${ver.reason}`.slice(0, 140), feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+        const country = canonScopeCountry(ver.country);
+        if (!country) {
+          rejected.push({ title: c.headline, reason: `out-of-scope-country:${ver.country ?? "?"}`, feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+        const titleEn = (ver.titleEn || c.headline).slice(0, 500);
+        // Append the LLM-extracted city to the summary so the geocoder can place
+        // the incident at city level rather than only the country centroid.
+        const summaryEn = [ver.summaryEn || titleEn, ver.city ? `Location: ${ver.city}.` : ""].join(" ").trim();
+        accepted.push({
+          title: titleEn,
+          summary: summaryEn,
+          country,
+          occurredAt: c.when,
+          source: c.sourceName.slice(0, 200),
+          sourceUrl: c.link,
+          feedLabel: feed.label,
+          reason: `llm:${ver.reason}`.slice(0, 200),
+        });
+        perFeed[feed.label].accepted++;
+      }
+    };
+    // Sequential: each feed already screens at concurrency 4 internally.
+    for (const feed of LOCAL_FEEDS) {
+      await processLocalFeed(feed);
+    }
   }
 
   // In-batch dedupe (multiple feeds can return the same article).
@@ -351,25 +577,6 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
     if (seen.has(k)) continue;
     seen.add(k);
     uniqueAccepted.push(a);
-  }
-
-  // DB dedupe against existing cargo_watch rows.
-  const existing = await db
-    .select({
-      title: incidentsTable.title,
-      occurredAt: incidentsTable.occurredAt,
-      country: incidentsTable.country,
-      topic: incidentsTable.topic,
-      sourceUrl: incidentsTable.sourceUrl,
-    })
-    .from(incidentsTable);
-
-  const existingKeys = new Set<string>();
-  const existingUrls = new Set<string>();
-  for (const row of existing) {
-    if (row.topic !== "cargo_watch") continue;
-    existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
-    if (row.sourceUrl) existingUrls.add(row.sourceUrl);
   }
 
   const toInsert: Accepted[] = [];
@@ -388,13 +595,16 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   }
 
   // Report
+  const allFeedLabels = [...FEEDS.map((f) => f.label), ...(llmReady ? LOCAL_FEEDS.map((f) => f.label) : [])];
+  const totalFeeds = allFeedLabels.length;
   log("\n=== Per-feed ===");
-  for (const f of FEEDS) {
-    const s = perFeed[f.label];
+  for (const label of allFeedLabels) {
+    const s = perFeed[label];
+    if (!s) continue;
     if (s.error) {
-      log(`  ${f.label.padEnd(28)} ERROR: ${s.error}`);
+      log(`  ${label.padEnd(28)} ERROR: ${s.error}`);
     } else {
-      log(`  ${f.label.padEnd(28)} found=${s.found.toString().padStart(3)}  accepted=${s.accepted.toString().padStart(3)}  rejected=${s.rejected.toString().padStart(3)}`);
+      log(`  ${label.padEnd(28)} found=${s.found.toString().padStart(3)}  accepted=${s.accepted.toString().padStart(3)}  rejected=${s.rejected.toString().padStart(3)}`);
     }
   }
 
@@ -404,7 +614,7 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   }
 
   log("\n=== Totals ===");
-  log(`  Feeds queried        : ${FEEDS.length}`);
+  log(`  Feeds queried        : ${totalFeeds}`);
   log(`  Feed errors          : ${feedErrors.length}`);
   log(`  Items found          : ${accepted.length + rejected.length}`);
   log(`  Accepted (raw)       : ${accepted.length}`);
@@ -419,17 +629,33 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   for (const [c, n] of sortedCov) log(`  ${c.padEnd(22)} ${n}`);
   if (sortedCov.length === 0) log("  (none)");
 
+  if (process.env.CARGO_DEBUG) {
+    const localLabels = new Set(LOCAL_FEEDS.map((f) => f.label));
+    const localAccepted = uniqueAccepted.filter((a) => localLabels.has(a.feedLabel));
+    process.stderr.write(`\n[cargo] === ACCEPTED local samples (${localAccepted.length}) ===\n`);
+    for (const a of localAccepted) {
+      process.stderr.write(
+        `[cargo] (${a.feedLabel.replace("Local · ", "")}) [${a.country}] ${a.title}\n        ${a.reason}\n`,
+      );
+    }
+    const localRej = rejected.filter((r) => localLabels.has(r.feedLabel));
+    process.stderr.write(`\n[cargo] === REJECTED local samples (first 20 of ${localRej.length}) ===\n`);
+    for (const r of localRej.slice(0, 20)) {
+      process.stderr.write(`[cargo] ${r.reason} — ${r.title.slice(0, 90)}\n`);
+    }
+  }
+
   const summaryBase = {
     topic: "cargo_watch" as const,
     mode: (commit ? "commit" : "dry-run") as IngestSummary["mode"],
-    sourcesFetched: FEEDS.length,
+    sourcesFetched: totalFeeds,
     itemsConsidered: accepted.length + rejected.length,
     acceptedRaw: accepted.length,
     acceptedUnique: uniqueAccepted.length,
     duplicateInDb: dupeInDb,
     newToInsert: toInsert.length,
     rejected: rejected.length,
-    perFeed: FEEDS.map((f) => perFeed[f.label]),
+    perFeed: allFeedLabels.map((label) => perFeed[label]).filter(Boolean),
     countryCoverage: sortedCov,
   };
 
