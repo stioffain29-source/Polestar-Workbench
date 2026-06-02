@@ -15,12 +15,14 @@ import { draftTopicReportProse } from "../src/lib/draftReportProse";
 import {
   isLowCredibilityShippingRecord,
   isCapabilityContext,
+  isConfirmedOperationalIncident,
   SOCIAL_HANDLE_TITLE_RE,
   SOCIAL_SOURCE_RE,
   HUMAN_INTEREST_RE,
   SPECULATIVE_CLAIM_RE,
   GENERIC_COMMENTARY_RE,
   isRhetoricalClosureThreat,
+  PLANNING_INTENT_RE,
   MEDIA_PACKAGING_RE,
 } from "../src/lib/shippingAnalysis";
 import { resolveReportWindow, filterIncidentsToWindow } from "../src/lib/reportWindow";
@@ -38,6 +40,8 @@ function reason(r: ShippingReportIncident): string {
   if (isRhetoricalClosureThreat(t)) return "political closure rhetoric / threat / claim — not confirmed disruption";
   if (MEDIA_PACKAGING_RE.test(t)) return "media packaging (video / photo / live blog)";
   if (isCapabilityContext(r)) return "capability / procurement / exercise news";
+  if (PLANNING_INTENT_RE.test(t)) return "planning / intent / prediction — event not occurred";
+  if (!isConfirmedOperationalIncident(r)) return "not a confirmed operational event (claim / advisory / commentary)";
   return "";
 }
 

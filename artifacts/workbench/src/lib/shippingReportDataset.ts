@@ -9,7 +9,7 @@ import {
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
   type ChokepointKey,
   isLowCredibilityShippingRecord,
-  isCapabilityContext,
+  isConfirmedOperationalIncident,
   FREIGHT_MARKET_INDEX_RE,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
@@ -481,13 +481,15 @@ export function buildShippingReportDataset(
 
   // Chokepoint counts — derived from the report window so the headline
   // "Main Affected Chokepoint" matches the Chokepoint Watch table below.
-  // Only credible operational records feed the headline count, so political
-  // closure rhetoric/claims, media-packaging wrappers and human-interest
-  // follow-ups can no longer inflate "Main Affected Chokepoint" above the
-  // credible-only Chokepoint Watch table.
+  // Only CONFIRMED operational events feed the headline count, so political
+  // closure rhetoric/claims, planning/intent language, advisory/escort
+  // posture, transit-volume commentary, media-packaging wrappers and
+  // human-interest follow-ups can no longer inflate "Main Affected
+  // Chokepoint". Bab-el-Mandeb (or any chokepoint) is therefore never shown
+  // as an affected chokepoint on the strength of an unconfirmed mention.
   const cpCounts = new Map<ChokepointKey, number>();
   for (const r of enriched30) {
-    if (isLowCredibilitySource(r)) continue;
+    if (!isConfirmedOperationalIncident(r)) continue;
     for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
   }
   let topCp: ChokepointKey | "" = "", topCpN = 0;
@@ -564,14 +566,14 @@ export function buildShippingReportDataset(
   // minehunting drone) are also excluded here so a capability headline can
   // never be promoted to Latest Significant Incident in place of a real
   // operational event.
-  const enrichedClean = enriched.filter(
-    (r) => !isLowCredibilitySource(r) && !isCapabilityContext(r),
-  );
-  // Strict exclusion: if no credible record exists in the window, the
-  // Latest Significant Incident card reads "—" rather than falling back to
-  // a repatriation / human-interest / speculative-claim row.
-  const latestSig = sortByDateDesc(enrichedClean).find((r) => r.severity === "extreme" || r.severity === "high")
-    ?? sortByDateDesc(enrichedClean)[0]
+  // Latest Significant Incident is drawn from the SAME confirmed-operational
+  // pool that feeds the Related Incidents table, so the headline card can
+  // never name a claim, threat, advisory or commentary item the table does
+  // not also carry. If no confirmed event exists in the window, the card
+  // reads "—" rather than falling back to rhetoric or a human-interest row.
+  const confirmedIncidents = enriched.filter((r) => isConfirmedOperationalIncident(r));
+  const latestSig = sortByDateDesc(confirmedIncidents).find((r) => r.severity === "extreme" || r.severity === "high")
+    ?? sortByDateDesc(confirmedIncidents)[0]
     ?? null;
 
   // Single, deduplicated Fast Facts grid (7 cards).
@@ -617,7 +619,7 @@ export function buildShippingReportDataset(
     // agree.
     const credible = enriched30
       .filter((r) => detectChokepoints(r).includes(cp))
-      .filter((r) => !isLowCredibilitySource(r));
+      .filter((r) => isConfirmedOperationalIncident(r));
     const hs = highestSeverity(credible);
     const credibleSorted = sortByDateDesc(credible);
     const credibleLatest = credibleSorted[0] ?? null;
@@ -736,7 +738,11 @@ export function buildShippingReportDataset(
   // commentary. Weak repatriation / generic items cannot reach this
   // path because they were dropped upstream in the vessel pipeline.
   const vesselThreatSeed = (vesselHostile[0] ?? vesselOther[0]) ?? null;
-  const relatedIncidents = prioritiseRelated(enriched, vesselThreatSeed);
+  // Seed the Latest Significant Incident at the head as well, so the closing
+  // table is guaranteed to carry the same incident the headline card names —
+  // the two surfaces can never disagree. Both seeds are confirmed-operational
+  // by construction, and prioritiseRelated dedupes any overlap.
+  const relatedIncidents = prioritiseRelated(enriched, [latestSig, vesselThreatSeed]);
 
   // Shipping-specific auto-prose for the four analyst sections. Editor
   // text takes precedence in the exporter and preview; these fallbacks
@@ -1044,8 +1050,16 @@ function buildRegionalCountryRead(opts: {
     ? `Across the weekly briefing window, ${lead.label} carries the heavier share with ${lead.value} record${lead.value === 1 ? "" : "s"}${second ? ` against ${second.value} for ${second.label}` : ""}.`
     : `Regional attribution is thin this cycle, with most records sitting outside the APAC and Middle East scope.`;
   const topCountries = countryRows.slice(0, 3).filter((r) => r.value > 0);
+  const identifiedTotal = countryRows.reduce((sum, r) => sum + r.value, 0);
+  // When as many (or more) records are unattributed as are tied to a country,
+  // the country ranking is not a safe basis for conclusions — say so plainly
+  // rather than letting the lead countries read as settled fact.
+  const heavyGap = locationNotIdentifiedCount > 0 && locationNotIdentifiedCount >= identifiedTotal;
+  const countryQualifier = heavyGap
+    ? ` These country totals are indicative only: with ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} unattributed against ${identifiedTotal} tied to a confirmed incident country, country-level conclusions should be treated as low-confidence.`
+    : "";
   const countryLine = topCountries.length > 0
-    ? `At country level the cycle is led by ${joinList(topCountries.map((c) => `${c.label} (${c.value})`))}.`
+    ? `At country level the cycle is led by ${joinList(topCountries.map((c) => `${c.label} (${c.value})`))}.${countryQualifier}`
     : `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file.`;
   const gapLine = locationNotIdentifiedCount > 0
     ? `A further ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} could not be tied to a confirmed incident country and ${locationNotIdentifiedCount === 1 ? "is" : "are"} excluded from the country chart to avoid distortion.`
@@ -1061,7 +1075,7 @@ function buildRegionalCountryRead(opts: {
 // already flagged as pure shipping-market noise.
 function prioritiseRelated(
   rows: EnrichedIncident[],
-  vesselThreatSeed: EnrichedIncident | null = null,
+  seeds: Array<EnrichedIncident | null> = [],
 ): EnrichedIncident[] {
   const strong: EnrichedIncident[] = [];
   const rest: EnrichedIncident[] = [];
@@ -1073,7 +1087,12 @@ function prioritiseRelated(
     // Incidents excludes it.
     const text2 = `${r.title ?? ""} ${r.summary ?? ""}`;
     if (FREIGHT_MARKET_INDEX_RE.test(text2) && !COMMERCIAL_OPERATIONAL_RE.test(text2)) continue;
-    if (isLowCredibilitySource(r)) continue;
+    // Confirmed-operational gate: only events that actually occurred (attack,
+    // seizure, piracy, concrete port/route/physical disruption) may appear as
+    // related incidents. Claims, threats, planning/intent, predictions,
+    // advisory/escort posture and bare chokepoint commentary are excluded so
+    // nothing is presented as a confirmed disruption that is not one.
+    if (!isConfirmedOperationalIncident(r)) continue;
     const text = text2.toLowerCase();
     const isVesselHostile = OPERATIONAL_HOOK_RE.test(text) && /\b(attack|attacked|hijack|piracy|seized|missile|drone|hostilit)\b/.test(text);
     const isPortRouteOrChoke = /\b(port|terminal|berth|chokepoint|hormuz|red\s*sea|bab[\s-]?el[\s-]?mandeb|suez|malacca|reroute|diversion|advisory|war[\s-]?risk|insurance|premium)\b/.test(text);
@@ -1081,13 +1100,13 @@ function prioritiseRelated(
     if ((isVesselHostile || isPortRouteOrChoke) && !isWeakBucket) strong.push(r);
     else if (!isWeakBucket) rest.push(r);
   }
-  // Seed the strongest vessel-threat record at the head of the list
-  // when the upstream vessel pipeline has surfaced one. dedupeByTitle
-  // below collapses any overlap with weekly-window rows. The seed has
-  // already cleared the vessel pipeline's credibility, human-interest
-  // and speculative-claim filters, so it never reintroduces weak
-  // repatriation or generic-commentary items.
-  const seeded = vesselThreatSeed ? [vesselThreatSeed, ...strong, ...rest] : [...strong, ...rest];
+  // Seed the supplied records (Latest Significant Incident, then the
+  // strongest vessel-threat record) at the head of the list. dedupeByTitle
+  // below collapses any overlap with weekly-window rows. Every seed is
+  // confirmed-operational by construction, so seeding never reintroduces a
+  // claim, advisory, repatriation or generic-commentary item.
+  const seedList = seeds.filter((s): s is EnrichedIncident => s !== null);
+  const seeded = [...seedList, ...strong, ...rest];
   const ordered = dedupeByTitle(seeded);
   // Cap tight so the Disclaimer block can be pulled back onto the same
   // page rather than orphaned on a near-empty final page.

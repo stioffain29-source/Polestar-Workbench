@@ -84,7 +84,7 @@ export const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ball
 // operational anchor. Also catches "what happens next" / "here's what it
 // means" / "why it matters" explainer framing, which is commentary about an
 // event rather than a report of the event itself.
-export const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|what (happens|happened|comes|could happen|that means|this means|it means|to expect)\b|what'?s next|here'?s what|why it matters|why it could|how (it|this) (could|will|might) (affect|hit|impact)|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
+export const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|what (happens|happened|comes|could happen|that means|this means|it means|to expect)\b|what'?s next|here'?s what|why it matters|why it could|how (it|this) (could|will|might) (affect|hit|impact)|how [^.]{0,70}\b(complements?|complementing|underpins?|underpinning|reshapes?|reshaping|drives?|shapes?|shaping|fuels?|explains?|redefines?|transforms?)\b[^.]{0,50}\b(architecture|landscape|dynamics|ecosystem|paradigm|calculus|playbook|framework|geometry|topology|order)\b|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
 
 // Political rhetoric / threat language about closing or sealing a waterway.
 // Iranian "vows to shut the Strait of Hormuz" / "says Hormuz will stay
@@ -385,6 +385,76 @@ export function classifyIssue(i: MaritimeRecordLike): string {
     if (ISSUE_RULES[k].pattern.test(text)) return ISSUE_RULES[k].label;
   }
   return "Unclassified maritime record";
+}
+
+// ---------------------------------------------------------------------------
+// Confirmed-operational gate
+//
+// The incident surfaces (Related Incidents table, Latest Significant
+// Incident, chokepoint operational counts) must show ONLY events that have
+// actually occurred to a vessel, crew, port or waterway. Claims, threats,
+// planning/intent language, predictions, diplomacy and advisory/escort
+// posture are NOT confirmed incidents and must never be presented as
+// confirmed disruption — they belong to threat / rhetoric / advisory watch.
+//
+// This is a POSITIVE gate (include only if confirmed), the inverse of the
+// noise denylist. A bare "Iran blocks Strait of Hormuz", "plans blockade",
+// "full closure", "blockade escalates tensions" or "transits are rising"
+// headline carries no concrete operational action, so it is excluded by
+// default rather than having to be matched by a suppression rule.
+// ---------------------------------------------------------------------------
+
+// Planning / intent / prediction / diplomacy language: the event has NOT
+// occurred. "Iran plans blockade", "weighs closing Hormuz", "vows to seal",
+// "threatens closure", "predicts oil will flow", "warns of closure",
+// "escalates tensions". A concrete physical cause (grounding, collision,
+// fire) overrides this — that is a real event phrased with an outlook.
+export const PLANNING_INTENT_RE = /\b(plans?|planning|prepares?|preparing|considers?|considering|weighs?|weighing|mulls?|mulling|vows?|vowed|pledges?|pledged|threatens?|threatened|warns? of|warning of|predicts?|predicted|forecasts?|forecasting|expected to|set to|poised to|risks? of|fears? of|escalat\w+ tensions?|tensions? (rise|rising|mount\w*|flare\w*|escalat\w*)|war of words)\b/i;
+
+// Concrete port / route / physical-disruption events that have actually
+// happened: a port closure or strike in effect, a canal blocked by a hull,
+// a grounding/collision/fire/sinking, vessels rerouted or diverted. These
+// are operational incidents even though they are not vessel attacks or
+// piracy. Intent and threat words are deliberately absent here.
+const CONFIRMED_PORT_ROUTE_RE = /\b(port (closed|closure|shut|shutdown|halted|suspended|congestion)|port strike|terminal (closed|shut|congestion)|berth (closed|closure|blocked)|(dock|stevedore|port)\s?workers?'? strike|dockworkers?'? strike|labou?r (strike|stoppage|walkout)|union (strike|walkout)|reroute|re[- ]?rout(ed|ing)|diverted|diverting|cape of good hope|ran aground|aground|grounding|grounded|refloat\w*|salvag\w*|collision|collided|allision|capsiz\w*|sank|sunk|sinking|wreck\w*|oil spill|canal (blocked|blockage|closed)|vessel (stranded|adrift|disabled)|broke down|engine failure|breakdown)\b/i;
+
+// Concrete CONFIRMED causes that override the planning/intent veto: a real
+// event phrased with a forward-looking clause ("port closed after strike,
+// expected to reopen") is still a confirmed incident. This is the physical
+// causes PLUS in-effect port/terminal/berth closures, dock/labour strikes,
+// canal blockages and disabled vessels — but deliberately NOT the weak,
+// prediction-prone route terms (reroute / diverted / cape of good hope /
+// congestion), so pure claims ("plans blockade", "predicts oil will flow")
+// keep returning false.
+const CONFIRMED_INCIDENT_CAUSE_RE = /\b(ran aground|aground|grounding|grounded|refloat\w*|salvag\w*|collision|collided|allision|capsiz\w*|sank|sunk|sinking|wreck\w*|fire|blaze|explosion|blast|debris|engine failure|breakdown|oil spill|port (closed|closure|shut|shutdown|halted|suspended)|port strike|terminal (closed|shut)|berth (closed|closure|blocked)|(dock|stevedore|port)\s?workers?'? strike|dockworkers?'? strike|labou?r (strike|stoppage|walkout)|union (strike|walkout)|canal (blocked|blockage|closed)|vessel (stranded|adrift|disabled))\b/i;
+
+/**
+ * True only when a record reports a CONFIRMED operational shipping event —
+ * an attack, seizure, piracy/armed-robbery act, or a concrete port/route/
+ * physical disruption that has actually occurred. Claims, threats, planning,
+ * predictions, diplomacy, advisory/escort posture and pure chokepoint
+ * commentary all return false, so they cannot be presented as incidents.
+ */
+export function isConfirmedOperationalIncident(i: MaritimeRecordLike): boolean {
+  // Never confirmed if it is noise, human-interest, speculative claim,
+  // rhetoric, media packaging, or capability/procurement context.
+  if (isLowCredibilityShippingRecord(i)) return false;
+  if (isCapabilityContext(i)) return false;
+  // Concrete hostile events — the strict classifiers already reject
+  // commentary, diplomatic follow-up, speculative claims and human-interest,
+  // so a match here is a real attack / seizure / piracy act.
+  if (classifyPiracy(i)) return true;
+  const v = classifyVesselIncident(i);
+  if (v === "Attack" || v === "Near miss" || v === "Seized") return true;
+  // Port / route / physical-disruption events. An advisory "Threat" vessel
+  // type, a bare chokepoint mention, or an escort/transit story falls
+  // through to here and is rejected unless a concrete disruption is present.
+  const text = `${i.title ?? ""} ${i.summary ?? ""}`;
+  if (isRhetoricalClosureThreat(text)) return false;
+  if (PLANNING_INTENT_RE.test(text) && !CONFIRMED_INCIDENT_CAUSE_RE.test(text)) {
+    return false;
+  }
+  return CONFIRMED_PORT_ROUTE_RE.test(text);
 }
 
 // Daily Intelligence Summary buckets — must match the 10-label vocabulary.
