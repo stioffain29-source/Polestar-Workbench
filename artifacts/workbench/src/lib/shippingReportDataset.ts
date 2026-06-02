@@ -586,7 +586,13 @@ export function buildShippingReportDataset(
   // Single, deduplicated Fast Facts grid (7 cards).
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
-    { label: "Records In Window", value: String(enriched.length) },
+    // "Records In Window" must count only CONFIRMED operational incidents
+    // (the same gate every incident table uses), not the raw feed volume.
+    // Counting all `enriched` records surfaced a headline (e.g. 55) that
+    // dwarfed the visible tables (2 vessel attacks, 0 piracy, 2 chokepoint),
+    // because the bulk are advisory/transit/commentary items the report
+    // deliberately does not list as incidents — an apparent overcount.
+    { label: "Records In Window", value: String(confirmedIncidents.length) },
     { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
     {
       label: "Main Affected Chokepoint",
