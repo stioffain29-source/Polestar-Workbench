@@ -34,7 +34,14 @@ export default function Dashboard() {
   const { trueByTopic, recentIncidents, kpi7d } = useMemo(() => {
     const byTopic = new Map<string, Incident[]>();
     for (const i of allIncidents) {
-      const t = dataTopicFor(i.topic);
+      // Bucket each incident by its OWN topic so a card counts exactly what its
+      // topic page fetches via useListIncidents({ topic }). Legacy 'protests'
+      // rows are skipped — the live civil-unrest feed writes 'flashpoint', the
+      // Protests page resolves to the 'flashpoint' topic, and no page or report
+      // reads topic='protests'. Folding them into flashpoint inflated the
+      // flashpoint/protests cards above their page totals (failed to tally).
+      if (i.topic === "protests") continue;
+      const t = i.topic;
       const arr = byTopic.get(t);
       if (arr) arr.push(i);
       else byTopic.set(t, [i]);
