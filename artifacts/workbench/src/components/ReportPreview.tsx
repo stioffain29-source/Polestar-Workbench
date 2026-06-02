@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { TOPIC_LABELS } from "@/lib/topics";
+import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
@@ -12,6 +12,8 @@ import {
   buildCargoImplications,
   buildCargoWatchNext,
   buildCargoPolestarView,
+  buildCargoCountryBreakdown,
+  type CargoCountryRow,
 } from "@/lib/cargoNarratives";
 import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
@@ -255,6 +257,75 @@ function ProducerActionsTable({ rows }: { rows: ProducerBuyerActionRow[] }) {
   );
 }
 
+function CargoCountryTable({ rows }: { rows: CargoCountryRow[] }) {
+  const th: React.CSSProperties = {
+    background: NAVY,
+    color: "#fff",
+    fontFamily: "Roboto, sans-serif",
+    fontWeight: 700,
+    fontSize: 10,
+    textAlign: "left",
+    padding: "8px 10px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  };
+  const td: React.CSSProperties = {
+    fontFamily: "Roboto, sans-serif",
+    fontSize: 12,
+    color: DUSK,
+    padding: "10px",
+    verticalAlign: "top",
+    borderBottom: `1px solid ${POLAR}`,
+    lineHeight: 1.45,
+  };
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${POLAR}` }}>
+      <thead>
+        <tr>
+          <th style={{ ...th, width: "18%" }}>Region / Country</th>
+          <th style={{ ...th, width: "30%" }}>Current Pattern</th>
+          <th style={{ ...th, width: "16%" }}>Severity</th>
+          <th style={{ ...th, width: "36%" }}>Operational Read</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td style={{ ...td, color: NAVY, fontWeight: 700 }}>
+              {r.country}
+              <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.75, marginTop: 3 }}>
+                {r.count} record{r.count === 1 ? "" : "s"}
+              </div>
+            </td>
+            <td style={td}>{r.pattern}</td>
+            <td style={td}>
+              <span
+                style={{
+                  ...severityBadgeStyle(r.severityKey),
+                  display: "inline-block",
+                  padding: "3px 8px",
+                  borderRadius: 2,
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  WebkitPrintColorAdjust: "exact",
+                  printColorAdjust: "exact",
+                }}
+              >
+                {r.severityLabel}
+              </span>
+            </td>
+            <td style={td}>{r.operationalRead}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function computePreviewFastFacts(
   report: ReportPreviewData,
   incidents: TopicFastFactsIncident[],
@@ -314,6 +385,7 @@ export default function ReportPreview({
         })),
       )
     : null;
+  const cargoCountry = isCargo ? buildCargoCountryBreakdown(cargoWindow) : null;
   if (cargoExtras) {
     fastFacts.push({
       label: "Est. Cargo Loss (USD)",
@@ -576,6 +648,19 @@ export default function ReportPreview({
                         title="Logistics Hub Read"
                         text={buildLogisticsHubRead(cargoWindow)}
                       />
+                      {cargoCountry && cargoCountry.rows.length > 0 && (
+                        <>
+                          <Section title="Country Risk Breakdown">
+                            <CargoCountryTable rows={cargoCountry.rows} />
+                          </Section>
+                          {cargoCountry.regionalRead && (
+                            <NarrativeSection
+                              title="Regional Read"
+                              text={cargoCountry.regionalRead}
+                            />
+                          )}
+                        </>
+                      )}
                     </>
                   )}
                   <NarrativeSection title="Situation" text={report.situation} />

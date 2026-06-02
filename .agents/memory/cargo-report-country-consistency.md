@@ -56,3 +56,28 @@ named lead appears in Fast Facts + Exec + Situation, and that the Reads carry a
 "among these route/hub-side records" scope. Both the on-screen preview and the
 jsPDF `exportTopicReportPdf` cargo branch import the same builders, so the fix
 propagates to the PDF automatically.
+
+## Country Risk Breakdown table — per-country severity must not overstate
+
+The per-country breakdown table (`buildCargoCountryBreakdown` in
+`cargoNarratives.ts`; rendered by `CargoCountryTable` in the preview and
+`drawCargoCountryTable` in the PDF, in the SAME spot: after Logistics Hub Read,
+before Situation) assigns each country ONE coloured five-tier rating.
+
+- **Severity = the PREVAILING (modal) tier, escalated by AT MOST ONE tier and
+  only when a strictly-higher tier RECURS (>=2 records)** (`pickCountrySeverity`).
+  A single stray High never lifts a Moderate country; a mostly-Low country with a
+  couple of Extremes reads "Low to Moderate", NOT Extreme. The coloured chip is
+  driven by the (capped) `severityKey`, label may be a range ("Low to Moderate").
+
+  **Why:** an earlier version jumped straight to the peak repeated tier, painting
+  a mostly-Low country with the Extreme-red chip — exactly the exaggeration this
+  user objects to (same anti-overstatement stance as `fuel-severity-capping`).
+  **How to apply:** keep the +1 cap; never let an outlier tier set the chip
+  colour. Brand: subdued red / Extreme reserved strictly.
+
+- Pattern phrase drops the classifier's weak "Other land-based cargo theft"
+  bucket whenever a stronger named type exists, and skips a location-exposure
+  suffix whose keyword already appears in a named type (no "Warehouse theft,
+  warehouse exposure"). Severity colours come from `severityBadgeStyle`
+  (`RATING_COLORS`, preview) and `SEV_COLOR` (`pdfChrome`, PDF) — kept in lockstep.

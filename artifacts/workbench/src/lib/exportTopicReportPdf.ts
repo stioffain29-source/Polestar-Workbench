@@ -45,6 +45,8 @@ import {
   buildCargoWatchNext,
   buildCargoPolestarView,
   buildCargoSituation,
+  buildCargoCountryBreakdown,
+  type CargoCountryRow,
 } from "./cargoNarratives";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -434,6 +436,98 @@ function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[])
     pdf.text(catLines, MX + colActorW + padX, ctx.y + 12);
     pdf.text(actionLines, MX + colActorW + colCatW + padX, ctx.y + 12);
     pdf.text(readLines, MX + colActorW + colCatW + colActionW + padX, ctx.y + 12);
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+}
+
+// Country Risk Breakdown table for the Cargo Watch report. Mirrors
+// drawProducerBuyerActionsTable but the third column is a coloured five-tier
+// severity chip. Rows are built by buildCargoCountryBreakdown, the same source
+// the on-screen preview renders — so screen and PDF never disagree.
+function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
+  if (rows.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  const colCountryW = Math.round(CW * 0.18);
+  const colPatternW = Math.round(CW * 0.3);
+  const colSevW = Math.round(CW * 0.16);
+  const colReadW = CW - colCountryW - colPatternW - colSevW;
+  const headerH = 20;
+  const padX = 6;
+  const lineH = 11;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, headerH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    pdf.text("REGION / COUNTRY", MX + padX, ctx.y + 12);
+    pdf.text("CURRENT PATTERN", MX + colCountryW + padX, ctx.y + 12);
+    pdf.text("SEVERITY", MX + colCountryW + colPatternW + padX, ctx.y + 12);
+    pdf.text("OPERATIONAL READ", MX + colCountryW + colPatternW + colSevW + padX, ctx.y + 12);
+    ctx.y += headerH;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+  };
+
+  ensureSpace(ctx, headerH + 30);
+  drawHeader();
+
+  for (const r of rows) {
+    const countryText = `${r.country}\n${r.count} record${r.count === 1 ? "" : "s"}`;
+    const countryLines: string[] = pdf.splitTextToSize(sanitize(countryText), colCountryW - padX * 2);
+    const patternLines: string[] = pdf.splitTextToSize(sanitize(r.pattern), colPatternW - padX * 2);
+    const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
+    const maxLines = Math.max(countryLines.length, patternLines.length, readLines.length, 2);
+    const rh = Math.max(28, maxLines * lineH + 10);
+
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+    }
+
+    // Row separator at the bottom of the row.
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    // First country line bold; the "N records" line subdued regular.
+    pdf.text(countryLines.slice(0, 1), MX + padX, ctx.y + 12);
+    if (countryLines.length > 1) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(7);
+      pdf.text(countryLines.slice(1), MX + padX, ctx.y + 12 + lineH);
+      pdf.setFontSize(8);
+    }
+
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+    pdf.text(patternLines, MX + colCountryW + padX, ctx.y + 12);
+    pdf.text(readLines, MX + colCountryW + colPatternW + colSevW + padX, ctx.y + 12);
+
+    // Severity chip — coloured by the row's tier key, label may be a range.
+    const sk = sevKey(r.severityKey);
+    const sevColor = SEV_COLOR[sk] ?? "#999999";
+    const chipX = MX + colCountryW + colPatternW + padX;
+    const chipW = colSevW - padX * 2;
+    setFill(pdf, sevColor);
+    pdf.rect(chipX, ctx.y + 5, chipW, 12, "F");
+    // Insignificant keeps dark text for contrast; every other tier is white.
+    setText(pdf, sk === "insignificant" ? DUSK : WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6.5);
+    pdf.text(sanitize(r.severityLabel.toUpperCase()), chipX + chipW / 2, ctx.y + 13, {
+      align: "center",
+    });
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
 
     ctx.y += rh;
   }
@@ -916,9 +1010,24 @@ export async function exportTopicReportPdf(
       // Editor text always wins on the four standard analyst sections;
       // auto-prose fills in when the editor leaves a field blank so the
       // cargo report reads at Fuel-Watch substance out of the box.
-      const proseSections: [string, string][] = [
+      const leadReads: [string, string][] = [
         ["Cargo Security Read", cargoSecurity],
         ["Logistics Hub Read", cargoNode],
+      ];
+      for (const [label, body] of leadReads) {
+        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
+      }
+      // Country Risk Breakdown table + Regional Read — same data and section
+      // order as the on-screen preview (after the two Reads, before Situation).
+      const breakdown = buildCargoCountryBreakdown(windowIncidents);
+      if (breakdown.rows.length > 0) {
+        drawSectionHeading(ctx, "Country Risk Breakdown");
+        drawCargoCountryTable(ctx, breakdown.rows);
+        if (breakdown.regionalRead.trim()) {
+          drawSectionWithProse(ctx, "Regional Read", breakdown.regionalRead);
+        }
+      }
+      const proseSections: [string, string][] = [
         ["Situation", pickProse(data.situation, buildCargoSituation(windowIncidents))],
         ["What Happened", (data.whatHappened ?? "").trim()],
         ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],

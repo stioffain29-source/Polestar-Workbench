@@ -21,6 +21,11 @@
 
 import { format, parseISO } from "date-fns";
 import { isUnattributedCountry, splitAttributedCountries } from "./topicRelevance";
+import {
+  classifyIncidentType,
+  classifyLocationType,
+  type CargoIncidentLike,
+} from "./cargoAnalysis";
 
 export interface CargoNarrativeIncident {
   id?: number | string;
@@ -321,4 +326,251 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
   const intro = `Logistics hub risk across warehouses, depots, distribution centres, terminals and bonded storage appears across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
   const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two cycles.`;
   return `${intro} ${countryLine}\n\n${watch}`;
+}
+
+// --- Country Risk Breakdown -------------------------------------------------
+// A per-country table for the Cargo Watch report: the recurring geographies
+// named in the prose are broken out with a coloured five-tier risk rating, the
+// dominant theft pattern, and a short operational read. Everything here is
+// DERIVED from the in-window incidents — no hardcoded countries, ratings or
+// patterns — so the table cannot drift from the data the rest of the report
+// reads. The on-screen preview and the PDF both build from this one function
+// and render the same rows in the same order.
+
+const SEV_RANK_C: Record<string, number> = {
+  insignificant: 1,
+  low: 2,
+  moderate: 3,
+  high: 4,
+  extreme: 5,
+};
+const SEV_LABEL_C: Record<string, string> = {
+  insignificant: "Insignificant",
+  low: "Low",
+  moderate: "Moderate",
+  high: "High",
+  extreme: "Extreme",
+};
+const SEV_RANK_TO_KEY_C: Record<number, string> = {
+  1: "insignificant",
+  2: "low",
+  3: "moderate",
+  4: "high",
+  5: "extreme",
+};
+
+export interface CargoCountryRow {
+  country: string;
+  count: number;
+  /** Dominant theft pattern phrase, e.g. "Truck hijacking, container theft, route-side exposure". */
+  pattern: string;
+  /** Lowercase tier key used to colour the rating chip (the worst recurring tier). */
+  severityKey: string;
+  /** Display label — a single tier ("High") or a range ("Moderate to High"). */
+  severityLabel: string;
+  /** Whether route-side or hub-side reporting dominates this country (drives the read). */
+  lead: "route" | "hub" | "mixed";
+  operationalRead: string;
+}
+
+export interface CargoCountryBreakdown {
+  rows: CargoCountryRow[];
+  regionalRead: string;
+}
+
+function incidentText(i: CargoNarrativeIncident): string {
+  return `${i.title} ${i.summary ?? ""}`;
+}
+
+// Group rows by attributed country (compounds split, Unknown dropped). A row
+// attributed to two countries counts under each — matching topCountries().
+function groupByCountry(
+  rows: CargoNarrativeIncident[],
+): Map<string, CargoNarrativeIncident[]> {
+  const m = new Map<string, CargoNarrativeIncident[]>();
+  for (const r of rows) {
+    for (const c of splitAttributedCountries(r.country)) {
+      const list = m.get(c) ?? [];
+      list.push(r);
+      m.set(c, list);
+    }
+  }
+  return m;
+}
+
+// The country's rating reflects the PREVAILING (modal) tier, nudged up by AT
+// MOST ONE tier and only when a strictly-higher tier RECURS (>=2 records). A
+// single stray High never inflates an otherwise-Moderate country, and a mostly-
+// Low country with a couple of Extremes reads "Low to Moderate" — not Extreme —
+// so the coloured chip states the typical posture rather than the worst outlier.
+function pickCountrySeverity(rows: CargoNarrativeIncident[]): {
+  key: string;
+  label: string;
+} {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const k = (r.severity ?? "").trim().toLowerCase();
+    if (SEV_RANK_C[k]) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  if (counts.size === 0) return { key: "moderate", label: "Moderate" };
+  let modal = "";
+  let modalCount = -1;
+  let peakRepeated = "";
+  for (const [k, c] of counts) {
+    if (c > modalCount || (c === modalCount && SEV_RANK_C[k] > SEV_RANK_C[modal])) {
+      modal = k;
+      modalCount = c;
+    }
+    if (c >= 2 && (!peakRepeated || SEV_RANK_C[k] > SEV_RANK_C[peakRepeated])) {
+      peakRepeated = k;
+    }
+  }
+  if (peakRepeated && SEV_RANK_C[peakRepeated] > SEV_RANK_C[modal]) {
+    // Cap the escalation at one tier above the prevailing rating.
+    const cappedRank = Math.min(SEV_RANK_C[modal] + 1, SEV_RANK_C[peakRepeated]);
+    const peakKey = SEV_RANK_TO_KEY_C[cappedRank];
+    return { key: peakKey, label: `${SEV_LABEL_C[modal]} to ${SEV_LABEL_C[peakKey]}` };
+  }
+  return { key: modal, label: SEV_LABEL_C[modal] };
+}
+
+const LOC_EXPOSURE: Record<string, string> = {
+  Warehouse: "warehouse exposure",
+  Depot: "depot exposure",
+  Airport: "airport cargo exposure",
+  Port: "port-side exposure",
+  Highway: "route-side exposure",
+};
+
+// The dominant theft pattern: the top one or two incident types present, plus
+// the most common premises exposure. All derived from the cargo classifiers.
+function patternPhrase(rows: CargoNarrativeIncident[]): string {
+  const typeCounts = new Map<string, number>();
+  const locCounts = new Map<string, number>();
+  for (const r of rows) {
+    const li = r as unknown as CargoIncidentLike;
+    const t = classifyIncidentType(li);
+    if (t && t !== "Other") typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
+    const l = classifyLocationType(li);
+    if (l && l !== "\u2014" && l !== "-") locCounts.set(l, (locCounts.get(l) ?? 0) + 1);
+  }
+  // "Other land-based cargo theft" is the classifier's weak fallback bucket.
+  // Drop it from the pattern phrase whenever a stronger, named type exists so
+  // the column reads on modus operandi, not on the catch-all label.
+  const WEAK_TYPE = "Other land-based cargo theft";
+  const typeEntries = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const strong = typeEntries.filter((e) => e[0] !== WEAK_TYPE);
+  const ranked = strong.length > 0 ? strong : typeEntries;
+  const topTypes = ranked.slice(0, 2).map((e) => e[0]);
+  const topLoc = [...locCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const parts = [...topTypes];
+  // Avoid redundant wording like "Warehouse theft, warehouse exposure": only
+  // add the premises exposure when its keyword is not already in a named type.
+  if (topLoc && LOC_EXPOSURE[topLoc]) {
+    const locWord = topLoc.toLowerCase();
+    const dup = topTypes.some((t) => t.toLowerCase().includes(locWord));
+    if (!dup) parts.push(LOC_EXPOSURE[topLoc]);
+  }
+  if (parts.length === 0) return "Mixed cargo theft";
+  const phrase = parts.join(", ");
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1).toLowerCase();
+}
+
+function operationalReadFor(
+  lead: "route" | "hub" | "mixed",
+  severityKey: string,
+): string {
+  let s: string;
+  if (lead === "route") {
+    s = "Road-movement risk is the main exposure; concern rises for high-value loads moving outside secured corridors.";
+  } else if (lead === "hub") {
+    s = "Hub-side exposure dominates; watch depot and warehouse access, seal integrity and contractor vetting.";
+  } else {
+    s = "Mixed road and storage exposure; hold baseline route security and depot access controls.";
+  }
+  if (severityKey === "high" || severityKey === "extreme") {
+    s += " Loss values and reporting point to organised targeting rather than casual theft.";
+  }
+  return s;
+}
+
+function joinCountryNames(names: string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+function buildRegionalRead(rows: CargoCountryRow[]): string {
+  if (rows.length === 0) return "";
+  const lead = rows[0];
+  const hubNames = rows.filter((r) => r.lead === "hub").map((r) => r.country);
+  const routeNames = rows.filter((r) => r.lead === "route").map((r) => r.country);
+  const highest = rows
+    .slice()
+    .sort((a, b) => SEV_RANK_C[b.severityKey] - SEV_RANK_C[a.severityKey])[0];
+  const parts: string[] = [];
+  const leadFocus =
+    lead.lead === "hub"
+      ? "warehouse and depot-linked incidents clustering around logistics hubs"
+      : lead.lead === "route"
+        ? "road-movement incidents clustering on the route side"
+        : "a mix of road-movement and storage incidents";
+  parts.push(
+    `${lead.country} is the lead pressure point this cycle on ${lead.count} record${lead.count === 1 ? "" : "s"}, with ${leadFocus}.`,
+  );
+  if (highest && highest.country !== lead.country && SEV_RANK_C[highest.severityKey] >= 4) {
+    parts.push(
+      `${highest.country} carries the highest severity (${highest.severityLabel.toLowerCase()}), consistent with organised, higher-value targeting rather than opportunistic theft.`,
+    );
+  }
+  if (hubNames.length > 0 && routeNames.length > 0) {
+    parts.push(
+      `For clients the practical split is simple: ${joinCountryNames(hubNames)} need hub-control scrutiny on access, seals and vendor vetting, while ${joinCountryNames(routeNames)} need route security and driver and vendor control.`,
+    );
+  } else if (hubNames.length > 0) {
+    parts.push(
+      `For clients the focus is hub control across ${joinCountryNames(hubNames)} — depot access, seal integrity and vendor vetting.`,
+    );
+  } else if (routeNames.length > 0) {
+    parts.push(
+      `For clients the focus is route security across ${joinCountryNames(routeNames)} — corridor selection, escorts on high-value loads and driver vetting.`,
+    );
+  }
+  return parts.join(" ");
+}
+
+export function buildCargoCountryBreakdown(
+  windowIncidents: CargoNarrativeIncident[],
+  maxRows = 6,
+): CargoCountryBreakdown {
+  const groups = groupByCountry(windowIncidents);
+  const entries = [...groups.entries()]
+    .map(([country, rows]) => ({ country, rows }))
+    .sort((a, b) => b.rows.length - a.rows.length);
+  // Prefer the recurring geographies (>=2 records). Fall back to whatever is
+  // attributed when the window is too thin to have repeats, so the table still
+  // renders rather than silently vanishing.
+  const recurring = entries.filter((e) => e.rows.length >= 2);
+  const chosen = (recurring.length >= 2 ? recurring : entries).slice(0, maxRows);
+  const rows: CargoCountryRow[] = chosen.map(({ country, rows }) => {
+    const sev = pickCountrySeverity(rows);
+    const routeSide = rows.filter((r) => CARGO_SECURITY_RE.test(incidentText(r))).length;
+    const hubSide = rows.filter((r) => LOGISTICS_HUB_RE.test(incidentText(r))).length;
+    let lead: "route" | "hub" | "mixed";
+    if (routeSide === 0 && hubSide === 0) lead = "mixed";
+    else if (routeSide > hubSide) lead = "route";
+    else if (hubSide > routeSide) lead = "hub";
+    else lead = "mixed";
+    return {
+      country,
+      count: rows.length,
+      pattern: patternPhrase(rows),
+      severityKey: sev.key,
+      severityLabel: sev.label,
+      lead,
+      operationalRead: operationalReadFor(lead, sev.key),
+    };
+  });
+  return { rows, regionalRead: buildRegionalRead(rows) };
 }
