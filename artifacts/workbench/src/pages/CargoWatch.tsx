@@ -63,9 +63,9 @@ function jitter(seed: number): [number, number] {
   return [((a - Math.floor(a)) - 0.5) * 1.4, ((b - Math.floor(b)) - 0.5) * 1.4];
 }
 
-type RangeKey = "24h" | "7d" | "30d" | "90d" | "1y";
-const RANGE_DAYS: Record<RangeKey, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365 };
-const RANGE_LABEL: Record<RangeKey, string> = { "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", "1y": "1y" };
+type RangeKey = "24h" | "7d" | "30d" | "90d" | "1y" | "all";
+const RANGE_DAYS: Record<RangeKey, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": Infinity };
+const RANGE_LABEL: Record<RangeKey, string> = { "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", "1y": "1y", "all": "All time" };
 
 function usd(n: number): string {
   return "$" + n.toLocaleString("en-US");
@@ -79,7 +79,11 @@ function usdAxis(v: number): string {
 
 export default function CargoWatch() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "cargo_watch" });
-  const [range, setRange] = useState<RangeKey>("30d");
+  // Default to the full record set so the headline count and confirmed-loss
+  // total reflect every in-scope cargo incident — matching the Dashboard card
+  // (isCargoInScope, all-time) instead of hiding most incidents behind a
+  // 30-day window. The range pills below still let an analyst narrow the view.
+  const [range, setRange] = useState<RangeKey>("all");
   const [mapMode, setMapMode] = useState<"spot" | "density">("spot");
   const [recentTab, setRecentTab] = useState<"main" | "review">("main");
 
@@ -116,15 +120,17 @@ export default function CargoWatch() {
   const needsReview = useMemo(() => allEnriched.filter((i) => i.scope === "country_review"), [allEnriched]);
 
   // Time-window filter drives the map, recent list, country chart, KPIs, table.
-  const cutoff = useMemo(() => subDays(new Date(), RANGE_DAYS[range]), [range]);
+  const cutoff = useMemo(() => (range === "all" ? null : subDays(new Date(), RANGE_DAYS[range])), [range]);
   const enriched = useMemo(
-    () => inScope.filter((i) => new Date(i.occurredAt) >= cutoff).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
+    () => inScope.filter((i) => cutoff === null || new Date(i.occurredAt) >= cutoff).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [inScope, cutoff],
   );
   const reviewInWindow = useMemo(
-    () => needsReview.filter((i) => new Date(i.occurredAt) >= cutoff).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
+    () => needsReview.filter((i) => cutoff === null || new Date(i.occurredAt) >= cutoff).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [needsReview, cutoff],
   );
+  // "last 7d" reads wrong for the all-time view; render a clean scope phrase.
+  const rangeText = range === "all" ? "all time" : `last ${RANGE_LABEL[range]}`;
 
   const total = enriched.length;
   const confirmedValue = enriched.reduce((s, i) => s + (i.usdLoss ?? 0), 0);
@@ -405,7 +411,7 @@ export default function CargoWatch() {
       <div className="bg-card border border-border rounded-sm p-4">
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="font-serif font-bold uppercase text-primary text-sm tracking-wide">Captured Incidents by Country &amp; Cargo</h2>
-          <span className="text-[11px] text-muted-foreground font-sans">{total} incidents across {countriesCovered} countries · last {RANGE_LABEL[range]}</span>
+          <span className="text-[11px] text-muted-foreground font-sans">{total} incidents across {countriesCovered} countries · {rangeText}</span>
         </div>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -425,14 +431,14 @@ export default function CargoWatch() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border p-px rounded-sm overflow-hidden">
-        <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · last ${RANGE_LABEL[range]}`} />
+        <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · ${rangeText}`} />
         <Kpi label="Confirmed Value Stolen" value={confirmedValue > 0 ? usd(confirmedValue) : "—"} sub="Source-stated USD only" />
         <Kpi label="Incidents With Companies Named" value={companiesNamed} sub="Named commercial entity in source" />
       </div>
 
       <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2 space-y-1">
         <div>
-          Showing {total} in-scope cargo / logistics crime record{total === 1 ? "" : "s"} from {totalInDb} total in source data (last {RANGE_LABEL[range]}). Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
+          Showing {total} in-scope cargo / logistics crime record{total === 1 ? "" : "s"} from {totalInDb} total in source data ({rangeText}). Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
         </div>
         {outOfScopeCount > 0 && (
           <div>Out-of-scope records excluded (incident location outside APAC / Middle East): {outOfScopeCount}.</div>
