@@ -66,3 +66,4 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Communication: no hyperbole or banter; answers ten words or less.
