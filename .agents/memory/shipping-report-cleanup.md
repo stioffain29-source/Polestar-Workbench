@@ -33,6 +33,12 @@ Durable rules learned making the Shipping Watch report client-ready (Cargo Watch
 - **Why:** "critical" in such headlines is the source's *advisory threat-LEVEL* jargon, not our incident severity; the two scales are different axes. `isConfirmedOperationalIncident` already treats `Threat` as unconfirmed, so the table was the lone surface still leaking it.
 - **How to apply:** drop `Threat` at the `vesselAll` build in `shippingReportDataset.ts` (keep Attack/Near miss/Seized). Downstream `vesselThreat30Total`/`vAttackSeize` stay coherent because they recompute from the filtered set; the fast-fact card already counts hostile-only.
 
+## KPIs vs distribution charts — disambiguate by LABEL, don't force one denominator
+- Headline fast-fact cards (Confirmed Incidents, Highest Severity, Latest Significant Incident) must read from the `confirmedIncidents` pool so the top-of-report numbers can never exceed the incident tables. The region/country DISTRIBUTION charts deliberately keep the broader `enriched` set (they answer "where did reporting cluster") and are titled "Records by …".
+- The headline count card is labelled **"Confirmed Incidents"**, NOT "Records In Window" — the old label collided with the "Records by …" charts (same word, two denominators) and read as a 55-vs-2 overcount.
+- **Why:** forcing the charts down to the confirmed pool would shrink them to a handful of rows AND contradict the SAVED Executive Summary prose (which describes the broad chart leaders) — a new contradiction. Relabelling the KPI fixes the clash with zero saved-prose risk.
+- **How to apply:** define `confirmedIncidents` ONCE right after `enriched`; feed it to every headline KPI; keep charts/auto-prose on `enriched`; never let a headline card and a chart share the word "Records". Preview/PDF render `fastFacts` as an array (no label lookups), so relabelling a card is safe.
+
 ## Proof harness
 - `artifacts/workbench/scripts/proveShippingSelection.ts` reads dumped incidents + report text and prints included/rejected-with-reasons + country/chokepoint/commercial reconciliation. Mirror this pattern when a distrustful user demands evidence a selection is correct. Its `reason()` falls through to `isConfirmedOperationalIncident` so every drop has a printed cause. Dump incidents with snake_case keys (`occurred_at`, `source_url`) — the harness maps those exact names; `/tmp/shipping_report.txt` must be `id|title|issue_date`.
 

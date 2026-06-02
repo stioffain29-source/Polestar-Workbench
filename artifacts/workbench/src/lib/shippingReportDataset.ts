@@ -456,6 +456,14 @@ export function buildShippingReportDataset(
   const enrichedAll = sortByDateDesc(enrich(windowed));
   const enriched = enrichedAll.filter((r) => r.region !== "Out of scope");
   const outOfScopeCount = enrichedAll.length - enriched.length;
+  // Single canonical pool of CONFIRMED operational incidents — the same gate
+  // every incident table uses. The headline KPIs (Confirmed Incidents,
+  // Highest Severity, Latest Significant Incident) all read from this so the
+  // top-of-report numbers can never exceed what the tables below actually
+  // list. The region/country DISTRIBUTION charts keep the broader `enriched`
+  // set on purpose (they answer "where did reporting cluster", a different
+  // question) and are labelled "Records by …" so the two are never confused.
+  const confirmedIncidents = enriched.filter((r) => isConfirmedOperationalIncident(r));
 
   // Chokepoint Watch, Vessel Attacks and Piracy / Armed Robbery are bounded to
   // the SAME report window as every other section. They previously used a
@@ -562,7 +570,9 @@ export function buildShippingReportDataset(
   const PIRACY_TABLE_CAP = 12;
   const piracyRows: PiracyRow[] = dedupeByTitle(piracyAll).slice(0, PIRACY_TABLE_CAP);
 
-  const hsAll = highestSeverity(enriched);
+  // Highest Severity reads from the confirmed pool so the chip can never be
+  // driven by an advisory/claim record the incident tables do not list.
+  const hsAll = highestSeverity(confirmedIncidents);
   const latestDate = enriched.length > 0 ? dateMax(enriched.map((r) => r.date)) : null;
   // Latest Significant Incident must skip repatriation / crew-return /
   // social-handle / speculative-claim records so the headline can't be
@@ -578,7 +588,6 @@ export function buildShippingReportDataset(
   // never name a claim, threat, advisory or commentary item the table does
   // not also carry. If no confirmed event exists in the window, the card
   // reads "—" rather than falling back to rhetoric or a human-interest row.
-  const confirmedIncidents = enriched.filter((r) => isConfirmedOperationalIncident(r));
   const latestSig = sortByDateDesc(confirmedIncidents).find((r) => r.severity === "extreme" || r.severity === "high")
     ?? sortByDateDesc(confirmedIncidents)[0]
     ?? null;
@@ -586,13 +595,13 @@ export function buildShippingReportDataset(
   // Single, deduplicated Fast Facts grid (7 cards).
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
-    // "Records In Window" must count only CONFIRMED operational incidents
-    // (the same gate every incident table uses), not the raw feed volume.
-    // Counting all `enriched` records surfaced a headline (e.g. 55) that
-    // dwarfed the visible tables (2 vessel attacks, 0 piracy, 2 chokepoint),
-    // because the bulk are advisory/transit/commentary items the report
-    // deliberately does not list as incidents — an apparent overcount.
-    { label: "Records In Window", value: String(confirmedIncidents.length) },
+    // Labelled "Confirmed Incidents" (not "Records In Window") and counted
+    // from the confirmed pool so it tallies with the incident tables below.
+    // The old "Records In Window" counted every `enriched` record (e.g. 55),
+    // which dwarfed the visible tables (2 vessel attacks, 0 piracy, 2
+    // chokepoint) and collided with the broad "Records by …" charts that use
+    // the same word. Distinct label + confirmed count removes both clashes.
+    { label: "Confirmed Incidents", value: String(confirmedIncidents.length) },
     { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
     {
       label: "Main Affected Chokepoint",
