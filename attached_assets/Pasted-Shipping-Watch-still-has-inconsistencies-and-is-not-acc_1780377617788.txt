@@ -1,0 +1,47 @@
+Shipping Watch still has inconsistencies and is not accepted yet.
+
+Before changing code, present a short plan first. After completing the work, confirm exactly what was changed and prove it with a revised PDF.
+
+Fix these points:
+
+1. Data status
+   The report says Static / import only, but latest record is 2 Jun. Confirm whether Shipping Watch is now live, manual scraper, or static/import-only. Label it correctly.
+
+2. Country consistency
+   Executive Summary says Yemen and Singapore.
+   Country chart says Iran, Singapore and Malaysia.
+   Polestar View says China and South Korea.
+
+These must all use the same dataset and country logic.
+
+3. Latest significant incident
+   “Defender-Viper: Royal Navy’s new minehunting drone...” is not clearly an incident. Replace it with a real operational shipping incident, or label it as capability/advisory context.
+
+4. Chokepoint lead
+   “Latest AP News Video...” is weak source framing and should not lead the Hormuz section. Use a confirmed operational event or advisory.
+
+5. Claims and rhetoric
+   Iranian statements about closing Hormuz or Bab el-Mandeb must not be treated as confirmed disruption unless supported by operational evidence. Classify as threat/rhetoric/advisory watch where appropriate.
+
+6. Country attribution
+   37 records have no confirmed country. Explain why, fix attribution where possible, and do not let country prose overstate weak attribution.
+
+7. Piracy card
+   The piracy card says latest record 01 Jun but count is 0. Fix the logic.
+
+Required plan before work:
+
+* what files/logic you will change
+* how you will separate confirmed incidents from claims/commentary
+* how you will make cards, prose, charts and related incidents use one dataset
+
+Required proof after work:
+
+* revised Shipping Watch PDF
+* included records list
+* rejected records list with reasons
+* confirmation country chart, Executive Summary and Polestar View agree
+* confirmation latest significant incident is operationally valid
+* confirmation piracy card logic is fixed
+
+Do not change branding, layout or colours.
