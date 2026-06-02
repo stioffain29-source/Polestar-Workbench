@@ -994,7 +994,7 @@ function buildVesselPiracyRead(opts: {
     ? ` The table below shows the top ${vesselTableShown} of these, prioritising attack and seizure events.`
     : "";
   const vesselSegment = vesselThreat30Total > 0
-    ? `Vessel-threat reporting across the reporting window carries ${vesselThreat30Total} qualifying event${vesselThreat30Total === 1 ? "" : "s"} after dedupe, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${capNote}${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ""}`
+    ? `Vessel-threat reporting across the reporting window carries ${vesselThreat30Total} qualifying event${vesselThreat30Total === 1 ? "" : "s"}, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${capNote}${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ""}`
     : `No vessel-attack or seizure records landed in the reporting window, even with piracy activity still on the file.`;
   const piracySegment = piracyRows30.length > 0
     ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window${piracyLead ? `, with "${piracyLead.title}" as the lead entry.` : `; no credible single lead is quoted as the file leans on low-credibility or speculative reporting.`}`
