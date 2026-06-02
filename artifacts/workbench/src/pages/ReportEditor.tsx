@@ -25,7 +25,6 @@ import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
-import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import {
@@ -234,7 +233,19 @@ export default function ReportEditor() {
           filename,
         );
       } else if (form.topic === "shipping") {
-        await exportShippingReportPdf(pdfPayload, incidentsForExport, filename);
+        // Rasterise the on-screen preview instead of the jsPDF builder.
+        // jsPDF emits CID fonts with Adobe-Identity-H, which macOS Preview /
+        // poppler / some browsers refuse to open ("Unknown character
+        // collection"). The DOM-rasterise path (same one Country reports use)
+        // produces a PDF that opens everywhere and is screen-identical. The
+        // jsPDF builder remains for the headless font-audit scripts only.
+        const shippingEl =
+          previewRef.current?.querySelector<HTMLElement>(".print-report") ??
+          previewRef.current;
+        if (!shippingEl) {
+          throw new Error("PDF export failed: report preview is not ready.");
+        }
+        await exportElementToPdf(shippingEl, filename);
       } else {
         await exportTopicReportPdf(
           {
