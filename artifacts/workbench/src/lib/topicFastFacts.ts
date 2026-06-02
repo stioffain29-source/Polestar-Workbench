@@ -9,6 +9,7 @@ import { format, parseISO, max as dateMax } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { isTopicRelevant, sanitizeFactValue, splitAttributedCountries } from "./topicRelevance";
+import { isCargoInScope } from "./cargoAnalysis";
 
 export interface TopicFastFactsIncident {
   id?: number | string;
@@ -60,6 +61,20 @@ export function filterTopicReportIncidents(
         (i) => i.topic === "flashpoint" || i.topic === "protests",
       )
     : filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
+  // Cargo Watch has its own scope classifier (APAC/ME cargo crime only) — the
+  // SAME predicate the cargo page and the shared true-incidents resolver use,
+  // so the report's record count reconciles exactly with the page/dashboard.
+  if (topic === "cargo_watch") {
+    return rawWindow.filter((i) =>
+      isCargoInScope({
+        title: i.title,
+        summary: i.summary ?? null,
+        source: i.source ?? null,
+        location: i.location ?? null,
+        country: i.country ?? null,
+      }),
+    );
+  }
   return rawWindow.filter((i) =>
     isTopicRelevant(topic, {
       topic: i.topic,

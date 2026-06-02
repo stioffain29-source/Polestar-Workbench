@@ -67,3 +67,16 @@ the multi-card / Extreme+Low duplicate the user complained about).
 **Open parity gap (NOT a bug, user only asked for the monitor):** the report's
 "Records In Window" fast-fact KPI still uses raw `enriched.length`, so the report
 headline can differ from the monitor's deduped total. Normalise only if asked.
+
+**Dashboard resolver must use the MONITOR pipeline, not the report's confirmed
+gate.** `resolveTrueIncidents("shipping", …)` (in `lib/trueIncidents.ts`, the
+single source the dashboard card reads) must reproduce the Shipping PAGE's exact
+base list — region scope → `!isLowCredibilityShippingRecord` →
+`dedupeShippingMonitorRows` (the deduped "Records" count, ~746). Do NOT gate it on
+`isConfirmedOperationalIncident` (the report's narrower ~311 "Confirmed Incidents"
+KPI) — that makes the dashboard card disagree with the page the user clicks into.
+The report legitimately shows BOTH numbers (Records vs Confirmed, labelled), but
+the dashboard "Total Incidents" card is the Records metric. The dedupe is a
+LIST-level transform, so it lives in `resolveTrueIncidents`, not the per-record
+`isTrueIncident` (which for shipping only does region + low-credibility and will
+over-count syndicated wires if used for totals).

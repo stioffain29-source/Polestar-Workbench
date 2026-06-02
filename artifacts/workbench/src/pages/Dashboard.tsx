@@ -1,4 +1,4 @@
-import { useGetDashboardOverview, useGetIncidentCountsByTopic, type DashboardTopicCard } from "@workspace/api-client-react";
+import { useGetDashboardOverview, useListIncidents, type DashboardTopicCard, type Incident } from "@workspace/api-client-react";
 import { AlertTriangle, Activity, CheckCircle2, XCircle, FileText, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo, useState } from "react";
@@ -6,8 +6,12 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { severityBadgeStyle } from "@/lib/topics";
 import { resolveReportTitle } from "@/lib/reportNaming";
-import { isTopicRelevant } from "@/lib/topicRelevance";
-import { selectFlashpointUsable } from "@/lib/flashpointReportDataset";
+import { resolveTrueIncidents } from "@/lib/trueIncidents";
+
+// The "Protests & Civil Unrest" card is backed by the flashpoint data topic.
+function dataTopicFor(topic: string): string {
+  return topic === "protests" ? "flashpoint" : topic;
+}
 
 const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
   { label: "24h", days: 1 },
@@ -22,60 +26,43 @@ const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
 
 export default function Dashboard() {
   const { data: overview, isLoading, isError } = useGetDashboardOverview();
+  // Over-fetch every incident once (same relevance-gated list the reports read)
+  // and reconcile each topic to its "true" scoped set with the SHARED resolver,
+  // so the cards, the topic pages and the reports all tally to one number.
+  const { data: allIncidents = [], isLoading: incidentsLoading } = useListIncidents({});
 
-  // The server returns the raw most-recent incidents with no relevance gate,
-  // so sports/finance/pageant noise leaks straight onto the dashboard. Apply
-  // the SAME selection used by the reports: flashpoint/protests rows go
-  // through the report-grade selectFlashpointUsable, every other topic through
-  // isTopicRelevant. Conservative by design (signal thin > noise in).
-  const { recentIncidents, latestRelevantByTopic } = useMemo(() => {
-    const all = overview?.recentIncidents ?? [];
-    if (all.length === 0) {
-      return { recentIncidents: [], latestRelevantByTopic: new Map<string, { headline: string; at: string }>() };
+  const { trueByTopic, recentIncidents, kpi7d } = useMemo(() => {
+    const byTopic = new Map<string, Incident[]>();
+    for (const i of allIncidents) {
+      const t = dataTopicFor(i.topic);
+      const arr = byTopic.get(t);
+      if (arr) arr.push(i);
+      else byTopic.set(t, [i]);
     }
-    const today = new Date().toISOString().slice(0, 10);
-    const flashpointRows = all.filter((i) => i.topic === "flashpoint" || i.topic === "protests");
-    const keptFlashpointIds = new Set(
-      selectFlashpointUsable(
-        flashpointRows.map((i) => ({
-          id: i.id,
-          title: i.title,
-          topic: i.topic,
-          severity: i.severity,
-          occurredAt: i.occurredAt,
-          country: i.country,
-          summary: i.summary,
-          source: i.source,
-          sourceUrl: i.sourceUrl,
-          location: i.location ?? i.country,
-        })),
-        "flashpoint",
-        today,
-      ).enriched.map((e) => e.id),
-    );
-    // Full relevance-gated list (rows already arrive ordered newest-first).
-    const relevant = all.filter((i) =>
-      i.topic === "flashpoint" || i.topic === "protests"
-        ? keptFlashpointIds.has(i.id)
-        : isTopicRelevant(i.topic, {
-            topic: i.topic,
-            title: i.title,
-            summary: i.summary,
-            source: i.source,
-            location: i.location ?? i.country,
-          }),
-    );
-    // Latest *relevant* headline per topic — overrides the server's raw
-    // latestHeadline on the topic cards so sports/finance noise can't be the
-    // card's headline either.
-    const latest = new Map<string, { headline: string; at: string }>();
-    for (const i of relevant) {
-      if (!latest.has(i.topic)) latest.set(i.topic, { headline: i.title, at: i.occurredAt });
+    const trueByTopic = new Map<string, Incident[]>();
+    for (const [t, rows] of byTopic) {
+      trueByTopic.set(t, resolveTrueIncidents(t, rows));
     }
-    return { recentIncidents: relevant.slice(0, 8), latestRelevantByTopic: latest };
-  }, [overview?.recentIncidents]);
+    // Recent priority list: newest true incidents across every topic (no double
+    // count — flashpoint/protests collapse to one data topic above).
+    const allTrue = Array.from(trueByTopic.values())
+      .flat()
+      .sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt));
+    const recentIncidents = allTrue.slice(0, 8);
+    // 7-day KPI strip recomputed from the true sets (server counts are raw).
+    const cutoff7 = Date.now() - 7 * 86_400_000;
+    let total7d = 0;
+    let critical7d = 0;
+    for (const i of allTrue) {
+      const d = +new Date(i.occurredAt);
+      if (isNaN(d) || d < cutoff7) continue;
+      total7d += 1;
+      if (i.severity === "extreme") critical7d += 1;
+    }
+    return { trueByTopic, recentIncidents, kpi7d: { total7d, critical7d } };
+  }, [allIncidents]);
 
-  if (isLoading) {
+  if (isLoading || incidentsLoading) {
     return (
       <div className="w-full h-full flex flex-col gap-6 animate-pulse">
         <div className="h-24 bg-muted/50 rounded-sm"></div>
@@ -108,8 +95,8 @@ export default function Dashboard() {
 
       {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-border p-px rounded-sm overflow-hidden">
-        <KpiItem label="Total Incidents (7d)" value={overview.totalIncidents7d} />
-        <KpiItem label="Critical Incidents (7d)" value={overview.criticalIncidents7d} alert={overview.criticalIncidents7d > 0} />
+        <KpiItem label="Total Incidents (7d)" value={kpi7d.total7d} />
+        <KpiItem label="Critical Incidents (7d)" value={kpi7d.critical7d} alert={kpi7d.critical7d > 0} />
         <KpiItem label="Active Sources" value={overview.activeSources} />
         <KpiItem label="Failing Sources" value={overview.failingSources} alert={overview.failingSources > 0} />
         <KpiItem label="Reports In Progress" value={overview.reportsInProgress} accent />
@@ -125,7 +112,7 @@ export default function Dashboard() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {overview.topicCards.map((topic) => (
-              <TopicCard key={topic.topic} topic={topic} latestOverride={latestRelevantByTopic.get(topic.topic)} />
+              <TopicCard key={topic.topic} topic={topic} trueList={trueByTopic.get(dataTopicFor(topic.topic)) ?? []} />
             ))}
           </div>
 
@@ -278,20 +265,36 @@ export default function Dashboard() {
   );
 }
 
-function TopicCard({ topic, latestOverride }: { topic: DashboardTopicCard; latestOverride?: { headline: string; at: string } }) {
+function TopicCard({ topic, trueList }: { topic: DashboardTopicCard; trueList: Incident[] }) {
   const [days, setDays] = useState(7);
-  const { data: counts = [] } = useGetIncidentCountsByTopic({ days });
-  const windowCount = counts.find((c) => c.topic === topic.topic)?.count ?? 0;
   const windowLabel = WINDOW_OPTIONS.find((w) => w.days === days)?.label ?? `${days}d`;
   const href = `/topics/${topic.topic.replace(/_/g, "-")}`;
-  // Prefer the relevance-gated headline (kills sports/finance slop on the card);
-  // fall back to the server's raw latest when no relevant row was fetched.
-  const latestHeadline = latestOverride?.headline ?? topic.latestHeadline;
-  const latestAt = latestOverride?.at ?? topic.latestAt;
+
+  // Every figure on the card is derived from the topic's true (scoped,
+  // noise-filtered) set, so it matches the topic page and the report exactly.
+  const { totalCount, windowCount, criticalCount, latestHeadline, latestAt } = useMemo(() => {
+    const cutoff = Date.now() - days * 86_400_000;
+    let windowCount = 0;
+    let criticalCount = 0;
+    let latest: Incident | undefined;
+    for (const i of trueList) {
+      if (i.severity === "extreme") criticalCount += 1;
+      const d = +new Date(i.occurredAt);
+      if (!isNaN(d) && d >= cutoff) windowCount += 1;
+      if (!latest || +new Date(i.occurredAt) > +new Date(latest.occurredAt)) latest = i;
+    }
+    return {
+      totalCount: trueList.length,
+      windowCount,
+      criticalCount,
+      latestHeadline: latest?.title ?? null,
+      latestAt: latest?.occurredAt ?? null,
+    };
+  }, [trueList, days]);
 
   return (
     <div className="bg-card border border-border p-4 rounded-sm hover:border-accent/50 transition-colors group h-full flex flex-col relative overflow-hidden">
-      {topic.criticalCount > 0 && (
+      {criticalCount > 0 && (
         <div className="absolute top-0 right-0 w-2 h-full bg-destructive" />
       )}
       <div className="flex justify-between items-start mb-3 gap-3">
@@ -301,7 +304,7 @@ function TopicCard({ topic, latestOverride }: { topic: DashboardTopicCard; lates
           </h3>
         </Link>
         <Link href={href} className="text-right block">
-          <div className="text-2xl font-serif font-bold leading-none">{topic.incidentCount}</div>
+          <div className="text-2xl font-serif font-bold leading-none">{totalCount}</div>
           <div className="text-[10px] text-muted-foreground font-sans uppercase tracking-wider">Total Incidents</div>
         </Link>
       </div>

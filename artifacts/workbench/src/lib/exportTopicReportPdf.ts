@@ -17,10 +17,18 @@ import { classifyIncidentType } from "./incidentClassifier";
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant } from "./topicRelevance";
+import {
+  buildCargoReportExtras,
+  formatCargoUsd,
+  cargoUsdNote,
+  cargoCommodityNote,
+  niceCargoCountMax,
+  type CargoTrendPoint,
+} from "./cargoReportData";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
-import { computeTopicFastFacts } from "./topicFastFacts";
+import { computeTopicFastFacts, filterTopicReportIncidents } from "./topicFastFacts";
 import {
   buildFuelWatchReportData,
   fuelMarketLatestDate,
@@ -239,6 +247,94 @@ function drawJetFuelEmptyCard(ctx: Ctx, benchmark: string) {
     ctx.y + padY + titleH + 12,
   );
   ctx.y += cardH + 10;
+}
+
+/**
+ * Draw the Weekly Cargo Theft Trend bar chart in the PDF. Mirrors the SVG
+ * version in CargoTrendChart.tsx (electric-blue bars, navy/dusk labels,
+ * polar-gray axes/gridlines, integer count ticks, Roboto throughout) so the
+ * screen and the PDF render the same series in the same shape.
+ */
+function drawCargoTrendChart(ctx: Ctx, series: CargoTrendPoint[]) {
+  const { pdf, MX, CW } = ctx;
+  const headerH = 16;
+  const chartH = 150;
+  const captionH = 14;
+  ensureSpace(ctx, headerH + chartH + captionH + 18);
+
+  const total = series.reduce((s, d) => s + d.count, 0);
+
+  // Header: title left, total/weeks right.
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(10);
+  pdf.text("Weekly Cargo Theft Trend", MX, ctx.y + 11);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  pdf.text(
+    `${total} record${total === 1 ? "" : "s"} across ${series.length} weeks`,
+    MX + CW,
+    ctx.y + 11,
+    { align: "right" },
+  );
+
+  const plotX0 = MX + 28;
+  const plotY0 = ctx.y + headerH;
+  const plotW = CW - 28 - 6;
+  const plotH = chartH - 18;
+  const xAxisY = plotY0 + plotH;
+  const yMax = niceCargoCountMax(Math.max(...series.map((d) => d.count)));
+  const ticks = yMax <= 4
+    ? Array.from({ length: yMax + 1 }, (_, k) => k)
+    : [0, 1, 2, 3, 4].map((k) => (k / 4) * yMax);
+
+  const slot = plotW / series.length;
+  const barW = slot * 0.6;
+  const xAt = (i: number) => plotX0 + i * slot + slot / 2;
+  const yAt = (v: number) => plotY0 + (1 - v / yMax) * plotH;
+
+  // Axes.
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(1);
+  pdf.line(plotX0, plotY0, plotX0, xAxisY);
+  pdf.line(plotX0, xAxisY, plotX0 + plotW, xAxisY);
+
+  // Y gridlines + integer labels.
+  pdf.setLineWidth(0.3);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  for (const v of ticks) {
+    const y = yAt(v);
+    pdf.line(plotX0, y, plotX0 + plotW, y);
+    pdf.text(String(Math.round(v)), plotX0 - 4, y + 3, { align: "right" });
+  }
+
+  // Bars.
+  setFill(pdf, ELECTRIC);
+  for (let i = 0; i < series.length; i++) {
+    const h = xAxisY - yAt(series[i].count);
+    if (h > 0) pdf.rect(xAt(i) - barW / 2, yAt(series[i].count), barW, h, "F");
+  }
+
+  // X tick labels (sampled to avoid crowding).
+  const tickIdx = series.length <= 6
+    ? series.map((_, i) => i)
+    : [0, Math.floor((series.length - 1) / 3), Math.floor((2 * (series.length - 1)) / 3), series.length - 1];
+  setText(pdf, DUSK);
+  for (const i of tickIdx) {
+    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, { align: "center" });
+  }
+
+  // Caption.
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  const caption = `In-scope cargo incidents per week, ${formatDateShortPdf(series[0].date)} to ${formatDateShortPdf(series[series.length - 1].date)}.`;
+  pdf.text(caption, MX, xAxisY + 26);
+
+  ctx.y = xAxisY + 26 + 6;
 }
 
 /**
@@ -642,16 +738,22 @@ export async function exportTopicReportPdf(
   // Strip records that match the topic field but are not operationally on
   // topic (e.g. hiking obituary that happens to mention "fuel"). The filter
   // is applied once and used for Fast Facts, prose data and the table.
-  const windowIncidents = rawWindow.filter((i) =>
-    isTopicRelevant(data.topic, {
-      topic: i.topic,
-      title: i.title,
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-      sourceUrl: i.sourceUrl ?? null,
-      location: i.location ?? null,
-    }),
-  );
+  const windowIncidents: TopicReportIncident[] = data.topic === "cargo_watch"
+    ? // Cargo Watch: use the SHARED selector the on-screen preview and the cargo
+      // page use, so the PDF, the preview and the dashboard can never tally
+      // differently (preview==PDF is mandatory). The cast is safe — the selector
+      // returns the same row objects (id is always present on real incidents).
+      (filterTopicReportIncidents(incidents, data.topic, renderIssueDate) as TopicReportIncident[])
+    : rawWindow.filter((i) =>
+        isTopicRelevant(data.topic, {
+          topic: i.topic,
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          sourceUrl: i.sourceUrl ?? null,
+          location: i.location ?? null,
+        }),
+      );
   const isFuel = data.topic === "fuel";
   if (isFuel) {
     // Canonical Fuel Watch payload — shared by preview/PDF/editor.
@@ -760,18 +862,49 @@ export async function exportTopicReportPdf(
     }
     renderProseSection("Polestar View", data.polestarView);
   } else {
-    drawSectionHeading(ctx, "Fast Facts");
-    drawFastFactsKpiCards(
-      ctx,
-      computeTopicFastFacts({
-        topic: data.topic,
-        issueDate: data.issueDate,
-        incidents,
-        topicLabel: topicLabels[data.topic] ?? data.topic,
-      }) as KpiCardData[],
-    );
-
     const isCargo = data.topic === "cargo_watch";
+    // Cargo Watch report extras — USD loss, most-stolen commodity and the
+    // weekly trend — built from the SAME in-scope window the preview uses
+    // (lib/cargoReportData.ts) so screen and PDF are identical.
+    const cargoExtras = isCargo
+      ? buildCargoReportExtras(
+          windowIncidents.map((i) => ({
+            title: i.title,
+            summary: i.summary ?? null,
+            source: i.source ?? null,
+            location: i.location ?? null,
+            country: i.country ?? null,
+            occurredAt: i.occurredAt,
+          })),
+        )
+      : null;
+
+    drawSectionHeading(ctx, "Fast Facts");
+    const fastFactCards = computeTopicFastFacts({
+      topic: data.topic,
+      issueDate: data.issueDate,
+      incidents,
+      topicLabel: topicLabels[data.topic] ?? data.topic,
+    }) as KpiCardData[];
+    if (cargoExtras) {
+      fastFactCards.push({
+        label: "Est. Cargo Loss (USD)",
+        value: formatCargoUsd(cargoExtras.usd),
+        note: cargoUsdNote(cargoExtras.usd),
+      });
+      fastFactCards.push({
+        label: "Most Stolen Commodity",
+        value: cargoExtras.commodity ?? "—",
+        note: cargoCommodityNote(cargoExtras),
+      });
+    }
+    drawFastFactsKpiCards(ctx, fastFactCards);
+
+    if (cargoExtras && cargoExtras.trend.length >= 2) {
+      drawSectionHeading(ctx, "Cargo Theft Trend");
+      drawCargoTrendChart(ctx, cargoExtras.trend);
+    }
+
     const pickProse = (editor: string | null | undefined, auto: string): string => {
       const t = (editor ?? "").trim();
       return t.length > 0 ? t : auto;

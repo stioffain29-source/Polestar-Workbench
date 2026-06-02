@@ -21,6 +21,13 @@ import {
   FUEL_MISSING_REQUIRED_NOTE,
 } from "@/lib/fuelWatchReport";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import CargoTrendChart from "@/components/CargoTrendChart";
+import {
+  buildCargoReportExtras,
+  formatCargoUsd,
+  cargoUsdNote,
+  cargoCommodityNote,
+} from "@/lib/cargoReportData";
 import DataAsOfBanner from "@/components/DataAsOfBanner";
 import { computeDataAsOf } from "@/lib/reportDataStatus";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
@@ -288,6 +295,37 @@ export default function ReportPreview({
       ? (fuelMarketLatestDate(report.hardNumbers) ?? report.issueDate)
       : report.issueDate;
   const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
+  // Cargo Watch report extras — computed once from the in-scope window so the
+  // Fast Facts, the trend chart and the narrative all read the SAME records.
+  const isCargo = report.topic === "cargo_watch";
+  const cargoWindow =
+    isCargo && report.topic && report.issueDate
+      ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
+      : [];
+  const cargoExtras = isCargo
+    ? buildCargoReportExtras(
+        cargoWindow.map((i) => ({
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          location: i.location ?? null,
+          country: i.country ?? null,
+          occurredAt: i.occurredAt,
+        })),
+      )
+    : null;
+  if (cargoExtras) {
+    fastFacts.push({
+      label: "Est. Cargo Loss (USD)",
+      value: formatCargoUsd(cargoExtras.usd),
+      note: cargoUsdNote(cargoExtras.usd),
+    });
+    fastFacts.push({
+      label: "Most Stolen Commodity",
+      value: cargoExtras.commodity ?? "—",
+      note: cargoCommodityNote(cargoExtras),
+    });
+  }
   // Canonical Fuel Watch payload. Preview, PDF and the editor debug
   // panel all consume this — no renderer parses hardNumbers on its own.
   const fuelData = isFuel && renderIssueDate
@@ -515,11 +553,13 @@ export default function ReportPreview({
               <FastFactsGrid cards={fastFacts} />
             </Section>
 
+            {isCargo && cargoExtras && cargoExtras.trend.length >= 2 && (
+              <Section title="Cargo Theft Trend">
+                <CargoTrendChart data={cargoExtras.trend} />
+              </Section>
+            )}
+
             {(() => {
-              const isCargo = report.topic === "cargo_watch";
-              const cargoWindow = isCargo && report.topic && report.issueDate
-                ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
-                : [];
               const pick = (editor: string | null | undefined, auto: string): string => {
                 const t = (editor ?? "").trim();
                 return t.length > 0 ? t : auto;

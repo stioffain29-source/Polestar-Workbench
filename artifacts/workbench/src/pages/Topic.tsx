@@ -1,9 +1,11 @@
 import { useRoute } from "wouter";
-import { useListIncidents, useGetIncidentCountsByTopic } from "@workspace/api-client-react";
+import { useListIncidents } from "@workspace/api-client-react";
 import { TOPIC_LABELS, SEVERITY_LEVELS, severityBadgeStyle, ratingColor } from "@/lib/topics";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
+import { useMemo } from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
+import { resolveTrueIncidents } from "@/lib/trueIncidents";
 
 export default function Topic() {
   const [, params] = useRoute("/topics/:topic");
@@ -18,9 +20,24 @@ export default function Topic() {
   const topic = labelKey === "protests" ? "flashpoint" : labelKey;
   const label = TOPIC_LABELS[labelKey] ?? topic;
 
-  const { data: incidents = [], isLoading } = useListIncidents({ topic: topic as never });
-  const { data: counts = [] } = useGetIncidentCountsByTopic({ days: 30 });
-  const myCount = counts.find((c) => c.topic === topic);
+  const { data: rawIncidents = [], isLoading } = useListIncidents({ topic: topic as never });
+
+  // Reconcile to the same "true" (scoped, noise-filtered) set the reports use,
+  // so the page tallies with the dashboard card and the report document.
+  const incidents = useMemo(() => resolveTrueIncidents(topic, rawIncidents), [topic, rawIncidents]);
+
+  const { count30d, critical30d } = useMemo(() => {
+    const cutoff = subDays(new Date(), 30);
+    let count30d = 0;
+    let critical30d = 0;
+    for (const i of incidents) {
+      const d = new Date(i.occurredAt);
+      if (isNaN(d.getTime()) || d < cutoff) continue;
+      count30d += 1;
+      if (i.severity === "extreme") critical30d += 1;
+    }
+    return { count30d, critical30d };
+  }, [incidents]);
 
   const severityData = SEVERITY_LEVELS.map((s) => ({
     severity: s,
@@ -35,8 +52,8 @@ export default function Topic() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border p-px rounded-sm overflow-hidden">
-        <Kpi label="Incidents (30d)" value={myCount?.count ?? 0} />
-        <Kpi label="Critical (30d)" value={myCount?.criticalCount ?? 0} accent />
+        <Kpi label="Incidents (30d)" value={count30d} />
+        <Kpi label="Critical (30d)" value={critical30d} accent />
         <Kpi label="Total Recorded" value={incidents.length} />
         <Kpi label="Latest" value={incidents[0] ? format(new Date(incidents[0].occurredAt), "dd MMM HH:mm") : "—"} small />
       </div>
