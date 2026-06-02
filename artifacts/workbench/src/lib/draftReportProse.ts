@@ -24,8 +24,10 @@ import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
 import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
 import { selectFlashpointUsable } from "./flashpointReportDataset";
+import { buildShippingReportDataset, type ShippingReportIncident } from "./shippingReportDataset";
 
 export interface DraftableIncident extends ClassifiableIncident {
+  id?: number | string;
   severity: string;
   occurredAt: string;
   country?: string | null;
@@ -438,8 +440,8 @@ const SHIPPING: ReportPack = {
     "Re-walk routing options around affected chokepoints, port-call sequencing, bunker planning and war-risk premium exposure. Confirm crew-change and advisory triggers with operators.",
   watchNext: () =>
     "Next cycle hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices.",
-  polestarView: () =>
-    "Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a thinner layer of commercial disruption. Iran carries the strongest identifiable signal, with lower volumes linked to China and South Korea.",
+  polestarView: ({ lead }) =>
+    `Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a thinner layer of commercial disruption.${lead ? ` ${lead} carries the strongest identifiable signal this cycle.` : ""}`,
   zeroExec: "Maritime reporting was quiet this cycle. Treat that as a coverage gap rather than proof of calm at sea.",
   zeroSituation: "Chokepoint, vessel and freight-side exposure persists even when the reporting cycle is light.",
   zeroWhatHappened: "No classifiable maritime activity surfaced, leaving the read directional rather than firm.",
@@ -627,6 +629,69 @@ export function draftTopicReportProse(opts: {
   incidents: DraftableIncident[];
 }): TopicReportProse {
   const { topic, issueDate, incidents } = opts;
+  // Shipping reports seed their prose directly from the Shipping report
+  // dataset — the SAME dataset that drives the on-screen preview, the PDF,
+  // the chokepoint counts and the Regional / Country chart. This is what
+  // keeps the seeded Polestar View / What Matters from ever naming a
+  // different lead country than the chart: there is one country derivation
+  // (deriveIncidentCountry, via ds.countryRows), and every analyst section
+  // reads from it. Editor edits still win downstream; this only seeds.
+  if (topic === "shipping") {
+    // Carry the same fields the live preview/PDF dataset receives (id,
+    // sourceUrl, location) so the seeded dataset is identical to what
+    // ShippingReportPreview builds — no silent country/source divergence.
+    const shipIncidents: ShippingReportIncident[] = incidents.map((r, i) => ({
+      id: r.id ?? i,
+      title: r.title,
+      topic: r.topic,
+      severity: r.severity,
+      occurredAt: r.occurredAt,
+      country: r.country ?? null,
+      summary: r.summary ?? null,
+      source: r.source ?? null,
+      sourceUrl: r.sourceUrl ?? null,
+      location: r.location ?? null,
+    }));
+    const ds = buildShippingReportDataset(shipIncidents, topic, issueDate);
+    const sEnriched: DraftableIncident[] = ds.enriched.map((e) => ({
+      id: e.id,
+      topic: e.topic,
+      title: e.title,
+      summary: e.summary ?? null,
+      source: e.source ?? null,
+      sourceUrl: e.sourceUrl ?? null,
+      location: e.location ?? null,
+      severity: e.severity,
+      occurredAt: e.occurredAt,
+      country: e.country ?? null,
+    }));
+    const sTotal = sEnriched.length;
+    const sLead = ds.countryRows[0]?.label ?? "";
+    const sCountries = joinList(
+      ds.countryRows.filter((r) => r.value > 0).slice(0, 3).map((r) => r.label),
+    );
+    const shipCtx: BuildCtx = {
+      total: sTotal,
+      countries: sCountries,
+      lead: sLead,
+      types: topTypesText(sEnriched),
+      sev: highestSeverity(sEnriched),
+      period: periodPhrase(topic, issueDate),
+      cadence: cadenceWord(topic),
+      thin: sTotal > 0 && sTotal < 3,
+    };
+    return {
+      executiveSummary: sTotal === 0 ? SHIPPING.zeroExec : SHIPPING.exec(shipCtx),
+      situation: sTotal === 0 ? SHIPPING.zeroSituation : SHIPPING.situation(shipCtx),
+      whatHappened: sTotal === 0 ? SHIPPING.zeroWhatHappened : SHIPPING.whatHappened(shipCtx),
+      // These four come straight from the dataset's auto-prose so the seeded
+      // form text is byte-identical to what the preview/PDF fall back to.
+      whatMatters: ds.autoWhatMatters,
+      implications: ds.autoImplications,
+      watchNext: ds.autoWatchNext,
+      polestarView: ds.autoPolestarView,
+    };
+  }
   // Flashpoint / protests reports share a single usable-incident selector
   // with the report dataset (merged flashpoint+protests buckets, with
   // kinetic / court / crime / novelty / weak-operational noise removed).

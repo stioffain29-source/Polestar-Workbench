@@ -534,3 +534,9 @@ id = "t3mxLoZG4tPTFmWzsUPRO"
 uri = "file://artifacts/workbench/screenshots/flashpoint_selection_proof.txt"
 type = "text"
 title = "Flashpoint Weekly — Selection Proof (included + rejected with reasons)"
+
+[[outputs]]
+id = "GeL3B8pWSyihX5XE16AmD"
+uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_revised_2026-06-01.pdf"
+type = "pdf"
+title = "Shipping Watch — revised, client-ready (report #12)"

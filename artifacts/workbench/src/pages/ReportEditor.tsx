@@ -313,6 +313,7 @@ export default function ReportEditor() {
             dataTopic,
           );
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
+      id: i.id,
       topic: i.topic,
       title: i.title,
       summary: i.summary,

@@ -81,8 +81,66 @@ export const HUMAN_INTEREST_RE = /(\brepatriat|\bseafarer welfare|\bcrew welfare
 export const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ballegedly|\breportedly|\bclaim(s|ed)\b[^.]{0,40}\b(strike|attack|hit|missile|drone|target|targeted|fired|sank|downed|shot down|launched)|\bclaim(s|ed) to have\b|\bclaim(s|ed) responsibility|\brumou?red|\bpurportedly|\bmay have (been )?(struck|hit|attacked|targeted)|\bappears to have been|\b(says|said) it (hit|struck|targeted|attacked|launched|downed))/i;
 
 // Pure commentary, explainer and analysis-piece headlines with no
-// operational anchor.
-export const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
+// operational anchor. Also catches "what happens next" / "here's what it
+// means" / "why it matters" explainer framing, which is commentary about an
+// event rather than a report of the event itself.
+export const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|what (happens|happened|comes|could happen|that means|this means|it means|to expect)\b|what'?s next|here'?s what|why it matters|why it could|how (it|this) (could|will|might) (affect|hit|impact)|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
+
+// Political rhetoric / threat language about closing or sealing a waterway.
+// Iranian "vows to shut the Strait of Hormuz" / "says Hormuz will stay
+// closed" statements are rhetoric, threat or claim-pending-confirmation —
+// NOT a confirmed operational closure. They must never be counted as a
+// verified chokepoint disruption or quoted as a hard incident.
+//
+// Precision over recall by design: a genuine reported closure ("Suez closed
+// after grounding") or a real blockage with a recovery outlook ("blocked by
+// vessel, could reopen in days") carries NEITHER an intent verb adjacent to a
+// close word NOR a future-modal-then-close phrase, so it is never suppressed.
+// We require BOTH a waterway AND one of three tight close-intent shapes.
+const WATERWAY_RE = /\b(strait|hormuz|bab[\s-]?el[\s-]?mandeb|red sea|suez|malacca|chokepoint|waterway|sea ?lane)\b/i;
+// "vows to shut", "threatens to close the strait", "pledges to seal"
+const THREAT_VERB_CLOSE_RE = /\b(vow|vows|vowed|threaten|threatens|threatened|pledge|pledges|pledged|promise|promises|promised|warn|warns|warned)\b(?:\s+\S+){0,6}?\s+(clos|shut|seal|blockad|block|chok)\w*/i;
+// "closure threatens", "blockade looms", "shutdown feared"
+const CLOSE_THREAT_NOUN_RE = /\b(closure|blockade|shutdown|sealing|closing)\b(?:\s+\S+){0,4}?\s+(threat|threaten|loom|fear|risk|warn)\w*/i;
+// "will stay closed", "could close", "set to shut" — modal then close word
+const FUTURE_CLOSE_RE = /\b(will|would|could|may|might|set to|poised to|going to|plans? to|prepares? to|moves? to|threatens? to|vows? to)\b(?:\s+\S+){0,4}?\s+(clos|shut|seal|blockad|block|chok)\w*/i;
+
+// A concrete physical-incident cause means the closure is a REAL operational
+// event, even when phrased with a future duration ("Suez will remain closed
+// for three days after grounding"). These markers exempt the record from the
+// rhetoric filter so genuine confirmed closures are never suppressed.
+const CONFIRMED_PHYSICAL_CAUSE_RE = /\b(ran aground|aground|grounding|grounded|refloat\w*|salvag\w*|collision|collided|allision|capsiz\w*|sank|sunk|sinking|wreck\w*|fire|blaze|explosion|blast|debris|engine failure|breakdown|oil spill)\b/i;
+
+/**
+ * True when the text is a political closure threat / rhetoric / claim about a
+ * waterway rather than a report of a confirmed closure. Requires a waterway
+ * AND an intent-or-future close shape; a concrete physical-incident cause
+ * exempts it so factual closures (incl. future-duration ones) are not caught.
+ */
+export function isRhetoricalClosureThreat(text: string): boolean {
+  if (!WATERWAY_RE.test(text)) return false;
+  if (CONFIRMED_PHYSICAL_CAUSE_RE.test(text)) return false;
+  return (
+    THREAT_VERB_CLOSE_RE.test(text) ||
+    CLOSE_THREAT_NOUN_RE.test(text) ||
+    FUTURE_CLOSE_RE.test(text)
+  );
+}
+
+// Media-packaging headlines: video reels, photo galleries, live blogs and
+// "Latest AP News Video" wire packaging. These are presentation wrappers,
+// not operational incident reports, so they must not surface as incidents.
+export const MEDIA_PACKAGING_RE = /(\bnews video\b|\bap (news )?video\b|\bvideo:|\bwatch:|\bwatch live\b|\blive blog\b|\bliveblog\b|\blive updates?\b|\bin pictures\b|\bphoto gallery\b|\bslideshow\b|\bphotos:|\bwebcam\b|\braw video\b|\bcaught on camera\b)/i;
+
+// Capability, procurement, sea-trial and exercise news (e.g. a navy's new
+// minehunting drone, a frigate commissioning, a joint naval drill). This is
+// capability / advisory context, not a live operational incident, so it must
+// not be selected as the Latest Significant Incident. Applied narrowly to
+// that headline pick rather than dropped wholesale from the file.
+// NOTE: deliberately omits a bare "launched new" / "to order" fragment —
+// those match real operational reporting ("group launched new attacks",
+// "ordered to evacuate"). Capability nouns are required instead.
+export const CAPABILITY_PROCUREMENT_RE = /\b(minehunt\w*|mine[\s-]?hunting|mine[\s-]?countermeasures?|unveil\w*|to (buy|procure|acquire)|procure\w*|test[\s-]?fir\w*|sea trials?|christen\w*|commission(s|ed|ing)?|new (drone|warship|frigate|destroyer|corvette|patrol (boat|vessel)|submarine|minehunter|minesweeper|capability|technology)|takes delivery of|delivery of (new|its)|maiden (voyage|deployment)|naval exercise|joint (naval )?(drill|exercise|patrol)|war ?games?)\b/i;
 
 // Pure freight-market index / rate-tracker commentary with no operational
 // anchor. Drewry WCI, Baltic indices, container freight rate weekly updates.
@@ -102,7 +160,19 @@ export function isLowCredibilityShippingRecord(i: MaritimeRecordLike): boolean {
   if (HUMAN_INTEREST_RE.test(text)) return true;
   if (SPECULATIVE_CLAIM_RE.test(text)) return true;
   if (GENERIC_COMMENTARY_RE.test(text)) return true;
+  if (isRhetoricalClosureThreat(text)) return true;
+  if (MEDIA_PACKAGING_RE.test(text)) return true;
   return false;
+}
+
+/**
+ * Capability / procurement / exercise context (a navy's new minehunting
+ * drone, a frigate commissioning, a joint drill). Kept in the file but
+ * excluded from the Latest Significant Incident pick so a capability story
+ * cannot stand in for a live operational incident.
+ */
+export function isCapabilityContext(i: MaritimeRecordLike): boolean {
+  return CAPABILITY_PROCUREMENT_RE.test(`${i.title ?? ""} ${i.summary ?? ""}`);
 }
 
 function blob(i: MaritimeRecordLike): string {

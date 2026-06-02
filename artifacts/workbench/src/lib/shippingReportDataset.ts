@@ -9,6 +9,7 @@ import {
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
   type ChokepointKey,
   isLowCredibilityShippingRecord,
+  isCapabilityContext,
   FREIGHT_MARKET_INDEX_RE,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
@@ -480,8 +481,15 @@ export function buildShippingReportDataset(
 
   // Chokepoint counts — derived from the report window so the headline
   // "Main Affected Chokepoint" matches the Chokepoint Watch table below.
+  // Only credible operational records feed the headline count, so political
+  // closure rhetoric/claims, media-packaging wrappers and human-interest
+  // follow-ups can no longer inflate "Main Affected Chokepoint" above the
+  // credible-only Chokepoint Watch table.
   const cpCounts = new Map<ChokepointKey, number>();
-  for (const r of enriched30) for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
+  for (const r of enriched30) {
+    if (isLowCredibilitySource(r)) continue;
+    for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
+  }
   let topCp: ChokepointKey | "" = "", topCpN = 0;
   for (const [k, v] of cpCounts) if (v > topCpN) { topCpN = v; topCp = k; }
 
@@ -552,7 +560,13 @@ export function buildShippingReportDataset(
   // hijacked by a human-interest follow-up that happens to be tagged
   // extreme. Falls back to the raw most-recent record only if the cleaned
   // pool is empty.
-  const enrichedClean = enriched.filter((r) => !isLowCredibilitySource(r));
+  // Capability / procurement / exercise stories (e.g. a navy's new
+  // minehunting drone) are also excluded here so a capability headline can
+  // never be promoted to Latest Significant Incident in place of a real
+  // operational event.
+  const enrichedClean = enriched.filter(
+    (r) => !isLowCredibilitySource(r) && !isCapabilityContext(r),
+  );
   // Strict exclusion: if no credible record exists in the window, the
   // Latest Significant Incident card reads "—" rather than falling back to
   // a repatriation / human-interest / speculative-claim row.
@@ -997,11 +1011,18 @@ function buildCommercialImpactRead(commercialRecords: EnrichedIncident[]): strin
   const lead = commercialRecords[0];
   const second = commercialRecords[1];
   const intro = `Operational commercial pressure on shipping in the weekly window centres on port disruption, freight or insurance movement with an operational hook, and commercial-shipping disruption tied directly to vessel or cargo flows. The cycle carries ${n} qualifying record${n === 1 ? "" : "s"} on this definition.`;
+  // With one or two records the commercial picture is too thin to read as a
+  // trend. Say the signal is limited and treat it as a watch item rather than
+  // overstating a broad commercial impact the data does not support.
+  const limited =
+    n <= 2
+      ? ` On a single weekly window this is a thin, directional signal rather than a confirmed commercial trend — treat it as a watch item, not evidence of broad commercial disruption.`
+      : "";
   const examples = second
     ? `The lead entry is "${lead.title}" (${lead.issue.toLowerCase()}); "${second.title}" sits alongside it (${second.issue.toLowerCase()}).`
     : `The lead entry is "${lead.title}" (${lead.issue.toLowerCase()}).`;
   const watch = `Watch for follow-on schedule disruption, premium adjustments on affected routes, and any operator decisions on diversion or port-skipping. Commercial pass-through to shippers typically follows the operational signal by one to two weeks.`;
-  return `${intro} ${examples}\n\n${watch}`;
+  return `${intro}${limited} ${examples}\n\n${watch}`;
 }
 
 function buildRegionalCountryRead(opts: {
