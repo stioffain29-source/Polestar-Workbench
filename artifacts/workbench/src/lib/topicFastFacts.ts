@@ -8,7 +8,7 @@
 import { format, parseISO, max as dateMax } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
-import { isTopicRelevant, sanitizeFactValue } from "./topicRelevance";
+import { isTopicRelevant, sanitizeFactValue, splitAttributedCountries } from "./topicRelevance";
 
 export interface TopicFastFactsIncident {
   id?: number | string;
@@ -97,12 +97,16 @@ export function computeTopicFastFacts(opts: {
   }
   const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : "—";
 
-  // Most affected country
+  // Most affected country — count only attributed countries via the shared
+  // splitter. "Unknown" is not a country; counting it made the card read
+  // "Country not identified" even when named countries clearly led. Compound
+  // strings ("Indonesia; West Papua") are split so the card and the report
+  // prose normalise countries the same way and can never disagree.
   const countryCount = new Map<string, number>();
   for (const i of windowIncidents) {
-    const c = (i.country ?? "").trim();
-    if (!c) continue;
-    countryCount.set(c, (countryCount.get(c) ?? 0) + 1);
+    for (const c of splitAttributedCountries(i.country)) {
+      countryCount.set(c, (countryCount.get(c) ?? 0) + 1);
+    }
   }
   let topCountry = "—";
   let topCountryN = 0;

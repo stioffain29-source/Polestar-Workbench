@@ -20,6 +20,7 @@
 // data, not just how many records there were.
 
 import { format, parseISO } from "date-fns";
+import { isUnattributedCountry, splitAttributedCountries } from "./topicRelevance";
 
 export interface CargoNarrativeIncident {
   id?: number | string;
@@ -46,17 +47,69 @@ function recordDate(i: CargoNarrativeIncident): Date | null {
   }
 }
 
+// Country tokenisation (compound-string splitting + unattributed drop) lives
+// in the shared relevance lib as splitAttributedCountries, so the Reads, the
+// editor seed and the Fast Facts card normalise countries the same way and can
+// never disagree (e.g. "Indonesia; West Papua" never appears as one country).
 function topCountries(rows: CargoNarrativeIncident[], n: number): { country: string; count: number }[] {
   const m = new Map<string, number>();
   for (const r of rows) {
-    const c = (r.country ?? "").trim();
-    if (!c) continue;
-    m.set(c, (m.get(c) ?? 0) + 1);
+    // "Unknown" is not a country. Counting it let the prose claim a window
+    // was "led by Unknown" and contradicted the Fast Facts card.
+    for (const c of splitAttributedCountries(r.country)) {
+      m.set(c, (m.get(c) ?? 0) + 1);
+    }
   }
   return Array.from(m.entries())
     .map(([country, count]) => ({ country, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, n);
+}
+
+interface CountryPicture {
+  top: { country: string; count: number }[];
+  identified: number;
+  total: number;
+  strong: boolean;
+  line: string;
+}
+
+// Single source of truth for how cargo prose talks about country
+// attribution. When most records carry no confirmed country, the prose
+// must explain that gap rather than assert a firm single lead — so the
+// Fast Facts card, the Reads and the analyst sections never disagree.
+// `scope` describes WHICH records the line covers. The Reads work on a subset
+// of the window (route-side or hub-side records), so their country line must
+// say "among these route-side records" rather than "in the window" — otherwise
+// a subset leader (e.g. Papua New Guinea on the route-side) reads as a flat
+// contradiction of the overall-window lead named in the Fast Facts card and
+// Executive Summary. Naming the scope explains the gap instead of hiding it.
+function countryPicture(
+  rows: CargoNarrativeIncident[],
+  n: number,
+  scope = "in the window",
+): CountryPicture {
+  const top = topCountries(rows, n);
+  // `identified` is ROW-level (does this record carry any attribution at all),
+  // while `top` is TOKEN-level (per-country mentions after splitting). The
+  // strong/weak gate below compares identified ROWS against total ROWS, so a
+  // partially-attributed row ("Indonesia; West Papua") counts once as
+  // identified — intentional: the record is attributed even if multi-country.
+  let identified = 0;
+  for (const r of rows) {
+    if (!isUnattributedCountry(r.country)) identified++;
+  }
+  const total = rows.length;
+  const strong = top.length > 0 && identified >= 2 && identified * 2 >= total;
+  let line: string;
+  if (top.length === 0) {
+    line = `Country attribution is sparse this cycle and limits the geographic read.`;
+  } else if (strong) {
+    line = `Country attribution ${scope} is led by ${joinCountries(top)}.`;
+  } else {
+    line = `Most records ${scope} carry no confirmed country; among the identified minority the recurring geographies are ${joinCountries(top)}, too thin to read as a single firm lead.`;
+  }
+  return { top, identified, total, strong, line };
 }
 
 function joinCountries(rows: { country: string; count: number }[]): string {
@@ -89,10 +142,7 @@ export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]
   }
   const lead = leadEntry(matches)!;
   const leadDate = recordDate(lead);
-  const countries = topCountries(matches, 3);
-  const countryLine = countries.length > 0
-    ? `Country attribution in the window is led by ${joinCountries(countries)}.`
-    : `Country attribution is sparse this cycle and limits the geographic read.`;
+  const countryLine = countryPicture(matches, 3, "among these route-side records").line;
   const intro = `Route-side and convoy cargo risk shows up across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle, covering truck hijack, container theft, in-transit loss and similar operational crime. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
   const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories are the cleanest early signals that route-side risk is firming.`;
   return `${intro} ${countryLine}\n\n${watch}`;
@@ -123,7 +173,7 @@ function buildCargoAutoCtx(windowIncidents: CargoNarrativeIncident[]): CargoAuto
 
 export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
-  const countries = topCountries(ctx.windowIncidents, 3);
+  const cp = countryPicture(ctx.windowIncidents, 3);
   const parts: string[] = [];
   if (ctx.securityMatches.length === 0 && ctx.hubMatches.length === 0) {
     return `No qualifying truck-hijack, container theft, in-transit loss or logistics-hub logistics incident reached the file this cycle. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or depot-side risk has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean cycles in a row.`;
@@ -131,9 +181,9 @@ export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[])
   parts.push(
     `What this cycle changes for cargo owners and operators is concentrated in two places: route-side incidents (${ctx.securityMatches.length} qualifying record${ctx.securityMatches.length === 1 ? "" : "s"}) that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses (${ctx.hubMatches.length} qualifying record${ctx.hubMatches.length === 1 ? "" : "s"}) that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
   );
-  if (countries.length > 0) {
+  if (cp.top.length > 0) {
     parts.push(
-      `Country-level concentration in the window is led by ${joinCountries(countries)}. Repeat hits in the same country across consecutive cycles are the cleanest early signal that a specific corridor or operator is being worked by an organised crew — that is the point at which insurance bulletins and police alerts typically follow.`,
+      `${cp.line} Repeat hits in the same country across consecutive cycles are the cleanest early signal that a specific corridor or operator is being worked by an organised crew — that is the point at which insurance bulletins and police alerts typically follow.`,
     );
   }
   parts.push(
@@ -189,7 +239,7 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
   // the Fast Facts "Most Affected Country" card) vs the logistics-hub
   // leader. If they differ, the prose calls that out instead of letting
   // the report appear self-contradictory.
-  const overallTop = topCountries(ctx.windowIncidents, 3);
+  const cp = countryPicture(ctx.windowIncidents, 3);
   const hubTop = topCountries(ctx.hubMatches, 1);
   const securityTop = topCountries(ctx.securityMatches, 1);
   const parts: string[] = [];
@@ -200,19 +250,22 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
     `Our read on the cycle is that the larger cargo losses on the file are being driven by route familiarity and likely insider knowledge rather than opportunistic crime. The pattern across hijack reports, depot raids and seal-failure entries is too consistent to read as chance — repeat corridors, named depots and the same modus operandi recur.`,
   );
 
-  // 2. Country split: name the main operating geographies and
-  // distinguish total-record leader from logistics-hub leader if they
-  // differ, so the Fast Facts card and the prose do not contradict.
-  if (overallTop.length > 0) {
-    const overallList = joinCountries(overallTop);
-    const hub = hubTop[0]?.country ?? null;
-    const sec = securityTop[0]?.country ?? null;
-    const split = hub && sec && hub !== sec
-      ? ` ${sec} leads route-side cargo-security reporting on the file while ${hub} leads logistics-hub and warehouse exposure — different lanes of the same problem, not separate issues.`
-      : "";
-    parts.push(
-      `The main operating geographies this cycle are ${overallList}.${split}`,
-    );
+  // 2. Country picture. Only assert a firm operating geography and the
+  // route-vs-hub split when attribution is strong enough to carry it;
+  // otherwise state the gap so the Fast Facts card and the prose agree.
+  if (cp.top.length > 0) {
+    if (cp.strong) {
+      const hub = hubTop[0]?.country ?? null;
+      const sec = securityTop[0]?.country ?? null;
+      const split = hub && sec && hub !== sec
+        ? ` ${sec} leads route-side cargo-security reporting on the file while ${hub} leads logistics-hub and warehouse exposure — different lanes of the same problem, not separate issues.`
+        : "";
+      parts.push(
+        `The main operating geographies this cycle are ${joinCountries(cp.top)}.${split}`,
+      );
+    } else {
+      parts.push(cp.line);
+    }
   }
 
   // 3. Route-side and hub-side risk are linked — treat them as one
@@ -239,16 +292,18 @@ export function buildCargoSituation(windowIncidents: CargoNarrativeIncident[]): 
   if (ctx.windowIncidents.length === 0) {
     return `Warehouse, depot and road-corridor exposure persists regardless of how quiet the reporting window looks. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap, not confirmation that route-side or hub-side risk has eased.`;
   }
-  const overallTop = topCountries(ctx.windowIncidents, 1);
-  const hubTop = topCountries(ctx.hubMatches, 1);
-  const overall = overallTop[0]?.country ?? null;
-  const hub = hubTop[0]?.country ?? null;
+  const cp = countryPicture(ctx.windowIncidents, 3);
+  const overall = cp.top[0]?.country ?? null;
+  const hub = topCountries(ctx.hubMatches, 1)[0]?.country ?? null;
   const focus = `Warehouse, depot and road corridors hold the live exposure this cycle, with route familiarity and insider risk as the persistent drivers.`;
-  const where = overall && hub && overall !== hub
-    ? ` ${overall} leads total reporting on the file, while ${hub} leads logistics-hub and warehouse risk — both sit inside the same operating picture.`
-    : overall
-      ? ` ${overall} sits at the centre of the recurring geography on this cycle.`
-      : "";
+  let where = "";
+  if (cp.strong && overall && hub && overall !== hub) {
+    where = ` ${overall} leads total reporting on the file, while ${hub} leads logistics-hub and warehouse risk — both sit inside the same operating picture.`;
+  } else if (cp.strong && overall) {
+    where = ` ${overall} sits at the centre of the recurring geography on this cycle.`;
+  } else if (cp.top.length > 0) {
+    where = ` ${cp.line}`;
+  }
   return `${focus}${where}`;
 }
 
@@ -262,10 +317,7 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
   }
   const lead = leadEntry(matches)!;
   const leadDate = recordDate(lead);
-  const countries = topCountries(matches, 3);
-  const countryLine = countries.length > 0
-    ? `The country picture in this cycle is led by ${joinCountries(countries)}.`
-    : `Country attribution is sparse this cycle and limits the geographic read.`;
+  const countryLine = countryPicture(matches, 3, "among these hub-side records").line;
   const intro = `Logistics hub risk across warehouses, depots, distribution centres, terminals and bonded storage appears across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
   const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two cycles.`;
   return `${intro} ${countryLine}\n\n${watch}`;

@@ -629,6 +629,38 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
 }
 
 /**
+ * True when a country label carries no usable attribution and must not be
+ * counted as a real country anywhere (Fast Facts cards or prose). The
+ * classifier writes "Unknown" for unattributed records; this is the single
+ * source of truth so cards and prose can never disagree on what counts.
+ */
+export function isUnattributedCountry(raw: string | null | undefined): boolean {
+  const v = (raw ?? "").trim();
+  if (!v || v === "-" || v === "--") return true;
+  if (/^unknown$/i.test(v)) return true;
+  if (/^country not identified$/i.test(v)) return true;
+  if (/^(n\/?a|unattributed|unspecified|other)$/i.test(v)) return true;
+  return false;
+}
+
+/**
+ * Split a country label into its individual attributed countries. Compound
+ * strings ("Indonesia; West Papua", "China, Iran") are split so each country
+ * scores on its own and a compound label never appears as if it were a single
+ * country, and unattributed placeholders are dropped. This is the single source
+ * of truth for country tokenisation so the Fast Facts cards, the report prose
+ * and the editor seed normalise countries the same way and can never disagree.
+ */
+export function splitAttributedCountries(raw: string | null | undefined): string[] {
+  const v = (raw ?? "").trim();
+  if (!v) return [];
+  return v
+    .split(/[;,/]+/)
+    .map((s) => s.trim())
+    .filter((s) => s && !isUnattributedCountry(s));
+}
+
+/**
  * Sanitize fallback labels emitted by the classifier or country counts
  * so the Fast Facts cards never read "Unknown" or "Other fuel incident".
  */
