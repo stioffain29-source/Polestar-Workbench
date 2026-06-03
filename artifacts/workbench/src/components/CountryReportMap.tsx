@@ -27,6 +27,24 @@ export interface CountryReportMapProps {
   incidents: CountryFastFactsIncident[];
   /** Optional DOM id used by html2canvas during PDF export. */
   domId?: string;
+  /** Report country name — used to centre the map when nothing is plottable. */
+  countryName?: string;
+}
+
+// Default map view per report country. When the active window holds no records
+// with coordinates, the map centres on the report's own country instead of a
+// generic world view. Centroids mirror COUNTRY_CENTROIDS in the ingest geocoder.
+const COUNTRY_VIEW: Record<string, { center: L.LatLngTuple; zoom: number }> = {
+  "papua new guinea": { center: [-6.31, 143.96], zoom: 5 },
+  png: { center: [-6.31, 143.96], zoom: 5 },
+  papua: { center: [-4.0, 138.0], zoom: 5 },
+  "west papua": { center: [-2.5, 138.0], zoom: 5 },
+};
+
+function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: number } | null {
+  const key = (name ?? "").trim().toLowerCase();
+  if (!key) return null;
+  return COUNTRY_VIEW[key] ?? null;
 }
 
 /**
@@ -37,7 +55,7 @@ export interface CountryReportMapProps {
  * severity-coloured circle markers. Records without coordinates are not
  * plotted but remain in totals and tables elsewhere on the page.
  */
-export default function CountryReportMap({ incidents, domId }: CountryReportMapProps) {
+export default function CountryReportMap({ incidents, domId, countryName }: CountryReportMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -74,7 +92,12 @@ export default function CountryReportMap({ incidents, domId }: CountryReportMapP
     });
 
     if (plottable.length === 0) {
-      map.setView([0, 120], 2);
+      const view = resolveCountryView(countryName);
+      if (view) {
+        map.setView(view.center, view.zoom);
+      } else {
+        map.setView([0, 120], 2);
+      }
       return;
     }
 
@@ -111,7 +134,7 @@ export default function CountryReportMap({ incidents, domId }: CountryReportMapP
     } else {
       map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24], maxZoom: 9 });
     }
-  }, [plottable]);
+  }, [plottable, countryName]);
 
   useEffect(() => {
     return () => {

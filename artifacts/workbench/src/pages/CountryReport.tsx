@@ -725,7 +725,7 @@ export default function CountryReport() {
       {/* 7. Map */}
       <Section title="Map">
         <div>
-          <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" />
+          <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" countryName={effective.name} />
         </div>
         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
           The map reflects the active reporting window — {active.incidents.length} {active.basisLabel} record{active.incidents.length === 1 ? "" : "s"}. It is not the full risk picture — read it alongside the 30 / 90-day context sections above.

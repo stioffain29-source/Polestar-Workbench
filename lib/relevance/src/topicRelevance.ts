@@ -616,14 +616,42 @@ export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
   return explainRelevance(topic, i).relevant;
 }
 
+// A country report is a SECURITY product, not a wire feed. The signals below
+// mark a record as carrying a genuine safety/security event — violence, armed
+// action, crime, unrest, disruption. Any record with one of these is kept even
+// if it also mentions an economic or sporting word (e.g. a fuel-subsidy protest
+// that turned violent, or a riot at a stadium).
+const COUNTRY_SECURITY_SIGNAL_RE =
+  /\b(attack|attacked|armed|gunm[ae]n|robber|robbery|robbed|hold[- ]?up|hijack|kidnap|abduct|shoot|shot|shooting|gunfire|gunshot|killed|dead|fatal|wounded|injur|casualt|clash|fighting|firefight|gun battle|riot|unrest|protest|demonstration|rally|march|picket|walkout|strike action|blockade|roadblock|ambush|raid|arson|loot|explosion|blast|bomb|ied|grenade|militant|insurgent|rebel|separatist|tpnpb|opm|displaced|evacuat|curfew|crackdown|violence|violent|assault|stab|machete|bush knife|rascal|raskol|theft|stolen|burglary|break[- ]?in|seiz|piracy|pirate|extort|arrest|detain|sabotage)\b/i;
+
+// Non-security record classes that must never DRIVE a country security report
+// when the same record carries no security signal: fiscal/economic policy,
+// market and corporate-finance commentary, public-relations boosterism, and
+// sports coverage. These were leaking in because the country gate previously
+// stripped only general-news noise (e.g. a "fuel subsidy" policy story or a
+// football scoreline appeared as the country's lead security incident).
+const COUNTRY_ECONOMIC_NOISE_RE =
+  /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?)\b/i;
+
+const COUNTRY_SPORTS_NOISE_RE =
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|super league|rugby|netball|cricket|grand final|test match|cross[- ]code coup)\b/i;
+
 /**
- * Country reports allow any operational record that mentions the country
- * context but still strip the noisy general-news exclusions above.
+ * Country reports allow any operational SECURITY record that mentions the
+ * country context. They strip the shared general-news exclusions above and,
+ * because a country report is a security product, also drop economic / market /
+ * PR / sports records that carry no security signal of their own.
  */
 export function isCountryRelevant(i: RelevanceInput): boolean {
   const text = haystack(i);
   for (const re of EXCLUDE_PHRASES) {
     if (re.test(text)) return false;
+  }
+  // Drop non-security economic / market / PR / sports noise UNLESS the record
+  // also carries a genuine security signal.
+  if (!COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    if (COUNTRY_ECONOMIC_NOISE_RE.test(text)) return false;
+    if (COUNTRY_SPORTS_NOISE_RE.test(text)) return false;
   }
   return true;
 }

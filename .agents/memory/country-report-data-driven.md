@@ -149,3 +149,49 @@ field on `CountryPdfExtras` + `drawCoverageBanner` for logic parity; it is not
 exercised by the country path at runtime but keep it in sync. Brand: banner uses
 POLAR border / ELECTRIC left accent / NAVY title / DUSK body — NO red (reserved
 for the Extreme tier only).
+
+# Country relevance gate drops economic/sports noise unless security signal present
+
+`isCountryRelevant` (in `@workspace/relevance` `topicRelevance.ts`) is the gate
+for ALL country-report surfaces (`countryReportLayers`, `countryFastFacts`,
+`draftReportProse`) and is frontend-only — no ingest/persistence/backfill. After
+the global `EXCLUDE_PHRASES` check it applies a security-product bias: if the text
+carries NO security-lexicon signal (`COUNTRY_SECURITY_SIGNAL_RE`) AND it matches
+economic noise (`COUNTRY_ECONOMIC_NOISE_RE`: subsidy/tariff/levy/share-price/
+earnings/applauds…) OR sports noise (`COUNTRY_SPORTS_NOISE_RE`: scorelines/FC/PSL/
+rugby…), drop it.
+
+**Why:** A PNG country SECURITY report led with an "Other fuel incident" that was
+actually a fuel-SUBSIDY story — economic noise. Country reports aggregate every
+topic, and PNG crime records live under topic `protests` (NOT `flashpoint`), so we
+cannot just apply `isTopicRelevant("protests")` (it would drop legitimate crime).
+The looser security-signal keep-gate is the right tool.
+
+**How to apply:** The "keep if any security signal" guard is load-bearing — it
+prevents over-filtering mixed stories (a subsidy protest that turns violent stays).
+Bias is intentionally toward UNDER-filtering: a metaphorical "raid" in a rugby
+story false-keeps (acceptable noise), but a genuine armed-robbery/hijack/IED/
+protest/march is never dropped. If you widen the economic/sports lexicons, re-check
+they don't strip a record that also names real security context.
+
+# Empty-window country map centres on the country centroid, not the world
+
+`CountryReportMap` takes a `countryName` prop (passed `effective.name` from
+`CountryReport.tsx`). When `plottable.length === 0` (no record in the active window
+has lat/long) the empty-state `setView` resolves a per-country centroid/zoom from a
+local `COUNTRY_VIEW` table (`resolveCountryView`) instead of the old world view
+`setView([0,120], 2)`. `countryName` must be in the effect deps or centering goes
+stale on slug change.
+
+**Why:** When the only window record had no coordinates (e.g. the fuel-subsidy
+story before it was filtered) the map fell back to a WORLD view — useless for a
+country report. Two fixes compound: the relevance gate removes the no-coord noise
+(so real records with coords drive `fitBounds`), AND this centroid fallback covers
+the genuinely-empty window.
+
+**Gotcha:** `COUNTRY_VIEW` is a small local table (PNG/png, papua, west papua) —
+fine because only two country reports exist (slugs `papua`, `papua-new-guinea`).
+Any new country report needs an entry or it reverts to the world fallback. The
+canonical centroids live in `lib/ingest/src/geocode.ts` `COUNTRY_CENTROIDS`; if
+this ever needs to scale, promote to one shared country-view module rather than
+growing the local table.
