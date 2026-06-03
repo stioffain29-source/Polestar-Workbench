@@ -78,6 +78,19 @@ async function withIngestLock<T>(
 ): Promise<{ ran: true; value: T } | { ran: false; reason: "locked" }> {
   const client = await pool.connect();
   let locked = false;
+  // The lock client is checked OUT of the pool and held mostly-idle for the
+  // whole (multi-minute) ingest, so pool.on("error") does NOT cover it. If the
+  // backend terminates this connection mid-run ("terminating connection due to
+  // administrator command", failover, idle timeout) the Client emits 'error';
+  // with no listener that is an uncaught exception that crashes the process.
+  // Attach a listener so it stays contained: the in-flight query rejects and
+  // propagates to the caller's try/catch, and we skip the unlock on a dead
+  // connection (Postgres already released the session lock when it dropped).
+  let clientBroken = false;
+  client.on("error", (err) => {
+    clientBroken = true;
+    logger.error({ err }, "ingest lock connection error (terminated mid-run)");
+  });
   try {
     const lockRes = await client.query<{ locked: boolean }>(
       "SELECT pg_try_advisory_lock($1) AS locked",
@@ -88,17 +101,22 @@ async function withIngestLock<T>(
     const value = await fn();
     return { ran: true, value };
   } finally {
-    if (locked) {
+    if (locked && !clientBroken) {
       try {
         await client.query("SELECT pg_advisory_unlock($1)", [INGEST_LOCK_KEY]);
       } catch (unlockErr) {
+        // Unlock failing usually means the connection broke between the run and
+        // here — treat it as broken so we destroy rather than recycle it.
+        clientBroken = true;
         logger.error(
           { err: unlockErr },
           "failed to release ingest advisory lock",
         );
       }
     }
-    client.release();
+    // release(true) destroys a broken connection instead of returning it to the
+    // pool, so a poisoned client is never handed to the next caller.
+    client.release(clientBroken ? true : undefined);
   }
 }
 
