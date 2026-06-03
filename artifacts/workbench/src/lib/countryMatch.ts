@@ -90,6 +90,79 @@ export function isIndonesianWestPapuaContext(
   return WEST_PAPUA_CONTEXT_RE.test(t) && !PNG_CONTEXT_RE.test(t);
 }
 
+// Distant foreign countries / nationalities / conflict theatres. When one of
+// these dominates a record's TITLE the article is about that country, not the
+// report's. Indonesia / West Papua are deliberately ABSENT — they are handled
+// by the dedicated cross-border West Papua guard above.
+const FOREIGN_TITLE_COUNTRY_RE =
+  /\b(myanmar|burma|burmese|thai|thailand|vietnam|vietnamese|cambodia|cambodian|laos|\blao\b|china|chinese|\bindia\b|indian|philippine|philippines|filipino|malaysia|malaysian|brunei|bangladesh|pakistan|pakistani|nepal|sri lanka|\bjapan\b|japanese|korea|korean|taiwan|hong kong|ukraine|russia|russian|israel|israeli|gaza|\biran\b|iranian|iraq|syria|syrian|afghanistan|yemen|lebanon|sudan|nigeria|ethiopia|somalia|venezuela|haiti)\b/i;
+
+// STRICT Papua New Guinea markers — proper nouns unlikely to appear as a
+// substring of foreign place names. Deliberately EXCLUDES short / ambiguous
+// city tokens like "lae" (which matches inside "Thicha Lae camp", the exact
+// geocoder mis-tag that wrongly filed a Myanmar story under PNG).
+const PNG_STRICT_LOCAL_RE =
+  /\b(papua new guinea|png|port moresby|bougainville|pngdf|rpngc|marape|national capital district)\b/i;
+
+// STRICT Indonesian Papua markers (province capitals and proper nouns).
+const PAPUA_STRICT_LOCAL_RE =
+  /\b(west papua|papua barat|jayapura|biak|wamena|manokwari|sorong|merauke|nabire|timika|fakfak)\b/i;
+
+/** Count the non-overlapping matches of a regex in a string. */
+function countMatches(re: RegExp, text: string): number {
+  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
+  return (text.match(g) ?? []).length;
+}
+
+/**
+ * True when a record is clearly about a DISTANT foreign country and is only
+ * filed under the report's country by a geocoder mis-tag — e.g. a
+ * Myanmar/Thailand conflict story filed under PNG because the city substring
+ * "Lae" matched "Thicha Lae camp". Only applies to the two existing country
+ * reports (Papua New Guinea, Indonesian Papua).
+ *
+ * A foreign nationality alone must NOT drop a genuine local incident (e.g.
+ * "Chinese investor robbed in Lae market"), so once a record is foreign-flagged
+ * we decide by SIGNAL DOMINANCE, not mere presence:
+ *   - an unambiguous STRICT local proper noun (e.g. "Port Moresby") always
+ *     rescues the record outright; otherwise
+ *   - we drop it only when distinct foreign cues OUTNUMBER local-context cues
+ *     across the narrative. The Myanmar story is saturated with foreign cues
+ *     (Myanmar, Thai, Thailand, ...) against a single stray "Lae"; the Lae
+ *     robbery has one foreign nationality against >=1 local cue, so it stays.
+ */
+export function isForeignDominantContext(
+  title: string | null | undefined,
+  fullText: string | null | undefined,
+  incidentCountry: string | null | undefined,
+  reportName: string,
+): boolean {
+  // A record is foreign-flagged when a distant country is named in its TITLE
+  // (e.g. "Myanmar clashes ... near Thai border") OR carried in its stored
+  // `country` field (e.g. "Pakistan; Papua New Guinea", where the headline
+  // never names Pakistan but the classifier tagged it).
+  const foreignFlagged =
+    FOREIGN_TITLE_COUNTRY_RE.test(title ?? "") ||
+    FOREIGN_TITLE_COUNTRY_RE.test(incidentCountry ?? "");
+  if (!foreignFlagged) return false;
+  const key = (reportName ?? "").trim().toLowerCase();
+  // Narrative only — the stored `country` field literally contains the report's
+  // own country for these mis-tags and would otherwise rescue them. The country
+  // field is folded into the FOREIGN count only (never the local count).
+  const narrative = `${title ?? ""} ${fullText ?? ""}`;
+  const foreignCount = countMatches(FOREIGN_TITLE_COUNTRY_RE, `${narrative} ${incidentCountry ?? ""}`);
+
+  if (key.includes("new guinea")) {
+    if (PNG_STRICT_LOCAL_RE.test(narrative)) return false;
+    return foreignCount > countMatches(PNG_CONTEXT_RE, narrative);
+  }
+  if (key === "papua" || key.includes("west papua")) {
+    if (PAPUA_STRICT_LOCAL_RE.test(narrative)) return false;
+    return foreignCount > countMatches(WEST_PAPUA_CONTEXT_RE, narrative);
+  }
+  return false;
+}
+
 const PNG_TOKEN_SET = new Set(COUNTRY_GROUPS["papua new guinea"]);
 const PAPUA_TOKEN_SET = new Set(COUNTRY_GROUPS["papua"]);
 

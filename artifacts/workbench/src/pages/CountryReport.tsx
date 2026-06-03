@@ -27,6 +27,7 @@ import {
   acceptedCountryTokens,
   isIndonesianWestPapuaContext,
   isCrossBorderPapuaPng,
+  isForeignDominantContext,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
@@ -131,6 +132,13 @@ export default function CountryReport() {
         const text = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
         if (isIndonesianWestPapuaContext(text)) return false;
       }
+      // Drop geocoder mis-tags: a record whose TITLE is about a distant
+      // foreign country (e.g. "Myanmar clashes ... near Thai border") with no
+      // strict local marker was filed here only because a city substring
+      // matched (the PNG city "Lae" inside "Thicha Lae camp"). It is not a
+      // local incident regardless of its stored country tag.
+      const fullText = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
+      if (isForeignDominantContext(i.title, fullText, i.country, name)) return false;
       return true;
     });
   }, [incidentsData, country]);

@@ -621,8 +621,13 @@ export function isTopicRelevant(topic: string, i: RelevanceInput): boolean {
 // action, crime, unrest, disruption. Any record with one of these is kept even
 // if it also mentions an economic or sporting word (e.g. a fuel-subsidy protest
 // that turned violent, or a riot at a stadium).
+// NOTE on "march": the protest verb forms "marchers / marching / marched" are
+// kept unconditionally, but the NOUN "march" is only counted in a protest
+// context — "protest/subsidy/wage/... march" or "march on/against/...". Bare
+// "march" is excluded because it matches the calendar month ("late March"),
+// the homonym that leaked non-events (e.g. a corporate-IT story) into the gate.
 const COUNTRY_SECURITY_SIGNAL_RE =
-  /\b(attack|attacked|armed|gunm[ae]n|robber|robbery|robbed|hold[- ]?up|hijack|kidnap|abduct|shoot|shot|shooting|gunfire|gunshot|killed|dead|fatal|wounded|injur|casualt|clash|fighting|firefight|gun battle|riot|unrest|protest|demonstration|rally|march|picket|walkout|strike action|blockade|roadblock|ambush|raid|arson|loot|explosion|blast|bomb|ied|grenade|militant|insurgent|rebel|separatist|tpnpb|opm|displaced|evacuat|curfew|crackdown|violence|violent|assault|stab|machete|bush knife|rascal|raskol|theft|stolen|burglary|break[- ]?in|seiz|piracy|pirate|extort|arrest|detain|sabotage)\b/i;
+  /\b(attack|attacked|armed|gunm[ae]n|robber|robbery|robbed|hold[- ]?up|hijack|kidnap|abduct|shoot|shot|shooting|gunfire|gunshot|killed|dead|fatal|wounded|injur|casualt|clash|fighting|firefight|gun battle|riot|unrest|protest|demonstration|rally|marchers?|march(?:ing|ed)|(?:protest|street|mass|peaceful|wage|subsidy|fuel|workers'?|hunger|silent) march|march (?:on|against|over|through|to|for)|picket|walkout|strike action|blockade|roadblock|ambush|raid|arson|loot|explosion|blast|bomb|ied|grenade|militant|insurgent|rebel|separatist|tpnpb|opm|displaced|evacuat|curfew|crackdown|violence|violent|assault|stab|machete|bush knife|rascal|raskol|theft|stolen|burglary|break[- ]?in|seiz|piracy|pirate|extort|arrest|detain|sabotage)\b/i;
 
 // Non-security record classes that must never DRIVE a country security report
 // when the same record carries no security signal: fiscal/economic policy,
@@ -631,10 +636,46 @@ const COUNTRY_SECURITY_SIGNAL_RE =
 // stripped only general-news noise (e.g. a "fuel subsidy" policy story or a
 // football scoreline appeared as the country's lead security incident).
 const COUNTRY_ECONOMIC_NOISE_RE =
-  /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?)\b/i;
+  /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?|completes? (the )?migration|migrat(ion|es|ed|ing) (of|to) (its )?[a-z]+ (system|platform)|system (migration|upgrade)|prepaid metering|go[- ]live|new (it|billing|payment|digital) platform)\b/i;
 
 const COUNTRY_SPORTS_NOISE_RE =
-  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|super league|rugby|netball|cricket|grand final|test match|cross[- ]code coup)\b/i;
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|rugby|netball|cricket|grand final|test match|cross[- ]code coup)\b/i;
+
+// HARD (unambiguous) security signals. Deliberately a STRICT subset of
+// COUNTRY_SECURITY_SIGNAL_RE: it omits every word that routinely appears in a
+// SPORTING / match-report sense, so a football article can never rescue itself
+// from the sports-noise drop by carrying one. Omitted on purpose:
+//   - "clash" (a "Round 1 clash"), "raid", "fighting", "march", "rally",
+//     "victory" — generic match vocabulary;
+//   - "attack" / "attacked" — matches "counter-attack" and "attacking play"
+//     (\battack\b hits "counter-attack" because the hyphen is a word boundary);
+//   - "shoot" / "shot" / "shooting" — "shot on goal", "shooting boots";
+//   - "killed" / "dead" — "killed off the game", "dead-ball", "dead rubber";
+//   - "injur" — "injury time", "injured player";
+//   - "assault" — "assault on goal", "aerial assault";
+//   - "seiz" — "seized possession / the initiative";
+//   - "armed" / "violent" / "violence" — "armed with a shot", "violent strike".
+// Only unambiguous violent-crime / terror / unrest words that essentially never
+// appear in a routine match report remain in the base set; the DISAMBIGUATED
+// patterns that follow it recover genuine violence at a sporting venue
+// ("armed attack at football club leaves two dead") while still rejecting the
+// match idioms that abuse the same words ("counter-attack", "killed off the
+// game", "dead-ball"). The economic branch still uses the full (soft) lexicon
+// so a genuine "fuel-subsidy protest/march" is still kept.
+const COUNTRY_HARD_SECURITY_RE = new RegExp(
+  [
+    // Unambiguous violent-crime / terror / unrest — never match-report idioms.
+    String.raw`\b(?:gunm[ae]n|gunfire|gunshot|robber|robbery|robbed|hold[- ]?up|hijack|kidnap|abduct|wounded|fatal|casualt|firefight|gun battle|ambush|arson|explosion|bomb|bombing|ied|grenade|militant|insurgent|rebel|separatist|tpnpb|opm|displaced|evacuat|curfew|crackdown|stab|stabbed|stabbing|machete|bush knife|rascal|raskol|theft|burglary|loot|piracy|pirate|extort|sabotage|riot|unrest|tear gas|stampede)\b`,
+    // Weapon/actor-prefixed "attack" — recovers real venue violence while still
+    // excluding "counter-attack" and "attacking play".
+    String.raw`\b(?:armed|gun|knife|bomb|grenade|machete|terror|terrorist|militant|rebel|insurgent|deadly|fatal|violent) attack`,
+    // Deaths with violent framing, excluding sports idioms.
+    String.raw`\bkilled(?! off| the (?:game|match|contest|tie|fixture))`,
+    String.raw`\bdead(?![- ](?:ball|rubber|heat|lock))`,
+    String.raw`\b(?:shot dead|shot and (?:killed|wounded)|opened fire|gunned down)\b`,
+  ].join("|"),
+  "i",
+);
 
 /**
  * Country reports allow any operational SECURITY record that mentions the
@@ -647,11 +688,17 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   for (const re of EXCLUDE_PHRASES) {
     if (re.test(text)) return false;
   }
-  // Drop non-security economic / market / PR / sports noise UNLESS the record
-  // also carries a genuine security signal.
-  if (!COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
-    if (COUNTRY_ECONOMIC_NOISE_RE.test(text)) return false;
-    if (COUNTRY_SPORTS_NOISE_RE.test(text)) return false;
+  // Drop non-security economic / market / PR noise UNLESS the record carries
+  // any (soft-inclusive) security signal — a fuel-subsidy protest/march stays.
+  if (COUNTRY_ECONOMIC_NOISE_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    return false;
+  }
+  // Drop SPORTS noise unless the record carries a HARD security signal. A match
+  // report routinely calls itself a "Round 1 clash"; "clash" (and "raid",
+  // "fighting", "victory") must NOT rescue a football story — only an
+  // unambiguous violence/crime word does.
+  if (COUNTRY_SPORTS_NOISE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
   }
   return true;
 }

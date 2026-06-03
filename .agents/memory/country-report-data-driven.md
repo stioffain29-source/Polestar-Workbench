@@ -197,6 +197,51 @@ fuel-subsidy story dated after the latest real incident) drags the 7-day window
 forward onto a week `buildCountryLayers` then empties — reintroducing the
 "old data read as current" / empty-cards class of bug.
 
+# Sports/foreign/IT noise leaks: the gate words collide with match idioms
+
+The country security gate has three classes of ambiguous-word collisions that
+let junk records lead a thin-reporting country report (the PNG complaint):
+
+- **Sports "counter-attack" rescue.** A football match report is sports-noise,
+  but its body said "counter-attack" and `\battack\b` matched it (the hyphen is
+  a word boundary), so the HARD-security rescue kept it. The sports-rescue set
+  (`COUNTRY_HARD_SECURITY_RE`) must hold ONLY words that never appear in routine
+  match reports. Words to keep OUT of the bare set: attack (counter-attack), shot/
+  shoot/shooting (shot on goal), killed/dead (killed off the game, dead-ball/
+  rubber), injur (injury time), assault (assault on goal), seiz (seized
+  possession), armed/violent (armed with a shot). Recover REAL venue violence with
+  DISAMBIGUATED patterns instead: weapon/actor-prefixed `(armed|gun|bomb|…) attack`,
+  `killed(?! off| the game…)`, `dead(?![- ](ball|rubber|…))`, `shot dead|opened fire`.
+
+- **"march" the month vs the protest.** Bare `march` in the soft security lexicon
+  (`COUNTRY_SECURITY_SIGNAL_RE`) matched "late **March**" and rescued a corporate-IT
+  non-event ("PPL completes migration of Easipay system") from the economic-noise
+  drop. Keep verb forms `marchers?/marching/marched` unconditionally, but only
+  count the NOUN in protest context: `(protest|subsidy|wage|…) march` or
+  `march (on|against|over|through|to|for)`. (Same month-homonym noted in
+  `dashboard-relevance-gate.md`.)
+
+- **Foreign theatre mis-tagged to the country.** A Myanmar/Thai-border story was
+  geocoded to PNG (city substring "Lae" matched "Thicha **Lae** camp") and carried
+  a stray "Papua New Guinea" country tag. `isForeignDominantContext`
+  (`countryMatch.ts`) flags foreign cues in the TITLE **or** the `country` field,
+  then decides by SIGNAL DOMINANCE not presence: a STRICT local proper noun
+  (Port Moresby/Bougainville/…) rescues outright; else drop only when distinct
+  foreign cues OUTNUMBER local-context cues across the narrative. **Why counting:**
+  presence alone fails both ways — "Lae" appears in the Myanmar camp name (would
+  wrongly rescue it) AND a real "Chinese investor robbed in **Lae**" has a foreign
+  nationality (would wrongly drop it). The country field is folded into the FOREIGN
+  count only, never the local count (it literally holds the report's own country).
+
+**Why these are durable:** each is a word that is legitimately security in one
+register and innocuous in another; presence tests can't separate them. Verify any
+change to these regexes by REPLAYING over the real stored rows, not a hand-written
+fixture — the football survived because the test fixture omitted "counter-attack".
+**How to apply:** prefer disambiguation (prefix/lookahead/context word) or cue
+counting over adding/removing a bare token; a bare token swap usually just moves
+the false-positive to a false-negative (the architect flagged exactly that on the
+first pass — over-tightening dropped real "armed attack"/protest-march/Lae records).
+
 # Empty-window country map centres on the country centroid, not the world
 
 `CountryReportMap` takes a `countryName` prop (passed `effective.name` from
