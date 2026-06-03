@@ -174,6 +174,29 @@ story false-keeps (acceptable noise), but a genuine armed-robbery/hijack/IED/
 protest/march is never dropped. If you widen the economic/sports lexicons, re-check
 they don't strip a record that also names real security context.
 
+**The frontend gate alone is INSUFFICIENT — the country page must fetch RAW.**
+`isCountryRelevant` only ever sees what the API returns. The `/incidents` API
+pre-filters by the PERSISTED `relevance_status` column (the general TOPIC
+classifier) unless `?includeIrrelevant=true`. For a SECURITY country aggregate
+that persisted verdict is backwards: a fuel-subsidy story (topic=fuel) persists
+`relevant` and passes, while an armed-robbery story (topic=protests) persists
+`irrelevant` and is dropped BEFORE `isCountryRelevant` can keep it. So the
+country page fetches with `includeIrrelevant: true` (passed via `as never` cast —
+the key is intentionally not in the typed `ListIncidentsParams`; the Orval URL
+builder serializes any key, the server reads it raw in `relevanceFilter.ts`).
+The page then relies SOLELY on its own `isCountryRelevant` gate. This also makes
+dev and prod identical regardless of how each DB happened to persist relevance —
+the symptom that "fixed in dev, unchanged in prod after republish" pointed
+straight here.
+
+**Clamp the issue date off the country-RELEVANT records, not the raw matched set.**
+`filterCountryRelevant` (exported from `countryReportLayers.ts`, the single
+definition reused by `buildCountryLayers`) is applied before
+`clampIssueDateToLatestRecord`. Otherwise a newer IRRELEVANT record (e.g. a
+fuel-subsidy story dated after the latest real incident) drags the 7-day window
+forward onto a week `buildCountryLayers` then empties — reintroducing the
+"old data read as current" / empty-cards class of bug.
+
 # Empty-window country map centres on the country centroid, not the world
 
 `CountryReportMap` takes a `countryName` prop (passed `effective.name` from

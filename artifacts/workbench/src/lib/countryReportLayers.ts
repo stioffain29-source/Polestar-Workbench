@@ -39,16 +39,17 @@ export interface WatchlistRow {
 }
 
 /**
- * Partition a pre-fetched incident set (typically the last 90 days)
- * into current / 30 / 90 day buckets. The input is filtered to
- * country-relevant records first so live blogs and obituaries do not
- * inflate the lookback counts.
+ * Filter a country-matched incident set down to the records that are
+ * relevant to a SECURITY country aggregate (drops economic/PR/sports
+ * noise via `isCountryRelevant`). This is the single relevance gate for
+ * the country report — used both to build the lookback layers AND to
+ * date the report, so a newer IRRELEVANT record (e.g. a fuel-subsidy
+ * story) can never drag the issue date onto an otherwise empty window.
  */
-export function buildCountryLayers(
-  incidents: CountryFastFactsIncident[],
-  issueDate: string,
-): CountryLayerBuckets {
-  const relevant = incidents.filter((i) =>
+export function filterCountryRelevant<T extends CountryFastFactsIncident>(
+  incidents: T[],
+): T[] {
+  return incidents.filter((i) =>
     isCountryRelevant({
       topic: i.topic,
       title: i.title,
@@ -58,6 +59,19 @@ export function buildCountryLayers(
       location: i.location ?? null,
     }),
   );
+}
+
+/**
+ * Partition a pre-fetched incident set (typically the last 90 days)
+ * into current / 30 / 90 day buckets. The input is filtered to
+ * country-relevant records first so live blogs and obituaries do not
+ * inflate the lookback counts.
+ */
+export function buildCountryLayers(
+  incidents: CountryFastFactsIncident[],
+  issueDate: string,
+): CountryLayerBuckets {
+  const relevant = filterCountryRelevant(incidents);
 
   const win = resolveReportWindow("country", issueDate);
   const end = win.end;

@@ -31,7 +31,7 @@ import {
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
+import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 
 // Brand palette (lowercase per brand spec).
@@ -93,9 +93,21 @@ export default function CountryReport() {
   // matching misses compound tags and cannot distinguish Indonesian
   // Papua from Papua New Guinea. `incidentMatchesCountry` does token-
   // exact group matching (see countryMatch.ts).
-  const { data: incidentsData } = useListIncidents(country ? { days: 90 } : {}, {
-    query: { enabled: !!country },
-  } as never);
+  //
+  // includeIrrelevant=true: country reports MUST NOT inherit the server's
+  // persisted relevance verdict. That verdict is the general TOPIC classifier
+  // (e.g. it keeps a fuel-subsidy story as "relevant to fuel" and drops an
+  // armed-robbery story as "irrelevant to protests"), which is exactly
+  // backwards for a SECURITY country aggregate. We fetch raw and let this
+  // page's own `isCountryRelevant` gate (applied in buildCountryLayers) be the
+  // single source of truth, so the report is self-consistent and identical in
+  // dev and prod regardless of how each DB persisted relevance.
+  const { data: incidentsData } = useListIncidents(
+    country ? ({ days: 90, includeIrrelevant: true } as never) : {},
+    {
+      query: { enabled: !!country },
+    } as never,
+  );
   // Source health feeds the coverage-status determination for an empty
   // weekly window (always a coverage-problem; the detail explains which).
   // Gate the banner only
@@ -147,13 +159,22 @@ export default function CountryReport() {
   // Clamp the issue date back to the country's newest incident so the headline
   // 7-day window sits on real records instead of an empty current week (which
   // previously forced a 30/90-day fallback that read old data as current).
+  // Clamp the issue date off the country-RELEVANT records only. If we
+  // clamped off the raw country-matched set, a newer irrelevant record
+  // (e.g. a fuel-subsidy story dated after the latest security incident)
+  // would drag the window forward onto a week that buildCountryLayers
+  // then empties — reintroducing the "old data read as current" bug.
+  const relevantIncidents = useMemo(
+    () => filterCountryRelevant(incidents as CountryFastFactsIncident[]),
+    [incidents],
+  );
   const issueDate = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return clampIssueDateToLatestRecord(
       today,
-      (incidents ?? []) as { occurredAt: string; topic?: string }[],
+      relevantIncidents as { occurredAt: string; topic?: string }[],
     );
-  }, [incidents]);
+  }, [relevantIncidents]);
 
   // Country baseline + lookback layers. The baseline is editorial
   // reference content that does not depend on the incident feed; the
