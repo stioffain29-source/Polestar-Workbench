@@ -101,7 +101,25 @@ const FLASHPOINT_DENY: RegExp[] = [
   /\bcelebrity\b/i,
   /\bentertainment news\b/i,
   /\brecipe\b/i,
+  // TV / documentary / trailer framing (e.g. "Tribal Conflict In PNG |
+  // Vinnie Jones' Toughest Cops (Full Episode)") — not a live incident.
+  /\b(full episode|toughest cops|docuseries|tv series|reality (show|series)|episode \d)\b/i,
+  // YouTube-style video titles carry an 11-char video id in parentheses
+  // (e.g. "The Leafs Are Ready To Strike... Papua New Guinea (vFetqxZnwf)
+  // - Mshal"). These are channel uploads, not incident reporting.
+  /\([0-9A-Za-z_-]{11}\)/,
 ];
+
+// Pacific (PNG / West Papua) civilian crime & communal-violence cues.
+// PNG's security signal is overwhelmingly violent CRIME (armed robbery,
+// carjacking, raskol gangs, tribal fighting), which carries none of the
+// protest/unrest cues in FLASHPOINT_REQUIRED and was therefore rejected.
+// These cues are accepted ONLY when the resolved country is Pacific, so the
+// global APAC feed set keeps its protest-only discipline (no worldwide
+// routine-crime noise). Kinetic armed conflict is still excluded upstream
+// by FLASHPOINT_DENY, which runs first.
+const PACIFIC_CRIME: RegExp =
+  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?rape|shot dead|opened fire|gun(?:point|fire)|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|payback (?:killing|attack)|sorcery[- ]?accusation)\b/i;
 
 // Country aliases for in-text matching. Restricted to the 14 APAC
 // targets the Flashpoint Data Coverage Audit calls out, plus Myanmar
@@ -169,8 +187,6 @@ function classify(title: string, summary: string): {
   for (const re of FLASHPOINT_DENY) {
     if (re.test(hay)) return { kept: false, reason: `deny:${re.source.slice(0, 30)}`, country: null };
   }
-  const allowHit = FLASHPOINT_REQUIRED.find((re) => re.test(hay));
-  if (!allowHit) return { kept: false, reason: "no-flashpoint-cue", country: null };
 
   // Country must appear in TITLE or SUMMARY (broader than cargo-watch
   // because Flashpoint headlines often omit the country, e.g.
@@ -182,9 +198,25 @@ function classify(title: string, summary: string): {
     const m = COUNTRY_ALIASES.find((c) => c.aliases.some((a) => hasWord(hay, a)));
     country = m ? m.canonical : null;
   }
-  if (!country) return { kept: false, reason: "no-apac-country", country: null };
 
-  return { kept: true, reason: `allow:${allowHit.source.slice(0, 30)}`, country };
+  const allowHit = FLASHPOINT_REQUIRED.find((re) => re.test(hay));
+  if (allowHit) {
+    if (!country) return { kept: false, reason: "no-apac-country", country: null };
+    return { kept: true, reason: `allow:${allowHit.source.slice(0, 30)}`, country };
+  }
+
+  // No protest/unrest cue. Accept ONLY Pacific civilian crime & communal
+  // violence (PNG's dominant security signal); every other country still
+  // requires a FLASHPOINT_REQUIRED cue so the global feed set stays clean.
+  const isPacific =
+    country === "Papua New Guinea" ||
+    country === "West Papua" ||
+    country === "West Papua; Papua New Guinea";
+  if (isPacific && PACIFIC_CRIME.test(hay)) {
+    return { kept: true, reason: "allow:pacific-crime", country };
+  }
+
+  return { kept: false, reason: country ? "no-flashpoint-cue" : "no-apac-country", country: null };
 }
 
 function dedupeKey(title: string, when: Date, country: string): string {

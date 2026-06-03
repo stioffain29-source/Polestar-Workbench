@@ -35,6 +35,12 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "Google News — Philippines (Civil Unrest)",   url: "https://news.google.com/rss/search?q=%22Philippines%22+OR+%22Manila%22+protest+OR+rally+OR+strike&hl=en-PH&gl=PH&ceid=PH:en", sourceType: "rss", reliability: 3, notes: "Owner: PH desk. Country and Manila civil unrest aggregator." },
   { name: "Google News — Japan (Civil Unrest)",         url: "https://news.google.com/rss/search?q=%22Japan%22+OR+%22Tokyo%22+protest+OR+rally+OR+demonstration&hl=en-JP&gl=JP&ceid=JP:en", sourceType: "rss", reliability: 3, notes: "Owner: JP desk. Country and Tokyo civil unrest aggregator." },
   { name: "Google News — Nepal (Civil Unrest)",         url: "https://news.google.com/rss/search?q=%22Nepal%22+OR+%22Kathmandu%22+protest+OR+strike+OR+rally&hl=en-NP&gl=NP&ceid=NP:en",   sourceType: "rss", reliability: 3, notes: "Owner: South Asia desk. Country and Kathmandu civil unrest aggregator." },
+  // when:14d constrains Google News to the last 14 days. Without it Google
+  // returns a relevance-sorted mix spanning years, so genuine PNG incidents
+  // arrive but never fall inside the report's rolling 7-day window. 14d (not
+  // 7d) gives the scheduler a buffer between runs.
+  { name: "Google News — Papua New Guinea (Crime & Security)", url: "https://news.google.com/rss/search?q=%22Papua+New+Guinea%22+(robbery+OR+carjacking+OR+raskol+OR+%22tribal+fight%22+OR+ambush+OR+stabbed+OR+%22shot+dead%22+OR+kidnap)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG violent-crime & communal-violence aggregator (armed robbery, carjacking, raskol gangs, tribal fighting). Last 14 days." },
+  { name: "Google News — Papua New Guinea (Civil Unrest)",    url: "https://news.google.com/rss/search?q=%22Papua+New+Guinea%22+(protest+OR+riot+OR+strike+OR+rally+OR+unrest+OR+looting+OR+roadblock)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG country-wide civil unrest aggregator. Last 14 days." },
   // Pacific desk — Papua New Guinea and Indonesian West Papua wires. These
   // are the ONLY collection sources that feed the PNG and Papua country
   // reports; without them those reports have no live data on this
