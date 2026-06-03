@@ -151,7 +151,7 @@ export function createCtx(header: HeaderOpts): Ctx {
   const H = pdf.internal.pageSize.getHeight();
   const MX = 40;
   // TOP leaves clearance under the gradient header; BOTTOM clears the Polar footer.
-  const TOP = HEADER_BAND_H + 22;
+  const TOP = HEADER_BAND_H + 36;
   const BOTTOM = FOOTER_BAND_H + 12;
   const ctx: Ctx = {
     pdf,
@@ -220,16 +220,53 @@ export function beginBodyPages(ctx: Ctx) {
  */
 export function drawDataAsOf(ctx: Ctx, line: string) {
   const { pdf, MX, CW } = ctx;
-  const padX = 8;
-  const boxH = 18;
+  const padX = 14;
+  const boxH = 26;
   setFill(pdf, "#f5f5f7");
   setStroke(pdf, POLAR);
   pdf.setLineWidth(0.6);
   pdf.rect(MX, ctx.y, CW, boxH, "FD");
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  pdf.text(sanitize(line), MX + padX, ctx.y + boxH / 2 + 2.8);
+
+  const yText = ctx.y + boxH / 2 + 3.2;
+  let currentX = MX + padX;
+  const parts = sanitize(line).split("   |   ");
+
+  const fontSize = 7;
+  const cSpace = 1.1;
+  const textOpts = { charSpace: cSpace };
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const colonIdx = part.indexOf(": ");
+
+    if (colonIdx !== -1) {
+      const label = part.substring(0, colonIdx + 1).toUpperCase();
+      const val = part.substring(colonIdx + 1).toUpperCase();
+
+      setText(pdf, NAVY);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(fontSize);
+      pdf.text(label, currentX, yText, textOpts);
+      currentX += pdf.getTextWidth(label) + label.length * cSpace;
+
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.text(val, currentX, yText, textOpts);
+      currentX += pdf.getTextWidth(val) + val.length * cSpace;
+    } else {
+      const pUpper = part.toUpperCase();
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(fontSize);
+      pdf.text(pUpper, currentX, yText, textOpts);
+      currentX += pdf.getTextWidth(pUpper) + pUpper.length * cSpace;
+    }
+
+    if (i < parts.length - 1) {
+      currentX += 28;
+    }
+  }
+
   ctx.y += boxH + 12;
   setText(pdf, DUSK);
   setFill(pdf, NAVY);
@@ -248,21 +285,31 @@ export function ensureSpace(ctx: Ctx, h: number) {
 export function drawSectionHeading(ctx: Ctx, title: string) {
   // Reserve enough vertical room for the heading itself plus a couple of
   // lines of body so we never leave an orphan heading at the page foot.
-  ensureSpace(ctx, 64);
+  ensureSpace(ctx, 70);
   // Breathing room above the heading when it follows other content on the
-  // same page — prevents the previous section colliding with this one.
-  if (ctx.y > ctx.TOP + 4) ctx.y += 10;
+  // same page — reduced to decrease excessive gaps between sections.
+  if (ctx.y > ctx.TOP + 4) ctx.y += 20;
   const { pdf, MX, CW } = ctx;
   setText(pdf, NAVY);
   setRoboto(pdf, "bold");
-  pdf.setFontSize(12);
+  pdf.setFontSize(14);
+  pdf.text(sanitize(title.toUpperCase()), MX, ctx.y);
+  ctx.y += 12;
+  // Thick blue divider line under the heading.
+  setStroke(pdf, ELECTRIC);
+  pdf.setLineWidth(1.5);
+  pdf.line(MX, ctx.y, MX + CW, ctx.y);
+  ctx.y += 18;
+}
+
+export function drawSubtitle(ctx: Ctx, title: string) {
+  if (ctx.y > ctx.TOP + 4) ctx.y += 10;
+  const { pdf, MX } = ctx;
+  setText(pdf, DUSK);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(9);
   pdf.text(sanitize(title.toUpperCase()), MX, ctx.y);
   ctx.y += 6;
-  // Thin blue divider line under the heading.
-  setStroke(pdf, ELECTRIC);
-  pdf.setLineWidth(0.6);
-  pdf.line(MX, ctx.y, MX + CW, ctx.y);
-  ctx.y += 14;
 }
 
 /**
@@ -275,9 +322,9 @@ export function drawSectionHeading(ctx: Ctx, title: string) {
  */
 export function drawSectionWithProse(ctx: Ctx, title: string, body: string) {
   const { pdf, CW } = ctx;
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(10);
-  const lineH = 14;
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
+  const lineH = 17;
   const paragraphs = sanitize(body)
     .split(/\n+/)
     .map((p) => p.trim())
@@ -287,13 +334,9 @@ export function drawSectionWithProse(ctx: Ctx, title: string, body: string) {
     return;
   }
   const firstParaLines: string[] = pdf.splitTextToSize(paragraphs[0], CW);
-  // Heading block ≈ 6 (text) + 14 (gap to body) + small lead-in.
-  // The body block we want to keep together = first paragraph lines.
-  const headingBlockH = 6 + 14 + 8;
-  const firstParaH = firstParaLines.length * lineH + 6;
-  // Match the lead-in spacing drawSectionHeading adds when it is not
-  // at the top of the page (10pt). Conservative: always include it.
-  const need = headingBlockH + firstParaH + 10;
+  const headingBlockH = 14 + 14 + 8 + 16;
+  const firstParaH = firstParaLines.length * lineH + 10;
+  const need = headingBlockH + firstParaH + 14;
   if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
   drawSectionHeading(ctx, title);
   renderProse(ctx, body);
@@ -301,35 +344,34 @@ export function drawSectionWithProse(ctx: Ctx, title: string, body: string) {
 
 export function renderProse(ctx: Ctx, body: string) {
   const { pdf, MX, CW } = ctx;
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(10);
-  setText(pdf, DUSK);
-  const lineH = 14;
+  const applyProseStyle = () => {
+    setRoboto(pdf, "light");
+    pdf.setFontSize(11);
+    setText(pdf, DUSK);
+  };
+  applyProseStyle();
+  const lineH = 17;
+  // Gap between paragraphs — matches the <p> margin-bottom in the preview.
+  const paraGap = 14;
   const paragraphs = sanitize(body)
     .split(/\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
   for (const p of paragraphs) {
     const lines: string[] = pdf.splitTextToSize(p, CW);
-    const paraH = lines.length * lineH + 6;
+    const paraH = lines.length * lineH + paraGap;
     const available = ctx.H - ctx.BOTTOM - ctx.y;
     const fitsOnNewPage = paraH <= ctx.H - ctx.TOP - ctx.BOTTOM;
     if (paraH > available && fitsOnNewPage) newPage(ctx);
-    if (!fitsOnNewPage) {
-      for (const ln of lines) {
-        ensureSpace(ctx, lineH);
-        pdf.text(ln, MX, ctx.y + 10);
-        ctx.y += lineH;
-      }
-    } else {
-      for (const ln of lines) {
-        pdf.text(ln, MX, ctx.y + 10);
-        ctx.y += lineH;
-      }
+    applyProseStyle();
+    for (const ln of lines) {
+      ensureSpace(ctx, lineH);
+      pdf.text(ln, MX, ctx.y + 11);
+      ctx.y += lineH;
     }
-    ctx.y += 6;
+    ctx.y += paraGap;
   }
-  ctx.y += 6;
+  ctx.y += 4;
 }
 
 export interface KpiCardData {
@@ -348,93 +390,142 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
   if (cards.length === 0) return;
   const { pdf, MX, CW } = ctx;
   const cols = 3;
-  const gap = 10;
+  const gap = 8;
   const cardW = (CW - gap * (cols - 1)) / cols;
-  const cardH = 82;
-  const rows = Math.ceil(cards.length / cols);
-  const totalH = rows * cardH + (rows - 1) * gap;
+  const STRIP_W = 3;
+  const PAD_L = STRIP_W + 8;
+  const PAD_R = 8;
+  const PAD_V = 10;
+  const innerW = cardW - PAD_L - PAD_R;
+
+  const LABEL_SIZE = 7;
+  const VALUE_SIZE = 14;
+  const NOTE_SIZE = 7.5;
+  const LABEL_H = 10;
+  const VALUE_LINE_H = 16;
+  const NOTE_LINE_H = 10;
+  const LABEL_VALUE_GAP = 3;
+  const VALUE_NOTE_GAP = 6;
+
+  function calcCardHeight(c: KpiCardData): number {
+    pdf.setFontSize(VALUE_SIZE);
+    const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), innerW);
+    const valueH = Math.min(valueLines.length, 3) * VALUE_LINE_H;
+
+    let noteH = 0;
+    if (c.note) {
+      pdf.setFontSize(NOTE_SIZE);
+      const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), innerW);
+      noteH = VALUE_NOTE_GAP + Math.min(noteLines.length, 3) * NOTE_LINE_H;
+    }
+
+    const asOfH = c.asOf ? NOTE_LINE_H + 4 : 0;
+    const srcH = c.source ? NOTE_LINE_H + 4 : 0;
+
+    return (
+      PAD_V + LABEL_H + LABEL_VALUE_GAP + valueH + noteH + asOfH + srcH + PAD_V
+    );
+  }
+
+  const cardHeights = cards.map(calcCardHeight);
+
+  // Row max heights — used for BOTH rect drawing AND row Y advancement
+  const numRows = Math.ceil(cards.length / cols);
+  const rowMaxH: number[] = [];
+  for (let r = 0; r < numRows; r++) {
+    let max = 0;
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      if (idx < cards.length) max = Math.max(max, cardHeights[idx]);
+    }
+    rowMaxH.push(max);
+  }
+
+  const totalH = rowMaxH.reduce((a, b) => a + b, 0) + (numRows - 1) * gap;
   ensureSpace(ctx, totalH);
 
   for (let i = 0; i < cards.length; i++) {
     const row = Math.floor(i / cols);
     const col = i % cols;
     const x = MX + col * (cardW + gap);
-    const yy = ctx.y + row * (cardH + gap);
+    const rowY = ctx.y + rowMaxH.slice(0, row).reduce((a, b) => a + b + gap, 0);
+
+    // ✅ rect uses rowMaxH[row] so all cards in same row are equal height
+    const drawH = rowMaxH[row];
     const c = cards[i];
+
     const sevK = c.severity ? sevKey(c.severity) : "";
     const accent = sevK && SEV_COLOR[sevK] ? SEV_COLOR[sevK] : ELECTRIC;
 
-    // Card body
+    // Card body — full row height
     setFill(pdf, CARD_BG);
     setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.6);
-    pdf.rect(x, yy, cardW, cardH, "FD");
+    pdf.setLineWidth(0.4);
+    pdf.rect(x, rowY, cardW, drawH, "FD");
 
-    // Vertical accent strip on the left of the card (no horizontal top bar).
-    const STRIP_W = 4;
+    // Left accent strip — full row height
     setFill(pdf, accent);
-    pdf.rect(x, yy, STRIP_W, cardH, "F");
-    const PAD_L = STRIP_W + 10;
+    pdf.rect(x, rowY, STRIP_W, drawH, "F");
+
+    // Content starts at PAD_V from top — uses individual card content only
+    let curY = rowY + PAD_V;
 
     // Label
     setText(pdf, DUSK);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    pdf.text(sanitize(c.label.toUpperCase()), x + PAD_L, yy + 16);
+    pdf.setFontSize(LABEL_SIZE);
+    pdf.text(sanitize(c.label.toUpperCase()), x + PAD_L, curY + 7);
+    curY += LABEL_H + LABEL_VALUE_GAP;
 
     // Value
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(15);
-    const valueLines: string[] = pdf.splitTextToSize(
-      sanitize(c.value),
-      cardW - PAD_L - 10,
-    );
-    const baseY = yy + 36;
-    pdf.text(valueLines.slice(0, 2), x + PAD_L, baseY);
+    pdf.setFontSize(VALUE_SIZE);
+    const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), innerW);
+    const valuePrint = valueLines.slice(0, 3);
+    valuePrint.forEach((line, li) => {
+      pdf.text(line, x + PAD_L, curY + (li + 1) * VALUE_LINE_H - 2);
+    });
+    curY += valuePrint.length * VALUE_LINE_H;
 
-    // Bottom-anchored caption block. Three optional lines, bottom up,
-    // each on its own row so the jet card reads:
-    //   "As of 15 May 2026"
-    //   "US Gulf Coast kerosene-type · EIA / FRED"
-    //   "+2.5% 7d"
-    // (with the value above). Asof/source are no longer merged into
-    // one cramped subline.
-    let captionY = yy + cardH - 10;
-    if (c.asOf) {
+    // Note
+    if (c.note) {
+      curY += VALUE_NOTE_GAP;
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
-      pdf.setFontSize(6.5);
-      const asOfLines: string[] = pdf.splitTextToSize(
-        sanitize(`As of ${c.asOf}`),
-        cardW - PAD_L - 10,
-      );
-      pdf.text(asOfLines.slice(0, 1), x + PAD_L, captionY);
-      captionY -= 9;
+      pdf.setFontSize(NOTE_SIZE);
+      const noteLines: string[] = pdf.splitTextToSize(sanitize(c.note), innerW);
+      noteLines.slice(0, 3).forEach((line, li) => {
+        pdf.text(line, x + PAD_L, curY + (li + 1) * NOTE_LINE_H - 2);
+      });
+      curY += noteLines.slice(0, 3).length * NOTE_LINE_H;
     }
+
+    // Source
     if (c.source) {
+      curY += 4;
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
       pdf.setFontSize(6.5);
       const srcLines: string[] = pdf.splitTextToSize(
         sanitize(c.source),
-        cardW - PAD_L - 10,
+        innerW,
       );
-      pdf.text(srcLines.slice(0, 1), x + PAD_L, captionY);
-      captionY -= 9;
+      pdf.text(srcLines.slice(0, 1), x + PAD_L, curY + 8);
+      curY += NOTE_LINE_H;
     }
-    if (c.note) {
+
+    // AsOf
+    if (c.asOf) {
+      curY += 2;
       setText(pdf, DUSK);
       setRoboto(pdf, "regular");
-      pdf.setFontSize(7);
-      const noteLines: string[] = pdf.splitTextToSize(
-        sanitize(c.note),
-        cardW - PAD_L - 10,
-      );
-      pdf.text(noteLines.slice(0, 2), x + PAD_L, captionY);
+      pdf.setFontSize(6.5);
+      pdf.text(sanitize(`As of ${c.asOf}`), x + PAD_L, curY + 8);
     }
   }
-  ctx.y += totalH + 18;
+
+  ctx.y += totalH + 14;
 }
 
 // Disclaimer is the only closing block. It tries hard to fit on the
@@ -446,26 +537,16 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
 // measure the wrapped body at the actual text width so the block
 // estimate matches what `renderProse` will draw.
 
-// Measure the full Disclaimer block (lead-in + heading + wrapped body) at the
-// exact metrics `drawDisclaimer` will use. Callers that keep an earlier section
-// together with the disclaimer (e.g. Related Incidents) reserve this height so
-// the disclaimer is guaranteed to land on the same page rather than orphaning.
-export function measureDisclaimerHeight(ctx: Ctx): number {
+export function drawDisclaimer(ctx: Ctx) {
   const { pdf, CW } = ctx;
-  const prevSize = pdf.getFontSize();
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(10);
+  // Match renderProse setup so splitTextToSize uses the same metrics.
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
   const wrapped: string[] = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
-  pdf.setFontSize(prevSize);
   const headingBlockH = 6 + 14 + 8; // pre-heading pad + heading line + post-heading pad
   const bodyH = wrapped.length * 14 + 6 + 6; // line height matches renderProse
-  // 8pt lead-in plus a small safety margin.
-  return 8 + headingBlockH + bodyH + 4;
-}
-
-export function drawDisclaimer(ctx: Ctx) {
-  // Match renderProse setup so splitTextToSize uses the same metrics.
-  const need = measureDisclaimerHeight(ctx);
+  // 8pt lead-in (the else branch below) plus a small safety margin.
+  const need = 8 + headingBlockH + bodyH + 4;
   if (ctx.y + need > ctx.H - ctx.BOTTOM) {
     newPage(ctx);
   } else {
@@ -531,11 +612,12 @@ export function drawBulletSection(
   const bullets = parseBullets(text, maxBullets);
   if (bullets.length === 0) return;
   const { pdf, MX, CW } = ctx;
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(10);
-  const lineH = 13;
-  const bulletIndent = 12;
-  const gapBetween = 4;
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
+  const lineH = 17;
+  const bulletIndent = 14;
+  // Gap between bullet items — matches the list-item spacing in preview.
+  const gapBetween = 10;
   // Pre-measure to keep heading + first bullet together.
   const firstLines: string[] = pdf.splitTextToSize(
     bullets[0],
@@ -546,24 +628,36 @@ export function drawBulletSection(
   const need = headingBlockH + firstParaH + 10;
   if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
   drawSectionHeading(ctx, title);
-  setRoboto(pdf, "regular");
-  setText(pdf, DUSK);
-  pdf.setFontSize(10);
+
+  const applyProseStyle = () => {
+    setRoboto(pdf, "light");
+    setText(pdf, DUSK);
+    pdf.setFontSize(11);
+  };
+  applyProseStyle();
+
   for (const b of bullets) {
     const lines: string[] = pdf.splitTextToSize(b, CW - bulletIndent);
     const blockH = lines.length * lineH + gapBetween;
     // Keep a bullet together with its first line; otherwise page break first.
-    if (ctx.y + blockH > ctx.H - ctx.BOTTOM) newPage(ctx);
-    // Marker
-    pdf.text("\u2022", MX, ctx.y + 10);
-    // Body lines
-    for (let i = 0; i < lines.length; i++) {
-      pdf.text(lines[i], MX + bulletIndent, ctx.y + 10);
+    if (ctx.y + blockH > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      applyProseStyle();
+    }
+
+    // Draw the bullet — filled circle aligned to cap-height of first text line.
+    setFill(pdf, DUSK);
+    pdf.circle(MX + 4, ctx.y + 7, 1.5, "F");
+
+    for (const ln of lines) {
+      ensureSpace(ctx, lineH);
+      applyProseStyle();
+      pdf.text(ln, MX + bulletIndent, ctx.y + 11);
       ctx.y += lineH;
     }
     ctx.y += gapBetween;
   }
-  ctx.y += 4;
+  ctx.y += 6;
 }
 
 /**
@@ -591,7 +685,7 @@ export function drawFooters(
     const ty = H - FOOTER_BAND_H / 2 + 3;
     pdf.text(sanitize(POLESTAR_URL), 18, ty);
     pdf.text(sanitize(POLESTAR_EMAIL), W / 2, ty, { align: "center" });
-    pdf.text(sanitize(`Page ${p} of ${pageCount}`), W - 18, ty, {
+    pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, {
       align: "right",
     });
     // Temporary diagnostic proof line, sits just above the footer band.
@@ -635,7 +729,7 @@ export interface CoverOpts {
 }
 
 /** Cover-band geometries (points). Kept here so previews can mirror them. */
-export const COVER_TOP_BAND_H = 70;
+export const COVER_TOP_BAND_H = 46;
 export const COVER_BOTTOM_BLOCK_H = 240;
 
 export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
@@ -650,14 +744,14 @@ export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   // 1. Top gradient band (flush to top/left/right edges).
   drawBrandGradient(pdf, 0, 0, W, topH);
   try {
-    // Logo vertically centred in the top band, flush-left with 24pt inset.
-    const logoH = 26;
+    // Logo vertically centred in the top band, flush-left with 18pt inset.
+    const logoH = 22;
     pdf.addImage(
       polestarLogo,
       "PNG",
-      24,
+      18,
       (topH - logoH) / 2,
-      156,
+      132,
       logoH,
       undefined,
       "FAST",
@@ -709,23 +803,25 @@ export function drawPolestarCover(ctx: Ctx, opts: CoverOpts) {
   }
 
   // Subtitle (e.g. POLESTAR INSIGHTS).
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(12);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(15);
   pdf.text(sanitize(opts.subtitle.toUpperCase()), padL, ty + 6, {
     charSpace: 1.6,
   });
 
   // Reporting period.
   setRoboto(pdf, "regular");
-  pdf.setFontSize(11);
+  pdf.setFontSize(10);
   pdf.text(sanitize(opts.reportingPeriod.toUpperCase()), padL, ty + 28, {
     charSpace: 1.2,
   });
 
   // Website at bottom left, flush above the bottom edge.
-  setRoboto(pdf, "bold");
+  setRoboto(pdf, "regular");
   pdf.setFontSize(10);
-  pdf.text(sanitize(POLESTAR_URL), padL, H - 24, { charSpace: 1.2 });
+  pdf.text(sanitize(POLESTAR_URL.toUpperCase()), padL, H - 24, {
+    charSpace: 1.2,
+  });
 
   ctx.suppressHeader = false;
 }
