@@ -32,7 +32,7 @@ import {
 import CountryReportMap from "@/components/CountryReportMap";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
+import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 
 // Brand palette (lowercase per brand spec).
@@ -172,8 +172,11 @@ export default function CountryReport() {
   // (e.g. a fuel-subsidy story dated after the latest security incident)
   // would drag the window forward onto a week that buildCountryLayers
   // then empties — reintroducing the "old data read as current" bug.
+  // Also strip syndicated rehashes (an aggregator re-running a months-old
+  // event with a fresh publication date) so a recycled headline can't drag
+  // the issue date onto an empty current week ahead of the genuine cluster.
   const relevantIncidents = useMemo(
-    () => filterCountryRelevant(incidents as CountryFastFactsIncident[]),
+    () => dropSyndicatedRehashes(filterCountryRelevant(incidents as CountryFastFactsIncident[])),
     [incidents],
   );
   const issueDate = useMemo(() => {

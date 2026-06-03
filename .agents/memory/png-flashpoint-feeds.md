@@ -34,6 +34,22 @@ Mshal" YouTube upload) that passes BOTH isCountryRelevant (strike=security
 signal) AND isForeignDominantContext (no foreign country named). Denied at
 ingest via the 11-char parenthetical YouTube video-id pattern in FLASHPOINT_DENY.
 
+**Syndicated-rehash trap:** an aggregator (e.g. Digital Journal) re-runs a
+months/years-old event with a FRESH pubdate ("...15 killed in riots", a re-run
+of the Jan-2024 Port Moresby riots). It passes isCountryRelevant, so the
+clamp anchors the 7-day window to the fake-fresh date → empty current week,
+genuine cluster buried. Fix is ANCHOR-ONLY, never hide from display, never
+fabricate: an "event signature" = contiguous 3-word title phrases carrying a
+number or casualty word (killed/dead/wounded...); if a candidate shares one
+with a row >=45d older it is a rehash. Primary guard is at INGEST
+(`lib/ingest/src/flashpoint.ts`, rejects before insert — durable because prod
+DB holds the originals, which carry source_url so they're already in the
+existing-rows dedupe set); a softer copy (`dropSyndicatedRehashes`, >=30d) runs
+in the frontend clamp set only (CountryReport.tsx) for rehashes whose original
+is inside the 90-day fetch. Also: `buildCountryLayers` window-end must be
+`endOfDay(issueDate)` not bare midnight, or the anchor-day records (wall-clock
+times like 08:00) the clamp just landed on get re-excluded → empty again.
+
 **How to apply:** new PNG/Pacific feeds go in FLASHPOINT_REGIONAL_SOURCES in
 `artifacts/api-server/src/lib/migrations.ts` (seeded on boot, reaches prod on
 deploy; repairFlashpointSeedUrls updates existing rows' URLs). Any new Google

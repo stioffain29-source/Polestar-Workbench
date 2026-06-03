@@ -6,7 +6,7 @@
 // breakdown so the report can read against named geographies even
 // when the current window is thin.
 
-import { format, parseISO, subDays } from "date-fns";
+import { endOfDay, format, parseISO, subDays } from "date-fns";
 import { isCountryRelevant } from "./topicRelevance";
 import { acceptedCountryTokens } from "./countryMatch";
 import { resolveReportWindow } from "./reportWindow";
@@ -61,6 +61,67 @@ export function filterCountryRelevant<T extends CountryFastFactsIncident>(
   );
 }
 
+const CASUALTY_WORD = /^(killed|kills|dead|deaths?|wounded|injured|fatalit(?:y|ies)|massacred?|slain)$/;
+
+// Build the distinctive "event signature" trigrams of a headline: contiguous
+// 3-word phrases carrying BOTH a digit and a casualty word ("15 killed in",
+// "after 23 dead"). Two records sharing such a phrase are describing the SAME
+// concrete event. We require a digit (not a bare casualty word) so a generic
+// "two killed in clash" can never collide with an unrelated incident — this is
+// anchor-only logic, but precision still protects against back-dating a report.
+function eventSignatureTrigrams(title: string): Set<string> {
+  const words = title
+    .toLowerCase()
+    .replace(/\s-\s[^-]*$/, "") // drop trailing " - Source" attribution
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const out = new Set<string>();
+  for (let i = 0; i + 3 <= words.length; i++) {
+    const tri = [words[i], words[i + 1], words[i + 2]];
+    const hasDigit = tri.some((w) => /\d/.test(w));
+    const hasCasualty = tri.some((w) => CASUALTY_WORD.test(w));
+    if (hasDigit && hasCasualty) out.add(tri.join(" "));
+  }
+  return out;
+}
+
+/**
+ * Drop SYNDICATED REHASHES: aggregator items that re-report a much older
+ * event with a fresh publication date (e.g. a 2026 wire repeating the
+ * January 2024 "15 killed in riots" state-of-emergency). A record is a
+ * rehash when an OLDER record (>=30 days earlier) shares one of its
+ * distinctive event-signature trigrams.
+ *
+ * This is used ONLY to pick the report's date anchor — never to hide a
+ * record from display — so a false positive can at worst date the report
+ * one cluster earlier, never erase a genuine incident. Re-dating a stale
+ * event as this week's news would be dishonest; that is what this prevents.
+ */
+export function dropSyndicatedRehashes<
+  T extends { title: string; occurredAt: string },
+>(incidents: T[]): T[] {
+  const enriched = incidents.map((i) => ({
+    i,
+    ms: Number.isNaN(Date.parse(i.occurredAt)) ? 0 : Date.parse(i.occurredAt),
+    sig: eventSignatureTrigrams(i.title),
+  }));
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+  return enriched
+    .filter((rec) => {
+      if (rec.sig.size === 0) return true;
+      for (const other of enriched) {
+        if (other === rec) continue;
+        if (other.ms > rec.ms - THIRTY_DAYS) continue; // must be >=30d older
+        for (const phrase of rec.sig) {
+          if (other.sig.has(phrase)) return false; // rehash of an older event
+        }
+      }
+      return true;
+    })
+    .map((rec) => rec.i);
+}
+
 /**
  * Partition a pre-fetched incident set (typically the last 90 days)
  * into current / 30 / 90 day buckets. The input is filtered to
@@ -78,7 +139,11 @@ export function buildCountryLayers(
   const currentStart = win.start.getTime();
   const thirtyStart = subDays(end, 29).getTime();
   const ninetyStart = subDays(end, 89).getTime();
-  const endMs = end.getTime();
+  // The issue date marks the END of the window, so records ON that calendar
+  // day (stored with a real wall-clock time, e.g. 08:00) must be included.
+  // Using the bare midnight boundary excludes them — which silently drops the
+  // very record the issue date was clamped to, emptying an otherwise-live week.
+  const endMs = endOfDay(end).getTime();
 
   const current: CountryFastFactsIncident[] = [];
   const thirtyDay: CountryFastFactsIncident[] = [];

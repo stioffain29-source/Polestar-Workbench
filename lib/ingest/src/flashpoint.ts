@@ -104,10 +104,12 @@ const FLASHPOINT_DENY: RegExp[] = [
   // TV / documentary / trailer framing (e.g. "Tribal Conflict In PNG |
   // Vinnie Jones' Toughest Cops (Full Episode)") — not a live incident.
   /\b(full episode|toughest cops|docuseries|tv series|reality (show|series)|episode \d)\b/i,
-  // YouTube-style video titles carry an 11-char video id in parentheses
+  // YouTube-style video titles carry a random-case video id in parentheses
   // (e.g. "The Leafs Are Ready To Strike... Papua New Guinea (vFetqxZnwf)
-  // - Mshal"). These are channel uploads, not incident reporting.
-  /\([0-9A-Za-z_-]{11}\)/,
+  // - Mshale"). Matched by the lower->UPPER case transition that is the
+  // video-id signature, so normal proper nouns like "(Highlands)" or
+  // "(Bougainville)" are NOT denied. These are channel uploads, not reporting.
+  /\([A-Za-z0-9_-]{0,14}[a-z][A-Z][A-Za-z0-9_-]{0,14}\)/,
 ];
 
 // Pacific (PNG / West Papua) civilian crime & communal-violence cues.
@@ -119,7 +121,7 @@ const FLASHPOINT_DENY: RegExp[] = [
 // routine-crime noise). Kinetic armed conflict is still excluded upstream
 // by FLASHPOINT_DENY, which runs first.
 const PACIFIC_CRIME: RegExp =
-  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?rape|shot dead|opened fire|gun(?:point|fire)|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|payback (?:killing|attack)|sorcery[- ]?accusation)\b/i;
+  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?(?:rape|violence|attack)|shot dead|shooting|gunned down|opened fire|gun(?:point|fire)|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|murder(?:ed|s)?|killed in|beaten to death|mob (?:attack|violence|justice)|assault(?:ed)?|payback (?:killing|attack)|sorcery)\b/i;
 
 // Country aliases for in-text matching. Restricted to the 14 APAC
 // targets the Flashpoint Data Coverage Audit calls out, plus Myanmar
@@ -227,6 +229,42 @@ function dedupeKey(title: string, when: Date, country: string): string {
     "flashpoint",
   ].join("||");
 }
+
+const CASUALTY_WORD =
+  /^(killed|kills|dead|deaths?|wounded|injured|fatalit(?:y|ies)|massacred?|slain)$/;
+
+// Distinctive "event signature" trigrams of a headline used to recognise a
+// SYNDICATED REHASH (an aggregator re-running an old event with a fresh date).
+// We deliberately keep ONLY trigrams that carry a DIGIT *and* sit next to a
+// casualty word (e.g. "15 killed in", "after 23 dead"). A bare casualty phrase
+// ("two killed in clash") or a lone number is too generic and would risk
+// rejecting genuine recurring incidents — precision matters more than recall
+// here because a false positive permanently drops a real record at ingest.
+function eventSignatureTrigrams(title: string): Set<string> {
+  const words = title
+    .toLowerCase()
+    .replace(/\s-\s[^-]*$/, "") // drop trailing " - Source" attribution
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const out = new Set<string>();
+  for (let i = 0; i + 3 <= words.length; i++) {
+    const tri = [words[i], words[i + 1], words[i + 2]];
+    const hasDigit = tri.some((w) => /\d/.test(w));
+    const hasCasualty = tri.some((w) => CASUALTY_WORD.test(w));
+    if (hasDigit && hasCasualty) out.add(tri.join(" "));
+  }
+  return out;
+}
+
+function normCountry(c: string): string {
+  return c.trim().toLowerCase();
+}
+
+// Minimum age gap for a match to count as a syndicated rehash (an aggregator
+// re-running a months-old event with a fresh publication date) rather than
+// genuine follow-up coverage of a current event.
+const REHASH_MIN_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 
 async function topicStats(): Promise<{ totalAfter: number; latestRecord: string | null; lastUpdated: string | null }> {
   const res = await db.execute(sql`
@@ -367,16 +405,49 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
 
   const existingKeys = new Set<string>();
   const existingUrls = new Set<string>();
+  // Event-signature index of existing flashpoint rows, so a freshly-dated
+  // aggregator item that re-runs a months-old event ("15 killed in riots")
+  // can be rejected instead of poisoning the rolling window with stale news.
+  const existingSignatures: { ms: number; country: string; sig: Set<string> }[] = [];
   for (const row of existing) {
     if (row.sourceUrl) existingUrls.add(row.sourceUrl);
-    if (row.topic === "flashpoint") existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
+    if (row.topic === "flashpoint") {
+      existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
+      const sig = eventSignatureTrigrams(row.title);
+      if (sig.size > 0)
+        existingSignatures.push({ ms: row.occurredAt.getTime(), country: normCountry(row.country), sig });
+    }
   }
+
+  // A candidate is a rehash only when it shares a distinctive digit+casualty
+  // trigram with a SAME-COUNTRY row dated >=45 days earlier. The same-country
+  // constraint stops a generic casualty count from colliding across unrelated
+  // theatres; the age gap separates a genuine follow-up from a recycled item.
+  const isSyndicatedRehash = (a: Accepted): boolean => {
+    const sig = eventSignatureTrigrams(a.title);
+    if (sig.size === 0) return false;
+    const aMs = a.occurredAt.getTime();
+    const aCountry = normCountry(a.country);
+    for (const prior of existingSignatures) {
+      if (prior.country !== aCountry) continue; // same country only
+      if (prior.ms > aMs - REHASH_MIN_AGE_MS) continue; // must be >=45d older
+      for (const phrase of sig) {
+        if (prior.sig.has(phrase)) return true;
+      }
+    }
+    return false;
+  };
 
   const toInsert: Accepted[] = [];
   let dupeInDb = 0;
+  let rehashSkipped = 0;
   for (const a of uniqueAccepted) {
     if (existingUrls.has(a.sourceUrl) || existingKeys.has(dedupeKey(a.title, a.occurredAt, a.country))) {
       dupeInDb++;
+      continue;
+    }
+    if (isSyndicatedRehash(a)) {
+      rehashSkipped++;
       continue;
     }
     toInsert.push(a);
@@ -409,6 +480,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   log(`  Accepted (raw)      : ${accepted.length}`);
   log(`  Accepted (unique)   : ${uniqueAccepted.length}`);
   log(`  Duplicate in DB     : ${dupeInDb}`);
+  log(`  Rehash skipped      : ${rehashSkipped}`);
   log(`  New to insert       : ${toInsert.length}`);
   log(`  Rejected            : ${rejected.length}`);
 
