@@ -5,12 +5,14 @@
 // addFileToVFS + addFont.
 import type jsPDF from "jspdf";
 import RobotoRegularUrl from "@expo-google-fonts/roboto/400Regular/Roboto_400Regular.ttf?url";
+import RobotoLightUrl from "@expo-google-fonts/roboto/300Light/Roboto_300Light.ttf?url";
 import RobotoMediumUrl from "@expo-google-fonts/roboto/500Medium/Roboto_500Medium.ttf?url";
 import RobotoBoldUrl from "@expo-google-fonts/roboto/700Bold/Roboto_700Bold.ttf?url";
 import RobotoItalicUrl from "@expo-google-fonts/roboto/400Regular_Italic/Roboto_400Regular_Italic.ttf?url";
 
 interface RobotoBytes {
   regular: string;
+  light: string;
   medium: string;
   bold: string;
   italic: string;
@@ -42,13 +44,14 @@ async function loadRobotoBytes(): Promise<RobotoBytes> {
   if (cache) return cache;
   if (loading) return loading;
   loading = (async () => {
-    const [regular, medium, bold, italic] = await Promise.all([
+    const [regular, light, medium, bold, italic] = await Promise.all([
       fetchAsBase64(RobotoRegularUrl),
+      fetchAsBase64(RobotoLightUrl),
       fetchAsBase64(RobotoMediumUrl),
       fetchAsBase64(RobotoBoldUrl),
       fetchAsBase64(RobotoItalicUrl),
     ]);
-    cache = { regular, medium, bold, italic };
+    cache = { regular, light, medium, bold, italic };
     return cache;
   })();
   return loading;
@@ -65,20 +68,22 @@ export async function ensureRobotoLoaded(pdf: jsPDF): Promise<void> {
   if (registered.has(pdf)) return;
   const fonts = await loadRobotoBytes();
   pdf.addFileToVFS("Roboto-Regular.ttf", fonts.regular);
-  pdf.addFont("Roboto-Regular.ttf", "Roboto", "normal", 400);
+  pdf.addFont("Roboto-Regular.ttf", "Roboto-Regular", "normal");
+  pdf.addFileToVFS("Roboto-Light.ttf", fonts.light);
+  pdf.addFont("Roboto-Light.ttf", "Roboto-Light", "normal");
   pdf.addFileToVFS("Roboto-Medium.ttf", fonts.medium);
-  pdf.addFont("Roboto-Medium.ttf", "Roboto", "normal", 500);
+  pdf.addFont("Roboto-Medium.ttf", "Roboto-Medium", "normal");
   pdf.addFileToVFS("Roboto-Bold.ttf", fonts.bold);
-  pdf.addFont("Roboto-Bold.ttf", "Roboto", "bold", 700);
+  pdf.addFont("Roboto-Bold.ttf", "Roboto-Bold", "normal");
   pdf.addFileToVFS("Roboto-Italic.ttf", fonts.italic);
-  pdf.addFont("Roboto-Italic.ttf", "Roboto", "italic", 400);
+  pdf.addFont("Roboto-Italic.ttf", "Roboto-Italic", "normal");
   registered.add(pdf);
   // Default every fresh instance to Roboto Regular so any forgotten call
   // site still renders in the right family rather than Helvetica.
-  pdf.setFont("Roboto", "normal", 400);
+  pdf.setFont("Roboto-Regular", "normal");
 }
 
-export type RobotoWeight = "regular" | "medium" | "bold" | "italic";
+export type RobotoWeight = "light" | "regular" | "medium" | "bold" | "italic";
 
 /**
  * Switch the active jsPDF font to a Roboto weight. Use this everywhere
@@ -86,17 +91,20 @@ export type RobotoWeight = "regular" | "medium" | "bold" | "italic";
  */
 export function setRoboto(pdf: jsPDF, weight: RobotoWeight = "regular"): void {
   switch (weight) {
+    case "light":
+      pdf.setFont("Roboto-Light", "normal");
+      return;
     case "regular":
-      pdf.setFont("Roboto", "normal", 400);
+      pdf.setFont("Roboto-Regular", "normal");
       return;
     case "medium":
-      pdf.setFont("Roboto", "normal", 500);
+      pdf.setFont("Roboto-Medium", "normal");
       return;
     case "bold":
-      pdf.setFont("Roboto", "bold", 700);
+      pdf.setFont("Roboto-Bold", "normal");
       return;
     case "italic":
-      pdf.setFont("Roboto", "italic", 400);
+      pdf.setFont("Roboto-Italic", "normal");
       return;
   }
 }

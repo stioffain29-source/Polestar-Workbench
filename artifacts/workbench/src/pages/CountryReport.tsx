@@ -86,9 +86,9 @@ export default function CountryReport() {
   const slug = params?.slug ?? "";
   const qc = useQueryClient();
   const { data: country, isLoading } = useGetCountryReport(slug);
-  // Country reports must not depend only on the 7-day window. Pull a
+  // Country reports lead with the rolling 30-day window. Pull a
   // 90-day backstop so the report can layer current / 30-day / 90-day
-  // context even when the current window is thin. We fetch the 90-day
+  // context for the deeper background section. We fetch the 90-day
   // feed unscoped and apply country matching client-side: the incidents
   // `country` field is a semicolon-separated list, so server-side exact
   // matching misses compound tags and cannot distinguish Indonesian
@@ -164,9 +164,9 @@ export default function CountryReport() {
   const reportPreviewRef = useRef<HTMLDivElement | null>(null);
 
   // Option A: date the country report to the period its data actually covers.
-  // Clamp the issue date back to the country's newest incident so the headline
-  // 7-day window sits on real records instead of an empty current week (which
-  // previously forced a 30/90-day fallback that read old data as current).
+  // Clamp the issue date back to the country's newest incident so the rolling
+  // 30-day headline window ends on real records instead of trailing weeks of
+  // empty calendar time past the latest incident.
   // Clamp the issue date off the country-RELEVANT records only. If we
   // clamped off the raw country-matched set, a newer irrelevant record
   // (e.g. a fuel-subsidy story dated after the latest security incident)
@@ -221,17 +221,17 @@ export default function CountryReport() {
     [layers, baseline, country?.name],
   );
 
-  // Active reporting window. ALWAYS the 7-day weekly window — even when
-  // empty. A zero-record week is a data-quality signal (see `coverage`
-  // below), never a reason to promote older 30/90-day records into the
-  // headline. Drives Fast Facts, map, charts, the related-incidents table
-  // and the drafted prose; 30/90-day material stays as labelled context.
+  // Active reporting window. Country reports LEAD WITH THE ROLLING 30-DAY
+  // window — a single quiet week is never read as calm in a high-threat
+  // country, so the headline reflects the real standing volume. Drives Fast
+  // Facts, map, charts, the related-incidents table and the drafted prose;
+  // the 90-day bucket stays as labelled background context.
   const active = useMemo(
     () => resolveActiveCountryWindow(layers, issueDate),
     [layers, issueDate],
   );
 
-  // Coverage status for an empty 7-day window. Drives the printable
+  // Coverage status for an empty 30-day window. Drives the printable
   // coverage banner; "active" (window has records) renders nothing.
   const coverage = useMemo(
     () =>
@@ -709,8 +709,8 @@ export default function CountryReport() {
       {/* Sections 3-6 are all auto-derived from the window-aware drafted
           prose (draftReportProse). They are intentionally NOT editable or
           stored: persisted overview / trend_summary / implications rows
-          previously went stale and implied fresh weekly activity even when
-          the 7-day window was empty. Driving every narrative section from
+          previously went stale and implied fresh activity even when
+          the headline window was empty. Driving every narrative section from
           the live dataset keeps the on-screen report, the captured PDF and
           both the dev and prod environments in agreement regardless of any
           legacy stored text. */}
@@ -899,9 +899,9 @@ export default function CountryReport() {
             </strong>
             {sourceSignals.specialist.unhealthy > 0 && " — does not affect country coverage"}
           </li>
-          {layers.current.length < 3 && (
+          {layers.thirtyDay.length < 3 && (
             <li style={{ color: "#A33232" }}>
-              Current-window record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
+              30-day headline record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
             </li>
           )}
         </ul>

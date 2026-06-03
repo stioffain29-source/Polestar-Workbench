@@ -193,23 +193,19 @@ function countryRangeLabels(end: Date, days: number): { label: string; shortLabe
 /**
  * The single active reporting window for a country report.
  *
- * Country reports are WEEKLY by contract: the 7-day window is the headline
- * whenever it holds any records. For thin-reporting countries (e.g. PNG,
- * West Papua) the week is routinely empty — and leaving the window empty
- * rendered every Fast Facts KPI card blank, which is what the client
- * rejected. So when the 7-day window is empty this falls back to the
- * narrowest wider window that actually holds records (30-day, then 90-day),
- * labelled as such via {@link ActiveCountryWindow.basisLabel} and the
- * `expanded` flag, so the cards/map/charts/prose render the real standing
- * picture instead of dashes.
+ * Country reports LEAD WITH THE ROLLING 30-DAY WINDOW. A single quiet week is
+ * not evidence of calm in a high-threat country — for thin-reporting places
+ * (e.g. PNG, West Papua) the week is routinely empty as a coverage artifact,
+ * not because nothing happened. So the headline reflects the real standing
+ * volume over 30 days, clearly labelled "30-day" via
+ * {@link ActiveCountryWindow.basisLabel}, instead of a strict 7-day window
+ * that would read as thin in any quiet week.
  *
- * This is NOT a "calm week" claim. An empty 7-day window remains a
- * data-quality signal: the coverage banner ({@link computeCountryCoverageStatus})
- * keys independently off `layers.current`, so it still fires on an empty week
- * even when the active facts draw on a 30/90-day fallback, and the drafted
- * prose states plainly that the 7-day window held no fresh records. Only when
- * even the 90-day window is empty does this return the honest empty 7-day
- * window.
+ * This is NOT a "stale data as current" claim: the period is explicitly the
+ * 30-day window, not this week. When even the 30-day window is empty the
+ * headline stays honestly empty and the coverage banner
+ * ({@link computeCountryCoverageStatus}) fires; the 90-day bucket still feeds
+ * the deeper background context section.
  *
  * The chosen window drives Fast Facts, the map, charts, the related-incidents
  * table AND the drafted prose, so the whole report reads against one window.
@@ -222,34 +218,17 @@ export function resolveActiveCountryWindow(
   try { end = parseISO(issueDate); } catch { end = new Date(); }
   if (isNaN(end.getTime())) end = new Date();
 
-  // The 7-day weekly window is the headline whenever it holds any records.
-  if (layers.current.length > 0) {
-    const { label, shortLabel } = countryRangeLabels(end, 7);
-    return {
-      basisDays: 7,
-      basisLabel: "7-day",
-      basisShort: "7-day",
-      incidents: layers.current,
-      expanded: false,
-      periodLabel: label,
-      periodShortLabel: shortLabel,
-    };
-  }
-
-  // Weekly window is empty. Option A: the caller has already clamped the issue
-  // date back to the country's newest record, so an empty 7-day window here
-  // means the country genuinely holds no incidents at all. We do NOT promote
-  // older 30/90-day records into the headline — that presented stale data as
-  // current, which the client rejected. The 30/90-day buckets remain available
-  // to the lookback/context sections; the headline window stays honestly empty
-  // and the coverage banner (computeCountryCoverageStatus, keyed off
-  // layers.current) fires independently.
-  const { label, shortLabel } = countryRangeLabels(end, 7);
+  // The rolling 30-day window is always the headline. When it holds records it
+  // shows the true standing volume; when it is empty it stays honestly empty
+  // (the coverage banner fires) and the 90-day background section carries the
+  // deeper pattern. The caller has already clamped the issue date back to the
+  // country's newest record, so the 30-day window ends on real data.
+  const { label, shortLabel } = countryRangeLabels(end, 30);
   return {
-    basisDays: 7,
-    basisLabel: "7-day",
-    basisShort: "7-day",
-    incidents: layers.current,
+    basisDays: 30,
+    basisLabel: "30-day",
+    basisShort: "30-day",
+    incidents: layers.thirtyDay,
     expanded: false,
     periodLabel: label,
     periodShortLabel: shortLabel,
@@ -342,10 +321,12 @@ export function summariseLookback(
 
   const thirtyDay =
     thirty === 0
-      ? `No incidents are on file for ${name} across the rolling 30-day context window.${baselineRef30}`
-      : thirty === current
-        ? `The 30-day context window holds the same ${thirty} record${thirty === 1 ? "" : "s"} as the current cycle — no additional reporting beyond the live window.${baselineRef30}`
-        : `Across the rolling 30-day context window ${name} carries ${thirty} record${thirty === 1 ? "" : "s"}, with ${thirtyDelta} record${thirtyDelta === 1 ? "" : "s"} sitting outside the current 7-day cycle.${baselineRef30}`;
+      ? `No incidents are on file for ${name} across the rolling 30-day window.${baselineRef30}`
+      : current === 0
+        ? `All ${thirty} record${thirty === 1 ? "" : "s"} in the 30-day headline window landed earlier in the month, with none in the most recent week — read the standing volume as the operating picture rather than the quiet week.${baselineRef30}`
+        : thirty === current
+          ? `All ${thirty} record${thirty === 1 ? "" : "s"} in the 30-day headline window landed in the most recent week.${baselineRef30}`
+          : `Of the ${thirty} record${thirty === 1 ? "" : "s"} in the 30-day headline window, ${current} landed in the most recent week and ${thirtyDelta} earlier in the month.${baselineRef30}`;
 
   const ninetyDay =
     ninety === 0
@@ -455,10 +436,10 @@ function isFeedUnhealthy(s: CoverageSourceLike, endMs: number): boolean {
 }
 
 /**
- * Classify an empty 7-day country window as a coverage problem, using the
+ * Classify an empty 30-day country window as a coverage problem, using the
  * health of the country's own collection sources + the staleness of the
  * newest record on file to pick the explanation. Returns `state: "active"`
- * (no banner) whenever the weekly window holds records.
+ * (no banner) whenever the 30-day headline window holds records.
  */
 export function computeCountryCoverageStatus(opts: {
   layers: CountryLayerBuckets;
@@ -469,8 +450,8 @@ export function computeCountryCoverageStatus(opts: {
   const { layers, sources, issueDate, countryName } = opts;
   const name = countryName || "this country";
 
-  // Weekly window has records → render normally, no coverage banner.
-  if (layers.current.length > 0) {
+  // The 30-day headline window has records → render normally, no banner.
+  if (layers.thirtyDay.length > 0) {
     return { state: "active", showBanner: false, title: "", detail: "" };
   }
 
@@ -504,7 +485,7 @@ export function computeCountryCoverageStatus(opts: {
       state: "coverage-problem",
       showBanner: true,
       title: "Coverage warning",
-      detail: `No active collection source is currently attributed to ${name}, so an empty week cannot be read as quiet. Treat the operating picture as unconfirmed and widen local-source coverage. The 30 and 90-day context sections below carry the standing risk pattern.`,
+      detail: `No active collection source is currently attributed to ${name}, so an empty 30-day window cannot be read as quiet. Treat the operating picture as unconfirmed and widen local-source coverage. The 90-day background section below carries the standing risk pattern.`,
     };
   }
 
@@ -516,7 +497,7 @@ export function computeCountryCoverageStatus(opts: {
       state: "coverage-problem",
       showBanner: true,
       title: "Coverage warning",
-      detail: `${n} of ${of} collection source${of === 1 ? "" : "s"} feeding ${name} ${n === 1 ? "is" : "are"} currently failing or out of date, so the empty 7-day window reflects a coverage problem rather than confirmed quiet. The operating picture is unconfirmed; read the 30 and 90-day context sections below for the standing risk pattern.`,
+      detail: `${n} of ${of} collection source${of === 1 ? "" : "s"} feeding ${name} ${n === 1 ? "is" : "are"} currently failing or out of date, so the empty 30-day window reflects a coverage problem rather than confirmed quiet. The operating picture is unconfirmed; read the 90-day background section below for the standing risk pattern.`,
     };
   }
 
@@ -532,20 +513,20 @@ export function computeCountryCoverageStatus(opts: {
       state: "coverage-problem",
       showBanner: true,
       title: "Coverage warning",
-      detail: `Collection sources feeding ${name} report healthy, but ${ageClause}, so the empty 7-day window cannot be confirmed as quiet. Treat the operating picture as unconfirmed; read the 30 and 90-day context sections below for the standing risk pattern.`,
+      detail: `Collection sources feeding ${name} report healthy, but ${ageClause}, so the empty 30-day window cannot be confirmed as quiet. Treat the operating picture as unconfirmed; read the 90-day background section below for the standing risk pattern.`,
     };
   }
 
   // Feeds report healthy and we hold a recent record, yet nothing cleared the
-  // wire this week. In a high-threat operating environment an empty week is
-  // NEVER asserted as calm — it is treated as a collection gap with the
-  // operating picture unconfirmed. There is deliberately no "genuinely quiet"
-  // outcome for a country report.
+  // wire across the 30-day window. In a high-threat operating environment an
+  // empty window is NEVER asserted as calm — it is treated as a collection gap
+  // with the operating picture unconfirmed. There is deliberately no "genuinely
+  // quiet" outcome for a country report.
   return {
     state: "coverage-problem",
     showBanner: true,
     title: "Coverage warning",
-    detail: `All collection sources feeding ${name} report healthy, but no qualifying incident cleared the wire in the 7-day window. In a high-threat operating environment an empty week is read as a collection gap, not a quiet one — the operating picture is unconfirmed. Work the standing pattern in the 30 and 90-day context sections below.`,
+    detail: `All collection sources feeding ${name} report healthy, but no qualifying incident cleared the wire in the 30-day window. In a high-threat operating environment an empty window is read as a collection gap, not a quiet one — the operating picture is unconfirmed. Work the standing pattern in the 90-day background section below.`,
   };
 }
 
