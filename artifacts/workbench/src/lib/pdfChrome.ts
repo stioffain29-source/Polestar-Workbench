@@ -591,7 +591,7 @@ export function drawFooters(
     const ty = H - FOOTER_BAND_H / 2 + 3;
     pdf.text(sanitize(POLESTAR_URL), 18, ty);
     pdf.text(sanitize(POLESTAR_EMAIL), W / 2, ty, { align: "center" });
-    pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, {
+    pdf.text(sanitize(`Page ${p} of ${pageCount}`), W - 18, ty, {
       align: "right",
     });
     // Temporary diagnostic proof line, sits just above the footer band.

@@ -10,9 +10,10 @@ import {
 } from "./pdfChrome";
 import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import {
-  resolveReportWindow, filterIncidentsToWindow, relatedIncidentsLimit, reportCadence,
+  resolveReportWindow, filterIncidentsToWindow, reportCadence,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
+import { selectRelatedIncidents } from "./relatedIncidents";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
@@ -39,6 +40,7 @@ import { capFuelMarketSeverity, type ProducerBuyerActionRow } from "./fuelNarrat
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 import {
   buildCargoSecurityRead,
+  buildCargoWhatHappened,
   buildLogisticsHubRead,
   buildCargoWhatMatters,
   buildCargoImplications,
@@ -541,92 +543,16 @@ function drawRelatedIncidents(
   _topicLabels: Record<string, string>,
 ) {
   if (windowIncidents.length === 0) return;
-  const { max } = relatedIncidentsLimit(topic);
-  // Prioritise operationally meaningful rows. When the classifier
-  // returns its weakest bucket (e.g. "Other fuel incident") we push
-  // those rows to the bottom; if we have at least a handful of
-  // operationally classified rows, the weakest bucket is dropped
-  // entirely so the table does not drag the report down.
-  function weakBucket(label: string): boolean {
-    return /^other\s.+incident$/i.test(label) || label === "Unclassified maritime record";
-  }
-  // For Cargo specifically the source data carries a lot of generic
-  // "Warehouse theft - Other" / "Container theft - Other" /
-  // "Warehouse theft - Electronics" titles that repeat across the
-  // window. Treat any title ending in a generic suffix as a weak row
-  // so the table prefers named-place / named-corridor / named-cargo
-  // records when they exist.
-  function isGenericCargoTitle(title: string): boolean {
-    const t = (title ?? "").trim();
-    // Generic synthetic titles take the shape
-    //   "<bucket> theft <dash> <single category word>"
-    // where <dash> can be ASCII hyphen, en-dash or em-dash, and the
-    // category word carries no place, route or modus operandi signal.
-    // We treat any single trailing token after a dash as generic; only
-    // titles that add a named place / corridor / operator survive.
-    return /\b(warehouse|container|cargo|truck|depot)\s+(theft|hijack|hijacking|robbery|loss|raid)\s+[-\u2013\u2014]\s+\S+\s*$/i.test(t)
-      // Also drop the matching "Other land-based cargo theft - <word>"
-      // pattern surfaced by the classifier's fallback bucket.
-      || /^other\s+land[- ]based\s+cargo\s+theft\s+[-\u2013\u2014]\s+\S+\s*$/i.test(t);
-  }
-  // Title-based dedupe: collapse syndicated / repeated rows so the
-  // Related Incidents table does not list the same loss four times.
-  function titleKey(s: string): string {
-    const STOP = new Set([
-      "the", "a", "an", "of", "in", "on", "at", "to", "for", "and",
-      "as", "by", "off", "near", "after", "amid", "with", "from", "into", "over",
-      "says", "say", "said", "reports", "report",
-    ]);
-    return (s ?? "")
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .split(" ")
-      .filter((w) => w && !STOP.has(w))
-      .slice(0, 8)
-      .join(" ");
-  }
-  const seen = new Set<string>();
-  const deduped: TopicReportIncident[] = [];
-  for (const i of windowIncidents) {
-    const k = titleKey(i.title);
-    if (k && seen.has(k)) continue;
-    if (k) seen.add(k);
-    deduped.push(i);
-  }
-  const annotated = deduped.map((i) => ({
-    i,
-    weak:
-      weakBucket(classifyIncidentType(i)) ||
-      (topic === "cargo_watch" && isGenericCargoTitle(i.title)),
-  }));
-  const strong = annotated.filter((r) => !r.weak).map((r) => r.i);
-  const weak = annotated.filter((r) => r.weak).map((r) => r.i);
-  const STRONG_FLOOR = 4;
-  // Cargo: generic-suffix titles ("Warehouse theft - Other" /
-  // "Container theft - Electronics" etc.) are hard-excluded regardless
-  // of strong-row count — they add noise without operational signal.
-  // Other topics keep the existing weak-fallback behaviour so sparse
-  // windows still produce a usable table.
-  const ordered =
-    topic === "cargo_watch"
-      ? strong
-      : strong.length >= STRONG_FLOOR ? strong : [...strong, ...weak];
-  const sorted = [...ordered].sort(
-    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
-  );
-  // Per-topic caps. Fuel was already tighter; Cargo and the generic
-  // path are now held at 10 so the Source Notes / Disclaimer block can
-  // be pulled back onto the same page rather than orphaned on a near-
-  // empty final page.
-  const effectiveMax =
-    topic === "fuel" ? Math.min(max, 6)
-    : topic === "cargo_watch" ? Math.min(max, 10)
-    : Math.min(max, 10);
-  const rows = sorted.slice(0, effectiveMax);
-  const truncated = sorted.length - rows.length;
+  // Row selection (title dedupe, weak-bucket filtering, recency ordering and the
+  // per-topic cap) is shared with the on-screen preview via selectRelatedIncidents
+  // so the two surfaces can never disagree.
+  const rows = selectRelatedIncidents(windowIncidents, topic);
   if (rows.length === 0) return;
+  // Cargo rows carry a source attribution under the title so the client can see
+  // the table is sourced, not fabricated.
+  const showSource = topic === "cargo_watch";
+  const sourceOf = (i: TopicReportIncident): string =>
+    showSource ? sanitize((i.source ?? "").trim()) : "";
 
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
@@ -645,11 +571,13 @@ function drawRelatedIncidents(
   // together on one page.
   setRoboto(pdf, "regular");
   pdf.setFontSize(8);
+  const SOURCE_LINE_H = 10;
   const measureTable = (rs: TopicReportIncident[]): number => {
     let h = rowH; // column header band
     for (const i of rs) {
       const tl: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-      h += Math.max(rowH, tl.length * 11 + ROW_PAD);
+      const srcH = sourceOf(i) ? SOURCE_LINE_H : 0;
+      h += Math.max(rowH, tl.length * 11 + ROW_PAD + srcH);
     }
     return h;
   };
@@ -699,7 +627,8 @@ function drawRelatedIncidents(
 
   for (const i of drawnRows) {
     const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-    const rh = Math.max(rowH, titleLines.length * 11 + ROW_PAD);
+    const src = sourceOf(i);
+    const rh = Math.max(rowH, titleLines.length * 11 + ROW_PAD + (src ? SOURCE_LINE_H : 0));
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
@@ -717,7 +646,21 @@ function drawRelatedIncidents(
     const typeLines: string[] = pdf.splitTextToSize(sanitize(incidentType), colTypeW - 8);
     pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
+    const titleX = MX + colDateW + colTypeW + 6;
+    pdf.text(titleLines, titleX, ctx.y + 12);
+    // Source attribution under the title (cargo) — shows the row is sourced.
+    if (src) {
+      setRoboto(pdf, "italic");
+      pdf.setFontSize(7);
+      setText(pdf, DUSK);
+      const srcLine: string = pdf.splitTextToSize(
+        `Source: ${src}`,
+        colTitleW - 8,
+      )[0];
+      pdf.text(srcLine, titleX, ctx.y + 12 + titleLines.length * 11);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8);
+    }
 
     const effectiveSeverity =
       topic === "fuel"
@@ -741,10 +684,8 @@ function drawRelatedIncidents(
   ctx.y += 8;
 
   // Client-facing reports intentionally omit the "Showing N latest of M"
-  // notice. The table cap is internal Workbench logic and surfacing it
-  // weakens the PDF.
-  void truncated;
-  void sorted;
+  // notice. The table cap is internal Workbench logic (in selectRelatedIncidents)
+  // and surfacing it weakens the PDF.
   // Touch the cadence helper so removing it would not silently regress —
   // and to make the per-cadence behaviour obvious to readers of this code.
   void reportCadence(topic);
@@ -1029,7 +970,7 @@ export async function exportTopicReportPdf(
       }
       const proseSections: [string, string][] = [
         ["Situation", pickProse(data.situation, buildCargoSituation(windowIncidents))],
-        ["What Happened", (data.whatHappened ?? "").trim()],
+        ["What Happened", pickProse(data.whatHappened, buildCargoWhatHappened(windowIncidents))],
         ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],
       ];
       for (const [label, body] of proseSections) {

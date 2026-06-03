@@ -52,6 +52,37 @@ function recordDate(i: CargoNarrativeIncident): Date | null {
   }
 }
 
+// West Papua, Papua Barat and Irian Jaya are Indonesian provinces, not separate
+// countries. Records tagged with them must fold into Indonesia so the geography
+// reads consistently — otherwise the same event surfaces twice ("Indonesia" and
+// "West Papua") and the country counts double-count. Bare "Papua" is left alone:
+// it is ambiguous (Papua New Guinea is a sovereign state, kept distinct). The
+// fold is LOCAL to cargo prose so it cannot disturb the shared relevance logic.
+const INDONESIA_PROVINCE_ALIASES = new Set([
+  "west papua",
+  "papua barat",
+  "irian jaya",
+  "irian jaya barat",
+  "south papua",
+  "central papua",
+  "highland papua",
+  "southwest papua",
+]);
+function normaliseCargoCountry(c: string): string {
+  return INDONESIA_PROVINCE_ALIASES.has(c.trim().toLowerCase()) ? "Indonesia" : c;
+}
+// Split a row's attribution exactly as the shared lib does, then fold the
+// Indonesian-province aliases into Indonesia and de-duplicate WITHIN the row so
+// "Indonesia; West Papua" counts once for Indonesia rather than twice.
+function splitCargoCountries(raw: string | null | undefined): string[] {
+  const out: string[] = [];
+  for (const c of splitAttributedCountries(raw)) {
+    const n = normaliseCargoCountry(c);
+    if (!out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
 // Country tokenisation (compound-string splitting + unattributed drop) lives
 // in the shared relevance lib as splitAttributedCountries, so the Reads, the
 // editor seed and the Fast Facts card normalise countries the same way and can
@@ -61,7 +92,7 @@ function topCountries(rows: CargoNarrativeIncident[], n: number): { country: str
   for (const r of rows) {
     // "Unknown" is not a country. Counting it let the prose claim a window
     // was "led by Unknown" and contradicted the Fast Facts card.
-    for (const c of splitAttributedCountries(r.country)) {
+    for (const c of splitCargoCountries(r.country)) {
       m.set(c, (m.get(c) ?? 0) + 1);
     }
   }
@@ -328,6 +359,55 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
   return `${intro} ${countryLine}\n\n${watch}`;
 }
 
+// Auto-prose for the What Happened section. The section was frequently left
+// blank, leaving a sparse page; this builder narrates the concrete events on
+// the file — the most recent route-side and hub-side lead entries with their
+// dates and countries, the qualifying counts, and any country clustering — so
+// the page carries substance drawn straight from the window's incidents.
+export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]): string {
+  const ctx = buildCargoAutoCtx(windowIncidents);
+  if (ctx.windowIncidents.length === 0) {
+    return `No qualifying cargo-crime records reached the file this cycle. Cargo reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or hub-side activity has stopped; treat the standing exposure as unchanged.`;
+  }
+  const parts: string[] = [];
+  const total = ctx.windowIncidents.length;
+  parts.push(
+    `${total} qualifying cargo-crime record${total === 1 ? "" : "s"} reached the file this cycle, split across route-side losses (${ctx.securityMatches.length}) and logistics-hub losses (${ctx.hubMatches.length}).`,
+  );
+
+  const named = (i: CargoNarrativeIncident): string => {
+    const d = recordDate(i);
+    const country = splitCargoCountries(i.country)[0];
+    const where = country ? ` in ${country}` : "";
+    const when = d ? `, filed ${format(d, "dd MMM yyyy")}` : "";
+    return `"${i.title}"${where}${when}`;
+  };
+
+  const routeLead = leadEntry(ctx.securityMatches);
+  const hubLead = leadEntry(ctx.hubMatches);
+  const detail: string[] = [];
+  if (routeLead) {
+    detail.push(`Route-side, the most recent notable entry is ${named(routeLead)}.`);
+  }
+  if (hubLead && hubLead !== routeLead) {
+    detail.push(`Hub-side, the lead entry is ${named(hubLead)}.`);
+  }
+  if (detail.length > 0) parts.push(detail.join(" "));
+
+  // Clustering: name the geographies carrying repeat reporting so the reader
+  // sees where activity concentrates, not just the headline count.
+  const cp = countryPicture(ctx.windowIncidents, 3);
+  const repeat = cp.top.filter((t) => t.count >= 2);
+  if (cp.strong && repeat.length > 0) {
+    parts.push(
+      `Reporting clusters in ${joinCountries(repeat)}, pointing to corridors being worked rather than isolated, one-off losses.`,
+    );
+  } else if (cp.top.length > 0) {
+    parts.push(cp.line);
+  }
+  return parts.join("\n\n");
+}
+
 // --- Country Risk Breakdown -------------------------------------------------
 // A per-country table for the Cargo Watch report: the recurring geographies
 // named in the prose are broken out with a coloured five-tier risk rating, the
@@ -389,7 +469,7 @@ function groupByCountry(
 ): Map<string, CargoNarrativeIncident[]> {
   const m = new Map<string, CargoNarrativeIncident[]>();
   for (const r of rows) {
-    for (const c of splitAttributedCountries(r.country)) {
+    for (const c of splitCargoCountries(r.country)) {
       const list = m.get(c) ?? [];
       list.push(r);
       m.set(c, list);
@@ -476,22 +556,70 @@ function patternPhrase(rows: CargoNarrativeIncident[]): string {
   return phrase.charAt(0).toUpperCase() + phrase.slice(1).toLowerCase();
 }
 
+// The country-level operational read. It must read differently country to
+// country — a flat "Road-movement risk is the main exposure" repeated down the
+// table tells a client nothing. So the core sentence is keyed on the country's
+// ACTUAL dominant modus operandi (from the cargo type classifier) within its
+// lead side, and a tail varies on severity and record volume. Two countries
+// only share wording when their modus, lead, severity tier AND count all match.
 function operationalReadFor(
+  rows: CargoNarrativeIncident[],
   lead: "route" | "hub" | "mixed",
   severityKey: string,
+  count: number,
 ): string {
-  let s: string;
+  const typeCounts = new Map<string, number>();
+  for (const r of rows) {
+    const t = classifyIncidentType(r as unknown as CargoIncidentLike);
+    if (t && t !== "Other") typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
+  }
+  const WEAK_TYPE = "Other land-based cargo theft";
+  const ranked = [...typeCounts.entries()]
+    .filter((e) => e[0] !== WEAK_TYPE)
+    .sort((a, b) => b[1] - a[1]);
+  const primary = (ranked[0]?.[0] ?? "").toLowerCase();
+
+  let core: string;
   if (lead === "route") {
-    s = "Road-movement risk is the main exposure; concern rises for high-value loads moving outside secured corridors.";
+    if (/hijack/.test(primary)) {
+      core =
+        "Truck and convoy hijacking is the recurring method; corridor selection, escort cover on high-value loads and driver vetting are the first controls.";
+    } else if (/container/.test(primary)) {
+      core =
+        "Container theft in transit leads the route-side picture; seal integrity and matched origin-to-destination handover checks are the priority.";
+    } else if (/pilfer/.test(primary)) {
+      core =
+        "Route-side pilferage is the dominant loss; tighten in-transit seals, stop-point discipline and load-count reconciliation.";
+    } else {
+      core =
+        "Road-movement losses dominate; harden corridor selection and driver vetting on contracted hauliers before the next high-value move.";
+    }
   } else if (lead === "hub") {
-    s = "Hub-side exposure dominates; watch depot and warehouse access, seal integrity and contractor vetting.";
+    if (/warehouse/.test(primary)) {
+      core =
+        "Warehouse losses concentrate the exposure; facility access, after-hours staffing and CCTV coverage are where to tighten.";
+    } else if (/depot|yard|terminal/.test(primary)) {
+      core =
+        "Depot and yard handling is the weak point; focus on gate control, seal integrity at handover and contractor vetting.";
+    } else if (/raid/.test(primary)) {
+      core =
+        "Organised facility raids drive the losses here; perimeter integrity, guarding posture and after-hours response are the controls to test.";
+    } else {
+      core =
+        "Hub-side losses lead; depot access, seal integrity and contractor vetting carry the risk.";
+    }
   } else {
-    s = "Mixed road and storage exposure; hold baseline route security and depot access controls.";
+    core =
+      "Road and storage losses appear in roughly equal measure; hold both corridor security and depot access controls.";
   }
+
+  let tail = "";
   if (severityKey === "high" || severityKey === "extreme") {
-    s += " Loss values and reporting point to organised targeting rather than casual theft.";
+    tail = ` The ${count} record${count === 1 ? "" : "s"} on file read as organised, targeted activity rather than opportunistic theft.`;
+  } else if (count >= 3) {
+    tail = ` Repeat reporting (${count} records) points to a corridor under sustained pressure.`;
   }
-  return s;
+  return core + tail;
 }
 
 function joinCountryNames(names: string[]): string {
@@ -569,7 +697,7 @@ export function buildCargoCountryBreakdown(
       severityKey: sev.key,
       severityLabel: sev.label,
       lead,
-      operationalRead: operationalReadFor(lead, sev.key),
+      operationalRead: operationalReadFor(rows, lead, sev.key, rows.length),
     };
   });
   return { rows, regionalRead: buildRegionalRead(rows) };

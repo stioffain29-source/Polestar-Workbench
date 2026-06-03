@@ -5,8 +5,11 @@ import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
+import { selectRelatedIncidents } from "@/lib/relatedIncidents";
+import { classifyIncidentType } from "@/lib/incidentClassifier";
 import {
   buildCargoSecurityRead,
+  buildCargoWhatHappened,
   buildLogisticsHubRead,
   buildCargoWhatMatters,
   buildCargoImplications,
@@ -321,6 +324,85 @@ function CargoCountryTable({ rows }: { rows: CargoCountryRow[] }) {
             <td style={td}>{r.operationalRead}</td>
           </tr>
         ))}
+      </tbody>
+    </table>
+  );
+}
+
+function RelatedIncidentsTable({ rows }: { rows: TopicFastFactsIncident[] }) {
+  const th: React.CSSProperties = {
+    background: NAVY,
+    color: "#fff",
+    fontFamily: "Roboto, sans-serif",
+    fontWeight: 700,
+    fontSize: 10,
+    textAlign: "left",
+    padding: "8px 10px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  };
+  const td: React.CSSProperties = {
+    fontFamily: "Roboto, sans-serif",
+    fontSize: 12,
+    color: DUSK,
+    padding: "10px",
+    verticalAlign: "top",
+    borderBottom: `1px solid ${POLAR}`,
+    lineHeight: 1.45,
+  };
+  const fmtDate = (s: string): string => {
+    try { return format(parseISO(s), "dd MMM yyyy"); } catch { return s; }
+  };
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${POLAR}` }}>
+      <thead>
+        <tr>
+          <th style={{ ...th, width: "16%" }}>Date</th>
+          <th style={{ ...th, width: "20%" }}>Type</th>
+          <th style={{ ...th, width: "48%" }}>Title</th>
+          <th style={{ ...th, width: "16%" }}>Severity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => {
+          const key = (r.severity ?? "").trim().toLowerCase();
+          const label = key ? key.charAt(0).toUpperCase() + key.slice(1) : "—";
+          const src = (r.source ?? "").trim();
+          return (
+            <tr key={r.id ?? i}>
+              <td style={{ ...td, color: DUSK }}>{fmtDate(r.occurredAt)}</td>
+              <td style={td}>{classifyIncidentType(r)}</td>
+              <td style={{ ...td, color: NAVY }}>
+                {r.title}
+                {src && (
+                  <div style={{ fontSize: 10, fontStyle: "italic", opacity: 0.7, marginTop: 3 }}>
+                    Source: {src}
+                  </div>
+                )}
+              </td>
+              <td style={td}>
+                <span
+                  style={{
+                    ...severityBadgeStyle(key),
+                    display: "inline-block",
+                    padding: "3px 8px",
+                    borderRadius: 2,
+                    fontWeight: 700,
+                    fontSize: 10,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
+                  }}
+                >
+                  {label}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -664,7 +746,12 @@ export default function ReportPreview({
                     </>
                   )}
                   <NarrativeSection title="Situation" text={report.situation} />
-                  <NarrativeSection title="What Happened" text={report.whatHappened} />
+                  <NarrativeSection
+                    title="What Happened"
+                    text={isCargo
+                      ? pick(report.whatHappened, buildCargoWhatHappened(cargoWindow))
+                      : report.whatHappened}
+                  />
                   <NarrativeSection
                     title="What Matters"
                     text={isCargo
@@ -690,6 +777,15 @@ export default function ReportPreview({
                       ? pick(report.polestarView, buildCargoPolestarView(cargoWindow))
                       : report.polestarView}
                   />
+                  {isCargo && (() => {
+                    const related = selectRelatedIncidents(cargoWindow, "cargo_watch");
+                    if (related.length === 0) return null;
+                    return (
+                      <Section title="Related Incidents">
+                        <RelatedIncidentsTable rows={related} />
+                      </Section>
+                    );
+                  })()}
                 </>
               );
             })()}
