@@ -23,6 +23,18 @@ warning (no source / unhealthy feed / stale record / healthy-but-silent) and the
 prose builder emits its "no relevant incidents… read as a coverage gap, not calm"
 branch. So both must stay in lockstep on the 7-day window.
 
+**Source-coverage scoping must be as strict as incident scoping.** The Papua/PNG
+pair is a substring trap: the short "papua" token substring-matches "papua new
+guinea", so any free-text matcher (e.g. coverage-health source attribution) will
+silently pull PNG feeds into the West Papua report. Incidents avoid this via
+EXACT token-set membership (`incidentMatchesCountry`); any new code that scopes
+sources/feeds to a country must match WHOLE words AND reject competing
+super-phrase tokens (`competingSupersetTokens` in countryMatch.ts), or coverage
+diagnostics report the wrong country's feed health.
+**Why:** a quiet-week coverage warning that reads PNG feed health for a West
+Papua report is a false-confidence bug — the exact class of cross-country leak
+the countryMatch module header warns about.
+
 **Two structural causes, not a window bug:**
 
 1. The flashpoint `classify()` only accepts FLASHPOINT_REQUIRED protest/unrest

@@ -8,7 +8,7 @@
 
 import { endOfDay, format, parseISO, subDays } from "date-fns";
 import { isCountryRelevant } from "./topicRelevance";
-import { acceptedCountryTokens } from "./countryMatch";
+import { acceptedCountryTokens, competingSupersetTokens } from "./countryMatch";
 import { resolveReportWindow } from "./reportWindow";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
 import type { CountryBaseline } from "./countryBaselines";
@@ -378,14 +378,31 @@ const COUNTRY_COVERAGE_WIRES: Record<string, string[]> = {
  * health is scoped to these feeds ONLY — never to every feed that happens to
  * share the report's record topic.
  */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Whole-word/phrase match so the short "papua" token does not substring-match
+// inside "papua new guinea". `.toLowerCase()` is applied by the caller.
+function nameContainsToken(hay: string, token: string): boolean {
+  if (!token) return false;
+  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(token)}([^a-z0-9]|$)`).test(hay);
+}
+
 function sourceCoversCountry(sourceName: string, countryName: string): boolean {
   const hay = (sourceName ?? "").toLowerCase();
   if (!hay) return false;
+  // A more specific competing-group token (e.g. PNG's "papua new guinea" for the
+  // West Papua report) claims this source for the OTHER country — never count it
+  // as covering this report, even though the short token would otherwise match.
+  for (const c of competingSupersetTokens(countryName)) {
+    if (nameContainsToken(hay, c)) return false;
+  }
   for (const t of acceptedCountryTokens(countryName)) {
-    if (t && hay.includes(t)) return true;
+    if (nameContainsToken(hay, t)) return true;
   }
   const key = (countryName ?? "").trim().toLowerCase();
-  return (COUNTRY_COVERAGE_WIRES[key] ?? []).some((w) => hay.includes(w));
+  return (COUNTRY_COVERAGE_WIRES[key] ?? []).some((w) => nameContainsToken(hay, w));
 }
 
 export interface CountryCoverageStatus {

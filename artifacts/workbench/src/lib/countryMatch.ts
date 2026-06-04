@@ -49,6 +49,33 @@ export function acceptedCountryTokens(reportName: string): string[] {
 }
 
 /**
+ * Tokens from a DIFFERENT country group that are a more specific super-phrase
+ * of one of this report's own tokens — e.g. for the "papua" (West Papua)
+ * report, PNG's "papua new guinea" (which contains the short "papua" token).
+ *
+ * When such a token appears in a free-text source/feed name, that source
+ * belongs to the OTHER country, not this report. Callers that match source
+ * names by substring/word use this to stop the short "papua" token leaking
+ * Papua New Guinea sources into the Indonesian West Papua report (and vice
+ * versa). Cross-border tokens shared by both groups are never disqualifying.
+ */
+export function competingSupersetTokens(reportName: string): string[] {
+  const ownKey = (reportName ?? "").trim().toLowerCase();
+  const own = acceptedCountryTokens(reportName);
+  if (own.length === 0) return [];
+  const ownSet = new Set(own);
+  const out: string[] = [];
+  for (const [groupKey, tokens] of Object.entries(COUNTRY_GROUPS)) {
+    if (groupKey === ownKey) continue;
+    for (const t of tokens) {
+      if (ownSet.has(t)) continue; // shared / cross-border token — not disqualifying
+      if (own.some((o) => t === o || t.includes(o))) out.push(t);
+    }
+  }
+  return out;
+}
+
+/**
  * True when an incident's `country` field contains at least one token that
  * is an exact member of the report's accepted-token set. Cross-border
  * records (tokens from more than one group) match every group they touch.
