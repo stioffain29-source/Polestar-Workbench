@@ -609,6 +609,7 @@ export async function exportCountryReportPdf(
     issueDate: todayIso,
     incidents: incidents as CountryFastFactsIncident[],
     windowIncidents: active.incidents,
+    standingIncidents: layers.ninetyDay,
     periodLabel: active.periodShortLabel,
   });
   const windowIncidents = facts.windowIncidents as PdfIncident[];

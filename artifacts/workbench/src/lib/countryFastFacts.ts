@@ -90,6 +90,10 @@ export interface CountryFactsBreakdown {
   // Booleans/values useful for prose and visualisations.
   highestKey: string;
   highestLabel: string;
+  // Standing-window (90-day) highest severity. Empty when no standing
+  // incidents were supplied.
+  standingKey: string;
+  standingLabel: string;
   topTypeLabel: string;
   topTypeCount: number;
   topAreaLabel: string;
@@ -116,6 +120,10 @@ export function computeCountryFastFacts(opts: {
   // When supplied, the caller's active window drives the cards. Country reports
   // lead with the rolling 7-day weekly window, so callers pass that here.
   windowIncidents?: CountryFastFactsIncident[];
+  // Wider standing-window incidents (the relevance-filtered 90-day bucket).
+  // When supplied, a "Standing Risk" card is shown ALONGSIDE the week's
+  // severity so a quiet 7-day window never makes an active theatre read "Low".
+  standingIncidents?: CountryFastFactsIncident[];
   // Reporting-period label for the active 7-day window (overrides win.shortLabel).
   periodLabel?: string;
 }): CountryFactsBreakdown {
@@ -137,6 +145,22 @@ export function computeCountryFastFacts(opts: {
     if (r > highestRank) { highestRank = r; highestKey = k; }
   }
   const highestLabel = highestKey ? (SEV_LABEL[highestKey] ?? highestKey) : "—";
+
+  // Standing risk — highest severity across the wider standing window (the
+  // relevance-filtered 90-day bucket the caller supplies). A quiet 7-day
+  // window must never make an active theatre read "Low": the standing card
+  // carries the persistent risk picture next to the week's severity. Omitted
+  // entirely when no standing incidents are supplied (backward-compatible).
+  const standingIncidents = opts.standingIncidents ?? [];
+  const hasStanding = standingIncidents.length > 0;
+  let standingKey = "";
+  let standingRank = 0;
+  for (const i of standingIncidents) {
+    const k = sevKey(i.severity);
+    const r = SEV_RANK[k] ?? 0;
+    if (r > standingRank) { standingRank = r; standingKey = k; }
+  }
+  const standingLabel = standingKey ? (SEV_LABEL[standingKey] ?? standingKey) : "—";
 
   // Top operational issue type (never the topic/product name)
   const typeCounts = new Map<string, number>();
@@ -212,48 +236,82 @@ export function computeCountryFastFacts(opts: {
       ? "Multiple locations"
       : topAreaLabel;
 
-  const cards: CountryFastFactCard[] = [
-    { label: "Reporting Period", value: opts.periodLabel ?? win.shortLabel },
-    {
-      label: "Total Records",
-      value: String(total),
-      note: total === 0
-        ? "No records in the 7-day window"
-        : total < 3
-          ? "Limited sample"
-          : "Incidents in window",
-    },
-    {
-      label: "Highest Severity",
-      value: highestLabel,
-      severity: highestKey || undefined,
-      note: highestKey ? "Highest rating in window" : undefined,
-    },
-    {
-      label: "Most Affected Area",
-      value: safeAreaValue,
-      note: topAreaCount > 0 && !topAreaIsMixed
-        ? `${topAreaCount} record${topAreaCount === 1 ? "" : "s"}`
-        : undefined,
-    },
-    {
-      label: "Latest Incident",
-      value: latestDate ? format(latestDate, "dd MMM yyyy") : "—",
-    },
-    {
-      label: "Main Issue Type",
-      value: safeTypeValue,
-      note: topTypeCount > 0 && !topTypeIsMixed
-        ? `${topTypeCount} record${topTypeCount === 1 ? "" : "s"}`
-        : undefined,
-    },
-  ];
+  const reportingPeriodCard: CountryFastFactCard = {
+    label: "Reporting Period",
+    value: opts.periodLabel ?? win.shortLabel,
+  };
+  const totalRecordsCard: CountryFastFactCard = {
+    label: "Total Records",
+    value: String(total),
+    note: total === 0
+      ? "No records in the 7-day window"
+      : total < 3
+        ? "Limited sample"
+        : "Incidents in window",
+  };
+  // Week severity. When a standing card sits beside it, relabel so the two
+  // severities read as a pair ("Severity This Week" + "Standing Risk").
+  const weekSeverityCard: CountryFastFactCard = {
+    label: hasStanding ? "Severity This Week" : "Highest Severity",
+    value: highestLabel,
+    severity: highestKey || undefined,
+    note: highestKey
+      ? (hasStanding ? "Highest rating, last 7 days" : "Highest rating in window")
+      : (hasStanding ? "No records this week" : undefined),
+  };
+  const standingCard: CountryFastFactCard = {
+    label: "Standing Risk",
+    value: standingLabel,
+    severity: standingKey || undefined,
+    note: standingKey ? "Highest rating, last 90 days" : undefined,
+  };
+  const mostAffectedCard: CountryFastFactCard = {
+    label: "Most Affected Area",
+    value: safeAreaValue,
+    note: topAreaCount > 0 && !topAreaIsMixed
+      ? `${topAreaCount} record${topAreaCount === 1 ? "" : "s"}`
+      : undefined,
+  };
+  const latestIncidentCard: CountryFastFactCard = {
+    label: "Latest Incident",
+    value: latestDate ? format(latestDate, "dd MMM yyyy") : "—",
+  };
+  const mainIssueCard: CountryFastFactCard = {
+    label: "Main Issue Type",
+    value: safeTypeValue,
+    note: topTypeCount > 0 && !topTypeIsMixed
+      ? `${topTypeCount} record${topTypeCount === 1 ? "" : "s"}`
+      : undefined,
+  };
+
+  // With a standing card present, place the two severities side by side
+  // (positions 4 & 5 → same grid row). Without it, keep the original order.
+  const cards: CountryFastFactCard[] = hasStanding
+    ? [
+        reportingPeriodCard,
+        totalRecordsCard,
+        latestIncidentCard,
+        weekSeverityCard,
+        standingCard,
+        mostAffectedCard,
+        mainIssueCard,
+      ]
+    : [
+        reportingPeriodCard,
+        totalRecordsCard,
+        weekSeverityCard,
+        mostAffectedCard,
+        latestIncidentCard,
+        mainIssueCard,
+      ];
 
   return {
     cards,
     windowIncidents,
     highestKey,
     highestLabel,
+    standingKey,
+    standingLabel,
     topTypeLabel,
     topTypeCount,
     topAreaLabel,

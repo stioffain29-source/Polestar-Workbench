@@ -17,7 +17,7 @@ export const PAGE_BG = "#FFFFFF";
 // intentionally separate from the Polestar brand palette so the five
 // tiers stay distinguishable on charts and chips.
 export const SEV_COLOR: Record<string, string> = {
-  extreme: "#800000",
+  extreme: "#A33232",
   high: "#C0392B",
   moderate: "#E67E22",
   low: "#6FB872",

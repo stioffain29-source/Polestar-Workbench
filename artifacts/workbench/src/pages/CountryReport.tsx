@@ -44,7 +44,7 @@ const ROBOTO = "Roboto, sans-serif";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
 const SEV_COLOR: Record<string, string> = {
-  extreme: "#800000",
+  extreme: "#A33232",
   high: "#C0392B",
   moderate: "#E67E22",
   low: "#6FB872",
@@ -264,9 +264,10 @@ export default function CountryReport() {
       issueDate,
       incidents: incidents as CountryFastFactsIncident[],
       windowIncidents: active.incidents,
+      standingIncidents: layers.ninetyDay,
       periodLabel: active.periodShortLabel,
     }),
-    [incidents, issueDate, active],
+    [incidents, issueDate, active, layers],
   );
 
   // Auto-derived prose (executiveSummary, whatMatters, watchNext, polestarView).
