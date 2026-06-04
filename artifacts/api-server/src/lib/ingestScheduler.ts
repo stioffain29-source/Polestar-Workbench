@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { runIngestOnce, runMarketPricesOnce } from "./ingestRunner";
+import { runIngestOnce, runMarketPricesOnce, runStrikesOnce } from "./ingestRunner";
 import { logger } from "./logger";
 
 // Automatic ingestion scheduler.
@@ -223,6 +223,52 @@ export function startIngestScheduler(): void {
   // deferral keeps the event loop free until the VM is marked ready; the timer
   // is unref()'d so it never holds the process open on its own.
   const BOOT_INGEST_DELAY_MS = 60_000;
+
+  // EARLY, strikes-only boot run. The Missile Strike Tracker had been frozen
+  // with no live source, so its backfill is the highest-value catch-up — but it
+  // sat at the END of a multi-minute chain that an autoscale instance kept
+  // tearing down before it ran (observed in prod: the forced run started but
+  // never finished, strikes stayed frozen). This fires MUCH sooner than the
+  // full chain (so it lands while the cold-start request burst is still keeping
+  // the instance warm) and runs ONLY strikes (fast: a handful of feeds), so it
+  // completes well before the instance idles out. It shares the same advisory
+  // lock as the full ingest, so it can never collide with the chain below.
+  // Gated on strikes staleness so warm/repeat cold starts stay cheap. unref()'d
+  // so it never holds the process open on its own.
+  const STRIKES_BOOT_DELAY_MS = 8_000;
+  const strikesTimer = setTimeout(() => void (async () => {
+    try {
+      const strikeAge = await hoursSinceNewestStrike();
+      if (strikeAge !== null && strikeAge < hours) {
+        logger.info(
+          { strikeAgeHours: Math.round(strikeAge) },
+          "boot strikes: tracker fresh, skipping early strikes run",
+        );
+        return;
+      }
+      logger.info(
+        { strikeAgeHours: strikeAge === null ? null : Math.round(strikeAge) },
+        "boot strikes: tracker stale, running early strikes-only ingest",
+      );
+      const result = await runStrikesOnce();
+      if (!result.ran) {
+        logger.info("boot strikes: skipped (full ingest already running)");
+        return;
+      }
+      logger.info(
+        {
+          strikesInserted: result.strikes.inserted,
+          strikesLatest: result.strikes.latestRecord,
+          byTheatre: result.strikes.byTheatre,
+          durationMs: result.durationMs,
+        },
+        "boot strikes: early strikes-only ingest finished",
+      );
+    } catch (err) {
+      logger.error({ err }, "boot strikes: early strikes-only ingest failed");
+    }
+  })(), STRIKES_BOOT_DELAY_MS);
+  strikesTimer.unref();
 
   // Boot catch-up: only scrape if data is already stale, so repeated cold
   // starts on autoscale stay cheap.

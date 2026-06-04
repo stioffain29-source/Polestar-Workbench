@@ -57,6 +57,16 @@ export type MarketPricesRunResult =
     }
   | { ran: false; reason: "locked" };
 
+export type StrikesRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      strikes: StrikesIngestSummary;
+    }
+  | { ran: false; reason: "locked" };
+
 function emptyStrikes(err: unknown): StrikesIngestSummary {
   return {
     mode: "commit",
@@ -227,6 +237,39 @@ export async function runMarketPricesOnce(): Promise<MarketPricesRunResult> {
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       marketPrices,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the Missile Strike Tracker ingest, committing to the database.
+ *
+ * The strikes table had been frozen with no live source, so its one-time
+ * backfill is the highest-value catch-up. The full incident chain is a
+ * multi-minute, unowned background task that an autoscale instance can be torn
+ * down mid-way, so we give strikes its OWN fast, early boot run that completes
+ * long before the instance idles out — instead of leaving it stranded at the
+ * end of the long chain. Shares the same advisory lock so it can never collide
+ * with a full run.
+ */
+export async function runStrikesOnce(): Promise<StrikesRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let strikes: StrikesIngestSummary;
+    try {
+      strikes = await runStrikesIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "strikes ingest failed");
+      strikes = emptyStrikes(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      strikes,
     };
   });
   if (!res.ran) return res;
