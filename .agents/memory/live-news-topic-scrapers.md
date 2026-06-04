@@ -16,9 +16,18 @@ severity → insert. Per-topic configs (feeds, allow/deny, severity topic) live 
 (incidents) all have live news scrapers. fuel ALSO has the FRED price feed (separate,
 for `hardNumbers` tiles).
 
-**Why strikes is excluded:** `strikes` is a separate missile/drone theatre tracker
-(`Strikes.tsx`, own table/schema, `useListStrikes`), NOT a news-incident topic. It must
-NOT get a news scraper.
+**Strikes is now LIVE via its OWN module (NOT runNewsTopicIngest).** `strikes` is a
+separate missile/drone theatre tracker (`Strikes.tsx`, own `strikes` table/schema,
+`useListStrikes`), so it deliberately does NOT use the generic news-topic runner. It has
+its own `lib/ingest/src/strikes.ts` (`runStrikesIngest`): per-theatre feeds (land_gcc /
+maritime_hormuz), allow/deny gate, conservative munition/target/infra classifier
+(unknown by default, NEVER fabricates casualties), coarse dedupe {theatre,country,
+munition,date}+sourceUrl. **Why a dedicated EARLY boot-only run** (`ingestScheduler.ts`,
+gated on `MAX(strikes.created_at)` staleness, separate from the full ingest): the tracker
+had frozen at 2026-05-22 because the full ingest sometimes timed out before reaching
+strikes, so strikes gets its own fast, early, strikes-only boot run. `INGEST_FORCE_VERSION`
+(currently 5) force-runs once on the next prod boot so strikes populates prod after a
+single republish.
 
 **Wiring rule:** a new ingest topic must be threaded through ALL of: `severity.ts`
 (`SeverityTopic` union + a topic branch), `types.ts` (`IngestTopic`), `index.ts`

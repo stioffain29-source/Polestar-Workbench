@@ -119,28 +119,56 @@ const SOUTH_APAC = [
 ];
 
 // ---------------------------------------------------------------- energy ----
-const ENERGY_TERMS = `("power outage" OR "power cut" OR "blackout" OR "load shedding" OR "load-shedding" OR "grid failure" OR "electricity crisis" OR "power shortage" OR "substation fire" OR "power tariff" OR "energy crisis")`;
+// Grid-stress footprint: South/SE Asia + East Asia + the Gulf + Oceania. The
+// import-only feed had covered only SOUTH_APAC, so Middle East / Australia /
+// New Zealand grid news never arrived; the US Google-News edition then flooded
+// the country feeds with US-local outages (now fixed via per-country EDITIONS
+// + ENERGY_EXCLUDE in @workspace/relevance).
+const ENERGY_COUNTRIES = [
+  ...SOUTH_APAC,
+  "Malaysia",
+  "China",
+  "Japan",
+  "South Korea",
+  "Iran",
+  "Iraq",
+  "Saudi Arabia",
+  "United Arab Emirates",
+  "Qatar",
+  "Kuwait",
+  "Oman",
+  "Bahrain",
+  "Australia",
+  "New Zealand",
+];
+
+const ENERGY_TERMS = `("power outage" OR "power cut" OR "blackout" OR "brownout" OR "rolling blackout" OR "load shedding" OR "load-shedding" OR "grid failure" OR "power grid" OR "electricity crisis" OR "power shortage" OR "electricity shortage" OR "power rationing" OR "electricity price" OR "electricity tariff" OR "power tariff" OR "energy crisis" OR "energy shortage" OR "gas shortage" OR "substation fire")`;
 
 const ENERGY_CONFIG: NewsTopicConfig = {
   topic: "energy",
   feeds: [
-    ...countryFeeds(SOUTH_APAC, ENERGY_TERMS),
+    ...countryFeeds(ENERGY_COUNTRIES, ENERGY_TERMS),
     { label: "Load shedding (region)", q: `"load shedding" (Pakistan OR Bangladesh OR "Sri Lanka" OR India OR Nepal)`, defaultCountry: "Unknown" },
-    { label: "Grid attack/sabotage", q: `(substation OR "transmission line" OR pipeline OR grid) (attack OR sabotage OR blast OR explosion OR fire) (India OR Pakistan OR Myanmar OR Bangladesh OR Iran OR Iraq)`, defaultCountry: "Unknown" },
+    { label: "Brownout/tariff (region)", q: `(brownout OR "rolling blackout" OR "electricity tariff" OR "power tariff" OR "tariff hike" OR "electricity price") (India OR Pakistan OR Philippines OR Indonesia OR Australia OR "New Zealand" OR "Saudi Arabia" OR "United Arab Emirates")`, defaultCountry: "Unknown" },
+    { label: "Grid attack/sabotage", q: `(substation OR "transmission line" OR pipeline OR grid) (attack OR sabotage OR blast OR explosion OR fire) (India OR Pakistan OR Myanmar OR Bangladesh OR Iran OR Iraq OR "Saudi Arabia")`, defaultCountry: "Unknown" },
   ],
   allow: [
     "power outage",
     "power cut",
     "blackout",
+    "brownout",
+    "rolling blackout",
     "load shedding",
     "load-shedding",
     "grid failure",
     "grid collapse",
+    "grid strain",
     "electricity shortage",
     "electricity crisis",
     "power shortage",
     "power crisis",
     "power rationing",
+    "electricity rationing",
     "substation fire",
     "substation attack",
     "transmission line",
@@ -148,10 +176,18 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     "pipeline sabotage",
     "power tariff",
     "electricity tariff",
+    "tariff hike",
+    "electricity price",
+    "power price",
+    "energy price",
     "energy crisis",
     "energy emergency",
+    "energy shortage",
+    "gas shortage",
+    "peak demand",
     "generation shortfall",
     "capacity shortfall",
+    "supply shortfall",
   ],
   deny: [
     ...COMMON_DENY,
@@ -162,6 +198,27 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     "wind farm",
     "energy stocks",
     "energy sector stocks",
+    // Out-of-region US / Canadian / African utilities + local distribution
+    // faults the old US Google-News edition injected into the country feeds.
+    "duke energy",
+    "dominion energy",
+    "consumers energy",
+    "nv energy",
+    "pg&e",
+    "con edison",
+    "georgia power",
+    "florida power",
+    "outage tracker",
+    "outage map",
+    "in your area",
+    "downed tree",
+    "tree crew",
+    "county",
+    "canada",
+    "canadian",
+    "nersa",
+    "ferrochrome",
+    "eskom",
   ],
   countryAliases: COUNTRY_ALIASES,
 };

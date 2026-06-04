@@ -331,6 +331,43 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   /\bgain from .{0,20}(disposal|sale|vessel|tanker)\b/,
 ];
 
+// Energy is a Middle East / South+East Asia / Oceania grid-stress monitor.
+// The US Google-News edition used to inject US-local distribution faults
+// ("downed tree", county feeders, investor-owned utilities) and African
+// load-shedding (Eskom/NERSA) into the country feeds. These run BEFORE the
+// REQUIRED gate, so an out-of-region utility story is dropped even when it
+// carries a "power outage" token. Deliberately omits the country names of
+// in-scope theatres and bare "u.s." (which appears in legit Gulf
+// energy-infrastructure strike stories).
+const ENERGY_EXCLUDE: RegExp[] = [
+  // US / Canadian investor-owned utilities and grid operators.
+  /\b(duke energy|dominion energy|consumers energy|nv energy|pg&e|pacific gas|con ?ed(ison)?|comed|exelon|xcel energy|georgia power|florida power|entergy|first ?energy|ameren|dte energy|eversource|hydro[- ]?quebec|bc hydro|hydro one|pseg|appalachian power|oncor|centerpoint)\b/,
+  // US-local distribution vocabulary + "outage tracker" SEO pages.
+  /\b(downed (tree|power line|line)|fallen tree|tree crew|outage (tracker|map)|in your area)\b/,
+  // US TV-station call signs that syndicate local outage notices.
+  /\b(abc\d{1,2}|wfaa|fox\d{1,2}|nbc\d{1,2}|cbs\d{1,2}|king ?5)\b/,
+  // US / Canadian geography markers (none collide with in-scope theatres).
+  /\b(county|township|ohio|texas|california|nevada|michigan|virginia|florida|illinois|oregon|washington state|ontario|quebec|alberta|british columbia)\b/,
+  // Out-of-region countries that recur in the energy feed.
+  /\b(canada|canadian|kenya|kenyan|nersa|ferrochrome|nigeria|south africa|eskom|ghana|zimbabwe|zambia)\b/,
+  // Out-of-region grid stories the country-edition feeds mis-attribute to
+  // in-scope countries (Iberia/Cuba/Ukraine/US blackouts). These run BEFORE
+  // required, so broadening the grid-collapse rule above cannot leak a Cuba or
+  // Spain blackout in under a Bangladesh / Indonesia byline. Deliberately
+  // omits bare turkey/russia/europe — those collide with legitimate in-scope
+  // grid stories (e.g. an Iraq–Turkey power-line attack, a Gulf outage tied to
+  // Russian/European supply); the Russia–Ukraine war noise is already caught
+  // by the "ukraine" token.
+  /\b(spain|spanish|portugal|portuguese|iberia|iberian|cuba|cuban|ukraine|ukrainian|virgin islands|zaporizhzhia)\b/,
+  // Planned / scheduled maintenance outages are routine, not grid stress.
+  /\b(planned|scheduled) (power )?(outage|maintenance)\b/,
+  /\brestored after\b.{0,30}(outage|disruption|fault)/,
+  // Negations — the OPPOSITE of an incident.
+  /\bno (power|electricity) (shortage|crisis|cut|outage)/,
+  /\bno (scope for|need for) (load[- ]?shedding|power cut|outage)/,
+  /\bno load[- ]?shedding\b/,
+];
+
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
     /\bfuel (shortage|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
@@ -359,13 +396,21 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\bfood security\b/,
   ],
   energy: [
-    /\b(power|grid|electricity) (outage|cut|blackout|disruption|failure|shortage|crisis|tariff)/,
+    /\b(power|grid|electricity) (outage|cut|blackout|brownout|disruption|failure|shortage|crisis|tariff|rationing|price|prices)/,
+    /\bpower grid\b/,
+    /\bgrid (collapse|collapses|collapsed|attack|attacked|sabotage|overload|overloaded)/,
+    /\bbrownout/,
+    /\brolling (blackout|outage|power cut)/,
     /\bload[ -]shedd/,
     /\bsubstation (fire|attack|failure|outage|sabotage)/,
-    /\b(generation|capacity) shortfall/,
+    /\b(generation|capacity|supply) shortfall/,
     /\b(transmission|pipeline) (attack|sabotage|disruption|outage|failure)/,
     /\b(gas|diesel|coal) .{0,20}power\b/,
-    /\benergy (crisis|shortage|tariff|emergency)/,
+    /\b(electricity|power|energy) (price|prices|tariff|tariffs) (hike|hiked|rise|rises|increase|increases|surge|jump|jumps)/,
+    /\b(tariff|price) (hike|hiked|increase|surge) .{0,25}(electricity|power|energy)/,
+    /\benergy (crisis|shortage|tariff|emergency|rationing)/,
+    /\b(peak|record) (power |electricity )?demand/,
+    /\bgas shortage/,
   ],
   shipping: [
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,
@@ -533,6 +578,10 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   if (topic === "cargo_watch") {
     const m = firstMatch(text, CARGO_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: cargo off-topic (/${m.source}/)` };
+  }
+  if (topic === "energy") {
+    const m = firstMatch(text, ENERGY_EXCLUDE);
+    if (m) return { relevant: false, reason: `excluded: energy off-topic (/${m.source}/)` };
   }
 
   if (topic === "flashpoint" || topic === "protests") {
