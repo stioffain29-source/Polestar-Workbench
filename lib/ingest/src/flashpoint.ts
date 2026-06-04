@@ -102,6 +102,17 @@ const FLASHPOINT_DENY: RegExp[] = [
   // Kinetic armed conflict — foreign signatures only (insurgent/armed-group
   // kinetic is handled conditionally in classify() so Pacific stays in scope).
   KINETIC_DENY_GLOBAL,
+  // WWII / wartime unexploded-ordnance accidents are tragedies but NOT
+  // security/conflict events. In the Papua theatre a cluster of "WWII bomb
+  // explodes, five dead" wire stories was leaking into the country report via
+  // the bare "killed" cue and misrepresenting the genuine security picture
+  // (insurgency). An 80-year-old munition detonating is an accident, not an
+  // armed-conflict incident, so it is denied from this tracker. Gated to require
+  // a WWII reference CO-OCCURRING with ordnance/explosion semantics so a genuine
+  // present-day security event that merely mentions WWII (a protest at a WWII
+  // memorial, a war anniversary rally) is NOT dropped — only the bomb-accident
+  // class is.
+  /(?:\b(?:world war (?:ii|2|two)|wwii|ww2|second world war)\b[\s\S]{0,40}\b(?:bomb|ordnance|munition|ammunition|shell|grenade|explo\w*|blast|unexploded|uxo))|(?:\b(?:bomb|ordnance|munition|ammunition|shell|grenade|explo\w*|blast|unexploded|uxo)\b[\s\S]{0,40}\b(?:world war (?:ii|2|two)|wwii|ww2|second world war)\b)|\bwartime (?:bomb|ordnance|munition|ammunition)\b|\bunexploded ordnance\b/i,
   // Cargo / freight noise (handled by cargo_watch)
   /\b(cargo theft|truck hijack|warehouse theft|container theft|freight theft|depot theft|cargo robbery|seal tamper)\b/i,
   // Commercial / market commentary
@@ -158,7 +169,7 @@ const FLASHPOINT_DENY: RegExp[] = [
 // <act>", "rebels/separatists" are the cues that capture the genuine PNG/West
 // Papua incidents the global protest-only allowlist misses.
 const PACIFIC_CRIME: RegExp =
-  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?(?:rape|violence|attack|war|fight|members?|shooting)|police raid|raid(?:ed|s)?|wanted (?:criminal|man|men|suspect|fugitive|offender)|shot dead|shooting|gunned down|opened fire|gun(?:point|fire|fight)|gun battle|firefight|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|murder(?:ed|s)?|manslaughter|kill(?:ed|ings?|s)?|fatalit(?:y|ies)|massacre|found dead|beaten to death|mob (?:attack|violence|justice|turns|sets|storms|burn|beat)|payback (?:killing|attack)|sorcery|riot(?:ing|s)?|arson|rebels?|separatists?|insurgen(?:t|ts|cy)|deadly clash|armed clash|violent clash)\b/i;
+  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?(?:rape|violence|attack|war|fight|members?|shooting)|police raid|raid(?:ed|s)?|wanted (?:criminal|man|men|suspect|fugitive|offender)|shot dead|shooting|gunned down|opened fire|gun(?:point|fire|fight)|gun battle|firefight|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|murder(?:ed|s)?|manslaughter|kill(?:ed|ings?|s)?|fatalit(?:y|ies)|massacre|found dead|beaten to death|mob (?:attack|violence|justice|turns|sets|storms|burn|beat)|payback (?:killing|attack)|sorcery|riot(?:ing|s)?|arson|rebels?|separatists?|insurgen(?:t|ts|cy)|deadly clash|armed clash|violent clash|opm|tpnpb|armed criminal group|criminal armed group|recover(?:ed|s)? (?:the )?bodies|bodies of (?:\d|the ))\b/i;
 
 // Country aliases for in-text matching. Restricted to the 14 APAC
 // targets the Flashpoint Data Coverage Audit calls out, plus Myanmar
@@ -197,7 +208,7 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
 const PNG_MARKERS =
   /\b(papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
 const WEST_PAPUA_MARKERS =
-  /\b(west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|papua pegunungan|papua tengah|papua selatan|papua barat daya|highland papua)\b/i;
+  /\b(west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|papua pegunungan|papua tengah|papua selatan|papua barat daya|highland papua|intan jaya|bilogai|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|kiwirok|maybrat|beoga|kenyam|mulia|damai cartenz|koops habema|kodam cenderawasih)\b/i;
 const INDONESIA_CONTEXT = /\b(indonesia|indonesian|tni|polri|jakarta)\b/i;
 // West Papua insurgency context. Per analyst direction, rebel / separatist
 // violence in the Indonesian Papua theatre (West Papua militants vs the
@@ -220,7 +231,9 @@ function resolvePapuaPng(hay: string): string | null {
   if (wp) return "West Papua";
   // Bare "papua" with Indonesian or insurgency context but no province
   // marker -> West Papua (Indonesian Papua theatre).
-  if (/\bpapua\b/i.test(hay) && (INDONESIA_CONTEXT.test(hay) || WP_INSURGENCY.test(hay)))
+  // Accept the demonym "Papuan" too (e.g. "killed by Papuan separatists"),
+  // which the bare \bpapua\b boundary check would otherwise miss.
+  if (/\bpapuan?\b/i.test(hay) && (INDONESIA_CONTEXT.test(hay) || WP_INSURGENCY.test(hay)))
     return "West Papua";
   return null;
 }

@@ -173,6 +173,43 @@ data (re-scraped in-session), so dev shows inserted:0/duplicateInDb — it is PR
 that gains the rows; verify prod post-republish via the admin-ingest perFeed
 stats for the new feed.
 
+**Accepting insurgency + a feed is STILL not enough — the West Papua resolver and
+cue set had recall holes that silently re-froze the report.** Even with the
+dedicated feed and PACIFIC_CRIME, the genuine May-2026 goldminer-massacre cluster
+was dropped because: (1) `resolvePapuaPng` only matched bare `\bpapua\b`, so the
+demonym "Papuan" ("killed by Papuan separatists") fell through to the Indonesia
+alias → country resolved NON-Pacific → PACIFIC_CRIME never applied → no-flashpoint-cue;
+(2) the Central/Highland conflict theatre proper nouns and named security
+operations were absent from `WEST_PAPUA_MARKERS` (Intan Jaya, Bilogai, Nduga,
+Puncak Jaya, Paniai, Ilaga, Sugapa, Yahukimo, Dekai, Kiwirok, Maybrat, Beoga,
+Kenyam, Mulia, Damai Cartenz, Koops Habema, Kodam Cenderawasih), so "Damai
+Cartenz secured a member of the Intan Jaya armed criminal group in Bilogai"
+resolved to NO country (no-apac-country); (3) aftermath/named-group phrasing
+("evacuated victims of OPM", "fled from OPM", "recovers bodies of N", "armed
+criminal group") carried no PACIFIC_CRIME cue, so even correctly-resolved West
+Papua items were dropped. Fix = `\bpapuan?\b` in resolvePapuaPng + the markers
+above + adding `opm|tpnpb|armed criminal group|recover(?:ed|s)? bodies|bodies of
+\d` to PACIFIC_CRIME. **Keep WEST_PAPUA_MARKERS in lockstep with the report-side
+`WEST_PAPUA_CONTEXT_RE` AND `PAPUA_STRICT_LOCAL_RE` in countryMatch.ts** — those
+two guards rescue the same rows from the PNG-strip and foreign-dominant drops, so
+a marker added only at ingest gets re-dropped at render.
+**Why:** "stuck on an old date" after the feed+insurgency work was NOT a feed gap
+— the events were fetched and dropped by an over-narrow resolver/cue set. Prove
+recall holes by running the live feed items through `classify` directly (a
+throwaway probe re-exporting it) and reading the per-item reason, not by trusting
+the accept/reject counts.
+
+**WWII / wartime unexploded-ordnance accidents are NOT security events — deny
+them.** A May/Jun-2026 cluster of "WWII bomb explodes in Papua, five dead" wire
+stories leaked into the country report via the bare "killed" PACIFIC_CRIME cue and
+falsely freshened/escalated the security picture (an 80-year-old munition
+detonating is an accident, not armed conflict). Denied globally in FLASHPOINT_DENY
+(`world war ii|wwii|ww2|second world war|wartime bomb/ordnance/munition|unexploded
+ordnance`). The deny only blocks FUTURE inserts; rows already in a DB from earlier
+runs must be purged separately (dev was cleaned with a scoped DELETE; prod never
+held them). **Why:** the user asked for GENUINE security events only — accident
+casualties misrepresent the theatre and inflate the date.
+
 **How to apply:** new PNG/Pacific feeds go in FLASHPOINT_REGIONAL_SOURCES in
 `artifacts/api-server/src/lib/migrations.ts` (seeded on boot, reaches prod on
 deploy; repairFlashpointSeedUrls updates existing rows' URLs). Any new Google
