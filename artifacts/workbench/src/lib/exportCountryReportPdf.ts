@@ -186,7 +186,12 @@ function drawTypeChart(ctx: Ctx, facts: CountryFactsBreakdown) {
 
 function drawMapSection(
   ctx: Ctx,
-  opts: { mapImage?: string; plottedCount: number; totalInWindow: number; basisShort: string },
+  opts: {
+    mapImage?: string;
+    plottedCount: number;
+    totalInWindow: number;
+    basisShort: string;
+  },
 ) {
   ensureSpace(ctx, opts.mapImage ? 192 : 88);
   drawSectionHeading(ctx, "Map");
@@ -244,21 +249,19 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
   const colTypeW = 120;
   const colSevW = 64;
   const colTitleW = CW - colDateW - colTypeW - colSevW - 6;
-  const rowH = 18;
+  const rowH = 20;
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text("DATE", MX + 6, ctx.y + 12);
-    pdf.text("TYPE", MX + colDateW + 6, ctx.y + 12);
-    pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 12);
+    pdf.setFontSize(7);
+    pdf.text("DATE", MX + 6, ctx.y + 13);
+    pdf.text("TYPE", MX + colDateW + 6, ctx.y + 13);
+    pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 13);
+    pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 13);
     ctx.y += rowH;
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
   };
 
   const sorted = [...incidents].sort(
@@ -272,50 +275,54 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
   drawHeader();
 
   for (const i of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+
     const titleLines: string[] = pdf.splitTextToSize(
       sanitize(i.title),
       colTitleW - 8,
     );
-    const rh = Math.max(rowH, titleLines.length * 11 + 8);
+    const rh = Math.max(rowH, titleLines.length * 12 + 10);
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
     }
     setStroke(pdf, POLAR);
     pdf.setLineWidth(0.3);
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
 
     setText(pdf, DUSK);
+    const textOpts = { lineHeightFactor: 1.4 };
     let dateStr = "";
     try {
       dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy");
     } catch {
       dateStr = i.occurredAt;
     }
-    pdf.text(dateStr, MX + 6, ctx.y + 12);
+    pdf.text(dateStr, MX + 6, ctx.y + 14, textOpts);
     const incidentType = classifyIncidentType(i);
     const typeLines: string[] = pdf.splitTextToSize(
       sanitize(incidentType),
       colTypeW - 8,
     );
-    pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
+    pdf.text(typeLines, MX + colDateW + 6, ctx.y + 14, textOpts);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
+    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 14, textOpts);
 
     const sk = sevKey(i.severity);
     const sevColor = SEV_COLOR[sk] ?? "#999999";
     setFill(pdf, sevColor);
     const chipX = MX + colDateW + colTypeW + colTitleW + 6;
-    pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+    pdf.rect(chipX, ctx.y + 4, 56, 12, "F");
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
+    pdf.setFontSize(6.5);
     const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
-    pdf.text(sanitize(sevDisplay.toUpperCase()), chipX + 28, ctx.y + 12, {
+    pdf.text(sanitize(sevDisplay.toUpperCase()), chipX + 28, ctx.y + 12.5, {
       align: "center",
     });
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
 
     ctx.y += rh;
   }
@@ -393,7 +400,7 @@ function drawWatchlistTable(ctx: Ctx, rows: WatchlistRow[]) {
   const col90W = 32;
   const colSevW = 70;
   const colNoteW = CW - colLabelW - col7W - col30W - col90W - colSevW - 6;
-  const rowH = 18;
+  const rowH = 20;
 
   const header = () => {
     setFill(pdf, NAVY);
@@ -401,37 +408,38 @@ function drawWatchlistTable(ctx: Ctx, rows: WatchlistRow[]) {
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(7);
-    pdf.text("LOCATION", MX + 6, ctx.y + 12);
-    pdf.text("NOTE", MX + colLabelW + 6, ctx.y + 12);
-    pdf.text("7D", MX + colLabelW + colNoteW + col7W - 4, ctx.y + 12, {
+    pdf.text("LOCATION", MX + 6, ctx.y + 13);
+    pdf.text("NOTE", MX + colLabelW + 6, ctx.y + 13);
+    pdf.text("7D", MX + colLabelW + colNoteW + col7W - 4, ctx.y + 13, {
       align: "right",
     });
     pdf.text(
       "30D",
       MX + colLabelW + colNoteW + col7W + col30W - 4,
-      ctx.y + 12,
+      ctx.y + 13,
       { align: "right" },
     );
     pdf.text(
       "90D",
       MX + colLabelW + colNoteW + col7W + col30W + col90W - 4,
-      ctx.y + 12,
+      ctx.y + 13,
       { align: "right" },
     );
     pdf.text(
       "WORST (90D)",
       MX + colLabelW + colNoteW + col7W + col30W + col90W + 6,
-      ctx.y + 12,
+      ctx.y + 13,
     );
     ctx.y += rowH;
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
   };
 
   ensureSpace(ctx, rowH * 3);
   header();
 
   for (const r of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+
     const labelLines: string[] = pdf.splitTextToSize(
       sanitize(r.label),
       colLabelW - 8,
@@ -442,44 +450,46 @@ function drawWatchlistTable(ctx: Ctx, rows: WatchlistRow[]) {
     );
     const rh = Math.max(
       rowH,
-      labelLines.length * 11 + 8,
-      noteLines.length * 10 + 8,
+      labelLines.length * 12 + 10,
+      noteLines.length * 12 + 10,
     );
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       header();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
     }
     setStroke(pdf, POLAR);
     pdf.setLineWidth(0.3);
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
 
+    const textOpts = { lineHeightFactor: 1.4 };
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text(labelLines, MX + 6, ctx.y + 12);
+    pdf.text(labelLines, MX + 6, ctx.y + 14, textOpts);
+
     setRoboto(pdf, "regular");
     setText(pdf, DUSK);
-    pdf.setFontSize(8);
-    pdf.text(noteLines, MX + colLabelW + 6, ctx.y + 12);
+    pdf.text(noteLines, MX + colLabelW + 6, ctx.y + 14, textOpts);
 
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
     pdf.text(
       String(r.currentCount),
       MX + colLabelW + colNoteW + col7W - 4,
-      ctx.y + 12,
+      ctx.y + 14,
       { align: "right" },
     );
     pdf.text(
       String(r.thirtyDayCount),
       MX + colLabelW + colNoteW + col7W + col30W - 4,
-      ctx.y + 12,
+      ctx.y + 14,
       { align: "right" },
     );
     pdf.text(
       String(r.ninetyDayCount),
       MX + colLabelW + colNoteW + col7W + col30W + col90W - 4,
-      ctx.y + 12,
+      ctx.y + 14,
       { align: "right" },
     );
     setRoboto(pdf, "regular");
@@ -489,26 +499,26 @@ function drawWatchlistTable(ctx: Ctx, rows: WatchlistRow[]) {
       const sevColor = SEV_COLOR[sk] ?? "#999999";
       setFill(pdf, sevColor);
       const chipX = MX + colLabelW + colNoteW + col7W + col30W + col90W + 6;
-      pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+      pdf.rect(chipX, ctx.y + 4, 56, 12, "F");
       setText(pdf, WHITE);
       setRoboto(pdf, "bold");
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.text(
         sanitize((SEV_LABEL[sk] ?? r.worstSeverity).toUpperCase()),
         chipX + 28,
-        ctx.y + 12,
+        ctx.y + 12.5,
         { align: "center" },
       );
       setRoboto(pdf, "regular");
-      pdf.setFontSize(8);
+      pdf.setFontSize(8.5);
     } else {
       setText(pdf, DUSK);
       setRoboto(pdf, "italic");
-      pdf.setFontSize(8);
       pdf.text(
         "No records",
         MX + colLabelW + colNoteW + col7W + col30W + col90W + 6,
-        ctx.y + 12,
+        ctx.y + 14,
+        textOpts,
       );
       setRoboto(pdf, "regular");
     }
@@ -541,7 +551,10 @@ function drawCoverageBanner(ctx: Ctx, coverage: CountryCoverageStatus) {
   const innerW = W - MX * 2 - padX * 2;
   setRoboto(pdf, "regular");
   pdf.setFontSize(9);
-  const lines = pdf.splitTextToSize(sanitize(coverage.detail), innerW) as string[];
+  const lines = pdf.splitTextToSize(
+    sanitize(coverage.detail),
+    innerW,
+  ) as string[];
   const boxH = 12 + 4 + lines.length * 11 + 8;
   ensureSpace(ctx, boxH + 8);
   const top = ctx.y;
@@ -587,7 +600,10 @@ export async function exportCountryReportPdf(
   await ensureRobotoLoaded(ctx.pdf);
 
   const todayIso = new Date().toISOString().slice(0, 10);
-  const layers = buildCountryLayers(incidents as CountryFastFactsIncident[], todayIso);
+  const layers = buildCountryLayers(
+    incidents as CountryFastFactsIncident[],
+    todayIso,
+  );
   const active = resolveActiveCountryWindow(layers, todayIso);
   const facts = computeCountryFastFacts({
     issueDate: todayIso,
@@ -625,13 +641,6 @@ export async function exportCountryReportPdf(
     coverImage,
   });
   beginBodyPages(ctx);
-  drawDataAsOf(
-    ctx,
-    formatDataAsOfLine({
-      ...computeDataAsOf({ topic: "country", incidents, filterByTopic: false }),
-      modeLabel: "Mixed sources (live, manual & static)",
-    }),
-  );
 
   // Coverage banner — only renders when the weekly window is empty.
   if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
@@ -727,6 +736,14 @@ export async function exportCountryReportPdf(
 
   // 12. Disclaimer
   drawDisclaimer(ctx);
+
+  drawDataAsOf(
+    ctx,
+    formatDataAsOfLine({
+      ...computeDataAsOf({ topic: "country", incidents, filterByTopic: false }),
+      modeLabel: "Mixed sources (live, manual & static)",
+    }),
+  );
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

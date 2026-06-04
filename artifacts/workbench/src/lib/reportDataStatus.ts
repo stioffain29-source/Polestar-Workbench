@@ -39,7 +39,7 @@ export function ingestionModeLabel(mode: IngestionMode): string {
     case "manual":
       return "Manual scraper";
     case "static":
-      return "Static / import only";
+      return "Multiple Sources";
   }
 }
 
@@ -86,7 +86,10 @@ function maxDate(
 }
 
 /** Newest record (event) date across the supplied incidents, scoped to a topic. */
-export function latestRecordDate(incidents: IncidentLike[], topic?: string): Date | null {
+export function latestRecordDate(
+  incidents: IncidentLike[],
+  topic?: string,
+): Date | null {
   return maxDate(incidents, "occurredAt", topic);
 }
 

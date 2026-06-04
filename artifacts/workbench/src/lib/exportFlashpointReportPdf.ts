@@ -1,12 +1,36 @@
 import { format, parseISO } from "date-fns";
 import {
-  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
-  setRoboto, ensureRobotoLoaded,
-  drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, drawFooters,
-  drawPolestarCover, beginBodyPages, prepareCoverImage, drawDataAsOf,
-  COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
-  setFill, setStroke, setText, sanitize,
-  NAVY, ELECTRIC, POLAR, DUSK, WHITE, SEV_COLOR, SEV_LABEL, sevKey,
+  createCtx,
+  newPage,
+  ensureSpace,
+  drawSectionHeading,
+  drawSubtitle,
+  renderProse,
+  drawSectionWithProse,
+  setRoboto,
+  ensureRobotoLoaded,
+  drawFastFactsKpiCards,
+  drawBulletSection,
+  drawDisclaimer,
+  drawFooters,
+  drawPolestarCover,
+  beginBodyPages,
+  prepareCoverImage,
+  drawDataAsOf,
+  COVER_TOP_BAND_H,
+  COVER_BOTTOM_BLOCK_H,
+  setFill,
+  setStroke,
+  setText,
+  sanitize,
+  NAVY,
+  ELECTRIC,
+  POLAR,
+  DUSK,
+  WHITE,
+  SEV_COLOR,
+  SEV_LABEL,
+  sevKey,
   type Ctx,
 } from "./pdfChrome";
 import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
@@ -15,7 +39,6 @@ import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import {
   buildFlashpointReportDataset,
-  isGenericFlashpointProse,
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
@@ -52,16 +75,33 @@ export type { FlashpointReportIncident };
 // --- Subtle bar styling helpers (kept local; identical math to shipping) ----
 function parseHex(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
-  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+  const v =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
+  return [
+    parseInt(v.slice(0, 2), 16),
+    parseInt(v.slice(2, 4), 16),
+    parseInt(v.slice(4, 6), 16),
+  ];
 }
 function toHex(r: number, g: number, b: number): string {
-  const c = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  const c = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n)))
+      .toString(16)
+      .padStart(2, "0");
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 function lightenHex(hex: string, amount: number): string {
   const [r, g, b] = parseHex(hex);
-  return toHex(r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount);
+  return toHex(
+    r + (255 - r) * amount,
+    g + (255 - g) * amount,
+    b + (255 - b) * amount,
+  );
 }
 function darkenHex(hex: string, amount: number): string {
   const [r, g, b] = parseHex(hex);
@@ -72,12 +112,12 @@ function darkenHex(hex: string, amount: number): string {
 // --- Incident table --------------------------------------------------------
 function drawIncidentTable(
   ctx: Ctx,
-  heading: string,
+  heading: string | null,
   rows: EnrichedIncident[],
   emptyMessage: string,
   rowLimit = 12,
 ) {
-  drawSectionHeading(ctx, heading);
+  if (heading) drawSubtitle(ctx, heading);
   if (rows.length === 0) {
     const { pdf, MX } = ctx;
     setText(pdf, DUSK);
@@ -91,23 +131,26 @@ function drawIncidentTable(
   const { pdf, MX, CW } = ctx;
   const colDateW = 80;
   const colIssueW = 120;
-  const colSevW = 64;
+  const colSevW = 75;
   const colTitleW = CW - colDateW - colIssueW - colSevW - 6;
-  const rowH = 18;
+  const rowH = 20;
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text("DATE", MX + 6, ctx.y + 12);
-    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 12);
-    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 12);
+    pdf.setFontSize(7);
+    pdf.text("DATE", MX + 6, ctx.y + 13);
+    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 13);
+    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 13);
+    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 13);
     ctx.y += rowH;
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
   };
 
   ensureSpace(ctx, rowH * 2);
@@ -115,30 +158,52 @@ function drawIncidentTable(
 
   const limited = rows.slice(0, rowLimit);
   for (const i of limited) {
-    const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-    const issueLines: string[] = pdf.splitTextToSize(sanitize(i.issue), colIssueW - 8);
-    const rh = Math.max(rowH, Math.max(titleLines.length, issueLines.length) * 11 + 8);
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) { newPage(ctx); drawHeader(); }
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+
+    const titleLines: string[] = pdf.splitTextToSize(
+      sanitize(i.title),
+      colTitleW - 8,
+    );
+    const issueLines: string[] = pdf.splitTextToSize(
+      sanitize(i.issue),
+      colIssueW - 8,
+    );
+    const rh = Math.max(
+      rowH,
+      Math.max(titleLines.length, issueLines.length) * 12 + 10,
+    );
+    // Prevent row from splitting across pages - ensure space for the entire row
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
     setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.3);
+    pdf.setLineWidth(0.6);
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
 
     setText(pdf, DUSK);
-    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 12);
-    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 12);
+    const textOpts = { lineHeightFactor: 1.4 };
+    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 14, textOpts);
+    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 14, textOpts);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 12);
+    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 14, textOpts);
 
     const sk = sevKey(i.severity);
     setFill(pdf, SEV_COLOR[sk] ?? "#999999");
     const chipX = MX + colDateW + colIssueW + colTitleW + 6;
-    pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+    const sevText = sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase());
+    const isSmallText = sevText === "HIGH" || sevText === "LOW";
+    const chipW = isSmallText ? 40 : 50;
+    pdf.rect(chipX, ctx.y + 4, chipW, 12, "F");
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    pdf.text(sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
+    pdf.setFontSize(6.5);
+    pdf.text(sevText, chipX + chipW / 2, ctx.y + 12.5, { align: "center" });
 
     ctx.y += rh;
   }
@@ -171,18 +236,23 @@ function drawHorizontalBarChart(
   const rowH = 20;
   const gap = 5;
   const axisH = 14;
-  const headingH = 32;
-  const projectedH = rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
+  const headingH = 22;
+  const projectedH =
+    rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
   // Reserve room for heading + chart body together so the heading
   // cannot strand at the bottom of a page above an orphaned chart.
   ensureSpace(ctx, headingH + projectedH);
-  drawSectionHeading(ctx, heading);
+  drawSubtitle(ctx, heading);
   const { pdf, MX, CW } = ctx;
   if (rows.length === 0) {
     setText(pdf, DUSK);
     setRoboto(pdf, "italic");
     pdf.setFontSize(9);
-    pdf.text(sanitize(opts.emptyMessage ?? "No data in window."), MX, ctx.y + 10);
+    pdf.text(
+      sanitize(opts.emptyMessage ?? "No data in window."),
+      MX,
+      ctx.y + 10,
+    );
     setRoboto(pdf, "regular");
     ctx.y += 22;
     return;
@@ -193,25 +263,28 @@ function drawHorizontalBarChart(
   const rawMax = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
   const { max, step } = niceScale(rawMax);
 
-  const gridTop = ctx.y + 2;
-  const gridBottom = ctx.y + rows.length * (rowH + gap) - gap + 2;
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(0.4);
-  for (let v = 0; v <= max; v += step) {
-    const gx = trackX + (v / max) * trackW;
-    pdf.line(gx, gridTop, gx, gridBottom);
-  }
-
   for (const r of rows) {
     const y = ctx.y;
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8.5);
-    const labelLines: string[] = pdf.splitTextToSize(sanitize(r.label), labelW - 4);
+    pdf.setFontSize(9.5);
+    const labelLines: string[] = pdf.splitTextToSize(
+      sanitize(r.label),
+      labelW - 4,
+    );
     pdf.text(labelLines.slice(0, 1), MX, y + rowH - 7);
 
+    // Track background.
     setFill(pdf, "#F3F4F8");
     pdf.rect(trackX, y + 4, trackW, rowH - 8, "F");
+
+    // Grid lines inside the track.
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.4);
+    for (let v = 0; v <= max; v += step) {
+      const gx = trackX + (v / max) * trackW;
+      pdf.line(gx, y + 4, gx, y + 4 + rowH - 8);
+    }
 
     const w = (r.value / max) * trackW;
     const baseColor = r.color ?? opts.barColor ?? ELECTRIC;
@@ -224,7 +297,7 @@ function drawHorizontalBarChart(
 
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(9);
+    pdf.setFontSize(9.5);
     pdf.text(String(r.value), trackX + trackW + 6, y + rowH - 7);
     setRoboto(pdf, "regular");
 
@@ -250,7 +323,7 @@ function drawHorizontalBarChart(
 function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
   if (rows.length === 0) return;
   const { pdf, MX, CW } = ctx;
-  const rowH = 18;
+  const rowH = 20;
   const colCountryW = 100;
   const colSignalW = 160;
   const colMeaningW = CW - colCountryW - colSignalW;
@@ -258,40 +331,77 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
   const drawHeader = () => {
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text("COUNTRY", MX + 6, ctx.y + 12);
-    pdf.text("SIGNAL", MX + colCountryW + 6, ctx.y + 12);
-    pdf.text("OPERATIONAL MEANING", MX + colCountryW + colSignalW + 6, ctx.y + 12);
+    pdf.setFontSize(7);
+    pdf.text("COUNTRY", MX + 6, ctx.y + 13);
+    pdf.text("SIGNAL", MX + colCountryW + 6, ctx.y + 13);
+    pdf.text(
+      "OPERATIONAL MEANING",
+      MX + colCountryW + colSignalW + 6,
+      ctx.y + 13,
+    );
     ctx.y += rowH;
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8.5);
   };
 
   ensureSpace(ctx, rowH * 2);
   drawHeader();
 
   for (const r of rows) {
-    const signalLines: string[] = pdf.splitTextToSize(sanitize(r.signal), colSignalW - 8);
-    const meaningLines: string[] = pdf.splitTextToSize(sanitize(r.meaning), colMeaningW - 8);
-    const countryLines: string[] = pdf.splitTextToSize(sanitize(r.country), colCountryW - 8);
-    const lines = Math.max(countryLines.length, signalLines.length, meaningLines.length);
-    const rh = Math.max(rowH, lines * 11 + 8);
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) { newPage(ctx); drawHeader(); }
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.3);
-    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
 
+    const signalLines: string[] = pdf.splitTextToSize(
+      sanitize(r.signal),
+      colSignalW - 8,
+    );
+    const meaningLines: string[] = pdf.splitTextToSize(
+      sanitize(r.meaning),
+      colMeaningW - 8,
+    );
+    const countryLines: string[] = pdf.splitTextToSize(
+      sanitize(r.country),
+      colCountryW - 8,
+    );
+    const lines = Math.max(
+      countryLines.length,
+      signalLines.length,
+      meaningLines.length,
+    );
+    const rh = Math.max(rowH, lines * 12 + 10);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
+
+    const textOpts = { lineHeightFactor: 1.4 };
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8.5);
-    pdf.text(countryLines, MX + 6, ctx.y + 12);
+    pdf.text(countryLines, MX + 6, ctx.y + 14, textOpts);
+
     setRoboto(pdf, "regular");
     setText(pdf, NAVY);
-    pdf.text(signalLines, MX + colCountryW + 6, ctx.y + 12);
+    pdf.text(signalLines, MX + colCountryW + 6, ctx.y + 14, textOpts);
+
     setText(pdf, DUSK);
-    pdf.text(meaningLines, MX + colCountryW + colSignalW + 6, ctx.y + 12);
+    pdf.text(
+      meaningLines,
+      MX + colCountryW + colSignalW + 6,
+      ctx.y + 14,
+      textOpts,
+    );
     ctx.y += rh;
   }
   ctx.y += 10;
@@ -309,7 +419,9 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
     setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     pdf.text(
-      sanitize("No qualifying related incidents in the briefing window. Treat the quiet cycle as a reporting gap rather than a sustained easing."),
+      sanitize(
+        "No qualifying related incidents in the briefing window. Treat the quiet cycle as a reporting gap rather than a sustained easing.",
+      ),
       MX,
       ctx.y + 10,
     );
@@ -321,51 +433,75 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
   const colIssueW = 120;
-  const colSevW = 64;
+  const colSevW = 75;
   const colTitleW = CW - colDateW - colIssueW - colSevW - 6;
-  const rowH = 18;
+  const rowH = 20;
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text("DATE", MX + 6, ctx.y + 12);
-    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 12);
-    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 12);
+    pdf.setFontSize(7);
+    pdf.text("DATE", MX + 6, ctx.y + 13);
+    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 13);
+    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 13);
+    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 13);
     ctx.y += rowH;
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
   };
   drawHeader();
 
   for (const i of rows) {
-    const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-    const issueLines: string[] = pdf.splitTextToSize(sanitize(i.issue), colIssueW - 8);
-    const rh = Math.max(rowH, Math.max(titleLines.length, issueLines.length) * 11 + 8);
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) { newPage(ctx); drawHeader(); }
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+
+    const titleLines: string[] = pdf.splitTextToSize(
+      sanitize(i.title),
+      colTitleW - 8,
+    );
+    const issueLines: string[] = pdf.splitTextToSize(
+      sanitize(i.issue),
+      colIssueW - 8,
+    );
+    const rh = Math.max(
+      rowH,
+      Math.max(titleLines.length, issueLines.length) * 12 + 10,
+    );
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
     setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.3);
+    pdf.setLineWidth(0.6);
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
 
     setText(pdf, DUSK);
-    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 12);
-    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 12);
+    const textOpts = { lineHeightFactor: 1.4 };
+    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 14, textOpts);
+    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 14, textOpts);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 12);
+    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 14, textOpts);
 
     const sk = sevKey(i.severity);
     setFill(pdf, SEV_COLOR[sk] ?? "#999999");
     const chipX = MX + colDateW + colIssueW + colTitleW + 6;
-    pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+    const sevText = sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase());
+    const isSmallText = sevText === "HIGH" || sevText === "LOW";
+    const chipW = isSmallText ? 40 : 50;
+    pdf.rect(chipX, ctx.y + 4, chipW, 12, "F");
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    pdf.text(sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
+    pdf.setFontSize(6.5);
+    pdf.text(sevText, chipX + chipW / 2, ctx.y + 12.5, { align: "center" });
 
     ctx.y += rh;
   }
@@ -382,7 +518,11 @@ export async function exportFlashpointReportPdf(
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const cadence = `${canon.cadence} Briefing`;
   let headerDate = data.issueDate;
-  try { headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd"); } catch { /* keep */ }
+  try {
+    headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd");
+  } catch {
+    /* keep */
+  }
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
   await ensureRobotoLoaded(ctx.pdf);
@@ -395,7 +535,10 @@ export async function exportFlashpointReportPdf(
       const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
       coverImage = await prepareCoverImage(coverUrl, ctx.W, heroH);
     } catch (err) {
-      console.warn("[exportFlashpointReportPdf] cover image load failed, falling back to gradient hero", err);
+      console.warn(
+        "[exportFlashpointReportPdf] cover image load failed, falling back to gradient hero",
+        err,
+      );
     }
   }
   drawPolestarCover(ctx, {
@@ -406,33 +549,16 @@ export async function exportFlashpointReportPdf(
   });
   void cadence;
   beginBodyPages(ctx);
-  drawDataAsOf(
-    ctx,
-    formatDataAsOfLine(
-      computeDataAsOf({
-        topic: data.topic === "protests" ? "flashpoint" : data.topic,
-        incidents,
-      }),
-    ),
+
+  const ds = buildFlashpointReportDataset(
+    incidents,
+    data.topic,
+    data.issueDate,
   );
 
-  const ds = buildFlashpointReportDataset(incidents, data.topic, data.issueDate);
-
-  // Shared prose selector: generic seed prose is replaced by the
-  // data-driven auto prose even when it clears the substance bar (see
-  // isGenericFlashpointProse); genuine short analyst notes (<240) are
-  // preserved and appended ahead of the auto-prose. Defined once here so
-  // EVERY section — including Executive Summary — uses identical logic to
-  // FlashpointReportPreview.tsx, keeping preview and PDF in lockstep.
-  const pickProse = (editor: string | null | undefined, auto: string): string => {
-    const t = (editor ?? "").trim();
-    if (!t || isGenericFlashpointProse(t)) return auto;
-    if (t.length >= 240) return t;
-    return `${t}\n\n${auto}`;
-  };
-
   drawSectionHeading(ctx, "Executive Summary");
-  renderProse(ctx, pickProse(data.executiveSummary, ds.autoExecutiveSummary));
+  const execText = (data.executiveSummary ?? "").trim();
+  renderProse(ctx, execText || ds.autoExecutiveSummary);
 
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);
@@ -441,16 +567,20 @@ export async function exportFlashpointReportPdf(
   drawSectionWithProse(ctx, "Activism and Protest Read", ds.activismRead);
   drawIncidentTable(
     ctx,
-    "Activism Records",
+    null,
     ds.activismRows,
     "No qualifying activism records in the briefing window.",
   );
 
   // Civil Unrest and Public Order Read — prose leads the unrest table.
-  drawSectionWithProse(ctx, "Civil Unrest and Public Order Read", ds.civilUnrestRead);
+  drawSectionWithProse(
+    ctx,
+    "Civil Unrest and Public Order Read",
+    ds.civilUnrestRead,
+  );
   drawIncidentTable(
     ctx,
-    "Civil Unrest Records",
+    null,
     ds.unrestRows,
     "No qualifying civil-unrest records in the briefing window.",
   );
@@ -465,10 +595,16 @@ export async function exportFlashpointReportPdf(
   renderProse(ctx, ds.forecastRead);
 
   // Regional and Country View — prose leads the country bar chart.
-  drawSectionWithProse(ctx, "Regional and Country View", ds.regionalCountryRead);
+  drawSectionWithProse(
+    ctx,
+    "Regional and Country View",
+    ds.regionalCountryRead,
+  );
   drawHorizontalBarChart(
     ctx,
-    ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country",
+    ds.countryRows.length >= 12
+      ? "Records by Country (Top 12)"
+      : "Records by Country",
     ds.countryRows,
     {
       labelW: 160,
@@ -476,12 +612,38 @@ export async function exportFlashpointReportPdf(
     },
   );
 
-  // Editor-authored analyst sections, using the shared pickProse defined
-  // above so every section follows identical preview/PDF selection logic.
-  drawSectionWithProse(ctx, "What Matters", pickProse(data.whatMatters, ds.autoWhatMatters));
-  drawBulletSection(ctx, "Implications for Business", pickProse(data.implications, ds.autoImplications));
-  drawBulletSection(ctx, "Watch Next", pickProse(data.watchNext, ds.autoWatchNext), 8);
-  drawSectionWithProse(ctx, "Polestar View", pickProse(data.polestarView, ds.autoPolestarView));
+  // Editor-authored analyst sections. Editor text wins only when it
+  // carries substance; thin stubs get the auto-prose appended.
+  const pickProse = (
+    editor: string | null | undefined,
+    auto: string,
+  ): string => {
+    const t = (editor ?? "").trim();
+    if (t.length >= 240) return t;
+    if (t.length === 0) return auto;
+    return `${t}\n\n${auto}`;
+  };
+  drawSectionWithProse(
+    ctx,
+    "What Matters",
+    pickProse(data.whatMatters, ds.autoWhatMatters),
+  );
+  drawBulletSection(
+    ctx,
+    "Implications for Business",
+    pickProse(data.implications, ds.autoImplications),
+  );
+  drawBulletSection(
+    ctx,
+    "Watch Next",
+    pickProse(data.watchNext, ds.autoWatchNext),
+    8,
+  );
+  drawSectionWithProse(
+    ctx,
+    "Polestar View",
+    pickProse(data.polestarView, ds.autoPolestarView),
+  );
 
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 
@@ -490,6 +652,15 @@ export async function exportFlashpointReportPdf(
   // Disclaimer follows Related Incidents directly.
 
   drawDisclaimer(ctx);
+  drawDataAsOf(
+    ctx,
+    formatDataAsOfLine(
+      computeDataAsOf({
+        topic: data.topic === "protests" ? "flashpoint" : data.topic,
+        incidents,
+      }),
+    ),
+  );
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

@@ -27,6 +27,7 @@ import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
+import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import {
   draftTopicReportProse,
   type DraftableIncident,
@@ -164,7 +165,6 @@ export default function ReportEditor() {
   const [exportError, setExportError] = useState<string | null>(null);
 
   const incidentsForExport = incidents ?? [];
-
   const downloadPdf = async (opts?: { forceAllowMissing?: boolean }) => {
     setExporting(true);
     setExportError(null);
@@ -233,19 +233,7 @@ export default function ReportEditor() {
           filename,
         );
       } else if (form.topic === "shipping") {
-        // Rasterise the on-screen preview instead of the jsPDF builder.
-        // jsPDF emits CID fonts with Adobe-Identity-H, which macOS Preview /
-        // poppler / some browsers refuse to open ("Unknown character
-        // collection"). The DOM-rasterise path (same one Country reports use)
-        // produces a PDF that opens everywhere and is screen-identical. The
-        // jsPDF builder remains for the headless font-audit scripts only.
-        const shippingEl =
-          previewRef.current?.querySelector<HTMLElement>(".print-report") ??
-          previewRef.current;
-        if (!shippingEl) {
-          throw new Error("PDF export failed: report preview is not ready.");
-        }
-        await exportElementToPdf(shippingEl, filename);
+        await exportShippingReportPdf(pdfPayload, incidentsForExport, filename);
       } else {
         await exportTopicReportPdf(
           {
@@ -265,7 +253,6 @@ export default function ReportEditor() {
       setExporting(false);
     }
   };
-
   useEffect(() => {
     if (!report) return;
     // Wait until incidents have loaded before seeding so the draft prose is

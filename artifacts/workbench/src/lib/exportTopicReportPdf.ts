@@ -1,16 +1,44 @@
 import { format, parseISO } from "date-fns";
 import {
-  createCtx, newPage, ensureSpace, drawSectionHeading, renderProse, drawSectionWithProse,
-  drawFastFactsKpiCards, drawBulletSection, drawDisclaimer, measureDisclaimerHeight, drawFooters,
-  drawPolestarCover, beginBodyPages, prepareCoverImage, drawDataAsOf,
-  COVER_TOP_BAND_H, COVER_BOTTOM_BLOCK_H,
-  setFill, setStroke, setText, sanitize, setRoboto, ensureRobotoLoaded,
-  NAVY, POLAR, DUSK, WHITE, ELECTRIC, SEV_COLOR, SEV_LABEL, sevKey,
-  type Ctx, type KpiCardData,
+  createCtx,
+  newPage,
+  ensureSpace,
+  drawSectionHeading,
+  renderProse,
+  drawSectionWithProse,
+  drawFastFactsKpiCards,
+  drawBulletSection,
+  drawDisclaimer,
+  measureDisclaimerHeight,
+  drawFooters,
+  drawPolestarCover,
+  beginBodyPages,
+  prepareCoverImage,
+  drawDataAsOf,
+  COVER_TOP_BAND_H,
+  COVER_BOTTOM_BLOCK_H,
+  setFill,
+  setStroke,
+  setText,
+  sanitize,
+  setRoboto,
+  ensureRobotoLoaded,
+  NAVY,
+  POLAR,
+  DUSK,
+  WHITE,
+  ELECTRIC,
+  SEV_COLOR,
+  SEV_LABEL,
+  sevKey,
+  type Ctx,
+  type KpiCardData,
 } from "./pdfChrome";
 import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import {
-  resolveReportWindow, filterIncidentsToWindow, reportCadence,
+  resolveReportWindow,
+  filterIncidentsToWindow,
+  reportCadence,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { selectRelatedIncidents } from "./relatedIncidents";
@@ -29,14 +57,20 @@ import {
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
-import { computeTopicFastFacts, filterTopicReportIncidents } from "./topicFastFacts";
+import {
+  computeTopicFastFacts,
+  filterTopicReportIncidents,
+} from "./topicFastFacts";
 import {
   buildFuelWatchReportData,
   fuelMarketLatestDate,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
-import { capFuelMarketSeverity, type ProducerBuyerActionRow } from "./fuelNarratives";
+import {
+  capFuelMarketSeverity,
+  type ProducerBuyerActionRow,
+} from "./fuelNarratives";
 import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 import {
   buildCargoSecurityRead,
@@ -108,7 +142,20 @@ export interface TopicReportIncident {
 function formatDateShortPdf(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   return `${d.getUTCDate().toString().padStart(2, "0")} ${months[d.getUTCMonth()]}`;
 }
 
@@ -118,17 +165,26 @@ function formatDateShortPdf(iso: string): string {
  * trajectory, navy latest-value marker, polar-gray axes/gridlines,
  * Roboto throughout). Annotations are drawn only when supplied by data.
  */
-function drawJetFuelChart(ctx: Ctx, series: JetFuelPricePoint[], benchmark: string) {
+function drawJetFuelChart(
+  ctx: Ctx,
+  series: JetFuelPricePoint[],
+  benchmark: string,
+) {
   const { pdf, MX, CW } = ctx;
-  const headerH = 18;
-  const chartH = 150;
+  const headerH = 32;
+  const chartH = 160;
   const captionH = 14;
-  const totalH = headerH + chartH + captionH + 8;
+  const totalH = headerH + chartH + captionH + 16;
   ensureSpace(ctx, totalH + 10);
 
   // Pick a display unit from the first point that has one.
   let unit = "";
-  for (const p of series) { if (p.unit) { unit = p.unit; break; } }
+  for (const p of series) {
+    if (p.unit) {
+      unit = p.unit;
+      break;
+    }
+  }
 
   // Header line: benchmark + unit on the left, latest value on the right.
   setText(pdf, NAVY);
@@ -137,7 +193,8 @@ function drawJetFuelChart(ctx: Ctx, series: JetFuelPricePoint[], benchmark: stri
   pdf.text(`${benchmark}${unit ? ` (${unit})` : ""}`, MX, ctx.y + 11);
   const last = series[series.length - 1];
   const span = Math.max(
-    Math.max(...series.map((p) => p.value)) - Math.min(...series.map((p) => p.value)),
+    Math.max(...series.map((p) => p.value)) -
+      Math.min(...series.map((p) => p.value)),
     Math.abs(Math.max(...series.map((p) => p.value))) * 0.02,
     0.01,
   );
@@ -180,11 +237,19 @@ function drawJetFuelChart(ctx: Ctx, series: JetFuelPricePoint[], benchmark: stri
   }
 
   // X tick labels.
-  const tickIdx = series.length <= 4
-    ? series.map((_, i) => i)
-    : [0, Math.floor((series.length - 1) / 3), Math.floor((2 * (series.length - 1)) / 3), series.length - 1];
+  const tickIdx =
+    series.length <= 4
+      ? series.map((_, i) => i)
+      : [
+          0,
+          Math.floor((series.length - 1) / 3),
+          Math.floor((2 * (series.length - 1)) / 3),
+          series.length - 1,
+        ];
   for (const i of tickIdx) {
-    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, { align: "center" });
+    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, {
+      align: "center",
+    });
   }
 
   // Annotations (data-supplied only).
@@ -206,7 +271,12 @@ function drawJetFuelChart(ctx: Ctx, series: JetFuelPricePoint[], benchmark: stri
   setStroke(pdf, ELECTRIC);
   pdf.setLineWidth(1.2);
   for (let i = 1; i < series.length; i++) {
-    pdf.line(xAt(i - 1), yAt(series[i - 1].value), xAt(i), yAt(series[i].value));
+    pdf.line(
+      xAt(i - 1),
+      yAt(series[i - 1].value),
+      xAt(i),
+      yAt(series[i].value),
+    );
   }
 
   // Latest-value marker — flat circle.
@@ -218,9 +288,9 @@ function drawJetFuelChart(ctx: Ctx, series: JetFuelPricePoint[], benchmark: stri
   setRoboto(pdf, "regular");
   pdf.setFontSize(8);
   const caption = `${benchmark}, ${series.length} observations from ${formatDateShortPdf(series[0].date)} to ${formatDateShortPdf(last.date)}.`;
-  pdf.text(caption, MX, plotY0 + plotH + 28);
+  pdf.text(caption, MX, plotY0 + plotH + 38);
 
-  ctx.y = plotY0 + plotH + 28 + 6;
+  ctx.y = plotY0 + plotH + 38 + 12;
 }
 
 function drawJetFuelEmptyCard(ctx: Ctx, benchmark: string) {
@@ -289,9 +359,10 @@ function drawCargoTrendChart(ctx: Ctx, series: CargoTrendPoint[]) {
   const plotH = chartH - 18;
   const xAxisY = plotY0 + plotH;
   const yMax = niceCargoCountMax(Math.max(...series.map((d) => d.count)));
-  const ticks = yMax <= 4
-    ? Array.from({ length: yMax + 1 }, (_, k) => k)
-    : [0, 1, 2, 3, 4].map((k) => (k / 4) * yMax);
+  const ticks =
+    yMax <= 4
+      ? Array.from({ length: yMax + 1 }, (_, k) => k)
+      : [0, 1, 2, 3, 4].map((k) => (k / 4) * yMax);
 
   const slot = plotW / series.length;
   const barW = slot * 0.6;
@@ -323,12 +394,20 @@ function drawCargoTrendChart(ctx: Ctx, series: CargoTrendPoint[]) {
   }
 
   // X tick labels (sampled to avoid crowding).
-  const tickIdx = series.length <= 6
-    ? series.map((_, i) => i)
-    : [0, Math.floor((series.length - 1) / 3), Math.floor((2 * (series.length - 1)) / 3), series.length - 1];
+  const tickIdx =
+    series.length <= 6
+      ? series.map((_, i) => i)
+      : [
+          0,
+          Math.floor((series.length - 1) / 3),
+          Math.floor((2 * (series.length - 1)) / 3),
+          series.length - 1,
+        ];
   setText(pdf, DUSK);
   for (const i of tickIdx) {
-    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, { align: "center" });
+    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, {
+      align: "center",
+    });
   }
 
   // Caption.
@@ -352,12 +431,15 @@ function drawCargoTrendChart(ctx: Ctx, series: CargoTrendPoint[]) {
  * trailing gap) so the caller can keep the whole block together and avoid
  * orphaning a row onto the next page.
  */
-function measureProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[]): number {
+function measureProducerBuyerActionsTable(
+  ctx: Ctx,
+  rows: ProducerBuyerActionRow[],
+): number {
   if (rows.length === 0) return 0;
   const { pdf, CW } = ctx;
   const colActorW = Math.round(CW * 0.16);
   const colCatW = Math.round(CW * 0.18);
-  const colReadW = Math.round(CW * 0.30);
+  const colReadW = Math.round(CW * 0.3);
   const colActionW = CW - colActorW - colCatW - colReadW;
   const headerH = 20;
   const padX = 6;
@@ -368,38 +450,67 @@ function measureProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow
   let total = headerH;
   for (const r of rows) {
     const actionText = r.date ? `${r.action}\n${r.date}` : r.action;
-    const actorLines: string[] = pdf.splitTextToSize(sanitize(r.actor), colActorW - padX * 2);
-    const catLines: string[] = pdf.splitTextToSize(sanitize(r.category), colCatW - padX * 2);
-    const actionLines: string[] = pdf.splitTextToSize(sanitize(actionText), colActionW - padX * 2);
-    const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
-    const maxLines = Math.max(actorLines.length, catLines.length, actionLines.length, readLines.length);
+    const actorLines: string[] = pdf.splitTextToSize(
+      sanitize(r.actor),
+      colActorW - padX * 2,
+    );
+    const catLines: string[] = pdf.splitTextToSize(
+      sanitize(r.category),
+      colCatW - padX * 2,
+    );
+    const actionLines: string[] = pdf.splitTextToSize(
+      sanitize(actionText),
+      colActionW - padX * 2,
+    );
+    const readLines: string[] = pdf.splitTextToSize(
+      sanitize(r.operationalRead),
+      colReadW - padX * 2,
+    );
+    const maxLines = Math.max(
+      actorLines.length,
+      catLines.length,
+      actionLines.length,
+      readLines.length,
+    );
     total += Math.max(22, maxLines * lineH + 10);
   }
   pdf.setFontSize(prevSize);
   return total + 8;
 }
 
-function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[]) {
+function drawProducerBuyerActionsTable(
+  ctx: Ctx,
+  rows: ProducerBuyerActionRow[],
+) {
   if (rows.length === 0) return;
   const { pdf, MX, CW } = ctx;
   const colActorW = Math.round(CW * 0.16);
   const colCatW = Math.round(CW * 0.18);
-  const colReadW = Math.round(CW * 0.30);
+  const colReadW = Math.round(CW * 0.3);
   const colActionW = CW - colActorW - colCatW - colReadW;
-  const headerH = 20;
+  const headerH = 18;
   const padX = 6;
   const lineH = 11;
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, headerH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + headerH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + headerH);
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(8);
     pdf.text("ACTOR", MX + padX, ctx.y + 12);
     pdf.text("CATEGORY", MX + colActorW + padX, ctx.y + 12);
     pdf.text("ACTION", MX + colActorW + colCatW + padX, ctx.y + 12);
-    pdf.text("OPERATIONAL READ", MX + colActorW + colCatW + colActionW + padX, ctx.y + 12);
+    pdf.text(
+      "OPERATIONAL READ",
+      MX + colActorW + colCatW + colActionW + padX,
+      ctx.y + 12,
+    );
     ctx.y += headerH;
     setRoboto(pdf, "regular");
     pdf.setFontSize(8);
@@ -410,13 +521,31 @@ function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[])
 
   for (const r of rows) {
     const actionText = r.date ? `${r.action}\n${r.date}` : r.action;
-    const actorLines: string[] = pdf.splitTextToSize(sanitize(r.actor), colActorW - padX * 2);
-    const catLines: string[] = pdf.splitTextToSize(sanitize(r.category), colCatW - padX * 2);
-    const actionLines: string[] = pdf.splitTextToSize(sanitize(actionText), colActionW - padX * 2);
-    const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
-    const maxLines = Math.max(actorLines.length, catLines.length, actionLines.length, readLines.length);
-    const rh = Math.max(22, maxLines * lineH + 10);
+    const actorLines: string[] = pdf.splitTextToSize(
+      sanitize(r.actor),
+      colActorW - padX * 2,
+    );
+    const catLines: string[] = pdf.splitTextToSize(
+      sanitize(r.category),
+      colCatW - padX * 2,
+    );
+    const actionLines: string[] = pdf.splitTextToSize(
+      sanitize(actionText),
+      colActionW - padX * 2,
+    );
+    const readLines: string[] = pdf.splitTextToSize(
+      sanitize(r.operationalRead),
+      colReadW - padX * 2,
+    );
+    const maxLines = Math.max(
+      actorLines.length,
+      catLines.length,
+      actionLines.length,
+      readLines.length,
+    );
+    const rh = Math.max(20, maxLines * lineH + 8);
 
+    // Prevent row from splitting across pages - ensure space for the entire row
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
@@ -424,8 +553,10 @@ function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[])
 
     // Row separator at the bottom of the row.
     setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.3);
+    pdf.setLineWidth(0.6);
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
 
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
@@ -437,7 +568,11 @@ function drawProducerBuyerActionsTable(ctx: Ctx, rows: ProducerBuyerActionRow[])
     pdf.setFontSize(8);
     pdf.text(catLines, MX + colActorW + padX, ctx.y + 12);
     pdf.text(actionLines, MX + colActorW + colCatW + padX, ctx.y + 12);
-    pdf.text(readLines, MX + colActorW + colCatW + colActionW + padX, ctx.y + 12);
+    pdf.text(
+      readLines,
+      MX + colActorW + colCatW + colActionW + padX,
+      ctx.y + 12,
+    );
 
     ctx.y += rh;
   }
@@ -468,7 +603,11 @@ function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
     pdf.text("REGION / COUNTRY", MX + padX, ctx.y + 12);
     pdf.text("CURRENT PATTERN", MX + colCountryW + padX, ctx.y + 12);
     pdf.text("SEVERITY", MX + colCountryW + colPatternW + padX, ctx.y + 12);
-    pdf.text("OPERATIONAL READ", MX + colCountryW + colPatternW + colSevW + padX, ctx.y + 12);
+    pdf.text(
+      "OPERATIONAL READ",
+      MX + colCountryW + colPatternW + colSevW + padX,
+      ctx.y + 12,
+    );
     ctx.y += headerH;
     setRoboto(pdf, "regular");
     pdf.setFontSize(8);
@@ -479,10 +618,24 @@ function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
 
   for (const r of rows) {
     const countryText = `${r.country}\n${r.count} record${r.count === 1 ? "" : "s"}`;
-    const countryLines: string[] = pdf.splitTextToSize(sanitize(countryText), colCountryW - padX * 2);
-    const patternLines: string[] = pdf.splitTextToSize(sanitize(r.pattern), colPatternW - padX * 2);
-    const readLines: string[] = pdf.splitTextToSize(sanitize(r.operationalRead), colReadW - padX * 2);
-    const maxLines = Math.max(countryLines.length, patternLines.length, readLines.length, 2);
+    const countryLines: string[] = pdf.splitTextToSize(
+      sanitize(countryText),
+      colCountryW - padX * 2,
+    );
+    const patternLines: string[] = pdf.splitTextToSize(
+      sanitize(r.pattern),
+      colPatternW - padX * 2,
+    );
+    const readLines: string[] = pdf.splitTextToSize(
+      sanitize(r.operationalRead),
+      colReadW - padX * 2,
+    );
+    const maxLines = Math.max(
+      countryLines.length,
+      patternLines.length,
+      readLines.length,
+      2,
+    );
     const rh = Math.max(28, maxLines * lineH + 10);
 
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
@@ -512,7 +665,11 @@ function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
     setRoboto(pdf, "regular");
     pdf.setFontSize(8);
     pdf.text(patternLines, MX + colCountryW + padX, ctx.y + 12);
-    pdf.text(readLines, MX + colCountryW + colPatternW + colSevW + padX, ctx.y + 12);
+    pdf.text(
+      readLines,
+      MX + colCountryW + colPatternW + colSevW + padX,
+      ctx.y + 12,
+    );
 
     // Severity chip — coloured by the row's tier key, label may be a range.
     const sk = sevKey(r.severityKey);
@@ -525,9 +682,14 @@ function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
     setText(pdf, sk === "insignificant" ? DUSK : WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(6.5);
-    pdf.text(sanitize(r.severityLabel.toUpperCase()), chipX + chipW / 2, ctx.y + 13, {
-      align: "center",
-    });
+    pdf.text(
+      sanitize(r.severityLabel.toUpperCase()),
+      chipX + chipW / 2,
+      ctx.y + 13,
+      {
+        align: "center",
+      },
+    );
     setRoboto(pdf, "regular");
     pdf.setFontSize(8);
 
@@ -543,149 +705,220 @@ function drawRelatedIncidents(
   _topicLabels: Record<string, string>,
 ) {
   if (windowIncidents.length === 0) return;
-  // Row selection (title dedupe, weak-bucket filtering, recency ordering and the
-  // per-topic cap) is shared with the on-screen preview via selectRelatedIncidents
-  // so the two surfaces can never disagree.
-  const rows = selectRelatedIncidents(windowIncidents, topic);
+  const { max } = relatedIncidentsLimit(topic);
+  // Prioritise operationally meaningful rows. When the classifier
+  // returns its weakest bucket (e.g. "Other fuel incident") we push
+  // those rows to the bottom; if we have at least a handful of
+  // operationally classified rows, the weakest bucket is dropped
+  // entirely so the table does not drag the report down.
+  function weakBucket(label: string): boolean {
+    return (
+      /^other\s.+incident$/i.test(label) ||
+      label === "Unclassified maritime record"
+    );
+  }
+  // For Cargo specifically the source data carries a lot of generic
+  // "Warehouse theft - Other" / "Container theft - Other" /
+  // "Warehouse theft - Electronics" titles that repeat across the
+  // window. Treat any title ending in a generic suffix as a weak row
+  // so the table prefers named-place / named-corridor / named-cargo
+  // records when they exist.
+  function isGenericCargoTitle(title: string): boolean {
+    const t = (title ?? "").trim();
+    // Generic synthetic titles take the shape
+    //   "<bucket> theft <dash> <single category word>"
+    // where <dash> can be ASCII hyphen, en-dash or em-dash, and the
+    // category word carries no place, route or modus operandi signal.
+    // We treat any single trailing token after a dash as generic; only
+    // titles that add a named place / corridor / operator survive.
+    return (
+      /\b(warehouse|container|cargo|truck|depot)\s+(theft|hijack|hijacking|robbery|loss|raid)\s+[-\u2013\u2014]\s+\S+\s*$/i.test(
+        t,
+      ) ||
+      // Also drop the matching "Other land-based cargo theft - <word>"
+      // pattern surfaced by the classifier's fallback bucket.
+      /^other\s+land[- ]based\s+cargo\s+theft\s+[-\u2013\u2014]\s+\S+\s*$/i.test(
+        t,
+      )
+    );
+  }
+  // Title-based dedupe: collapse syndicated / repeated rows so the
+  // Related Incidents table does not list the same loss four times.
+  function titleKey(s: string): string {
+    const STOP = new Set([
+      "the",
+      "a",
+      "an",
+      "of",
+      "in",
+      "on",
+      "at",
+      "to",
+      "for",
+      "and",
+      "as",
+      "by",
+      "off",
+      "near",
+      "after",
+      "amid",
+      "with",
+      "from",
+      "into",
+      "over",
+      "says",
+      "say",
+      "said",
+      "reports",
+      "report",
+    ]);
+    return (s ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter((w) => w && !STOP.has(w))
+      .slice(0, 8)
+      .join(" ");
+  }
+  const seen = new Set<string>();
+  const deduped: TopicReportIncident[] = [];
+  for (const i of windowIncidents) {
+    const k = titleKey(i.title);
+    if (k && seen.has(k)) continue;
+    if (k) seen.add(k);
+    deduped.push(i);
+  }
+  const annotated = deduped.map((i) => ({
+    i,
+    weak:
+      weakBucket(classifyIncidentType(i)) ||
+      (topic === "cargo_watch" && isGenericCargoTitle(i.title)),
+  }));
+  const strong = annotated.filter((r) => !r.weak).map((r) => r.i);
+  const weak = annotated.filter((r) => r.weak).map((r) => r.i);
+  const STRONG_FLOOR = 4;
+  // Cargo: generic-suffix titles ("Warehouse theft - Other" /
+  // "Container theft - Electronics" etc.) are hard-excluded regardless
+  // of strong-row count — they add noise without operational signal.
+  // Other topics keep the existing weak-fallback behaviour so sparse
+  // windows still produce a usable table.
+  const ordered =
+    topic === "cargo_watch"
+      ? strong
+      : strong.length >= STRONG_FLOOR
+        ? strong
+        : [...strong, ...weak];
+  const sorted = [...ordered].sort(
+    (a, b) =>
+      new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+  );
+  // Per-topic caps. Fuel was already tighter; Cargo and the generic
+  // path are now held at 10 so the Source Notes / Disclaimer block can
+  // be pulled back onto the same page rather than orphaned on a near-
+  // empty final page.
+  const effectiveMax =
+    topic === "fuel"
+      ? Math.min(max, 8)
+      : topic === "cargo_watch"
+        ? Math.min(max, 10)
+        : Math.min(max, 10);
+  const rows = sorted.slice(0, effectiveMax);
+  const truncated = sorted.length - rows.length;
   if (rows.length === 0) return;
-  // Cargo rows carry a source attribution under the title so the client can see
-  // the table is sourced, not fabricated.
-  const showSource = topic === "cargo_watch";
-  const sourceOf = (i: TopicReportIncident): string =>
-    showSource ? sanitize((i.source ?? "").trim()) : "";
+
+  drawSectionHeading(ctx, "Related Incidents");
 
   const { pdf, MX, CW } = ctx;
   const colDateW = 86;
   const colTypeW = 120;
-  const colSevW = 64;
+  const colSevW = 75;
   const colTitleW = CW - colDateW - colTypeW - colSevW - 6;
-  const rowH = 20;
-  const ROW_PAD = 10;
-
-  // Keep the whole table together. Pre-measure the header plus every row
-  // (with the same regular 8pt metrics used to render the titles) and also
-  // reserve room for the Disclaimer block that follows, then break to a
-  // fresh page UP-FRONT if the combined block will not fit on the current
-  // page. This prevents a "heading + one orphan row" at the foot of the
-  // previous page and keeps the table and disclaimer sitting cleanly
-  // together on one page.
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  const SOURCE_LINE_H = 10;
-  const measureTable = (rs: TopicReportIncident[]): number => {
-    let h = rowH; // column header band
-    for (const i of rs) {
-      const tl: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-      const srcH = sourceOf(i) ? SOURCE_LINE_H : 0;
-      h += Math.max(rowH, tl.length * 11 + ROW_PAD + srcH);
-    }
-    return h;
-  };
-  const HEADING_BLOCK_H = 50;     // pre-pad + heading line + divider + lead
-  // Reserve the disclaimer's ACTUAL measured height (wrapped at the real width)
-  // so the keep-together estimate matches what drawDisclaimer will draw, rather
-  // than a fixed guess that can drift if the legal text or margins change.
-  const DISCLAIMER_RESERVE_H = measureDisclaimerHeight(ctx);
-  const usable = ctx.H - ctx.TOP - ctx.BOTTOM;
-  // Row-reduction fallback: if the heading + full table + disclaimer cannot
-  // fit even on a fresh page, drop rows from the bottom until the whole block
-  // fits, so the section and its disclaimer always sit together on one page.
-  let drawnRows = rows.slice();
-  let tableH = measureTable(drawnRows);
-  while (
-    drawnRows.length > 0 &&
-    HEADING_BLOCK_H + tableH + 8 + DISCLAIMER_RESERVE_H > usable
-  ) {
-    drawnRows = drawnRows.slice(0, -1);
-    tableH = measureTable(drawnRows);
-  }
-  // `measureTable` was called after the loop with the regular 8pt font already
-  // set; re-assert it before the render loop runs splitTextToSize again.
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  ensureSpace(ctx, HEADING_BLOCK_H + tableH + 8 + DISCLAIMER_RESERVE_H);
-
-  drawSectionHeading(ctx, "Related Incidents");
+  const rowH = 18;
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
     pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
+    pdf.setFontSize(7);
     pdf.text("DATE", MX + 6, ctx.y + 12);
     pdf.text("TYPE", MX + colDateW + 6, ctx.y + 12);
     pdf.text("TITLE", MX + colDateW + colTypeW + 6, ctx.y + 12);
     pdf.text("SEVERITY", MX + colDateW + colTypeW + colTitleW + 6, ctx.y + 12);
     ctx.y += rowH;
     setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
+    pdf.setFontSize(7);
   };
 
   ensureSpace(ctx, rowH + 4);
   drawHeader();
 
-  for (const i of drawnRows) {
-    const titleLines: string[] = pdf.splitTextToSize(sanitize(i.title), colTitleW - 8);
-    const src = sourceOf(i);
-    const rh = Math.max(rowH, titleLines.length * 11 + ROW_PAD + (src ? SOURCE_LINE_H : 0));
+  for (const i of rows) {
+    const titleLines: string[] = pdf.splitTextToSize(
+      sanitize(i.title),
+      colTitleW - 8,
+    );
+    const rh = Math.max(rowH, titleLines.length * 11 + 8);
+    // Prevent row from splitting across pages - ensure space for the entire row
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
     }
     setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.3);
+    pdf.setLineWidth(0.6);
     pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
 
     setText(pdf, DUSK);
     let dateStr = "";
-    try { dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy"); } catch { dateStr = i.occurredAt; }
+    try {
+      dateStr = format(parseISO(i.occurredAt), "dd MMM yyyy");
+    } catch {
+      dateStr = i.occurredAt;
+    }
     pdf.text(dateStr, MX + 6, ctx.y + 12);
     // Use the derived operational incident-type label, never the topic name.
     const incidentType = classifyIncidentType(i);
-    const typeLines: string[] = pdf.splitTextToSize(sanitize(incidentType), colTypeW - 8);
+    const typeLines: string[] = pdf.splitTextToSize(
+      sanitize(incidentType),
+      colTypeW - 8,
+    );
     pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
     setText(pdf, NAVY);
-    const titleX = MX + colDateW + colTypeW + 6;
-    pdf.text(titleLines, titleX, ctx.y + 12);
-    // Source attribution under the title (cargo) — shows the row is sourced.
-    if (src) {
-      setRoboto(pdf, "italic");
-      pdf.setFontSize(7);
-      setText(pdf, DUSK);
-      const srcLine: string = pdf.splitTextToSize(
-        `Source: ${src}`,
-        colTitleW - 8,
-      )[0];
-      pdf.text(srcLine, titleX, ctx.y + 12 + titleLines.length * 11);
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8);
-    }
+    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
 
-    const effectiveSeverity =
-      topic === "fuel"
-        ? capFuelMarketSeverity(i.severity, i.title, i.summary ?? "")
-        : i.severity;
-    const sk = sevKey(effectiveSeverity);
-    const sevColor = SEV_COLOR[sk] ?? "#999999";
-    setFill(pdf, sevColor);
+    const sevKeyStr = sevKey(i.severity);
+    const sevDisplay = SEV_LABEL[sevKeyStr] ?? i.severity ?? "";
+    setFill(pdf, SEV_COLOR[sevKeyStr] ?? "#999999");
     const chipX = MX + colDateW + colTypeW + colTitleW + 6;
-    pdf.rect(chipX, ctx.y + 5, 56, 10, "F");
+    const sevText = sanitize(sevDisplay.toUpperCase());
+    const isSmallText = sevText === "HIGH" || sevText === "LOW";
+    const chipW = isSmallText ? 40 : 50;
+    pdf.rect(chipX, ctx.y + 3, chipW, 12, "F");
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
-    pdf.text(sanitize(sevDisplay.toUpperCase()), chipX + 28, ctx.y + 12, { align: "center" });
+    pdf.setFontSize(6);
+    pdf.text(sevText, chipX + chipW / 2, ctx.y + 11.5, { align: "center" });
     setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
+    pdf.setFontSize(7);
 
     ctx.y += rh;
   }
   ctx.y += 8;
 
   // Client-facing reports intentionally omit the "Showing N latest of M"
-  // notice. The table cap is internal Workbench logic (in selectRelatedIncidents)
-  // and surfacing it weakens the PDF.
+  // notice. The table cap is internal Workbench logic and surfacing it
+  // weakens the PDF.
+  void truncated;
+  void sorted;
   // Touch the cadence helper so removing it would not silently regress —
   // and to make the per-cadence behaviour obvious to readers of this code.
   void reportCadence(topic);
@@ -704,18 +937,12 @@ export async function exportTopicReportPdf(
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const cadence = `${canon.cadence} Briefing`;
-  // Fuel Watch is a MARKET product: its reporting-period END is the latest
-  // market close the report carries, NOT the stored issue date (which may
-  // sit a few days past the last available market close). Deriving the
-  // render date here keeps the cover date, reporting-period label, incident
-  // window and chart all anchored to the same market close. Other topics —
-  // and a fuel draft with no dated market data yet — keep the stored date.
-  const renderIssueDate =
-    data.topic === "fuel"
-      ? (fuelMarketLatestDate(data.hardNumbers) ?? data.issueDate)
-      : data.issueDate;
-  let headerDate = renderIssueDate;
-  try { headerDate = format(parseISO(renderIssueDate), "yyyy-MM-dd"); } catch { /* keep */ }
+  let headerDate = data.issueDate;
+  try {
+    headerDate = format(parseISO(data.issueDate), "yyyy-MM-dd");
+  } catch {
+    /* keep */
+  }
 
   const ctx = createCtx({
     kind: resolvedTitle,
@@ -730,7 +957,7 @@ export async function exportTopicReportPdf(
   // shipping report does and pass it through; otherwise fall back to the
   // gradient hero. The image load is wrapped in try/catch so a missing or
   // unreadable asset never blocks PDF export.
-  const win = resolveReportWindow(data.topic, renderIssueDate);
+  const win = resolveReportWindow(data.topic, data.issueDate);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   const topicCoverUrl = TOPIC_COVER_URLS[data.topic];
   if (topicCoverUrl) {
@@ -738,7 +965,10 @@ export async function exportTopicReportPdf(
       const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
       coverImage = await prepareCoverImage(topicCoverUrl, ctx.W, heroH);
     } catch (err) {
-      console.warn(`[exportTopicReportPdf] cover image load failed for topic ${data.topic}, falling back to gradient hero`, err);
+      console.warn(
+        `[exportTopicReportPdf] cover image load failed for topic ${data.topic}, falling back to gradient hero`,
+        err,
+      );
     }
   }
   drawPolestarCover(ctx, {
@@ -752,50 +982,38 @@ export async function exportTopicReportPdf(
   void cadence;
   // Body pages start here, each with the gradient header band.
   beginBodyPages(ctx);
-  drawDataAsOf(
-    ctx,
-    formatDataAsOfLine(
-      computeDataAsOf({
-        topic: data.topic,
-        incidents,
-        marketAsOf:
-          data.topic === "fuel" ? fuelMarketLatestDate(data.hardNumbers) : null,
-      }),
-    ),
-  );
 
   if (data.executiveSummary && data.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, data.executiveSummary);
   }
 
-  const rawWindow = filterIncidentsToWindow(incidents, data.topic, renderIssueDate, { byTopic: true });
+  const rawWindow = filterIncidentsToWindow(
+    incidents,
+    data.topic,
+    data.issueDate,
+    { byTopic: true },
+  );
   // Strip records that match the topic field but are not operationally on
   // topic (e.g. hiking obituary that happens to mention "fuel"). The filter
   // is applied once and used for Fast Facts, prose data and the table.
-  const windowIncidents: TopicReportIncident[] = data.topic === "cargo_watch"
-    ? // Cargo Watch: use the SHARED selector the on-screen preview and the cargo
-      // page use, so the PDF, the preview and the dashboard can never tally
-      // differently (preview==PDF is mandatory). The cast is safe — the selector
-      // returns the same row objects (id is always present on real incidents).
-      (filterTopicReportIncidents(incidents, data.topic, renderIssueDate) as TopicReportIncident[])
-    : rawWindow.filter((i) =>
-        isTopicRelevant(data.topic, {
-          topic: i.topic,
-          title: i.title,
-          summary: i.summary ?? null,
-          source: i.source ?? null,
-          sourceUrl: i.sourceUrl ?? null,
-          location: i.location ?? null,
-        }),
-      );
+  const windowIncidents = rawWindow.filter((i) =>
+    isTopicRelevant(data.topic, {
+      topic: i.topic,
+      title: i.title,
+      summary: i.summary ?? null,
+      source: i.source ?? null,
+      sourceUrl: i.sourceUrl ?? null,
+      location: i.location ?? null,
+    }),
+  );
   const isFuel = data.topic === "fuel";
   if (isFuel) {
     // Canonical Fuel Watch payload — shared by preview/PDF/editor.
     const fuelData = buildFuelWatchReportData(
       {
         title: data.title,
-        issueDate: renderIssueDate,
+        issueDate: data.issueDate,
         author: data.author,
         executiveSummary: data.executiveSummary,
         situation: data.situation,
@@ -811,8 +1029,13 @@ export async function exportTopicReportPdf(
 
     // Fail closed: refuse to export a polished but hollow report unless
     // the caller explicitly opted in via options.allowMissingMarketData.
-    if (!fuelData.validation.hasRequiredFuelWatchData && !options.allowMissingMarketData) {
-      throw new FuelRequiredDataMissingError(fuelData.validation.missingRequired);
+    if (
+      !fuelData.validation.hasRequiredFuelWatchData &&
+      !options.allowMissingMarketData
+    ) {
+      throw new FuelRequiredDataMissingError(
+        fuelData.validation.missingRequired,
+      );
     }
 
     drawSectionHeading(ctx, "Fast Facts");
@@ -827,7 +1050,8 @@ export async function exportTopicReportPdf(
       // No marketData at all but the user overrode — emit warnings only.
       for (const w of fuelData.validation.warnings) renderProse(ctx, w);
     } else {
-      const kpis: KpiCardData[] = fuelData.marketData.fastFactsCards.map(toRenderableCard);
+      const kpis: KpiCardData[] =
+        fuelData.marketData.fastFactsCards.map(toRenderableCard);
       drawFastFactsKpiCards(ctx, kpis);
       for (const w of fuelData.validation.warnings) renderProse(ctx, w);
     }
@@ -845,25 +1069,6 @@ export async function exportTopicReportPdf(
       drawJetFuelEmptyCard(ctx, fuelData.marketData.jetFuelBenchmarkLabel);
     }
 
-    // In-period jet-fuel lag note (only when jet data stops before the
-    // period end). Mirrors the subdued note under the chart in the preview.
-    if (fuelData.marketData.jetDataNote) {
-      const { pdf, MX, CW } = ctx;
-      setText(pdf, DUSK);
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8);
-      const noteLines = pdf.splitTextToSize(
-        fuelData.marketData.jetDataNote,
-        CW,
-      ) as string[];
-      ensureSpace(ctx, noteLines.length * 10 + 6);
-      for (const line of noteLines) {
-        pdf.text(line, MX, ctx.y + 8);
-        ctx.y += 10;
-      }
-      ctx.y += 2;
-    }
-
     // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
     // Operational Read, Regional Highlights, Producer and Buyer Actions)
     // sit alongside the editor-authored prose so the report reads 60%
@@ -871,76 +1076,60 @@ export async function exportTopicReportPdf(
     // Use the atomic heading+first-paragraph renderer for every Fuel
     // Watch section so a heading is never stranded at the foot of a
     // page while its body lands on the next one.
-    const renderProseSection = (label: string, body: string | null | undefined) => {
+    const renderProseSection = (
+      label: string,
+      body: string | null | undefined,
+    ) => {
       if (body && body.trim()) drawSectionWithProse(ctx, label, body);
     };
 
     renderProseSection("Market Read", fuelData.marketData.marketRead);
     renderProseSection("Situation", data.situation);
     renderProseSection("What Happened", data.whatHappened);
-    renderProseSection("Operational Read", fuelData.incidentData.operationalRead);
-    renderProseSection("Regional Highlights", fuelData.incidentData.regionalHighlights);
+    renderProseSection(
+      "Operational Read",
+      fuelData.incidentData.operationalRead,
+    );
+    renderProseSection(
+      "Regional Highlights",
+      fuelData.incidentData.regionalHighlights,
+    );
     if (fuelData.incidentData.producerBuyerActions.length > 0) {
-      // Keep the whole block together: measure the heading + full table and
-      // push it onto the next page if it would otherwise orphan a row.
-      const tableH = measureProducerBuyerActionsTable(ctx, fuelData.incidentData.producerBuyerActions);
-      ensureSpace(ctx, 30 + tableH);
+      // Guard against an orphaned section heading: if there isn't room
+      // for the heading + table header + a couple of rows, push the
+      // whole block to the next page before drawing the heading.
+      ensureSpace(ctx, 24 + 18 + 60);
       drawSectionHeading(ctx, "Producer and Buyer Actions");
-      drawProducerBuyerActionsTable(ctx, fuelData.incidentData.producerBuyerActions);
+      drawProducerBuyerActionsTable(
+        ctx,
+        fuelData.incidentData.producerBuyerActions,
+      );
     }
     renderProseSection("What Matters", data.whatMatters);
-    if (fuelData.narrativeData.implications && fuelData.narrativeData.implications.trim()) {
-      drawBulletSection(ctx, "Implications for Business", fuelData.narrativeData.implications);
+    if (data.implications && data.implications.trim()) {
+      drawBulletSection(ctx, "Implications for Business", data.implications);
     }
-    if (fuelData.narrativeData.watchNext && fuelData.narrativeData.watchNext.trim()) {
-      drawBulletSection(ctx, "Watch Next", fuelData.narrativeData.watchNext, 8);
+    if (data.watchNext && data.watchNext.trim()) {
+      drawBulletSection(ctx, "Watch Next", data.watchNext, 8);
     }
     renderProseSection("Polestar View", data.polestarView);
   } else {
-    const isCargo = data.topic === "cargo_watch";
-    // Cargo Watch report extras — USD loss, most-stolen commodity and the
-    // weekly trend — built from the SAME in-scope window the preview uses
-    // (lib/cargoReportData.ts) so screen and PDF are identical.
-    const cargoExtras = isCargo
-      ? buildCargoReportExtras(
-          windowIncidents.map((i) => ({
-            title: i.title,
-            summary: i.summary ?? null,
-            source: i.source ?? null,
-            location: i.location ?? null,
-            country: i.country ?? null,
-            occurredAt: i.occurredAt,
-          })),
-        )
-      : null;
-
     drawSectionHeading(ctx, "Fast Facts");
-    const fastFactCards = computeTopicFastFacts({
-      topic: data.topic,
-      issueDate: data.issueDate,
-      incidents,
-      topicLabel: topicLabels[data.topic] ?? data.topic,
-    }) as KpiCardData[];
-    if (cargoExtras) {
-      fastFactCards.push({
-        label: "Est. Cargo Loss (USD)",
-        value: formatCargoUsd(cargoExtras.usd),
-        note: cargoUsdNote(cargoExtras.usd),
-      });
-      fastFactCards.push({
-        label: "Most Stolen Commodity",
-        value: cargoExtras.commodity ?? "—",
-        note: cargoCommodityNote(cargoExtras),
-      });
-    }
-    drawFastFactsKpiCards(ctx, fastFactCards);
+    drawFastFactsKpiCards(
+      ctx,
+      computeTopicFastFacts({
+        topic: data.topic,
+        issueDate: data.issueDate,
+        incidents,
+        topicLabel: topicLabels[data.topic] ?? data.topic,
+      }) as KpiCardData[],
+    );
 
-    if (cargoExtras && cargoExtras.trend.length >= 2) {
-      drawSectionHeading(ctx, "Cargo Theft Trend");
-      drawCargoTrendChart(ctx, cargoExtras.trend);
-    }
-
-    const pickProse = (editor: string | null | undefined, auto: string): string => {
+    const isCargo = data.topic === "cargo_watch";
+    const pickProse = (
+      editor: string | null | undefined,
+      auto: string,
+    ): string => {
       const t = (editor ?? "").trim();
       return t.length > 0 ? t : auto;
     };
@@ -951,37 +1140,40 @@ export async function exportTopicReportPdf(
       // Editor text always wins on the four standard analyst sections;
       // auto-prose fills in when the editor leaves a field blank so the
       // cargo report reads at Fuel-Watch substance out of the box.
-      const leadReads: [string, string][] = [
+      const proseSections: [string, string][] = [
         ["Cargo Security Read", cargoSecurity],
         ["Logistics Hub Read", cargoNode],
-      ];
-      for (const [label, body] of leadReads) {
-        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
-      }
-      // Country Risk Breakdown table + Regional Read — same data and section
-      // order as the on-screen preview (after the two Reads, before Situation).
-      const breakdown = buildCargoCountryBreakdown(windowIncidents);
-      if (breakdown.rows.length > 0) {
-        drawSectionHeading(ctx, "Country Risk Breakdown");
-        drawCargoCountryTable(ctx, breakdown.rows);
-        if (breakdown.regionalRead.trim()) {
-          drawSectionWithProse(ctx, "Regional Read", breakdown.regionalRead);
-        }
-      }
-      const proseSections: [string, string][] = [
-        ["Situation", pickProse(data.situation, buildCargoSituation(windowIncidents))],
-        ["What Happened", pickProse(data.whatHappened, buildCargoWhatHappened(windowIncidents))],
-        ["What Matters", pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents))],
+        [
+          "Situation",
+          pickProse(data.situation, buildCargoSituation(windowIncidents)),
+        ],
+        ["What Happened", (data.whatHappened ?? "").trim()],
+        [
+          "What Matters",
+          pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents)),
+        ],
       ];
       for (const [label, body] of proseSections) {
         if (body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
-      const implBody = pickProse(data.implications, buildCargoImplications(windowIncidents));
-      if (implBody && implBody.trim()) drawBulletSection(ctx, "Implications for Business", implBody);
-      const wnBody = pickProse(data.watchNext, buildCargoWatchNext(windowIncidents));
-      if (wnBody && wnBody.trim()) drawBulletSection(ctx, "Watch Next", wnBody, 8);
-      const psBody = pickProse(data.polestarView, buildCargoPolestarView(windowIncidents));
-      if (psBody && psBody.trim()) drawSectionWithProse(ctx, "Polestar View", psBody);
+      const implBody = pickProse(
+        data.implications,
+        buildCargoImplications(windowIncidents),
+      );
+      if (implBody && implBody.trim())
+        drawBulletSection(ctx, "Implications for Business", implBody);
+      const wnBody = pickProse(
+        data.watchNext,
+        buildCargoWatchNext(windowIncidents),
+      );
+      if (wnBody && wnBody.trim())
+        drawBulletSection(ctx, "Watch Next", wnBody, 8);
+      const psBody = pickProse(
+        data.polestarView,
+        buildCargoPolestarView(windowIncidents),
+      );
+      if (psBody && psBody.trim())
+        drawSectionWithProse(ctx, "Polestar View", psBody);
     } else {
       const proseSections: [string, string | null | undefined][] = [
         ["Situation", data.situation],
@@ -1006,6 +1198,10 @@ export async function exportTopicReportPdf(
   drawRelatedIncidents(ctx, windowIncidents, data.topic, topicLabels);
 
   drawDisclaimer(ctx);
+  drawDataAsOf(
+    ctx,
+    formatDataAsOfLine(computeDataAsOf({ topic: data.topic, incidents })),
+  );
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
