@@ -94,6 +94,26 @@ is inside the 90-day fetch. Also: `buildCountryLayers` window-end must be
 `endOfDay(issueDate)` not bare midnight, or the anchor-day records (wall-clock
 times like 08:00) the clamp just landed on get re-excluded → empty again.
 
+**Rehash guard FALSE-POSITIVE (the "report is thin / no raskol" complaint):**
+the ingest rehash test originally had only a LOWER age bound (>=45d) and a
+SINGLE shared digit+casualty trigram — no upper bound, no title check. A genuine
+NEW extreme incident (PNG "vows crackdown after 15 killed in riots", Jun-2026,
+EXTREME) was permanently dropped at ingest because a DISTINCT Jan-2024 PNG event
+("declares state of emergency after 15 killed in riots") shared the generic
+trigram "15 killed in" — a coincidental casualty-count collision 29 months apart,
+NOT a recycle. PNG has recurring capital riots with similar tolls, so this class
+of collision is structural, not rare. Fix (`lib/ingest/src/flashpoint.ts`): a
+rehash now requires ALL of (1) shared digit+casualty trigram, (2) prior aged
+BETWEEN 45d and ~18mo (`REHASH_MAX_AGE_MS` 548d — older = distinct recurring
+event), and (3) title Jaccard >= 0.6 (`REHASH_MIN_TITLE_SIMILARITY`, tokens after
+stripping " - Source") so two different events sharing only a number are not
+collapsed. **Why:** a rehash false positive PERMANENTLY drops a real record at
+ingest — exactly the silent data-loss the trigram comment warned about. The two
+distinct riot headlines score Jaccard ~0.57 (< 0.6) AND are 29mo apart, so both
+new guards independently rescue the real story; a true recycle (near-identical
+headline, weeks-months apart) still trips all three. Verified: after the fix the
+Jun-2026 riots story inserts (rehashSkipped 0) and leads the PNG weekly window.
+
 **Kinetic deny MUST be split global vs non-Pacific (West Papua insurgency is
 IN scope by user decision):** a single kinetic DENY that runs before country
 resolution silently strips West Papua / PNG insurgent violence (TPNPB/OPM

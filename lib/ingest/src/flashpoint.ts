@@ -320,6 +320,46 @@ function normCountry(c: string): string {
 // genuine follow-up coverage of a current event.
 const REHASH_MIN_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 
+// Maximum age gap. A genuine syndication recycle re-runs within a bounded
+// window (weeks to a year or so). A shared casualty trigram against a record
+// MORE than this far in the past is far more likely a DISTINCT recurring event
+// than a recycle — e.g. PNG capital riots with "15 killed" occurred in
+// Jan-2024 AND again Jun-2026; the generic "15 killed in" trigram collides
+// 29 months apart even though they are unrelated events. Beyond this bound the
+// candidate must NOT be treated as a rehash, or genuine current incidents are
+// permanently dropped at ingest (the root cause of "the report is thin").
+const REHASH_MAX_AGE_MS = 548 * 24 * 60 * 60 * 1000; // ~18 months
+
+// Minimum title-token overlap (Jaccard, after stripping the trailing
+// " - Source" attribution) for two items to count as the SAME recycled
+// article rather than two different events that merely share a numeric
+// casualty trigram. Two distinct PNG riot headlines ("declares state of
+// emergency after 15 killed in riots" vs "vows crackdown after 15 killed in
+// riots") score below this; a true recycle (near-identical headline) scores
+// far above it.
+const REHASH_MIN_TITLE_SIMILARITY = 0.6;
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/\s-\s[^-]*$/, "") // drop trailing " - Source" attribution
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .split(/\s+/)
+      .filter(Boolean),
+  );
+}
+
+function titleSimilarity(a: string, b: string): number {
+  const ta = titleTokens(a);
+  const tb = titleTokens(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  const union = ta.size + tb.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
 async function topicStats(): Promise<{ totalAfter: number; latestRecord: string | null; lastUpdated: string | null }> {
   const res = await db.execute(sql`
     SELECT COUNT(*)::int AS count,
@@ -462,21 +502,24 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   // Event-signature index of existing flashpoint rows, so a freshly-dated
   // aggregator item that re-runs a months-old event ("15 killed in riots")
   // can be rejected instead of poisoning the rolling window with stale news.
-  const existingSignatures: { ms: number; country: string; sig: Set<string> }[] = [];
+  const existingSignatures: { ms: number; country: string; sig: Set<string>; title: string }[] = [];
   for (const row of existing) {
     if (row.sourceUrl) existingUrls.add(row.sourceUrl);
     if (row.topic === "flashpoint") {
       existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
       const sig = eventSignatureTrigrams(row.title);
       if (sig.size > 0)
-        existingSignatures.push({ ms: row.occurredAt.getTime(), country: normCountry(row.country), sig });
+        existingSignatures.push({ ms: row.occurredAt.getTime(), country: normCountry(row.country), sig, title: row.title });
     }
   }
 
-  // A candidate is a rehash only when it shares a distinctive digit+casualty
-  // trigram with a SAME-COUNTRY row dated >=45 days earlier. The same-country
-  // constraint stops a generic casualty count from colliding across unrelated
-  // theatres; the age gap separates a genuine follow-up from a recycled item.
+  // A candidate is a rehash only when ALL hold against a SAME-COUNTRY prior
+  // row: (1) it shares a distinctive digit+casualty trigram, (2) the prior is
+  // 45 days to ~18 months older — too recent is a genuine follow-up, too old
+  // is a distinct recurring event, not a recycle — and (3) the two headlines
+  // are substantially similar, so two different events that merely share a
+  // numeric casualty count ("15 killed in") are not collapsed. Each guard
+  // exists to stop a false positive permanently dropping a real record.
   const isSyndicatedRehash = (a: Accepted): boolean => {
     const sig = eventSignatureTrigrams(a.title);
     if (sig.size === 0) return false;
@@ -484,10 +527,19 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     const aCountry = normCountry(a.country);
     for (const prior of existingSignatures) {
       if (prior.country !== aCountry) continue; // same country only
-      if (prior.ms > aMs - REHASH_MIN_AGE_MS) continue; // must be >=45d older
+      const age = aMs - prior.ms;
+      if (age < REHASH_MIN_AGE_MS) continue; // must be >=45d older
+      if (age > REHASH_MAX_AGE_MS) continue; // too old: distinct recurring event
+      let shares = false;
       for (const phrase of sig) {
-        if (prior.sig.has(phrase)) return true;
+        if (prior.sig.has(phrase)) {
+          shares = true;
+          break;
+        }
       }
+      if (!shares) continue;
+      if (titleSimilarity(a.title, prior.title) < REHASH_MIN_TITLE_SIMILARITY) continue;
+      return true;
     }
     return false;
   };

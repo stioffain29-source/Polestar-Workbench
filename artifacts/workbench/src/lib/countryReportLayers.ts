@@ -86,6 +86,34 @@ function eventSignatureTrigrams(title: string): Set<string> {
   return out;
 }
 
+// Minimum title-token overlap (Jaccard) for two items to count as the SAME
+// recycled article rather than two DISTINCT events that merely share a numeric
+// casualty trigram ("15 killed in"). Mirrors the ingest guard in
+// lib/ingest/src/flashpoint.ts: PNG capital riots recur with similar tolls, so
+// a shared casualty count alone must never collapse two real incidents.
+const REHASH_MIN_TITLE_SIMILARITY = 0.6;
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/\s-\s[^-]*$/, "") // drop trailing " - Source" attribution
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .split(/\s+/)
+      .filter(Boolean),
+  );
+}
+
+function titleSimilarity(a: string, b: string): number {
+  const ta = titleTokens(a);
+  const tb = titleTokens(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  const union = ta.size + tb.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
 /**
  * Drop SYNDICATED REHASHES: aggregator items that re-report a much older
  * event with a fresh publication date (e.g. a 2026 wire repeating the
@@ -113,9 +141,19 @@ export function dropSyndicatedRehashes<
       for (const other of enriched) {
         if (other === rec) continue;
         if (other.ms > rec.ms - THIRTY_DAYS) continue; // must be >=30d older
+        let shares = false;
         for (const phrase of rec.sig) {
-          if (other.sig.has(phrase)) return false; // rehash of an older event
+          if (other.sig.has(phrase)) {
+            shares = true;
+            break;
+          }
         }
+        if (!shares) continue;
+        // A shared casualty trigram alone is not enough: two DISTINCT events can
+        // both be "15 killed in ...". Require the headlines to be substantially
+        // similar (same recycled article) before treating it as a rehash.
+        if (titleSimilarity(rec.i.title, other.i.title) < REHASH_MIN_TITLE_SIMILARITY) continue;
+        return false; // rehash of an older event
       }
       return true;
     })
