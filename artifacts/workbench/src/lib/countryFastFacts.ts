@@ -114,9 +114,9 @@ export function computeCountryFastFacts(opts: {
   incidents: CountryFastFactsIncident[];
   // Pre-resolved active-window incidents (already window + relevance filtered).
   // When supplied, the caller's active window drives the cards. Country reports
-  // lead with the rolling 30-day window, so callers pass that here.
+  // lead with the rolling 7-day weekly window, so callers pass that here.
   windowIncidents?: CountryFastFactsIncident[];
-  // Reporting-period label for the active 30-day window (overrides win.shortLabel).
+  // Reporting-period label for the active 7-day window (overrides win.shortLabel).
   periodLabel?: string;
 }): CountryFactsBreakdown {
   const { issueDate } = opts;
@@ -218,7 +218,7 @@ export function computeCountryFastFacts(opts: {
       label: "Total Records",
       value: String(total),
       note: total === 0
-        ? "No records in the 30-day window"
+        ? "No records in the 7-day window"
         : total < 3
           ? "Limited sample"
           : "Incidents in window",

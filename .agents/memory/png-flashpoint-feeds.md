@@ -6,15 +6,22 @@ description: Why opening PNG feeds needs a classifier change + when:Nd, and why 
 The PNG (and West Papua) country report kept rendering "too thin" — the rolling
 7-day window was empty even after the noise items were dropped.
 
-**Country reports LEAD with the 7-day weekly window (reversal of the prior
-30-day lead).** `resolveActiveCountryWindow` (countryReportLayers.ts) picks the
-NARROWEST non-empty window: 7-day first, falling back to 30 then 90 ONLY when the
-narrower tier is empty; `expanded = basisDays !== 7` drives the basis labels.
-Empty-all → honest empty 7-day (never widened to hide a quiet week).
-**Why:** the user (4th, angry) insisted a weekly brief must lead with a 7-day
-window and surface real recent incidents, NOT bury them in a rolling 30-day. The
-30/90-day tiers became clearly-labelled CONTEXT/background sections beneath the
-weekly lead, not the headline.
+**Country report headline basis is FIXED to the 7-day weekly window — never
+widened.** `resolveActiveCountryWindow` (countryReportLayers.ts) always returns
+basisDays=7 / `layers.current`; it must NOT fall back to 30/90-day. An empty week
+stays an honest empty headline; the 30/90-day buckets are shown ONLY as labelled
+context/background sections, never promoted to the active basis.
+**Why:** the user is explicit that "30 days is too long for a rolling weekly
+report" — a weekly brief must lead with the 7-day window and surface real recent
+incidents, not bury them in (or be padded out by) a 30-day window. An earlier
+attempt that widened to 30/90 when the week was empty was rejected for exactly
+this reason: it re-promoted 30-day as the basis.
+**Empty-week honesty pairs with the coverage banner:** `computeCountryCoverageStatus`
+is keyed to WEEKLY emptiness (`layers.current.length === 0`), NOT 30-day. A
+zero-record week is never asserted as quiet — it renders a graded coverage
+warning (no source / unhealthy feed / stale record / healthy-but-silent) and the
+prose builder emits its "no relevant incidents… read as a coverage gap, not calm"
+branch. So both must stay in lockstep on the 7-day window.
 
 **Two structural causes, not a window bug:**
 

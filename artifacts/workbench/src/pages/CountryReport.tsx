@@ -86,7 +86,7 @@ export default function CountryReport() {
   const slug = params?.slug ?? "";
   const qc = useQueryClient();
   const { data: country, isLoading } = useGetCountryReport(slug);
-  // Country reports lead with the rolling 30-day window. Pull a
+  // Country reports lead with the rolling 7-day (weekly) window. Pull a
   // 90-day backstop so the report can layer current / 30-day / 90-day
   // context for the deeper background section. We fetch the 90-day
   // feed unscoped and apply country matching client-side: the incidents
@@ -165,7 +165,7 @@ export default function CountryReport() {
 
   // Option A: date the country report to the period its data actually covers.
   // Clamp the issue date back to the country's newest incident so the rolling
-  // 30-day headline window ends on real records instead of trailing weeks of
+  // 7-day headline window ends on real records instead of trailing weeks of
   // empty calendar time past the latest incident.
   // Clamp the issue date off the country-RELEVANT records only. If we
   // clamped off the raw country-matched set, a newer irrelevant record
@@ -221,18 +221,19 @@ export default function CountryReport() {
     [layers, baseline, country?.name],
   );
 
-  // Active reporting window. Country reports LEAD WITH THE ROLLING 30-DAY
-  // window — a single quiet week is never read as calm in a high-threat
-  // country, so the headline reflects the real standing volume. Drives Fast
-  // Facts, map, charts, the related-incidents table and the drafted prose;
-  // the 90-day bucket stays as labelled background context.
+  // Active reporting window. Country reports are a WEEKLY brief, so the headline
+  // basis is FIXED to the rolling 7-day window — it never widens to 30/90-day
+  // (the user was explicit that 30 days is too long for a weekly report). Drives
+  // Fast Facts, map, charts, the related-incidents table and the drafted prose;
+  // the 30/90-day buckets stay as labelled context/background sections. An empty
+  // week is surfaced via the coverage banner, never widened away.
   const active = useMemo(
     () => resolveActiveCountryWindow(layers, issueDate),
     [layers, issueDate],
   );
 
-  // Coverage status for an empty 30-day window. Drives the printable
-  // coverage banner; "active" (window has records) renders nothing.
+  // Coverage status for an empty WEEKLY (7-day) window. Drives the printable
+  // coverage banner; "active" (week has records) renders nothing.
   const coverage = useMemo(
     () =>
       computeCountryCoverageStatus({
@@ -901,7 +902,7 @@ export default function CountryReport() {
           </li>
           {layers.thirtyDay.length < 3 && (
             <li style={{ color: "#A33232" }}>
-              30-day headline record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
+              30-day context record count is thin (&lt;3). Treat as a coverage signal rather than a clean operating picture — check the Sources page for failing / stale feeds on this country and consider widening local-press coverage.
             </li>
           )}
         </ul>

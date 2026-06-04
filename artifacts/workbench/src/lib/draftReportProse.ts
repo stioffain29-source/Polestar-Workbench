@@ -748,7 +748,7 @@ export function draftTopicReportProse(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Country report draft (rolling 30-day headline window applied)
+// Country report draft (rolling 7-day weekly headline window applied)
 // ---------------------------------------------------------------------------
 
 export function draftCountryReportProse(opts: {
@@ -760,14 +760,14 @@ export function draftCountryReportProse(opts: {
   // When supplied, the prose reads against the same active window as the rest
   // of the report instead of re-filtering.
   windowIncidents?: DraftableIncident[];
-  // Active reporting basis (7 / 30 / 90). Country reports lead with 30; this
-  // drives the window labels in the prose.
+  // Active reporting basis (7 / 30 / 90). Country reports are a weekly brief and
+  // lead with 7; this drives the window labels in the prose.
   basisDays?: number;
 }): CountryReportProse {
   const name = opts.countryName || "this country";
   const region = opts.region || "the region";
   const issueDate = opts.issueDate ?? new Date().toISOString().slice(0, 10);
-  // Country reports lead with the rolling 30-day window; callers supply a
+  // Country reports lead with the rolling 7-day weekly window; callers supply a
   // pre-resolved active window so prose, Fast Facts, map and table all read
   // against one window. The filter fallback below is a defensive default only.
   const inWindow = opts.windowIncidents ??
@@ -781,13 +781,13 @@ export function draftCountryReportProse(opts: {
     );
   const total = inWindow.length;
 
-  // Active reporting basis. Country reports lead with the rolling 30-day
-  // window, so the prose labels that window; the caller passes basisDays.
-  const basisDays = opts.basisDays ?? 30;
+  // Active reporting basis. Country reports are a weekly brief and lead with the
+  // rolling 7-day window, so the prose labels that window; the caller passes
+  // basisDays (always 7 for the headline).
+  const basisDays = opts.basisDays ?? 7;
   const basisShort = basisDays === 30 ? "30-day" : basisDays === 90 ? "90-day" : "7-day";
-  // Country reports lead with the rolling 30-day window by design — a single
-  // quiet week is never read as calm — so the active frame names that window
-  // directly rather than presenting it as a fallback from an empty week.
+  // The headline is the rolling 7-day week. An empty week is read as a coverage
+  // gap, never as calm; the active frame names the weekly window directly.
   const activeFrame = `A single quiet week is not read as calm here, so the headline draws on the rolling ${basisShort} lookback.`;
   // Tail describing where older records sit relative to the active window.
   const olderTail = basisDays === 30
@@ -931,9 +931,9 @@ export function draftCountryReportProse(opts: {
   // (six provinces), NOT Papua New Guinea. Like PNG it is a low-volume,
   // restricted-reporting environment where foreign press/NGO access is
   // tightly controlled, so a thin or empty week is the norm — which is why the
-  // report leads with the rolling 30-day window. Name the standing operating
-  // signature and lean explicitly on the 30-day headline and 90-day background
-  // sections rather than inventing bland country prose.
+  // report leads with the rolling 7-day weekly window. Name the standing
+  // operating signature and lean explicitly on the weekly headline and the
+  // 30 / 90-day context sections rather than inventing bland country prose.
   const isPapua = /\bpapua\b/i.test(name);
   if (isPapua) {
     const currentSentence = total === 0
