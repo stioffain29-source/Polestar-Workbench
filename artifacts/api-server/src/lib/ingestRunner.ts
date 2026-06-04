@@ -153,7 +153,23 @@ async function withIngestLock<T>(
 export async function runIngestOnce(): Promise<IngestRunResult> {
   const res = await withIngestLock(async () => {
     const startedAt = new Date();
-    // Sequential: both share the same DB pool and dedupe against the incidents
+    // Strikes ingest runs FIRST, deliberately. This whole chain is launched as
+    // an UNOWNED background task on boot (lib/ingestScheduler.ts), and on an
+    // autoscale deployment the instance can be torn down before a multi-minute
+    // chain finishes. Whatever runs LAST is the most likely casualty — and the
+    // strikes table was the one that had been frozen with no live source, so it
+    // is the highest-value step to capture first. It writes its OWN table and
+    // shares nothing with the incidents dedupe below, so ordering it first is
+    // safe. Isolated in its own try so a feed/parse failure can never fail the
+    // rest of the chain — it just reports the error in its summary.
+    let strikes: StrikesIngestSummary;
+    try {
+      strikes = await runStrikesIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "strikes ingest failed");
+      strikes = emptyStrikes(err);
+    }
+    // Sequential: these share the same DB pool and dedupe against the incidents
     // table; running them one after another mirrors scrape:prod.
     const flashpoint = await runFlashpointIngest({ commit: true });
     const cargoWatch = await runCargoWatchIngest({ commit: true });
@@ -169,16 +185,6 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     } catch (err) {
       logger.error({ err }, "market price ingest failed");
       marketPrices = emptyMarketPrices(err);
-    }
-    // Missile Strike Tracker ingest (both theatres). Isolated in its own try so a
-    // feed/parse failure can never fail the incident ingest that already
-    // committed above — it just reports the error in its summary.
-    let strikes: StrikesIngestSummary;
-    try {
-      strikes = await runStrikesIngest({ commit: true });
-    } catch (err) {
-      logger.error({ err }, "strikes ingest failed");
-      strikes = emptyStrikes(err);
     }
     const finishedAt = new Date();
     return {

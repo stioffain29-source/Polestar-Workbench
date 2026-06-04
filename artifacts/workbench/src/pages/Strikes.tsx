@@ -290,12 +290,12 @@ export default function Strikes() {
         <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
           {theatre === "maritime_hormuz" ? (
             <>
-              No maritime-theatre strikes are currently on file. The imported dataset only contains land-based strikes across the GCC.{" "}
+              No maritime-theatre strikes are currently on file for this window.{" "}
               <Link href="/strikes/land" className="text-accent hover:underline">View Land — GCC</Link>.
             </>
           ) : (
             <>
-              No land-theatre strikes are currently on file in the imported dataset.{" "}
+              No land-theatre strikes are currently on file for this window.{" "}
               <Link href="/strikes/maritime" className="text-accent hover:underline">View Maritime — Hormuz</Link>.
             </>
           )}

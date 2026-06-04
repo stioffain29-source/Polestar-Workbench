@@ -17,5 +17,12 @@ Dedupe collapses to ONE row per `{theatre, country, munition, day}` (the `cluste
 ## Casualty parsing — explicit deaths only, never fabricate
 `parseCasualties` counts a number ONLY when directly governed by a death term (`killed/kills/killing/dead/deaths/fatalities`). The earlier `leaving (\d+)` branch was removed because "leaving 12 injured" was being counted as 12 deaths. Injuries are never counted; missing count → null.
 
+## Autoscale: the backfill must run FIRST, not last
+`runIngestOnce` is launched as an UNOWNED background task ~60s after boot by the scheduler. On an AUTOSCALE deployment the instance is torn down once traffic stops, so a multi-minute chain (flashpoint+cargo+shipping+energy+fertiliser+fuel+FRED+strikes) frequently dies before the LAST step runs. The first prod republish proved this: logs showed "boot ingest: forced run ... forceVersion=4" but NO "scheduled ingest finished", and prod strikes stayed at 48 land / 0 maritime — strikes (then last) was never reached.
+
+**Fix/rule:** the strikes ingest now runs FIRST in `runIngestOnce` (it writes its own table, shares nothing with the incidents dedupe, so reordering is safe). Any one-time backfill that depends on the boot scheduler must be ordered to run before the long incident chain, or it may never land on autoscale. Bump `INGEST_FORCE_VERSION` whenever the forced-run behaviour changes so the next boot re-forces. The truly guaranteed path for a one-time backfill is request-scoped (the token-gated `POST /api/admin/ingest`, which keeps the instance alive for the request) or a reserved-VM/scheduled deployment — NOT an unowned boot timer.
+
+**Watch out:** the in-app "Run Backfill" button (`StrikesBackfill.tsx`) is a MANUAL single-event entry form (public `POST /api/strikes`), NOT a scraper trigger. It does not run the live ingest.
+
 ## Precision: deny-list trailing-`\b` plural trap
 The STRIKE_DENY verb/place groups intentionally OMIT the trailing `\b` (leading `\b` only) so inflections/plurals are caught: `\bukrain` matches "Ukraine"/"Ukrainian", `cope cage` matches "cope cages", `narcotic`/`drug` match plurals. A trailing `\b` on the group silently failed on every plural (the most common false-accept class). Country detection is TITLE-FIRST (strip Google's trailing " - Source", detect on headline only); land events must name a GCC state in the headline, maritime events need a maritime cue or they're rejected.
