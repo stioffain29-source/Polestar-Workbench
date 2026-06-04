@@ -27,6 +27,17 @@ export type TopicFeed = {
   label: string;
   q: string;
   defaultCountry: string;
+  /**
+   * Google News edition for this feed. Country feeds MUST set this to the
+   * country's own edition (e.g. India -> gl=IN, ceid=IN:en) — the default
+   * US edition pulls US-local distribution faults (Duke Energy outages,
+   * county feeder trips, "outage tracker" SEO pages) that loosely match a
+   * quoted country name and then get mis-stamped with the feed's default
+   * country. A per-country edition pulls that country's own grid news.
+   */
+  gl?: string;
+  hl?: string;
+  ceid?: string;
 };
 
 export type NewsTopicConfig = {
@@ -41,9 +52,15 @@ export type NewsTopicConfig = {
   countryAliases: CountryAlias[];
 };
 
-export function gnews(query: string): string {
+export function gnews(
+  query: string,
+  edition?: { gl?: string; hl?: string; ceid?: string },
+): string {
   const q = encodeURIComponent(query);
-  return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
+  const hl = encodeURIComponent(edition?.hl ?? "en-US");
+  const gl = encodeURIComponent(edition?.gl ?? "US");
+  const ceid = encodeURIComponent(edition?.ceid ?? "US:en");
+  return `https://news.google.com/rss/search?q=${q}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
 }
 
 type Feed = TopicFeed & { url: string };
@@ -124,7 +141,10 @@ export async function runNewsTopicIngest(
   const logLines: string[] = [];
   const log = (s: string) => logLines.push(s);
 
-  const FEEDS: Feed[] = cfg.feeds.map((f) => ({ ...f, url: gnews(f.q) }));
+  const FEEDS: Feed[] = cfg.feeds.map((f) => ({
+    ...f,
+    url: gnews(f.q, { gl: f.gl, hl: f.hl, ceid: f.ceid }),
+  }));
   log(
     `${topic} scraper — ${FEEDS.length} feeds, mode=${commit ? "COMMIT" : "DRY-RUN"}${
       titleFilter ? `, title filter="${titleFilter}"` : ""

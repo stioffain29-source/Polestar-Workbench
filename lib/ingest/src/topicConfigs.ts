@@ -28,7 +28,43 @@ const COUNTRY_ALIASES: CountryAlias[] = [
   { canonical: "Iraq", aliases: ["iraq", "iraqi", "baghdad", "basra"] },
   { canonical: "Saudi Arabia", aliases: ["saudi arabia", "saudi", "riyadh", "jeddah"] },
   { canonical: "United Arab Emirates", aliases: ["united arab emirates", "uae", "dubai", "abu dhabi"] },
+  { canonical: "Qatar", aliases: ["qatar", "qatari", "doha"] },
+  { canonical: "Kuwait", aliases: ["kuwait", "kuwaiti"] },
+  { canonical: "Oman", aliases: ["oman", "omani", "muscat"] },
+  { canonical: "Bahrain", aliases: ["bahrain", "bahraini", "manama"] },
+  { canonical: "Australia", aliases: ["australia", "australian", "sydney", "melbourne", "brisbane", "perth", "adelaide", "canberra", "queensland", "new south wales", "nsw"] },
+  { canonical: "New Zealand", aliases: ["new zealand", "auckland", "wellington", "christchurch"] },
 ];
+
+// Per-country Google News edition. A country feed MUST pull that country's own
+// edition or the default US edition floods it with US-local distribution faults
+// (Duke/Dominion/Consumers Energy outages, county feeder trips, "outage
+// tracker" SEO pages) that loosely match the quoted country name and then get
+// mis-stamped with the feed's default country. Countries with no reliable
+// English edition (Myanmar, China, Iran, Iraq) fall back to the US edition but
+// rely on the quoted country name + relevance gate.
+const EDITIONS: Record<string, { gl: string; hl: string; ceid: string }> = {
+  India: { gl: "IN", hl: "en-IN", ceid: "IN:en" },
+  Pakistan: { gl: "PK", hl: "en-PK", ceid: "PK:en" },
+  Bangladesh: { gl: "BD", hl: "en-BD", ceid: "BD:en" },
+  "Sri Lanka": { gl: "LK", hl: "en-LK", ceid: "LK:en" },
+  Nepal: { gl: "NP", hl: "en-NP", ceid: "NP:en" },
+  Indonesia: { gl: "ID", hl: "en-ID", ceid: "ID:en" },
+  Philippines: { gl: "PH", hl: "en-PH", ceid: "PH:en" },
+  Vietnam: { gl: "VN", hl: "en-VN", ceid: "VN:en" },
+  Thailand: { gl: "TH", hl: "en-TH", ceid: "TH:en" },
+  Malaysia: { gl: "MY", hl: "en-MY", ceid: "MY:en" },
+  Japan: { gl: "JP", hl: "en-JP", ceid: "JP:en" },
+  "South Korea": { gl: "KR", hl: "en-KR", ceid: "KR:en" },
+  "Saudi Arabia": { gl: "SA", hl: "en-SA", ceid: "SA:en" },
+  "United Arab Emirates": { gl: "AE", hl: "en-AE", ceid: "AE:en" },
+  Qatar: { gl: "QA", hl: "en-QA", ceid: "QA:en" },
+  Kuwait: { gl: "KW", hl: "en-KW", ceid: "KW:en" },
+  Oman: { gl: "OM", hl: "en-OM", ceid: "OM:en" },
+  Bahrain: { gl: "BH", hl: "en-BH", ceid: "BH:en" },
+  Australia: { gl: "AU", hl: "en-AU", ceid: "AU:en" },
+  "New Zealand": { gl: "NZ", hl: "en-NZ", ceid: "NZ:en" },
+};
 
 // Shared denylist of market/finance/PR/homonym noise common to all three
 // land-commodity topics. Topic-specific extras are appended below.
@@ -65,6 +101,7 @@ function countryFeeds(
     label: `${c}`,
     q: `${termGroup} "${c}"`,
     defaultCountry: c,
+    ...(EDITIONS[c] ?? {}),
   }));
 }
 
