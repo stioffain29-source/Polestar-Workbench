@@ -639,7 +639,26 @@ const COUNTRY_ECONOMIC_NOISE_RE =
   /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?|completes? (the )?migration|migrat(ion|es|ed|ing) (of|to) (its )?[a-z]+ (system|platform)|system (migration|upgrade)|prepaid metering|go[- ]live|new (it|billing|payment|digital) platform)\b/i;
 
 const COUNTRY_SPORTS_NOISE_RE =
-  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|rugby|netball|cricket|grand final|test match|cross[- ]code coup)\b/i;
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|rugby|netball|cricket|grand final|test match|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?)\b/i;
+
+// Non-event editorial classes: explainers, op-eds, "what you need to know"
+// guides and fact-checks. A country SECURITY aggregate lists concrete
+// EVENTS, not background pieces about laws or institutions. These are
+// dropped unless the record also carries a hard security signal (so a real
+// "police explain the armed robbery investigation" still survives).
+const COUNTRY_EXPLAINER_NOISE_RE =
+  /\b(explains?|explained|explainer|breaks? down|what (you )?need to know|here'?s what|fact[- ]?check|backgrounder|op[- ]?ed|opinion piece)\b.{0,40}\b(law|laws|history|culture|tradition|custom|system|policy|act|bill)\b|\b(law|laws|history|culture|tradition|custom|system|policy|act|bill)\b.{0,40}\b(explained|explainer)\b/i;
+
+// Scraped-aggregator junk: a YouTube-style video-id signature "(vFetqxZnwf)"
+// left in a syndicated headline — a 9–14 char token from [A-Za-z0-9_-] with
+// an internal lower→UPPER transition inside parentheses. The length floor
+// (9) avoids false-dropping ordinary short parenthesised camelCase tokens
+// like "(iPhone)"/"(eBay)"/"(macOS)", while still catching the 10–11 char
+// random ids these aggregators leave behind. Tested against the RAW title
+// because the case transition is the discriminator and the haystack is
+// lower-cased. Mirrors FLASHPOINT_DENY in the scraper so the country gate
+// drops rows already in the DB that ingest now blocks at insert.
+const YOUTUBE_VIDEO_ID_RE = /\((?=[A-Za-z0-9_-]{9,14}\))[A-Za-z0-9_-]*[a-z][A-Z][A-Za-z0-9_-]*\)/;
 
 // HARD (unambiguous) security signals. Deliberately a STRICT subset of
 // COUNTRY_SECURITY_SIGNAL_RE: it omits every word that routinely appears in a
@@ -688,9 +707,20 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   for (const re of EXCLUDE_PHRASES) {
     if (re.test(text)) return false;
   }
+  // Scraped-aggregator junk: a leftover YouTube video-id in the headline
+  // ("...Papua New Guinea (vFetqxZnwf) - Mshale") is never a real incident.
+  // Test the RAW title — the lower→UPPER case transition is the signature
+  // and `haystack` has already lower-cased everything.
+  if (YOUTUBE_VIDEO_ID_RE.test(i.title ?? "")) return false;
   // Drop non-security economic / market / PR noise UNLESS the record carries
   // any (soft-inclusive) security signal — a fuel-subsidy protest/march stays.
   if (COUNTRY_ECONOMIC_NOISE_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    return false;
+  }
+  // Drop explainer / op-ed / "what you need to know" editorial UNLESS the
+  // record carries a hard security signal — a security aggregate lists
+  // EVENTS, not background pieces about laws or institutions.
+  if (COUNTRY_EXPLAINER_NOISE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
     return false;
   }
   // Drop SPORTS noise unless the record carries a HARD security signal. A match

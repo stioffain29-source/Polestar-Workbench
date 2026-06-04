@@ -484,6 +484,20 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   log(`  New to insert       : ${toInsert.length}`);
   log(`  Rejected            : ${rejected.length}`);
 
+  // Diagnostic: dump rejected items (optionally filtered by substring) so we
+  // can see WHY real events are being dropped. Gated on an env var so normal
+  // runs stay quiet. FLASHPOINT_DEBUG_REJECTS=1 dumps all; set it to a
+  // substring (e.g. "lae") to filter the title.
+  const dbgRejects = process.env.FLASHPOINT_DEBUG_REJECTS;
+  if (dbgRejects) {
+    const needle = dbgRejects === "1" ? "" : dbgRejects.toLowerCase();
+    log("\n=== Rejected (debug) ===");
+    for (const r of rejected) {
+      if (needle && !r.title.toLowerCase().includes(needle)) continue;
+      log(`  [${r.reason}] ${r.title.slice(0, 110)}`);
+    }
+  }
+
   const summaryBase = {
     topic: "flashpoint" as const,
     mode: (commit ? "commit" : "dry-run") as IngestSummary["mode"],

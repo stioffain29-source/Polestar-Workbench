@@ -32,7 +32,22 @@ reflects sparse reality, not a bug — be honest about this with the user.
 noise (e.g. a hockey "The Leafs Are Ready To Strike... PNG (vFetqxZnwf) -
 Mshal" YouTube upload) that passes BOTH isCountryRelevant (strike=security
 signal) AND isForeignDominantContext (no foreign country named). Denied at
-ingest via the 11-char parenthetical YouTube video-id pattern in FLASHPOINT_DENY.
+ingest via the parenthetical YouTube video-id pattern in FLASHPOINT_DENY.
+
+**Country-report junk must ALSO be dropped in `isCountryRelevant`, NOT only at
+ingest / per-topic persisted relevance:** CountryReport.tsx fetches raw
+(`includeIrrelevant:true`) and applies its OWN `isCountryRelevant`
+(`lib/relevance/src/topicRelevance.ts`) — so per-topic backfill/RELEVANCE_RULE_VERSION
+bumps DO NOTHING for the country report, and rows already in the DB bypass any
+ingest-only deny. Added there: a YouTube-id drop (test the RAW title — `haystack()`
+lowercases away the lower→UPPER case signature) and a COUNTRY_EXPLAINER_NOISE_RE
+op-ed/explainer drop gated on `!COUNTRY_HARD_SECURITY_RE` (so "police explain the
+robbery investigation" survives). **The aggregator id is 10 chars, not 11** (YouTube
+ids are 11 but "vFetqxZnwf" is 10) — the length guard is a 9–14 RANGE with an
+internal lower→UPPER transition, floored at 9 so short camelCase like "(iPhone)"
+/"(eBay)"/"(macOS)" is never false-dropped. Verified over all live PNG rows: 7
+junk dropped (sports finals, FC results, cross-code, IT migration, sorcery-law
+explainer, fuel-subsidy PR), 41 genuine security events kept.
 
 **Syndicated-rehash trap:** an aggregator (e.g. Digital Journal) re-runs a
 months/years-old event with a FRESH pubdate ("...15 killed in riots", a re-run

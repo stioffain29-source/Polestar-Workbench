@@ -9,7 +9,6 @@ import {
   drawFastFactsKpiCards,
   drawBulletSection,
   drawDisclaimer,
-  measureDisclaimerHeight,
   drawFooters,
   drawPolestarCover,
   beginBodyPages,
@@ -39,6 +38,7 @@ import {
   resolveReportWindow,
   filterIncidentsToWindow,
   reportCadence,
+  relatedIncidentsLimit,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { selectRelatedIncidents } from "./relatedIncidents";
