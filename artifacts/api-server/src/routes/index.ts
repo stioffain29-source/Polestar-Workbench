@@ -8,11 +8,13 @@ import countriesRouter from "./countries";
 import baselinesRouter from "./baselines";
 import dashboardRouter from "./dashboard";
 import adminRouter from "./admin";
+import backfillRouter from "./backfill";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(adminRouter);
+router.use(backfillRouter);
 router.use(incidentsRouter);
 router.use(strikesRouter);
 router.use(sourcesRouter);
