@@ -24,6 +24,16 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  void runDataMigrations();
-  startIngestScheduler();
+  // Run data migrations (which seed the scraper source feeds) BEFORE starting
+  // the ingest scheduler, so the boot/forced ingest can never fire against a
+  // sources table that is still missing a newly seeded feed. The server is
+  // already listening, so startup health probes are answered during this work.
+  void (async () => {
+    try {
+      await runDataMigrations();
+    } catch (migrationErr) {
+      logger.error({ err: migrationErr }, "data migrations failed");
+    }
+    startIngestScheduler();
+  })();
 });

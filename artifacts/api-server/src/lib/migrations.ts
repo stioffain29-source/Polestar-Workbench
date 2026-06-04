@@ -48,6 +48,16 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   // re-breaks recency. Verified empirically — this set honours when:14d.
   { name: "Google News — Papua New Guinea (Crime & Security)", url: "https://news.google.com/rss/search?q=(Lae+OR+Morobe+OR+Taraka+OR+%22Port+Moresby%22+OR+%22Mount+Hagen%22+OR+Madang)+(police+OR+raid+OR+robbery+OR+shooting+OR+killed+OR+crime+OR+violence+OR+wanted+OR+mob)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG violent-crime & communal-violence aggregator, anchored on urban-crime hubs (Lae, Morobe, Taraka, Port Moresby, Mount Hagen, Madang) so headline incidents that omit the country name are still captured. Last 14 days." },
   { name: "Google News — Papua New Guinea (Civil Unrest)",    url: "https://news.google.com/rss/search?q=%22Papua+New+Guinea%22+(protest+OR+riot+OR+strike+OR+rally+OR+unrest+OR+looting+OR+roadblock)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG country-wide civil unrest aggregator. Last 14 days." },
+  // Indonesian West Papua insurgency & violence. The Indonesia (Civil Unrest)
+  // feed above queries ONLY protest/rally/demonstration, so it never surfaces
+  // the TPNPB/OPM rebel-vs-military violence that dominates the West Papua
+  // theatre (e.g. "8 civilians killed by West Papua rebels", "rebels behind
+  // killing of 8 goldminers"). Without this feed the Papua country report has
+  // NO live insurgency data and rewinds to its last stale record. Mirrors the
+  // PNG pair: insurgency + violence cues, when:14d for recency. Kept compact
+  // (2 country tokens x 8 cues) so Google News honours the when:14d filter
+  // (verified empirically — large grouped OR queries silently drop it).
+  { name: "Google News — West Papua (Insurgency & Violence)", url: "https://news.google.com/rss/search?q=(%22West+Papua%22+OR+Papua)+(TPNPB+OR+OPM+OR+rebels+OR+separatist+OR+shooting+OR+killed+OR+clash+OR+ambush)+when:14d&hl=en-ID&gl=ID&ceid=ID:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. Indonesian West Papua insurgency & violence aggregator (TPNPB/OPM rebel activity, security-force operations). Last 14 days." },
   // Pacific desk — Papua New Guinea and Indonesian West Papua wires. These
   // are the ONLY collection sources that feed the PNG and Papua country
   // reports; without them those reports have no live data on this

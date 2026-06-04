@@ -147,6 +147,32 @@ OR-ed place×term clauses) silently DROP the `when:14d` operator → years-old
 mix returns. Keep PNG feeds as place-anchored smaller queries
 (Lae/Morobe/Taraka/Port Moresby/Mount Hagen/Madang × terms) so when:14d sticks.
 
+**West Papua needed its OWN seed feed — accepting insurgency wasn't enough:**
+the classifier/deny work above only DECIDES what to keep; if no feed FETCHES
+rebel/TPNPB violence, the West Papua report still rewinds. The single "Google
+News — Indonesia (Civil Unrest)" feed queries protest/rally/demonstration terms
+ONLY, so it never surfaces TPNPB/OPM shootings, ambushes, the goldminer
+massacre, etc. Fix: a dedicated `Google News — West Papua (Insurgency &
+Violence)` feed in FLASHPOINT_REGIONAL_SOURCES querying ("West Papua" OR Papua) +
+(TPNPB OR OPM OR rebels OR separatist OR shooting OR killed OR clash OR ambush)
++when:14d, hl/gl=ID. **Why:** "stuck on an old date" for a Pacific theatre is
+almost always a missing FEED, not a filter/clamp/display bug — prove it by
+diffing live Google News against the prod DB before touching report code.
+
+**Prod rollout of a new feed = republish + a GUARANTEED ingest, not just
+republish.** The scheduler boot catch-up is gated on a 12h freshness heartbeat,
+so a republish whose existing rows are <12h old does NOT poll the newly seeded
+feed — the data sits absent until rows age out (the user re-reports "still
+stuck"). Mechanism that fixes this: bump `INGEST_FORCE_VERSION` (ingestScheduler.ts),
+which forces exactly ONE full ingest on next boot regardless of freshness, keyed
+by an app_migration_markers row so it runs once per environment per bump. AND
+the seed must land before that forced run fires — index.ts now AWAITS
+runDataMigrations() before startIngestScheduler() (was fire-and-forget), so the
+forced ingest can never race an unseeded sources table. Dev already holds the
+data (re-scraped in-session), so dev shows inserted:0/duplicateInDb — it is PROD
+that gains the rows; verify prod post-republish via the admin-ingest perFeed
+stats for the new feed.
+
 **How to apply:** new PNG/Pacific feeds go in FLASHPOINT_REGIONAL_SOURCES in
 `artifacts/api-server/src/lib/migrations.ts` (seeded on boot, reaches prod on
 deploy; repairFlashpointSeedUrls updates existing rows' URLs). Any new Google
