@@ -348,6 +348,10 @@ const ENERGY_EXCLUDE: RegExp[] = [
   /\b(abc\d{1,2}|wfaa|fox\d{1,2}|nbc\d{1,2}|cbs\d{1,2}|king ?5)\b/,
   // US / Canadian geography markers (none collide with in-scope theatres).
   /\b(county|township|ohio|texas|california|nevada|michigan|virginia|florida|illinois|oregon|washington state|ontario|quebec|alberta|british columbia)\b/,
+  // US city names — country-edition feeds mis-attribute US storm/outage stories
+  // (esp. Texas/ERCOT) to an in-scope byline. Curated to clearly-US cities with
+  // no in-scope APAC/ME/AU collision.
+  /\b(austin|houston|dallas|fort worth|san antonio|el paso|denver|atlanta|seattle|sacramento|baltimore|memphis|nashville|tulsa|cleveland|milwaukee|minneapolis|detroit)\b/,
   // Out-of-region countries that recur in the energy feed.
   /\b(canada|canadian|kenya|kenyan|nersa|ferrochrome|nigeria|south africa|eskom|ghana|zimbabwe|zambia)\b/,
   // Out-of-region grid stories the country-edition feeds mis-attribute to
@@ -362,6 +366,9 @@ const ENERGY_EXCLUDE: RegExp[] = [
   // Planned / scheduled maintenance outages are routine, not grid stress.
   /\b(planned|scheduled) (power )?(outage|maintenance)\b/,
   /\brestored after\b.{0,30}(outage|disruption|fault)/,
+  // Recovery / improvement framing — outages easing is the OPPOSITE of an
+  // incident (deliberately omits "ease", which appears in ongoing-crisis prose).
+  /\b(power )?outages?\b[^.]{0,20}\b(drop|fall|decline|recede|subside)\b/,
   // Negations — the OPPOSITE of an incident.
   /\bno (power|electricity) (shortage|crisis|cut|outage)/,
   /\bno (scope for|need for) (load[- ]?shedding|power cut|outage)/,

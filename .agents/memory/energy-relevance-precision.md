@@ -28,6 +28,15 @@ in-scope energy).
 **Also omitted on purpose:** `united states`/`u.s.` (appears in legit Gulf
 energy-infrastructure strike stories); `national grid` (Indian usage → false-drop risk).
 
+**US CITY names are excluded, not just states.** Country-edition feeds mis-attribute US
+storm/outage stories (esp. Texas/ERCOT) to an in-scope byline, and "power outages"
+satisfies REQUIRED, so a US-state token alone misses any title without the state name
+(e.g. "Austin power outages drop after severe storms" → mis-tagged Philippines). A
+curated clearly-US city list (austin/houston/dallas/etc., no in-scope collision) is in
+the exclude. Also excluded: outage **recovery** framing ("outages drop|fall|decline|
+recede|subside") — the opposite of an incident (omit "ease", which appears in
+ongoing-crisis prose).
+
 **Mechanism reminder:** any rule change here needs a `RELEVANCE_RULE_VERSION` bump
 (`evaluate.ts`) so the api-server boot backfill re-evaluates stored rows; otherwise the
 DB keeps the old verdicts.
