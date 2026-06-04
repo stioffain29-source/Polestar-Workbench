@@ -35,7 +35,7 @@ const MS_PER_HOUR = 60 * 60 * 1000;
 // freshness, so a deploy that changes what the scrapers accept/reject takes
 // effect immediately. The marker is stored in app_migration_markers keyed by
 // version, so the forced run happens once per environment per version bump.
-const INGEST_FORCE_VERSION = 3;
+const INGEST_FORCE_VERSION = 4;
 
 /**
  * True when the current INGEST_FORCE_VERSION has not yet run in this
@@ -124,6 +124,21 @@ async function hoursSinceNewestPerLandTopic(): Promise<Record<string, number | n
 }
 
 /**
+ * Hours since the newest inserted strike (or null when the strikes table is
+ * empty). The Missile Strike Tracker lives in its own table with no
+ * sources.last_success_at heartbeat, so — like the scraped land topics — the
+ * boot gate must force a full run whenever it is stale, otherwise a fresh
+ * flashpoint heartbeat would wrongly suppress the catch-up while strikes sit
+ * weeks behind.
+ */
+async function hoursSinceNewestStrike(): Promise<number | null> {
+  const res = await db.execute(sql`SELECT MAX(created_at) AS last FROM strikes`);
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
  * Run one full ingest. Returns true ONLY when a full run actually completed
  * (the advisory lock was acquired and no error was thrown). Returns false when
  * the run was skipped because another instance holds the lock, or when it
@@ -146,6 +161,7 @@ async function tick(reason: string): Promise<boolean> {
         energyInserted: result.energy.inserted,
         fertiliserInserted: result.fertiliser.inserted,
         fuelInserted: result.fuel.inserted,
+        strikesInserted: result.strikes.inserted,
         fuelReportsPriced: result.marketPrices.reportsUpdated,
         fuelPriceAsOf: result.marketPrices.latest.asOf,
         durationMs: result.durationMs,
@@ -246,13 +262,16 @@ export function startIngestScheduler(): void {
       }
       const age = await hoursSinceLastIngest();
       const landAges = await hoursSinceNewestPerLandTopic();
+      const strikeAge = await hoursSinceNewestStrike();
       // A land topic is stale if it has no rows or its newest insert is older
       // than the interval. ANY stale land topic forces a full run.
       const staleLandTopics = SCRAPED_LAND_TOPICS.filter((t) => {
         const a = landAges[t];
         return a === null || a >= hours;
       });
-      if (age === null || age >= hours || staleLandTopics.length > 0) {
+      // Strikes live in their own table (no heartbeat), so check it the same way.
+      const strikesStale = strikeAge === null || strikeAge >= hours;
+      if (age === null || age >= hours || staleLandTopics.length > 0 || strikesStale) {
         logger.info(
           {
             ageHours: age === null ? null : Math.round(age),
@@ -260,6 +279,8 @@ export function startIngestScheduler(): void {
               SCRAPED_LAND_TOPICS.map((t) => [t, landAges[t] === null ? null : Math.round(landAges[t]!)]),
             ),
             staleLandTopics,
+            strikeAgeHours: strikeAge === null ? null : Math.round(strikeAge),
+            strikesStale,
           },
           "boot ingest: data stale, running catch-up",
         );

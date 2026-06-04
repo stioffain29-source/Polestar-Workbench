@@ -7,8 +7,10 @@ import {
   runFertiliserIngest,
   runFuelIngest,
   runMarketPricesIngest,
+  runStrikesIngest,
   type IngestSummary,
   type MarketPriceSummary,
+  type StrikesIngestSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 
@@ -41,6 +43,7 @@ export type IngestRunResult =
       fertiliser: IngestSummary;
       fuel: IngestSummary;
       marketPrices: MarketPriceSummary;
+      strikes: StrikesIngestSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -53,6 +56,27 @@ export type MarketPricesRunResult =
       marketPrices: MarketPriceSummary;
     }
   | { ran: false; reason: "locked" };
+
+function emptyStrikes(err: unknown): StrikesIngestSummary {
+  return {
+    mode: "commit",
+    sourcesFetched: 0,
+    itemsConsidered: 0,
+    acceptedRaw: 0,
+    acceptedUnique: 0,
+    duplicateInDb: 0,
+    newToInsert: 0,
+    inserted: 0,
+    rejected: 0,
+    totalAfter: null,
+    latestRecord: null,
+    lastUpdated: null,
+    perFeed: [],
+    byTheatre: [],
+    byCountry: [],
+    logLines: [`strikes ingest failed: ${err instanceof Error ? err.message : String(err)}`],
+  };
+}
 
 function emptyMarketPrices(err: unknown): MarketPriceSummary {
   return {
@@ -146,6 +170,16 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "market price ingest failed");
       marketPrices = emptyMarketPrices(err);
     }
+    // Missile Strike Tracker ingest (both theatres). Isolated in its own try so a
+    // feed/parse failure can never fail the incident ingest that already
+    // committed above — it just reports the error in its summary.
+    let strikes: StrikesIngestSummary;
+    try {
+      strikes = await runStrikesIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "strikes ingest failed");
+      strikes = emptyStrikes(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
@@ -158,6 +192,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       fertiliser,
       fuel,
       marketPrices,
+      strikes,
     };
   });
   if (!res.ran) return res;

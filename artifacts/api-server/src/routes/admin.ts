@@ -89,6 +89,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
         energyInserted: result.energy.inserted,
         fertiliserInserted: result.fertiliser.inserted,
         fuelInserted: result.fuel.inserted,
+        strikesInserted: result.strikes.inserted,
         durationMs: result.durationMs,
       },
       "admin ingest finished",
@@ -104,13 +105,30 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
         result.shipping.inserted +
         result.energy.inserted +
         result.fertiliser.inserted +
-        result.fuel.inserted,
+        result.fuel.inserted +
+        result.strikes.inserted,
       flashpoint: trimmedSummary(result.flashpoint),
       cargoWatch: trimmedSummary(result.cargoWatch),
       shipping: trimmedSummary(result.shipping),
       energy: trimmedSummary(result.energy),
       fertiliser: trimmedSummary(result.fertiliser),
       fuel: trimmedSummary(result.fuel),
+      strikes: {
+        mode: result.strikes.mode,
+        sourcesFetched: result.strikes.sourcesFetched,
+        itemsConsidered: result.strikes.itemsConsidered,
+        acceptedUnique: result.strikes.acceptedUnique,
+        duplicateInDb: result.strikes.duplicateInDb,
+        newToInsert: result.strikes.newToInsert,
+        inserted: result.strikes.inserted,
+        rejected: result.strikes.rejected,
+        totalAfter: result.strikes.totalAfter,
+        latestRecord: result.strikes.latestRecord,
+        lastUpdated: result.strikes.lastUpdated,
+        byTheatre: result.strikes.byTheatre,
+        byCountry: result.strikes.byCountry,
+        perFeed: result.strikes.perFeed,
+      },
       marketPrices: {
         seriesFetched: result.marketPrices.seriesFetched,
         seriesErrors: result.marketPrices.seriesErrors,
