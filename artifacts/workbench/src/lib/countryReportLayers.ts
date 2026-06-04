@@ -193,19 +193,20 @@ function countryRangeLabels(end: Date, days: number): { label: string; shortLabe
 /**
  * The single active reporting window for a country report.
  *
- * Country reports LEAD WITH THE ROLLING 30-DAY WINDOW. A single quiet week is
- * not evidence of calm in a high-threat country — for thin-reporting places
- * (e.g. PNG, West Papua) the week is routinely empty as a coverage artifact,
- * not because nothing happened. So the headline reflects the real standing
- * volume over 30 days, clearly labelled "30-day" via
- * {@link ActiveCountryWindow.basisLabel}, instead of a strict 7-day window
- * that would read as thin in any quiet week.
+ * Country reports LEAD WITH THE ROLLING 7-DAY (WEEKLY) WINDOW. This is a weekly
+ * brief, so the headline must reflect THIS WEEK whenever the week has records.
+ * Only when the 7-day window is genuinely EMPTY does the report fall back to a
+ * wider window (30-day, then 90-day) so a thin-reporting country (e.g. PNG,
+ * West Papua) still shows its real standing pattern instead of a blank page.
+ * The fallback is flagged via {@link ActiveCountryWindow.expanded} and the
+ * widened basis is clearly labelled via {@link ActiveCountryWindow.basisLabel},
+ * so a 30/90-day fallback never reads as "this week".
  *
- * This is NOT a "stale data as current" claim: the period is explicitly the
- * 30-day window, not this week. When even the 30-day window is empty the
- * headline stays honestly empty and the coverage banner
- * ({@link computeCountryCoverageStatus}) fires; the 90-day bucket still feeds
- * the deeper background context section.
+ * This is NOT a "stale data as current" claim: when the week has data the
+ * period is explicitly the last 7 days; a wider basis is shown only as a
+ * labelled fallback. When even the 90-day window is empty the headline stays
+ * honestly empty and the coverage banner ({@link computeCountryCoverageStatus})
+ * fires.
  *
  * The chosen window drives Fast Facts, the map, charts, the related-incidents
  * table AND the drafted prose, so the whole report reads against one window.
@@ -218,18 +219,27 @@ export function resolveActiveCountryWindow(
   try { end = parseISO(issueDate); } catch { end = new Date(); }
   if (isNaN(end.getTime())) end = new Date();
 
-  // The rolling 30-day window is always the headline. When it holds records it
-  // shows the true standing volume; when it is empty it stays honestly empty
-  // (the coverage banner fires) and the 90-day background section carries the
-  // deeper pattern. The caller has already clamped the issue date back to the
-  // country's newest record, so the 30-day window ends on real data.
-  const { label, shortLabel } = countryRangeLabels(end, 30);
+  // Lead with the weekly window. The caller has already clamped the issue date
+  // back to the country's newest record, so the 7-day window ends on real data.
+  // Fall back to 30-day then 90-day ONLY when the narrower window is empty, so a
+  // quiet week never renders a blank report — the wider basis is labelled and
+  // flagged expanded so it never masquerades as the current week.
+  const tiers: Array<{ basisDays: CountryWindowBasis; incidents: CountryFastFactsIncident[] }> = [
+    { basisDays: 7, incidents: layers.current },
+    { basisDays: 30, incidents: layers.thirtyDay },
+    { basisDays: 90, incidents: layers.ninetyDay },
+  ];
+  const chosen = tiers.find((t) => t.incidents.length > 0) ?? tiers[0];
+  const expanded = chosen.basisDays !== 7;
+  const basisShort = chosen.basisDays === 90 ? "90-day" : `${chosen.basisDays}-day`;
+  const basisLabel = chosen.basisDays === 90 ? "90-day context" : basisShort;
+  const { label, shortLabel } = countryRangeLabels(end, chosen.basisDays);
   return {
-    basisDays: 30,
-    basisLabel: "30-day",
-    basisShort: "30-day",
-    incidents: layers.thirtyDay,
-    expanded: false,
+    basisDays: chosen.basisDays,
+    basisLabel,
+    basisShort,
+    incidents: chosen.incidents,
+    expanded,
     periodLabel: label,
     periodShortLabel: shortLabel,
   };

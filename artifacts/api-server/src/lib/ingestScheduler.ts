@@ -26,6 +26,45 @@ import { logger } from "./logger";
 const DEFAULT_INTERVAL_HOURS = 12;
 const MS_PER_HOUR = 60 * 60 * 1000;
 
+// One-time forced boot ingest, keyed to a code version. The boot catch-up is
+// normally gated on data freshness so autoscale cold starts stay cheap — but
+// that means a republish carrying NEW scraper/classifier logic does NOT refresh
+// prod when the existing rows are still "fresh" (e.g. scraped <12h ago). The
+// new rules then never reach prod until the data happens to age out. Bumping
+// this version forces exactly ONE full ingest on the next boot, regardless of
+// freshness, so a deploy that changes what the scrapers accept/reject takes
+// effect immediately. The marker is stored in app_migration_markers keyed by
+// version, so the forced run happens once per environment per version bump.
+const INGEST_FORCE_VERSION = 1;
+
+/**
+ * True when the current INGEST_FORCE_VERSION has not yet run in this
+ * environment (so the boot catch-up must force a full ingest once). Creates the
+ * marker table if missing, mirroring the runtime-migration marker pattern.
+ */
+async function needsForcedIngest(): Promise<boolean> {
+  const key = `ingest_force_v${INGEST_FORCE_VERSION}`;
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS app_migration_markers (
+      key text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  const existing = await db.execute(sql`
+    SELECT 1 FROM app_migration_markers WHERE key = ${key}
+  `);
+  return (existing.rowCount ?? 0) === 0;
+}
+
+/** Record that the forced ingest for the current version has run. */
+async function markForcedIngestDone(): Promise<void> {
+  const key = `ingest_force_v${INGEST_FORCE_VERSION}`;
+  await db.execute(sql`
+    INSERT INTO app_migration_markers (key) VALUES (${key})
+    ON CONFLICT (key) DO NOTHING
+  `);
+}
+
 function intervalHours(): number {
   const raw = process.env["INGEST_INTERVAL_HOURS"];
   const n = raw ? Number(raw) : NaN;
@@ -84,12 +123,19 @@ async function hoursSinceNewestPerLandTopic(): Promise<Record<string, number | n
   return out;
 }
 
-async function tick(reason: string): Promise<void> {
+/**
+ * Run one full ingest. Returns true ONLY when a full run actually completed
+ * (the advisory lock was acquired and no error was thrown). Returns false when
+ * the run was skipped because another instance holds the lock, or when it
+ * failed. Callers that must guarantee a real run (the forced boot ingest) gate
+ * their bookkeeping on this so a skipped/failed run never counts as done.
+ */
+async function tick(reason: string): Promise<boolean> {
   try {
     const result = await runIngestOnce();
     if (!result.ran) {
       logger.info({ reason }, "scheduled ingest skipped (already running)");
-      return;
+      return false;
     }
     logger.info(
       {
@@ -107,8 +153,10 @@ async function tick(reason: string): Promise<void> {
       },
       "scheduled ingest finished",
     );
+    return true;
   } catch (err) {
     logger.error({ err, reason }, "scheduled ingest failed");
+    return false;
   }
 }
 
@@ -164,6 +212,38 @@ export function startIngestScheduler(): void {
   // starts on autoscale stay cheap.
   const bootTimer = setTimeout(() => void (async () => {
     try {
+      // A new deploy carrying changed scraper/classifier rules forces ONE full
+      // ingest regardless of freshness, so the new rules reach prod immediately
+      // instead of waiting for the existing rows to age past the interval.
+      let forced = false;
+      try {
+        forced = await needsForcedIngest();
+      } catch (err) {
+        logger.error({ err }, "boot ingest: forced-version check failed");
+      }
+      if (forced) {
+        logger.info(
+          { forceVersion: INGEST_FORCE_VERSION },
+          "boot ingest: forced run for new ingest version, refreshing now",
+        );
+        const ran = await tick("boot-forced");
+        if (ran) {
+          // Only record the marker when a full ingest actually completed. A
+          // skipped run (another instance holds the lock) or a failed run must
+          // NOT consume the one guaranteed refresh — a later boot retries.
+          try {
+            await markForcedIngestDone();
+          } catch (err) {
+            logger.error({ err }, "boot ingest: failed to record forced-version marker");
+          }
+        } else {
+          logger.warn(
+            { forceVersion: INGEST_FORCE_VERSION },
+            "boot ingest: forced run did not complete (skipped or failed); will retry next boot",
+          );
+        }
+        return;
+      }
       const age = await hoursSinceLastIngest();
       const landAges = await hoursSinceNewestPerLandTopic();
       // A land topic is stale if it has no rows or its newest insert is older

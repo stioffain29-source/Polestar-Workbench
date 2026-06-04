@@ -50,6 +50,22 @@ to zero): every cold start that finds stale data self-refreshes. The scheduler o
 prod after a republish, and writes prod only inside the deployment (writable primary there).
 Disable with `INGEST_SCHEDULE_ENABLED=false`.
 
+## Freshness guard SKIPS the boot catch-up after a republish that changes classifier rules
+The boot catch-up only runs when data is stale beyond `INGEST_INTERVAL_HOURS`. So a republish
+carrying NEW scraper/classifier logic does NOT refresh prod when the existing rows are still
+"fresh" (e.g. scraped <12h ago) — the new accept/reject rules never reach prod until the data
+happens to age out. Symptom: code that surfaces a genuine new incident works in dev (which got
+re-scraped) but prod stays empty/stale right after publishing.
+**Fix:** a version-gated forced boot ingest — a code constant `INGEST_FORCE_VERSION` + an
+`app_migration_markers` key `ingest_force_v<N>`. On boot, if the marker for the current version
+is absent, force ONE full ingest regardless of freshness, then insert the marker. Bumping the
+constant in code guarantees the next deploy re-scrapes prod once.
+**Why mark only on success:** the forced path must record the marker ONLY when a full run
+actually completed. `tick()` swallows errors and also returns when the advisory lock is already
+held (ran=false) — so it returns a boolean and the forced path gates `markForcedIngestDone()`
+on `ran===true`. A skipped/failed forced run must NOT consume the one guaranteed refresh; a
+later boot retries.
+
 ## Only flashpoint + cargo_watch have scrapers; the rest are import-only
 fuel / energy / fertiliser / shipping / strikes have NO live feed — they are STATIC / IMPORT
 ONLY (the Fuel Watch report literally prints that). "Fix ingestion for every topic" is not

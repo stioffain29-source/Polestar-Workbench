@@ -6,6 +6,16 @@ description: Why opening PNG feeds needs a classifier change + when:Nd, and why 
 The PNG (and West Papua) country report kept rendering "too thin" — the rolling
 7-day window was empty even after the noise items were dropped.
 
+**Country reports LEAD with the 7-day weekly window (reversal of the prior
+30-day lead).** `resolveActiveCountryWindow` (countryReportLayers.ts) picks the
+NARROWEST non-empty window: 7-day first, falling back to 30 then 90 ONLY when the
+narrower tier is empty; `expanded = basisDays !== 7` drives the basis labels.
+Empty-all → honest empty 7-day (never widened to hide a quiet week).
+**Why:** the user (4th, angry) insisted a weekly brief must lead with a 7-day
+window and surface real recent incidents, NOT bury them in a rolling 30-day. The
+30/90-day tiers became clearly-labelled CONTEXT/background sections beneath the
+weekly lead, not the headline.
+
 **Two structural causes, not a window bug:**
 
 1. The flashpoint `classify()` only accepts FLASHPOINT_REQUIRED protest/unrest

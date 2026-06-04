@@ -69,7 +69,7 @@ type Rejected = {
 // artifacts/workbench/src/lib/topicRelevance.ts. At least one must hit
 // in title+summary for the item to qualify.
 const FLASHPOINT_REQUIRED: RegExp[] = [
-  /\b(protest|demonstration|rally|march|sit[- ]in|strike|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|disorder|crackdown|clash)/i,
+  /\b(protest|demonstration|rally|march|sit[- ]in|strike|walkout|stoppage|riot|public disorder|looting|roadblock|road block|blockade|unrest|disorder|crackdown|clash)/i,
   /\b(curfew|state of emergency|martial law|lockdown imposed)/i,
   /\b(security forces?|police|military) .{0,30}(deployed|operation|clash|crackdown|tear[- ]?gas|baton|rubber bullet|water cannon|mass arrest)/i,
   /\b(students?|workers|farmers|union|opposition|civil society|teachers|chemists?|lawyers?) .{0,30}(protest|march|rally|strike|gather|walkout|boycott)/i,
