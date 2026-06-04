@@ -39,7 +39,14 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   // returns a relevance-sorted mix spanning years, so genuine PNG incidents
   // arrive but never fall inside the report's rolling 7-day window. 14d (not
   // 7d) gives the scheduler a buffer between runs.
-  { name: "Google News — Papua New Guinea (Crime & Security)", url: "https://news.google.com/rss/search?q=%22Papua+New+Guinea%22+(robbery+OR+carjacking+OR+raskol+OR+tribal+OR+ambush+OR+stabbed+OR+shot+OR+shooting+OR+killed+OR+murder+OR+violence+OR+assault+OR+kidnap+OR+rape+OR+mob+OR+sorcery)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG violent-crime & communal-violence aggregator (armed robbery, carjacking, raskol gangs, tribal fighting, killings, mob/sorcery violence). Last 14 days." },
+  // Anchored on PNG urban-crime hubs (Lae, Morobe, Taraka, Port Moresby,
+  // Mount Hagen, Madang) NOT the literal country name, so incidents that
+  // omit "Papua New Guinea" in the headline (e.g. "West Taraka police raid")
+  // are captured. Kept deliberately SMALL (6 places x 9 terms): Google News
+  // silently drops the when:14d recency filter on large grouped queries and
+  // returns a year-spanning relevance mix, so widening the OR lists here
+  // re-breaks recency. Verified empirically — this set honours when:14d.
+  { name: "Google News — Papua New Guinea (Crime & Security)", url: "https://news.google.com/rss/search?q=(Lae+OR+Morobe+OR+Taraka+OR+%22Port+Moresby%22+OR+%22Mount+Hagen%22+OR+Madang)+(police+OR+raid+OR+robbery+OR+shooting+OR+killed+OR+crime+OR+violence+OR+wanted+OR+mob)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG violent-crime & communal-violence aggregator, anchored on urban-crime hubs (Lae, Morobe, Taraka, Port Moresby, Mount Hagen, Madang) so headline incidents that omit the country name are still captured. Last 14 days." },
   { name: "Google News — Papua New Guinea (Civil Unrest)",    url: "https://news.google.com/rss/search?q=%22Papua+New+Guinea%22+(protest+OR+riot+OR+strike+OR+rally+OR+unrest+OR+looting+OR+roadblock)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. PNG country-wide civil unrest aggregator. Last 14 days." },
   // Pacific desk — Papua New Guinea and Indonesian West Papua wires. These
   // are the ONLY collection sources that feed the PNG and Papua country
@@ -90,7 +97,7 @@ async function repairFlashpointSeedUrls(): Promise<void> {
     await db
       .update(sourcesTable)
       .set({ url: seed.url, sourceType: seed.sourceType, notes: seed.notes })
-      .where(sql`${sourcesTable.name} = ${seed.name} AND (${sourcesTable.url} IS DISTINCT FROM ${seed.url})`);
+      .where(sql`${sourcesTable.name} = ${seed.name} AND ${sourcesTable.topic} = 'flashpoint' AND (${sourcesTable.url} IS DISTINCT FROM ${seed.url})`);
   }
 }
 

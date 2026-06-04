@@ -72,7 +72,7 @@ const WEST_PAPUA_CONTEXT_RE =
 // institutions). If any of these appear, the record is directly relevant
 // to PNG and must NOT be stripped as Indonesian West Papua noise.
 const PNG_CONTEXT_RE =
-  /\b(papua new guinea|png|port moresby|lae|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
+  /\b(papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
 
 /**
  * True when a record's narrative is clearly about Indonesian West Papua

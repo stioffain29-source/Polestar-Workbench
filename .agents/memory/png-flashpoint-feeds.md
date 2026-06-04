@@ -65,6 +65,39 @@ is inside the 90-day fetch. Also: `buildCountryLayers` window-end must be
 `endOfDay(issueDate)` not bare midnight, or the anchor-day records (wall-clock
 times like 08:00) the clamp just landed on get re-excluded → empty again.
 
+**Kinetic deny MUST be split global vs non-Pacific (West Papua insurgency is
+IN scope by user decision):** a single kinetic DENY that runs before country
+resolution silently strips West Papua / PNG insurgent violence (TPNPB/OPM
+ambush, gun battle, "insurgents/separatists kill", "rebels ambush troops"),
+which the user explicitly wants included. Fix: two sets — `KINETIC_DENY_GLOBAL`
+(foreign signatures: drone/missile/air strike, artillery/shelling, IED,
+car/suicide bomb, jihadist/terror attack, quadcopter → denied for EVERY
+country, runs in FLASHPOINT_DENY before country resolution) and
+`KINETIC_DENY_NONPACIFIC` (gunmen/militants/insurgents kill-or-attack, ambush,
+gun battle, armed-group raid, wanted commander → applied ONLY when resolved
+country is NOT Pacific). `classify()` must resolve country FIRST, compute
+`isPacific` (PNG / West Papua / both), THEN apply KINETIC_DENY_NONPACIFIC only
+if `!isPacific`. So Myanmar/Mindanao kinetic stays denied, foreign kinetic
+(airstrike) is denied even if mis-tagged Pacific, but West Papua small-arms
+insurgency passes. `WP_INSURGENCY` regex + bare "papua" + (Indonesian-military |
+insurgency cue) lets resolvePapuaPng tag insurgent headlines West Papua without
+an explicit province token. Order matters — REGRESSION RISK is re-introducing a
+deny that fires before country resolution.
+
+**False-positive cues that the loosened PACIFIC_CRIME let in (now guarded):**
+bare "attack"/"clash"/"violence" pulled rugby/debate/awareness items, so
+PACIFIC_CRIME keeps ONLY qualified cues (police raid, raid, wanted <person>,
+mob <act>, kill(ed/ings/s), rebels/separatists/insurgency, deadly/armed/violent
+clash). Sports DENY needed: rugby league/grand final/NRL/Kumuls/ladder
+leaders/national football stadium; scoreline "\d-\d victory|win|..."; "run riot
+over <team>" (bare "run riot" intentionally NOT denied — real unrest). Sports
+cues usually live in the SUMMARY not the title, so deny must test title+summary.
+
+**when:Nd query-SIZE lesson:** large grouped Google-News queries (many
+OR-ed place×term clauses) silently DROP the `when:14d` operator → years-old
+mix returns. Keep PNG feeds as place-anchored smaller queries
+(Lae/Morobe/Taraka/Port Moresby/Mount Hagen/Madang × terms) so when:14d sticks.
+
 **How to apply:** new PNG/Pacific feeds go in FLASHPOINT_REGIONAL_SOURCES in
 `artifacts/api-server/src/lib/migrations.ts` (seeded on boot, reaches prod on
 deploy; repairFlashpointSeedUrls updates existing rows' URLs). Any new Google

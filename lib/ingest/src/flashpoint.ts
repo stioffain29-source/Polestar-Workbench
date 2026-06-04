@@ -79,9 +79,29 @@ const FLASHPOINT_REQUIRED: RegExp[] = [
 // commercial / market commentary and the live-blog / fluff patterns
 // stripped by EXCLUDE_PHRASES in topicRelevance.ts. Order does not
 // matter; a single hit rejects the item.
+// FOREIGN kinetic signatures (drone/missile/air strikes, artillery, IEDs,
+// car/suicide bombs, jihadist/terrorist attacks, quadcopters). These never
+// describe Pacific (PNG / West Papua) communal or insurgent violence, so they
+// are denied for EVERY country — including Pacific, where their presence
+// instead signals mis-tagged foreign-conflict syndication.
+const KINETIC_DENY_GLOBAL: RegExp =
+  /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|jihadist|terror(ist)? attack|quadcopter)\b/i;
+
+// INSURGENT / armed-group kinetic signatures (ambush, gun battle, gunmen /
+// militants / insurgents kill-or-attack, armed-group raids, wanted
+// commanders). Denied for the global APAC feed set so kinetic armed conflict
+// (Myanmar, Mindanao, etc.) stays out of a protest/unrest tracker — BUT
+// allowed when the resolved country is Pacific, because West Papua's TPNPB/OPM
+// insurgency and PNG highlands armed clashes are explicitly IN scope (product
+// owner: "include West Papua rebel/insurgent violence"). Applied in classify()
+// AFTER country resolution, gated on isPacific.
+const KINETIC_DENY_NONPACIFIC: RegExp =
+  /\b(gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|raid|strike|fire)|insurgents? (kill|attack|target|ambush)|\bambush\b|armed group (attack|kill|raid)|terrorists? killed|wanted (commander|terrorist|ringleader))\b/i;
+
 const FLASHPOINT_DENY: RegExp[] = [
-  // Kinetic armed conflict
-  /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|raid|strike|fire)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid)|terrorists? killed|wanted (commander|terrorist|ringleader)|quadcopter)\b/i,
+  // Kinetic armed conflict — foreign signatures only (insurgent/armed-group
+  // kinetic is handled conditionally in classify() so Pacific stays in scope).
+  KINETIC_DENY_GLOBAL,
   // Cargo / freight noise (handled by cargo_watch)
   /\b(cargo theft|truck hijack|warehouse theft|container theft|freight theft|depot theft|cargo robbery|seal tamper)\b/i,
   // Commercial / market commentary
@@ -97,6 +117,16 @@ const FLASHPOINT_DENY: RegExp[] = [
   /\bobituary\b/i,
   /\bsport(s)? results?\b/i,
   /\bmatch report\b/i,
+  // Sports-fixture noise: PNG's Post-Courier feed carries rugby-league match
+  // previews whose "(amazing) round clash" trips the bare FLASHPOINT_REQUIRED
+  // "clash" cue. These phrases are sports-only and never appear in genuine
+  // crime/unrest incidents.
+  /\b(rugby league|rugby union|\bnrl\b|digicel cup|premiership contention|grand final|kumuls|ladder leaders?|national football stadium)\b/i,
+  // Football/rugby scoreline ("3-0 victory") and the "run riot over <team>"
+  // idiom are sports-result framing, never a security incident. "run riot"
+  // alone is NOT denied (genuine "youths run riot in town" unrest keeps it).
+  /\b\d{1,2}-\d{1,2}\s+(?:victory|win|defeat|draw|loss|lead|triumph|thrashing)\b/i,
+  /\brun riot over\b/i,
   /\bbox office\b/i,
   /\bcelebrity\b/i,
   /\bentertainment news\b/i,
@@ -120,8 +150,15 @@ const FLASHPOINT_DENY: RegExp[] = [
 // global APAC feed set keeps its protest-only discipline (no worldwide
 // routine-crime noise). Kinetic armed conflict is still excluded upstream
 // by FLASHPOINT_DENY, which runs first.
+// NOTE on scope discipline: cues here must be PHYSICAL-violence specific.
+// Bare "attack"/"clash"/"violence" were tried and pulled false positives
+// (a rugby "round clash", an MP's rhetorical "attack" in a debate, "violence
+// against women" awareness campaigns), so attack/clash are kept QUALIFIED and
+// bare "violence" is excluded. "kill(ed)", "raid", "wanted <person>", "mob
+// <act>", "rebels/separatists" are the cues that capture the genuine PNG/West
+// Papua incidents the global protest-only allowlist misses.
 const PACIFIC_CRIME: RegExp =
-  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?(?:rape|violence|attack)|shot dead|shooting|gunned down|opened fire|gun(?:point|fire)|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|murder(?:ed|s)?|killed in|beaten to death|mob (?:attack|violence|justice)|assault(?:ed)?|payback (?:killing|attack)|sorcery)\b/i;
+  /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?(?:rape|violence|attack|war|fight|members?|shooting)|police raid|raid(?:ed|s)?|wanted (?:criminal|man|men|suspect|fugitive|offender)|shot dead|shooting|gunned down|opened fire|gun(?:point|fire|fight)|gun battle|firefight|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|murder(?:ed|s)?|manslaughter|kill(?:ed|ings?|s)?|fatalit(?:y|ies)|massacre|found dead|beaten to death|mob (?:attack|violence|justice|turns|sets|storms|burn|beat)|payback (?:killing|attack)|sorcery|riot(?:ing|s)?|arson|rebels?|separatists?|insurgen(?:t|ts|cy)|deadly clash|armed clash|violent clash)\b/i;
 
 // Country aliases for in-text matching. Restricted to the 14 APAC
 // targets the Flashpoint Data Coverage Audit calls out, plus Myanmar
@@ -158,10 +195,17 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
 // guards in artifacts/workbench/src/lib/countryMatch.ts
 // (WEST_PAPUA_CONTEXT_RE / PNG_CONTEXT_RE).
 const PNG_MARKERS =
-  /\b(papua new guinea|png|port moresby|lae|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
+  /\b(papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
 const WEST_PAPUA_MARKERS =
   /\b(west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|papua pegunungan|papua tengah|papua selatan|papua barat daya|highland papua)\b/i;
 const INDONESIA_CONTEXT = /\b(indonesia|indonesian|tni|polri|jakarta)\b/i;
+// West Papua insurgency context. Per analyst direction, rebel / separatist
+// violence in the Indonesian Papua theatre (West Papua militants vs the
+// Indonesian military) is IN scope for the Papua country report. Bare
+// "papua" alongside any of these resolves to West Papua even without an
+// explicit province marker (e.g. "Rebels in Papua region kill 8").
+const WP_INSURGENCY =
+  /\b(rebels?|separatists?|insurgen(?:t|ts|cy)|opm|tpnpb|west papua national liberation|indonesian (?:military|soldiers?|troops?|forces?))\b/i;
 
 /**
  * Resolve a Papua-region country tag, or null when the text is not about
@@ -174,8 +218,10 @@ function resolvePapuaPng(hay: string): string | null {
   if (png && wp) return "West Papua; Papua New Guinea";
   if (png) return "Papua New Guinea";
   if (wp) return "West Papua";
-  // Bare "papua" with Indonesian context but no province marker -> West Papua.
-  if (/\bpapua\b/i.test(hay) && INDONESIA_CONTEXT.test(hay)) return "West Papua";
+  // Bare "papua" with Indonesian or insurgency context but no province
+  // marker -> West Papua (Indonesian Papua theatre).
+  if (/\bpapua\b/i.test(hay) && (INDONESIA_CONTEXT.test(hay) || WP_INSURGENCY.test(hay)))
+    return "West Papua";
   return null;
 }
 
@@ -201,6 +247,18 @@ function classify(title: string, summary: string): {
     country = m ? m.canonical : null;
   }
 
+  const isPacific =
+    country === "Papua New Guinea" ||
+    country === "West Papua" ||
+    country === "West Papua; Papua New Guinea";
+
+  // Insurgent / armed-group kinetic conflict is denied everywhere EXCEPT the
+  // Pacific (West Papua's TPNPB/OPM insurgency + PNG highlands armed clashes
+  // are in scope). Must run AFTER country resolution so the gate can apply.
+  if (!isPacific && KINETIC_DENY_NONPACIFIC.test(hay)) {
+    return { kept: false, reason: "deny:kinetic-nonpacific", country: null };
+  }
+
   const allowHit = FLASHPOINT_REQUIRED.find((re) => re.test(hay));
   if (allowHit) {
     if (!country) return { kept: false, reason: "no-apac-country", country: null };
@@ -210,10 +268,6 @@ function classify(title: string, summary: string): {
   // No protest/unrest cue. Accept ONLY Pacific civilian crime & communal
   // violence (PNG's dominant security signal); every other country still
   // requires a FLASHPOINT_REQUIRED cue so the global feed set stays clean.
-  const isPacific =
-    country === "Papua New Guinea" ||
-    country === "West Papua" ||
-    country === "West Papua; Papua New Guinea";
   if (isPacific && PACIFIC_CRIME.test(hay)) {
     return { kept: true, reason: "allow:pacific-crime", country };
   }
