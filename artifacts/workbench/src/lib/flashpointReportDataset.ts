@@ -836,7 +836,7 @@ export function buildFlashpointReportDataset(
       label: "Highest Severity",
       value: hs.label,
       severity: hs.key || undefined,
-      note: hs.key ? "Worst rating in window" : undefined,
+      note: hs.key ? "Highest rating in window" : undefined,
     },
     {
       label: "Top Issue Type",

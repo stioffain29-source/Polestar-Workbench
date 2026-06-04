@@ -162,7 +162,7 @@ export function computeTopicFastFacts(opts: {
       label: "Highest Severity",
       value: highestLabel,
       severity: highestKey || undefined,
-      note: highestKey ? "Worst rating in window" : undefined,
+      note: highestKey ? "Highest rating in window" : undefined,
     },
     {
       label: "Top Issue Type",
