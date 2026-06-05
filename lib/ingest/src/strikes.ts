@@ -194,6 +194,15 @@ const MARITIME_COUNTRIES = new Set([
 // no littoral state.
 const HORMUZ_CENTROID: [number, number] = [26.57, 56.25];
 
+// Bounding box for the Middle East / Gulf theatre. Any geocode outside this box
+// is a bad match (e.g. a foreign city named only in a source masthead) and must
+// never set a strike's location. Generous enough to cover Jordan through Iran
+// and the whole Arabian Gulf / Gulf of Oman / Red Sea, tight enough to exclude
+// East Asia, Europe and the Americas.
+function inGulfTheatre(lat: number, lng: number): boolean {
+  return lat >= 8 && lat <= 42 && lng >= 30 && lng <= 66;
+}
+
 function detectCountry(hay: string): string | null {
   const match = COUNTRY_ALIASES.find((c) => c.aliases.some((a) => hasWord(hay, a)));
   return match ? match.canonical : null;
@@ -576,9 +585,25 @@ export async function runStrikesIngest(
     let latitude = geo?.latitude ?? null;
     let longitude = geo?.longitude ?? null;
     let location = geo?.location ?? null;
-    if (latitude == null && a.theatre === "maritime_hormuz") {
-      [latitude, longitude] = HORMUZ_CENTROID;
-      location = "Strait of Hormuz";
+    // Hard in-theatre clamp. Both theatres are firmly Middle East / Gulf, so a
+    // location outside that box is always a bad geocode — typically a foreign
+    // place named only in the source masthead (e.g. "Taipei" from the byline
+    // "Taipei Times"). Drop the bogus city rather than mis-mark the strike.
+    if (latitude != null && longitude != null && !inGulfTheatre(latitude, longitude)) {
+      latitude = null;
+      longitude = null;
+      location = null;
+    }
+    if (latitude == null) {
+      if (a.theatre === "maritime_hormuz") {
+        [latitude, longitude] = HORMUZ_CENTROID;
+        location = "Strait of Hormuz";
+      } else {
+        const centroid = geocode(a.country, "");
+        latitude = centroid?.latitude ?? null;
+        longitude = centroid?.longitude ?? null;
+        location = null;
+      }
     }
     if (latitude != null) geocoded++;
     return {

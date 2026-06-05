@@ -1,4 +1,4 @@
-import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable } from "@workspace/db";
+import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import { logger } from "./logger";
@@ -320,6 +320,60 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { rows: res.rowCount ?? 0, marker: markerKey },
           "One-time shipping report prose reset (now rendered from live dataset)",
+        );
+      }
+    }
+    // 3c) ONE-TIME relocation of out-of-theatre strike rows.
+    //
+    //     Both Missile Strike Tracker theatres (maritime_hormuz, land_gcc) are
+    //     firmly Middle East / Gulf. A historical geocode bug let a foreign
+    //     place named only in a source masthead set a strike's location — e.g.
+    //     a genuine Strait of Hormuz seizure reported by the "Taipei Times"
+    //     resolved to "Taipei" (lat ~25, lng ~121.6), polluting the "Strikes by
+    //     Port/Chokepoint" chart. The geocode now hard-clamps to the Gulf box,
+    //     but existing rows must be repaired in place. These are REAL strikes,
+    //     so RELOCATE rather than delete: maritime rows fall back to the Strait
+    //     of Hormuz centroid; land rows drop the bogus city (location/coords
+    //     nulled) but keep the record. Detected by coordinates outside the Gulf
+    //     bounding box (lat 8..42, lng 30..66). Marker-gated so analyst-set
+    //     locations made afterwards are never overwritten.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "strikes_out_of_theatre_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const maritime = await db.execute(sql`
+          UPDATE strikes
+          SET latitude = 26.57, longitude = 56.25, location = 'Strait of Hormuz'
+          WHERE theatre = 'maritime_hormuz'
+            AND latitude IS NOT NULL AND longitude IS NOT NULL
+            AND NOT (latitude BETWEEN 8 AND 42 AND longitude BETWEEN 30 AND 66)
+        `);
+        const land = await db.execute(sql`
+          UPDATE strikes
+          SET latitude = NULL, longitude = NULL, location = NULL
+          WHERE theatre <> 'maritime_hormuz'
+            AND latitude IS NOT NULL AND longitude IS NOT NULL
+            AND NOT (latitude BETWEEN 8 AND 42 AND longitude BETWEEN 30 AND 66)
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            maritime: maritime.rowCount ?? 0,
+            land: land.rowCount ?? 0,
+            marker: markerKey,
+          },
+          "One-time relocation of out-of-theatre strike rows (bad geocode cleanup)",
         );
       }
     }

@@ -216,20 +216,43 @@ function titleCase(s: string): string {
  * incident's free text (title + summary). Returns null when nothing in scope
  * matches, so the caller can log the miss instead of silently dropping it.
  */
-export function geocode(country: string, text = ""): GeoResult | null {
-  // City match first (finer granularity). Scan the text for known cities.
-  if (text) {
-    for (const [key, c] of Object.entries(CITY_COORDS)) {
-      if (hasWord(text, key)) {
-        return { latitude: c.lat, longitude: c.lng, location: c.name ?? titleCase(key) };
-      }
-    }
-  }
+// A city named in the text may only set the incident location if it actually
+// sits near the record's attributed country. Without this, a passing mention
+// of a foreign city (e.g. "Taipei" in a Gulf strike story) would hijack the
+// location and place the marker thousands of km out of theatre.
+const MAX_CITY_KM = 2500;
 
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+export function geocode(country: string, text = ""): GeoResult | null {
   // Country centroid fallback. Combined tags like "West Papua; Papua New
   // Guinea" resolve on their first component.
   const primary = country.split(";")[0]?.trim() ?? country.trim();
   const centroid = COUNTRY_CENTROIDS[primary] ?? COUNTRY_CENTROIDS[country.trim()];
+
+  // City match first (finer granularity). Scan the text for known cities, but
+  // skip any city that lies far from the country centroid — a foreign-city
+  // mention must never override the incident's real location. When no centroid
+  // anchors the record, fall back to the legacy first-match behaviour.
+  if (text) {
+    for (const [key, c] of Object.entries(CITY_COORDS)) {
+      if (!hasWord(text, key)) continue;
+      if (centroid && haversineKm(c.lat, c.lng, centroid[0], centroid[1]) > MAX_CITY_KM) {
+        continue;
+      }
+      return { latitude: c.lat, longitude: c.lng, location: c.name ?? titleCase(key) };
+    }
+  }
+
   if (centroid) {
     return { latitude: centroid[0], longitude: centroid[1], location: null };
   }
