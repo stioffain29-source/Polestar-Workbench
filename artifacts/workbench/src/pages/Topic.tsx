@@ -1,5 +1,5 @@
 import { useRoute } from "wouter";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -12,6 +12,8 @@ import {
   TOPIC_LABELS, SEVERITY_LEVELS, SEVERITY_LABELS, severityBadgeStyle, ratingColor,
 } from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
+import { RangeToggle } from "@/components/RangeToggle";
+import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 
 const FILL_OPACITY = 0.78;
@@ -57,6 +59,11 @@ export default function Topic() {
 
   const { data: raw = [], isLoading } = useListIncidents({ topic: topic as never });
 
+  // Date-range window. Defaults to the widest option so the first load shows the
+  // full record set; the analyst can narrow the whole dashboard from the header.
+  const [range, setRange] = useState<RangeKey>("2y");
+  const windowDays = RANGE_DAYS[range];
+
   // Reconcile to the same scoped, noise-filtered set the dashboard card and the
   // reports use, so every surface tallies.
   const trueIncidents = useMemo(() => resolveTrueIncidents(topic, raw), [topic, raw]);
@@ -82,15 +89,23 @@ export default function Topic() {
     return diff >= 0 && diff <= days;
   };
 
-  const in30d = useMemo(() => enriched.filter((i) => within(i, 30)), [enriched]);
-  const count30d = in30d.length;
-  const critical30d = useMemo(
-    () => in30d.filter((i) => i.severity === "high" || i.severity === "extreme").length,
-    [in30d],
+  // Windowed working set — drives every range-scoped metric, chart, the map and
+  // the incident table. No lower bound so the widest default never hides a
+  // (possibly future-dated) record that the all-time view used to show.
+  const inWindow = useMemo(
+    () => enriched.filter(
+      (i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= windowDays,
+    ),
+    [enriched, windowDays],
   );
-  const moderatePlus30d = useMemo(
-    () => in30d.filter((i) => (SEV_RANK[i.severity] ?? 0) >= 3).length,
-    [in30d],
+  const countWindow = inWindow.length;
+  const criticalWindow = useMemo(
+    () => inWindow.filter((i) => i.severity === "high" || i.severity === "extreme").length,
+    [inWindow],
+  );
+  const moderatePlusWindow = useMemo(
+    () => inWindow.filter((i) => (SEV_RANK[i.severity] ?? 0) >= 3).length,
+    [inWindow],
   );
 
   // 7-day change: last 7 days vs the 7 days before that.
@@ -120,30 +135,30 @@ export default function Topic() {
   // --- Countries ----------------------------------------------------------
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
-    enriched.forEach((i) => {
+    inWindow.forEach((i) => {
       if (!i.country) return;
       m.set(i.country, (m.get(i.country) ?? 0) + 1);
     });
     return Array.from(m.entries())
       .map(([country, count]) => ({ country, count }))
       .sort((a, b) => b.count - a.count);
-  }, [enriched]);
+  }, [inWindow]);
 
   const countriesAffected = byCountry.length;
   const topCountry = byCountry[0] ?? null;
   const byCountryTop12 = byCountry.slice(0, 12);
   const top5Countries = byCountry.slice(0, 5);
 
-  const distinctCountries30d = useMemo(() => {
+  const distinctCountriesWindow = useMemo(() => {
     const s = new Set<string>();
-    in30d.forEach((i) => { if (i.country) s.add(i.country); });
+    inWindow.forEach((i) => { if (i.country) s.add(i.country); });
     return s.size;
-  }, [in30d]);
+  }, [inWindow]);
 
   // Country severity profile — count of high/extreme records per country.
   const countrySeverity = useMemo(() => {
     const m = new Map<string, { severe: number; maxRank: number; total: number }>();
-    enriched.forEach((i) => {
+    inWindow.forEach((i) => {
       if (!i.country) return;
       const rank = SEV_RANK[i.severity] ?? 0;
       const cur = m.get(i.country) ?? { severe: 0, maxRank: 0, total: 0 };
@@ -153,7 +168,7 @@ export default function Topic() {
       m.set(i.country, cur);
     });
     return m;
-  }, [enriched]);
+  }, [inWindow]);
 
   const topByHighExtreme = useMemo(
     () =>
@@ -189,9 +204,9 @@ export default function Topic() {
     () => SEVERITY_LEVELS.map((s) => ({
       severity: s,
       label: SEVERITY_LABELS[s] ?? s,
-      count: enriched.filter((i) => i.severity === s).length,
+      count: inWindow.filter((i) => i.severity === s).length,
     })),
-    [enriched],
+    [inWindow],
   );
 
   const highestSev = useMemo(() => {
@@ -204,11 +219,9 @@ export default function Topic() {
     return key;
   }, [enriched]);
 
-  // --- 30-day trend -------------------------------------------------------
+  // --- Trend (windowed) ---------------------------------------------------
   const timeline = useMemo(() => {
-    const source = in30d.length > 0
-      ? in30d
-      : enriched.filter((i) => !isNaN(i.occurredDate.getTime()));
+    const source = inWindow.filter((i) => !isNaN(i.occurredDate.getTime()));
     const m = new Map<string, number>();
     source.forEach((i) => {
       const k = format(startOfDay(i.occurredDate), "yyyy-MM-dd");
@@ -217,28 +230,31 @@ export default function Topic() {
     return Array.from(m.entries())
       .map(([date, count]) => ({ date, label: format(parseISO(date), "dd MMM"), count }))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [in30d, enriched]);
+  }, [inWindow]);
 
-  const withCoords = enriched.filter((i) => i.latitude != null && i.longitude != null);
+  const withCoords = inWindow.filter((i) => i.latitude != null && i.longitude != null);
 
   const sortedForTable = useMemo(
-    () => [...enriched].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
-    [enriched],
+    () => [...inWindow].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
+    [inWindow],
   );
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
-        <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{label}</h1>
-        <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">{subtitle}</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
+          <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{label}</h1>
+          <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">{subtitle}</p>
+        </div>
+        <RangeToggle range={range} onChange={setRange} />
       </div>
 
       {/* 1. Top metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Kpi label="Incidents (30d)" value={count30d} accent="#465bff" />
-        <Kpi label="Critical (30d)" value={critical30d} accent="#C0392B" />
+        <Kpi label={`Incidents (${RANGE_LABEL[range]})`} value={countWindow} accent="#465bff" />
+        <Kpi label={`Critical (${RANGE_LABEL[range]})`} value={criticalWindow} accent="#C0392B" />
         <Kpi label="Total Recorded" value={total} accent="#0b0a3d" />
         <Kpi label="Countries Affected" value={countriesAffected} accent="#363636" />
         <Kpi
@@ -255,7 +271,7 @@ export default function Topic() {
           <FastFactCard
             label="Top Country"
             value={topCountry ? topCountry.country : "—"}
-            note={topCountry ? `${topCountry.count} of ${total} record${total === 1 ? "" : "s"} on file.` : "No identified countries."}
+            note={topCountry ? `${topCountry.count} of ${countWindow} record${countWindow === 1 ? "" : "s"} in the ${RANGE_NOTE[range]}.` : "No identified countries."}
             accent="#465bff"
           />
           <FastFactCard
@@ -269,21 +285,21 @@ export default function Topic() {
             accent={highestSeverityCountry ? ratingColor(Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === highestSeverityCountry.maxRank) ?? "insignificant") : "#B8C2CC"}
           />
           <FastFactCard
-            label="High / Extreme (30d)"
-            value={String(critical30d)}
-            note="Elevated-severity records in the past 30 days."
+            label={`High / Extreme (${RANGE_LABEL[range]})`}
+            value={String(criticalWindow)}
+            note={`Elevated-severity records in the ${RANGE_NOTE[range]}.`}
             accent="#C0392B"
           />
           <FastFactCard
-            label="Moderate+ (30d)"
-            value={String(moderatePlus30d)}
-            note="Moderate, high or extreme records in the past 30 days."
+            label={`Moderate+ (${RANGE_LABEL[range]})`}
+            value={String(moderatePlusWindow)}
+            note={`Moderate, high or extreme records in the ${RANGE_NOTE[range]}.`}
             accent="#E67E22"
           />
           <FastFactCard
-            label="Active Countries (30d)"
-            value={String(distinctCountries30d)}
-            note="Distinct countries with records in the past 30 days."
+            label={`Active Countries (${RANGE_LABEL[range]})`}
+            value={String(distinctCountriesWindow)}
+            note={`Distinct countries with records in the ${RANGE_NOTE[range]}.`}
             accent="#363636"
           />
           <FastFactCard
@@ -301,7 +317,7 @@ export default function Topic() {
           <Kpi label="Last 7 Days" value={last7} accent="#465bff" />
           <Kpi label="Prior 7 Days" value={prev7} accent="#363636" />
           <Kpi label="High / Extreme (Total)" value={hiExtremeTotal} accent="#C0392B" />
-          <Kpi label="Active Countries (30d)" value={distinctCountries30d} accent="#0b0a3d" />
+          <Kpi label={`Active Countries (${RANGE_LABEL[range]})`} value={distinctCountriesWindow} accent="#0b0a3d" />
         </div>
       </Section>
 
@@ -326,7 +342,7 @@ export default function Topic() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="30 Day Incident Trend">
+          <ChartCard title={`Incident Trend (${RANGE_LABEL[range]})`}>
             {timeline.length === 0 ? (
               <EmptyChart message="No timeline data available." />
             ) : (
@@ -360,16 +376,16 @@ export default function Topic() {
             )}
           </ChartCard>
 
-          <ChartCard title="Severity Mix (Last 30 Days)">
-            {count30d === 0 ? (
-              <EmptyChart message="No records in the past 30 days." />
+          <ChartCard title={`Severity Mix (${RANGE_LABEL[range]})`}>
+            {countWindow === 0 ? (
+              <EmptyChart message={`No records in the ${RANGE_NOTE[range]}.`} />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={SEVERITY_LEVELS.map((s) => ({
                     severity: s,
                     label: SEVERITY_LABELS[s] ?? s,
-                    count: in30d.filter((i) => i.severity === s).length,
+                    count: inWindow.filter((i) => i.severity === s).length,
                   }))}
                   margin={{ top: 16, right: 8, left: 0, bottom: 0 }}
                 >

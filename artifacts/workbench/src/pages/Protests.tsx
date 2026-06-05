@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,6 +9,8 @@ import {
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
+import { RangeToggle } from "@/components/RangeToggle";
+import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import {
   classifyProtestCategory, detectOperationalImpacts,
   PROTEST_CATEGORIES, CATEGORY_COLOR, CATEGORY_CARD_LABEL,
@@ -45,6 +47,11 @@ export default function Protests() {
   // protests→flashpoint mapping.
   const { data: raw = [], isLoading } = useListIncidents({ topic: "flashpoint" });
 
+  // Date-range window. Defaults to the widest option so the first load shows the
+  // full record set; the analyst can narrow the whole dashboard from the header.
+  const [range, setRange] = useState<RangeKey>("2y");
+  const windowDays = RANGE_DAYS[range];
+
   // Reconcile to the same scoped, noise-filtered set the dashboard card and the
   // reports use, so every surface tallies.
   const trueIncidents = useMemo(() => resolveTrueIncidents("flashpoint", raw), [raw]);
@@ -75,11 +82,19 @@ export default function Protests() {
     return diff >= 0 && diff <= days;
   };
 
-  const in30d = useMemo(() => enriched.filter((i) => within(i, 30)), [enriched]);
-  const count30d = in30d.length;
-  const critical30d = useMemo(
-    () => in30d.filter((i) => i.severity === "high" || i.severity === "extreme").length,
-    [in30d],
+  // Windowed working set — drives every range-scoped metric, chart, the map and
+  // the incident table. No lower bound so the widest default never hides a
+  // (possibly future-dated) record that the all-time view used to show.
+  const inWindow = useMemo(
+    () => enriched.filter(
+      (i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= windowDays,
+    ),
+    [enriched, windowDays],
+  );
+  const countWindow = inWindow.length;
+  const criticalWindow = useMemo(
+    () => inWindow.filter((i) => i.severity === "high" || i.severity === "extreme").length,
+    [inWindow],
   );
 
   // 7-day change: last 7 days vs the 7 days before that.
@@ -105,37 +120,34 @@ export default function Protests() {
   const byCategory = useMemo(
     () => PROTEST_CATEGORIES.map((cat) => ({
       category: cat,
-      count: enriched.filter((i) => i.category === cat).length,
+      count: inWindow.filter((i) => i.category === cat).length,
     })),
-    [enriched],
+    [inWindow],
   );
-  const byCategory30d = useMemo(() => {
+  const byCategoryWindow = useMemo(() => {
     const m = new Map<ProtestCategory, number>(PROTEST_CATEGORIES.map((c) => [c, 0]));
-    in30d.forEach((i) => m.set(i.category, (m.get(i.category) ?? 0) + 1));
+    inWindow.forEach((i) => m.set(i.category, (m.get(i.category) ?? 0) + 1));
     return m;
-  }, [in30d]);
+  }, [inWindow]);
 
   const mostActiveCategory = useMemo(() => {
-    // Rank on the 30-day window, falling back to the full dataset.
-    const ranked30 = PROTEST_CATEGORIES
-      .map((c) => ({ category: c, count: byCategory30d.get(c) ?? 0 }))
+    const ranked = PROTEST_CATEGORIES
+      .map((c) => ({ category: c, count: byCategoryWindow.get(c) ?? 0 }))
       .sort((a, b) => b.count - a.count);
-    if (ranked30[0] && ranked30[0].count > 0) return ranked30[0];
-    const rankedAll = [...byCategory].sort((a, b) => b.count - a.count);
-    return rankedAll[0] && rankedAll[0].count > 0 ? rankedAll[0] : null;
-  }, [byCategory30d, byCategory]);
+    return ranked[0] && ranked[0].count > 0 ? ranked[0] : null;
+  }, [byCategoryWindow]);
 
   // --- Countries ----------------------------------------------------------
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
-    enriched.forEach((i) => {
+    inWindow.forEach((i) => {
       if (!i.country) return;
       m.set(i.country, (m.get(i.country) ?? 0) + 1);
     });
     return Array.from(m.entries())
       .map(([country, count]) => ({ country, count }))
       .sort((a, b) => b.count - a.count);
-  }, [enriched]);
+  }, [inWindow]);
 
   const countriesAffected = byCountry.length;
   const topCountry = byCountry[0] ?? null;
@@ -143,7 +155,7 @@ export default function Protests() {
   // Country severity profile — count of high/extreme records per country.
   const countrySeverity = useMemo(() => {
     const m = new Map<string, { severe: number; maxRank: number; total: number }>();
-    enriched.forEach((i) => {
+    inWindow.forEach((i) => {
       if (!i.country) return;
       const rank = SEV_RANK[i.severity] ?? 0;
       const cur = m.get(i.country) ?? { severe: 0, maxRank: 0, total: 0 };
@@ -153,7 +165,7 @@ export default function Protests() {
       m.set(i.country, cur);
     });
     return m;
-  }, [enriched]);
+  }, [inWindow]);
 
   const topByHighExtreme = useMemo(
     () =>
@@ -192,9 +204,9 @@ export default function Protests() {
     () => SEVERITY_LEVELS.map((s) => ({
       severity: s,
       label: SEVERITY_LABELS[s] ?? s,
-      count: enriched.filter((i) => i.severity === s).length,
+      count: inWindow.filter((i) => i.severity === s).length,
     })),
-    [enriched],
+    [inWindow],
   );
 
   const highestSev = useMemo(() => {
@@ -207,14 +219,11 @@ export default function Protests() {
     return key;
   }, [enriched]);
 
-  // --- 30-day trend -------------------------------------------------------
-  // Built from the EXACT same set the "Incidents (30d)" card counts (`in30d`),
-  // so the trend total and the card can never diverge. Falls back to the full
-  // valid-date set only when nothing lands in the last 30 days.
+  // --- Windowed trend -----------------------------------------------------
+  // Built from the EXACT same windowed set the "Incidents" card counts
+  // (`inWindow`), so the trend total and the card can never diverge.
   const timeline = useMemo(() => {
-    const source = in30d.length > 0
-      ? in30d
-      : enriched.filter((i) => !isNaN(i.occurredDate.getTime()));
+    const source = inWindow.filter((i) => !isNaN(i.occurredDate.getTime()));
     const m = new Map<string, number>();
     source.forEach((i) => {
       const k = format(startOfDay(i.occurredDate), "yyyy-MM-dd");
@@ -223,42 +232,45 @@ export default function Protests() {
     return Array.from(m.entries())
       .map(([date, count]) => ({ date, label: format(parseISO(date), "dd MMM"), count }))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [in30d, enriched]);
+  }, [inWindow]);
 
   const byCountryTop12 = byCountry.slice(0, 12);
-  const withCoords = enriched.filter((i) => i.latitude != null && i.longitude != null);
+  const withCoords = inWindow.filter((i) => i.latitude != null && i.longitude != null);
 
   // --- Operational impact aggregation ------------------------------------
   const impactRows = useMemo(() => {
-    const sorted = [...enriched]
+    const sorted = [...inWindow]
       .filter((i) => !isNaN(i.occurredDate.getTime()))
       .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
     return OPERATIONAL_IMPACTS.map((rule) => {
       const records = sorted.filter((i) => i.impacts.includes(rule.label));
       return { ...rule, count: records.length, recent: records.slice(0, 3) };
     });
-  }, [enriched]);
+  }, [inWindow]);
 
   const sortedForTable = useMemo(
-    () => [...enriched].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
-    [enriched],
+    () => [...inWindow].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
+    [inWindow],
   );
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
-        <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Protests &amp; Civil Unrest</h1>
-        <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
-          Activism, protests, industrial action and civil unrest monitor.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
+          <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Protests &amp; Civil Unrest</h1>
+          <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
+            Activism, protests, industrial action and civil unrest monitor.
+          </p>
+        </div>
+        <RangeToggle range={range} onChange={setRange} />
       </div>
 
       {/* 1. Top metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Kpi label="Incidents (30d)" value={count30d} accent="#465bff" />
-        <Kpi label="Critical (30d)" value={critical30d} accent="#C0392B" />
+        <Kpi label={`Incidents (${RANGE_LABEL[range]})`} value={countWindow} accent="#465bff" />
+        <Kpi label={`Critical (${RANGE_LABEL[range]})`} value={criticalWindow} accent="#C0392B" />
         <Kpi label="Total Recorded" value={total} accent="#0b0a3d" />
         <Kpi label="Countries Affected" value={countriesAffected} accent="#363636" />
         <Kpi
@@ -277,7 +289,7 @@ export default function Protests() {
             value={mostActiveCategory ? CATEGORY_CARD_LABEL[mostActiveCategory.category] : "—"}
             note={
               mostActiveCategory
-                ? `${mostActiveCategory.count} record${mostActiveCategory.count === 1 ? "" : "s"} in the past 30 days.`
+                ? `${mostActiveCategory.count} record${mostActiveCategory.count === 1 ? "" : "s"} in the ${RANGE_NOTE[range]}.`
                 : "No category activity in window."
             }
             accent={mostActiveCategory ? CATEGORY_COLOR[mostActiveCategory.category] : "#B8C2CC"}
@@ -287,7 +299,7 @@ export default function Protests() {
             value={topCountry ? topCountry.country : "—"}
             note={
               topCountry
-                ? `${topCountry.count} of ${total} record${total === 1 ? "" : "s"} on file.`
+                ? `${topCountry.count} of ${countWindow} record${countWindow === 1 ? "" : "s"} in the ${RANGE_NOTE[range]}.`
                 : "No identified countries."
             }
             accent="#465bff"
@@ -303,15 +315,15 @@ export default function Protests() {
             accent={highestSeverityCountry ? ratingColor(Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === highestSeverityCountry.maxRank) ?? "insignificant") : "#B8C2CC"}
           />
           <FastFactCard
-            label="Industrial Action (30d)"
-            value={String(byCategory30d.get("Industrial Action") ?? 0)}
-            note="Strikes, walkouts and labour disputes in the past 30 days."
+            label={`Industrial Action (${RANGE_LABEL[range]})`}
+            value={String(byCategoryWindow.get("Industrial Action") ?? 0)}
+            note={`Strikes, walkouts and labour disputes in the ${RANGE_NOTE[range]}.`}
             accent={CATEGORY_COLOR["Industrial Action"]}
           />
           <FastFactCard
-            label="Civil Unrest (30d)"
-            value={String(byCategory30d.get("Civil Unrest") ?? 0)}
-            note="Riots, clashes and disorder in the past 30 days."
+            label={`Civil Unrest (${RANGE_LABEL[range]})`}
+            value={String(byCategoryWindow.get("Civil Unrest") ?? 0)}
+            note={`Riots, clashes and disorder in the ${RANGE_NOTE[range]}.`}
             accent={CATEGORY_COLOR["Civil Unrest"]}
           />
           <FastFactCard
@@ -323,14 +335,14 @@ export default function Protests() {
         </div>
       </Section>
 
-      {/* 3. Key Metrics — category 30-day counts */}
+      {/* 3. Key Metrics — windowed category counts */}
       <Section title="Key Metrics">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {PROTEST_CATEGORIES.map((cat) => (
             <Kpi
               key={cat}
-              label={`${CATEGORY_CARD_LABEL[cat]} (30d)`}
-              value={byCategory30d.get(cat) ?? 0}
+              label={`${CATEGORY_CARD_LABEL[cat]} (${RANGE_LABEL[range]})`}
+              value={byCategoryWindow.get(cat) ?? 0}
               accent={CATEGORY_COLOR[cat]}
             />
           ))}
@@ -376,7 +388,7 @@ export default function Protests() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="30 Day Incident Trend">
+          <ChartCard title={`Incident Trend (${RANGE_LABEL[range]})`}>
             {timeline.length === 0 ? (
               <EmptyChart message="No timeline data available." />
             ) : (

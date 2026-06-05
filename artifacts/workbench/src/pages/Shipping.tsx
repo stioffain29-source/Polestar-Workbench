@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
 import type { Incident } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
@@ -21,6 +21,8 @@ import {
 } from "@/lib/shippingAnalysis";
 import { computeHormuzStatus, HORMUZ_TONE_COLOR, type HormuzCategoryResult, type HormuzStatusTone } from "@/lib/hormuzStatus";
 import { dedupeShippingMonitorRows } from "@/lib/shippingReportDataset";
+import { RangeToggle } from "@/components/RangeToggle";
+import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
@@ -91,6 +93,12 @@ function darken(hex: string, amount = 0.18): string {
 export default function Shipping() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "shipping" });
 
+  // Date-range window. Defaults to the widest option so the first load shows the
+  // full record set; the analyst narrows the whole dashboard from the header.
+  const [range, setRange] = useState<RangeKey>("2y");
+  const windowDays = RANGE_DAYS[range];
+  const now = useMemo(() => new Date(), []);
+
   // Scope: APAC + Middle East only. Records that classify to a country outside
   // those regions are dropped from this view. Records with no identifiable
   // country are kept and surfaced as "Country not identified".
@@ -131,35 +139,55 @@ export default function Shipping() {
         .filter((i) => !isLowCredibilityShippingRecord(i)),
     [allEnriched],
   );
-  const enriched = useMemo(
+  // All-time cleaned + deduped in-scope set (pre-window). Windowing is applied
+  // on top of this so the dedupe always runs over the full record set first.
+  const enrichedAll = useMemo(
     () => dedupeShippingMonitorRows(inScopeClean),
     [inScopeClean],
   );
+  // `enriched` is the windowed working set that drives every range-scoped
+  // surface (KPIs, charts, region/issue/country mixes, chokepoint, vessel,
+  // piracy, map, table). No lower bound so the widest default never hides a
+  // record the all-time view used to show.
+  const enriched = useMemo(
+    () =>
+      enrichedAll.filter(
+        (i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= windowDays,
+      ),
+    [enrichedAll, windowDays, now],
+  );
   // `cleanEnriched` is retained as an alias so the analyst-narrative surfaces
   // (Latest Significant Incident, Chokepoint Watch, Vessel / Piracy tables)
-  // keep their names; cleaned + deduped is now the single base for the page.
+  // keep their names; cleaned + deduped + windowed is the single base.
   const cleanEnriched = enriched;
   // Pre-region-filter clean + deduped set — feeds the Strait of Hormuz status
   // indicators, which intentionally read across regions (FT / Reuters US
-  // bylines etc.) rather than the APAC + ME scope.
+  // bylines etc.) rather than the APAC + ME scope. Also windowed so the banner
+  // reflects the selected range.
   const cleanAllEnriched = useMemo(
     () =>
       dedupeShippingMonitorRows(
         allEnriched.filter((i) => !isLowCredibilityShippingRecord(i)),
+      ).filter(
+        (i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= windowDays,
       ),
-    [allEnriched],
+    [allEnriched, windowDays, now],
   );
 
   const total = enriched.length;
 
-  const last7 = useMemo(() => {
-    const now = new Date();
-    return enriched.filter((i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= 7).length;
-  }, [enriched]);
-  const last30 = useMemo(() => {
-    const now = new Date();
-    return enriched.filter((i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= 30).length;
-  }, [enriched]);
+  // `last7`/`last30` are FIXED-PERIOD deltas (the caption literally says "in the
+  // past 7/30 days"), so they read the all-time `enrichedAll`, NOT the windowed
+  // `enriched`. Otherwise a 24h/7d selection would cap "past 30 days" at the
+  // narrower window and the caption would lie.
+  const last7 = useMemo(
+    () => enrichedAll.filter((i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= 7).length,
+    [enrichedAll, now],
+  );
+  const last30 = useMemo(
+    () => enrichedAll.filter((i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= 30).length,
+    [enrichedAll, now],
+  );
 
   // Region chart shows only the two real theatres. "Country not identified"
   // is excluded — it was an unlabelled bar that dwarfed the meaningful regions
@@ -356,8 +384,8 @@ export default function Shipping() {
   // the latest reporting window" reflects the active week, while category
   // counts cover the entire loaded window.
   const hormuzStatus = useMemo(
-    () => computeHormuzStatus(cleanAllEnriched, { kineticWindowDays: 7 }),
-    [cleanAllEnriched],
+    () => computeHormuzStatus(cleanAllEnriched, { kineticWindowDays: Math.min(7, windowDays) }),
+    [cleanAllEnriched, windowDays],
   );
 
   // --- Piracy and Armed Robbery -------------------------------------------
@@ -380,12 +408,15 @@ export default function Shipping() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* 1. Header */}
-      <div>
-        <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
-        <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Shipping</h1>
-        <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
-          Port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance pressure, naval advisories, port strikes and cargo movement disruption. APAC and the Middle East only — records from other regions are excluded. Cargo theft and pilferage are tracked under Cargo Watch.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
+          <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Shipping</h1>
+          <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
+            Port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance pressure, naval advisories, port strikes and cargo movement disruption. APAC and the Middle East only — records from other regions are excluded. Cargo theft and pilferage are tracked under Cargo Watch.
+          </p>
+        </div>
+        <RangeToggle range={range} onChange={setRange} />
       </div>
 
       {outOfScopeCount > 0 && (
@@ -478,18 +509,18 @@ export default function Shipping() {
             value={String(total)}
             note={`${last7} in the past 7 days · ${last30} in the past 30 days.`}
             accent="#465bff"
-            window="All records on file"
+            window={`Last ${RANGE_LABEL[range]}`}
           />
           <FastFactCard
             label="Highest Severity On File"
             value={highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}
             note={
               highestSev
-                ? `${highestSevCount} record${highestSevCount === 1 ? "" : "s"} at this rating across the dataset.`
+                ? `${highestSevCount} record${highestSevCount === 1 ? "" : "s"} at this rating in the window.`
                 : "No severity recorded."
             }
             accent={highestSev ? ratingColor(highestSev) : "#B8C2CC"}
-            window="All records on file"
+            window={`Last ${RANGE_LABEL[range]}`}
           />
           <FastFactCard
             label="Main Affected Country"
@@ -500,7 +531,7 @@ export default function Shipping() {
                 : "No country-level attribution available."
             }
             accent={mainCountry ? REGION_COLOR[classifyRegion(mainCountry.country)] : "#B8C2CC"}
-            window="All records on file"
+            window={`Last ${RANGE_LABEL[range]}`}
           />
           <FastFactCard
             label="Main Issue Type"
@@ -511,7 +542,7 @@ export default function Shipping() {
                 : "No issue classification available."
             }
             accent="#0b0a3d"
-            window="All records on file"
+            window={`Last ${RANGE_LABEL[range]}`}
           />
           <FastFactCard
             label="Latest Significant Incident"
@@ -530,23 +561,23 @@ export default function Shipping() {
       {/* 3. Key Metrics */}
       <Section title="Key Metrics">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Kpi label="Total Records" value={total} accent="#0b0a3d" window="All records on file" />
+          <Kpi label="Total Records" value={total} accent="#0b0a3d" window={`Last ${RANGE_LABEL[range]}`} />
           <Kpi
             label="Highest Severity"
             value={highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}
             accent={highestSev ? ratingColor(highestSev) : "#B8C2CC"}
             small
-            window="All records on file"
+            window={`Last ${RANGE_LABEL[range]}`}
           />
           <Kpi
             label="Main Affected Chokepoint"
             value={mainChokepoint ? mainChokepoint.key : (mainRegion?.region ?? "—")}
             accent={mainChokepoint ? "#0b0a3d" : (mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC")}
             small
-            window="All records on file"
+            window={`Last ${RANGE_LABEL[range]}`}
           />
-          <Kpi label="Vessel Attacks / Seizures" value={vesselAttackOrSeizureCount} accent="#C0392B" window="Confirmed · all on file" />
-          <Kpi label="Piracy / Armed Robbery" value={piracyIncidents.length} accent="#E67E22" window="Confirmed · all on file" />
+          <Kpi label="Vessel Attacks / Seizures" value={vesselAttackOrSeizureCount} accent="#C0392B" window={`Confirmed · last ${RANGE_LABEL[range]}`} />
+          <Kpi label="Piracy / Armed Robbery" value={piracyIncidents.length} accent="#E67E22" window={`Confirmed · last ${RANGE_LABEL[range]}`} />
           <Kpi
             label="Latest Significant Incident"
             value={latestSignificant ? format(latestSignificant.occurredDate, "dd MMM yyyy") : "—"}
@@ -675,10 +706,10 @@ export default function Shipping() {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0b0a3d" window="Confirmed · all on file" />
-              <Kpi label="Attacks" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} window="Confirmed · all on file" />
-              <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} window="Confirmed · all on file" />
-              <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} window="Confirmed · all on file" />
+              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0b0a3d" window={`Confirmed · last ${RANGE_LABEL[range]}`} />
+              <Kpi label="Attacks" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} window={`Confirmed · last ${RANGE_LABEL[range]}`} />
+              <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} window={`Confirmed · last ${RANGE_LABEL[range]}`} />
+              <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} window={`Confirmed · last ${RANGE_LABEL[range]}`} />
             </div>
             <div
               className="flex gap-3 mt-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1"
