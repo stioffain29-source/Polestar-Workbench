@@ -17,9 +17,9 @@ import {
   classifyIssue, ISSUE_PALETTE,
   classifyVesselIncident, type VesselIncidentType, VESSEL_ACCENT,
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
-  isLowCredibilityShippingRecord,
+  isLowCredibilityShippingRecord, isCapabilityContext,
 } from "@/lib/shippingAnalysis";
-import { computeHormuzStatus, HORMUZ_TONE_COLOR, type HormuzCategoryResult } from "@/lib/hormuzStatus";
+import { computeHormuzStatus, HORMUZ_TONE_COLOR, type HormuzCategoryResult, type HormuzStatusTone } from "@/lib/hormuzStatus";
 import { dedupeShippingMonitorRows } from "@/lib/shippingReportDataset";
 import { ExternalLink } from "lucide-react";
 
@@ -43,15 +43,15 @@ const STROKE_WIDTH = 1.5;
 const SHIPPING_DEFINITIONS: { term: string; def: string }[] = [
   {
     term: "Shipping record",
-    def: "One de-duplicated maritime news item scoped to APAC or the Middle East that passes the credibility screen. Social-media handles, repatriation / crew-welfare follow-ups, speculative or unverified claims, pure commentary, rhetorical closure threats and media-packaging headlines are excluded. Syndicated copies of the same event on the same day collapse to a single record, keeping the most severe / most recent version.",
+    def: "One de-duplicated maritime news item scoped to APAC or the Middle East that passes the credibility screen. Social-media handles, repatriation / crew-welfare follow-ups, speculative or unverified claims, pure commentary, rhetorical closure threats and media-packaging headlines are excluded. Syndicated copies are collapsed: identical headlines merge regardless of date, reworded copies of one event merge within a date-and-keyword signature, and re-reports of a single vessel event cluster across a few days — keeping the most severe / most recent version.",
   },
   {
     term: "Significant incident",
-    def: "The most recent record rated High or Extreme; if none is on file, the most recent record. Repatriation, social-handle, speculative-claim and capability / procurement items are never eligible to be the significant incident.",
+    def: "The most recent record rated High or Extreme; if none is on file, the most recent credible record. Repatriation, social-handle, speculative-claim and capability / procurement / exercise items are filtered out before the pick, so none can become the significant incident.",
   },
   {
     term: "Chokepoint risk",
-    def: "A record naming one of six tracked chokepoints (Strait of Hormuz, Gulf of Oman, Arabian / Persian Gulf, Red Sea, Bab el-Mandeb, Malacca) together with an operational maritime term. A bare geographic mention, a policy proposal or a price reference does not qualify.",
+    def: "A record naming one of six tracked chokepoints (Strait of Hormuz, Gulf of Oman, Arabian / Persian Gulf, Red Sea, Bab el-Mandeb, Malacca). The Strait of Hormuz additionally requires an operational maritime term, so a bare 'Hormuz' mention in a price or policy headline does not qualify; the other five match on a named mention.",
   },
   {
     term: "Vessel attack / seizure",
@@ -70,11 +70,11 @@ const SHIPPING_DEFINITIONS: { term: string; def: string }[] = [
 // Status thresholds for the Strait of Hormuz banner. The banner tone is chosen
 // strictly by these rules — no strong language is shown unless its threshold is
 // met. Mirrors the branching in computeHormuzStatus().
-const HORMUZ_STATUS_THRESHOLDS: { label: string; rule: string }[] = [
-  { label: "Active kinetic environment", rule: "≥1 confirmed kinetic incident in the last 7 days." },
-  { label: "High-risk operating environment", rule: "No kinetic incident in the last 7 days, but traffic disruption is on file." },
-  { label: "Elevated chokepoint signal", rule: "No kinetic incident or traffic disruption, but ≥1 other indicator (navigation, posture, market, diplomatic) is active." },
-  { label: "No activity", rule: "All six indicator categories are empty in the loaded window." },
+const HORMUZ_STATUS_THRESHOLDS: { tone: HormuzStatusTone; label: string; rule: string }[] = [
+  { tone: "kinetic", label: "Active kinetic environment", rule: "≥1 confirmed kinetic incident in the last 7 days." },
+  { tone: "constrained", label: "High-risk operating environment", rule: "No kinetic incident in the last 7 days, but traffic disruption is on file." },
+  { tone: "elevated", label: "Elevated chokepoint signal", rule: "No kinetic incident or traffic disruption, but ≥1 other indicator (navigation, posture, market, diplomatic) is active." },
+  { tone: "no-activity", label: "No activity", rule: "All six indicator categories are empty in the loaded window." },
 ];
 
 // Hormuz indicator categories split into confirmed incidents vs context.
@@ -259,6 +259,7 @@ export default function Shipping() {
     // human-interest follow-up.
     const sortedClean = [...cleanEnriched]
       .filter((i) => !isNaN(i.occurredDate.getTime()))
+      .filter((i) => !isCapabilityContext(i))
       .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
     return (
       sortedClean.find((i) => i.severity === "extreme" || i.severity === "high")
@@ -580,7 +581,7 @@ export default function Shipping() {
           )}
           <div className="text-[11px] font-sans mt-2 pt-2 border-t" style={{ color: "#303030", borderColor: "#E2E2E2" }}>
             <span className="uppercase tracking-wider font-semibold">Trigger</span>{" "}
-            {HORMUZ_STATUS_THRESHOLDS.find((t) => hormuzStatus.headline.replace(/\.$/, "") === t.label)?.rule
+            {HORMUZ_STATUS_THRESHOLDS.find((t) => t.tone === hormuzStatus.tone)?.rule
               ?? "Status derived from the loaded indicator window."}{" "}
             Thresholds are listed in Methodology &amp; Definitions above.
           </div>
