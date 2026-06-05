@@ -6,7 +6,7 @@ import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
-  LineChart, Line,
+  LineChart, Line, LabelList,
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { deriveIncidentCountry, deriveFlagState, LOCATION_NOT_IDENTIFIED } from "@/lib/shippingCountry";
@@ -161,14 +161,17 @@ export default function Shipping() {
     return enriched.filter((i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= 30).length;
   }, [enriched]);
 
+  // Region chart shows only the two real theatres. "Country not identified"
+  // is excluded — it was an unlabelled bar that dwarfed the meaningful regions
+  // and told the analyst nothing about where activity was occurring; the
+  // unattributed count is surfaced as a caption under the chart instead.
   const byRegion = useMemo(() => {
     const m = new Map<Region, number>([
       ["Middle East", 0],
       ["APAC", 0],
-      ["Country not identified", 0],
     ]);
     enriched.forEach((i) => {
-      if (i.region === "Out of scope") return;
+      if (i.region !== "Middle East" && i.region !== "APAC") return;
       m.set(i.region, (m.get(i.region) ?? 0) + 1);
     });
     return Array.from(m.entries()).map(([region, count]) => ({ region, count }));
@@ -879,20 +882,32 @@ export default function Shipping() {
           </ChartCard>
 
           <ChartCard title="Incidents by Region">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byRegion} layout="vertical" margin={{ left: 24, right: 16 }}>
-                <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
-                <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
-                <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} width={130} />
-                <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
-                <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
-                  {byRegion.map((d) => {
-                    const c = REGION_COLOR[d.region as Region];
-                    return <Cell key={d.region} fill={c} stroke={darken(c)} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="flex flex-col h-full">
+              <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={byRegion} layout="vertical" margin={{ left: 24, right: 40 }}>
+                    <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                    <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                    <YAxis dataKey="region" type="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} width={100} />
+                    <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                    <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
+                      <LabelList dataKey="count" position="right" fill="#0b0a3d" fontSize={12} fontWeight={700} />
+                      {byRegion.map((d) => {
+                        const c = REGION_COLOR[d.region as Region];
+                        return <Cell key={d.region} fill={c} stroke={darken(c)} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {notIdentifiedCount > 0 && (
+                <p className="text-[11px] text-muted-foreground font-sans mt-2 shrink-0 leading-snug">
+                  Based on {meCount + apCount} record{meCount + apCount === 1 ? "" : "s"} with an identified incident location.
+                  A further {notIdentifiedCount} credible record{notIdentifiedCount === 1 ? "" : "s"} could not be tied to a
+                  specific country and {notIdentifiedCount === 1 ? "is" : "are"} omitted from this chart.
+                </p>
+              )}
+            </div>
           </ChartCard>
 
           <ChartCard title="Incidents by Country (Top 12)">
@@ -905,7 +920,9 @@ export default function Shipping() {
                   <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
                   <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
-                  <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY} />
+                  <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY}>
+                    <LabelList dataKey="count" position="top" fill="#0b0a3d" fontSize={11} fontWeight={700} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -919,6 +936,7 @@ export default function Shipping() {
                 <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                 <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                 <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
+                  <LabelList dataKey="count" position="top" fill="#0b0a3d" fontSize={11} fontWeight={700} />
                   {bySeverity.map((d) => {
                     const c = ratingColor(d.severity);
                     return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
