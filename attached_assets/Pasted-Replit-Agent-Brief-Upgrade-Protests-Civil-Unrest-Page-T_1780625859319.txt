@@ -1,0 +1,153 @@
+Replit Agent Brief: Upgrade Protests & Civil Unrest Page
+
+The current Protests & Civil Unrest topic page is too basic. It only shows headline totals, one severity chart and an incident list.
+
+I need it upgraded so it looks and works more like the existing Shipping page, with meaningful operational metrics.
+
+Product name
+
+Keep the page name as:
+
+PROTESTS & CIVIL UNREST
+
+Subtitle:
+
+Activism, protests, industrial action and civil unrest monitor
+
+Do not rename this page to Flashpoint.
+
+Required categories
+
+All incidents on this page need to be grouped into one of these four categories:
+
+Activism
+Protests
+Industrial action
+Civil unrest
+
+These categories must be visible in the dashboard metrics, charts and incident table.
+
+Required changes
+
+Add the following sections in this order:
+
+1. Top metric cards
+
+Replace the current basic cards with:
+
+Incidents 30D
+Critical 30D
+Total recorded
+Countries affected
+Latest incident
+2. Fast facts row
+
+Add fast fact cards similar to Shipping:
+
+Most active category
+Top country
+Highest severity country
+Industrial action 30D
+Civil unrest 30D
+7 day change
+3. Key metrics row
+
+Add category cards showing 30 day counts for:
+
+Activism
+Protests
+Industrial action
+Civil unrest
+4. Charts
+
+Replace the single severity chart with:
+
+Category distribution
+Severity distribution
+30 day incident trend
+Top countries by incident count
+5. Geography section
+
+Add:
+
+Top 5 countries by incident count
+Top 5 countries by high/extreme count
+Countries newly active in last 7 days if available
+
+Keep map markers if already available.
+
+6. Operational impact section
+
+Add operational indicators where data allows:
+
+Transport disruption
+Site access disruption
+Industrial site disruption
+Government facility targeting
+Energy or utility disruption
+Supply chain disruption
+
+If exact tagging does not exist yet, infer cautiously from title/source text using simple keyword matching. Do not overstate confidence.
+
+7. Incident table
+
+Improve the incident table.
+
+Required columns:
+
+Date
+Type
+Country
+Headline
+Sector or impact
+Severity
+Source/action link
+
+Type must show one of:
+
+Activism
+Protest
+Industrial Action
+Civil Unrest
+Classification rules
+
+If existing records do not have a clean category field, add simple title/source text classification:
+
+strike, union, walkout, labour, wage, workers, industrial dispute = Industrial action
+protest, rally, demonstration, march, sit in = Protest
+activist, campaign, blockade, environmental group, boycott = Activism
+riot, unrest, clashes, violence, arson, looting, curfew = Civil unrest
+
+Where uncertain, default to Protest.
+
+Do not use “Other” as a fallback category.
+
+Styling
+
+Use the same visual structure and density as the Shipping page.
+
+Use existing Polestar styling:
+
+Midnight Blue: #0b0a3d
+Electric Blue: #465bff
+Dusk Gray: #363636
+Polar Gray: #e2e2e2
+
+Use the existing severity colour system.
+
+Do not introduce new colour palettes.
+
+Acceptance criteria
+
+Complete means:
+
+Page remains named Protests & Civil Unrest
+Subtitle reflects activism, protests, industrial action and civil unrest
+Category metrics are visible
+Fast facts are added
+Charts show category, severity, trend and top countries
+Incident table includes type and operational impact
+No “Other” fallback category is used
+Visual layout feels close to the Shipping page
+Existing data still loads correctly
+Agent confirms files changed and logic added after completion
