@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
-  LineChart, Line,
+  LineChart, Line, LabelList,
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
@@ -342,7 +342,7 @@ export default function Protests() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ChartCard title="Category Distribution">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byCategory}>
+              <BarChart data={byCategory} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
                 <XAxis dataKey="category" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} interval={0} />
                 <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
@@ -352,6 +352,7 @@ export default function Protests() {
                     const c = CATEGORY_COLOR[d.category];
                     return <Cell key={d.category} fill={c} stroke={darken(c)} />;
                   })}
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -359,7 +360,7 @@ export default function Protests() {
 
           <ChartCard title="Severity Distribution">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bySeverity}>
+              <BarChart data={bySeverity} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
                 <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
@@ -369,6 +370,7 @@ export default function Protests() {
                     const c = ratingColor(d.severity);
                     return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
                   })}
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
