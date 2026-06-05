@@ -238,6 +238,11 @@ export default function Shipping() {
     return top;
   }, [byRegion]);
 
+  // Concrete location data — the single most-affected incident country
+  // (not the coarse APAC/Middle East bucket). "Country not identified" is
+  // already excluded by byCountry, so this only surfaces real attribution.
+  const mainCountry = byCountry[0] ?? null;
+
   const mainIssue = byIssue[0] ?? null;
 
   const highestSev = useMemo(() => {
@@ -484,14 +489,14 @@ export default function Shipping() {
             window="All records on file"
           />
           <FastFactCard
-            label="Main Affected Region"
-            value={mainRegion ? mainRegion.region : "—"}
+            label="Main Affected Country"
+            value={mainCountry ? mainCountry.country : "—"}
             note={
-              mainRegion
-                ? `${mainRegion.count} of ${total} shipping records mapped to this region.`
-                : "No regional distribution available."
+              mainCountry
+                ? `${mainCountry.count} of ${total} shipping records map to this country${mainRegion ? ` (${mainRegion.region})` : ""}.`
+                : "No country-level attribution available."
             }
-            accent={mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC"}
+            accent={mainCountry ? REGION_COLOR[classifyRegion(mainCountry.country)] : "#B8C2CC"}
             window="All records on file"
           />
           <FastFactCard
