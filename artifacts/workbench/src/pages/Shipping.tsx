@@ -396,7 +396,7 @@ export default function Shipping() {
 
       {/* 1b. Methodology & Definitions */}
       <Section title="Methodology & Definitions">
-        <details className="bg-white border border-border rounded-sm" open>
+        <details className="bg-white border border-border rounded-sm">
           <summary className="cursor-pointer select-none px-4 py-3 text-sm font-sans text-primary">
             How this monitor defines its terms, windows, categories and status thresholds.
           </summary>
