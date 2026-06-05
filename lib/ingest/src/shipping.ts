@@ -5,6 +5,7 @@ import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { recordSourceHealth } from "./sourceHealth";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Shipping ingest core.
@@ -502,6 +503,19 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
   const sortedCov = [...countryCoverage.entries()].sort((a, b) => b[1] - a[1]);
   for (const [c, n] of sortedCov) log(`  ${c.padEnd(22)} ${n}`);
   if (sortedCov.length === 0) log("  (none)");
+
+  if (commit) {
+    await recordSourceHealth(
+      "shipping",
+      FEEDS.map((f) => ({
+        name: f.label,
+        url: f.url,
+        ok: !perFeed[f.label]?.error,
+        error: perFeed[f.label]?.error ?? null,
+      })),
+      { sourceType: "rss", reliability: 3, notes: "Live Google News maritime feed — auto-monitored each ingest run." },
+    );
+  }
 
   const summaryBase = {
     topic: "shipping" as const,

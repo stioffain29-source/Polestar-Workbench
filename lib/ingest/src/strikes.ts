@@ -3,6 +3,7 @@ import { db, strikesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { geocode } from "./geocode";
+import { recordSourceHealth } from "./sourceHealth";
 import type { FeedStat } from "./types";
 
 // Missile Strike Tracker live ingest.
@@ -529,6 +530,19 @@ export async function runStrikesIngest(
     const d = a.occurredAt.toISOString().slice(0, 10);
     const cas = a.casualties != null ? `${a.casualties}d` : "-";
     log(`  ${d} ${a.country.padEnd(20)} ${a.munition.padEnd(17)} ${a.targetCategory.padEnd(20)} ${cas.padStart(4)}  ${a.title.slice(0, 90)}`);
+  }
+
+  if (commit) {
+    await recordSourceHealth(
+      "strikes",
+      STRIKE_FEEDS.map((f) => ({
+        name: f.label,
+        url: gnews(f.q),
+        ok: !perFeed[f.label]?.error,
+        error: perFeed[f.label]?.error ?? null,
+      })),
+      { sourceType: "rss", reliability: 3, notes: "Live Google News strike-tracker feed — auto-monitored each ingest run." },
+    );
   }
 
   const base = {

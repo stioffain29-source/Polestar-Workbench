@@ -1,5 +1,6 @@
 import { db, reportsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { recordSourceHealth } from "./sourceHealth";
 
 // Live fuel-market price ingest.
 //
@@ -410,6 +411,36 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     log(`\nNO ROWS WRITTEN — crude degraded; existing prices preserved. Next run will retry.`);
   } else {
     log(`\nDRY-RUN — no rows written. Re-run with --commit to write live prices.`);
+  }
+
+  // Record honest price-feed health onto the fuel topic. These rows REPLACE the
+  // old fabricated "Reuters Energy Wire" / "S&P Global Platts" placeholders —
+  // the report's prices genuinely come from these public market series.
+  if (commit) {
+    await recordSourceHealth(
+      "fuel",
+      [
+        {
+          name: "ICE Brent front-month (Yahoo Finance / FRED)",
+          url: "https://finance.yahoo.com/quote/BZ=F",
+          ok: brent.points.length > 0,
+          error: brent.points.length > 0 ? null : "no price points returned (Yahoo + FRED both failed)",
+        },
+        {
+          name: "NYMEX WTI front-month (Yahoo Finance / FRED)",
+          url: "https://finance.yahoo.com/quote/CL=F",
+          ok: wti.points.length > 0,
+          error: wti.points.length > 0 ? null : "no price points returned (Yahoo + FRED both failed)",
+        },
+        {
+          name: "US Gulf Coast Jet Fuel (EIA / FRED)",
+          url: `${FRED_CSV}?id=DJFUELUSGULF`,
+          ok: jet.points.length > 0,
+          error: jet.points.length > 0 ? null : "no price points returned (FRED failed)",
+        },
+      ],
+      { sourceType: "api", reliability: 4, notes: "Live market price series — auto-monitored each price ingest run." },
+    );
   }
 
   return {

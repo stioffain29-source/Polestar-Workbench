@@ -529,7 +529,11 @@ export function computeCountryCoverageStatus(opts: {
   // (and a hard-coded fallback set), so one failing, unrelated feed could trip
   // every country's coverage warning. Name scoping confines the determination
   // to the feeds that genuinely serve the country in question.
-  const relevant = sources.filter((s) => sourceCoversCountry(s.name, name));
+  const relevant = sources.filter(
+    (s) =>
+      COUNTRY_TOPIC_FEEDS.has((s.topic ?? "").toLowerCase()) &&
+      sourceCoversCountry(s.name, name),
+  );
 
   const unhealthy = relevant.filter((s) => isFeedUnhealthy(s, endMs));
 

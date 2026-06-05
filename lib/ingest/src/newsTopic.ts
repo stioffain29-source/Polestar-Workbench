@@ -5,6 +5,7 @@ import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { recordSourceHealth } from "./sourceHealth";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Generic Google-News topic ingest.
@@ -297,6 +298,19 @@ export async function runNewsTopicIngest(
   const sortedCov = [...countryCoverage.entries()].sort((a, b) => b[1] - a[1]);
   for (const [c, n] of sortedCov) log(`  ${c.padEnd(22)} ${n}`);
   if (sortedCov.length === 0) log("  (none)");
+
+  if (commit) {
+    await recordSourceHealth(
+      topic,
+      FEEDS.map((f) => ({
+        name: `Google News — ${f.label}`,
+        url: f.url,
+        ok: !perFeed[f.label]?.error,
+        error: perFeed[f.label]?.error ?? null,
+      })),
+      { sourceType: "rss", reliability: 3, notes: "Live Google News feed — auto-monitored each ingest run." },
+    );
+  }
 
   const summaryBase = {
     topic,

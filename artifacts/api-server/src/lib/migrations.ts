@@ -1,5 +1,5 @@
 import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable } from "@workspace/db";
-import { sql, eq, or, ne, isNull } from "drizzle-orm";
+import { sql, eq, or, ne, isNull, and, inArray } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
@@ -465,6 +465,61 @@ export async function runDataMigrations(): Promise<void> {
       await repairFlashpointSeedUrls();
     } catch (srcErr) {
       logger.error({ err: srcErr }, "Flashpoint regional source seed failed");
+    }
+
+    // 7) One-time removal of dead placeholder (never-monitored) non-flashpoint
+    //    source rows. These were seed-only catalogue entries that never had a
+    //    live feed, so the Source Health page showed them as permanently green
+    //    (or red) without ever actually polling anything. The topic ingests now
+    //    register the REAL Google-News / market feeds they genuinely poll
+    //    (recordSourceHealth), so the placeholders are misleading and removed.
+    //    Marker-gated: a source legitimately re-added later with the same name
+    //    is never re-deleted.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "dead_placeholder_sources_removed_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const DEAD_PLACEHOLDER_SOURCES = [
+          // cargo_watch
+          "BSI Supply Chain Risk", "TAPA Incident Reports", "TT Club Cargo Theft",
+          // energy
+          "GCC Grid Operators", "IEA Real-time Power",
+          // fertiliser
+          "FAO Fertilizer Outlook", "ICIS Fertilizer Daily",
+          // fuel
+          "Reuters Energy Wire", "S&P Global Platts",
+          // protests
+          "ACLED Conflict Data", "GDELT 2.0", "Local APAC Stringer Network",
+          // shipping
+          "JMSDF Press Releases", "Lloyd's List Intelligence", "Maritime Executive", "UKMTO Advisories",
+        ];
+        const res = await db
+          .delete(sourcesTable)
+          .where(
+            and(
+              ne(sourcesTable.topic, "flashpoint"),
+              inArray(sourcesTable.name, DEAD_PLACEHOLDER_SOURCES),
+            ),
+          );
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "Removed dead placeholder non-flashpoint source rows (real feeds now self-register via ingest)",
+        );
+      }
+    } catch (delErr) {
+      logger.error({ err: delErr }, "Dead placeholder source removal failed");
     }
 
     try {

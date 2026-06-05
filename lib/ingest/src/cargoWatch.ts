@@ -6,6 +6,7 @@ import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { isLlmAvailable, screenBatch } from "./translateScreen";
+import { recordSourceHealth } from "./sourceHealth";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Cargo Watch ingest core.
@@ -645,6 +646,22 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
     for (const r of localRej.slice(0, 20)) {
       process.stderr.write(`[cargo] ${r.reason} — ${r.title.slice(0, 90)}\n`);
     }
+  }
+
+  if (commit) {
+    const healthFeeds = [
+      ...FEEDS.map((f) => ({ name: f.label, url: f.url })),
+      ...(llmReady ? LOCAL_FEEDS.map((f) => ({ name: f.label, url: f.url })) : []),
+    ].map((f) => ({
+      ...f,
+      ok: !perFeed[f.name]?.error,
+      error: perFeed[f.name]?.error ?? null,
+    }));
+    await recordSourceHealth("cargo_watch", healthFeeds, {
+      sourceType: "rss",
+      reliability: 3,
+      notes: "Live cargo-theft news feed — auto-monitored each ingest run.",
+    });
   }
 
   const summaryBase = {
