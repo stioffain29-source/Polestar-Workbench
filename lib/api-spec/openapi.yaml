@@ -43,6 +43,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardOverview"
 
+  /market-prices:
+    get:
+      operationId: listMarketPrices
+      tags: [market-prices]
+      summary: Live commodity-price snapshots for the Fuel / Energy / Fertiliser monitors
+      parameters:
+        - name: group
+          in: query
+          description: Limit to one monitor group (fuel | energy | fertiliser)
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MarketPrice" }
+
   /incidents:
     get:
       operationId: listIncidents
@@ -1193,3 +1212,28 @@ components:
         reportsPipeline:
           type: array
           items: { $ref: "#/components/schemas/Report" }
+
+    MarketPriceTrajectoryPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date: { type: string }
+        value: { type: number }
+
+    MarketPrice:
+      type: object
+      required: [group, key, label, value, unit, asOf, source]
+      properties:
+        group: { type: string }
+        key: { type: string }
+        label: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        change: { type: ["string", "null"] }
+        asOf: { type: string }
+        source: { type: string }
+        benchmark: { type: ["string", "null"] }
+        trajectory:
+          type: ["array", "null"]
+          items: { $ref: "#/components/schemas/MarketPriceTrajectoryPoint" }
+        updatedAt: { type: string, format: date-time }

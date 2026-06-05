@@ -14,6 +14,7 @@ import {
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
+import { MarketPricesSection, IncidentDerivedPanel, type DerivedIncidentRow } from "@/components/MarketPrices";
 import { ExternalLink } from "lucide-react";
 
 const FILL_OPACITY = 0.78;
@@ -22,6 +23,12 @@ const STROKE_WIDTH = 1.5;
 const SEV_RANK: Record<string, number> = {
   insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
 };
+
+// Keyword patterns for the topic-specific derived panels. Matched against the
+// headline + summary of the already-loaded, noise-filtered incident set — these
+// surface a slice of real records, never fabricated rows.
+const BROWNOUT_RE = /\b(brownout|blackout|black-?out|load[\s-]?shedding|power (?:cut|outage|outages|failure|loss)|grid (?:failure|collapse|down|instability)|rolling (?:outage|blackout)|electricity (?:shortage|rationing)|power shortage|power rationing|outage)\b/i;
+const PINCH_RE = /\b(shortage|scarcity|supply (?:disruption|crunch|squeeze|shortfall)|export ban|export restriction|export curb|production (?:halt|cut|stoppage)|plant (?:shutdown|closure|outage|halt)|curtail|rationing|stockout|out of stock|run short|short supply)\b/i;
 
 const TOPIC_SUBTITLE: Record<string, string> = {
   energy: "Power, grid and energy-infrastructure disruption monitor.",
@@ -239,6 +246,35 @@ export default function Topic() {
     [inWindow],
   );
 
+  // --- Derived panels (energy brownouts / fertiliser supply pinch points) ----
+  // Slice the windowed set by keyword. The matcher reads the same incidents the
+  // rest of the page tallies, so these panels never invent records.
+  const derived = useMemo(() => {
+    const re = topic === "energy" ? BROWNOUT_RE : topic === "fertiliser" ? PINCH_RE : null;
+    if (!re) return { rows: [] as DerivedIncidentRow[], countryRows: [] as { label: string; value: number }[] };
+    const matched = sortedForTable.filter((i) => {
+      const text = `${i.title ?? ""} ${(i as { summary?: string | null }).summary ?? ""}`;
+      return re.test(text);
+    });
+    const cm = new Map<string, number>();
+    matched.forEach((i) => { if (i.country) cm.set(i.country, (cm.get(i.country) ?? 0) + 1); });
+    const countryRows = Array.from(cm.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+    const rows: DerivedIncidentRow[] = matched.map((i) => ({
+      id: i.id,
+      dateLabel: isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy"),
+      country: i.country,
+      title: i.title,
+      severity: i.severity,
+      sourceUrl: (i as { sourceUrl?: string | null }).sourceUrl,
+    }));
+    return { rows, countryRows };
+  }, [topic, sortedForTable]);
+
+  const showPrices = topic === "fuel" || topic === "energy" || topic === "fertiliser";
+
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
@@ -264,6 +300,9 @@ export default function Topic() {
           small
         />
       </div>
+
+      {/* Market Prices (fuel / energy / fertiliser only) */}
+      {showPrices && <MarketPricesSection group={topic} />}
 
       {/* 2. Fast Facts */}
       <Section title="Fast Facts">
@@ -471,6 +510,28 @@ export default function Topic() {
           )}
         </div>
       </Section>
+
+      {/* Derived risk panel (energy brownouts / fertiliser supply pinch points) */}
+      {topic === "energy" && (
+        <IncidentDerivedPanel
+          title="Brownouts & Power Disruptions"
+          subtitle={`Power outages, blackouts, load-shedding and grid failures within the loaded ${RANGE_NOTE[range]}.`}
+          accent="#465bff"
+          countryRows={derived.countryRows}
+          rows={derived.rows}
+          emptyText={`No power-disruption records matched in the ${RANGE_NOTE[range]}.`}
+        />
+      )}
+      {topic === "fertiliser" && (
+        <IncidentDerivedPanel
+          title="Supply Pinch Points & Shortages"
+          subtitle={`Shortages, supply disruptions, export bans and plant shutdowns within the loaded ${RANGE_NOTE[range]}.`}
+          accent="#465bff"
+          countryRows={derived.countryRows}
+          rows={derived.rows}
+          emptyText={`No supply-pinch records matched in the ${RANGE_NOTE[range]}.`}
+        />
+      )}
 
       {/* 6. Incident table */}
       <Section title="Recent Incidents">

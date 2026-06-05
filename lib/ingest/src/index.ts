@@ -6,6 +6,8 @@ export { runNewsTopicIngest } from "./newsTopic";
 export type { NewsTopicConfig, TopicFeed, CountryAlias } from "./newsTopic";
 export { runMarketPricesIngest } from "./marketPrices";
 export type { MarketPriceSummary } from "./marketPrices";
+export { runMarketSnapshotIngest } from "./marketSnapshot";
+export type { MarketSnapshotSummary } from "./marketSnapshot";
 export { runStrikesIngest } from "./strikes";
 export type { StrikesIngestSummary, StrikeTheatre } from "./strikes";
 export { classifySeverity } from "./severity";

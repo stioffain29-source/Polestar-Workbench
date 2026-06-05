@@ -213,6 +213,32 @@ export const GetDashboardOverviewResponse = zod.object({
 })
 
 
+/**
+ * @summary Live commodity-price snapshots for the Fuel / Energy / Fertiliser monitors
+ */
+export const ListMarketPricesQueryParams = zod.object({
+  "group": zod.coerce.string().optional().describe('Limit to one monitor group (fuel | energy | fertiliser)')
+})
+
+export const ListMarketPricesResponseItem = zod.object({
+  "group": zod.string(),
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "unit": zod.string(),
+  "change": zod.string().nullish(),
+  "asOf": zod.string(),
+  "source": zod.string(),
+  "benchmark": zod.string().nullish(),
+  "trajectory": zod.array(zod.object({
+  "date": zod.string(),
+  "value": zod.number()
+})).nullish(),
+  "updatedAt": zod.coerce.date().optional()
+})
+export const ListMarketPricesResponse = zod.array(ListMarketPricesResponseItem)
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 

@@ -34,9 +34,11 @@ import type {
   IncidentInput,
   IncidentUpdate,
   ListIncidentsParams,
+  ListMarketPricesParams,
   ListReportsParams,
   ListSourcesParams,
   ListStrikesParams,
+  MarketPrice,
   Report,
   ReportInput,
   ReportUpdate,
@@ -205,6 +207,90 @@ export function useGetDashboardOverview<TData = Awaited<ReturnType<typeof getDas
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMarketPricesUrl = (params?: ListMarketPricesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/market-prices?${stringifiedParams}` : `/api/market-prices`
+}
+
+/**
+ * @summary Live commodity-price snapshots for the Fuel / Energy / Fertiliser monitors
+ */
+export const listMarketPrices = async (params?: ListMarketPricesParams, options?: RequestInit): Promise<MarketPrice[]> => {
+
+  return customFetch<MarketPrice[]>(getListMarketPricesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMarketPricesQueryKey = (params?: ListMarketPricesParams,) => {
+    return [
+    `/api/market-prices`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMarketPricesQueryOptions = <TData = Awaited<ReturnType<typeof listMarketPrices>>, TError = ErrorType<unknown>>(params?: ListMarketPricesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMarketPricesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMarketPrices>>> = ({ signal }) => listMarketPrices(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMarketPrices>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMarketPricesQueryResult = NonNullable<Awaited<ReturnType<typeof listMarketPrices>>>
+export type ListMarketPricesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Live commodity-price snapshots for the Fuel / Energy / Fertiliser monitors
+ */
+
+export function useListMarketPrices<TData = Awaited<ReturnType<typeof listMarketPrices>>, TError = ErrorType<unknown>>(
+ params?: ListMarketPricesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMarketPricesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -1,6 +1,22 @@
 import { db, reportsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { recordSourceHealth } from "./sourceHealth";
+import {
+  FRED_CSV,
+  fetchFredSeries,
+  fetchCrudeSeries,
+  valueAsOf,
+  changeOver,
+  trajectoryAsOf,
+  type Series,
+} from "./priceSeries";
+
+// Thin aliases so the report-pricing call sites below read unchanged. Crude and
+// jet use the report's 7-day change convention; the shared fetchers/parsers now
+// live in priceSeries.ts (reused by the live market-snapshot ingest).
+const fetchSeries = fetchFredSeries;
+const changePct = (series: Series, asOf: string, value: number): string | null =>
+  changeOver(series, asOf, value, 7, "7d");
 
 // Live fuel-market price ingest.
 //
@@ -31,16 +47,6 @@ import { recordSourceHealth } from "./sourceHealth";
 // AS-OF report, not a live ticker. Re-running is idempotent. Like the other
 // ingest modules, this NEVER closes the shared DB pool — only the CLI wrapper does.
 
-const FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv";
-const YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
-
-type Series = {
-  id: string;
-  /** Human-readable provenance shown on the price card (must match the data actually used). */
-  source: string;
-  /** Ascending by date, missing values dropped. */
-  points: { date: string; value: number }[];
-};
 
 export type MarketPriceSummary = {
   topic: "fuel_prices";
@@ -54,163 +60,6 @@ export type MarketPriceSummary = {
   logLines: string[];
 };
 
-function parseFredCsv(id: string, text: string): { date: string; value: number }[] {
-  const lines = text.trim().split(/\r?\n/);
-  const points: { date: string; value: number }[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const parts = lines[i].split(",");
-    if (parts.length < 2) continue;
-    const date = parts[0].trim();
-    const raw = parts[1].trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    if (raw === "" || raw === ".") continue;
-    const value = Number(raw);
-    if (!Number.isFinite(value)) continue;
-    points.push({ date, value });
-  }
-  points.sort((a, b) => a.date.localeCompare(b.date));
-  return points;
-}
-
-const FETCH_ATTEMPTS = 3;
-
-/**
- * Fetch one FRED series, retrying transient failures. FRED's public
- * fredgraph.csv endpoint is intermittently flaky (HTTP/2 stream resets, brief
- * 5xx/429), and in a deployment a SINGLE swallowed failure here used to leave a
- * report permanently un-priced (the freshness gate then skipped every retry).
- * Retrying with backoff makes the common transient case self-heal within one
- * run; a hard failure still throws so the caller records it and a later cold
- * start re-attempts.
- */
-async function fetchSeries(id: string, source: string, startDate: string): Promise<Series> {
-  const url = `${FRED_CSV}?id=${encodeURIComponent(id)}&cosd=${startDate}`;
-  let lastErr: unknown;
-  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
-    try {
-      const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
-      });
-      if (!res.ok) throw new Error(`FRED ${id} HTTP ${res.status}`);
-      const text = await res.text();
-      return { id, source, points: parseFredCsv(id, text) };
-    } catch (err) {
-      lastErr = err;
-      if (attempt < FETCH_ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, 400 * attempt));
-      }
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
-}
-
-/** Parse Yahoo Finance chart JSON into ascending daily close points. */
-function parseYahooChart(symbol: string, text: string): { date: string; value: number }[] {
-  const json = JSON.parse(text) as {
-    chart?: { result?: { timestamp?: number[]; indicators?: { quote?: { close?: (number | null)[] }[] } }[] };
-  };
-  const result = json.chart?.result?.[0];
-  const ts = result?.timestamp;
-  const close = result?.indicators?.quote?.[0]?.close;
-  if (!ts || !close) throw new Error(`Yahoo ${symbol}: no timestamp/close in payload`);
-  const byDate = new Map<string, number>();
-  for (let i = 0; i < ts.length; i++) {
-    const v = close[i];
-    if (v == null || !Number.isFinite(v)) continue;
-    const date = new Date(ts[i] * 1000).toISOString().slice(0, 10);
-    byDate.set(date, v); // last write wins → keeps the final close for a given day
-  }
-  return [...byDate.entries()]
-    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-/**
- * Fetch one Yahoo Finance daily series (front-month future), retrying transient
- * failures. The window is anchored to `startDate` via period1/period2 (NOT a
- * hardcoded `range=1y`) so the series always reaches back far enough to price the
- * OLDEST fuel report — a fixed 1-year range silently truncated history and would
- * blank crude on any report older than a year.
- */
-async function fetchYahooSeries(symbol: string, source: string, startDate: string): Promise<Series> {
-  const period1 = Math.floor(new Date(`${startDate}T00:00:00Z`).getTime() / 1000);
-  const period2 = Math.floor(Date.now() / 1000) + 86400; // +1d so today's close is included
-  const url = `${YAHOO_CHART}/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=1d`;
-  let lastErr: unknown;
-  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
-    try {
-      const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
-      });
-      if (!res.ok) throw new Error(`Yahoo ${symbol} HTTP ${res.status}`);
-      const text = await res.text();
-      const points = parseYahooChart(symbol, text);
-      if (!points.length) throw new Error(`Yahoo ${symbol}: empty series`);
-      return { id: symbol, source, points };
-    } catch (err) {
-      lastErr = err;
-      if (attempt < FETCH_ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, 400 * attempt));
-      }
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
-}
-
-/**
- * Crude (Brent/WTI) prefers Yahoo front-month futures (carries the latest market
- * close) and falls back to the FRED EIA spot series if Yahoo is unavailable, so
- * the headline crude price is as fresh as possible but never goes empty. The
- * returned series carries the source actually used, so the card attribution is
- * always truthful.
- */
-async function fetchCrudeSeries(
-  yahoo: { symbol: string; source: string },
-  fred: { id: string; source: string },
-  startDate: string,
-  log: (s: string) => void,
-): Promise<Series> {
-  try {
-    const s = await fetchYahooSeries(yahoo.symbol, yahoo.source, startDate);
-    const last = s.points.at(-1);
-    log(`  ${yahoo.symbol.padEnd(14)} points=${s.points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"} [Yahoo]`);
-    return s;
-  } catch (yErr) {
-    const ymsg = yErr instanceof Error ? yErr.message : String(yErr);
-    log(`  ${yahoo.symbol.padEnd(14)} Yahoo failed (${ymsg}) → falling back to FRED ${fred.id}`);
-    const s = await fetchSeries(fred.id, fred.source, startDate);
-    const last = s.points.at(-1);
-    log(`  ${fred.id.padEnd(14)} points=${s.points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"} [FRED fallback]`);
-    return s;
-  }
-}
-
-/** Latest observation on or before `onOrBefore` (ISO date). */
-function valueAsOf(series: Series, onOrBefore: string): { date: string; value: number } | null {
-  let found: { date: string; value: number } | null = null;
-  for (const p of series.points) {
-    if (p.date <= onOrBefore) found = p;
-    else break;
-  }
-  return found;
-}
-
-/** Observation nearest to `target` days back (latest on or before target). */
-function changePct(series: Series, asOf: string, value: number): string | null {
-  const d = new Date(asOf);
-  d.setUTCDate(d.getUTCDate() - 7);
-  const weekAgoDate = d.toISOString().slice(0, 10);
-  const prev = valueAsOf(series, weekAgoDate);
-  if (!prev || prev.value === 0) return null;
-  const pct = ((value - prev.value) / prev.value) * 100;
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% 7d`;
-}
-
-/** The most recent weekly trajectory points on or before the anchor date. */
-function trajectoryAsOf(series: Series, onOrBefore: string, count: number): { date: string; value: number }[] {
-  const eligible = series.points.filter((p) => p.date <= onOrBefore);
-  return eligible.slice(-count).map((p) => ({ date: p.date, value: p.value }));
-}
 
 function buildHardNumbers(
   anchorDate: string,

@@ -7,9 +7,11 @@ import {
   runFertiliserIngest,
   runFuelIngest,
   runMarketPricesIngest,
+  runMarketSnapshotIngest,
   runStrikesIngest,
   type IngestSummary,
   type MarketPriceSummary,
+  type MarketSnapshotSummary,
   type StrikesIngestSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -43,6 +45,7 @@ export type IngestRunResult =
       fertiliser: IngestSummary;
       fuel: IngestSummary;
       marketPrices: MarketPriceSummary;
+      marketSnapshot: MarketSnapshotSummary;
       strikes: StrikesIngestSummary;
     }
   | { ran: false; reason: "locked" };
@@ -98,6 +101,17 @@ function emptyMarketPrices(err: unknown): MarketPriceSummary {
     reportsUpdated: 0,
     latest: { brent: null, wti: null, jet: null, asOf: null },
     logLines: [],
+  };
+}
+
+function emptyMarketSnapshot(err: unknown): MarketSnapshotSummary {
+  return {
+    mode: "commit",
+    upserted: 0,
+    considered: 0,
+    errors: [{ key: "all", error: err instanceof Error ? err.message : String(err) }],
+    rows: [],
+    logLines: [`market snapshot ingest failed: ${err instanceof Error ? err.message : String(err)}`],
   };
 }
 
@@ -196,6 +210,16 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "market price ingest failed");
       marketPrices = emptyMarketPrices(err);
     }
+    // Live commodity-price SNAPSHOTS for the Fuel/Energy/Fertiliser monitors.
+    // Isolated in its own try so a FRED/Yahoo/World Bank outage can never fail
+    // the incident ingest — a failed series just leaves its prior row untouched.
+    let marketSnapshot: MarketSnapshotSummary;
+    try {
+      marketSnapshot = await runMarketSnapshotIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "market snapshot ingest failed");
+      marketSnapshot = emptyMarketSnapshot(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
@@ -208,6 +232,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       fertiliser,
       fuel,
       marketPrices,
+      marketSnapshot,
       strikes,
     };
   });

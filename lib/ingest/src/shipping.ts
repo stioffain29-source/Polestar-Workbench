@@ -168,6 +168,35 @@ const ALLOW = [
   "boarding",
   "hijack",
   "hijacked",
+  // Piracy / sea-robbery against vessels. The Singapore Strait & Malacca
+  // feeds explicitly query "piracy OR robbery", but the bare words were
+  // missing from ALLOW, so a ReCAAP-style "armed robbery against a ship"
+  // or "sea robbery" report survived only by incidentally containing the
+  // literal "singapore strait"/"boarding" string. Maritime-qualified
+  // forms only — bare "piracy"/"robbery" would pull in political rhetoric
+  // ("Kremlin calls it piracy"), listicles ("world's piracy hotspots")
+  // and historical pieces ("Golden Age of Piracy").
+  "sea robbery",
+  "armed robbery",
+  "robbery against",
+  "robbery on board",
+  "robbery aboard",
+  "robbed the crew",
+  "robbed crew",
+  "piracy attack",
+  "piracy attempt",
+  "attempted piracy",
+  "suspected piracy",
+  "piracy incident",
+  "piracy bid",
+  "anti-piracy",
+  "pirate attack",
+  "pirate attacks",
+  "pirates attacked",
+  "pirates boarded",
+  "pirates board",
+  "pirates seized",
+  "pirates hijacked",
   "missile",
   "drone",
   "projectile",

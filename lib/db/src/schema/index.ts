@@ -5,3 +5,4 @@ export * from "./reports";
 export * from "./countryReports";
 export * from "./countryBaselines";
 export * from "./appMigrationMarkers";
+export * from "./marketPrices";

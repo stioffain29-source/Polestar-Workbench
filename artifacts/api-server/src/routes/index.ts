@@ -7,6 +7,7 @@ import reportsRouter from "./reports";
 import countriesRouter from "./countries";
 import baselinesRouter from "./baselines";
 import dashboardRouter from "./dashboard";
+import marketPricesRouter from "./marketPrices";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
 
@@ -22,5 +23,6 @@ router.use(reportsRouter);
 router.use(baselinesRouter);
 router.use(countriesRouter);
 router.use(dashboardRouter);
+router.use(marketPricesRouter);
 
 export default router;

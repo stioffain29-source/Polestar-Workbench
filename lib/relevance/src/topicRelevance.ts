@@ -422,6 +422,13 @@ const REQUIRED: Record<string, RegExp[]> = {
   shipping: [
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,
     /\battack (on|against) (a |an |the )?(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew)/,
+    // Piracy / sea robbery against vessels (mirrors the ingest ALLOW list).
+    // Maritime-qualified phrases plus a proximity match so a ReCAAP-style
+    // "armed robbery against a ship in the Singapore Strait" passes the gate,
+    // while bare political/historical "piracy" stays out.
+    /\b(sea robbery|armed robbery|piracy attack|piracy attempt|attempted piracy|suspected piracy|piracy incident|piracy bid|pirate attack)\b/,
+    /\b(piracy|pirate|pirates|robbery|robbed) .{0,40}(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage|strait|at sea|off (the )?coast)\b/,
+    /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage) .{0,40}(piracy|pirate|pirates|sea robbery|armed robbery|robbed|robbery)\b/,
     /\b(missile|drone) (strike|attack) .{0,30}(ship|vessel|tanker|maritime|port|hormuz|red sea)/,
     /\bport (closure|shutdown|strike|congestion|disruption|attack|berth|backlog)/,
     /\bchokepoint\b/,

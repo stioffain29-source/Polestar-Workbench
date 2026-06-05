@@ -556,6 +556,35 @@ export interface DashboardOverview {
   reportsPipeline: Report[];
 }
 
+export interface MarketPriceTrajectoryPoint {
+  date: string;
+  value: number;
+}
+
+export interface MarketPrice {
+  group: string;
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  /** @nullable */
+  change?: string | null;
+  asOf: string;
+  source: string;
+  /** @nullable */
+  benchmark?: string | null;
+  /** @nullable */
+  trajectory?: MarketPriceTrajectoryPoint[] | null;
+  updatedAt?: string;
+}
+
+export type ListMarketPricesParams = {
+/**
+ * Limit to one monitor group (fuel | energy | fertiliser)
+ */
+group?: string;
+};
+
 export type ListIncidentsParams = {
 topic?: Topic;
 country?: string;
