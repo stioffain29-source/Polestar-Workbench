@@ -35,8 +35,13 @@ const CIVIL_UNREST =
   /\b(riot|unrest|clash|violen|arson|loot|curfew|crackdown|ransack|vandal|stampede)/;
 const INDUSTRIAL_ACTION =
   /\b(strike|union|walkout|walk-out|labour|labor|wage|worker|industrial dispute|industrial action|picket)/;
+// Activism = cause/advocacy-driven action (rights, environment, awareness,
+// indigenous land defence, boycotts, vigils). Deliberately does NOT include
+// bare "rally" or "march" — those collide with stock-market/sports "rally" and
+// the calendar month "March", and a generic demonstration belongs in Protest.
+// We only claim Activism when the cause itself is explicit in the text.
 const ACTIVISM =
-  /\b(activist|activism|campaign|blockade|environmental group|boycott|hunger strike)/;
+  /\b(activist|activism|advoca(te|cy|tes|ting)|campaign|blockade|boycott|hunger strike|indigenous|environmental|ecolog|climate (protest|activis|march|strike|rally)|human rights|civil rights|minority rights|women'?s rights|animal rights|gender rights|land rights|disability rights|rights group|rights activis|lgbt|pride (month|parade|march)|awareness (rally|campaign|march|drive|walk)|petition|candlelight|vigil|sit-in|sit in|rally for|march for|world \w+ day)/;
 
 // Precedence is intentional: violence (Civil Unrest) is the most operationally
 // significant signal, so a labour strike that turns violent reads as Civil
@@ -45,6 +50,9 @@ const ACTIVISM =
 export function classifyProtestCategory(i: ProtestTextLike): ProtestCategory {
   const t = text(i);
   if (CIVIL_UNREST.test(t)) return "Civil Unrest";
+  // Cause-driven "strikes" (hunger/climate/rent) are activism, not labour
+  // action, so catch them before the Industrial Action /strike/ test below.
+  if (/\b(hunger strike|climate strike|rent strike)/.test(t)) return "Activism";
   if (INDUSTRIAL_ACTION.test(t)) return "Industrial Action";
   if (ACTIVISM.test(t)) return "Activism";
   return "Protest";
