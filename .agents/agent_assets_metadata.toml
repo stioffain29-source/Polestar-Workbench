@@ -546,3 +546,9 @@ id = "A8qb5fodR9EhJZiSKNhpp"
 uri = "file://artifacts/workbench/screenshots/Shipping_Watch_revised.pdf"
 type = "pdf"
 title = "Shipping Watch — revised (confirmed incidents only)"
+
+[[outputs]]
+id = "DWOmJPsAsEYlYMna4stie"
+uri = "file://AUDIT.md"
+type = "text"
+title = "Polestar Workbench — Honest Code Audit"
