@@ -1,11 +1,47 @@
 import { useRoute } from "wouter";
-import { useListIncidents } from "@workspace/api-client-react";
-import { TOPIC_LABELS, SEVERITY_LEVELS, severityBadgeStyle, ratingColor } from "@/lib/topics";
-import { format, subDays } from "date-fns";
 import { useMemo } from "react";
-import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
-import { cn } from "@/lib/utils";
+import { useListIncidents } from "@workspace/api-client-react";
+import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
+import {
+  BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
+  LineChart, Line, LabelList,
+} from "recharts";
+import {
+  TOPIC_LABELS, SEVERITY_LEVELS, SEVERITY_LABELS, severityBadgeStyle, ratingColor,
+} from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
+import { ExternalLink } from "lucide-react";
+
+const FILL_OPACITY = 0.78;
+const STROKE_WIDTH = 1.5;
+
+const SEV_RANK: Record<string, number> = {
+  insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
+};
+
+const TOPIC_SUBTITLE: Record<string, string> = {
+  energy: "Power, grid and energy-infrastructure disruption monitor.",
+  fertiliser: "Fertiliser supply, plant and input-cost disruption monitor.",
+  fuel: "Fuel supply, refining and pricing disruption monitor.",
+  flashpoint: "Cross-topic flashpoint and civil-disturbance monitor.",
+};
+
+function darken(hex: string, amount = 0.18): string {
+  const h = hex.replace("#", "");
+  const r = Math.max(0, Math.round(parseInt(h.slice(0, 2), 16) * (1 - amount)));
+  const g = Math.max(0, Math.round(parseInt(h.slice(2, 4), 16) * (1 - amount)));
+  const b = Math.max(0, Math.round(parseInt(h.slice(4, 6), 16) * (1 - amount)));
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
+function cleanCountry(c?: string | null): string | null {
+  if (!c) return null;
+  const t = c.trim();
+  if (!t || /^unknown$/i.test(t)) return null;
+  return t;
+}
 
 export default function Topic() {
   const [, params] = useRoute("/topics/:topic");
@@ -13,102 +49,543 @@ export default function Topic() {
   // Slug → label key (cargo-watch URL uses an underscored topic id).
   const labelKey = slug === "cargo-watch" ? "cargo_watch" : slug;
   // Data topic. The "protests" monitor is fed by the scraper under the
-  // "flashpoint" topic (the scraper writes topic='flashpoint'; "protests" is a
-  // legacy/manual snapshot with no live feed). Resolve it to the live topic so
-  // the monitor reflects fresh ingested data — consistent with the
-  // protests→flashpoint mapping the reports / data-status already use.
+  // "flashpoint" topic; resolve it to the live topic so the monitor reflects
+  // fresh ingested data — consistent with the reports / data-status mapping.
   const topic = labelKey === "protests" ? "flashpoint" : labelKey;
   const label = TOPIC_LABELS[labelKey] ?? topic;
+  const subtitle = TOPIC_SUBTITLE[topic] ?? `${label} incident monitor.`;
 
-  const { data: rawIncidents = [], isLoading } = useListIncidents({ topic: topic as never });
+  const { data: raw = [], isLoading } = useListIncidents({ topic: topic as never });
 
-  // Reconcile to the same "true" (scoped, noise-filtered) set the reports use,
-  // so the page tallies with the dashboard card and the report document.
-  const incidents = useMemo(() => resolveTrueIncidents(topic, rawIncidents), [topic, rawIncidents]);
+  // Reconcile to the same scoped, noise-filtered set the dashboard card and the
+  // reports use, so every surface tallies.
+  const trueIncidents = useMemo(() => resolveTrueIncidents(topic, raw), [topic, raw]);
 
-  const { count30d, critical30d } = useMemo(() => {
-    const cutoff = subDays(new Date(), 30);
-    let count30d = 0;
-    let critical30d = 0;
-    for (const i of incidents) {
-      const d = new Date(i.occurredAt);
-      if (isNaN(d.getTime()) || d < cutoff) continue;
-      count30d += 1;
-      if (i.severity === "extreme") critical30d += 1;
-    }
-    return { count30d, critical30d };
-  }, [incidents]);
+  const enriched = useMemo(
+    () =>
+      trueIncidents.map((i) => ({
+        ...i,
+        country: cleanCountry((i as { country?: string | null }).country),
+        occurredDate: (() => { try { return parseISO(i.occurredAt); } catch { return new Date(NaN); } })(),
+      })),
+    [trueIncidents],
+  );
 
-  const severityData = SEVERITY_LEVELS.map((s) => ({
-    severity: s,
-    count: incidents.filter((i) => i.severity === s).length,
-  }));
+  const total = enriched.length;
+  const now = new Date();
+
+  // Single window predicate for every time-scoped metric, so the cards, fast
+  // facts and the trend chart can never disagree at a boundary.
+  const within = (i: { occurredDate: Date }, days: number) => {
+    if (isNaN(i.occurredDate.getTime())) return false;
+    const diff = differenceInDays(now, i.occurredDate);
+    return diff >= 0 && diff <= days;
+  };
+
+  const in30d = useMemo(() => enriched.filter((i) => within(i, 30)), [enriched]);
+  const count30d = in30d.length;
+  const critical30d = useMemo(
+    () => in30d.filter((i) => i.severity === "high" || i.severity === "extreme").length,
+    [in30d],
+  );
+  const moderatePlus30d = useMemo(
+    () => in30d.filter((i) => (SEV_RANK[i.severity] ?? 0) >= 3).length,
+    [in30d],
+  );
+
+  // 7-day change: last 7 days vs the 7 days before that.
+  const last7 = useMemo(() => enriched.filter((i) => within(i, 7)).length, [enriched]);
+  const prev7 = useMemo(
+    () => enriched.filter(
+      (i) => !isNaN(i.occurredDate.getTime())
+        && differenceInDays(now, i.occurredDate) > 7
+        && differenceInDays(now, i.occurredDate) <= 14,
+    ).length,
+    [enriched],
+  );
+  const change7 = last7 - prev7;
+
+  const hiExtremeTotal = useMemo(
+    () => enriched.filter((i) => (SEV_RANK[i.severity] ?? 0) >= 4).length,
+    [enriched],
+  );
+
+  const latest = useMemo(() => {
+    const sorted = [...enriched]
+      .filter((i) => !isNaN(i.occurredDate.getTime()))
+      .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
+    return sorted[0] ?? null;
+  }, [enriched]);
+
+  // --- Countries ----------------------------------------------------------
+  const byCountry = useMemo(() => {
+    const m = new Map<string, number>();
+    enriched.forEach((i) => {
+      if (!i.country) return;
+      m.set(i.country, (m.get(i.country) ?? 0) + 1);
+    });
+    return Array.from(m.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [enriched]);
+
+  const countriesAffected = byCountry.length;
+  const topCountry = byCountry[0] ?? null;
+  const byCountryTop12 = byCountry.slice(0, 12);
+  const top5Countries = byCountry.slice(0, 5);
+
+  const distinctCountries30d = useMemo(() => {
+    const s = new Set<string>();
+    in30d.forEach((i) => { if (i.country) s.add(i.country); });
+    return s.size;
+  }, [in30d]);
+
+  // Country severity profile — count of high/extreme records per country.
+  const countrySeverity = useMemo(() => {
+    const m = new Map<string, { severe: number; maxRank: number; total: number }>();
+    enriched.forEach((i) => {
+      if (!i.country) return;
+      const rank = SEV_RANK[i.severity] ?? 0;
+      const cur = m.get(i.country) ?? { severe: 0, maxRank: 0, total: 0 };
+      cur.total += 1;
+      if (rank >= 4) cur.severe += 1;
+      if (rank > cur.maxRank) cur.maxRank = rank;
+      m.set(i.country, cur);
+    });
+    return m;
+  }, [enriched]);
+
+  const topByHighExtreme = useMemo(
+    () =>
+      Array.from(countrySeverity.entries())
+        .map(([country, v]) => ({ country, count: v.severe }))
+        .filter((x) => x.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5),
+    [countrySeverity],
+  );
+
+  const highestSeverityCountry = useMemo(() => {
+    const ranked = Array.from(countrySeverity.entries())
+      .map(([country, v]) => ({ country, ...v }))
+      .sort((a, b) => b.severe - a.severe || b.maxRank - a.maxRank || b.total - a.total);
+    return ranked[0] ?? null;
+  }, [countrySeverity]);
+
+  // Countries newly active in the last 7 days (present in last 7d, absent before).
+  const newlyActive = useMemo(() => {
+    const recent = new Set<string>();
+    const prior = new Set<string>();
+    enriched.forEach((i) => {
+      if (!i.country || isNaN(i.occurredDate.getTime())) return;
+      if (differenceInDays(now, i.occurredDate) <= 7) recent.add(i.country);
+      else prior.add(i.country);
+    });
+    return Array.from(recent).filter((c) => !prior.has(c)).sort();
+  }, [enriched]);
+
+  // --- Severity -----------------------------------------------------------
+  const bySeverity = useMemo(
+    () => SEVERITY_LEVELS.map((s) => ({
+      severity: s,
+      label: SEVERITY_LABELS[s] ?? s,
+      count: enriched.filter((i) => i.severity === s).length,
+    })),
+    [enriched],
+  );
+
+  const highestSev = useMemo(() => {
+    let key = "";
+    let rank = 0;
+    enriched.forEach((i) => {
+      const r = SEV_RANK[i.severity] ?? 0;
+      if (r > rank) { rank = r; key = i.severity; }
+    });
+    return key;
+  }, [enriched]);
+
+  // --- 30-day trend -------------------------------------------------------
+  const timeline = useMemo(() => {
+    const source = in30d.length > 0
+      ? in30d
+      : enriched.filter((i) => !isNaN(i.occurredDate.getTime()));
+    const m = new Map<string, number>();
+    source.forEach((i) => {
+      const k = format(startOfDay(i.occurredDate), "yyyy-MM-dd");
+      m.set(k, (m.get(k) ?? 0) + 1);
+    });
+    return Array.from(m.entries())
+      .map(([date, count]) => ({ date, label: format(parseISO(date), "dd MMM"), count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [in30d, enriched]);
+
+  const withCoords = enriched.filter((i) => i.latitude != null && i.longitude != null);
+
+  const sortedForTable = useMemo(
+    () => [...enriched].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
+    [enriched],
+  );
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
+      {/* Header */}
       <div>
         <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
         <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{label}</h1>
+        <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">{subtitle}</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border p-px rounded-sm overflow-hidden">
-        <Kpi label="Incidents (30d)" value={count30d} />
-        <Kpi label="Critical (30d)" value={critical30d} accent />
-        <Kpi label="Total Recorded" value={incidents.length} />
-        <Kpi label="Latest" value={incidents[0] ? format(new Date(incidents[0].occurredAt), "dd MMM HH:mm") : "—"} small />
+      {/* 1. Top metric cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <Kpi label="Incidents (30d)" value={count30d} accent="#465bff" />
+        <Kpi label="Critical (30d)" value={critical30d} accent="#C0392B" />
+        <Kpi label="Total Recorded" value={total} accent="#0b0a3d" />
+        <Kpi label="Countries Affected" value={countriesAffected} accent="#363636" />
+        <Kpi
+          label="Latest Incident"
+          value={latest ? format(latest.occurredDate, "dd MMM yyyy") : "—"}
+          accent={latest ? ratingColor(latest.severity) : "#B8C2CC"}
+          small
+        />
       </div>
 
-      <div className="bg-card border border-border rounded-sm p-4">
-        <h2 className="font-serif font-bold uppercase text-primary text-sm mb-3 tracking-wide">Severity Distribution</h2>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={severityData}>
-              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
-              <XAxis dataKey="severity" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
-              <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
-              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
-              <Bar dataKey="count">
-                {severityData.map((d) => (
-                  <Cell key={d.severity} fill={ratingColor(d.severity)} />
+      {/* 2. Fast Facts */}
+      <Section title="Fast Facts">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <FastFactCard
+            label="Top Country"
+            value={topCountry ? topCountry.country : "—"}
+            note={topCountry ? `${topCountry.count} of ${total} record${total === 1 ? "" : "s"} on file.` : "No identified countries."}
+            accent="#465bff"
+          />
+          <FastFactCard
+            label="Highest Severity Country"
+            value={highestSeverityCountry ? highestSeverityCountry.country : "—"}
+            note={
+              highestSeverityCountry
+                ? `${highestSeverityCountry.severe} high/extreme record${highestSeverityCountry.severe === 1 ? "" : "s"}; worst rating ${SEVERITY_LABELS[Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === highestSeverityCountry.maxRank) ?? "insignificant"] ?? "—"}.`
+                : "No severity attributed to a country."
+            }
+            accent={highestSeverityCountry ? ratingColor(Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === highestSeverityCountry.maxRank) ?? "insignificant") : "#B8C2CC"}
+          />
+          <FastFactCard
+            label="High / Extreme (30d)"
+            value={String(critical30d)}
+            note="Elevated-severity records in the past 30 days."
+            accent="#C0392B"
+          />
+          <FastFactCard
+            label="Moderate+ (30d)"
+            value={String(moderatePlus30d)}
+            note="Moderate, high or extreme records in the past 30 days."
+            accent="#E67E22"
+          />
+          <FastFactCard
+            label="Active Countries (30d)"
+            value={String(distinctCountries30d)}
+            note="Distinct countries with records in the past 30 days."
+            accent="#363636"
+          />
+          <FastFactCard
+            label="7 Day Change"
+            value={`${change7 >= 0 ? "+" : ""}${change7}`}
+            note={`${last7} in the past 7 days vs ${prev7} in the prior 7 days.`}
+            accent={change7 > 0 ? "#C0392B" : change7 < 0 ? "#6FB872" : "#363636"}
+          />
+        </div>
+      </Section>
+
+      {/* 3. Key Metrics */}
+      <Section title="Key Metrics">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Kpi label="Last 7 Days" value={last7} accent="#465bff" />
+          <Kpi label="Prior 7 Days" value={prev7} accent="#363636" />
+          <Kpi label="High / Extreme (Total)" value={hiExtremeTotal} accent="#C0392B" />
+          <Kpi label="Active Countries (30d)" value={distinctCountries30d} accent="#0b0a3d" />
+        </div>
+      </Section>
+
+      {/* 4. Charts */}
+      <Section title="Charts">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartCard title="Severity Distribution">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bySeverity} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+                <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
+                  {bySeverity.map((d) => {
+                    const c = ratingColor(d.severity);
+                    return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
+                  })}
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="30 Day Incident Trend">
+            {timeline.length === 0 ? (
+              <EmptyChart message="No timeline data available." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timeline} margin={{ left: 8, right: 16 }}>
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} interval="preserveStartEnd" />
+                  <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Line type="monotone" dataKey="count" stroke="#0b0a3d" strokeWidth={2} isAnimationActive={false} dot={{ r: 3, stroke: "#0b0a3d", strokeWidth: 1.5, fill: "#465bff", fillOpacity: FILL_OPACITY }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          <ChartCard title="Top Countries by Incident Count">
+            {byCountryTop12.length === 0 ? (
+              <EmptyChart message="No identified countries on file." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byCountryTop12} margin={{ top: 16, left: 8, right: 16, bottom: 40 }}>
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                  <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
+                  <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY}>
+                    <LabelList dataKey="count" position="top" fontSize={12} fontWeight={700} fill="#303030" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          <ChartCard title="Severity Mix (Last 30 Days)">
+            {count30d === 0 ? (
+              <EmptyChart message="No records in the past 30 days." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={SEVERITY_LEVELS.map((s) => ({
+                    severity: s,
+                    label: SEVERITY_LABELS[s] ?? s,
+                    count: in30d.filter((i) => i.severity === s).length,
+                  }))}
+                  margin={{ top: 16, right: 8, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Bar dataKey="count" fillOpacity={FILL_OPACITY} strokeWidth={STROKE_WIDTH}>
+                    {SEVERITY_LEVELS.map((s) => {
+                      const c = ratingColor(s);
+                      return <Cell key={s} fill={c} stroke={darken(c)} />;
+                    })}
+                    <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+        </div>
+      </Section>
+
+      {/* 5. Geography */}
+      <Section title="Geography">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <GeoCard
+            title="Top 5 Countries by Incident Count"
+            rows={top5Countries.map((c) => ({ label: c.country, value: c.count }))}
+            empty="No identified countries on file."
+            accent="#465bff"
+          />
+          <GeoCard
+            title="Top 5 Countries by High / Extreme"
+            rows={topByHighExtreme.map((c) => ({ label: c.country, value: c.count }))}
+            empty="No high or extreme records attributed to a country."
+            accent="#C0392B"
+          />
+          <div className="bg-white border border-border rounded-sm p-4">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">Newly Active (Last 7 Days)</div>
+            {newlyActive.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic mt-3">No countries became newly active in the last 7 days.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {newlyActive.map((c) => (
+                  <span key={c} className="px-2 py-1 text-xs font-sans rounded-sm bg-muted text-primary border border-border">{c}</span>
                 ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="bg-card border border-border rounded-sm">
-        <div className="p-3 border-b border-border bg-muted/50 font-serif font-bold uppercase text-sm text-primary">
-          Incidents
-        </div>
-        {isLoading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
-        ) : !incidents.length ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">No incidents recorded for this topic.</div>
-        ) : (
-          <div className="divide-y divide-border">
-            {incidents.map((i) => (
-              <div key={i.id} className="grid grid-cols-[180px_1fr_140px_100px] items-center text-sm hover:bg-muted/30">
-                <div className="p-3 font-mono text-xs">{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
-                <div className="p-3 font-medium">{i.title}</div>
-                <div className="p-3 text-xs">{i.country}</div>
-                <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
               </div>
-            ))}
+            )}
+            <p className="text-[11px] text-muted-foreground font-sans mt-3 leading-snug">
+              Countries with records in the last 7 days and none earlier in the loaded window.
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+
+        <div className="bg-white border border-border rounded-sm overflow-hidden mt-3">
+          {withCoords.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              No geocoded records available for this view.
+            </div>
+          ) : (
+            <div className="h-[420px]">
+              <MapContainer center={[20, 80]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
+                <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {withCoords.map((i) => {
+                  const c = ratingColor(i.severity);
+                  return (
+                    <CircleMarker
+                      key={i.id}
+                      center={[i.latitude!, i.longitude!]}
+                      radius={6}
+                      pathOptions={{ fillColor: c, color: darken(c), fillOpacity: FILL_OPACITY, weight: STROKE_WIDTH }}
+                    >
+                      <LeafletTooltip>
+                        <div className="text-xs">
+                          <div className="font-bold">{i.title}</div>
+                          <div>{i.country ?? "Location not identified"}</div>
+                        </div>
+                      </LeafletTooltip>
+                    </CircleMarker>
+                  );
+                })}
+              </MapContainer>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* 6. Incident table */}
+      <Section title="Recent Incidents">
+        <div className="bg-white border border-border rounded-sm">
+          {isLoading ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+          ) : !sortedForTable.length ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">No incidents recorded for this topic.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="text-left p-2 font-sans font-medium w-[120px]">Date</th>
+                    <th className="text-left p-2 font-sans font-medium w-[150px]">Country</th>
+                    <th className="text-left p-2 font-sans font-medium">Headline</th>
+                    <th className="text-left p-2 font-sans font-medium w-[110px]">Severity</th>
+                    <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {sortedForTable.map((i) => (
+                    <tr key={i.id} className="hover:bg-muted/30 align-top">
+                      <td className="p-2 font-mono text-xs whitespace-nowrap">
+                        {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
+                      </td>
+                      <td className="p-2 text-xs">{i.country ?? "—"}</td>
+                      <td className="p-2 font-medium">{i.title}</td>
+                      <td className="p-2">
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
+                          {SEVERITY_LABELS[i.severity] ?? i.severity}
+                        </span>
+                      </td>
+                      <td className="p-2">
+                        {i.sourceUrl ? (
+                          <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground italic mt-2">
+          Highest severity on file: {highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}. Severity is keyword-rated from the headline and summary.
+        </p>
+      </Section>
     </div>
   );
 }
 
-function Kpi({ label, value, accent, small }: { label: string; value: string | number; accent?: boolean; small?: boolean }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-card p-4">
-      <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-      <div className={cn("font-serif font-bold leading-none", small ? "text-xl" : "text-3xl", accent ? "text-accent" : "text-primary")}>
-        {value}
-      </div>
+    <section className="space-y-3">
+      <h2 className="font-serif font-bold uppercase text-primary text-base tracking-wide border-b-2 border-accent pb-1 inline-block">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function FastFactCard({ label, value, note, accent }: { label: string; value: string; note: string; accent: string }) {
+  return (
+    <div className="bg-white border border-border rounded-sm p-3 relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: accent }} />
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mt-1">{label}</div>
+      <div className="font-serif font-bold text-primary leading-tight mt-1 text-xl">{value}</div>
+      <div className="text-[11px] text-muted-foreground font-sans mt-2 leading-snug">{note}</div>
+    </div>
+  );
+}
+
+function Kpi({ label, value, accent, small }: { label: string; value: string | number; accent: string; small?: boolean }) {
+  return (
+    <div className="bg-white border border-border rounded-sm p-3 relative overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: accent }} />
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans pl-2">{label}</div>
+      <div className={"font-serif font-bold leading-none text-primary mt-2 pl-2 " + (small ? "text-lg" : "text-2xl")}>{value}</div>
+    </div>
+  );
+}
+
+function ChartCard({ title, children, height = 280 }: { title: string; children: React.ReactNode; height?: number }) {
+  return (
+    <div className="bg-white border border-border rounded-sm p-4">
+      <h3 className="font-serif font-bold uppercase text-primary text-sm mb-3 tracking-wide">{title}</h3>
+      <div style={{ height }}>{children}</div>
+    </div>
+  );
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="h-full flex items-center justify-center text-sm text-muted-foreground italic">
+      {message}
+    </div>
+  );
+}
+
+function GeoCard({ title, rows, empty, accent }: { title: string; rows: { label: string; value: number }[]; empty: string; accent: string }) {
+  const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
+  return (
+    <div className="bg-white border border-border rounded-sm p-4">
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">{title}</div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic mt-3">{empty}</p>
+      ) : (
+        <div className="space-y-2 mt-3">
+          {rows.map((r) => {
+            const pct = max > 0 ? Math.round((r.value / max) * 100) : 0;
+            return (
+              <div key={r.label} className="space-y-1">
+                <div className="flex items-baseline justify-between">
+                  <div className="text-xs font-sans text-primary">{r.label}</div>
+                  <div className="text-xs font-mono text-muted-foreground">{r.value}</div>
+                </div>
+                <div className="h-1.5 bg-muted rounded-sm overflow-hidden">
+                  <div className="h-full" style={{ width: `${pct}%`, background: accent, opacity: FILL_OPACITY }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
