@@ -19,7 +19,7 @@ import {
   TRANSIT_ISSUES, COMMERCIAL_ISSUES,
   isLowCredibilityShippingRecord,
 } from "@/lib/shippingAnalysis";
-import { computeHormuzStatus, HORMUZ_TONE_COLOR } from "@/lib/hormuzStatus";
+import { computeHormuzStatus, HORMUZ_TONE_COLOR, type HormuzCategoryResult } from "@/lib/hormuzStatus";
 import { dedupeShippingMonitorRows } from "@/lib/shippingReportDataset";
 import { ExternalLink } from "lucide-react";
 
@@ -35,6 +35,50 @@ const SEV_RANK: Record<string, number> = {
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
+
+// --- Methodology --------------------------------------------------------------
+// Plain-language definitions for every term the dashboard asserts, derived
+// directly from the shared classifiers in shippingAnalysis.ts / hormuzStatus.ts
+// so the stated methodology and the computed numbers can never drift.
+const SHIPPING_DEFINITIONS: { term: string; def: string }[] = [
+  {
+    term: "Shipping record",
+    def: "One de-duplicated maritime news item scoped to APAC or the Middle East that passes the credibility screen. Social-media handles, repatriation / crew-welfare follow-ups, speculative or unverified claims, pure commentary, rhetorical closure threats and media-packaging headlines are excluded. Syndicated copies of the same event on the same day collapse to a single record, keeping the most severe / most recent version.",
+  },
+  {
+    term: "Significant incident",
+    def: "The most recent record rated High or Extreme; if none is on file, the most recent record. Repatriation, social-handle, speculative-claim and capability / procurement items are never eligible to be the significant incident.",
+  },
+  {
+    term: "Chokepoint risk",
+    def: "A record naming one of six tracked chokepoints (Strait of Hormuz, Gulf of Oman, Arabian / Persian Gulf, Red Sea, Bab el-Mandeb, Malacca) together with an operational maritime term. A bare geographic mention, a policy proposal or a price reference does not qualify.",
+  },
+  {
+    term: "Vessel attack / seizure",
+    def: "A confirmed hostile act against a specific vessel — attack, near miss, or seizure / hijack — per the strict vessel classifier. Commercial, finance, regulatory and diplomatic-follow-up items are excluded. This counts a confirmed event, not a claim of one.",
+  },
+  {
+    term: "Piracy / armed robbery",
+    def: "Hostile activity against vessels or crew at sea or at anchorage: piracy, armed robbery, boarding or attempted boarding, suspicious or small-craft approach, hijacking, crew threat, and theft from a vessel. Land and warehouse cargo theft is tracked under Cargo Watch, not here.",
+  },
+  {
+    term: "Active kinetic environment",
+    def: "A status reserved for one or more confirmed kinetic incidents (attack, near miss, seizure or boarding — by the strict vessel classifier or explicit UKMTO / JMIC confirmation) in the Strait of Hormuz theatre within the last 7 days. Routine advisories, naval posture, market, insurance and diplomatic reporting never trigger it.",
+  },
+];
+
+// Status thresholds for the Strait of Hormuz banner. The banner tone is chosen
+// strictly by these rules — no strong language is shown unless its threshold is
+// met. Mirrors the branching in computeHormuzStatus().
+const HORMUZ_STATUS_THRESHOLDS: { label: string; rule: string }[] = [
+  { label: "Active kinetic environment", rule: "≥1 confirmed kinetic incident in the last 7 days." },
+  { label: "High-risk operating environment", rule: "No kinetic incident in the last 7 days, but traffic disruption is on file." },
+  { label: "Elevated chokepoint signal", rule: "No kinetic incident or traffic disruption, but ≥1 other indicator (navigation, posture, market, diplomatic) is active." },
+  { label: "No activity", rule: "All six indicator categories are empty in the loaded window." },
+];
+
+// Hormuz indicator categories split into confirmed incidents vs context.
+const HORMUZ_CONFIRMED_KEYS = new Set(["kinetic"]);
 
 function darken(hex: string, amount = 0.18): string {
   const h = hex.replace("#", "");
@@ -341,6 +385,82 @@ export default function Shipping() {
         </div>
       )}
 
+      {/* 1b. Methodology & Definitions */}
+      <Section title="Methodology & Definitions">
+        <details className="bg-white border border-border rounded-sm" open>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-sans text-primary">
+            How this monitor defines its terms, windows, categories and status thresholds.
+          </summary>
+          <div className="px-4 pb-4 pt-1 space-y-4">
+            {/* Definitions */}
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Definitions</div>
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                {SHIPPING_DEFINITIONS.map((d) => (
+                  <div key={d.term}>
+                    <dt className="font-serif font-bold text-sm text-primary">{d.term}</dt>
+                    <dd className="text-[12px] text-foreground/80 font-sans leading-snug mt-0.5">{d.def}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            {/* Category model: exclusive vs overlapping */}
+            <div className="border-t border-border pt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Category model</div>
+              <p className="text-[12px] text-foreground/80 font-sans leading-snug">
+                <span className="font-semibold text-primary">Mutually exclusive</span> — each record carries exactly one
+                Issue Type, one Region and one Severity tier. These totals are additive and sum to the record count.
+              </p>
+              <p className="text-[12px] text-foreground/80 font-sans leading-snug mt-1.5">
+                <span className="font-semibold text-primary">Overlapping by design</span> — Vessel Attacks, Piracy / Armed
+                Robbery, the per-chokepoint counts and the six Strait of Hormuz indicators are lenses over the same records,
+                so one incident can appear in more than one (a tanker attack in Hormuz shows under Vessel Attacks, the
+                Hormuz confirmed-kinetic indicator and the Hormuz chokepoint row). Counts across these lenses are
+                therefore not additive with the Issue Type totals.
+              </p>
+            </div>
+
+            {/* Confirmed vs contextual */}
+            <div className="border-t border-border pt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Confirmed incidents vs contextual indicators</div>
+              <p className="text-[12px] text-foreground/80 font-sans leading-snug">
+                <span className="font-semibold text-primary">Confirmed incidents</span> — vessel attacks / seizures,
+                piracy / armed robbery, and confirmed kinetic events. <span className="font-semibold text-primary">Contextual
+                indicators (not incidents)</span> — traffic disruption, navigation interference, naval / security posture,
+                market moves, insurance pressure, and diplomatic / advisory reporting. Strong status language is driven
+                only by confirmed incidents crossing a stated threshold below; context can raise the posture but never, on
+                its own, declares an active kinetic environment.
+              </p>
+            </div>
+
+            {/* Status thresholds */}
+            <div className="border-t border-border pt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Strait of Hormuz status thresholds</div>
+              <ul className="space-y-1">
+                {HORMUZ_STATUS_THRESHOLDS.map((t) => (
+                  <li key={t.label} className="text-[12px] font-sans leading-snug">
+                    <span className="font-semibold text-primary">{t.label}</span>
+                    <span className="text-foreground/80"> — {t.rule}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Confidence & sources */}
+            <div className="border-t border-border pt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Confidence & sources</div>
+              <p className="text-[12px] text-foreground/80 font-sans leading-snug">
+                Every displayed record passes the credibility screen and links to its source where one is available;
+                items without a source link are marked. Severity tiers are assigned automatically from the report text,
+                with Extreme reserved for confirmed mass-casualty or major physical-disruption events. Where no value can
+                be derived (location, flag state, severity), the monitor states it plainly rather than inventing one.
+              </p>
+            </div>
+          </div>
+        </details>
+      </Section>
+
       {/* 2. Fast Facts */}
       <Section title="Fast Facts">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -349,6 +469,7 @@ export default function Shipping() {
             value={String(total)}
             note={`${last7} in the past 7 days · ${last30} in the past 30 days.`}
             accent="#465bff"
+            window="All records on file"
           />
           <FastFactCard
             label="Highest Severity On File"
@@ -359,6 +480,7 @@ export default function Shipping() {
                 : "No severity recorded."
             }
             accent={highestSev ? ratingColor(highestSev) : "#B8C2CC"}
+            window="All records on file"
           />
           <FastFactCard
             label="Main Affected Region"
@@ -369,6 +491,7 @@ export default function Shipping() {
                 : "No regional distribution available."
             }
             accent={mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC"}
+            window="All records on file"
           />
           <FastFactCard
             label="Main Issue Type"
@@ -379,6 +502,7 @@ export default function Shipping() {
                 : "No issue classification available."
             }
             accent="#0b0a3d"
+            window="All records on file"
           />
           <FastFactCard
             label="Latest Significant Incident"
@@ -389,6 +513,7 @@ export default function Shipping() {
                 : "No significant shipping incident on record."
             }
             accent={latestSignificant ? ratingColor(latestSignificant.severity) : "#B8C2CC"}
+            window="Most recent High/Extreme"
           />
         </div>
       </Section>
@@ -396,26 +521,29 @@ export default function Shipping() {
       {/* 3. Key Metrics */}
       <Section title="Key Metrics">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Kpi label="Records in Window" value={total} accent="#0b0a3d" />
+          <Kpi label="Total Records" value={total} accent="#0b0a3d" window="All records on file" />
           <Kpi
             label="Highest Severity"
             value={highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}
             accent={highestSev ? ratingColor(highestSev) : "#B8C2CC"}
             small
+            window="All records on file"
           />
           <Kpi
             label="Main Affected Chokepoint"
             value={mainChokepoint ? mainChokepoint.key : (mainRegion?.region ?? "—")}
             accent={mainChokepoint ? "#0b0a3d" : (mainRegion ? REGION_COLOR[mainRegion.region] : "#B8C2CC")}
             small
+            window="All records on file"
           />
-          <Kpi label="Vessel Attacks / Seizures" value={vesselAttackOrSeizureCount} accent="#C0392B" />
-          <Kpi label="Piracy / Armed Robbery" value={piracyIncidents.length} accent="#E67E22" />
+          <Kpi label="Vessel Attacks / Seizures" value={vesselAttackOrSeizureCount} accent="#C0392B" window="Confirmed · all on file" />
+          <Kpi label="Piracy / Armed Robbery" value={piracyIncidents.length} accent="#E67E22" window="Confirmed · all on file" />
           <Kpi
             label="Latest Significant Incident"
             value={latestSignificant ? format(latestSignificant.occurredDate, "dd MMM yyyy") : "—"}
             accent={latestSignificant ? ratingColor(latestSignificant.severity) : "#B8C2CC"}
             small
+            window="Most recent High/Extreme"
           />
         </div>
       </Section>
@@ -450,62 +578,32 @@ export default function Shipping() {
                 : " · no new kinetic incident in last 7 days"}
             </div>
           )}
+          <div className="text-[11px] font-sans mt-2 pt-2 border-t" style={{ color: "#303030", borderColor: "#E2E2E2" }}>
+            <span className="uppercase tracking-wider font-semibold">Trigger</span>{" "}
+            {HORMUZ_STATUS_THRESHOLDS.find((t) => hormuzStatus.headline.replace(/\.$/, "") === t.label)?.rule
+              ?? "Status derived from the loaded indicator window."}{" "}
+            Thresholds are listed in Methodology &amp; Definitions above.
+          </div>
+        </div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
+          Confirmed incidents
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {hormuzStatus.categories
+            .filter((cat) => HORMUZ_CONFIRMED_KEYS.has(cat.key))
+            .map((cat) => (
+              <HormuzCategoryCard key={cat.key} cat={cat} />
+            ))}
+        </div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
+          Contextual indicators — not confirmed incidents
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {hormuzStatus.categories.map((cat) => {
-            const active = cat.count > 0;
-            const accent = active ? "#4655FF" : "#E2E2E2";
-            return (
-              <div
-                key={cat.key}
-                className="rounded-sm border bg-white p-3"
-                style={{ borderColor: "#E2E2E2", borderLeftColor: accent, borderLeftWidth: 4 }}
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <div
-                    className="font-serif font-bold text-sm"
-                    style={{ color: "#0B0B3D" }}
-                  >
-                    {cat.label}
-                  </div>
-                  <div
-                    className="font-mono text-sm"
-                    style={{ color: active ? "#0B0B3D" : "#303030" }}
-                  >
-                    {cat.count}
-                  </div>
-                </div>
-                <div className="text-[11px] font-sans mt-0.5" style={{ color: "#303030" }}>
-                  {cat.description}
-                </div>
-                {active ? (
-                  <ul className="mt-2 space-y-1">
-                    {cat.recent.slice(0, 3).map((r, idx) => (
-                      <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#303030" }}>
-                        <span className="font-mono mr-1.5" style={{ color: "#303030" }}>
-                          {r.occurredAt
-                            ? (() => {
-                                try { return format(parseISO(r.occurredAt), "dd MMM"); } catch { return "—"; }
-                              })()
-                            : "—"}
-                        </span>
-                        {r.title}
-                      </li>
-                    ))}
-                    {cat.count > 3 && (
-                      <li className="text-[11px] font-sans italic" style={{ color: "#303030" }}>
-                        +{cat.count - 3} more in window
-                      </li>
-                    )}
-                  </ul>
-                ) : (
-                  <div className="text-xs font-sans italic mt-2" style={{ color: "#303030" }}>
-                    Nothing on file for this category in the loaded window.
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {hormuzStatus.categories
+            .filter((cat) => !HORMUZ_CONFIRMED_KEYS.has(cat.key))
+            .map((cat) => (
+              <HormuzCategoryCard key={cat.key} cat={cat} />
+            ))}
         </div>
       </Section>
 
@@ -568,10 +666,10 @@ export default function Shipping() {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0b0a3d" />
-              <Kpi label="Attacks" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} />
-              <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} />
-              <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} />
+              <Kpi label="Total vessel incidents" value={vesselIncidents.length} accent="#0b0a3d" window="Confirmed · all on file" />
+              <Kpi label="Attacks" value={vesselCounts.Attack} accent={VESSEL_ACCENT.Attack} window="Confirmed · all on file" />
+              <Kpi label="Near miss" value={vesselCounts["Near miss"]} accent={VESSEL_ACCENT["Near miss"]} window="Confirmed · all on file" />
+              <Kpi label="Seized" value={vesselCounts.Seized} accent={VESSEL_ACCENT.Seized} window="Confirmed · all on file" />
             </div>
             <div
               className="flex gap-3 mt-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1"
@@ -913,23 +1011,81 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function FastFactCard({ label, value, note, accent }: { label: string; value: string; note: string; accent: string }) {
+function HormuzCategoryCard({ cat }: { cat: HormuzCategoryResult }) {
+  const active = cat.count > 0;
+  const accent = active ? "#4655FF" : "#E2E2E2";
+  return (
+    <div
+      className="rounded-sm border bg-white p-3"
+      style={{ borderColor: "#E2E2E2", borderLeftColor: accent, borderLeftWidth: 4 }}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="font-serif font-bold text-sm" style={{ color: "#0B0B3D" }}>
+          {cat.label}
+        </div>
+        <div className="font-mono text-sm" style={{ color: active ? "#0B0B3D" : "#303030" }}>
+          {cat.count}
+        </div>
+      </div>
+      <div className="text-[11px] font-sans mt-0.5" style={{ color: "#303030" }}>
+        {cat.description}
+      </div>
+      {active ? (
+        <ul className="mt-2 space-y-1">
+          {cat.recent.slice(0, 3).map((r, idx) => (
+            <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#303030" }}>
+              <span className="font-mono mr-1.5" style={{ color: "#303030" }}>
+                {r.occurredAt
+                  ? (() => {
+                      try { return format(parseISO(r.occurredAt), "dd MMM"); } catch { return "—"; }
+                    })()
+                  : "—"}
+              </span>
+              {r.title}
+            </li>
+          ))}
+          {cat.count > 3 && (
+            <li className="text-[11px] font-sans italic" style={{ color: "#303030" }}>
+              +{cat.count - 3} more in window
+            </li>
+          )}
+        </ul>
+      ) : (
+        <div className="text-xs font-sans italic mt-2" style={{ color: "#303030" }}>
+          Nothing on file for this category in the loaded window.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WindowBadge({ window, className }: { window: string; className?: string }) {
+  return (
+    <div className={"text-[9px] uppercase tracking-widest font-sans " + (className ?? "")} style={{ color: "#465bff" }}>
+      Window: {window}
+    </div>
+  );
+}
+
+function FastFactCard({ label, value, note, accent, window }: { label: string; value: string; note: string; accent: string; window: string }) {
   return (
     <div className="bg-white border border-border rounded-sm p-3 relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: accent }} />
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mt-1">{label}</div>
       <div className="font-serif font-bold text-primary leading-tight mt-1 text-xl">{value}</div>
+      <WindowBadge window={window} className="mt-1" />
       <div className="text-[11px] text-muted-foreground font-sans mt-2 leading-snug">{note}</div>
     </div>
   );
 }
 
-function Kpi({ label, value, accent, small }: { label: string; value: string | number; accent: string; small?: boolean }) {
+function Kpi({ label, value, accent, small, window }: { label: string; value: string | number; accent: string; small?: boolean; window: string }) {
   return (
     <div className="bg-white border border-border rounded-sm p-3 relative overflow-hidden">
       <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: accent }} />
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans pl-2">{label}</div>
       <div className={"font-serif font-bold leading-none text-primary mt-2 pl-2 " + (small ? "text-lg" : "text-2xl")}>{value}</div>
+      <WindowBadge window={window} className="pl-2 mt-1.5" />
     </div>
   );
 }
