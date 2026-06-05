@@ -63,9 +63,9 @@ function jitter(seed: number): [number, number] {
   return [((a - Math.floor(a)) - 0.5) * 1.4, ((b - Math.floor(b)) - 0.5) * 1.4];
 }
 
-type RangeKey = "24h" | "7d" | "30d" | "90d" | "1y" | "all";
-const RANGE_DAYS: Record<RangeKey, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": Infinity };
-const RANGE_LABEL: Record<RangeKey, string> = { "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", "1y": "1y", "all": "All time" };
+type RangeKey = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
+const RANGE_DAYS: Record<RangeKey, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "180d": 180, "1y": 365, "all": Infinity };
+const RANGE_LABEL: Record<RangeKey, string> = { "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", "180d": "180d", "1y": "1y", "all": "All time" };
 
 function usd(n: number): string {
   return "$" + n.toLocaleString("en-US");
