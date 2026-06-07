@@ -225,6 +225,17 @@ export type PiracyAct =
 const LAND_CARGO_RE =
   /\b(warehouse|depot|truck|lorry|convoy|highway|road|yard|parking|shipping container yard|distribution centre|distribution center)\b/i;
 
+// Statistical roundups and multi-period retrospectives are not discrete piracy
+// EVENTS even though they quote "armed robbery"/"piracy". ReCAAP's annual /
+// half-yearly / quarterly tallies and "N-year record" or trend headlines
+// ("incidents reported in 2025", "cases surged in the first half of 2025")
+// must never seed the Piracy & Armed Robbery table as if each were a single
+// boarding. Weekly incident bulletins ("Two incidents of armed robbery 24
+// February – 2 March") and discrete reports carry no period-tally framing, so
+// they are unaffected.
+const PIRACY_STAT_RE =
+  /\b(half[- ]?yearly|annual report|quarterly report|in (the )?first (three|six|nine) months|first half of \d{4}|jan(uary)?[-–\s]*(sep|sept|september|jun|june)|\d{2}[- ]year (record|high)|highest (in|since)|record (high|number)|(reported|recorded) in \d{4}|(incidents|cases) (have )?(surge|surged|spike|spiked|doubled|tripled|risen|rose|fell|fallen|jumped|climbed))\b/i;
+
 const PIRACY_RULES: Array<{ type: PiracyAct; pattern: RegExp }> = [
   { type: "Hijacking", pattern: /\b(hijack(ed|ing)?)\b/i },
   { type: "Attempted boarding", pattern: /\battempted boarding\b/i },
@@ -249,6 +260,8 @@ export function classifyPiracy(i: MaritimeRecordLike): PiracyAct | null {
   // Repatriation / crew-return / human-interest follow-ups are not piracy
   // events even when the text mentions a previous hijacking or seizure.
   if (HUMAN_INTEREST_RE.test(text)) return null;
+  // Period tallies / trend retrospectives are not discrete events.
+  if (PIRACY_STAT_RE.test(text)) return null;
   for (const r of PIRACY_RULES) {
     if (r.pattern.test(text)) return r.type;
   }

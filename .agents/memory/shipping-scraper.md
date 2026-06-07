@@ -40,3 +40,27 @@ Keep diversion terms qualified (`route diversion`, `vessel diversion`,
 Country names are stored as FULL names ("United Arab Emirates", "Iran") to match
 the legacy imported rows; "Unknown" is the convention for unlocated at-sea items.
 Geocoding gap (some rows null lat/long) is known/acceptable.
+
+**ReCAAP weekly-bulletin feed + two-layer anti-aggregate defense.** Google News
+RSS lags ReCAAP ISC weeklies (published days AFTER the boarding) and buries
+Malacca/Singapore items under Hormuz-war analysis, so genuine Singapore Strait
+armed-robbery boardings were never ingested. Fix = a dedicated VESSEL_FEEDS feed
+("Sea robbery (ReCAAP)", defaultCountry Singapore) querying ReCAAP + robbery/
+boarding terms. The trap: ReCAAP also publishes NON-incident content carrying
+"armed robbery" (null-incident weeks "No incident…", governing-council/capacity-
+building governance, half-yearly/annual/quarterly tallies, "N-year record"),
+which would otherwise classify as fake discrete piracy rows. Defense is TWO
+layers, both needed:
+  1. INGEST DENY (`shipping.ts`, GLOBAL across all feeds) stops the high-volume
+     null-week/governance/period-tally items from entering at all.
+  2. PRESENTATION guard `PIRACY_STAT_RE` in `shippingAnalysis.ts` `classifyPiracy`
+     returns null for statistical/trend framing ("reported in 2025", "N-year
+     record", "first half of YYYY", "incidents surged") that slips ingest —
+     benefits ALL sources, not just ReCAAP.
+**Why two layers:** a "No incident of armed robbery" bulletin DOES match the
+Armed-robbery PIRACY_RULE, so without the ingest DENY it would show as a fake
+row; presentation guard alone can't strip what ingest never tagged as stat.
+**How to apply:** weekly bulletins ("Two incidents of armed robbery 24 Feb – 2
+Mar") must survive BOTH layers — verify any DENY/regex change with the KEEP/DROP
+sample sets (period-tally framing DROPs, day-range bulletins KEEP). DENY is
+global, so prefer the presentation guard over broad global DENY words.

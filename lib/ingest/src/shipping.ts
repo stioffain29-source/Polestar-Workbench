@@ -84,6 +84,20 @@ const VESSEL_FEEDS: { label: string; q: string; defaultCountry: string }[] = [
     q: `(UKMTO OR "maritime security" OR "naval advisory" OR "war risk insurance") (Hormuz OR "Red Sea" OR Gulf OR vessel OR tanker OR shipping)`,
     defaultCountry: "Unknown",
   },
+  // ReCAAP ISC — the authoritative regional body for piracy / sea-robbery
+  // against ships in Asia. Its weekly bulletins (carried by safety4sea et al.)
+  // are the canonical source for Singapore Strait / Malacca armed-robbery
+  // boardings, which the general Google-News chokepoint feeds miss: the
+  // Malacca/Singapore feeds are flooded by Strait-of-Hormuz "next chokepoint"
+  // analysis, and trade press only echoes a discrete boarding once ReCAAP's
+  // weekly publishes (days after the event). Default country Singapore — the
+  // overwhelming majority of SOMS incidents sit in the Singapore Strait; the
+  // text geocoder still overrides when a summary names another country.
+  {
+    label: "Sea robbery (ReCAAP)",
+    q: `ReCAAP ("armed robbery" OR "sea robbery" OR boarded OR boarding OR perpetrators)`,
+    defaultCountry: "Singapore",
+  },
 ];
 
 const PORT_TERMS = `("port closure" OR "port shutdown" OR "port strike" OR "port congestion" OR "port disruption" OR "berth backlog")`;
@@ -305,6 +319,36 @@ const DENY = [
   "old video",
   "misleading",
   "debunk",
+  // ReCAAP-feed non-incidents. The ReCAAP feed deliberately matches "armed
+  // robbery"/"sea robbery", so its NON-event bulletins (which carry the same
+  // words) must be stripped or they would seed the Piracy & Armed Robbery
+  // table with rows that are not discrete incidents:
+  //  - "No incident of armed robbery <week>" — the quiet-week bulletins.
+  //  - Governance / training items that spell out ReCAAP's full name
+  //    ("...Combating Piracy and Armed Robbery").
+  //  - Period roundups (half-yearly / annual / quarterly) and multi-year
+  //    trend retrospectives — aggregate statistics, not events. Markers are
+  //    chosen to never appear in a discrete WEEKLY bulletin (which uses a
+  //    day range like "19-25 May" and a small count), so real incident
+  //    reports are never dropped.
+  "no incident",
+  "no incidents",
+  "governing council",
+  "capacity building",
+  "executive programme",
+  "executive program",
+  "half yearly",
+  "half-yearly",
+  "annual report",
+  "first three months",
+  "first six months",
+  "first nine months",
+  "jan-sep",
+  "jan-jun",
+  "january-september",
+  "january-june",
+  "19-year",
+  "20-year",
 ];
 
 type Classified = {
