@@ -5,36 +5,14 @@ import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { fetchFeed } from "./feedFetch";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
-const FEED_TIMEOUT_MS = 20000;
-const FEED_UA = "Mozilla/5.0 (PolestarWorkbench FlashpointScraper)";
-
-// Fetch + parse a feed robustly. rss-parser's parseURL does not reliably
-// decompress gzip/br responses — some feeds (e.g. Jubi.id, the dedicated
-// Indonesian West Papua source) return gzipped bytes that surface as a
-// "Non-whitespace before first tag, Char: \x1F" XML error (\x1F is the
-// gzip magic byte). Node's global fetch auto-decompresses gzip/deflate/br,
-// so we fetch the body ourselves and hand the decoded text to parseString.
-async function fetchFeed(parser: Parser, url: string) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FEED_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": FEED_UA,
-        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-      },
-      signal: ctrl.signal,
-      redirect: "follow",
-    });
-    if (!res.ok) throw new Error(`Status code ${res.status}`);
-    const body = await res.text();
-    return await parser.parseString(body);
-  } finally {
-    clearTimeout(timer);
-  }
-}
+// Feed fetching is centralised in feedFetch.ts: a real browser User-Agent,
+// AbortController timeout, gzip/br auto-decompression (some feeds — e.g.
+// Jubi.id — return gzipped bytes that parseURL surfaces as a "\x1F" XML
+// error), and retry/backoff so transient Google News throttles don't flag a
+// healthy source as Failing.
 
 // Flashpoint ingest core.
 //
@@ -428,11 +406,11 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   // Feeds are fetched with bounded concurrency. Sequential fetching of
   // ~39 feeds at a 20s-per-feed timeout can exceed two minutes.
   // Processing is otherwise identical and order-independent.
-  const CONCURRENCY = 8;
+  const CONCURRENCY = 4;
   const processFeed = async (s: (typeof fetchable)[number]) => {
     perFeed[s.name] = { name: s.name, found: 0, accepted: 0, rejected: 0 };
     try {
-      const parsed = await fetchFeed(parser, s.url!);
+      const parsed = await fetchFeed(parser, s.url!, { stagger: true });
       const items = parsed.items ?? [];
       perFeed[s.name].found = items.length;
       for (const item of items) {

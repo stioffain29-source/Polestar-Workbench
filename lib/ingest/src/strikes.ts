@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { fetchFeed } from "./feedFetch";
 import { db, strikesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
@@ -344,7 +345,7 @@ export async function runStrikesIngest(
   const processFeed = async (feed: StrikeFeed) => {
     perFeed[feed.label] = { name: feed.label, found: 0, accepted: 0, rejected: 0 };
     try {
-      const parsed = await parser.parseURL(gnews(feed.q));
+      const parsed = await fetchFeed(parser, gnews(feed.q), { stagger: true });
       const items = parsed.items ?? [];
       perFeed[feed.label].found = items.length;
       for (const item of items) {
@@ -437,7 +438,7 @@ export async function runStrikesIngest(
     }
   };
 
-  const CONCURRENCY = 6;
+  const CONCURRENCY = 4;
   for (let i = 0; i < STRIKE_FEEDS.length; i += CONCURRENCY) {
     await Promise.allSettled(STRIKE_FEEDS.slice(i, i + CONCURRENCY).map(processFeed));
   }

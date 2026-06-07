@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
@@ -397,11 +398,11 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
 
   // Bounded concurrency: sequential fetching at 20s-per-feed can exceed two
   // minutes. Processing is order-independent.
-  const CONCURRENCY = 8;
+  const CONCURRENCY = 4;
   const processFeed = async (feed: (typeof FEEDS)[number]) => {
     perFeed[feed.label] = { name: feed.label, found: 0, accepted: 0, rejected: 0 };
     try {
-      const parsed = await parser.parseURL(feed.url);
+      const parsed = await fetchFeed(parser, feed.url, { stagger: true });
       const items = parsed.items ?? [];
       perFeed[feed.label].found = items.length;
       for (const item of items) {
