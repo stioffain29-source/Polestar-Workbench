@@ -1,8 +1,8 @@
 import type Parser from "rss-parser";
 
 const DEFAULT_TIMEOUT_MS = 20000;
-const DEFAULT_ATTEMPTS = 2;
-const BASE_BACKOFF_MS = 1500;
+const DEFAULT_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 2500;
 
 // A realistic desktop-browser User-Agent. Google News RSS throttles or blocks
 // generic / library-default User-Agents (rss-parser's parseURL HTTP client),

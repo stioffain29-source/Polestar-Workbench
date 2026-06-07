@@ -438,7 +438,7 @@ export async function runStrikesIngest(
     }
   };
 
-  const CONCURRENCY = 4;
+  const CONCURRENCY = 2;
   for (let i = 0; i < STRIKE_FEEDS.length; i += CONCURRENCY) {
     await Promise.allSettled(STRIKE_FEEDS.slice(i, i + CONCURRENCY).map(processFeed));
   }

@@ -397,8 +397,10 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
   const perFeed: Record<string, FeedStat> = {};
 
   // Bounded concurrency: sequential fetching at 20s-per-feed can exceed two
-  // minutes. Processing is order-independent.
-  const CONCURRENCY = 4;
+  // minutes. Processing is order-independent. Kept low (2) so a burst of
+  // parallel requests to news.google.com does not trip the per-IP throttle
+  // that times out the prod egress IP.
+  const CONCURRENCY = 2;
   const processFeed = async (feed: (typeof FEEDS)[number]) => {
     perFeed[feed.label] = { name: feed.label, found: 0, accepted: 0, rejected: 0 };
     try {

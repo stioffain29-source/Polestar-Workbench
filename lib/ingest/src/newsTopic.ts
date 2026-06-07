@@ -163,7 +163,7 @@ export async function runNewsTopicIngest(
   const feedErrors: { feed: string; error: string }[] = [];
   const perFeed: Record<string, FeedStat> = {};
 
-  const CONCURRENCY = 4;
+  const CONCURRENCY = 2;
   const processFeed = async (feed: Feed) => {
     perFeed[feed.label] = { name: feed.label, found: 0, accepted: 0, rejected: 0 };
     try {

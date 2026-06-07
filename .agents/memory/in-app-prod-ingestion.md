@@ -66,10 +66,34 @@ held (ran=false) — so it returns a boolean and the forced path gates `markForc
 on `ran===true`. A skipped/failed forced run must NOT consume the one guaranteed refresh; a
 later boot retries.
 
-## Only flashpoint + cargo_watch have scrapers; the rest are import-only
-fuel / energy / fertiliser / shipping / strikes have NO live feed — they are STATIC / IMPORT
-ONLY (the Fuel Watch report literally prints that). "Fix ingestion for every topic" is not
-possible as stated; there is nothing to pull for those. cargo_watch has a scraper but the
-APAC cargo-theft feeds are genuinely thin (few accepted items), so it moves slowly even when
-running. Cargo Map "0 geocoded" is a SEPARATE gap: the ingest inserts incidents with
-latitude/longitude = null (no geocoding step), so the map has nothing to plot.
+## (SUPERSEDED) "Only flashpoint + cargo_watch have scrapers"
+This was true historically but is NO LONGER — energy / fertiliser / fuel / shipping / strikes
+are now LIVE Google-News-RSS scrapers too (see `live-news-topic-scrapers.md`). Do not repeat
+the old "nothing to pull for those topics" claim.
+
+## Autoscale FREEZES the long boot ingest mid-run → "no change after republish"
+The version-gated forced boot ingest fires correctly in prod (deployment log shows
+`boot ingest: forced run ... forceVersion=N`) but on an AUTOSCALE deployment the instance is
+frozen/scaled down once the triggering page-load requests finish. The multi-minute serial
+`runIngestOnce` chain (strikes+flashpoint+cargo+shipping+energy+fertiliser+fuel+prices, one
+lock, no checkpoint/resume) then STOPS dead mid-run: no further per-feed logs, prod DB writes
+halt, and the `ingest_force_v<N>` completion marker is NEVER written (it's gated on a completed
+run). Symptom the user sees: republish → Source Health still shows the same failing feeds →
+"no change / you're lying". A republish can NEVER fix this; it's the deployment model.
+**Reliable fix (user decision, cost-bearing):** run ingestion in a process that stays alive to
+completion — a Scheduled Deployment running `scrape:prod`, or a Reserved-VM/always-on deployment.
+NOT another autoscale republish.
+**How to PROVE which problem you're hitting:** read prod via `executeSql({environment:"production"})`
+for `app_migration_markers` (is `ingest_force_v<N>` present? if absent the run never finished) and
+`sources.last_success_at/last_failure_at` (do writes stop dead mid-run?); read the deployment
+runtime via `fetch_deployment_logs` (does anything follow the "forced run" line, or silence?).
+
+## Google News rate-limits the PROD egress IP (not a code bug)
+Dev (workspace IP) scrapes every feed operational; prod consistently times out ~20+ Google-News
+feeds (`Request timed out after 20000ms`) on the same energy/shipping/strikes/fertiliser set.
+That gap = per-IP throttling of the prod egress IP, not broken fetch code. Mitigation that
+helps but may not fully clear it: gentler fetch (browser UA already; attempts 3, backoff 2.5s
+exp, burst CONCURRENCY 2 on the Google-News topics) to avoid bursts. **Trade-off:** gentler =
+slower = MORE exposure to the autoscale freeze above, so it only pays off on a Scheduled
+Deployment / always-on runner where slow-but-thorough is fine. If still throttled there,
+consider env-specific tuning or splitting ingest into short per-stage-marked jobs.
