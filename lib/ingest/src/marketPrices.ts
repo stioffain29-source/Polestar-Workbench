@@ -218,21 +218,39 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   let latestIssue = "";
 
   // Sort newest issue date first so `latest` reflects the most recent report.
-  const sorted = [...fuelReports].sort((a, b) => (b.issueDate ?? "").localeCompare(a.issueDate ?? ""));
+  // Tie-break on id (serial, so highest = most recently created) to keep the
+  // "live report" selection deterministic when several share an issue date.
+  const sorted = [...fuelReports].sort((a, b) => {
+    const byDate = (b.issueDate ?? "").localeCompare(a.issueDate ?? "");
+    return byDate !== 0 ? byDate : Number(b.id) - Number(a.id);
+  });
+
+  // The MOST RECENT fuel report is the LIVE tracker — it must always show the
+  // latest market close, never freeze behind a stale issue date. Crude wins the
+  // period end (it publishes daily; jet/FRED lags and is labelled, not clamped),
+  // so the live anchor = the latest available CRUDE close date. Older reports
+  // stay anchored to their own issue date as historical as-of snapshots.
+  const newestId = sorted[0]?.id;
+  const crudeDates = [...brent.points, ...wti.points].map((p) => p.date);
+  const latestCrudeClose = crudeDates.length
+    ? crudeDates.reduce((a, b) => (a > b ? a : b))
+    : null;
 
   for (const r of sorted) {
     const issueDate = r.issueDate ?? today;
-    // Anchor each report's prices to the END OF ITS REPORTING WINDOW = its
-    // issue date. Fuel Watch is a MARKET product: the reporting period is
-    // driven by the market close, NOT pulled back to the latest incident
-    // (incidents are reported separately as incident data status, and may
-    // stop earlier). valueAsOf() already returns the latest close on/before
-    // the anchor — FRED/Yahoo lag means that may be a day or two earlier —
-    // so an older report still shows ITS period's close, never today's, and
-    // the newest report shows the newest close. The workbench reads these
-    // same dates back out of hardNumbers to set the cover/period, so cover,
-    // Fast Facts and the jet chart can never disagree.
-    const anchorDate = issueDate;
+    // The live (newest) report rolls FORWARD to the latest crude close so its
+    // prices track the current market; it never rolls backward (a future-dated
+    // report keeps its issue date and valueAsOf still returns the latest close).
+    // Older reports anchor to their issue date. valueAsOf() returns the latest
+    // close on/before the anchor (FRED/Yahoo lag may put it a day or two
+    // earlier), and the workbench reads these same dates back out of
+    // hardNumbers to drive the cover/period, the Fast Facts and the jet chart,
+    // so cover, prices, market-read prose and the jet chart can never disagree.
+    const isLive = r.id === newestId;
+    const anchorDate =
+      isLive && latestCrudeClose && latestCrudeClose > issueDate
+        ? latestCrudeClose
+        : issueDate;
     const built = buildHardNumbers(anchorDate, brent, wti, jet);
     if (!built) {
       log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);

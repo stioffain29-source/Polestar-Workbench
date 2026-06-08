@@ -34,8 +34,23 @@ incident-only, so there was nothing fabricated to replace there.
   MARKET product: the reporting-period END is the latest MARKET-CLOSE date the
   report carries (`fuelMarketLatestDate(hardNumbers)` = max of price asOf, jet
   snapshot asOf, jet trajectory point dates), NOT the latest incident. The
-  ingest now anchors prices to the issue date UNCLAMPED (`anchorDate =
-  issueDate`); the workbench DERIVES the render period from the market close.
+  workbench DERIVES the render period from the market close.
+- LIVE-REPORT FORWARD ROLL (current rule; INTENTIONALLY reverses the old "anchor
+  every report to its issue date / do NOT special-case the newest" guidance
+  below). The newest fuel report (max issueDate, tie-break highest serial id) is
+  the LIVE TRACKER: its `anchorDate` rolls FORWARD to the latest available CRUDE
+  close (`latestCrudeClose` = max date across Brent+WTI points) whenever that is
+  newer than its issue date — never backward. OLDER reports still anchor to their
+  own issue date (frozen historical as-of snapshots). **Why:** with the strict
+  issue-date anchor, the single prod fuel report (issue_date 2026-05-31) was
+  permanently pinned to the 29 May close even though Yahoo/FRED ran to June; the
+  client treats the one fuel report as a live tracker and (by their own words,
+  "when the market closes that should be the last date") wants the LATEST close.
+  This does NOT re-create the old period/price MISMATCH the warning below guards
+  against, because the render period is derived from the SAME hardNumbers — Fast
+  Facts, MARKET READ prose (`buildFuelMarketRead`, computed from the cards at
+  render), jet trajectory and cover/period all move together. Issue_date is NOT
+  mutated; only the anchor used for the price build advances.
   Cover date, REPORTING PERIOD label, Fast Facts asOf, jet chart latest, and the
   incident window ALL flow from this one date (`renderIssueDate` in
   ReportPreview.tsx + exportTopicReportPdf.ts; `resolveFuelPeriodEnd` in the
