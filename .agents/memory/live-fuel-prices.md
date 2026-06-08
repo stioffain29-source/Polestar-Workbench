@@ -8,16 +8,22 @@ never a hardcoded constant.
 
 **Source per card (load-bearing):** Brent/WTI come from Yahoo Finance front-month
 futures (BZ=F / CL=F) PRIMARY, with FRED EIA spot (DCOILBRENTEU/DCOILWTICO) as an
-automatic fallback if Yahoo fails — crude must never go empty. Jet fuel stays on
-FRED's EIA Gulf Coast kerosene series (DJFUELUSGULF) with no substitute.
+automatic fallback if Yahoo fails — crude must never go empty. JET is now a
+labelled PROXY: Yahoo HO=F (NY Harbor ULSD / heating-oil front-month, the closest
+liquid DAILY distillate future to jet kerosene) PRIMARY, with FRED DJFUELUSGULF
+(weekly Gulf Coast jet) as fallback so the card never goes empty. The benchmark
+string is hardcoded "NY Harbor ULSD (heating oil) - jet fuel proxy" regardless of
+which source served it, so the card is honestly labelled a proxy, not real jet.
 **Why:** FRED's EIA SPOT series publish with a multi-business-day lag, so a
 FRED-only crude card genuinely missed real price moves (e.g. Brent ~99.6→92.05
 over 27-29 May) and the client correctly called it stale; Yahoo futures carry the
-most recent daily CLOSE (incl. the Friday close). There is no honest daily
-jet-fuel future, so jet legitimately tracks its own slower FRED cadence — do NOT
-fabricate a jet proxy to make the dates match; a jet asOf older than crude asOf is
-expected and truthful. Each series carries its own `source` string so the price-card
-attribution always names the source that actually served the data.
+most recent daily CLOSE (incl. the Friday close). The OLD rule ("jet stays on
+weekly DJFUELUSGULF, a jet asOf older than crude is expected/truthful, do NOT
+proxy") was REVERSED by user demand: a jet card frozen ~a week behind daily
+Brent/WTI read as broken/stale to the client ("stuck on 1st June"). HO=F is a
+daily distillate future that tracks jet direction day-to-day, so the labelled
+proxy keeps the jet date in step with crude. Each series carries its own `source`
+string so the attribution always names the source that actually served the data.
 
 **Why:** the original prices were a fixed sample constant that never changed
 across republishes; the client saw identical numbers every week and called it
@@ -118,3 +124,17 @@ incident-only, so there was nothing fabricated to replace there.
   after a republish.
 - Never re-introduce an auto-seeded fabricated sample into the preview/PDF. An
   unseeded report shows empty market fields, not fake numbers.
+- PROD-REFRESH TRAP (cost me a turn): a code-only change to the price/jet source
+  does NOT refresh existing prod fuel reports just by republishing. The
+  freshness-gated boot catch-up SKIPS the full ingest when incidents are fresh,
+  and the every-boot priceTick only fires on a COLD start — so a warm autoscale
+  process keeps serving the OLD jet entry (whole hardNumbers is REPLACED per run,
+  so you see exactly the last successful run's code: old benchmark label = old
+  code ran last). The deterministic lever is `INGEST_FORCE_VERSION` in
+  `artifacts/api-server/src/lib/ingestScheduler.ts` — bump it so the next boot
+  forces ONE full ingest (marker-gated in app_migration_markers, once per env per
+  version). Symptom that pins this: Brent/WTI move to today but jet is frozen days
+  behind with the OLD source/benchmark string. Confirm via prod replica:
+  `SELECT key FROM app_migration_markers WHERE key LIKE 'ingest_force%'` (is the
+  current version already applied?) and the fuel report's
+  `hard_numbers->'fastFacts'->'prices'` jet benchmark label.
