@@ -944,7 +944,7 @@ export default function ReportEditor() {
                       onChange={(e) =>
                         setFuelJetField("benchmark", e.target.value)
                       }
-                      placeholder="e.g. NY Harbor ULSD (heating oil) - jet fuel proxy"
+                      placeholder="e.g. U.S. Gulf Coast kerosene-type jet fuel"
                     />
                   </Field>
                   <Field label="Source">
@@ -954,7 +954,7 @@ export default function ReportEditor() {
                       onChange={(e) =>
                         setFuelJetField("source", e.target.value)
                       }
-                      placeholder="e.g. NY Harbor ULSD front-month (Yahoo Finance)"
+                      placeholder="e.g. EIA / FRED (DJFUELUSGULF)"
                     />
                   </Field>
                   <Field label="Value">

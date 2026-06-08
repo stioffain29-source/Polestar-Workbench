@@ -8,22 +8,24 @@ never a hardcoded constant.
 
 **Source per card (load-bearing):** Brent/WTI come from Yahoo Finance front-month
 futures (BZ=F / CL=F) PRIMARY, with FRED EIA spot (DCOILBRENTEU/DCOILWTICO) as an
-automatic fallback if Yahoo fails — crude must never go empty. JET is now a
-labelled PROXY: Yahoo HO=F (NY Harbor ULSD / heating-oil front-month, the closest
-liquid DAILY distillate future to jet kerosene) PRIMARY, with FRED DJFUELUSGULF
-(weekly Gulf Coast jet) as fallback so the card never goes empty. The benchmark
-string is hardcoded "NY Harbor ULSD (heating oil) - jet fuel proxy" regardless of
-which source served it, so the card is honestly labelled a proxy, not real jet.
-**Why:** FRED's EIA SPOT series publish with a multi-business-day lag, so a
-FRED-only crude card genuinely missed real price moves (e.g. Brent ~99.6→92.05
-over 27-29 May) and the client correctly called it stale; Yahoo futures carry the
-most recent daily CLOSE (incl. the Friday close). The OLD rule ("jet stays on
-weekly DJFUELUSGULF, a jet asOf older than crude is expected/truthful, do NOT
-proxy") was REVERSED by user demand: a jet card frozen ~a week behind daily
-Brent/WTI read as broken/stale to the client ("stuck on 1st June"). HO=F is a
-daily distillate future that tracks jet direction day-to-day, so the labelled
-proxy keeps the jet date in step with crude. Each series carries its own `source`
-string so the attribution always names the source that actually served the data.
+automatic fallback if Yahoo fails — crude must never go empty. JET is the REAL EIA
+U.S. Gulf Coast kerosene-type jet-fuel series (FRED DJFUELUSGULF), fetched via
+`fetchFredSeries` directly (NOT through fetchCrudeSeries — there is no Yahoo jet
+primary). The benchmark string is "U.S. Gulf Coast kerosene-type jet fuel" and the
+source "EIA / FRED (DJFUELUSGULF)". DJFUELUSGULF publishes WEEKLY, so the jet "as
+of" date normally sits a few business days behind the daily Brent/WTI close — that
+lag is honest and surfaced via `jetDataNote`, never hidden.
+**Why:** FRED's EIA SPOT crude series lag a few business days, so a FRED-only crude
+card genuinely missed real moves (e.g. Brent ~99.6→92.05 over 27-29 May) and the
+client correctly called it stale; Yahoo futures carry the most recent daily CLOSE.
+JET DECISION (current, supersedes the HO=F proxy episode): the user was OFFERED the
+choice — real weekly Gulf Coast jet (lags) vs a daily NY Harbor ULSD/heating-oil
+PROXY that moves with crude — and chose REAL jet, accepting the weekly lag, on the
+grounds that a labelled "heating-oil proxy" is not literally jet fuel. So do NOT
+proxy jet with HO=F; use DJFUELUSGULF. (The brief HO=F-proxy detour existed because
+a weekly-lagged jet read "stuck" next to daily crude; the user prefers honest-real
+over daily-but-fake.) Each series carries its own `source` string so attribution
+always names the source that actually served the data.
 
 **Why:** the original prices were a fixed sample constant that never changed
 across republishes; the client saw identical numbers every week and called it

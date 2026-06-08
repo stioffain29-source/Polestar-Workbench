@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { recordSourceHealth } from "./sourceHealth";
 import {
   fetchCrudeSeries,
+  fetchFredSeries,
   valueAsOf,
   changeOver,
   trajectoryAsOf,
@@ -32,13 +33,12 @@ const changePct = (series: Series, asOf: string, value: number): string | null =
 // crude never goes empty.
 //   * Brent crude — Yahoo BZ=F  (fallback FRED DCOILBRENTEU), USD/bbl, daily
 //   * WTI crude   — Yahoo CL=F  (fallback FRED DCOILWTICO),   USD/bbl, daily
-//   * Jet fuel    — Yahoo HO=F (NY Harbor ULSD / heating-oil front-month),
-//     USD/gal, daily — used as a JET FUEL PROXY and labelled as such. The EIA
-//     Gulf Coast jet series (FRED DJFUELUSGULF) only publishes WEEKLY, so a
-//     jet card on that series reads stale next to daily Brent/WTI. ULSD is the
-//     closest liquid daily distillate future to jet kerosene, so it tracks
-//     jet-fuel direction day to day. FRED DJFUELUSGULF stays the fallback if
-//     Yahoo is down, so the jet card never goes empty.
+//   * Jet fuel    — FRED DJFUELUSGULF (U.S. Gulf Coast kerosene-type jet fuel,
+//     EIA), USD/gal. This is the REAL jet-fuel price, not a proxy. The EIA
+//     series publishes WEEKLY, so the jet "as of" date usually sits a few
+//     business days behind the daily Brent/WTI close — that lag is inherent to
+//     the only honest free jet-fuel feed and is surfaced via jetDataNote, never
+//     papered over with a daily distillate stand-in.
 //
 // FRED's fredgraph.csv and Yahoo's chart endpoint are both public and need no
 // API key. Every fuel report is priced AS OF THE END OF ITS REPORTING WINDOW
@@ -87,7 +87,7 @@ function buildHardNumbers(
   }
   if (j) {
     const change = changePct(jet, j.date, j.value);
-    prices.push({ label: "Jet fuel", benchmark: "NY Harbor ULSD (heating oil) - jet fuel proxy", value: j.value, unit: "USD/gal", ...(change ? { change } : {}), asOf: j.date, source: jet.source });
+    prices.push({ label: "Jet fuel", benchmark: "U.S. Gulf Coast kerosene-type jet fuel", value: j.value, unit: "USD/gal", ...(change ? { change } : {}), asOf: j.date, source: jet.source });
     if (!asOf || j.date > asOf) asOf = j.date;
   }
 
@@ -97,10 +97,10 @@ function buildHardNumbers(
   };
   if (trajPoints.length >= 2) {
     hardNumbers["jetFuelTrajectory"] = {
-      benchmark: "NY Harbor ULSD (heating oil) - jet fuel proxy",
+      benchmark: "U.S. Gulf Coast kerosene-type jet fuel",
       source: jet.source,
       unit: "USD/gal",
-      period: "last 30 days",
+      period: "recent weeks",
       points: trajPoints,
     };
   }
@@ -161,10 +161,11 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     }
   };
 
-  // Crude and the jet PROXY prefer Yahoo (latest market close) and fall back to
-  // FRED. Jet is proxied by NY Harbor ULSD (heating-oil) front-month — a daily
-  // distillate future — because the EIA Gulf Coast jet series only publishes
-  // weekly; FRED DJFUELUSGULF remains the jet fallback. All run in parallel.
+  // Crude (Brent/WTI) prefers Yahoo (latest market close) and falls back to
+  // FRED. Jet uses the REAL EIA U.S. Gulf Coast jet-fuel series (FRED
+  // DJFUELUSGULF) directly — it publishes weekly, so its latest point lags the
+  // daily crude close by a few days, but it is the genuine jet price, not a
+  // daily distillate proxy. All run in parallel.
   const [brent, wti, jet] = await Promise.all([
     safe(
       "BZ=F",
@@ -189,15 +190,9 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
       { id: "CL=F", source: "NYMEX WTI front-month (Yahoo Finance)", points: [] },
     ),
     safe(
-      "HO=F",
-      () =>
-        fetchCrudeSeries(
-          { symbol: "HO=F", source: "NY Harbor ULSD front-month (Yahoo Finance)" },
-          { id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)" },
-          startDate,
-          log,
-        ),
-      { id: "HO=F", source: "NY Harbor ULSD front-month (Yahoo Finance)", points: [] },
+      "DJFUELUSGULF",
+      () => fetchFredSeries("DJFUELUSGULF", "EIA / FRED (DJFUELUSGULF)", startDate),
+      { id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)", points: [] },
     ),
   ]);
 
@@ -304,10 +299,10 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
           error: wti.points.length > 0 ? null : "no price points returned (Yahoo + FRED both failed)",
         },
         {
-          name: "NY Harbor ULSD jet proxy (Yahoo HO=F / FRED fallback)",
-          url: "https://finance.yahoo.com/quote/HO=F",
+          name: "EIA U.S. Gulf Coast jet fuel (FRED DJFUELUSGULF)",
+          url: "https://fred.stlouisfed.org/series/DJFUELUSGULF",
           ok: jet.points.length > 0,
-          error: jet.points.length > 0 ? null : "no price points returned (Yahoo + FRED both failed)",
+          error: jet.points.length > 0 ? null : "no price points returned (FRED DJFUELUSGULF failed)",
         },
       ],
       { sourceType: "api", reliability: 4, notes: "Live market price series — auto-monitored each price ingest run." },

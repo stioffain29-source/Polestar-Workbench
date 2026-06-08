@@ -77,15 +77,14 @@ const SPECS: Spec[] = [
     },
   },
   {
-    // Jet PROXY: NY Harbor ULSD (heating-oil) front-month is a daily distillate
-    // future; the EIA Gulf Coast jet series only publishes weekly. Falls back to
-    // FRED DJFUELUSGULF if Yahoo is down. Labelled as a jet proxy everywhere.
-    group: "fuel", key: "jet", label: "Jet Fuel (ULSD proxy)", unit: "USD/gal",
-    benchmark: "NY Harbor ULSD (heating oil) - jet fuel proxy", changeMode: "7d", trajCount: 16, decimals: 2,
+    // Jet fuel: the REAL EIA U.S. Gulf Coast kerosene-type jet-fuel series
+    // (FRED DJFUELUSGULF), USD/gal. Publishes weekly, so it lags the daily
+    // crude close by a few days — it is the genuine jet price, not a proxy.
+    group: "fuel", key: "jet", label: "Jet Fuel", unit: "USD/gal",
+    benchmark: "U.S. Gulf Coast kerosene-type jet fuel", changeMode: "7d", trajCount: 16, decimals: 2,
     fetch: {
-      kind: "crude",
-      yahoo: { symbol: "HO=F", source: "NY Harbor ULSD front-month (Yahoo Finance)" },
-      fred: { id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)" },
+      kind: "fred",
+      id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)",
     },
   },
   // --- Energy ---------------------------------------------------------------

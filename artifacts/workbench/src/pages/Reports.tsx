@@ -2,16 +2,18 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   useListReports, useCreateReport, useDeleteReport,
+  useGetDashboardOverview,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
 } from "@workspace/api-client-react";
+import { fuelMarketLatestDate } from "@/lib/fuelWatchReport";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, REPORT_STATUSES, reportStatusClass } from "@/lib/topics";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canonicalTopic } from "@/lib/reportNaming";
@@ -26,8 +28,39 @@ export default function Reports() {
   if (topic) params.topic = topic;
   if (status) params.status = status;
   const { data: reports = [] } = useListReports(params);
+  const { data: overview } = useGetDashboardOverview();
   const del = useDeleteReport();
   const create = useCreateReport();
+
+  // Per-topic latest record date, so a card can clamp its displayed date the
+  // same way the editor does (protests reads the flashpoint feed).
+  // Format the latest record date in LOCAL time, identically to the editor's
+  // clampIssueDateToLatestRecord (which does format(latestRecordDate(...),
+  // "yyyy-MM-dd")). A bare .slice(0,10) on the UTC ISO string would drift one
+  // day from the editor near timezone boundaries.
+  const latestByTopic: Record<string, string> = {};
+  for (const c of overview?.topicCards ?? []) {
+    if (c.latestAt) latestByTopic[c.topic] = format(parseISO(c.latestAt), "yyyy-MM-dd");
+  }
+  // Drafts are living documents: the editor advances a stale draft's effective
+  // issue date to today, then clamps it down to the latest data the topic
+  // actually has (Fuel Watch clamps to its freshest market close). The card
+  // must show that SAME effective date — otherwise the list looks frozen on the
+  // old stored date while the editor shows the current window. Published reports
+  // are frozen snapshots and keep their stored issue date.
+  const cardIssueDate = (r: (typeof reports)[number]): string => {
+    const stored = (r.issueDate ?? "").slice(0, 10);
+    if (r.status !== "draft") return stored;
+    const today = new Date().toISOString().slice(0, 10);
+    let eff = stored && stored > today ? stored : today;
+    const dataTopic = r.topic === "protests" ? "flashpoint" : r.topic;
+    const latest =
+      r.topic === "fuel"
+        ? fuelMarketLatestDate(r.hardNumbers) ?? latestByTopic["fuel"]
+        : latestByTopic[dataTopic];
+    if (latest && latest < eff) eff = latest;
+    return eff;
+  };
 
   const [form, setForm] = useState({
     title: "",
@@ -126,7 +159,7 @@ export default function Reports() {
               );
             })()}
             <div className="text-xs text-muted-foreground mt-2 font-mono">
-              {format(new Date(r.issueDate), "d MMM yyyy")}{r.author ? ` · ${r.author}` : ""}
+              {format(parseISO(cardIssueDate(r)), "d MMM yyyy")}{r.author ? ` · ${r.author}` : ""}
             </div>
             <Link href={`/reports/${r.id}`}>
               <div className="mt-4 pt-3 border-t border-border text-xs font-sans uppercase tracking-wider text-accent inline-flex items-center gap-1 group-hover:gap-2 transition-all">
