@@ -1081,7 +1081,7 @@ function buildRegionalCountryRead(opts: {
     ? ` These country totals are indicative only: with ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} unattributed against ${identifiedTotal} tied to a confirmed incident country, country-level conclusions should be treated as low-confidence.`
     : "";
   const countryLine = topCountries.length > 0
-    ? `At country level the cycle is led by ${joinList(topCountries.map((c) => `${c.label} (${c.value})`))}.${countryQualifier}`
+    ? `At country level the cycle is led by ${joinList(topCountries.map((c) => c.label))}.${countryQualifier}`
     : `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file.`;
   const gapLine = locationNotIdentifiedCount > 0
     ? `A further ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} could not be tied to a confirmed incident country and ${locationNotIdentifiedCount === 1 ? "is" : "are"} excluded from the country chart to avoid distortion.`

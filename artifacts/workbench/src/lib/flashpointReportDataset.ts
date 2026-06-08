@@ -883,7 +883,6 @@ export function buildFlashpointReportDataset(
     activismRows,
     unrestRows,
     countryRows,
-    fileTotal: enriched.length,
     hasFutureTable: forecastFuture.length > 0,
     forecastLeadCountry: forecastFuture[0]?.country ?? null,
     forecastLeadSignal: forecastFuture[0]?.signal ?? null,
@@ -1069,7 +1068,6 @@ function buildForecastRead(opts: {
   activismRows: EnrichedIncident[];
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
-  fileTotal: number;
   hasFutureTable: boolean;
   forecastLeadCountry?: string | null;
   forecastLeadSignal?: string | null;
@@ -1079,11 +1077,6 @@ function buildForecastRead(opts: {
   const forecastLeadSignal = (opts.forecastLeadSignal ?? "").trim();
   const lead = countryRows[0];
   const total = activismRows.length + unrestRows.length;
-  // Denominator for the "X of Y records" headline counts. Uses the full
-  // count of records on the file (enriched.length) so it matches the
-  // executive summary, rather than the activism+unrest split `total` (which
-  // omits records bucketed as neither and would read one short).
-  const fileTotal = opts.fileTotal;
   // The structured forward-looking table is rendered above this prose
   // by the exporter when at least one credible future-dated record is
   // present. Prose then carries trajectory commentary only.
@@ -1747,8 +1740,8 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const sevCountry = (sevInc?.country ?? "").trim();
   const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
   const volClause = lead
-    ? `${lead.label} carries the most records (${lead.value} of ${total})`
-    : `no single country dominates the ${total}-record file`;
+    ? `${lead.label} carries the largest single concentration`
+    : `no single country dominates the file`;
   // Only name a separate severity lead when it is genuinely elevated
   // (Moderate+) and in a different country; otherwise just report the
   // ceiling. A "highest" that is still Low is not an escalation.

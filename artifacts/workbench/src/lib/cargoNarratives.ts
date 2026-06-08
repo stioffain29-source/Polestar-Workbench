@@ -150,7 +150,7 @@ function countryPicture(
 
 function joinCountries(rows: { country: string; count: number }[]): string {
   if (rows.length === 0) return "";
-  const parts = rows.map((r) => `${r.country} (${r.count})`);
+  const parts = rows.map((r) => r.country);
   if (parts.length === 1) return parts[0];
   if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
@@ -614,9 +614,9 @@ function operationalReadFor(
 
   let tail = "";
   if (severityKey === "high" || severityKey === "extreme") {
-    tail = ` The ${count} record${count === 1 ? "" : "s"} on file read as organised, targeted activity rather than opportunistic theft.`;
+    tail = ` The reporting on file reads as organised, targeted activity rather than opportunistic theft.`;
   } else if (count >= 3) {
-    tail = ` Repeat reporting (${count} records) points to a corridor under sustained pressure.`;
+    tail = ` Repeat reporting points to a corridor under sustained pressure.`;
   }
   return core + tail;
 }
