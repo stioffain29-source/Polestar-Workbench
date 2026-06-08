@@ -1125,18 +1125,18 @@ function buildForecastRead(opts: {
       ? `, which is why it leads the forward-looking table even though it is not the busiest country`
       : ``;
     lines.push(
-      `Two distinct leads sit in this file and they must be read together. On volume, ${lead.label} carries the heaviest concentration (${lead.value} of ${fileTotal} record${fileTotal === 1 ? "" : "s"}) and is the most likely source of recurring, lower-intensity disruption. On severity, the sharper signal is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — a smaller count but a higher escalation ceiling${tableClause}. A higher record count is not the same as a higher ceiling: plan for breadth of disruption across ${lead.label} and for escalation depth in ${sevCountry}.`,
+      `Two distinct leads sit in this file and they must be read together. On volume, ${lead.label} carries the heaviest concentration and is the most likely source of recurring, lower-intensity disruption. On severity, the sharper signal is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — a smaller count but a higher escalation ceiling${tableClause}. A higher count is not the same as a higher ceiling: plan for breadth of disruption across ${lead.label} and for escalation depth in ${sevCountry}.`,
     );
   } else if (lead && tableLeadDiffers) {
     // Volume leader and forecast-table leader differ, but on count not
     // severity. Explain the table is a scheduling signal, not a ranking.
     const sig = forecastLeadSignal ? ` (${forecastLeadSignal})` : "";
     lines.push(
-      `Read the forward-looking table and the country chart together. ${lead.label} carries the heaviest concentration on the file this cycle (${lead.value} of ${fileTotal} record${fileTotal === 1 ? "" : "s"}) and remains the most likely source of recurring disruption. The forecast table leads with ${forecastLeadCountry}${sig} only because it holds the clearest confirmed future-dated item — a scheduling signal for the next 7-14 days, not an indication that ${forecastLeadCountry} outranks ${lead.label} on volume or severity. Plan for sustained, broad-based disruption in ${lead.label} and treat the ${forecastLeadCountry} entry as a dated calendar item to action on the day.`,
+      `Read the forward-looking table and the country chart together. ${lead.label} carries the heaviest concentration on the file this cycle and remains the most likely source of recurring disruption. The forecast table leads with ${forecastLeadCountry}${sig} only because it holds the clearest confirmed future-dated item — a scheduling signal for the next 7-14 days, not an indication that ${forecastLeadCountry} outranks ${lead.label} on volume or severity. Plan for sustained, broad-based disruption in ${lead.label} and treat the ${forecastLeadCountry} entry as a dated calendar item to action on the day.`,
     );
   } else if (lead) {
     lines.push(
-      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file (${lead.value} of ${fileTotal} record${fileTotal === 1 ? "" : "s"}). Adjacent cities and university campuses are possible secondary flashpoints.`,
+      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file. Adjacent cities and university campuses are possible secondary flashpoints.`,
     );
   } else {
     lines.push(
@@ -1482,7 +1482,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   }
   if (lead) {
     bullets.push(
-      `${lead.label} — the next dated opposition, sectoral or court call. As the heaviest-concentration geography this cycle (${lead.value} record${lead.value === 1 ? "" : "s"}), a fresh trigger here converts fastest into road closures and venue-access friction.`,
+      `${lead.label} — the next dated opposition, sectoral or court call. As the heaviest-concentration geography this cycle, a fresh trigger here converts fastest into road closures and venue-access friction.`,
     );
   }
   if (sevInc && sevCountry && sevElevated && (!lead || sevCountry !== lead.label)) {

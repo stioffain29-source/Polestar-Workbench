@@ -215,7 +215,7 @@ export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[])
     return `No qualifying truck-hijack, container theft, in-transit loss or logistics-hub logistics incident reached the file this cycle. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or depot-side risk has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean cycles in a row.`;
   }
   parts.push(
-    `What this cycle changes for cargo owners and operators is concentrated in two places: route-side incidents (${ctx.securityMatches.length} qualifying record${ctx.securityMatches.length === 1 ? "" : "s"}) that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses (${ctx.hubMatches.length} qualifying record${ctx.hubMatches.length === 1 ? "" : "s"}) that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
+    `What this cycle changes for cargo owners and operators is concentrated in two places: route-side incidents that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
   );
   if (cp.top.length > 0) {
     parts.push(
@@ -370,9 +370,8 @@ export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]
     return `No qualifying cargo-crime records reached the file this cycle. Cargo reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or hub-side activity has stopped; treat the standing exposure as unchanged.`;
   }
   const parts: string[] = [];
-  const total = ctx.windowIncidents.length;
   parts.push(
-    `${total} qualifying cargo-crime record${total === 1 ? "" : "s"} reached the file this cycle, split across route-side losses (${ctx.securityMatches.length}) and logistics-hub losses (${ctx.hubMatches.length}).`,
+    `Qualifying cargo-crime reporting reached the file this cycle, split across route-side and logistics-hub losses.`,
   );
 
   const named = (i: CargoNarrativeIncident): string => {

@@ -190,12 +190,11 @@ export function buildFuelRegionalHighlights(opts: {
     const overlay = COUNTRY_OVERLAY[country.toLowerCase()];
     const why = overlay?.why
       ?? fam?.why
-      ?? "These records signal underlying pressure on local fuel availability and cost.";
+      ?? "This reporting signals underlying pressure on local fuel availability and cost.";
     const watch = overlay?.watch
       ?? fam?.watch
       ?? "Watch the next reporting cycle to confirm whether the pattern persists or eases.";
-    const n = items.length;
-    const recordsClause = n === 1 ? "A single record this cycle points to" : `${n} records this cycle point to`;
+    const recordsClause = "Reporting this cycle points to";
     let opener: string;
     if (idx === 0) {
       opener = `${titleCase(country)} is the clearest pressure point in this window.`;
@@ -488,7 +487,7 @@ export function buildFuelOperationalRead(opts: {
   if (counts.size === 0) {
     // We have window items but none mapped to a recognised family. Say
     // so plainly rather than padding with generic language.
-    return `The window carries ${window.length} fuel-relevant record${window.length === 1 ? "" : "s"} that do not group into a single dominant operational theme this cycle. Treat the read as directional and rely on the related-incidents table below for the detail.`;
+    return `The fuel-relevant reporting this window does not group into a single dominant operational theme this cycle. Treat the read as directional and rely on the related-incidents table below for the detail.`;
   }
 
   // Country roll-up for the closing line ("strongest operational signal").
@@ -504,10 +503,7 @@ export function buildFuelOperationalRead(opts: {
 
   const themeLine = ordered
     .slice(0, 3)
-    .map(({ fam, items }) => {
-      const n = items.length;
-      return `${fam.phrase} (${n} record${n === 1 ? "" : "s"})`;
-    })
+    .map(({ fam }) => fam.phrase)
     .join("; ");
 
   const lead = ordered[0];

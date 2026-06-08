@@ -943,7 +943,7 @@ function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const pressurePoint = cp ? cp.name : "Hormuz and the Red Sea corridor";
 
   const para1Pressure = cp
-    ? `${pressurePoint} remains the dominant shipping pressure point across the reporting window (${cp.count} qualifying record${cp.count === 1 ? "" : "s"}), and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`
+    ? `${pressurePoint} remains the dominant shipping pressure point across the reporting window, and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`
     : `${pressurePoint} remains the dominant shipping pressure point across the reporting window, and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`;
   const para1Vessel = vesselThreat30 > 0
     ? ` The vessel threat picture across the window — ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} — still matters. A quiet cycle in this geography is the normal pattern, not a benign trend, so it should be read as a reporting gap rather than a sustained easing.`
