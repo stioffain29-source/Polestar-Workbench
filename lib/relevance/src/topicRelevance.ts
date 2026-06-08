@@ -134,6 +134,15 @@ const FUEL_EXCLUDE: RegExp[] = [
   // PR / booster commentary — subsidy-leadership praise and industry-
   // dialogue applause are promotional, not operational fuel signal.
   /\b(applauds?|lauds?|praises?|hails?|welcomes?|congratulates?)\b.{0,40}(leadership|reform|initiative|vision|dialogue|effort|stewardship)/,
+  // Consumer travel-advisory / SEO comma-spam aggregator junk. These
+  // content-mill headlines ("Travelers Warned: Visa & Mastercard Banned …
+  // — Sunwing & WestJet Suspend Flights, Jet Fuel Crisis … Emergency
+  // Travel Tips Inside") chain several unrelated claims around a tourism/
+  // payments lead. A genuine fuel-supply incident never reads "travelers
+  // warned" / "emergency travel tips" / "visa & mastercard banned"; these
+  // markers are unambiguous consumer-travel-advisory signal, so dropping
+  // them never suppresses a real operational fuel story.
+  /\b(travell?ers? warned|travel (tips|advisory|warning)|emergency travel|things to know before you (travel|go)|what travell?ers? (need to|should) know|beach resorts?|visa (&|and) mastercard banned)\b/,
 ];
 
 // Shipping-specific exclusions. Food-price commentary, airline fuel cost
@@ -377,7 +386,7 @@ const ENERGY_EXCLUDE: RegExp[] = [
 
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
-    /\bfuel (shortage|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
+    /\bfuel (shortage|crisis|emergency|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
     /\bpetrol (shortage|price|prices|station)/,
     /\bdiesel (shortage|price|prices|supply)/,
     /\b(refinery|refineries) (disruption|outage|shutdown|fire|attack|maintenance|closure|halt)/,

@@ -226,10 +226,14 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     category: "Government / policy action",
     test: [
-      /\b(government|ministry|parliament|cabinet|regulator|state[- ]owned|caucus)\b/,
+      /\b(government|ministry|parliament|cabinet|regulator|state[- ]owned|caucus|municipality|municipal|council|authority|authorities)\b/,
       /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene)/,
       /\b(fuel|petrol|diesel) .{0,20}(subsidy|levy|duty|excise|tax) (cut|hike|raise|removal|removed|reform|reintroduce)/,
       /\b(price control|price cap|price freeze|export ban|import ban|export quota|import quota)/,
+      // Rationing / allocation / curfew are direct shortage-management
+      // levers during a fuel crisis — a core government action, not noise.
+      /\b(ration|rationing|allocation|curfew) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene)/,
+      /\b(fuel|petrol|diesel|gas|lpg|kerosene) .{0,30}(ration|rationing|allocation|curfew)/,
     ],
   },
   {
@@ -245,6 +249,12 @@ const CATEGORY_RULES: CategoryRule[] = [
     category: "Buyer action",
     test: [
       /\b(airline|carrier) .{0,30}(surcharge|fuel hedge|hedging|capacity (cut|reduction))/,
+      // Aviation demand response: a named carrier (or the generic words
+      // airline/carrier/airways) suspending, cancelling, cutting, grounding
+      // or trimming flights/routes/capacity is a buyer-side reaction to fuel
+      // cost or availability — a core action class during a fuel crisis.
+      /\b(airline|carrier|airways|indigo|emirates|easyjet|jet2|lufthansa|qantas|ryanair|wizz air|air india|spicejet|vistara|cathay|singapore airlines|ana|jal|yemenia|akasa|airasia|air asia|garuda|lion air|thai airways|vietnam airlines|philippine airlines|cebu pacific)\b.{0,80}\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|axes|halt|halts|slash|slashes|defer|trim|drop|drops)\w*/,
+      /\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|halt|slash|defer|trim)\w*\b.{0,40}\b(flight|flights|route|routes|service|services|capacity|schedule|schedules)\b/,
       /\b(indian oil|bharat petroleum|hindustan petroleum|sinopec|cnpc) .{0,30}(spot purchase|tender|cargo|import|buy)/,
       /\b(buyer|importer|trading house|trader|refiner) .{0,30}(switch|diversif|cancel|defer|stockpile|spot purchase|tender)/,
       /\b(strategic reserve|spr) (release|draw|tap)/,
@@ -285,6 +295,11 @@ function classifyCategory(t: string): FuelActionCategory | null {
 function deriveOperationalRead(t: string, category: FuelActionCategory): string {
   if (/\b(refinery|refining|crack spread)\b/.test(t))
     return "Refinery-side move: regional crack spreads tighten and downstream pump and bunker pricing usually firms within days.";
+  if ((/\b(flight|flights|route|routes|capacity|aviation|airline|carrier|airways)\b/.test(t))
+      && /\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|halt|slash|defer|trim|drop)\w*/.test(t))
+    return "Aviation demand response: carriers trimming capacity signal jet-fuel cost or availability stress feeding straight into route economics.";
+  if (/\b(ration|rationing|allocation|curfew)\b/.test(t))
+    return "Rationing or allocation controls confirm a physical shortage; commercial offtake is restricted before pump prices fully adjust.";
   if (/\b(export ban|import ban|export quota|import quota|embargo)\b/.test(t))
     return "Trade controls reroute flows; expect tighter spot availability and wider freight differentials on affected grades.";
   if (/\b(subsidy|subsidies|levy|levies|duty|excise|tax|price control|price cap|price freeze)\b/.test(t))
@@ -337,6 +352,12 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
     "Rosneft", "Gazprom", "Sinopec", "CNPC", "CNOOC", "Reliance",
     "Indian Oil", "Bharat Petroleum", "Hindustan Petroleum", "ONGC",
     "Pertamina", "Petronas",
+    // Airlines (aviation demand response shows the carrier as the actor).
+    "IndiGo", "Emirates", "easyJet", "Jet2", "Lufthansa", "Qantas",
+    "Ryanair", "Wizz Air", "Air India", "SpiceJet", "Vistara", "Cathay",
+    "Singapore Airlines", "Garuda", "Lion Air", "Thai Airways",
+    "Vietnam Airlines", "Philippine Airlines", "Cebu Pacific", "AirAsia",
+    "Akasa", "Yemenia",
   ];
   for (const a of ACTORS) {
     if (t.includes(a.toLowerCase())) return a;
@@ -380,9 +401,20 @@ function nearDuplicate(a: Set<string>, b: Set<string>): boolean {
   for (const x of a) if (b.has(x)) overlap++;
   const smaller = Math.min(a.size, b.size);
   if (smaller === 0) return false;
-  // Same story when the titles share a strong block of content words, or
-  // when most of the shorter title's content is contained in the other.
-  return overlap >= 4 || overlap >= Math.ceil(0.7 * smaller);
+  // Jaccard similarity guards the absolute-overlap branch. During a fuel
+  // crisis two genuinely DIFFERENT actions ("IndiGo Suspends 7 Asian
+  // Routes … Fuel Crisis 2026" vs "Emirates Cuts 14% of Flights … Fuel
+  // Crisis 2026") share a block of generic crisis vocabulary ("fuel",
+  // "crisis", "major", the year) — enough to trip a bare overlap >= 4 and
+  // wrongly collapse two distinct carriers' actions into one row. A real
+  // syndicated rewrite of the SAME story shares its DISTINCTIVE tokens at
+  // a high ratio, so requiring Jaccard >= 0.4 alongside the absolute count
+  // keeps true syndication merging while letting the two airlines stand.
+  const jaccard = overlap / (a.size + b.size - overlap);
+  // Same story when the titles share a strong block of distinctive content
+  // words (absolute overlap AND a high similarity ratio), or when most of
+  // the shorter title's content is contained in the other.
+  return (overlap >= 4 && jaccard >= 0.4) || overlap >= Math.ceil(0.7 * smaller);
 }
 
 /**
@@ -437,10 +469,12 @@ export function buildFuelProducerBuyerActions(opts: {
     "Infrastructure / routing action",
     "Market / supply signal",
   ];
-  const PER_CATEGORY = 2;
-  // Capped at 4 rows so the table stays on a single page block and never
-  // spills an orphaned row onto the next page.
-  const TOTAL_CAP = 4;
+  const PER_CATEGORY = 3;
+  // Up to 8 rows overall. During an active fuel crisis the window carries
+  // many genuine producer/buyer/government actions, so a 4-row cap read as
+  // sparse; 8 captures the breadth while the PDF exporter's pre-measured
+  // keep-together logic paginates the block cleanly (no orphaned rows).
+  const TOTAL_CAP = 8;
   const out: ProducerBuyerActionRow[] = [];
   for (const cat of ORDER) {
     const items = raw.filter((r) => r.category === cat).slice(0, PER_CATEGORY);

@@ -108,12 +108,12 @@ export interface FuelMarketData {
   /** Auto-derived 2-paragraph Market Read prose. Null when no market
    *  data is available (caller renders nothing). */
   marketRead: string | null;
-  /** Set when the jet-fuel series (EIA/FRED, published on a lag) stops
-   *  BEFORE the reporting-period end (which is anchored to the freshest
-   *  market close — usually Brent/WTI). The note explains the in-period
-   *  date gap so the jet chart's earlier "Latest" date never reads as a
-   *  contradiction of the cover/period. Null when jet fuel is current to
-   *  the period end (the dates already agree). */
+  /** Set when the jet-fuel proxy series stops BEFORE the reporting-period
+   *  end (which is anchored to the freshest market close — usually
+   *  Brent/WTI). With the daily NY Harbor ULSD proxy the dates normally
+   *  agree and this stays null; it only fires if the proxy falls back to
+   *  the weekly EIA series. The note explains the in-period date gap so the
+   *  jet chart's earlier "Latest" date never reads as a contradiction. */
   jetDataNote: string | null;
 }
 
@@ -224,7 +224,7 @@ export function buildFuelWatchReportData(
   //   3. the latest trajectory point
   // The card label is always the bare "Jet fuel" string so the Fast
   // Facts grid reads "JET FUEL" uppercased; the benchmark moves into
-  // the `note` subline ("US Gulf Coast kerosene-type").
+  // the `note` subline ("NY Harbor ULSD (heating oil) - jet fuel proxy").
   let jetFuel: FuelDataCard | null = findCard(prices, JET_RE);
   if (jetFuel) jetFuel = normaliseJetCard(jetFuel);
   if (!jetFuel && parsed.jetFuel?.latestValue !== undefined) {
@@ -346,10 +346,12 @@ export function buildFuelWatchReportData(
 
   // Jet-fuel lag note. The reporting period ends on the freshest market
   // close the report carries (fuelMarketLatestDate — usually Brent/WTI from
-  // the daily futures feed). The EIA/FRED jet-fuel series publishes on a
-  // lag, so its latest dated point can fall a few days inside that period.
-  // When it does, surface an explicit in-period note so the jet chart's
-  // earlier "Latest" date is explained, not perceived as a mismatch.
+  // the daily futures feed). The jet figure is the daily NY Harbor ULSD
+  // proxy, so it normally runs to the same date and no note appears; this
+  // only fires if the proxy fell back to the weekly EIA jet series, whose
+  // latest point can land a few days inside the period. When it does,
+  // surface an in-period note so the jet chart's earlier "Latest" date is
+  // explained, not perceived as a mismatch.
   const periodEnd = fuelMarketLatestDate(report.hardNumbers);
   const jetDates: string[] = [];
   const pushJet = (raw: string | undefined | null) => {
@@ -365,9 +367,8 @@ export function buildFuelWatchReportData(
   let jetDataNote: string | null = null;
   if (periodEnd && jetLatest && jetLatest < periodEnd) {
     jetDataNote =
-      `Jet fuel data (EIA/FRED) publishes on a lag — latest available ` +
-      `${formatFuelNoteDate(jetLatest)}; Brent and WTI run to ` +
-      `${formatFuelNoteDate(periodEnd)} (the period end).`;
+      `Jet fuel proxy latest available ${formatFuelNoteDate(jetLatest)}; ` +
+      `Brent and WTI run to ${formatFuelNoteDate(periodEnd)} (the period end).`;
   }
 
   return {
@@ -584,7 +585,7 @@ export const FUEL_MARKET_DATA_SAMPLE = {
     prices: [
       { label: "Brent crude", value: 109.26, unit: "USD/bbl", change: "+7.9% 7d", asOf: "2026-05-15", source: "Manual" },
       { label: "WTI crude", value: 101.02, unit: "USD/bbl", change: "+10.5% 7d", asOf: "2026-05-15", source: "Manual" },
-      { label: "Jet fuel", benchmark: "US Gulf Coast kerosene-type", value: 4.152, unit: "USD/gal", change: "+2.5% 7d", asOf: "2026-05-15", source: "EIA / FRED" },
+      { label: "Jet fuel", benchmark: "NY Harbor ULSD (heating oil) - jet fuel proxy", value: 2.41, unit: "USD/gal", change: "+2.5% 7d", asOf: "2026-05-15", source: "NY Harbor ULSD front-month (Yahoo Finance)" },
     ],
     supply: [
       { label: "Fuel shortages / rationing", value: 5, unit: "events", note: "reporting window" },
@@ -597,16 +598,16 @@ export const FUEL_MARKET_DATA_SAMPLE = {
     ],
   },
   jetFuelTrajectory: {
-    benchmark: "US Gulf Coast kerosene-type jet fuel",
-    source: "EIA / FRED",
+    benchmark: "NY Harbor ULSD (heating oil) - jet fuel proxy",
+    source: "NY Harbor ULSD front-month (Yahoo Finance)",
     unit: "USD/gal",
     period: "last 30 days",
     points: [
-      { date: "2026-04-17", value: 3.709 },
-      { date: "2026-04-24", value: 3.906 },
-      { date: "2026-05-01", value: 4.160 },
-      { date: "2026-05-08", value: 4.049 },
-      { date: "2026-05-15", value: 4.152 },
+      { date: "2026-04-17", value: 2.18 },
+      { date: "2026-04-24", value: 2.27 },
+      { date: "2026-05-01", value: 2.39 },
+      { date: "2026-05-08", value: 2.34 },
+      { date: "2026-05-15", value: 2.41 },
     ],
   },
 } as const;
