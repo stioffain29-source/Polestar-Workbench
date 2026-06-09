@@ -140,3 +140,8 @@ incident-only, so there was nothing fabricated to replace there.
   `SELECT key FROM app_migration_markers WHERE key LIKE 'ingest_force%'` (is the
   current version already applied?) and the fuel report's
   `hard_numbers->'fastFacts'->'prices'` jet benchmark label.
+
+## Versioned upstream data URLs go stale silently (fertiliser prices)
+- Durable lesson: a version-stamped upstream data file (World Bank "Pink Sheet" monthly xlsx feeding the fertiliser urea/DAP/potash cards) keeps returning HTTP 200 after its URL rotates, but its data STOPS at that vintage's last month — it froze the cards ~6 months back. A 200 is NOT proof of freshness.
+- **Why:** any hardcoded version-stamped data URL is a time bomb.
+- **How to apply:** prefer DISCOVERING the current link from the source's index/landing page at runtime (fall back to last-known URLs); and verify any price-feed change by checking the LATEST OBSERVATION DATE, not just that the fetch succeeded. A >60-day lag warning now guards the market snapshot.

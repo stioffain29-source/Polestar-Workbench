@@ -204,15 +204,41 @@ export function changeVsPrev(series: Series, onOrBefore: string, suffix: string)
 
 // World Bank "Pink Sheet" monthly commodity prices — the only honest, free,
 // global source for urea / DAP / potash spot prices ($/mt). The workbook URL is
-// version-stamped and rotates ~monthly, so we try the freshest known URL first
-// and fall back to the long-stable one; whichever parses is used and the card
-// always shows the REAL "as of" month, so a slightly older file is never
-// misrepresented as current. Monthly cadence is inherent — there is no daily
-// fertiliser price feed anywhere.
-const WORLD_BANK_XLSX_URLS = [
+// version-stamped and rotates ~monthly (e.g. ...-0050012025/... → ...-0050012026/...),
+// so a HARDCODED url goes stale: it keeps returning HTTP 200 but its data stops
+// at the vintage's last month, silently freezing the cards months in the past.
+// To self-heal, we DISCOVER the current link from the public CMO landing page at
+// runtime and try it first, then fall back to the last-known URLs. Whichever
+// parses is used and the card always shows the REAL "as of" month, so an older
+// file is never misrepresented as current. Monthly cadence is inherent — there
+// is no daily fertiliser price feed anywhere.
+const WORLD_BANK_CMO_PAGE = "https://www.worldbank.org/en/research/commodity-markets";
+const WORLD_BANK_XLSX_FALLBACK_URLS = [
+  "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
   "https://thedocs.worldbank.org/en/doc/18675f1d1639c7a34d463f59263ba0a2-0050012025/related/CMO-Historical-Data-Monthly.xlsx",
-  "https://thedocs.worldbank.org/en/doc/5d903e848db1d1b83e0ec8f744e55570-0350012021/related/CMO-Historical-Data-Monthly.xlsx",
 ];
+
+/**
+ * Scrape the World Bank CMO landing page for the CURRENT monthly-history xlsx
+ * link. The page always points at the freshest workbook, so this is what keeps
+ * the fertiliser cards current after the URL rotates. Returns null on any
+ * failure so the caller falls back to the baked-in URLs.
+ */
+async function discoverWorldBankXlsxUrl(): Promise<string | null> {
+  try {
+    const res = await fetch(WORLD_BANK_CMO_PAGE, {
+      headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const m = html.match(
+      /https:\/\/thedocs\.worldbank\.org\/[^"'\s)]*CMO-Historical-Data-Monthly\.xlsx/i,
+    );
+    return m ? m[0] : null;
+  } catch {
+    return null;
+  }
+}
 
 type WbCommodity = "urea" | "dap" | "potash";
 
@@ -237,7 +263,9 @@ function wbMonthToIso(raw: string): string | null {
 export async function fetchWorldBankFertiliser(startDate: string): Promise<Record<string, Series>> {
   const ExcelJS = (await import("exceljs")).default;
   let lastErr: unknown;
-  for (const url of WORLD_BANK_XLSX_URLS) {
+  const discovered = await discoverWorldBankXlsxUrl();
+  const urls = [...new Set([discovered, ...WORLD_BANK_XLSX_FALLBACK_URLS].filter((u): u is string => !!u))];
+  for (const url of urls) {
     try {
       // The 770KB+ xlsx download is large and its CDN intermittently resets the
       // connection ("fetch failed"). Retry a few times per URL with backoff so a

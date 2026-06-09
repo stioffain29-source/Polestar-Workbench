@@ -196,6 +196,15 @@ export async function runMarketSnapshotIngest(
       const latest = valueAsOf(series, anchor) ?? series.points.at(-1) ?? null;
       if (!latest) throw new Error("no observations in series");
 
+      // Staleness guardrail: even monthly series should lag <~60 days. A larger
+      // gap means the upstream feed froze (e.g. a version-stamped URL that still
+      // returns HTTP 200 but stopped advancing) — surface it loudly so a future
+      // source-layout/URL rotation is caught instead of silently freezing cards.
+      const lagDays = Math.floor((Date.parse(anchor) - Date.parse(latest.date)) / 86_400_000);
+      if (lagDays > 60) {
+        log(`  WARN ${spec.group}:${spec.key} latest=${latest.date} lags ${lagDays}d — feed may be stale`);
+      }
+
       const value = round(latest.value, spec.decimals);
       const change =
         spec.changeMode === "prev"
