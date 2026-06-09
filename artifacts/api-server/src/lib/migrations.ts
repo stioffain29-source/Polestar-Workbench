@@ -377,6 +377,68 @@ export async function runDataMigrations(): Promise<void> {
         );
       }
     }
+    // 3d) ONE-TIME purge of out-of-region mis-stamped commodity rows.
+    //
+    //     The fuel / energy / fertiliser monitors are scoped to Asia / Gulf /
+    //     Oceania, but a country-edition Google-News feed cross-syndicates
+    //     foreign stories that name no in-region country. The old ingest blind-
+    //     stamped them with the feed's defaultCountry and dropped them on that
+    //     centroid — a Libyan "libyaupdate.com" fuel crisis tagged Pakistan, a
+    //     Cuba blackout tagged Indonesia, a Texas/Europe outage tagged Myanmar/
+    //     Philippines. The ingest classifier now rejects these at the source;
+    //     this clears the rows already in the DB. Delete (not relocate) — they
+    //     are out of every monitor's scope. Mirrors the ingest guard: a foreign
+    //     signal in title/summary/source AND no in-region country named. Marker-
+    //     gated so it runs once and never touches legitimate rows that merely
+    //     cite a foreign country alongside an in-region one.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      // NOTE: backslashes are DOUBLED (\\y, \\.) because this string is a JS
+      // template literal first — a single \y reaches Postgres as a bare "y" and
+      // silently mangles the regex (a previous pass deleted the wrong rows that
+      // way). Word boundaries (\\y) gate the TEXT; the SOURCE is matched as a
+      // SUBSTRING (no boundary) so a masthead like "libyaupdate.com" still
+      // resolves to Libya — exactly mirroring the ingest classifier's
+      // hasWord(text) || source.includes(token) logic.
+      const FOREIGN =
+        "libya|egypt|nigeria|niger|sudan|algeria|morocco|tunisia|ethiopia|kenya|ghana|somalia|angola|zambia|zimbabwe|uganda|tanzania|cameroon|senegal|mozambique|cuba|venezuela|colombia|brazil|argentina|mexico|texas|france|germany|spain|italy|britain|british|england|ireland|europe|european";
+      // INREGION is deliberately WIDE — it is the protective guard: any row that
+      // mentions one of these is kept. It must err toward over-matching so a
+      // legitimate in-region story is never purged. Includes subnational/state
+      // aliases (punjab, sindh, queensland, …) and demonyms beyond the runtime
+      // country list, because a valid story may name only a province or city.
+      const INREGION =
+        "india|indian|delhi|mumbai|kolkata|chennai|bengaluru|hyderabad|pune|ahmedabad|punjab|sindh|gujarat|maharashtra|kerala|tamil nadu|assam|bihar|rajasthan|pakistan|pakistani|karachi|lahore|islamabad|peshawar|quetta|rawalpindi|bangladesh|bangladeshi|dhaka|chittagong|sri lanka|sri lankan|colombo|nepal|nepali|kathmandu|bhutan|maldives|afghanistan|afghan|kabul|myanmar|burma|burmese|yangon|mandalay|naypyidaw|indonesia|indonesian|jakarta|java|sumatra|surabaya|bali|borneo|kalimantan|sulawesi|philippines|filipino|manila|luzon|mindanao|cebu|davao|vietnam|vietnamese|hanoi|ho chi minh|saigon|thailand|thai|bangkok|phuket|malaysia|malaysian|kuala lumpur|penang|sabah|sarawak|singapore|brunei|cambodia|cambodian|phnom penh|laos|lao|vientiane|timor|china|chinese|beijing|shanghai|guangzhou|shenzhen|hong kong|macau|japan|japanese|tokyo|osaka|nagoya|yokohama|korea|korean|seoul|busan|incheon|taiwan|taiwanese|taipei|kaohsiung|iran|iranian|tehran|isfahan|iraq|iraqi|baghdad|basra|mosul|syria|syrian|saudi|riyadh|jeddah|dammam|uae|emirati|dubai|abu dhabi|sharjah|qatar|qatari|doha|kuwait|kuwaiti|oman|omani|muscat|bahrain|bahraini|manama|yemen|yemeni|sanaa|jordan|jordanian|amman|lebanon|lebanese|beirut|israel|israeli|jerusalem|tel aviv|gaza|turkey|turkish|ankara|istanbul|australia|australian|sydney|melbourne|brisbane|perth|adelaide|canberra|queensland|victoria|new south wales|tasmania|new zealand|kiwi|auckland|wellington|christchurch|papua|pacific|fiji|solomon|vanuatu";
+      const markerKey = "commodity_out_of_region_purge_v3";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM incidents
+          WHERE topic IN ('fuel', 'energy', 'fertiliser')
+            AND (
+              (COALESCE(title,'') || ' ' || COALESCE(summary,'')) ~* ('\\y(' || ${FOREIGN} || ')\\y')
+              OR COALESCE(source,'') ~* ('(' || ${FOREIGN} || ')')
+            )
+            AND (COALESCE(title,'') || ' ' || COALESCE(summary,'') || ' ' || COALESCE(source,'')) !~* ('\\y(' || ${INREGION} || ')\\y')
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time purge of out-of-region mis-stamped fuel/energy/fertiliser rows",
+        );
+      }
+    }
+
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never

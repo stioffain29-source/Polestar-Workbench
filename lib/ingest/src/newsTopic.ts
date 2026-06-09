@@ -74,7 +74,82 @@ function detectCountry(hay: string, aliases: CountryAlias[]): string | null {
   return match ? match.canonical : null;
 }
 
-function classify(title: string, summary: string, feed: Feed, cfg: NewsTopicConfig): Classified {
+// Countries OUTSIDE every monitor's Asia / Gulf / Oceania footprint. A
+// country-edition Google-News feed routinely cross-syndicates a foreign story
+// that names NO in-region country (e.g. a Libyan "libyaupdate.com" fuel story
+// surfacing in the Pakistan edition). The old code then blind-stamped it with
+// the feed's defaultCountry and the geocoder dropped it on that country's
+// centroid — a Libya story tagged Pakistan, a Cuba blackout tagged Indonesia.
+// When the text names no in-region country AND a foreign signal appears in the
+// title/summary (word match) or the source name/domain (substring), reject the
+// row rather than mis-stamp it. Deliberately omits turkey / russia / europe-as-
+// single-token where they collide with legitimate Middle East coverage; europe/
+// european is kept because the failing rows were literally European jet-fuel
+// stories stamped Philippines and no in-region Gulf alias overlaps it.
+const OUT_OF_REGION: { token: string; canonical: string }[] = [
+  // Africa
+  { token: "libya", canonical: "Libya" },
+  { token: "egypt", canonical: "Egypt" },
+  { token: "nigeria", canonical: "Nigeria" },
+  { token: "niger", canonical: "Niger" },
+  { token: "sudan", canonical: "Sudan" },
+  { token: "algeria", canonical: "Algeria" },
+  { token: "morocco", canonical: "Morocco" },
+  { token: "tunisia", canonical: "Tunisia" },
+  { token: "ethiopia", canonical: "Ethiopia" },
+  { token: "kenya", canonical: "Kenya" },
+  { token: "ghana", canonical: "Ghana" },
+  { token: "somalia", canonical: "Somalia" },
+  { token: "angola", canonical: "Angola" },
+  { token: "zambia", canonical: "Zambia" },
+  { token: "zimbabwe", canonical: "Zimbabwe" },
+  { token: "uganda", canonical: "Uganda" },
+  { token: "tanzania", canonical: "Tanzania" },
+  { token: "cameroon", canonical: "Cameroon" },
+  { token: "senegal", canonical: "Senegal" },
+  { token: "mozambique", canonical: "Mozambique" },
+  { token: "south africa", canonical: "South Africa" },
+  // Americas
+  { token: "cuba", canonical: "Cuba" },
+  { token: "venezuela", canonical: "Venezuela" },
+  { token: "colombia", canonical: "Colombia" },
+  { token: "brazil", canonical: "Brazil" },
+  { token: "argentina", canonical: "Argentina" },
+  { token: "mexico", canonical: "Mexico" },
+  { token: "texas", canonical: "United States" },
+  { token: "american", canonical: "United States" },
+  // Europe
+  { token: "france", canonical: "France" },
+  { token: "germany", canonical: "Germany" },
+  { token: "spain", canonical: "Spain" },
+  { token: "italy", canonical: "Italy" },
+  { token: "britain", canonical: "United Kingdom" },
+  { token: "england", canonical: "United Kingdom" },
+  { token: "ireland", canonical: "Ireland" },
+  { token: "europe", canonical: "Europe" },
+  { token: "european", canonical: "Europe" },
+];
+
+// Source-domain fragments that betray a foreign publisher even when the text
+// names no country. Substring-matched against the source name + host because a
+// masthead like "libyaupdate.com" has no word boundary around "libya".
+const OUT_OF_REGION_DOMAIN = [".uk", ".eg", ".ly", ".ng", ".za"];
+
+function detectOutOfRegion(textHay: string, sourceHay: string): string | null {
+  for (const { token, canonical } of OUT_OF_REGION) {
+    if (hasWord(textHay, token) || sourceHay.includes(token)) return canonical;
+  }
+  if (OUT_OF_REGION_DOMAIN.some((d) => sourceHay.includes(d))) return "Foreign";
+  return null;
+}
+
+function classify(
+  title: string,
+  summary: string,
+  feed: Feed,
+  cfg: NewsTopicConfig,
+  source = "",
+): Classified {
   const hay = `${title}\n${summary}`.toLowerCase();
 
   const denyHit = cfg.deny.find((d) => hay.includes(d));
@@ -85,7 +160,17 @@ function classify(title: string, summary: string, feed: Feed, cfg: NewsTopicConf
 
   // Land-based incidents are usually in the feed's country, so accept a country
   // match anywhere in title+summary then fall back to the per-feed default.
-  const country = detectCountry(hay, cfg.countryAliases) ?? feed.defaultCountry;
+  const detected = detectCountry(hay, cfg.countryAliases);
+
+  // No in-region country in the text means we are about to blind-trust the
+  // feed's defaultCountry. Before doing so, reject obvious cross-syndicated
+  // foreign stories so they are not mis-stamped onto an in-region centroid.
+  if (!detected) {
+    const foreign = detectOutOfRegion(hay, source.toLowerCase());
+    if (foreign) return { kept: false, reason: `out-of-region:${foreign}`, country: null };
+  }
+
+  const country = detected ?? feed.defaultCountry;
 
   return { kept: true, reason: `allow:${allowHit}`, country };
 }
@@ -182,16 +267,22 @@ export async function runNewsTopicIngest(
           continue;
         }
 
-        const c = classify(title, summary, feed, cfg);
+        const dashIdx = title.lastIndexOf(" - ");
+        const sourceName = dashIdx > 0 ? title.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
+        const cleanTitle = dashIdx > 0 ? title.slice(0, dashIdx).trim() : title;
+        let host = "";
+        try {
+          host = new URL(link).hostname.replace(/^www\./, "");
+        } catch {
+          /* link may be a Google News redirect without a parseable host */
+        }
+
+        const c = classify(cleanTitle, summary, feed, cfg, `${sourceName} ${host}`);
         if (!c.kept || !c.country) {
           rejected.push({ title, reason: c.reason, feedLabel: feed.label });
           perFeed[feed.label].rejected++;
           continue;
         }
-
-        const dashIdx = title.lastIndexOf(" - ");
-        const sourceName = dashIdx > 0 ? title.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
-        const cleanTitle = dashIdx > 0 ? title.slice(0, dashIdx).trim() : title;
 
         accepted.push({
           title: cleanTitle.slice(0, 500),
