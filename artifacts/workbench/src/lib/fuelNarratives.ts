@@ -226,7 +226,14 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     category: "Government / policy action",
     test: [
-      /\b(government|ministry|parliament|cabinet|regulator|state[- ]owned|caucus|municipality|municipal|council|authority|authorities)\b/,
+      // An institution ALONE is not a policy action — it must pair with a
+      // concrete policy lever (subsidy/levy/tax/duty, price control, trade
+      // ban/quota, rationing/allocation/curfew, mandate/sanction,
+      // nationalisation), in either order. A bare mention — e.g. "Municipality
+      // monitors fuel crisis and announces start of supply arrivals" — is
+      // operational supply news, not a government policy intervention.
+      /\b(government|ministry|parliament|cabinet|regulator|state[- ]owned|caucus|municipality|municipal|council|authority|authorities)\b.{0,80}\b(subsid\w+|levy|levies|duty|duties|excise|tax|tariff|price (control|cap|freeze)|export ban|import ban|\bban\b|quota|ration\w*|allocation|curfew|mandate|sanction\w*|nationali[sz]\w+)\b/,
+      /\b(subsid\w+|levy|levies|duty|duties|excise|tariff|price (control|cap|freeze)|export ban|import ban|quota|ration\w*|allocation|curfew|mandate|sanction\w*|nationali[sz]\w+)\b.{0,80}\b(government|ministry|parliament|cabinet|regulator|state[- ]owned|caucus|municipality|municipal|council|authority|authorities)\b/,
       /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene)/,
       /\b(fuel|petrol|diesel) .{0,20}(subsidy|levy|duty|excise|tax) (cut|hike|raise|removal|removed|reform|reintroduce)/,
       /\b(price control|price cap|price freeze|export ban|import ban|export quota|import quota)/,
@@ -277,6 +284,10 @@ const CATEGORY_RULES: CategoryRule[] = [
       /\b(jet fuel|diesel|petrol|gasoline|kerosene) (price|prices) (rise|fall|climb|drop|surge|slide|hit|break)/,
       /\b(supply (tighten|tightens|squeeze)|demand (jump|rise|fall|drop)|inventory (build|draw))/,
       /\b(refinery margin|crack spread)/,
+      // Supply resuming / arriving / shortage easing is a genuine availability
+      // signal (bearish for local pump prices), not a policy action.
+      /\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/,
+      /\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/,
     ],
   },
 ];
@@ -319,6 +330,9 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
     return "Added barrels ease near-term tightness but rarely move prices on their own without demand confirmation.";
   if (/\b(supply (tighten|tightens|squeeze)|inventory draw)/.test(t))
     return "Tightening balances put a floor under prices and reduce buyer flexibility on the next cycle.";
+  if (/\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/.test(t)
+      || /\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/.test(t))
+    return "Supply resuming eases the local shortage; pump-price and surcharge pressure should soften as availability normalises.";
   if (/\b(price|prices) (rise|climb|surge|jump|hit|reach|break)/.test(t))
     return "Reinforces the cost-pressure picture; freight surcharges and bunker invoices follow on the next cycle.";
   // Per-category fallbacks (different from each other so the table never
