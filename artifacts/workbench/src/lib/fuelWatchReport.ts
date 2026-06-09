@@ -49,7 +49,7 @@ function formatFuelNoteDate(iso: string): string {
 export const FUEL_MISSING_REQUIRED_NOTE =
   "Fuel Watch is missing required market data. Add Brent, WTI and jet fuel data before export.";
 export const FUEL_JET_MISSING_NOTE =
-  "Jet fuel data has not been loaded for this reporting cycle.";
+  "Jet fuel data has not been loaded for this report.";
 
 // Detection patterns for the headline crude/jet rows. Kept narrow on
 // purpose so a card titled "Brent" wins over a generic "Crude oil" card.
@@ -337,11 +337,11 @@ export function buildFuelWatchReportData(
   // and incident layer specifically rather than asserting an absence.
   if (!hasSupplyOrPolicy && !hasRelatedIncidents) {
     warnings.push(
-      "No supply, policy or route indicators in the Fast Facts grid or the incident layer this cycle.",
+      "No supply, policy or route indicators in the Fast Facts grid or the incident layer right now.",
     );
   }
   if (!hasRelatedIncidents) {
-    warnings.push("No related fuel incidents in the reporting window.");
+    warnings.push("No related fuel incidents were reported recently.");
   }
 
   // Jet-fuel lag note. The reporting period ends on the freshest market
@@ -482,18 +482,18 @@ export function buildFuelMarketRead(opts: {
     else dir = "holding above the start of the period";
     const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
     parts.push(
-      `The jet fuel series is ${dir}, with the latest read at ${last.toFixed(3)} ${jetUnit} versus ${first.toFixed(3)} at the start (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
+      `The jet fuel series is ${dir}, with the latest figure at ${last.toFixed(3)} ${jetUnit} versus ${first.toFixed(3)} at the start (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
     );
   } else if (jetFuel) {
     const jv = numVal(jetFuel);
     if (jv !== null && !Number.isNaN(jv)) {
-      parts.push(`Jet fuel is printing at ${jv.toFixed(3)} ${jetFuel.unit ?? "USD/gal"}, anchoring the aviation-linked cost line.`);
+      parts.push(`Jet fuel is running at ${jv.toFixed(3)} ${jetFuel.unit ?? "USD/gal"}, anchoring the aviation-linked cost line.`);
     }
   }
 
   const para1 = parts.join(" ");
   const para2 =
-    "The combined read points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so the market indicators here should be treated as the cost-floor for any decisions further down the report.";
+    "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
   return para1 ? `${para1}\n\n${para2}` : para2;
 }
 
@@ -588,10 +588,10 @@ export const FUEL_MARKET_DATA_SAMPLE = {
       { label: "Jet fuel", benchmark: "U.S. Gulf Coast kerosene-type jet fuel", value: 2.41, unit: "USD/gal", change: "+2.5% 7d", asOf: "2026-05-15", source: "EIA / FRED (DJFUELUSGULF)" },
     ],
     supply: [
-      { label: "Fuel shortages / rationing", value: 5, unit: "events", note: "reporting window" },
+      { label: "Fuel shortages / rationing", value: 5, unit: "events", note: "this week" },
     ],
     policy: [
-      { label: "Subsidy / levy moves", value: 1, unit: "policy event", note: "reporting window" },
+      { label: "Subsidy / levy moves", value: 1, unit: "policy event", note: "this week" },
     ],
     routes: [
       { label: "Fuel-relevant chokepoint pressure", value: 15, unit: "records", note: "Hormuz / route disruption" },

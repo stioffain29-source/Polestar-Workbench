@@ -265,12 +265,12 @@ export function computeHormuzStatus(
   } else if (hasTraffic) {
     tone = "constrained";
     headline = "High-risk operating environment.";
-    detail = "No new confirmed kinetic incident in the latest reporting window, but traffic remains constrained and security/insurance conditions remain abnormal.";
+    detail = "No new confirmed attack in the latest reporting period, but traffic remains constrained and security and insurance conditions remain abnormal.";
   } else {
     tone = "elevated";
     headline = "Elevated chokepoint signal.";
     const others = activeCategoryLabels.join("; ");
-    detail = `No new kinetic incident or traffic restriction in the latest window, but ${others} indicator${activeCategoryLabels.length === 1 ? " is" : "s are"} active. Standing exposure to the Strait remains.`;
+    detail = `No new attack or traffic restriction in the latest period, but ${others} indicator${activeCategoryLabels.length === 1 ? " is" : "s are"} active. Standing exposure to the Strait remains.`;
   }
 
   return {

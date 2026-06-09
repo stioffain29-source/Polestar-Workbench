@@ -326,7 +326,7 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
   if (rows.length === 0) {
     return (
       <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        {emptyMessage ?? "No data in window."}
+        {emptyMessage ?? "No data reported this week."}
       </p>
     );
   }
@@ -576,7 +576,7 @@ export default function ShippingReportPreview({
             rows={ds.vesselRows}
             actLabel="Act"
             actFor={(r) => r.vesselType}
-            emptyMessage="No hostile vessel incidents on file in this window."
+            emptyMessage="No hostile vessel incidents reported this week."
           />
           <div
             className="uppercase mb-2 mt-4"
@@ -588,7 +588,7 @@ export default function ShippingReportPreview({
             rows={ds.piracyRows}
             actLabel="Act"
             actFor={(r) => r.act}
-            emptyMessage="No piracy or armed-robbery records in this window."
+            emptyMessage="No piracy or armed-robbery reports this week."
           />
         </Section>
 
@@ -613,7 +613,7 @@ export default function ShippingReportPreview({
             >
               Records by Region
             </div>
-            <HorizontalBarChart rows={ds.regionRows} labelW={180} emptyMessage="No regional classifications in window." />
+            <HorizontalBarChart rows={ds.regionRows} labelW={180} emptyMessage="No regional classifications reported this week." />
           </div>
           <div
             className="uppercase mb-2"
@@ -621,7 +621,7 @@ export default function ShippingReportPreview({
           >
             {ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country"}
           </div>
-          <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries in window." />
+          <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries reported this week." />
         </Section>
 
         <Section title="What Matters">

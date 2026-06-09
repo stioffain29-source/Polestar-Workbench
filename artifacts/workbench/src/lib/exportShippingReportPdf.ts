@@ -380,7 +380,7 @@ function drawHorizontalBarChart(
     setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     pdf.text(
-      sanitize(opts.emptyMessage ?? "No data in window."),
+      sanitize(opts.emptyMessage ?? "No data reported this week."),
       MX,
       ctx.y + 10,
     );
@@ -616,7 +616,7 @@ export async function exportShippingReportPdf(
     {
       showActColumn: true,
       actFor: (r) => r.vesselType,
-      emptyMessage: "No hostile vessel incidents on file in this window.",
+      emptyMessage: "No hostile vessel incidents reported this week.",
     },
   );
   drawIncidentTable<PiracyRow>(
@@ -626,7 +626,7 @@ export async function exportShippingReportPdf(
     {
       showActColumn: true,
       actFor: (r) => r.act,
-      emptyMessage: "No piracy or armed-robbery records in this window.",
+      emptyMessage: "No piracy or armed-robbery reports this week.",
     },
   );
 
@@ -653,7 +653,7 @@ export async function exportShippingReportPdf(
   );
   drawHorizontalBarChart(ctx, "Records by Region", ds.regionRows, {
     labelW: 160,
-    emptyMessage: "No regional classifications in window.",
+    emptyMessage: "No regional classifications reported this week.",
   });
   drawHorizontalBarChart(
     ctx,
@@ -663,7 +663,7 @@ export async function exportShippingReportPdf(
     ds.countryRows,
     {
       labelW: 160,
-      emptyMessage: "No identified incident countries in window.",
+      emptyMessage: "No identified incident countries reported this week.",
     },
   );
 

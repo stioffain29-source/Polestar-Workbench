@@ -836,7 +836,7 @@ export function buildFlashpointReportDataset(
       label: "Highest Severity",
       value: hs.label,
       severity: hs.key || undefined,
-      note: hs.key ? "Highest rating in window" : undefined,
+      note: hs.key ? "Highest rating this week" : undefined,
     },
     {
       label: "Top Issue Type",
@@ -918,7 +918,7 @@ export function buildFlashpointReportDataset(
   // internal classifier vocabulary.
   const noteParts: string[] = [];
   if (kineticDropped > 0) {
-    noteParts.push(`${kineticDropped} kinetic armed-conflict record${kineticDropped === 1 ? "" : "s"} without a public-order hook were excluded so the read stays focused on activism, protests and civil unrest.`);
+    noteParts.push(`${kineticDropped} kinetic armed-conflict record${kineticDropped === 1 ? "" : "s"} without a public-order hook were excluded so this report stays focused on activism, protests and civil unrest.`);
   }
   if (courtDropped > 0) {
     noteParts.push(`${courtDropped} court-only legal-process record${courtDropped === 1 ? " was" : "s were"} excluded for lack of a civil-unrest hook.`);
@@ -1013,7 +1013,7 @@ function stalenessPrefix(rows: EnrichedIncident[], windowEnd: Date): string {
 
 function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, windowEnd: Date): string {
   if (rows.length === 0) {
-    return `No qualifying protest, strike, student-activism or sit-in records reached the file across ${windowLabel}. Treat the quiet cycle as a reporting gap rather than a sustained easing: activism cadence in the covered geographies tends to be lumpy, with thin weeks routinely followed by a sharp escalation around a policy trigger or anniversary.\n\nKeep tracking opposition political calendars, union notifications, student-body statements and sectoral chambers (chemists, transporters, lawyers, traders) — those are the leading indicators that the next cycle will firm up rather than stay quiet.`;
+    return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. Treat the quiet stretch as a gap in reporting rather than a lasting easing: protest activity in these countries tends to come in bursts, with quiet weeks often followed by a sharp escalation around a policy decision or anniversary.\n\nKeep tracking opposition political calendars, union notices, student-body statements and trade groups (chemists, transporters, lawyers, traders) — these are the earliest signs that activity will pick up again rather than stay quiet.`;
   }
   const lead = pickLead(rows);
   // Driver fingerprinting drives prose shape rather than a generic
@@ -1028,11 +1028,11 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
   if (sectoral.length > 0) drivers.push("sectoral chamber and union action");
   if (student.length > 0) drivers.push("student and campus activism");
   const headline = lead
-    ? `Across ${windowLabel} the activism picture is led by "${lead.title}" and sits in the ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "moderate"} severity band on current file evidence.`
-    : `Across ${windowLabel} the activism picture carries no single dominant lead record, though the underlying organising signal remains intact in the file.`;
+    ? `Across ${windowLabel} the activism picture is led by "${lead.title}", which falls in the ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "moderate"} severity band.`
+    : `Across ${windowLabel} no single event stands out, though the underlying organising activity is clearly continuing.`;
   const driverLine = drivers.length > 0
-    ? `The cycle is being driven by ${joinList(drivers)} — multiple independent organising vectors that are harder for the state to contain than a single-issue wave and that historically convert into rolling road action inside 24-72 hours of an announced date.`
-    : `The cycle is running on background organising rather than any single named driver, which usually signals a thin reporting window rather than a structural easing.`;
+    ? `Activity is being driven by ${joinList(drivers)} — several separate organising efforts that are harder for authorities to contain than a single-issue wave and that historically turn into rolling road action within 24-72 hours of an announced date.`
+    : `Activity is running on steady background organising rather than any single named driver, which usually points to a quiet stretch rather than a lasting easing.`;
   const operational = `Operationally, the pressure points to watch are city-centre commercial districts, court complexes, party headquarters, ministry quarters and the main intercity arteries. Staff movement, last-mile logistics and customer-facing footfall are the surfaces that feel the effect first; supply-chain friction from sectoral walkouts tracks one news cycle behind.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${driverLine}\n\n${operational}`;
@@ -1041,7 +1041,7 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
 
 function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, windowEnd: Date): string {
   if (rows.length === 0) {
-    return `No qualifying riot, clash, crackdown, curfew or security-force operation records reached the file across ${windowLabel}. A blank civil-unrest cycle alongside activism reporting usually means the state response has stayed below the threshold of mass arrests or curfew orders — useful, but reversible inside a single news cycle if a protest crosses a policy line.\n\nKeep tracking police statements, district-administration orders, internet-shutdown notices and any military-aid-to-civil-power references. Those move ahead of curfew impositions and visible street-level enforcement.`;
+    return `Little riot, clash, crackdown, curfew or security-force activity was reported across ${windowLabel}. A quiet stretch for civil unrest alongside continuing protest activity usually means the authorities have held back from mass arrests or curfew orders — useful, but it can reverse within days if a protest crosses a policy line.\n\nKeep tracking police statements, local government orders, internet-shutdown notices and any move to call in the military. These tend to come ahead of curfews and visible street-level enforcement.`;
   }
   const lead = pickLead(rows);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
@@ -1053,12 +1053,12 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (hasCrackdown) postureBits.push("visible enforcement has crossed the threshold of measured policing");
   if (hasRiotClash) postureBits.push("street-level disorder is on the record");
   const headline = lead
-    ? `The civil-unrest read across ${windowLabel} is anchored on "${lead.title}", carrying the heaviest weight in the file.`
-    : `The civil-unrest read across ${windowLabel} sits behind the activism picture rather than ahead of it, with no single dominant lead record.`;
+    ? `The civil-unrest picture across ${windowLabel} centres on "${lead.title}", the most significant event reported.`
+    : `The civil-unrest picture across ${windowLabel} sits behind the protest activity rather than ahead of it, with no single standout event.`;
   const postureLine = postureBits.length > 0
-    ? `State posture this cycle is the operative signal: ${joinList(postureBits)}. That changes the runway from announced rally to kinetic incident from days to hours and raises the probability that the next mobilisation date attracts a hardened response rather than measured policing.`
-    : `State posture this cycle reads as measured rather than escalatory — no curfew impositions, mass-arrest reporting or visible crackdowns on the file. That can flip inside a single news cycle once a high-visibility incident or political trigger lands.`;
-  const operational = `For business users the read is that crackdowns, curfew orders and internet shutdowns matter more than the headline protest count: they signal where staff movement, commercial operations and venue access can be disrupted at short notice. Where enforcement clusters around a single city or district, expect rolling road closures, intermittent connectivity and same-day venue access restrictions.`;
+    ? `How the authorities are responding is the key point right now: ${joinList(postureBits)}. That shortens the time from an announced rally to violence from days to hours and raises the chance that the next protest date draws a tougher response rather than measured policing.`
+    : `The authorities' response looks measured rather than escalating — no curfews, mass arrests or visible crackdowns have been reported. That can change within days once a high-profile incident or political trigger occurs.`;
+  const operational = `For businesses, the takeaway is that crackdowns, curfew orders and internet shutdowns matter more than the headline number of protests: they show where staff movement, commercial operations and venue access can be disrupted at short notice. Where enforcement clusters around a single city or district, expect rolling road closures, patchy connectivity and same-day venue access restrictions.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${postureLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -1081,13 +1081,13 @@ function buildForecastRead(opts: {
   // by the exporter when at least one credible future-dated record is
   // present. Prose then carries trajectory commentary only.
   const futureBlock = hasFutureTable
-    ? `Confirmed forward-looking items are listed in the table above and should be the first reference points for the next 7-14 days. The trajectory commentary below sits behind that scheduled calendar.`
-    : `No confirmed future-dated protest calls, strike notices or scheduled hearings were identified in the current file. The forecast below is therefore an assessment of likely trajectory based on current mobilisation patterns rather than a list of scheduled events.`;
+    ? `Confirmed upcoming events are listed in the table above and are the first things to plan around for the next 7-14 days. The outlook below builds on that schedule.`
+    : `No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported. The outlook below is therefore an assessment of the likely direction based on current activity rather than a list of scheduled events.`;
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
   const lines: string[] = [futureBlock];
   if (total === 0) {
-    lines.push(`Forecast for the next 7-14 days is for a continued thin reporting cycle, with limited fresh activism or civil-unrest reporting expected on current signals. The risk increases if a policy trigger lands (court ruling, fuel-price decision, election-calendar event) or a named opposition movement publishes a fresh protest schedule. The risk eases if political calendars stay quiet and sectoral chambers remain unmobilised.`);
+    lines.push(`The outlook for the next 7-14 days is for continued quiet, with little fresh protest or civil-unrest activity expected for now. The risk increases if a policy trigger occurs (a court ruling, a fuel-price decision, an election-calendar event) or a named opposition movement announces a fresh protest schedule. The risk eases if political calendars stay quiet and trade groups hold back.`);
     return lines.join("\n\n");
   }
   const allRows = [...activismRows, ...unrestRows];
@@ -1118,39 +1118,39 @@ function buildForecastRead(opts: {
       ? `, which is why it leads the forward-looking table even though it is not the busiest country`
       : ``;
     lines.push(
-      `Two distinct leads sit in this file and they must be read together. On volume, ${lead.label} carries the heaviest concentration and is the most likely source of recurring, lower-intensity disruption. On severity, the sharper signal is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — a smaller count but a higher escalation ceiling${tableClause}. A higher count is not the same as a higher ceiling: plan for breadth of disruption across ${lead.label} and for escalation depth in ${sevCountry}.`,
+      `Two different stories sit side by side here and should be read together. By volume, ${lead.label} sees the most activity and is the most likely source of repeated, lower-level disruption. For seriousness, the sharper concern is ${sevCountry}, where ${shortSignalLabel(sevInc)} rated ${sevHs.label} — less frequent but with more potential to escalate${tableClause}. More events is not the same as more dangerous ones: plan for widespread disruption across ${lead.label} and for sharper escalation in ${sevCountry}.`,
     );
   } else if (lead && tableLeadDiffers) {
     // Volume leader and forecast-table leader differ, but on count not
     // severity. Explain the table is a scheduling signal, not a ranking.
     const sig = forecastLeadSignal ? ` (${forecastLeadSignal})` : "";
     lines.push(
-      `Read the forward-looking table and the country chart together. ${lead.label} carries the heaviest concentration on the file this cycle and remains the most likely source of recurring disruption. The forecast table leads with ${forecastLeadCountry}${sig} only because it holds the clearest confirmed future-dated item — a scheduling signal for the next 7-14 days, not an indication that ${forecastLeadCountry} outranks ${lead.label} on volume or severity. Plan for sustained, broad-based disruption in ${lead.label} and treat the ${forecastLeadCountry} entry as a dated calendar item to action on the day.`,
+      `The upcoming-events table and the country breakdown point in slightly different directions. ${lead.label} sees the most activity this week and remains the most likely source of repeated disruption. The outlook highlights ${forecastLeadCountry}${sig} only because it has the clearest confirmed upcoming event — something to plan around for the next 7-14 days, not a sign that ${forecastLeadCountry} outweighs ${lead.label} on volume or seriousness. Plan for sustained, widespread disruption in ${lead.label} and treat the ${forecastLeadCountry} item as a fixed calendar date to act on.`,
     );
   } else if (lead) {
     lines.push(
-      `Across the next 7-14 days, ${lead.label} is likely to remain the leading source of activism and civil-unrest reporting on current cadence, carrying the heaviest concentration on the current file. Adjacent cities and university campuses are possible secondary flashpoints.`,
+      `Over the next 7-14 days, ${lead.label} is likely to remain the main source of protest and civil-unrest activity at the current pace, with the highest concentration of events. Nearby cities and university campuses are possible secondary flashpoints.`,
     );
   } else {
     lines.push(
-      `Across the next 7-14 days, the geographic concentration is likely to stay loose on current cadence, with no single country dominating the file. Watch for a coordinated opposition or sectoral call that could sharpen the picture inside a single news cycle.`,
+      `Over the next 7-14 days, activity is likely to stay spread out at the current pace, with no single country standing out. Watch for a coordinated opposition or trade-group call that could sharpen the picture within days.`,
     );
   }
   if (activismShare >= 0.6) {
     lines.push(
-      `Activism reporting dominates the current mix, so the most likely escalation path is from announced rallies and sectoral walkouts into intermittent road closures and city-centre disruption. Risk increases if security forces respond with mass arrests, tear gas or curfew orders; risk eases if organisers stand down voluntarily or political talks open.`,
+      `Protest activity dominates at the moment, so the most likely escalation path is from announced rallies and trade-group walkouts into intermittent road closures and city-centre disruption. Risk increases if security forces respond with mass arrests, tear gas or curfew orders; risk eases if organisers stand down voluntarily or political talks open.`,
     );
   } else if (unrestShare >= 0.6) {
     lines.push(
-      `Civil-unrest reporting dominates the current mix, which usually signals the state response is already running ahead of fresh organising. The most likely path is for visible enforcement (curfews, mass arrests, security operations) to continue. Risk eases if curfew orders are lifted and protest leaders are released; risk increases if a fatality or a high-profile detention triggers a fresh round of street mobilisation.`,
+      `Civil unrest dominates at the moment, which usually means the authorities' response is already running ahead of fresh organising. The most likely path is for visible enforcement — curfews, mass arrests, security operations — to continue. Risk eases if curfews are lifted and protest leaders are released; risk increases if a death or a high-profile arrest triggers a fresh round of street protests.`,
     );
   } else {
     lines.push(
-      `Activism and civil-unrest reporting are roughly balanced, which is the typical pattern when announced rallies are routinely met with police orders and selective detentions. The next 7-14 days are likely to keep that rhythm. Watch for a policy trigger or court decision that tips the balance toward either side.`,
+      `Protest activity and civil unrest are roughly balanced, the typical pattern when announced rallies are routinely met with police orders and selective arrests. The next 7-14 days are likely to keep that rhythm. Watch for a policy trigger or court decision that tips the balance one way or the other.`,
     );
   }
   lines.push(
-    `Cautious read: a thin cycle is not a sustained easing in these geographies. A single political event can repopulate the file inside 48 hours, so the forecast should be treated as a baseline rather than a prediction.`,
+    `A note of caution: a quiet stretch is not a lasting easing in these countries. A single political event can bring activity flooding back within 48 hours, so treat this outlook as a starting point rather than a firm prediction.`,
   );
   return lines.join("\n\n");
 }
@@ -1161,10 +1161,10 @@ function buildRegionalCountryRead(opts: {
 }): string {
   const { enriched, countryRows } = opts;
   if (enriched.length === 0) {
-    return `No qualifying flashpoint records were tied to a country in the briefing window, so the geographic picture is empty this cycle. Across the covered geographies a blank cycle is unusual rather than reassuring: opposition political calendars, sectoral chambers and student bodies typically repopulate the file inside a single news cycle once a policy trigger or anniversary lands.\n\nFor business users the practical read is that standing readiness on the historically affected city-centre commercial districts, transport hubs and government precincts should not be drawn down on the strength of one thin reporting cycle.`;
+    return `No activity could be tied to a specific country this week, so there is no geographic picture to show. Across these countries a fully quiet week is unusual rather than reassuring: opposition political calendars, trade groups and student bodies usually bring activity back quickly once a policy trigger or anniversary occurs.\n\nFor businesses on the ground, the practical takeaway is that readiness around the usual city-centre commercial districts, transport hubs and government precincts should not be wound down on the strength of one quiet week.`;
   }
   if (countryRows.length === 0) {
-    return `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file even where the operational signal is present. That usually reflects upstream source coverage rather than a real absence of street-level activity.\n\nBusiness users with footprint in the historically affected geographies should keep crisis-comms cascade lists and staff-movement plans on a live footing until the next cycle either confirms or reverses the apparent quiet.`;
+    return `Few events could be tied to a specific country this week, even where there is clearly activity happening. That usually reflects gaps in reporting rather than a real absence of street-level activity.\n\nBusinesses with a presence in the usual hotspots should keep crisis-communication contact lists and staff-movement plans ready until the coming weeks either confirm or reverse the apparent quiet.`;
   }
   const lead = countryRows[0];
   // APAC sub-region spread leads. The reader sees the regional
@@ -1180,8 +1180,8 @@ function buildRegionalCountryRead(opts: {
       return top ? `${r} (led by ${top.label})` : r;
     });
   const headline = spread.regions.length >= 2
-    ? `Across the briefing window the file spans ${joinList(regionList)}. The cycle is genuinely regional rather than confined to any single sub-region; ${lead.label} carries the heaviest concentration but is not the whole story, and operators with footprint across multiple APAC capitals should treat the picture as a coordinated rather than localised one.`
-    : `Across the briefing window the file leans on ${lead.label} as the dominant geography, with the wider APAC footprint thinner this cycle than usual. Treat that as a reporting-window characteristic rather than a structural shift.`;
+    ? `This week activity spans ${joinList(regionList)}. It is genuinely regional rather than confined to any single sub-region; ${lead.label} sees the most activity but is not the whole story, and businesses with a presence across several APAC capitals should treat this as a coordinated rather than localised picture.`
+    : `This week activity centres on ${lead.label}, with the wider APAC region quieter than usual. Treat that as a feature of a quiet week rather than a lasting shift.`;
   // Per-country operational breakdown using the dataset's own bucket
   // tags. This gives the reader a genuine country-level read on what
   // is driving mobilisation, what form activity is likely to take and
@@ -1198,7 +1198,7 @@ function buildRegionalCountryRead(opts: {
     const counts = new Map<string, number>();
     for (const r of rows) counts.set(r.issue, (counts.get(r.issue) ?? 0) + 1);
     const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-    if (ranked.length === 0) return "mixed activism and civil-unrest signal";
+    if (ranked.length === 0) return "a mix of protest and civil-unrest activity";
     if (ranked.length === 1) return ranked[0][0].toLowerCase();
     return `${ranked[0][0].toLowerCase()} alongside ${ranked[1][0].toLowerCase()}`;
   };
@@ -1218,18 +1218,18 @@ function buildRegionalCountryRead(opts: {
     return "city-centre commercial districts, transport hubs and government precincts";
   };
   const topThree = countryRows.slice(0, 3);
-  const RANK_LABEL = ["The lead geography", "The second-heaviest geography", "The third-heaviest geography"];
+  const RANK_LABEL = ["The busiest area", "The second-busiest area", "The third-busiest area"];
   const countryParas: string[] = [];
   topThree.forEach((cr, idx) => {
     const rows = byCountry.get(cr.label) ?? [];
     if (rows.length === 0) return;
     countryParas.push(
-      `${cr.label} — ${RANK_LABEL[idx] ?? "A leading geography"} this cycle, driven by ${driverFor(rows)}. Likely form: ${formFor(rows)}; main disruption loci: ${lociFor(rows)}.`,
+      `${cr.label} — ${RANK_LABEL[idx] ?? "A leading area"} this week, driven by ${driverFor(rows)}. Likely form: ${formFor(rows)}; main areas affected: ${lociFor(rows)}.`,
     );
   });
   const reach = countryRows.length > 3
-    ? `Further APAC geographies carry thinner entries this cycle and are listed in the country chart below.`
-    : `Full distribution in chart below.`;
+    ? `Other APAC countries saw less activity this week and appear in the country chart below.`
+    : `Full breakdown in the chart below.`;
   // Coverage callouts. The product needs to be visibly checking the
   // recurring Asia-Pacific protest environments — Australia, Papua /
   // PNG / Indonesian Papua, Philippines / Manila, Japan / Tokyo,
@@ -1371,34 +1371,34 @@ interface AutoCtx {
 function buildWhatMatters(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
   if (ctx.activismRows.length + ctx.unrestRows.length === 0) {
-    return `The operational read this cycle is shaped by an absence of fresh activism and civil-unrest reporting rather than by any single event. That is a reporting gap, not a sustained easing — the covered geographies have not been quiet for long historically, and the next political trigger usually repopulates the file inside a week.\n\nFor businesses on the ground, the practical implication is that standing readiness on city-centre commercial districts, transport hubs and staff movement should not be drawn down on the strength of a thin briefing cycle.`;
+    return `What stands out this week is the absence of fresh protest and civil-unrest activity rather than any single event. That is a gap in reporting, not a lasting easing — these countries have rarely stayed quiet for long, and the next political trigger usually brings activity back within a week.\n\nFor businesses on the ground, the practical implication is that readiness around city-centre commercial districts, transport hubs and staff movement should not be wound down on the strength of one quiet week.`;
   }
   const lines: string[] = [];
   const spread = subregionSpread(ctx.countryRows);
   if (spread.regions.length >= 2 && lead) {
     lines.push(
-      `What matters most this cycle is that the activism signal is regionally distributed across ${joinList(spread.regions)} rather than concentrated in a single capital. That kind of spread is harder to police, harder to forecast and routinely converts into rolling, short-notice disruption across multiple operating geographies in the same week. ${lead.label} sets the tempo but is not the whole picture.`,
+      `What matters most this week is that activity is spread across ${joinList(spread.regions)} rather than concentrated in a single capital. That kind of spread is harder to police, harder to predict and routinely turns into rolling, short-notice disruption across several countries in the same week. ${lead.label} sets the pace but is not the whole picture.`,
     );
   } else if (lead) {
     lines.push(
-      `What matters most this cycle is the geographic concentration on ${lead.label}, which historically converts into rolling road closures, intermittent connectivity disruption and short-notice pressure on staff movement around named flashpoints.`,
+      `What matters most this week is how concentrated activity is in ${lead.label}, which historically turns into rolling road closures, patchy connectivity and short-notice pressure on staff movement around known flashpoints.`,
     );
   } else {
     lines.push(
-      `Geographic concentration is loose this cycle, which usually signals a broadly distributed political mood rather than a single flashpoint. A named opposition call or a single policy trigger tends to pull activity back to one or two cities inside days.`,
+      `Activity is spread out this week, which usually reflects a broad political mood rather than a single flashpoint. A named opposition call or a single policy trigger tends to pull activity back to one or two cities within days.`,
     );
   }
   if (ctx.activismRows.length > 0 && ctx.unrestRows.length > 0) {
     lines.push(
-      `Activism and civil-unrest reporting running side by side is the classic pattern when announced rallies are routinely met with police orders, selective detentions and tear-gas dispersal. The risk profile sits in the second-order response: curfew impositions, internet shutdowns and mass arrests usually follow a single high-visibility incident rather than a slow build.`,
+      `Protest activity and civil unrest running side by side is the classic pattern when announced rallies are routinely met with police orders, selective arrests and tear gas. The bigger risk sits in what follows: curfews, internet shutdowns and mass arrests usually come after a single high-profile incident rather than building slowly.`,
     );
   } else if (ctx.activismRows.length > 0) {
     lines.push(
-      `The mix this cycle leans on activism rather than civil unrest, which usually means the state response has stayed below the threshold of visible enforcement. That can change inside a single news cycle if a rally crosses a policy line.`,
+      `Activity this week leans toward protests rather than civil unrest, which usually means the authorities have held back from visible enforcement. That can change within days if a rally crosses a policy line.`,
     );
   } else {
     lines.push(
-      `The mix this cycle leans on civil unrest rather than fresh activism, which usually signals the state response is running ahead of new organising. Expect visible enforcement to continue until the political trigger eases.`,
+      `Activity this week leans toward civil unrest rather than fresh protests, which usually means the authorities' response is running ahead of new organising. Expect visible enforcement to continue until the political trigger eases.`,
     );
   }
   return lines.join("\n\n");
@@ -1408,8 +1408,8 @@ function buildImplications(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
   const spread = subregionSpread(ctx.countryRows);
   const where = spread.regions.length >= 2
-    ? `${lead ? lead.label : "the lead geography"} and the wider ${joinList(spread.regions)} footprint`
-    : (lead ? lead.label : "the affected geographies");
+    ? `${lead ? lead.label : "the busiest area"} and the wider ${joinList(spread.regions)} region`
+    : (lead ? lead.label : "the affected areas");
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const all = [...ctx.activismRows, ...ctx.unrestRows];
   const hasSectoral = all.some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|samsung|walkout)\b/i.test(text(r)));
@@ -1428,10 +1428,10 @@ function buildImplications(ctx: AutoCtx): string {
     bullets.push(`Monitor for Section 144 / curfew orders, mass arrests and internet-shutdown notices in cities of operation — these move ahead of visible street-level disruption.`);
   }
   if (hasSectoral) {
-    bullets.push(`Wire procurement, distribution and customer-service into the security early-warning feed — sectoral chamber and union walkouts already on the file routinely run 24-72 hours ahead of supply-chain friction.`);
+    bullets.push(`Wire procurement, distribution and customer-service into the security early-warning feed — the trade-group and union walkouts already reported routinely run 24-72 hours ahead of supply-chain friction.`);
   }
   if (hasCampus) {
-    bullets.push(`Brief campus-adjacent sites on student-mobilisation cycles — campus action seeds wider city-centre protest within a week and is a leading indicator of a sustained cycle.`);
+    bullets.push(`Brief campus-adjacent sites on student-mobilisation patterns — campus action seeds wider city-centre protests within a week and is an early sign of a sustained run.`);
   }
   return bullets.map((b) => `- ${b}`).join("\n");
 }
@@ -1475,19 +1475,19 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   }
   if (lead) {
     bullets.push(
-      `${lead.label} — the next dated opposition, sectoral or court call. As the heaviest-concentration geography this cycle, a fresh trigger here converts fastest into road closures and venue-access friction.`,
+      `${lead.label} — the next dated opposition, trade-group or court call. As the busiest area this week, a fresh trigger here turns fastest into road closures and venue-access problems.`,
     );
   }
   if (sevInc && sevCountry && sevElevated && (!lead || sevCountry !== lead.label)) {
     bullets.push(
-      `${sevCountry} — follow-through after ${shortSignalLabel(sevInc)}, the sharpest incident on file: watch for retaliatory mobilisation, further arrests or injuries inside 48 hours.`,
+      `${sevCountry} — follow-through after ${shortSignalLabel(sevInc)}, the most serious incident reported: watch for retaliatory protests, further arrests or injuries within 48 hours.`,
     );
   }
   bullets.push(
     `Union or chamber strike notices: supply-chain friction 24-72 hours ahead of any visible street activity.`,
     `Section 144 / curfew orders or assembly bans in a city of operation: trigger WFH and close public-facing sites the same day.`,
     `Court hearings or detention rulings on political figures: an adverse decision converts into same-day rallies near the court complex.`,
-    `Student-union or campus mobilisation calls: a leading indicator that the cycle is firming into a sustained rather than one-off run.`,
+    `Student-union or campus mobilisation calls: an early sign that activity is building into a sustained rather than one-off run.`,
   );
   // De-dupe on the leading clause so a future signal and a standing
   // bullet about the same theme do not both appear.
@@ -1634,26 +1634,26 @@ function operationalMeaningFor(r: EnrichedIncident): string {
 
 function buildWatchNext(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
-  const where = lead ? lead.label : "the affected geographies";
-  const intro = `The following indicators sit ahead of street-level escalation in ${where} and should be tracked daily through the next reporting window. Each carries a specific operational meaning rather than a generic risk flag.`;
+  const where = lead ? lead.label : "the affected areas";
+  const intro = `The following signs tend to come ahead of street-level escalation in ${where} and are worth tracking daily over the coming week. Each points to a specific, practical consequence rather than a generic risk flag.`;
   const items: string[] = [
     `Protest calls and mobilisation dates from opposition parties, named movements and civil-society coalitions. A dated, location-specific call is the single best lead indicator for road closures, transport disruption and crowd action around the targeted venue.`,
     `Union strike notices — federation-level call-outs, sectoral chamber announcements (chemists, transporters, traders, lawyers) and confirmed walkout dates. Treat these as 24-72 hour warnings of supply-chain disruption, branch closures and customer-service degradation before any street activity is visible.`,
     `Court hearings and detention triggers — bail rulings, indictments, contempt findings and high-profile transfers involving political figures, activists or movement leaders. Adverse rulings convert into same-day rallies and route closures around court complexes.`,
     `Police permit refusals or assembly bans for announced rallies. A refusal rarely cancels the protest — it converts an organised event into a dispersed, harder-to-police one and raises the probability of clashes, baton charges and tear-gas dispersal at the venue.`,
     `Section 144 / curfew orders or their geographical expansion. A fresh imposition in a city of operation is the trigger for immediate work-from-home declaration, suspension of non-essential staff movement and customer-facing site closure.`,
-    `Arrests, injuries and any confirmed fatalities in a protest or unrest context. These are the single clearest signal that the cycle will firm up rather than ease — expect retaliatory mobilisation, sympathy strikes in adjacent sectors and a hardened state response inside 48 hours.`,
+    `Arrests, injuries and any confirmed deaths in a protest or unrest context. These are the clearest sign that activity will build rather than ease — expect retaliatory protests, sympathy strikes in nearby sectors and a tougher response from authorities within 48 hours.`,
     `Roadblocks and transport disruption — confirmed motorway closures, rail stoppages, port-access blockades and airport-route disruption. Validate these against named routes the business uses and convert into live driver advisories rather than passive monitoring.`,
-    `Campus mobilisation — student-union calls, occupations, walkouts and university-administration closure notices. Campus action routinely seeds wider city-centre protest within a week and is a leading indicator of a sustained rather than one-off cycle.`,
+    `Campus mobilisation — student-union calls, occupations, walkouts and university closure notices. Campus action routinely seeds wider city-centre protests within a week and is an early sign of a sustained rather than one-off run.`,
     `Online calls moving to street action — verified hashtags, telegram channels or WhatsApp mobilisation that name a date and location. The transition from digital organising to a confirmed venue is where social-media noise becomes operationally relevant.`,
   ];
   if (ctx.unrestRows.length > 0) {
     items.push(
-      `Visible enforcement steps already in play on the current file — internet-shutdown notices, mass-arrest reporting and military-aid-to-civil-power references. These indicate the state response has crossed the threshold of measured policing and the next cycle is likely to be harder, not softer.`,
+      `Visible enforcement steps already under way — internet-shutdown notices, mass-arrest reports and any move to call in the military. These show the authorities' response has gone beyond measured policing, and the coming week is likely to be harder, not softer.`,
     );
   } else {
     items.push(
-      `Triggering events that historically flip a quiet civil-unrest cycle into a sharp one — fuel-price decisions, currency moves, election-calendar shifts, security-force fatalities or a major court ruling. Treat any of these as accelerants and step up monitoring cadence immediately.`,
+      `Triggers that historically turn a quiet stretch into a sharp one — fuel-price decisions, currency moves, election-calendar shifts, security-force deaths or a major court ruling. Treat any of these as accelerants and step up monitoring immediately.`,
     );
   }
   return `${intro}\n\n${items.map((l) => `\u2022 ${l}`).join("\n\n")}`;
@@ -1670,19 +1670,19 @@ function buildPolestarView(ctx: AutoCtx): string {
   // 1. Directional verdict. One sharp sentence up top.
   let verdict: string;
   if (mobVectors >= 2 && hasEnforcement) {
-    verdict = `Polestar's view: the cycle is firming up, not easing. Independent organising vectors are running alongside visible state enforcement, and the window should be planned for further short-notice disruption rather than a return to quiet.`;
+    verdict = `Polestar's view: activity is building, not easing. Several separate organising efforts are running alongside visible enforcement by the authorities, and the coming week should be planned for further short-notice disruption rather than a return to quiet.`;
   } else if (mobVectors >= 2) {
-    verdict = `Polestar's view: the cycle reads as broadly mobilised but not yet escalatory. Multiple organising vectors are active; the state response has stayed below visible enforcement so far.`;
+    verdict = `Polestar's view: the picture is broadly mobilised but not yet escalating. Several organising efforts are active; the authorities' response has stayed below visible enforcement so far.`;
   } else if (hasEnforcement) {
-    verdict = `Polestar's view: enforcement is leading the cycle. Visible state action is already on file ahead of fresh organising, which usually signals a contained but sustained crackdown rather than a one-off response.`;
+    verdict = `Polestar's view: enforcement is leading the way. Visible action by the authorities is already happening ahead of fresh organising, which usually points to a contained but sustained crackdown rather than a one-off response.`;
   } else if (mobVectors >= 1) {
-    verdict = `Polestar's view: the cycle is live but contained. Organising signal sits on the file without a hardened enforcement response yet — a stable picture that historically flips on a single political trigger.`;
+    verdict = `Polestar's view: activity is live but contained. There is organising under way without a tough enforcement response yet — a stable picture that historically tips on a single political trigger.`;
   } else {
-    verdict = `Polestar's view: the cycle reads as a thin reporting window, not a structural easing. Organising infrastructure across the covered geographies remains intact and can reactivate on a single political trigger.`;
+    verdict = `Polestar's view: this is a quiet week, not a lasting easing. The organising infrastructure across these countries remains intact and can reactivate on a single political trigger.`;
   }
 
   // 2. Business disruption risk judgement.
-  const disruption = `Business disruption risk reads as moderate-to-elevated: short-notice transport disruption on protest days, public-facing site closures driven by Section 144 / curfew orders, and supply-chain friction from sectoral walkouts. The residual tail is a triggering event — adverse court ruling, fuel-price decision, security-force fatality — flipping the cycle into sustained unrest.`;
+  const disruption = `Business disruption risk is moderate-to-elevated: short-notice transport disruption on protest days, closures of public-facing sites driven by Section 144 / curfew orders, and supply-chain friction from trade-group walkouts. The main remaining risk is a trigger — an adverse court ruling, a fuel-price decision, a security-force death — that tips this into sustained unrest.`;
 
   return [verdict, disruption].join("\n\n");
 }
@@ -1701,7 +1701,7 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const total = ctx.enriched.length;
   const windowLabel = ctx.windowLabel;
   if (total === 0) {
-    return `This briefing covers the activism, protest and civil-unrest picture across APAC for ${windowLabel}. No qualifying records reached the file in this cycle. Treat the quiet window as a reporting gap rather than a structural easing — organising infrastructure across the covered geographies remains intact and typically repopulates the file inside a single news cycle once a policy trigger or anniversary lands.`;
+    return `This briefing covers the activism, protest and civil-unrest picture across APAC for ${windowLabel}. Little was reported this week. Treat the quiet as a gap in reporting rather than a lasting easing — the organising infrastructure across these countries remains intact and activity typically returns within days once a policy trigger or anniversary occurs.`;
   }
   const lead = ctx.countryRows[0];
   const spread = subregionSpread(ctx.countryRows);
@@ -1716,20 +1716,20 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   if (sectoral) driverBits.push("sectoral chamber and union action");
   if (hasEnforcement) driverBits.push("visible state enforcement");
   const driverLine = driverBits.length > 0
-    ? `The cycle is being shaped by ${joinList(driverBits)}.`
-    : `The cycle is running on background organising rather than any single named driver.`;
+    ? `Activity is being shaped by ${joinList(driverBits)}.`
+    : `Activity is running on steady background organising rather than any single named driver.`;
 
   const geoLine = spread.regions.length >= 2 && lead
-    ? `Coverage is regional rather than single-country: the file spans ${joinList(spread.regions)}, with ${lead.label} carrying the largest single concentration.`
+    ? `Activity is regional rather than confined to one country: it spans ${joinList(spread.regions)}, with ${lead.label} seeing the most.`
     : lead
-      ? `Coverage is concentrated on ${lead.label} this cycle, with the wider APAC footprint thinner than usual.`
-      : `Country-level attribution is thin this cycle — read the picture from the issue mix rather than a geographic concentration.`;
+      ? `Activity is concentrated in ${lead.label} this week, with the wider APAC region quieter than usual.`
+      : `Few events could be tied to a specific country this week — read the picture from the type of activity rather than where it is happening.`;
 
   const severityLine = hs.key === "high" || hs.key === "extreme"
-    ? `Severity in the file leans toward the upper end of the activism and public-order band rather than the kinetic armed-conflict tail (which sits out of scope for Flashpoint), which keeps the operational read squarely on protest disruption rather than kinetic violence.`
+    ? `The most serious incidents sit toward the upper end of the protest and public-order range rather than the armed-conflict tail (which sits out of scope for Flashpoint), which keeps the focus squarely on protest disruption rather than armed violence.`
     : hs.key
-      ? `Severity in the file sits in the lower-to-middle activism and public-order band, with no kinetic armed-conflict reporting (out of scope for Flashpoint). That keeps the operational read on disruption rather than direct physical-safety risk.`
-      : `Severity grading is thin this cycle; read the picture from the issue mix rather than a top-line severity number.`;
+      ? `The most serious incidents sit in the lower-to-middle protest and public-order range, with no armed-conflict reporting (out of scope for Flashpoint). That keeps the focus on disruption rather than direct physical-safety risk.`
+      : `Few incidents carry a severity grade this week; read the picture from the type of activity rather than a top-line severity number.`;
   void hs;
 
   // Sharp operational opener: lead with the judgement, then name the
@@ -1740,21 +1740,21 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const sevCountry = (sevInc?.country ?? "").trim();
   const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
   const volClause = lead
-    ? `${lead.label} carries the largest single concentration`
-    : `no single country dominates the file`;
+    ? `${lead.label} sees the most activity`
+    : `no single country stands out`;
   // Only name a separate severity lead when it is genuinely elevated
   // (Moderate+) and in a different country; otherwise just report the
   // ceiling. A "highest" that is still Low is not an escalation.
   const sevClause = sevInc && sevCountry && lead && sevCountry !== lead.label && sevElevated
-    ? `, while the sharpest single escalation sits in ${sevCountry} — ${shortSignalLabel(sevInc)}, rated ${hs.label}`
+    ? `, while the sharpest single escalation is in ${sevCountry} — ${shortSignalLabel(sevInc)}, rated ${hs.label}`
     : hs.key
-      ? `, with severity topping out at ${hs.label} on the activism and public-order band`
+      ? `, with the most serious reaching ${hs.label} on the protest and public-order range`
       : ``;
-  const opener = `The operational read this cycle is to plan for short-notice protest disruption, not a return to quiet: ${volClause}${sevClause}. ${driverLine}`;
+  const opener = `The picture this week is one to plan around for short-notice protest disruption, not a return to quiet: ${volClause}${sevClause}. ${driverLine}`;
 
   const closing = hasEnforcement
-    ? `Bottom line for the next 7-14 days: plan for further short-notice disruption around named flashpoints rather than a return to quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
-    : `Bottom line for the next 7-14 days: the runway from announced mobilisation to street-level disruption stays short — historically 24-72 hours once a policy trigger lands. Detailed activism, civil-unrest, forecast and country sections follow.`;
+    ? `Bottom line for the next 7-14 days: plan for further short-notice disruption around known flashpoints rather than a return to quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
+    : `Bottom line for the next 7-14 days: the time from an announced protest to street-level disruption stays short — historically 24-72 hours once a policy trigger occurs. Detailed activism, civil-unrest, forecast and country sections follow.`;
 
   return `${opener}\n\n${geoLine} ${severityLine}\n\n${closing}`;
 }

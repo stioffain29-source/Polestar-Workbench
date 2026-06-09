@@ -245,10 +245,10 @@ export function computeCountryFastFacts(opts: {
     label: "Total Records",
     value: String(total),
     note: total === 0
-      ? "No records in the 7-day window"
+      ? "No records this week"
       : total < 3
         ? "Limited sample"
-        : "Incidents in window",
+        : "Incidents this week",
   };
   // Week severity. Labelled "Highest Severity Recorded" (the highest incident
   // severity in the 7-day window) so it never reads as an overall weekly risk
@@ -258,7 +258,7 @@ export function computeCountryFastFacts(opts: {
     value: highestLabel,
     severity: highestKey || undefined,
     note: highestKey
-      ? (hasStanding ? "Highest rating, last 7 days" : "Highest rating in window")
+      ? (hasStanding ? "Highest rating, last 7 days" : "Highest rating this week")
       : (hasStanding ? "No records this week" : undefined),
   };
   const standingCard: CountryFastFactCard = {

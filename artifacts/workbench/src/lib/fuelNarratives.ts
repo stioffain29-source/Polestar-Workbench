@@ -69,7 +69,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(strait of hormuz|hormuz)\b/, /\bbab[- ]el[- ]mandeb\b/, /\bred sea\b/, /\bmalacca\b/, /\bsuez\b/],
     phrase: "chokepoint pressure and tanker-route disruption",
     why: "Route pressure on Hormuz, Bab-el-Mandeb or the Red Sea feeds straight into bunker cost, transit time and war-risk premium.",
-    opMeaning: "Dependent fuel movement is forced onto longer, costlier cycles even when the underlying barrels are still available.",
+    opMeaning: "Dependent fuel movement is forced onto longer, costlier routes even when the underlying barrels are still available.",
     watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
   },
   {
@@ -104,7 +104,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     ],
     phrase: "policy and subsidy / levy moves",
     why: "Policy moves on subsidies, levies or price controls reset operating cost assumptions and contract pass-through clauses.",
-    opMeaning: "Surcharge clauses and indexation formulas reset on the gazette date; today's contract economics may not survive the next cycle.",
+    opMeaning: "Surcharge clauses and indexation formulas reset on the gazette date; today's contract economics may not hold for long.",
     watch: "Watch for gazette dates, ministerial statements and any contract-renegotiation triggers from suppliers.",
   },
   {
@@ -120,7 +120,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(oil|crude) (export ban|export halt|embargo|sanctions|sabotage|attack|spill)/],
     phrase: "crude supply-chain and sanctions pressure",
     why: "Crude-side disruption rolls into bunker, jet and downstream pricing on a 1-2 week lag and is hard to hedge away cleanly.",
-    opMeaning: "The cost shock arrives with a lag, which makes it easy to under-budget the cycle that absorbs it.",
+    opMeaning: "The cost shock arrives with a lag, which makes it easy to under-budget for the months that absorb it.",
     watch: "Watch for OPEC+ commentary, sanctions enforcement signals and any retaliation in shipping lanes.",
   },
 ];
@@ -176,7 +176,7 @@ export function buildFuelRegionalHighlights(opts: {
       watch: "Watch for state-level fuel-tax changes, fresh forecourt or rationing reports and any operator-side surcharge announcements on road and rail.",
     },
     pakistan: {
-      why: "Availability, pricing and power resilience are the operational pressure points here; fuel for generators, freight and field operations is where the cycle hurts before it shows up in macro data.",
+      why: "Availability, pricing and power resilience are the main pressure points here; fuel for generators, freight and field operations is where it bites first, well before it shows up in the wider economy.",
       watch: "Watch for load-shedding patterns, depot-stock advisories and any government action on fuel pricing or commercial allocation.",
     },
   };
@@ -190,16 +190,16 @@ export function buildFuelRegionalHighlights(opts: {
     const overlay = COUNTRY_OVERLAY[country.toLowerCase()];
     const why = overlay?.why
       ?? fam?.why
-      ?? "This reporting signals underlying pressure on local fuel availability and cost.";
+      ?? "There is underlying pressure on local fuel availability and cost.";
     const watch = overlay?.watch
       ?? fam?.watch
-      ?? "Watch the next reporting cycle to confirm whether the pattern persists or eases.";
-    const recordsClause = "Reporting this cycle points to";
+      ?? "Watch the coming weeks to confirm whether the pattern persists or eases.";
+    const recordsClause = "Recent activity points to";
     let opener: string;
     if (idx === 0) {
-      opener = `${titleCase(country)} is the clearest pressure point in this window.`;
+      opener = `${titleCase(country)} is the clearest pressure point right now.`;
     } else if (idx === 1) {
-      opener = `${titleCase(country)} carries a secondary but credible signal.`;
+      opener = `${titleCase(country)} is a secondary but credible concern.`;
     } else {
       opener = `${titleCase(country)} adds further weight to the picture.`;
     }
@@ -316,7 +316,7 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
   if (/\b(subsidy|subsidies|levy|levies|duty|excise|tax|price control|price cap|price freeze)\b/.test(t))
     return "Policy reset: review pump-price exposure and contract pass-through clauses before the next billing cycle.";
   if (/\b(jet fuel|bunker|fuel) hedg/.test(t))
-    return "Hedging signal from buyers; contract pricing on similar grades typically follows the lead within a cycle.";
+    return "Hedging signal from buyers; contract pricing on similar grades typically follows the lead within weeks.";
   if (/\b(spot purchase|tender|long[- ]term contract|long[- ]term deal|supply (contract|deal|agreement|swap))\b/.test(t))
     return "Procurement signal: near-term demand pulled forward; watch tender outcomes and freight follow-through.";
   if (/\b(strategic reserve|\bspr\b|storage|stockpile|reserve) (release|draw|tap|build|expand)/.test(t))
@@ -329,12 +329,12 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
   if (/\b(production|output) (hike|increase|boost|expand|raise|restart)/.test(t))
     return "Added barrels ease near-term tightness but rarely move prices on their own without demand confirmation.";
   if (/\b(supply (tighten|tightens|squeeze)|inventory draw)/.test(t))
-    return "Tightening balances put a floor under prices and reduce buyer flexibility on the next cycle.";
+    return "Tightening balances put a floor under prices and reduce buyer flexibility in the weeks ahead.";
   if (/\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/.test(t)
       || /\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/.test(t))
     return "Supply resuming eases the local shortage; pump-price and surcharge pressure should soften as availability normalises.";
   if (/\b(price|prices) (rise|climb|surge|jump|hit|reach|break)/.test(t))
-    return "Reinforces the cost-pressure picture; freight surcharges and bunker invoices follow on the next cycle.";
+    return "Reinforces the cost-pressure picture; freight surcharges and bunker invoices follow in the weeks ahead.";
   // Per-category fallbacks (different from each other so the table never
   // shows the same operational read across multiple categories).
   switch (category) {
@@ -535,7 +535,7 @@ export function buildFuelOperationalRead(opts: {
   if (counts.size === 0) {
     // We have window items but none mapped to a recognised family. Say
     // so plainly rather than padding with generic language.
-    return `The fuel-relevant reporting this window does not group into a single dominant operational theme this cycle. Treat the read as directional and rely on the related-incidents table below for the detail.`;
+    return `Fuel-related developments this week do not point to a single dominant theme. Treat the picture as a rough guide and rely on the incidents listed below for the detail.`;
   }
 
   // Country roll-up for the closing line ("strongest operational signal").
@@ -558,14 +558,14 @@ export function buildFuelOperationalRead(opts: {
   // Use `opMeaning` here, not `why` — `why` is already used verbatim in
   // Regional Highlights and we don't want the same sentence in two
   // adjacent sections.
-  const driverPara = `The dominant operational themes in this window are ${themeLine}. ${lead.fam.opMeaning}`;
+  const driverPara = `The main themes right now are ${themeLine}. ${lead.fam.opMeaning}`;
 
   const watchLines: string[] = [];
   for (const { fam } of ordered.slice(0, 2)) watchLines.push(fam.watch);
 
   const where =
     topCountries.length > 0
-      ? ` ${topCountries.map(([c]) => titleCase(c)).join(", ")} carr${topCountries.length === 1 ? "ies" : "y"} the strongest operational signal this cycle.`
+      ? ` ${topCountries.map(([c]) => titleCase(c)).join(", ")} carr${topCountries.length === 1 ? "ies" : "y"} the most activity this week.`
       : "";
 
   const closingPara = `${watchLines.join(" ")}${where}`.trim();

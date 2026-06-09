@@ -123,7 +123,7 @@ interface CountryPicture {
 function countryPicture(
   rows: CargoNarrativeIncident[],
   n: number,
-  scope = "in the window",
+  scope = "this month",
 ): CountryPicture {
   const top = topCountries(rows, n);
   // `identified` is ROW-level (does this record carry any attribution at all),
@@ -139,11 +139,11 @@ function countryPicture(
   const strong = top.length > 0 && identified >= 2 && identified * 2 >= total;
   let line: string;
   if (top.length === 0) {
-    line = `Country attribution is sparse this cycle and limits the geographic read.`;
+    line = `Few reports this month name a specific country, which limits what can be said about the geography.`;
   } else if (strong) {
-    line = `Country attribution ${scope} is led by ${joinCountries(top)}.`;
+    line = `The countries named most often ${scope} are ${joinCountries(top)}.`;
   } else {
-    line = `Most records ${scope} carry no confirmed country; among the identified minority the recurring geographies are ${joinCountries(top)}, too thin to read as a single firm lead.`;
+    line = `Most reports ${scope} do not name a country; among those that do, ${joinCountries(top)} come up most often, though not often enough to point to a single clear leader.`;
   }
   return { top, identified, total, strong, line };
 }
@@ -174,13 +174,13 @@ export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]
     return CARGO_SECURITY_RE.test(text);
   });
   if (matches.length === 0) {
-    return `No qualifying truck-hijack, container theft, in-transit loss, pilferage or convoy-attack records reached the file in this cycle. Cargo-security reporting tends to be lumpy and a quiet window should be treated as a coverage gap rather than confirmation that route-side risk has eased.\n\nWatch insurance underwriter bulletins, transport-association advisories and any operator decisions on convoying or rerouting. Those signals usually move ahead of headline crime reporting on the routes that matter.`;
+    return `Little was reported this month on truck hijackings, container theft, in-transit loss, pilferage or convoy attacks. Cargo-security reporting tends to come in bursts, so a quiet month points to a gap in reporting rather than proof that risk on the road has eased.\n\nKeep an eye on insurance underwriter bulletins, transport-association advisories and any operator decisions on convoying or rerouting. Those signals usually move ahead of headline crime reporting on the routes that matter.`;
   }
   const lead = leadEntry(matches)!;
   const leadDate = recordDate(lead);
   const countryLine = countryPicture(matches, 3, "among these route-side records").line;
-  const intro = `Route-side and convoy cargo risk shows up across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle, covering truck hijack, container theft, in-transit loss and similar operational crime. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
-  const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories are the cleanest early signals that route-side risk is firming.`;
+  const intro = `Route-side and convoy cargo risk showed up this month, covering truck hijackings, container theft, in-transit loss and similar crime. The most recent example is "${lead.title}"${leadDate ? `, reported ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
+  const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories are the earliest signs that risk on the road is building.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }
 
@@ -212,18 +212,18 @@ export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[])
   const cp = countryPicture(ctx.windowIncidents, 3);
   const parts: string[] = [];
   if (ctx.securityMatches.length === 0 && ctx.hubMatches.length === 0) {
-    return `No qualifying truck-hijack, container theft, in-transit loss or logistics-hub logistics incident reached the file this cycle. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or depot-side risk has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean cycles in a row.`;
+    return `Little was reported this month on truck hijackings, container theft, in-transit loss or logistics-hub incidents. Cargo-crime reporting comes in bursts, so a quiet month points to a gap in reporting rather than proof that risk on the road or at the depot has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean months in a row.`;
   }
   parts.push(
-    `What this cycle changes for cargo owners and operators is concentrated in two places: route-side incidents that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
+    `What changed this month for cargo owners and operators sits in two places: route-side incidents that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
   );
   if (cp.top.length > 0) {
     parts.push(
-      `${cp.line} Repeat hits in the same country across consecutive cycles are the cleanest early signal that a specific corridor or operator is being worked by an organised crew — that is the point at which insurance bulletins and police alerts typically follow.`,
+      `${cp.line} Repeat hits in the same country month after month are the clearest early sign that a specific corridor or operator is being worked by an organised crew — that is the point at which insurance bulletins and police alerts typically follow.`,
     );
   }
   parts.push(
-    `For high-value cargo moves the implication is to assume route-side risk has not eased even on a quiet week. Pre-route security reviews, seal and lock integrity checks at handover, and driver-vetting on contracted hauliers are the cheapest mitigation; they only get expensive after a loss.`,
+    `For high-value cargo moves the implication is to assume route-side risk has not eased even on a quiet month. Pre-route security reviews, seal and lock integrity checks at handover, and driver-vetting on contracted hauliers are the cheapest mitigation; they only get expensive after a loss.`,
   );
   return parts.join("\n\n");
 }
@@ -243,7 +243,7 @@ export function buildCargoImplications(_windowIncidents: CargoNarrativeIncident[
     `Tighten depot and warehouse access control — visitor logs, after-hours staffing, CCTV blind spots and perimeter integrity at named hubs.`,
     `Re-baseline driver and yard-staff vetting on contracted hauliers; insider involvement is the consistent thread behind larger losses.`,
     `Enforce seal and lock checks at every handover, with photographic evidence captured and matched at origin and destination.`,
-    `Review insurance cover and deductibles on repeat corridors; expect underwriter response within one to two cycles on lanes with recurring activity.`,
+    `Review insurance cover and deductibles on repeat corridors; expect underwriter response within one to two weeks on lanes with recurring activity.`,
     `Confirm incident-reporting and recovery procedures end-to-end — police notification, insurer notification, internal escalation and stock-recovery actions — so the response is rehearsed, not improvised.`,
   ];
   return bullets.map((b) => `- ${b}`).join("\n");
@@ -257,14 +257,14 @@ export function buildCargoWatchNext(_windowIncidents: CargoNarrativeIncident[]):
   // or police alerts.
   void _windowIncidents;
   const bullets: string[] = [
-    `Repeat losses on the same corridor across consecutive cycles — clearest sign an organised crew is working a specific lane.`,
+    `Repeat losses on the same corridor month after month — clearest sign an organised crew is working a specific lane.`,
     `Copycat theft within two weeks of a publicised hijack — one event commonly draws three or four imitators.`,
     `Insider involvement signals — out-of-hours loading, driver or yard-staff turnover coinciding with a loss, seal or lock anomalies.`,
     `Depot access failures, after-hours entries and CCTV outages on the same shift — facility-side organisation rather than opportunistic pilferage.`,
     `Seal or lock failures at handover — leading indicator of a compromised driver, agent or yard handler.`,
     `Fresh arrests, recoveries or charge-sheet filings on prior losses — tells you whether the law-enforcement response is firming or stalling.`,
-    `Route displacement away from controlled depots toward weaker ones under cost pressure — common precursor to a fresh loss cycle.`,
-    `Insurance underwriter bulletins, transport-association advisories and police-alert circulars on affected corridors — the cleanest market-side signal.`,
+    `Route displacement away from controlled depots toward weaker ones under cost pressure — common precursor to a fresh round of losses.`,
+    `Insurance underwriter bulletins, transport-association advisories and police-alert circulars on affected corridors — the clearest market-side warning.`,
   ];
   return bullets.map((b) => `- ${b}`).join("\n");
 }
@@ -283,7 +283,7 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
   // 1. Judgement: larger losses driven by route familiarity and
   // likely insider knowledge.
   parts.push(
-    `Our read on the cycle is that the larger cargo losses on the file are being driven by route familiarity and likely insider knowledge rather than opportunistic crime. The pattern across hijack reports, depot raids and seal-failure entries is too consistent to read as chance — repeat corridors, named depots and the same modus operandi recur.`,
+    `Our assessment is that the larger cargo losses being reported are driven by route familiarity and likely insider knowledge rather than opportunistic crime. The pattern across hijackings, depot raids and seal failures is too consistent to be chance — repeat corridors, named depots and the same methods recur.`,
   );
 
   // 2. Country picture. Only assert a firm operating geography and the
@@ -294,10 +294,10 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
       const hub = hubTop[0]?.country ?? null;
       const sec = securityTop[0]?.country ?? null;
       const split = hub && sec && hub !== sec
-        ? ` ${sec} leads route-side cargo-security reporting on the file while ${hub} leads logistics-hub and warehouse exposure — different lanes of the same problem, not separate issues.`
+        ? ` ${sec} leads route-side cargo-security incidents while ${hub} leads logistics-hub and warehouse exposure — different sides of the same problem, not separate issues.`
         : "";
       parts.push(
-        `The main operating geographies this cycle are ${joinCountries(cp.top)}.${split}`,
+        `The main areas of activity this month are ${joinCountries(cp.top)}.${split}`,
       );
     } else {
       parts.push(cp.line);
@@ -312,7 +312,7 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
 
   // 4. Where business users should actually focus.
   parts.push(
-    `For business users the focus should sit on four controls: handover discipline (seals, locks, photographic evidence at origin and destination); driver and yard-staff vetting on contracted hauliers; depot discipline on access, staffing and after-hours integrity; and routing that treats repeat-loss corridors as live exposure rather than a default lane choice. These are the controls that hold up across cycles regardless of how loud or quiet any single week looks.`,
+    `For business users the focus should sit on four controls: handover discipline (seals, locks, photographic evidence at origin and destination); driver and yard-staff vetting on contracted hauliers; depot discipline on access, staffing and after-hours integrity; and routing that treats repeat-loss corridors as live exposure rather than a default lane choice. These are the controls that hold up over time regardless of how loud or quiet any single month looks.`,
   );
 
   return parts.join("\n\n");
@@ -326,17 +326,17 @@ export function buildCargoPolestarView(windowIncidents: CargoNarrativeIncident[]
 export function buildCargoSituation(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
   if (ctx.windowIncidents.length === 0) {
-    return `Warehouse, depot and road-corridor exposure persists regardless of how quiet the reporting window looks. Cargo-crime reporting is lumpy and a blank window should be read as a coverage gap, not confirmation that route-side or hub-side risk has eased.`;
+    return `Warehouse, depot and road-corridor exposure persists no matter how quiet the month looks. Cargo-crime reporting comes in bursts, so a quiet month points to a gap in reporting, not proof that risk on the road or at the depot has eased.`;
   }
   const cp = countryPicture(ctx.windowIncidents, 3);
   const overall = cp.top[0]?.country ?? null;
   const hub = topCountries(ctx.hubMatches, 1)[0]?.country ?? null;
-  const focus = `Warehouse, depot and road corridors hold the live exposure this cycle, with route familiarity and insider risk as the persistent drivers.`;
+  const focus = `Warehouse, depot and road corridors hold the live exposure this month, with route familiarity and insider risk as the persistent drivers.`;
   let where = "";
   if (cp.strong && overall && hub && overall !== hub) {
-    where = ` ${overall} leads total reporting on the file, while ${hub} leads logistics-hub and warehouse risk — both sit inside the same operating picture.`;
+    where = ` ${overall} leads the overall reporting, while ${hub} leads logistics-hub and warehouse risk — both sit inside the same picture.`;
   } else if (cp.strong && overall) {
-    where = ` ${overall} sits at the centre of the recurring geography on this cycle.`;
+    where = ` ${overall} sits at the centre of the recurring geography this month.`;
   } else if (cp.top.length > 0) {
     where = ` ${cp.line}`;
   }
@@ -349,13 +349,13 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
     return LOGISTICS_HUB_RE.test(text);
   });
   if (matches.length === 0) {
-    return `No qualifying warehouse, depot, terminal or yard incidents reached the file in this cycle. Logistics-hub losses often go unreported until insurance claims are filed, so a blank window does not redefine the underlying picture on storage and last-mile facilities.\n\nKeep tracking facility-security bulletins, insurer loss notices and any operator commentary on staffing or perimeter changes. Those are the early indicators that hub-side risk is firming on a specific corridor.`;
+    return `Little was reported this month on warehouse, depot, terminal or yard incidents. Logistics-hub losses often go unreported until insurance claims are filed, so a quiet month does not change the underlying picture on storage and last-mile facilities.\n\nKeep tracking facility-security bulletins, insurer loss notices and any operator commentary on staffing or perimeter changes. Those are the early indicators that hub-side risk is building on a specific corridor.`;
   }
   const lead = leadEntry(matches)!;
   const leadDate = recordDate(lead);
   const countryLine = countryPicture(matches, 3, "among these hub-side records").line;
-  const intro = `Logistics hub risk across warehouses, depots, distribution centres, terminals and bonded storage appears across ${matches.length} qualifying record${matches.length === 1 ? "" : "s"} this cycle. The lead entry is "${lead.title}"${leadDate ? `, filed ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
-  const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two cycles.`;
+  const intro = `Logistics-hub risk across warehouses, depots, distribution centres, terminals and bonded storage showed up this month. The most recent example is "${lead.title}"${leadDate ? `, reported ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
+  const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two weeks.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }
 
@@ -367,18 +367,18 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
 export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
   if (ctx.windowIncidents.length === 0) {
-    return `No qualifying cargo-crime records reached the file this cycle. Cargo reporting is lumpy and a blank window should be read as a coverage gap rather than confirmation that route-side or hub-side activity has stopped; treat the standing exposure as unchanged.`;
+    return `Little cargo crime was reported this month. Cargo reporting comes in bursts, so a quiet month points to a gap in reporting rather than proof that activity on the road or at the depot has stopped; treat the standing exposure as unchanged.`;
   }
   const parts: string[] = [];
   parts.push(
-    `Qualifying cargo-crime reporting reached the file this cycle, split across route-side and logistics-hub losses.`,
+    `Cargo crime was reported this month, split across route-side and logistics-hub losses.`,
   );
 
   const named = (i: CargoNarrativeIncident): string => {
     const d = recordDate(i);
     const country = splitCargoCountries(i.country)[0];
     const where = country ? ` in ${country}` : "";
-    const when = d ? `, filed ${format(d, "dd MMM yyyy")}` : "";
+    const when = d ? `, reported ${format(d, "dd MMM yyyy")}` : "";
     return `"${i.title}"${where}${when}`;
   };
 
@@ -386,10 +386,10 @@ export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]
   const hubLead = leadEntry(ctx.hubMatches);
   const detail: string[] = [];
   if (routeLead) {
-    detail.push(`Route-side, the most recent notable entry is ${named(routeLead)}.`);
+    detail.push(`Route-side, the most recent example is ${named(routeLead)}.`);
   }
   if (hubLead && hubLead !== routeLead) {
-    detail.push(`Hub-side, the lead entry is ${named(hubLead)}.`);
+    detail.push(`Hub-side, the most recent example is ${named(hubLead)}.`);
   }
   if (detail.length > 0) parts.push(detail.join(" "));
 
@@ -399,7 +399,7 @@ export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]
   const repeat = cp.top.filter((t) => t.count >= 2);
   if (cp.strong && repeat.length > 0) {
     parts.push(
-      `Reporting clusters in ${joinCountries(repeat)}, pointing to corridors being worked rather than isolated, one-off losses.`,
+      `Losses cluster in ${joinCountries(repeat)}, pointing to corridors being worked rather than isolated, one-off losses.`,
     );
   } else if (cp.top.length > 0) {
     parts.push(cp.line);
@@ -614,7 +614,7 @@ function operationalReadFor(
 
   let tail = "";
   if (severityKey === "high" || severityKey === "extreme") {
-    tail = ` The reporting on file reads as organised, targeted activity rather than opportunistic theft.`;
+    tail = ` The reports point to organised, targeted activity rather than opportunistic theft.`;
   } else if (count >= 3) {
     tail = ` Repeat reporting points to a corridor under sustained pressure.`;
   }
@@ -644,7 +644,7 @@ function buildRegionalRead(rows: CargoCountryRow[]): string {
         ? "road-movement incidents clustering on the route side"
         : "a mix of road-movement and storage incidents";
   parts.push(
-    `${lead.country} is the lead pressure point this cycle on ${lead.count} record${lead.count === 1 ? "" : "s"}, with ${leadFocus}.`,
+    `${lead.country} is the main pressure point this month, with ${leadFocus}.`,
   );
   if (highest && highest.country !== lead.country && SEV_RANK_C[highest.severityKey] >= 4) {
     parts.push(

@@ -120,7 +120,7 @@ function drawSeverityChart(ctx: Ctx, facts: CountryFactsBreakdown) {
   ensureSpace(ctx, 32 + (total === 0 ? 34 : chartH));
   drawSectionHeading(ctx, "Severity Distribution");
   if (total === 0) {
-    renderProse(ctx, "No incidents in the active window to chart.");
+    renderProse(ctx, "No incidents reported this week to chart.");
     return;
   }
   const { pdf, MX, CW } = ctx;
@@ -157,7 +157,7 @@ function drawTypeChart(ctx: Ctx, facts: CountryFactsBreakdown) {
   ensureSpace(ctx, 32 + (data.length === 0 ? 34 : chartH));
   drawSectionHeading(ctx, "Incident Breakdown by Type");
   if (data.length === 0) {
-    renderProse(ctx, "No classifiable incident types in the active window.");
+    renderProse(ctx, "No incident types reported this week.");
     return;
   }
   const max = Math.max(...data.map((d) => d.n));
@@ -538,7 +538,7 @@ function drawNarrative(
   const text = trimmed || (fallback ?? "");
   // Keep the heading with its first paragraph so country sections never
   // orphan at the bottom of a PDF page.
-  drawSectionWithProse(ctx, heading, text || "Not populated for this cycle.");
+  drawSectionWithProse(ctx, heading, text || "Not populated for this report.");
 }
 
 // Coverage banner — mirrors the on-screen printable banner (POLAR border
@@ -651,7 +651,7 @@ export async function exportCountryReportPdf(
     ctx,
     "Executive Summary",
     extras.executiveSummary,
-    `Brief for ${country.name} covering the ${active.basisShort} reporting window. See the sections below for the operating picture, what changed, why it matters, implications and what to watch next.`,
+    `Brief for ${country.name} covering the ${active.basisShort} reporting period. See the sections below for the operating picture, what changed, why it matters, implications and what to watch next.`,
   );
 
   // 2. Fast Facts

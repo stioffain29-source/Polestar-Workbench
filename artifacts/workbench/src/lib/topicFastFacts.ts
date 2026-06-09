@@ -157,12 +157,12 @@ export function computeTopicFastFacts(opts: {
 
   return [
     { label: "Reporting Period", value: reportingPeriod },
-    { label: "Total Records", value: String(windowIncidents.length), note: `${topicLabel} in window` },
+    { label: "Total Records", value: String(windowIncidents.length), note: `${topicLabel} this period` },
     {
       label: "Highest Severity",
       value: highestLabel,
       severity: highestKey || undefined,
-      note: highestKey ? "Highest rating in window" : undefined,
+      note: highestKey ? "Highest rating this period" : undefined,
     },
     {
       label: "Top Issue Type",
@@ -176,7 +176,7 @@ export function computeTopicFastFacts(opts: {
       value: safeCountry,
       note: topCountryN > 0 && safeCountry === topCountry
         ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}`
-        : "Coverage gap",
+        : "Limited reporting",
     },
     { label: "Latest Incident", value: latest },
   ];

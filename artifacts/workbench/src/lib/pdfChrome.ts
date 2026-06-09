@@ -58,7 +58,7 @@ export const METHODOLOGY_TEXT =
   "Records are de-duplicated, screened for relevance and assigned a five-tier severity rating (Insignificant, Low, Moderate, High, Extreme) from the reporting text. " +
   "Locations are geocoded on a best-effort basis: records without reliable coordinates are retained in counts and tables but not plotted on the map. " +
   "Figures reflect what is on file at the time of export, not a comprehensive incident census. " +
-  "Open-source coverage is uneven — a quiet reporting window can reflect access or press-freedom limits rather than an absence of activity. " +
+  "Open-source coverage is uneven — a quiet reporting period can reflect access or press-freedom limits rather than an absence of activity. " +
   "The rolling 7-day window shows current signal; the 30- and 90-day sections carry standing pattern and should be read as background, not live activity.";
 
 export const POLESTAR_URL = "polestar-advisory.com";

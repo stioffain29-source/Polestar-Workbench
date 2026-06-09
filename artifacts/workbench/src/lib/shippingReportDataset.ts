@@ -608,15 +608,15 @@ export function buildShippingReportDataset(
       value: topCp || "—",
       note: topCpN > 0
         ? `${topCpN} record${topCpN === 1 ? "" : "s"}`
-        : (topRegion ? `Fallback to region: ${topRegion} (${topRegionN})` : "No chokepoint mention in window"),
+        : (topRegion ? `Nearest region: ${topRegion} (${topRegionN})` : "No chokepoint reported this week"),
     },
     { label: "Vessel Attacks / Seizures", value: String(vAttackSeize) },
     {
       label: "Piracy / Armed Robbery",
       value: String(piracyRows.length),
       note: piracyRows.length > 0
-        ? `Latest record in window: ${format(piracyRows[0].date, "dd MMM yyyy")}`
-        : "No qualifying piracy record in window",
+        ? `Latest: ${format(piracyRows[0].date, "dd MMM yyyy")}`
+        : "None reported this week",
     },
     {
       label: "Latest Significant Incident",
@@ -647,11 +647,11 @@ export function buildShippingReportDataset(
     const credibleLatest = credibleSorted[0] ?? null;
     let readText: string;
     if (credible.length === 0) {
-      readText = "Quiet across the reporting window; no qualifying activity on file.";
+      readText = "Quiet this week, with little reported here.";
     } else if (credible.length === 1) {
-      readText = `Activity here was anchored by a single entry, "${credibleLatest!.title}", in the reporting window.`;
+      readText = `Activity here came down to a single event this week, "${credibleLatest!.title}".`;
     } else {
-      readText = `Reporting was led by "${credibleLatest!.title}", with ${credible.length} qualifying records in the reporting window.`;
+      readText = `The standout here this week was "${credibleLatest!.title}", with further events reported alongside it.`;
     }
     return {
       name: cp,
@@ -791,10 +791,10 @@ export function buildShippingReportDataset(
   // never counted as incident country. The placeholder label is an
   // internal classification only and is intentionally NOT surfaced here.
   const locNote = locationNotIdentifiedCount > 0
-    ? `${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} in the window could not be tied to a confirmed incident country; ${locationNotIdentifiedCount === 1 ? "it is" : "they are"} included in total counts but excluded from the country and regional charts to avoid geographic distortion. Vessel flag state is never counted as incident country.`
-    : `Vessel flag state is never counted as incident country.`;
+    ? `${locationNotIdentifiedCount} report${locationNotIdentifiedCount === 1 ? "" : "s"} this week could not be tied to a specific country, so ${locationNotIdentifiedCount === 1 ? "it is" : "they are"} left off the country and regional charts to keep the geographic picture accurate. A vessel's flag is never treated as the location of an incident.`
+    : `A vessel's flag is never treated as the location of an incident.`;
   const dataNote = outOfScopeCount > 0
-    ? `${outOfScopeCount} shipping record${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East were excluded from this view, matching the Shipping dashboard scope. ${locNote}`
+    ? `${outOfScopeCount} shipping report${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East fall outside this report and are not included here. ${locNote}`
     : locNote;
 
   return {
@@ -848,30 +848,30 @@ function buildShippingWhatMatters(ctx: ShippingAutoCtx): string {
   const lines: string[] = [];
   if (cp) {
     lines.push(
-      `The cycle's centre of gravity is ${cp.name}, which carries ${cp.count} qualifying record${cp.count === 1 ? "" : "s"}${cp2 ? ` ahead of ${cp2.name} on ${cp2.count}` : ""}. That matters for routing decisions because every additional advisory tightens transit-time variance and feeds straight into vessel scheduling and bunker planning for any operator with exposure to the region.`,
+      `The main pressure point this week is ${cp.name}${cp2 ? `, ahead of ${cp2.name}` : ""}. That matters for route planning, because each new warning makes transit times less predictable and feeds straight into ship scheduling and fuel planning for any company moving cargo through the region.`,
     );
   } else {
     lines.push(
-      `No single chokepoint dominated this cycle, which sounds reassuring but is usually a coverage gap rather than a genuine easing. Treat the picture as fragile: when activity returns it tends to land on the same two or three transit corridors.`,
+      `No single chokepoint stood out this week, which sounds reassuring but usually points to a gap in reporting rather than a real easing. Treat the calm as fragile: when activity returns, it tends to hit the same two or three shipping routes.`,
     );
   }
   if (ctx.vesselHostile.length > 0 || ctx.piracyRows.length > 0) {
     lines.push(
-      `Hostile activity against vessels still anchors the risk picture, with ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} on file across the reporting window (${ctx.thirtyDayLabel}). Any operator running through the affected lanes should be reviewing crew-change locations, war-risk and P&I premium exposure, and the threshold at which their advisory partners would recommend re-routing.`,
+      `Attacks on ships remain the biggest risk, with vessel attacks, seizures, and piracy or armed robbery all reported recently (${ctx.thirtyDayLabel}). Any company sailing through the affected routes should be reviewing where crews are changed over, its war-risk and insurance costs, and the point at which its security advisers would recommend taking a different route.`,
     );
   } else {
     lines.push(
-      `Vessel-side and piracy reporting was thin this cycle. The underlying threat picture has not been benign for long, so a quiet window should be read as a reporting gap and not as a sustained easing of crew, hull or cargo risk.`,
+      `Little was reported on vessel attacks or piracy this week. The threat in this region has not been calm for long, so a quiet spell is better read as a gap in reporting than as a lasting drop in the risk to crews, ships or cargo.`,
     );
   }
   if (ctx.commercialRecords.length > 0) {
     lines.push(
-      `On the commercial side the cycle carries ${ctx.commercialRecords.length} qualifying record${ctx.commercialRecords.length === 1 ? "" : "s"} of port disruption, schedule slippage, war-risk or insurance movement with a clean operational anchor. That feeds directly into cargo flow planning, port-call sequencing and freight-cost pass-through to shippers.`,
+      `On the commercial side, there were reports this week of port disruption, schedule delays, and shifts in war-risk or insurance costs tied to real events. These feed directly into cargo planning, the order of port calls, and the freight costs passed on to shippers.`,
     );
   }
   if (region) {
     lines.push(
-      `Regionally the weekly window leaned on ${region.label}; country-level concentration is set out in the chart below.`,
+      `By region, most activity this week was in ${region.label}; the breakdown by country is shown in the chart below.`,
     );
   }
   return lines.join("\n\n");
@@ -881,25 +881,25 @@ function buildShippingImplications(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
   const where = cp ? cp.name : "the affected corridors";
   const bullets: string[] = [
-    `Run a live review of vessel scheduling, port-call sequencing and bunker planning against the latest advisories for ${where}.`,
-    `Size war-risk and P&I exposure now — premium adjustments typically land one to two cycles after the operational signal firms.`,
-    `Pre-position alternative routings and skip-call options on affected strings; brief commercial teams on demurrage and schedule-reliability risk.`,
+    `Review ship scheduling, the order of port calls and fuel planning against the latest advisories for ${where}.`,
+    `Assess war-risk and insurance exposure now — premium changes usually follow a week or two after the activity picks up.`,
+    `Line up alternative routes and the option to skip port calls on affected services; brief commercial teams on the risk of delays and added costs.`,
   ];
   if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
     bullets.push(
-      `Re-examine crew-change locations on voyages transiting the affected lanes; shift to safer ports where supported.`,
+      `Re-check where crews are changed over on voyages through the affected routes, and move to safer ports where possible.`,
     );
     bullets.push(
-      `Confirm naval-escort or convoy options with advisory partners for the highest-risk strings.`,
+      `Confirm naval-escort or convoy options with security advisers for the highest-risk routes.`,
     );
   }
   if (ctx.commercialRecords.length > 0) {
     bullets.push(
-      `Price surcharge pass-through into cargo-flow planning — port-call disruption converts to surcharges within one to two weeks.`,
+      `Build expected surcharges into cargo planning — port disruption usually turns into surcharges within one to two weeks.`,
     );
   } else {
     bullets.push(
-      `Write flexibility clauses into near-term lifting contracts — a single port closure or war-risk move can pull surcharges across a lane within days.`,
+      `Add flexibility clauses to near-term shipping contracts — a single port closure or war-risk change can push surcharges across a route within days.`,
     );
   }
   return bullets.map((b) => `- ${b}`).join("\n");
@@ -909,22 +909,22 @@ function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
   const where = cp ? cp.name : "Hormuz, Bab-el-Mandeb, the Red Sea and Malacca";
   const bullets: string[] = [
-    `Fresh naval and maritime advisories on ${where}: leading signal for where pressure is firming.`,
-    `UKMTO, IMB and coalition-force bulletins: move ahead of headline freight rates.`,
-    `War-risk and P&I premium movement on affected lanes: cleanest confirmation that the operational signal has firmed commercially.`,
-    `Operator decisions to divert or skip a port call: trigger schedule-reliability and demurrage review.`,
-    `Escalation in naval-escort or convoy posture: signal that advisory partners are sizing up the threat.`,
+    `New naval and maritime advisories on ${where}: the earliest sign of where pressure is building.`,
+    `UKMTO, IMB and coalition-force bulletins: these move ahead of headline freight rates.`,
+    `War-risk and insurance premium changes on affected routes: the clearest confirmation that the activity is now hitting costs.`,
+    `Decisions by operators to divert or skip a port call: a prompt to review schedule reliability and delay costs.`,
+    `A step-up in naval escorts or convoys: a sign that security advisers are taking the threat more seriously.`,
   ];
   if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
     bullets.push(
-      `Crew-change advisories and flag-state guidance updates: re-examine manning-hub plans on transiting voyages.`,
+      `Crew-change advisories and flag-state guidance updates: a reason to re-check crewing plans on voyages through the area.`,
     );
     bullets.push(
-      `Hostile-area underwriting extended to adjacent waters: clearest sign the threat perimeter is widening, not easing.`,
+      `War-risk insurance being extended to nearby waters: the clearest sign the danger zone is widening, not easing.`,
     );
   } else {
     bullets.push(
-      `Any extension of hostile-area underwriting clauses: early indicator the threat picture is firming again.`,
+      `Any extension of war-risk insurance terms: an early sign the threat is building again.`,
     );
   }
   return bullets.map((b) => `- ${b}`).join("\n");
@@ -943,14 +943,14 @@ function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const pressurePoint = cp ? cp.name : "Hormuz and the Red Sea corridor";
 
   const para1Pressure = cp
-    ? `${pressurePoint} remains the dominant shipping pressure point across the reporting window, and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`
-    : `${pressurePoint} remains the dominant shipping pressure point across the reporting window, and that is where the structural risk continues to sit regardless of any individual cycle's cadence.`;
+    ? `${pressurePoint} remains the main pressure point for shipping, and that is where the underlying risk continues to sit, no matter how busy or quiet a given week looks.`
+    : `${pressurePoint} remains the main pressure point for shipping, and that is where the underlying risk continues to sit, no matter how busy or quiet a given week looks.`;
   const para1Vessel = vesselThreat30 > 0
-    ? ` The vessel threat picture across the window — ${ctx.vesselHostile.length} attack or seizure record${ctx.vesselHostile.length === 1 ? "" : "s"} and ${ctx.piracyRows.length} piracy or armed-robbery entr${ctx.piracyRows.length === 1 ? "y" : "ies"} — still matters. A quiet cycle in this geography is the normal pattern, not a benign trend, so it should be read as a reporting gap rather than a sustained easing.`
-    : ` Vessel-side activity is limited this cycle, but the threat picture still matters: the same lanes have not been clean for long, so a thin window should be read as cycle noise rather than a sustained easing.`;
+    ? ` The threat to ships — recent attacks, seizures, and piracy or armed robbery — still matters. A quiet spell in this region is normal, not a sign things have improved, so it is better read as a gap in reporting than as a lasting easing.`
+    : ` Activity against ships is limited this week, but the threat still matters: these same routes have not been clear for long, so a quiet spell is better read as background noise than as a lasting easing.`;
   const para1 = `${para1Pressure}${para1Vessel}`;
 
-  const para2 = `Operators should treat the current cycle as a routing, insurance and advisory-monitoring problem rather than a broad maritime shutdown. The practical business levers sit with war-risk and P&I premium reviews, crew-change locations on voyages transiting ${pressurePoint}, and the port-call sequencing decisions that follow from fresh advisories — not with any expectation of a regional standstill.`;
+  const para2 = `Operators should treat the current situation as a matter of route planning, insurance and keeping an eye on advisories rather than a wholesale shutdown of the region's shipping. The practical levers are war-risk and insurance reviews, where crews are changed over on voyages through ${pressurePoint}, and the port-call decisions that follow fresh advisories — not any expectation that the whole region will grind to a halt.`;
 
   return `${para1}\n\n${para2}`;
 }
@@ -979,22 +979,22 @@ function buildChokepointRouteRead(opts: {
 }): string {
   const { cpRanked, transitRecords, weeklyEnriched, thirtyDayLabel } = opts;
   if (cpRanked.length === 0 && transitRecords.length === 0) {
-    return `No qualifying chokepoint or route-disruption records reached the file across the reporting window (${thirtyDayLabel}). Read this as a coverage gap rather than confirmation that pressure has eased — chokepoint advisories tend to be lumpy and a quiet cycle does not redefine the underlying risk picture on Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep tracking maritime advisories, naval movement and any operator decisions on routing or war-risk premium. A return of activity is usually visible in advisory traffic before it shows up in commercial freight rates.`;
+    return `Little was reported on chokepoints or route disruption recently (${thirtyDayLabel}). Read this as a gap in reporting rather than proof that pressure has eased — warnings on these routes come in bursts, and a quiet spell does not change the underlying risk around Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep watching maritime advisories, naval movements and any operator decisions on routing or war-risk insurance. A return of activity usually shows up in advisories before it reaches commercial freight rates.`;
   }
   const lead = cpRanked[0];
   const second = cpRanked[1];
   const cpPhrase = lead
-    ? `The reporting window is led by ${lead.name}, which carries ${lead.count} qualifying record${lead.count === 1 ? "" : "s"}${lead.highestSeverityKey ? ` and a highest severity of ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} follows with ${second.count} record${second.count === 1 ? "" : "s"}.` : ""}`
-    : "Chokepoint coverage is thin this cycle but transit-side activity still warrants attention.";
+    ? `The busiest route this week is ${lead.name}${lead.highestSeverityKey ? `, where the most serious incident reached ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} comes next.` : ""}`
+    : "Little was reported on chokepoints this week, but movement along the routes still deserves attention.";
   const weeklyTransit = weeklyEnriched.filter((r) =>
     TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   ).length;
   const transitLine = weeklyTransit > 0
-    ? `Across the window, ${weeklyTransit} record${weeklyTransit === 1 ? "" : "s"} pointed specifically at transit, diversion or advisory pressure — a tighter view of what shippers actually felt across the cycle.`
-    : `No fresh transit-side advisories landed inside the window, so the read leans on the broader chokepoint picture above for context.`;
+    ? `This week, reporting pointed specifically to transit problems, diversions or advisory pressure — a closer view of what shippers actually faced.`
+    : `No new transit advisories came through this week, so the picture leans on the broader chokepoint view above for context.`;
   const watch = lead
-    ? `Watch for new naval advisories on ${lead.name}, any war-risk premium adjustments and operator commentary on rerouting. Those are the early indicators of escalation; commercial freight rates lag them by days.`
-    : `Watch for fresh advisory traffic and any operator decisions on diversion — those move ahead of headline freight rates and signal where pressure is building.`;
+    ? `Keep an eye on new naval advisories for ${lead.name}, any changes to war-risk insurance and what operators say about rerouting. These are the early warning signs of escalation; freight rates follow a few days later.`
+    : `Keep an eye on new advisories and any operator decisions to divert — these move ahead of headline freight rates and show where pressure is building.`;
   return `${cpPhrase}\n\n${transitLine}\n\n${watch}`;
 }
 
@@ -1008,7 +1008,7 @@ function buildVesselPiracyRead(opts: {
 }): string {
   const { vesselThreat30Total, vesselTableShown, vesselRows30, piracyRows30, vAttackSeize30, thirtyDayLabel } = opts;
   if (vesselThreat30Total + piracyRows30.length === 0) {
-    return `Nothing hostile against vessels and no piracy or armed-robbery records reached the file across the reporting window (${thirtyDayLabel}). The underlying threat picture in the region has not been benign for long, so treat the quiet cycle as a reporting gap and keep crew-change, advisory and naval-patrol signals on the watchlist.\n\nA return to hostile activity is usually announced first by naval forces, then by maritime risk bulletins, before it shows up in P&I or war-risk premium movement.`;
+    return `No attacks on ships and no piracy or armed robbery were reported recently (${thirtyDayLabel}). The threat in this region has not been calm for long, so treat the quiet spell as a gap in reporting and keep crew changes, advisories and naval patrols on the watchlist.\n\nA return to attacks is usually flagged first by naval forces, then by maritime risk bulletins, before it shows up in insurance or war-risk costs.`;
   }
   // Lead-title quotes must come from a credible maritime / security /
   // industry / news source. The vessel pipeline is already filtered for
@@ -1021,37 +1021,37 @@ function buildVesselPiracyRead(opts: {
   // dedupe and credibility filtering, (2) the attack/seizure subset of
   // that total, (3) the capped row count shown in the table below.
   const capNote = vesselTableShown < vesselThreat30Total
-    ? ` The table below shows the top ${vesselTableShown} of these, prioritising attack and seizure events.`
+    ? ` The table below highlights the most serious of these, focusing on attacks and seizures.`
     : "";
   const vesselSegment = vesselThreat30Total > 0
-    ? `Vessel-threat reporting across the reporting window carries ${vesselThreat30Total} qualifying event${vesselThreat30Total === 1 ? "" : "s"}, of which ${vAttackSeize30} ${vAttackSeize30 === 1 ? "is" : "are"} an attack or seizure rather than a softer boarding or approach.${capNote}${vesselLead ? ` The lead entry is "${vesselLead.title}".` : ""}`
-    : `No vessel-attack or seizure records landed in the reporting window, even with piracy activity still on the file.`;
+    ? `Threats to ships were reported recently, including attacks and seizures rather than just lower-level boardings or approaches.${capNote}${vesselLead ? ` The standout was "${vesselLead.title}".` : ""}`
+    : `No attacks or seizures of ships were reported recently, though piracy activity was still reported.`;
   const piracySegment = piracyRows30.length > 0
-    ? `Piracy and armed-robbery reporting carries ${piracyRows30.length} record${piracyRows30.length === 1 ? "" : "s"} across the same window${piracyLead ? `, with "${piracyLead.title}" as the lead entry.` : `; no credible single lead is quoted as the file leans on low-credibility or speculative reporting.`}`
-    : `Piracy and armed-robbery reporting is empty across the reporting window, which is unusual rather than reassuring for this geography.`;
-  const watch = `Track maritime advisories, naval-force statements and any movement in war-risk or P&I premiums on affected routes. Those are the cleanest early indicators that hostile activity is firming or easing.`;
+    ? `Piracy and armed robbery were also reported over the same period${piracyLead ? `, with "${piracyLead.title}" the clearest case.` : `, though no single reliable case stands out, as the reporting is weak or unconfirmed.`}`
+    : `No piracy or armed robbery was reported recently, which is unusual rather than reassuring for this part of the world.`;
+  const watch = `Keep an eye on maritime advisories, naval statements and any change in war-risk or insurance costs on affected routes. These are the clearest early signs of whether attacks are picking up or easing.`;
   return `${vesselSegment} ${piracySegment}\n\n${watch}`;
 }
 
 function buildCommercialImpactRead(commercialRecords: EnrichedIncident[]): string {
   if (commercialRecords.length === 0) {
-    return `No port, freight, insurance or commercial-shipping disruption records reached the file in the weekly window. Pure market commentary — newbuild orders, vessel S&P, fleet finance, earnings, share-price moves — is intentionally excluded from this section, so a blank cycle here means the operational disruption signal was genuinely quiet rather than under-reported.\n\nWatch for fresh port advisories, schedule slippage out of the major box and tanker hubs, and any insurance-premium adjustments tied to specific routes. Those are the next signals that operational commercial pressure is firming.`;
+    return `No port, freight, insurance or commercial shipping disruption was reported this week. General market news — new ship orders, vessel sales, fleet finance, earnings, share-price moves — is deliberately left out of this section, so a quiet week here means real disruption was genuinely low rather than simply unreported.\n\nKeep an eye on new port advisories, schedule delays at the major container and tanker hubs, and any insurance changes tied to specific routes. These are the next signs that commercial pressure is building.`;
   }
   const n = commercialRecords.length;
   const lead = commercialRecords[0];
   const second = commercialRecords[1];
-  const intro = `Operational commercial pressure on shipping in the weekly window centres on port disruption, freight or insurance movement with an operational hook, and commercial-shipping disruption tied directly to vessel or cargo flows. The cycle carries ${n} qualifying record${n === 1 ? "" : "s"} on this definition.`;
+  const intro = `Commercial pressure on shipping this week centres on port disruption, freight or insurance changes tied to real events, and disruption linked directly to ships or cargo flows. Cases of this kind were reported.`;
   // With one or two records the commercial picture is too thin to read as a
   // trend. Say the signal is limited and treat it as a watch item rather than
   // overstating a broad commercial impact the data does not support.
   const limited =
     n <= 2
-      ? ` On a single weekly window this is a thin, directional signal rather than a confirmed commercial trend — treat it as a watch item, not evidence of broad commercial disruption.`
+      ? ` Over a single week this is only a rough guide rather than a confirmed trend — treat it as something to watch, not proof of widespread commercial disruption.`
       : "";
   const examples = second
-    ? `The lead entry is "${lead.title}" (${lead.issue.toLowerCase()}); "${second.title}" sits alongside it (${second.issue.toLowerCase()}).`
-    : `The lead entry is "${lead.title}" (${lead.issue.toLowerCase()}).`;
-  const watch = `Watch for follow-on schedule disruption, premium adjustments on affected routes, and any operator decisions on diversion or port-skipping. Commercial pass-through to shippers typically follows the operational signal by one to two weeks.`;
+    ? `The clearest case is "${lead.title}" (${lead.issue.toLowerCase()}), with "${second.title}" alongside it (${second.issue.toLowerCase()}).`
+    : `The clearest case is "${lead.title}" (${lead.issue.toLowerCase()}).`;
+  const watch = `Keep an eye on knock-on schedule disruption, premium changes on affected routes, and any operator decisions to divert or skip ports. Costs usually reach shippers one to two weeks after the activity.`;
   return `${intro}${limited} ${examples}\n\n${watch}`;
 }
 
@@ -1063,14 +1063,14 @@ function buildRegionalCountryRead(opts: {
 }): string {
   const { regionRows, countryRows, weeklyCount, locationNotIdentifiedCount } = opts;
   if (weeklyCount === 0) {
-    return `No qualifying maritime records reached the file across APAC and the Middle East in the weekly window. The underlying picture has not been benign for long, so a blank cycle should be treated as a reporting gap rather than a sustained easing of regional risk.`;
+    return `Little was reported across APAC and the Middle East this week. The underlying picture has not been calm for long, so a quiet week is better treated as a gap in reporting than as a lasting easing of regional risk.`;
   }
   const regionRanked = [...regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
   const lead = regionRanked[0];
   const second = regionRanked[1];
   const regionLine = lead
-    ? `Across the weekly briefing window, ${lead.label} carries the heavier share with ${lead.value} record${lead.value === 1 ? "" : "s"}${second ? ` against ${second.value} for ${second.label}` : ""}.`
-    : `Regional attribution is thin this cycle, with most records sitting outside the APAC and Middle East scope.`;
+    ? `This week, ${lead.label} saw the larger share of activity${second ? `, ahead of ${second.label}` : ""}.`
+    : `Little could be tied to a region this week, with most reports falling outside APAC and the Middle East.`;
   const topCountries = countryRows.slice(0, 3).filter((r) => r.value > 0);
   const identifiedTotal = countryRows.reduce((sum, r) => sum + r.value, 0);
   // When as many (or more) records are unattributed as are tied to a country,
@@ -1078,13 +1078,13 @@ function buildRegionalCountryRead(opts: {
   // rather than letting the lead countries read as settled fact.
   const heavyGap = locationNotIdentifiedCount > 0 && locationNotIdentifiedCount >= identifiedTotal;
   const countryQualifier = heavyGap
-    ? ` These country totals are indicative only: with ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} unattributed against ${identifiedTotal} tied to a confirmed incident country, country-level conclusions should be treated as low-confidence.`
+    ? ` These country figures are a rough guide only: a large share of reports could not be tied to a specific country, so country-level conclusions should be treated with caution.`
     : "";
   const countryLine = topCountries.length > 0
-    ? `At country level the cycle is led by ${joinList(topCountries.map((c) => c.label))}.${countryQualifier}`
-    : `Country-level attribution is incomplete this cycle; identified incident countries are sparse in the file.`;
+    ? `By country, the most activity this week was in ${joinList(topCountries.map((c) => c.label))}.${countryQualifier}`
+    : `The country picture is incomplete this week, with few reports tied to a specific country.`;
   const gapLine = locationNotIdentifiedCount > 0
-    ? `A further ${locationNotIdentifiedCount} record${locationNotIdentifiedCount === 1 ? "" : "s"} could not be tied to a confirmed incident country and ${locationNotIdentifiedCount === 1 ? "is" : "are"} excluded from the country chart to avoid distortion.`
+    ? `Some reports could not be tied to a specific country and are left off the country chart to keep it accurate.`
     : "";
   return `${regionLine} ${countryLine}${gapLine ? `\n\n${gapLine}` : ""}`;
 }

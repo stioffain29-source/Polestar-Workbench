@@ -266,7 +266,7 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
   if (rows.length === 0) {
     return (
       <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        {emptyMessage ?? "No data in window."}
+        {emptyMessage ?? "No data reported this week."}
       </p>
     );
   }
@@ -315,7 +315,7 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
   if (rows.length === 0) {
     return (
       <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        No qualifying related incidents in the briefing window. Treat the quiet cycle as a reporting gap rather than a sustained easing.
+        Little related activity was reported this week. Treat the quiet stretch as a gap in reporting rather than a lasting calm.
       </p>
     );
   }
@@ -323,7 +323,7 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
     <div className="w-full">
       {rows.length < 4 && (
         <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13, marginBottom: 8 }}>
-          Signal is thin this cycle: only {rows.length} qualifying incident{rows.length === 1 ? "" : "s"} cleared the relevance and operational filters. The table is intentionally short — low-signal items are excluded rather than used to pad it.
+          Little related activity was reported this week, so the list below is short. It is kept deliberately brief — minor items are left out rather than used to fill space.
         </p>
       )}
       <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
@@ -451,7 +451,7 @@ export default function FlashpointReportPreview({
           <div className="mt-4">
             <IncidentTable
               rows={ds.activismRows}
-              emptyMessage="No qualifying activism records in the briefing window."
+              emptyMessage="No protest or activism activity was reported this week."
             />
           </div>
         </Section>
@@ -461,7 +461,7 @@ export default function FlashpointReportPreview({
           <div className="mt-4">
             <IncidentTable
               rows={ds.unrestRows}
-              emptyMessage="No qualifying civil-unrest records in the briefing window."
+              emptyMessage="No civil unrest or public-order activity was reported this week."
             />
           </div>
         </Section>
@@ -501,7 +501,7 @@ export default function FlashpointReportPreview({
             >
               {ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country"}
             </div>
-            <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries in window." />
+            <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No countries with reported activity this week." />
           </div>
         </Section>
 

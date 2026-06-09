@@ -249,7 +249,7 @@ function drawHorizontalBarChart(
     setRoboto(pdf, "italic");
     pdf.setFontSize(9);
     pdf.text(
-      sanitize(opts.emptyMessage ?? "No data in window."),
+      sanitize(opts.emptyMessage ?? "No data reported this week."),
       MX,
       ctx.y + 10,
     );
@@ -420,7 +420,7 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
     pdf.setFontSize(9);
     pdf.text(
       sanitize(
-        "No qualifying related incidents in the briefing window. Treat the quiet cycle as a reporting gap rather than a sustained easing.",
+        "No related incidents reported this week. Treat the quiet week as a gap in reporting rather than a sustained easing.",
       ),
       MX,
       ctx.y + 10,
@@ -569,7 +569,7 @@ export async function exportFlashpointReportPdf(
     ctx,
     null,
     ds.activismRows,
-    "No qualifying activism records in the briefing window.",
+    "No activism reporting this week.",
   );
 
   // Civil Unrest and Public Order Read — prose leads the unrest table.
@@ -582,7 +582,7 @@ export async function exportFlashpointReportPdf(
     ctx,
     null,
     ds.unrestRows,
-    "No qualifying civil-unrest records in the briefing window.",
+    "No civil-unrest reporting this week.",
   );
 
   // Forecast — structured Country / Signal / Operational meaning table
@@ -608,7 +608,7 @@ export async function exportFlashpointReportPdf(
     ds.countryRows,
     {
       labelW: 160,
-      emptyMessage: "No identified incident countries in window.",
+      emptyMessage: "No identified incident countries reported this week.",
     },
   );
 

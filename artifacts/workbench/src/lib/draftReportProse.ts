@@ -223,12 +223,12 @@ interface ReportPack {
 }
 
 function sevTail(sev: string): string {
-  return sev ? ` Severity peaked at ${sev}.` : "";
+  return sev ? ` The most serious reached ${sev}.` : "";
 }
 
 function thinTail(thin: boolean, total: number): string {
   if (!thin || total === 0) return "";
-  return " Volume is light, so the read is directional rather than firm.";
+  return " There is little to go on this week, so treat this as a rough guide.";
 }
 
 // Fuel Watch tracks cost-and-continuity pressure, not casualty-grade events.
@@ -245,7 +245,7 @@ function fuelPressureTail(sev: string): string {
       : sev === "moderate"
         ? "elevated"
         : "contained";
-  return ` Operating pressure across the window reads as ${level}.`;
+  return ` Operating pressure right now reads as ${level}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,9 +257,9 @@ const FUEL: ReportPack = {
   exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
     const driver = types || "price movement, shortage reporting and transport disruption";
     const geo = lead
-      ? ` ${lead} produced the clearest country signal${countries && countries !== lead ? `, with further reporting from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with more reported from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    const para1 = `Fuel risk this ${cadence} cycle reads as a cost-and-continuity issue rather than a single dramatic event. Pressure across the window was driven by ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total)}`;
+    const para1 = `Fuel risk this ${cadence === "monthly" ? "month" : "week"} is mainly about cost and continuity rather than a single dramatic event. The pressure came from ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total)}`;
     const para2 = `Cost indicators are holding above easy-budget levels, and the incident picture adds operational stress — shortages, forecourt disruption, subsidy moves and route pressure where they appear — rather than relief.`;
     const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
@@ -268,14 +268,14 @@ const FUEL: ReportPack = {
   // matters. No section cross-references, no meta-report wording.
   situation: ({ lead }) => {
     const where = lead ? ` ${lead} is the country carrying the most weight.` : "";
-    return `Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream. The cycle matters because cost pressure and availability pressure are showing up together this period, which is when contract economics and operational continuity stop being separate concerns.${where}`;
+    return `Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream. This matters because cost pressure and availability pressure are showing up together right now, which is when contract economics and operational continuity stop being separate concerns.${where}`;
   },
   // What Happened: short — what changed or was reported. No
   // cross-references to Market Read / Operational Read, no "table
   // below" language.
   whatHappened: ({ types, countries, sev, lead }) => {
     if (!types) {
-      return `Classifiable fuel reporting was light this cycle, with no single pattern dominating the window.${fuelPressureTail(sev)}`;
+      return `Fuel reporting was light recently, with no single pattern standing out.${fuelPressureTail(sev)}`;
     }
     const secondaries = countries && countries !== lead
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
@@ -283,14 +283,14 @@ const FUEL: ReportPack = {
     const geo = lead
       ? ` concentrated on ${lead}${secondaries ? `, with secondary reporting from ${secondaries}` : ""}`
       : "";
-    return `Reporting this cycle was led by ${types}${geo}.${fuelPressureTail(sev)}`;
+    return `Reporting was led by ${types}${geo}.${fuelPressureTail(sev)}`;
   },
   // What Matters: two analytical paragraphs connecting prices, jet movement,
   // shortage / route pressure and business continuity.
   whatMatters: ({ lead }) => {
     const where = lead ? ` Exposure to ${lead} is the live pressure point for fleet, generator and field operations.` : "";
-    const para1 = `Elevated crude and a jet fuel series that is not retreating tell the cost side of the story: fuel-linked invoices stay heavy. The incident layer then tells the availability side: shortages, rationing and route pressure are the points where price stops being the only problem and physical access becomes the issue.${where}`;
-    const para2 = `Where the two reinforce each other — high prices meeting tight supply or chokepoint disruption — the operational impact compounds. Freight rates lift, surcharge clauses fire, generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against this cycle.`;
+    const para1 = `Elevated crude and a jet fuel series that is not retreating tell the cost side of the story: fuel-linked invoices stay heavy. The incident picture then tells the availability side: shortages, rationing and route pressure are the points where price stops being the only problem and physical access becomes the issue.${where}`;
+    const para2 = `Where the two reinforce each other — high prices meeting tight supply or chokepoint disruption — the operational impact compounds. Freight rates lift, surcharge clauses fire, generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against now.`;
     return `${para1}\n\n${para2}`;
   },
   // Implications for Business: practical and client-useful, one distinct
@@ -322,15 +322,15 @@ const FUEL: ReportPack = {
   polestarView: ({ lead, countries }) => {
     const pressure = lead
       ? ` ${lead} is the clearest country pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
-      : " No single country carries the read this cycle.";
-    return `Fuel Watch is flagging a cost-and-continuity risk this cycle, not simply a rise in fuel headlines. The market indicators show elevated fuel costs holding rather than easing, while the incident picture shows operational stress around shortages, route pressure and policy intervention. For business users, the priority is to protect movement, backup power and fuel-dependent operations from short-notice price or availability shocks.${pressure}`;
+      : " No single country stands out right now.";
+    return `Fuel Watch is flagging a cost-and-continuity risk right now, not simply a rise in fuel headlines. The market indicators show elevated fuel costs holding rather than easing, while the incident picture shows operational stress around shortages, route pressure and policy intervention. For business users, the priority is to protect movement, backup power and fuel-dependent operations from short-notice price or availability shocks.${pressure}`;
   },
-  zeroExec: "Fuel reporting was quiet this cycle. Treat that as a coverage gap rather than evidence that supply has stabilised. The market indicators in the Fast Facts and Jet Fuel Price Trajectory still carry the cost-side read; the incident layer simply has less to say this window. For business users, the standing exposures — fuel stock cover, generator runtime, road transport exposure and supplier resilience — remain the operational focus until fresh reporting lands.",
-  zeroSituation: "Underlying exposure to shortage, subsidy change and refinery disruption remains, even on a quiet reporting cycle.",
-  zeroWhatHappened: "Nothing classifiable on fuel landed in the window, so any read is inferred from the prior cycle rather than fresh evidence.",
-  zeroWhatMatters: "Transport cost, generator reliance and continuity at high-fuel-use sites stay the standing concern regardless of headline volume. With no fresh incident reporting this cycle, the market indicators above carry the read on their own; treat them as the cost floor for any forward planning.",
-  zeroPolestar: "No usable fuel signal landed in the incident window this cycle, so the read leans on the market indicators above. Hold the prior cycle assessment, keep standing fuel-resilience measures live, and revisit the picture once the next batch of reporting arrives.",
-  thinNote: "Fuel reporting in this window is thin. Treat as a coverage gap, not as evidence that supply has stabilised.",
+  zeroExec: "Fuel reporting was quiet this week. Read that as a gap in reporting rather than a sign that supply has settled. The market indicators in the Fast Facts and Jet Fuel Price Trajectory still carry the cost-side picture. For business users, the lasting exposures — fuel stock cover, generator runtime, road transport exposure and supplier resilience — remain the focus until fresh reporting comes through.",
+  zeroSituation: "Underlying exposure to shortage, subsidy change and refinery disruption remains, even in a quiet week.",
+  zeroWhatHappened: "Nothing notable on fuel came through this week, so the picture carries over from recent weeks rather than fresh reporting.",
+  zeroWhatMatters: "Transport cost, generator reliance and continuity at high-fuel-use sites stay the standing concern whether or not anything is reported. With no fresh incidents this week, the market indicators above carry the picture on their own; treat them as the cost floor for any forward planning.",
+  zeroPolestar: "Nothing useful came through on fuel incidents this week, so the picture leans on the market indicators above. Keep current fuel-resilience measures in place and revisit once new reporting comes through.",
+  thinNote: "Fuel reporting was light this week. Treat that as a gap in reporting, not a sign that supply has settled.",
 };
 
 // ---------------------------------------------------------------------------
@@ -340,22 +340,22 @@ const FERTILISER: ReportPack = {
   exec: ({ types, lead, countries, sev, thin, total }) => {
     const driver = types || "pricing, export controls and production disruption";
     const geo = lead
-      ? ` ${lead} carried the strongest country signal${countries && countries !== lead ? `, supported by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      ? ` ${lead} saw the most activity${countries && countries !== lead ? `, supported by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
     return `Fertiliser pressure was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
   },
   situation: ({ types }) => {
-    const focus = types ? `Supply, price and export decisions stay front of mind, currently expressed through ${types}.` : "Supply, price and export decisions stay front of mind, with farmer access and planting timing the operational concern.";
+    const focus = types ? `Supply, price and export decisions stay front of mind, currently showing up as ${types}.` : "Supply, price and export decisions stay front of mind, with farmer access and planting timing the operational concern.";
     return `${focus} The chain runs from input price into farm output and onward food cost.`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Activity centred on ${types}.` : `Activity was light, with little classifiable detail.`;
+    const lead = types ? `Activity centred on ${types}.` : `Activity was light, with little to go on.`;
     const geo = countries ? ` Reporting clustered around ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ lead }) => {
     const where = lead ? ` Exposure to ${lead} matters most for forward stock cover and supplier conversations.` : "";
-    return `Movement in fertiliser pricing and supply rolls forward into planting decisions, farm input cost and the wider food security read.${where}`;
+    return `Movement in fertiliser pricing and supply rolls forward into planting decisions, farm input cost and the wider food security picture.${where}`;
   },
   implications: () =>
     "Walk through supplier diversification, forward stock cover, exposure to single-source urea and potash, and contingency for export-ban announcements.",
@@ -363,14 +363,14 @@ const FERTILISER: ReportPack = {
     "Keep eyes on export restrictions, plant maintenance and outage announcements, farmer protest activity and any government subsidy moves.",
   polestarView: ({ lead }) => {
     const tail = lead ? ` ${lead} is the country to watch when planning forward cover.` : "";
-    return `The standing concern is supply continuity rather than the volume of headlines.${tail}`;
+    return `The standing concern is supply continuity rather than the number of headlines.${tail}`;
   },
-  zeroExec: "Fertiliser reporting was quiet this cycle. Treat that as a coverage gap rather than proof of market calm.",
-  zeroSituation: "Supply, price and export decisions remain the operating concern even when headline volume is light.",
-  zeroWhatHappened: "Few classifiable fertiliser items landed, so the picture rests on the prior cycle rather than fresh reporting.",
-  zeroWhatMatters: "Farm input cost, planting decisions and downstream food price pressure stay live exposures whatever the window count.",
-  zeroPolestar: "No usable fertiliser signal landed in the window. Hold the prior cycle assessment until fresh records arrive.",
-  thinNote: "Fertiliser reporting in this window is thin. Treat as a coverage gap, not as proof of supply stability.",
+  zeroExec: "Fertiliser reporting was quiet this week. Read that as a gap in reporting rather than proof of market calm.",
+  zeroSituation: "Supply, price and export decisions remain the operating concern even when little is reported.",
+  zeroWhatHappened: "Little fertiliser reporting came through, so the picture rests on recent weeks rather than fresh reporting.",
+  zeroWhatMatters: "Farm input cost, planting decisions and downstream food price pressure stay live exposures whatever is reported.",
+  zeroPolestar: "Nothing useful came through on fertiliser this week. Hold the recent assessment until fresh reporting arrives.",
+  thinNote: "Fertiliser reporting was light this week. Treat that as a gap in reporting, not proof of supply stability.",
 };
 
 // ---------------------------------------------------------------------------
@@ -380,9 +380,9 @@ const CARGO: ReportPack = {
   exec: ({ types, lead, countries, sev, thin, total }) => {
     const driver = types || "theft, pilferage and warehouse loss";
     const geo = lead
-      ? ` ${lead} carried the most consistent reporting${countries && countries !== lead ? `, alongside ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      ? ` ${lead} saw the most consistent reporting${countries && countries !== lead ? `, alongside ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Cargo loss across the window was shaped by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    return `Cargo loss this month was shaped by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
   },
   situation: ({ types, lead }) => {
     const focus = types ? `Warehouse, depot and road corridors hold the live exposure, currently visible in ${types}.` : "Warehouse, depot and road corridors hold the live exposure, with route knowledge and insider risk as the persistent drivers.";
@@ -390,7 +390,7 @@ const CARGO: ReportPack = {
     return `${focus}${where}`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `The dominant patterns were ${types}.` : `Few classifiable cargo events surfaced.`;
+    const lead = types ? `The dominant patterns were ${types}.` : `Little classifiable cargo activity came through.`;
     const geo = countries ? ` Loss reporting concentrated on ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
@@ -406,12 +406,12 @@ const CARGO: ReportPack = {
     const where = countries ? ` ${countries} hold the recurring geography${lead ? `; ${lead} is the lead pressure point` : ""}.` : "";
     return `Insider knowledge and route familiarity continue to drive the larger losses.${where}`;
   },
-  zeroExec: "Cargo reporting was quiet this cycle. Treat that as a coverage gap, not proof that the problem is absent.",
-  zeroSituation: "Warehouse, depot and road-corridor exposure persists regardless of how quiet the reporting window looks.",
-  zeroWhatHappened: "Few classifiable cargo events surfaced, so the read defers to the prior cycle rather than this window.",
+  zeroExec: "Cargo reporting was quiet this month. Read that as a gap in reporting, not proof that the problem is absent.",
+  zeroSituation: "Warehouse, depot and road-corridor exposure persists regardless of how quiet reporting looks.",
+  zeroWhatHappened: "Little cargo activity came through, so the picture carries over from recent weeks.",
   zeroWhatMatters: "Insider knowledge and route familiarity continue to sit behind the larger losses whether or not new reporting lands.",
-  zeroPolestar: "No usable cargo signal landed in the window. Hold the prior cycle assessment and revisit once fresh reporting arrives.",
-  thinNote: "Cargo reporting in this window is thin. That should be treated as a coverage gap, not proof that the problem is absent.",
+  zeroPolestar: "Nothing useful came through on cargo this month. Hold the recent assessment and revisit once fresh reporting arrives.",
+  thinNote: "Cargo reporting was light this month. Treat that as a gap in reporting, not proof that the problem is absent.",
 };
 
 // ---------------------------------------------------------------------------
@@ -421,33 +421,33 @@ const SHIPPING: ReportPack = {
   exec: ({ types, lead, countries, sev, thin, total }) => {
     const driver = types || "chokepoint exposure, vessel risk and freight-side pressure";
     const geo = lead
-      ? ` ${lead} produced the strongest identifiable signal${countries && countries !== lead ? `, with lower volumes from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
-      : " Country attribution is sparse, with several records lacking a precise incident location.";
+      ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with less from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      : " No single country stands out, and several reports do not pin down a precise location.";
     return `Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
   },
   situation: ({ types }) => {
-    const focus = types ? `Chokepoints and major ports remain the standing pressure points, currently expressed through ${types}.` : "Chokepoints and major ports remain the standing pressure points, with vessel and freight-side risk close behind.";
-    return `${focus} Records without a precise incident location stay in totals but out of country charts.`;
+    const focus = types ? `Chokepoints and major ports remain the standing pressure points, currently showing up as ${types}.` : "Chokepoints and major ports remain the standing pressure points, with vessel and freight-side risk close behind.";
+    return `${focus}`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Maritime activity was shaped by ${types}.` : `Maritime activity was light on classifiable detail.`;
-    const geo = countries ? ` Identifiable reporting tracked back to ${countries}.` : "";
+    const lead = types ? `Maritime activity was shaped by ${types}.` : `Maritime activity was light this week.`;
+    const geo = countries ? ` Reporting traced back to ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: () =>
-    "Pressure here feeds straight into transit time, freight cost and war-risk premium exposure across the wider region. A small shift on any one chokepoint usually shows up in the freight and insurance read soon after.",
+    "Pressure here feeds straight into transit time, freight cost and war-risk premium exposure across the wider region. A small shift on any one chokepoint usually shows up in the freight and insurance picture soon after.",
   implications: () =>
     "Re-walk routing options around affected chokepoints, port-call sequencing, bunker planning and war-risk premium exposure. Confirm crew-change and advisory triggers with operators.",
   watchNext: () =>
-    "Next cycle hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices.",
+    "Next week hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices.",
   polestarView: ({ lead }) =>
-    `Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a thinner layer of commercial disruption.${lead ? ` ${lead} carries the strongest identifiable signal this cycle.` : ""}`,
-  zeroExec: "Maritime reporting was quiet this cycle. Treat that as a coverage gap rather than proof of calm at sea.",
-  zeroSituation: "Chokepoint, vessel and freight-side exposure persists even when the reporting cycle is light.",
-  zeroWhatHappened: "No classifiable maritime activity surfaced, leaving the read directional rather than firm.",
-  zeroWhatMatters: "Underlying pressure on transit time, freight cost and war-risk premium remains, regardless of window count.",
-  zeroPolestar: "No usable maritime signal landed in the window. Standing exposure to chokepoint, vessel and freight risk remains.",
-  thinNote: "Shipping reporting in this window is thin. Treat as a coverage gap, not proof that disruption has eased.",
+    `Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a thinner layer of commercial disruption.${lead ? ` ${lead} saw the most activity this week.` : ""}`,
+  zeroExec: "Maritime reporting was quiet this week. Read that as a gap in reporting rather than proof of calm at sea.",
+  zeroSituation: "Chokepoint, vessel and freight-side exposure persists even when little is reported.",
+  zeroWhatHappened: "No notable maritime activity came through, so the picture is a rough guide rather than firm.",
+  zeroWhatMatters: "Underlying pressure on transit time, freight cost and war-risk premium remains, whatever is reported.",
+  zeroPolestar: "Nothing useful came through on shipping this week. Standing exposure to chokepoint, vessel and freight risk remains.",
+  thinNote: "Shipping reporting was light this week. Treat that as a gap in reporting, not proof that disruption has eased.",
 };
 
 // ---------------------------------------------------------------------------
@@ -465,24 +465,24 @@ const FLASHPOINT: ReportPack = {
       : "";
     const geoLead = lead
       ? `${lead} carries the heaviest concentration${secondaries ? `, with ${secondaries} as supporting watch areas` : ""}`
-      : "no single country carries the read this cycle";
+      : "no single country stands out this week";
     const sevClause = sev
-      ? ` Worst-case reporting reached the ${sev.toLowerCase()} tier, so the cycle cannot be read as routine.`
+      ? ` The most serious reached ${sev.toLowerCase()}, so this week is not routine.`
       : "";
     const thinClause = thin && total > 0
-      ? " Volume is light, so the read is directional rather than firm."
+      ? " There is little to go on this week, so treat this as a rough guide."
       : "";
-    const para1 = `Flashpoint risk this cycle reads as an operational-tempo issue rather than a single headline event. The window was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
-    const para2 = `What the incident layer adds is speed: these events move from notice to road closure, transport halt or site-access disruption inside a working day. The pattern is short-cycle escalation against a standing baseline, not isolated flare-ups.`;
-    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Standing readiness — refreshed journey-management, agreed escalation triggers and live country-lead routing — does more work this cycle than headline-severity tracking.`;
+    const para1 = `Flashpoint risk this week is about operational tempo rather than a single headline event. It was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
+    const para2 = `What stands out is speed: these events move from notice to road closure, transport halt or site-access disruption inside a working day. The pattern is rapid escalation against a standing baseline, not isolated flare-ups.`;
+    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Standing readiness — refreshed journey-management, agreed escalation triggers and live country-lead routing — does more work this week than headline-severity tracking.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types }) => {
-    const focus = types ? `Short-cycle events on streets, transport hubs and central business districts shape the picture, with ${types} the visible drivers.` : "Short-cycle events on streets, transport hubs and central business districts shape the picture, with rapid escalation the standing risk.";
+    const focus = types ? `Fast-moving events on streets, transport hubs and central business districts shape the picture, with ${types} the visible drivers.` : "Fast-moving events on streets, transport hubs and central business districts shape the picture, with rapid escalation the standing risk.";
     return `${focus} Operational impact lands quickly when these surface.`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Disruption centred on ${types}.` : `Few classifiable flashpoint events surfaced.`;
+    const lead = types ? `Disruption centred on ${types}.` : `Little flashpoint activity came through.`;
     const geo = countries ? ` Activity concentrated around ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
@@ -496,14 +496,14 @@ const FLASHPOINT: ReportPack = {
     "Track planned political dates, calls to mobilise, security-force deployments and any sign of cross-city escalation.",
   polestarView: ({ lead }) => {
     const tail = lead ? ` ${lead} remains the city-by-city focus.` : "";
-    return `The story this cycle is operational tempo rather than headline severity. Standing readiness on affected cities is what protects continuity.${tail}`;
+    return `The story this week is operational tempo rather than headline severity. Standing readiness on affected cities is what protects continuity.${tail}`;
   },
-  zeroExec: "Flashpoint reporting was quiet this cycle. Treat that as a coverage gap, not proof that the streets are calm.",
-  zeroSituation: "Short-cycle disruption risk on transport hubs and central business districts persists whether or not new reporting lands.",
-  zeroWhatHappened: "No classifiable flashpoint events surfaced, so the operating read draws on prior-cycle exposure.",
+  zeroExec: "Flashpoint reporting was quiet this week. Read that as a gap in reporting, not proof that the streets are calm.",
+  zeroSituation: "Fast-moving disruption risk on transport hubs and central business districts persists whether or not new reporting lands.",
+  zeroWhatHappened: "Little flashpoint activity came through, so the picture draws on recent weeks.",
   zeroWhatMatters: "Speed of escalation continues to set the operational concern; staff movement and site access stay the live points.",
-  zeroPolestar: "No usable flashpoint signal landed in the window. Maintain standing readiness on previously affected cities.",
-  thinNote: "Flashpoint reporting in this window is thin. Treat as a coverage gap, not as proof of calm.",
+  zeroPolestar: "Nothing useful came through on flashpoint activity this week. Maintain standing readiness on previously affected cities.",
+  thinNote: "Flashpoint reporting was light this week. Treat that as a gap in reporting, not proof of calm.",
 };
 
 // ---------------------------------------------------------------------------
@@ -515,15 +515,15 @@ const ENERGY: ReportPack = {
     const geo = lead
       ? ` ${lead} carried the most visible grid strain${countries && countries !== lead ? `, alongside ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Power and grid pressure through the window was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    return `Power and grid pressure this week was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Capacity strain shows through ${types}, with fuel-to-power supply the underlying weakness.` : "Capacity strain remains the background condition, with fuel-to-power supply the underlying weakness.";
     return `${focus} Industrial continuity sits squarely in the firing line when outages run long.`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Grid reporting was shaped by ${types}.` : `Grid reporting was thin on classifiable detail.`;
-    const geo = countries ? ` Visible stress tracked back to ${countries}.` : "";
+    const lead = types ? `Grid reporting was shaped by ${types}.` : `Grid reporting was light this week.`;
+    const geo = countries ? ` Visible stress traced back to ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ countries }) => {
@@ -535,15 +535,15 @@ const ENERGY: ReportPack = {
   watchNext: () =>
     "Keep an eye on fresh load-shedding schedules, substation incidents, fuel-to-power supply moves and weather events that pressure peak demand.",
   polestarView: ({ lead }) => {
-    const tail = lead ? ` ${lead} is where backup and continuity spend earn their keep this cycle.` : "";
+    const tail = lead ? ` ${lead} is where backup and continuity spend earn their keep this week.` : "";
     return `The grid story is one of standing fragility rather than a single dramatic event.${tail}`;
   },
-  zeroExec: "Grid reporting was quiet this cycle. Treat that as a coverage gap rather than evidence that the grid is stable.",
+  zeroExec: "Grid reporting was quiet this week. Read that as a gap in reporting rather than evidence that the grid is stable.",
   zeroSituation: "Capacity strain and fuel-to-power supply weakness remain the background condition whether or not new reporting lands.",
-  zeroWhatHappened: "No classifiable grid stress surfaced, so the read carries forward from the prior cycle.",
+  zeroWhatHappened: "No notable grid stress came through, so the picture carries forward from recent weeks.",
   zeroWhatMatters: "Site uptime, generator load and continuity spend stay the operational concern on regional grids.",
-  zeroPolestar: "No usable grid signal landed in the window. Underlying capacity gaps on most regional grids remain.",
-  thinNote: "Energy reporting in this window is thin. Treat as a coverage gap, not as proof that the grid is stable.",
+  zeroPolestar: "Nothing useful came through on the grid this week. Underlying capacity gaps on most regional grids remain.",
+  thinNote: "Energy reporting was light this week. Treat that as a gap in reporting, not proof that the grid is stable.",
 };
 
 // ---------------------------------------------------------------------------
@@ -564,16 +564,16 @@ const PROTESTS: ReportPack = {
       : "";
     const geoLead = lead
       ? `${lead} carries the heaviest concentration${secondaries ? `, with ${secondaries} as supporting watch areas` : ""}`
-      : "no single country carries the read this cycle";
+      : "no single country stands out this week";
     const sevClause = sev
-      ? ` Worst-case reporting reached the ${sev.toLowerCase()} tier, so the cycle cannot be read as routine.`
+      ? ` The most serious reached ${sev.toLowerCase()}, so this week is not routine.`
       : "";
     const thinClause = thin && total > 0
-      ? " Volume is light, so the read is directional rather than firm."
+      ? " There is little to go on this week, so treat this as a rough guide."
       : "";
-    const para1 = `Public-order risk this cycle reads as an operational-tempo issue rather than a single headline event. The window was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
-    const para2 = `What the incident layer adds is speed: these events move from notice to road closure, transit halt or site-access disruption inside a working day. The pattern is short-cycle escalation against a standing baseline of unrest, not isolated flare-ups.`;
-    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Refreshed journey-management plans, agreed escalation triggers and live country-lead routing do more work this cycle than headline-severity tracking.`;
+    const para1 = `Public-order risk this week is about operational tempo rather than a single headline event. It was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
+    const para2 = `What stands out is speed: these events move from notice to road closure, transit halt or site-access disruption inside a working day. The pattern is rapid escalation against a standing baseline of unrest, not isolated flare-ups.`;
+    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Refreshed journey-management plans, agreed escalation triggers and live country-lead routing do more work this week than headline-severity tracking.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types }) => {
@@ -581,7 +581,7 @@ const PROTESTS: ReportPack = {
     return `${focus}`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Reporting centred on ${types}.` : `Reporting carried little classifiable detail.`;
+    const lead = types ? `Reporting centred on ${types}.` : `Little public-order activity came through.`;
     const geo = countries ? ` Activity clustered around ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
@@ -595,14 +595,14 @@ const PROTESTS: ReportPack = {
     "Track planned protest dates, university and union calls to action, police deployment notices and any escalation in arrest numbers.",
   polestarView: ({ lead }) => {
     const tail = lead ? ` ${lead} remains the city-by-city focus.` : "";
-    return `Operational tempo, not headline severity, is the read this cycle.${tail}`;
+    return `Operational tempo, not headline severity, is the picture this week.${tail}`;
   },
-  zeroExec: "Public-order reporting was quiet this cycle. Treat that as a coverage gap rather than calm streets.",
+  zeroExec: "Public-order reporting was quiet this week. Read that as a gap in reporting rather than calm streets.",
   zeroSituation: "Standing risk to transport, access and central business districts persists whether or not new reporting lands.",
-  zeroWhatHappened: "No classifiable public-order events surfaced, leaving the read carried forward from the prior cycle.",
+  zeroWhatHappened: "Little public-order activity came through, so the picture carries forward from recent weeks.",
   zeroWhatMatters: "Staff movement and site access remain the operational concern when these events do appear.",
-  zeroPolestar: "No usable public-order signal landed in the window.",
-  thinNote: "Public order reporting in this window is thin. Treat as a coverage gap, not as proof of calm.",
+  zeroPolestar: "Nothing useful came through on public order this week.",
+  thinNote: "Public-order reporting was light this week. Treat that as a gap in reporting, not proof of calm.",
 };
 
 const PACKS: Record<string, ReportPack> = {
@@ -781,20 +781,11 @@ export function draftCountryReportProse(opts: {
     );
   const total = inWindow.length;
 
-  // Active reporting basis. Country reports are a weekly brief and lead with the
-  // rolling 7-day window, so the prose labels that window; the caller passes
-  // basisDays (always 7 for the headline).
+  // Reporting period in plain reader-facing words. Country reports lead with
+  // the rolling weekly window (basisDays defaults to 7); the toggle can widen
+  // it to a month or quarter.
   const basisDays = opts.basisDays ?? 7;
-  const basisShort = basisDays === 30 ? "30-day" : basisDays === 90 ? "90-day" : "7-day";
-  // The headline is the rolling 7-day week. An empty week is read as a coverage
-  // gap, never as calm; the active frame names the weekly window directly.
-  const activeFrame = `A single quiet week is not read as calm here, so the headline draws on the rolling ${basisShort} lookback.`;
-  // Tail describing where older records sit relative to the active window.
-  const olderTail = basisDays === 30
-    ? "Records beyond the last 30 days sit in the 90-day background section below and should be read as deeper context."
-    : basisDays === 90
-      ? "This is the deepest lookback on file; read it as background pattern rather than current-week activity."
-      : "Anything older than seven days sits in the 30 / 90-day context sections below and should not be read as current activity.";
+  const periodWord = basisDays === 30 ? "this past month" : basisDays === 90 ? "this past quarter" : "this week";
   const types = topTypesText(inWindow);
   const sev = highestSeverity(inWindow);
 
@@ -821,44 +812,43 @@ export function draftCountryReportProse(opts: {
   const secondArea = sortedAreas[1]?.[0] ?? "";
   const areaSentence = leadArea
     ? secondArea
-      ? `${leadArea} and ${secondArea} carry the clearest operational signal this cycle.`
-      : `${leadArea} carries the clearest operational signal this cycle.`
+      ? `Most of it was in and around ${leadArea} and ${secondArea}.`
+      : `Most of it was in and around ${leadArea}.`
     : "";
 
-  // Situation — operating environment framing, not a count.
+  // Situation — what the country is like to operate in, in plain terms.
   const overview = total === 0
-    ? `${name} sits in ${region}. Reporting is quiet across the rolling ${basisShort} window; treat the silence as a coverage gap rather than a clean operating picture.`
-    : `${name} sits in ${region}. The cycle's reporting is shaped by ${types || "a mix of operational and public-order events"}, and the tempo of activity matters more than the headline volume.${areaSentence ? ` ${areaSentence}` : ""}`;
+    ? `${name} sits in ${region}. Little came through in open reporting ${periodWord}. On its own that says little, so treat the country's usual risks as unchanged until fresh activity appears.`
+    : `${name} sits in ${region}. The picture ${periodWord} is shaped by ${types || "a mix of security and public-order events"}.${areaSentence ? ` ${areaSentence}` : ""}`;
 
-  // What Happened — pattern read, no "Polestar holds..." opener.
+  // What Happened — what actually occurred, told for a reader.
   const trendSummary = total === 0
-    ? `No records landed across the rolling ${basisShort} window. The prior assessment stands until new reporting comes through.`
+    ? `Nothing of note reached open reporting ${periodWord}. The picture from recent weeks still stands.`
     : total < 4
-      ? `Reporting is light but workable. ${types ? `The activity that did land points to ${types}` : "The events on file point to a mixed operational picture"}, and a small sample limits how firmly any single pattern can be read.${sevTail(sev)}`
-      : `Activity is running at normal cycle tempo. ${types ? `Lead patterns are ${types}.` : "The mix is broad enough that no single pattern dominates."}${sevTail(sev)}`;
+      ? `Reporting was light ${periodWord}. ${types ? `What did come through pointed to ${types}` : "What did come through was a mixed picture"}${leadArea ? ` around ${leadArea}` : ""}.${sev ? ` The most serious reached ${sev}.` : ""} It is too little to call a firm trend, but worth noting.`
+      : `Activity ran at a normal level ${periodWord}, led by ${types || "a broad mix of events"}.${sev ? ` The most serious reached ${sev}.` : ""}`;
 
-  // What Matters — implications for visibility and source confidence; not
-  // a metric restatement.
+  // What Matters — why a reader should care and where to focus.
   const whatMatters = total === 0
-    ? "The absence of records does not mean an absence of activity. Source coverage in this window was thin, so any forward read should treat the operating picture as unconfirmed rather than calm."
+    ? "A quiet week is not the same as a safe one. Keep existing security and travel measures in place rather than easing them on the strength of one calm period."
     : total < 4
-      ? `Even a small record set sharpens the operating picture for ${name}. Treat the named locations as where to focus access, movement and security-coordination checks, while accepting that the broader pattern needs more reporting to firm up.`
-      : `The pattern is broad enough to act on. ${areaSentence ? `${areaSentence} ` : ""}Use it to prioritise journey management, site-access checks and pre-movement coordination in the affected sub-regions before broader posture changes.`;
+      ? `Even a handful of incidents helps focus attention in ${name}. Use the locations named above to guide where to tighten movement, site access and security checks, while accepting the wider picture needs more reporting to firm up.`
+      : `The pattern is clear enough to act on.${areaSentence ? ` ${areaSentence}` : ""} Prioritise journey planning, site-access checks and pre-movement coordination in the affected areas before making wider changes.`;
 
-  // Implications for Business
+  // Implications for Business — plain actions.
   const implications = total === 0
-    ? "Hold standing controls on staff movement, site access and journey management. Revisit posture as soon as fresh records land."
-    : `Keep journey management discipline on routes touching the affected areas, hold site-access controls under active review and refresh staff briefings on the live incident types. Confirm escalation routes with the in-country lead before any movement plan is locked in.`;
+    ? "Keep current controls on staff movement, site access and journey planning in place. Review them as soon as new activity appears."
+    : `Keep journey planning tight on routes through the affected areas, keep site-access controls under review and update staff briefings on the types of incident now occurring. Confirm escalation contacts with the in-country lead before locking any movement plan.`;
 
   // Watch Next — concrete, no "Watch for..." opener.
   const watchNext = total === 0
-    ? "Track whether reporting volume recovers next cycle. A second quiet window would shift this from coverage gap to a substantive read."
-    : `Track whether the activity in ${leadArea || name} firms into a sustained pattern or fades back to baseline. The next cycle's reporting will decide whether posture needs to tighten or hold.`;
+    ? "Watch whether activity picks up again next week. A second quiet week would start to look like a genuine lull rather than a gap in coverage."
+    : `Watch whether activity around ${leadArea || name} settles down or builds. Next week's reporting will show whether to tighten posture or hold.`;
 
-  // Polestar View — short analyst judgement, not a count.
+  // Polestar View — the bottom-line judgement, in a reader's words.
   const polestarView = total === 0
-    ? `${name} reads as quiet for now, but the absence of records is the read worth challenging. Keep posture conservative until reporting returns.`
-    : `${name} warrants steady-state monitoring with a tighter brief for staff and contractors moving through the affected areas. Adjust posture if the next cycle escalates rather than easing.`;
+    ? `${name} looks quiet for now, but the lack of reporting is the thing to question, not to trust. Keep a cautious posture until the picture fills in.`
+    : `${name} warrants steady monitoring, with a sharper briefing for staff and contractors moving through the affected areas. Tighten posture only if next week escalates.`;
 
   // -------------------------------------------------------------------------
   // Country-specific editorial overrides
@@ -871,48 +861,42 @@ export function draftCountryReportProse(opts: {
   const isPNG = /\bpapua new guinea\b/i.test(name) || /^png$/i.test(name);
 
   if (isPNG) {
-    const currentSentence = total === 0
-      ? `No records landed across the ${basisShort} window.`
-      : total === 1
-        ? `The ${basisShort} window holds one record.`
-        : `The ${basisShort} window holds ${total} records.`;
-
     const png = {
       executiveSummary: total === 0
-        ? `Papua New Guinea is a high-friction operating environment; open-source reporting is uneven week to week. No relevant incidents were recorded across the ${basisShort} window — read that as a coverage gap, not calm. Urban violent crime in Port Moresby and Lae, route security, Highlands instability and resource-sector exposure remain the standing operating risks.`
-        : `Papua New Guinea is a high-friction operating environment; open-source reporting is uneven week to week, so this brief leads with the rolling ${basisShort} window rather than a single quiet week. ${currentSentence} The standing judgement holds: urban violent crime in Port Moresby and Lae sets the operational tempo, with route security, Highlands instability and resource-sector exposure as persistent background risks.`,
+        ? `Papua New Guinea is a demanding place to operate, and open reporting is patchy from week to week. Nothing of note surfaced ${periodWord} — read that as a gap in coverage, not a safe week. Urban violent crime in Port Moresby and Lae, road security, instability in the Highlands and exposure around resource sites remain the main risks for any operation.`
+        : `Papua New Guinea is a demanding place to operate, and open reporting is patchy from week to week. Activity ${periodWord} points to ${types || "urban violent crime"} in or around Port Moresby and Lae. The wider picture holds: urban violent crime sets the day-to-day tempo, with road security, Highlands instability and exposure around resource sites in the background.`,
 
       overview: total === 0
-        ? `Papua New Guinea is shaped by urban opportunistic crime in Port Moresby and Lae, inter-clan violence in the highlands, recurring resource-sector disputes and severe interior infrastructure limits — these are the standing operating picture. No relevant incidents were recorded across the ${basisShort} window; treat the silence as a reporting-coverage feature of PNG rather than a clean operating picture. The named risks above and the deeper 90-day background section carry the standing pattern.`
-        : `Papua New Guinea is shaped by urban opportunistic crime in Port Moresby and Lae, inter-clan violence in the highlands, recurring resource-sector disputes and severe interior infrastructure limits. ${activeFrame} ${currentSentence} Treat these as the active operational signal. ${olderTail}`,
+        ? `Day to day, Papua New Guinea is shaped by opportunistic urban crime in Port Moresby and Lae, inter-clan violence in the Highlands, recurring disputes around resource projects, and very limited roads and infrastructure away from the main centres. Nothing notable came through in open reporting ${periodWord}, which in PNG is common and reflects thin coverage rather than calm. The risks above still set the operating picture.`
+        : `Day to day, Papua New Guinea is shaped by opportunistic urban crime in Port Moresby and Lae, inter-clan violence in the Highlands, recurring disputes around resource projects, and very limited roads and infrastructure away from the main centres. The activity ${periodWord} centred on ${types || "urban crime"}${leadArea ? ` around ${leadArea}` : ""}, which is where attention should sit now.`,
 
       trendSummary: total === 0
-        ? `Nothing landed across the ${basisShort} window. The 90-day background section carries the wider pattern — including any election-cycle unrest, fuel or port disruption, and Madang / Lae corridor incidents — but those are deeper context. Treat them as standing-risk reference rather than current activity.`
-        : `The rolling ${basisShort} window points to ${types || "urban violent-crime activity"} in or around Port Moresby and Lae. That is the active signal. Anything beyond the last 30 days — including election-cycle unrest, fuel or port disruption, Highlands Highway incidents and Madang / Lae corridor events — sits in the 90-day background section and should be read as deeper pattern rather than current activity.`,
+        ? `Nothing of note reached open reporting ${periodWord}. Recent months have featured election-related unrest, occasional fuel and port disruption, and incidents along the Madang–Lae corridor; treat these as the standing pattern rather than current events.`
+        : `Reporting ${periodWord} points to ${types || "urban violent-crime activity"} in or around Port Moresby and Lae. Longer-running issues — election-related unrest, fuel or port disruption, Highlands Highway incidents and Madang–Lae corridor events — are part of the background pattern rather than this week's news.`,
 
       implications: [
         "- Review movement plans for Port Moresby and Lae and refresh pre-movement briefings on the current incident types.",
         "- Avoid predictable travel patterns around cash-handling sites, ATMs and end-of-shift cash runs.",
-        "- Check local security support is in place for any commercial site visit, including arrival / departure windows.",
-        "- Confirm journey management for staff and contractors, with a named on-call contact and a clear escalation path.",
-        "- Review road movement assumptions outside the main urban areas; default to air where the Highlands Highway is in play.",
-        "- Maintain flexible routing and a tolerance for delay; closures and protests can land at short notice.",
-        "- Confirm medical and evacuation arrangements for remote work, including the Cairns / Brisbane / Singapore medevac chain.",
+        "- Check local security support is in place for any commercial site visit, including arrival and departure windows.",
+        "- Confirm journey planning for staff and contractors, with a named on-call contact and a clear escalation path.",
+        "- Review road travel assumptions outside the main urban areas; fly rather than drive where Highlands Highway travel is involved.",
+        "- Keep routing flexible and allow for delay; closures and protests can happen at short notice.",
+        "- Confirm medical and evacuation arrangements for remote work, including the Cairns, Brisbane or Singapore evacuation route.",
       ].join("\n"),
 
       watchNext: [
         "- Repeat armed-robbery or violent-crime activity in Port Moresby or Lae.",
-        "- Copycat or cluster activity around commercial premises, banks and cash-handling sites.",
-        "- Police response, arrests or any visible RPNGC posture change in the affected districts.",
-        "- Movement disruption near markets, main roads or cash-handling points in the two cities.",
-        "- Any shift from urban opportunistic crime to route or corridor incidents.",
-        "- Highlands Highway or Lae corridor deterioration — ambush, landslide, tribal-fight closure or strike action.",
-        "- Fuel, port or road disruption surfacing in the 90-day background that could spill into the active window.",
+        "- Copycat or clustered activity around commercial premises, banks and cash-handling sites.",
+        "- Police response, arrests or any visible change in police posture in the affected districts.",
+        "- Disruption to movement near markets, main roads or cash-handling points in the two cities.",
+        "- Any shift from opportunistic urban crime to incidents on the main roads and corridors.",
+        "- Worsening conditions on the Highlands Highway or Lae corridor — ambush, landslide, tribal-fight closure or strike action.",
+        "- Fuel, port or road disruption building up that could spill into the cities.",
       ].join("\n"),
 
       polestarView: total === 0
-        ? `PNG should be treated as a high-friction operating environment. A quiet week does not equal low risk. No relevant incidents were recorded across the ${basisShort} window; the standing concerns — urban violent crime in Port Moresby and Lae, route security, Highlands instability and resource-sector exposure — sit in the 90-day background section as deeper pattern. Business users should focus on movement discipline, local security support, and clear escalation triggers for any staff or contractor travel.`
-        : `PNG should be treated as a high-friction operating environment. A quiet week does not equal low risk. The ${basisShort} window points to urban violent crime in Port Moresby and Lae, while the 90-day background keeps route security, Highlands instability and resource-sector exposure in view. Business users should focus on movement discipline, local security support, and clear escalation triggers for any staff or contractor travel.`,
+        ? `Papua New Guinea should be treated as a demanding operating environment, and a quiet week does not mean low risk. The lasting concerns — urban violent crime in Port Moresby and Lae, road security, Highlands instability and resource-site exposure — still apply. For business travel, the priorities are disciplined movement, reliable local security support, and clear escalation triggers for any staff or contractor travel.`
+        : `Papua New Guinea should be treated as a demanding operating environment, and a quiet week does not mean low risk. The activity ${periodWord} points to urban violent crime in Port Moresby and Lae, while road security, Highlands instability and resource-site exposure stay in view. For business travel, the priorities are disciplined movement, reliable local security support, and clear escalation triggers for any staff or contractor travel.`,
     };
 
     return {
@@ -936,48 +920,42 @@ export function draftCountryReportProse(opts: {
   // 30 / 90-day context sections rather than inventing bland country prose.
   const isPapua = /\bpapua\b/i.test(name);
   if (isPapua) {
-    const currentSentence = total === 0
-      ? `No relevant incidents were recorded across the ${basisShort} window.`
-      : total === 1
-        ? `The ${basisShort} window holds one record.`
-        : `The ${basisShort} window holds ${total} records.`;
-
     const papua = {
       executiveSummary: total === 0
-        ? `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment; open-source access is uneven week to week. ${currentSentence} Read that as a coverage gap, not calm, given tightly controlled foreign press and NGO access. The standing judgement holds: student and church-led protest, highland security operations and TPNPB-OPM activity around the Freeport corridor remain the operating risks.`
-        : `${name} (Indonesian West Papua) is a restricted-reporting, high-friction operating environment; open-source access is uneven week to week, so this brief leads with the rolling ${basisShort} window rather than a single quiet week. ${currentSentence} The standing judgement holds: highland insurgency and TNI/POLRI operations set the operational tempo, with coastal-city protest cycles and resource-corridor exposure at Freeport and Tangguh as persistent background risks.`,
+        ? `${name} (Indonesian West Papua) is a difficult, tightly controlled place to operate, and open reporting comes and goes. Nothing of note surfaced ${periodWord} — with foreign press and NGO access restricted, read that as limited coverage rather than calm. Student and church-led protest, security operations in the highlands and armed-group activity around the Freeport mining corridor remain the main risks.`
+        : `${name} (Indonesian West Papua) is a difficult, tightly controlled place to operate, and open reporting comes and goes. Activity ${periodWord} points to ${types || "protest and security-operation activity"}${leadArea ? ` around ${leadArea}` : ""}. The wider picture holds: highland insurgency and army and police operations set the tempo, with protest in the coastal cities and exposure around the Freeport and Tangguh corridors in the background.`,
 
       overview: total === 0
-        ? `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation — these are the standing operating picture. ${currentSentence} Treat the silence as a feature of restricted reporting access rather than a clean operating picture. The named risks above and the deeper 90-day background section carry the standing pattern.`
-        : `${name} is shaped by a long-running low-intensity insurgency, recurring student and church-led protest over Jakarta's security and resource policy, heavy TNI/POLRI deployment across the highlands, and extreme geographic isolation. ${activeFrame} ${currentSentence} Treat these as the active operational signal.${areaSentence ? ` ${areaSentence}` : ""} ${olderTail}`,
+        ? `${name} is shaped by a long-running low-level insurgency, regular student and church-led protest over Jakarta's security and resource policy, a heavy army and police presence across the highlands, and severe geographic isolation. Nothing notable came through ${periodWord}, which reflects restricted reporting access rather than a calm picture. The risks above still set the operating picture.`
+        : `${name} is shaped by a long-running low-level insurgency, regular student and church-led protest over Jakarta's security and resource policy, a heavy army and police presence across the highlands, and severe geographic isolation. The activity ${periodWord} centred on ${types || "protest and security-operation activity"}${leadArea ? ` around ${leadArea}` : ""}, which is where attention should sit now.`,
 
       trendSummary: total === 0
-        ? `Nothing landed across the ${basisShort} window. The 90-day background section carries the wider pattern — protest activity around Jayapura and Manokwari campuses and commemoration dates, highland security operations and TPNPB-OPM clashes, and resource-corridor friction around the Timika–Tembagapura (Freeport) and Bintuni (Tangguh LNG) belts — but those are deeper context. Treat them as standing-risk reference rather than current activity.`
-        : `The rolling ${basisShort} window points to ${types || "protest and security-operation activity"} in or around ${leadArea || "the named areas"}. That is the active signal. Anything beyond the last 30 days — student protest cycles, highland clashes and TPNPB-OPM activity, Freeport convoy security and cross-border movement on the PNG frontier — sits in the 90-day background section and should be read as deeper pattern rather than current activity.`,
+        ? `Nothing of note reached open reporting ${periodWord}. Recent months have seen protest around the Jayapura and Manokwari campuses and on key anniversary dates, security operations and armed-group clashes in the highlands, and friction along the Timika–Tembagapura (Freeport) and Bintuni (Tangguh LNG) corridors; treat these as the standing pattern rather than current events.`
+        : `Reporting ${periodWord} points to ${types || "protest and security-operation activity"} in or around ${leadArea || "the named areas"}. Longer-running issues — student protest cycles, highland clashes and armed-group activity, Freeport convoy security and cross-border movement on the PNG frontier — are part of the background pattern rather than this week's news.`,
 
       implications: [
-        "- Confirm Surat Jalan / travel-permit status before any movement into the highlands; access can be withdrawn at short notice during security operations.",
-        "- Plan highland and interior travel by air via Sentani, Timika, Wamena, Manokwari or Sorong; treat road movement on the Trans-Papua corridor as weather- and security-dependent.",
-        "- Hold heightened journey management around Jayapura and Manokwari campuses and government sites on commemoration dates (1 May, 1 December, 19 December) and during student protest cycles.",
-        "- For resource-sector footprints, confirm convoy security and TNI/POLRI and contracted-security coordination on the Timika–Tembagapura (Freeport) and Bintuni Bay (Tangguh LNG) corridors.",
-        "- Build in tolerance for internet shutdowns and cellular blackspots; carry HF/VHF or satellite comms for highland and interior work.",
-        "- Confirm out-of-province medevac arrangements (Makassar / Jakarta / Singapore); in-province tier-1 care is not available and highland evacuation is weather-dependent.",
-        "- Treat thin weekly reporting as restricted access, not low risk; cross-check local-language and church / NGO sources before standing down posture.",
+        "- Confirm Surat Jalan travel-permit status before any movement into the highlands; access can be withdrawn at short notice during security operations.",
+        "- Plan highland and interior travel by air via Sentani, Timika, Wamena, Manokwari or Sorong; treat road travel on the Trans-Papua corridor as weather- and security-dependent.",
+        "- Tighten journey planning around the Jayapura and Manokwari campuses and government sites on anniversary dates (1 May, 1 December, 19 December) and during student protest cycles.",
+        "- For resource-sector sites, confirm convoy security and coordination with army, police and contracted security on the Timika–Tembagapura (Freeport) and Bintuni Bay (Tangguh LNG) corridors.",
+        "- Allow for internet shutdowns and cellular blackspots; carry HF/VHF or satellite communications for highland and interior work.",
+        "- Confirm out-of-province medical-evacuation arrangements (Makassar, Jakarta or Singapore); in-province specialist care is not available and highland evacuation is weather-dependent.",
+        "- Treat thin weekly reporting as restricted access, not low risk; cross-check local-language and church or NGO sources before easing posture.",
       ].join("\n"),
 
       watchNext: [
-        "- Renewed student or church-led protest out of Jayapura, Manokwari or Sorong, especially around commemoration dates.",
-        "- TNI/POLRI security operations or TPNPB-OPM clashes in Nduga, Intan Jaya, Puncak, Puncak Jaya or Yahukimo.",
+        "- Renewed student or church-led protest out of Jayapura, Manokwari or Sorong, especially around anniversary dates.",
+        "- Army or police security operations, or armed-group (TPNPB-OPM) clashes in Nduga, Intan Jaya, Puncak, Puncak Jaya or Yahukimo.",
         "- Armed-group activity or convoy incidents on the Timika–Tembagapura (Freeport Grasberg) corridor.",
         "- Labour or indigenous-rights friction around the Tangguh LNG / Bintuni Bay belt and South Papua plantation concessions.",
         "- Highland access disruption — landslide closures on the Trans-Papua corridor, weather-grounded airstrips or operation-driven district lockdowns.",
         "- Internet or communications shutdowns imposed in response to unrest.",
-        "- Cross-border movement or refugee flows on the Keerom / Pegunungan Bintang / Boven Digoel frontier with Papua New Guinea.",
+        "- Cross-border movement or refugee flows on the Keerom, Pegunungan Bintang or Boven Digoel frontier with Papua New Guinea.",
       ].join("\n"),
 
       polestarView: total === 0
-        ? `${name} should be treated as a restricted-reporting, high-friction operating environment where a quiet week reflects access limits, not low risk. ${currentSentence} The standing concerns — highland insurgency and security operations, protest cycles in the coastal cities, and resource-corridor exposure at Freeport and Tangguh — sit in the 90-day background section as deeper pattern. Business users should focus on permit and movement discipline, air-first highland travel, resilient communications and clear out-of-province medevac triggers.`
-        : `${name} should be treated as a restricted-reporting, high-friction operating environment. A quiet week does not equal low risk. The ${basisShort} window points to ${types || "protest and security-operation activity"}, while the 90-day background keeps highland insurgency, protest cycles and resource-corridor exposure in view. Business users should focus on permit and movement discipline, air-first highland travel, resilient communications and clear out-of-province medevac triggers.`,
+        ? `${name} should be treated as a difficult, tightly controlled operating environment where a quiet week reflects limited access, not low risk. The lasting concerns — highland insurgency and security operations, protest in the coastal cities, and exposure around the Freeport and Tangguh corridors — still apply. For business travel, the priorities are travel-permit and movement discipline, flying rather than driving into the highlands, reliable communications and clear medical-evacuation plans.`
+        : `${name} should be treated as a difficult, tightly controlled operating environment, and a quiet week does not mean low risk. Activity ${periodWord} points to ${types || "protest and security-operation activity"}, while highland insurgency, protest cycles and corridor exposure stay in view. For business travel, the priorities are travel-permit and movement discipline, flying rather than driving into the highlands, reliable communications and clear medical-evacuation plans.`,
     };
 
     return {
@@ -993,8 +971,8 @@ export function draftCountryReportProse(opts: {
 
   return {
     executiveSummary: total === 0
-      ? `${name} reporting is light across the rolling ${basisShort} window. The page captures what is on file, but the gap itself is the most important read — coverage rather than calm.`
-      : `${name} reporting for the rolling ${basisShort} window is shaped by ${types || "a mix of operational events"}.${areaSentence ? ` ${areaSentence}` : ""} The brief below covers the operating picture, what changed, why it matters and what to watch next.`,
+      ? `Little came through in open reporting on ${name} ${periodWord}. That is more likely a gap in coverage than genuine calm, so the country's usual risks still apply. The brief below sets out the operating picture and what to keep watching.`
+      : `Activity in ${name} ${periodWord} centred on ${types || "a mix of security and public-order events"}.${areaSentence ? ` ${areaSentence}` : ""}${sev ? ` The most serious reached ${sev}.` : ""} The brief below covers what happened, why it matters and what to watch next.`,
     whatMatters,
     watchNext,
     polestarView,

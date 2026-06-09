@@ -240,7 +240,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         <div
           style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
         >
-          Map reflects country operating context only. Incident records in this reporting window do not contain sufficient coordinates for reliable plotting.
+          Map reflects country operating context only. Incident records in this period do not contain sufficient coordinates for reliable plotting.
         </div>
       )}
     </div>
