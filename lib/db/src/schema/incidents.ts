@@ -4,6 +4,11 @@ export const incidentsTable = pgTable("incidents", {
   id: serial("id").primaryKey(),
   topic: text("topic").notNull(),
   title: text("title").notNull(),
+  // Clean English advisory title produced at ingest for non-English source
+  // headlines (e.g. Bahasa Indonesia from Jubi.id). Nullable: English rows and
+  // not-yet-processed rows leave it null and the UI falls back to the original
+  // `title`. The original headline is ALWAYS preserved in `title`.
+  displayTitle: text("display_title"),
   summary: text("summary").notNull(),
   country: text("country").notNull(),
   location: text("location"),

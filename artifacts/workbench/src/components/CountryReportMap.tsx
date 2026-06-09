@@ -147,7 +147,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
 
       const loc = (i.location ?? "").trim();
       const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
-      const title = (i.title ?? "Incident").trim();
+      const title = ((i.displayTitle && i.displayTitle.trim()) || i.title || "Incident").trim();
       dot.title = [title, loc, sevDisplay ? `Severity: ${sevDisplay}` : ""]
         .filter(Boolean)
         .join(" — ");

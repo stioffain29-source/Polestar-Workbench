@@ -131,6 +131,8 @@ export interface Incident {
   id: number;
   topic: Topic;
   title: string;
+  /** @nullable */
+  displayTitle?: string | null;
   summary: string;
   country: string;
   /** @nullable */

@@ -884,7 +884,7 @@ export default function CountryReport() {
                 <div key={i.id} className="grid items-center" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
                   <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                   <div className="p-2.5">{classifyIncidentType(i)}</div>
-                  <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{cleanIncidentTitle(i.title, i.source)}</div>
+                  <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{(i.displayTitle && i.displayTitle.trim()) ? i.displayTitle.trim() : cleanIncidentTitle(i.title, i.source)}</div>
                   <div className="p-2.5">
                     <span
                       style={{

@@ -9,6 +9,7 @@ import {
   runMarketPricesIngest,
   runMarketSnapshotIngest,
   runStrikesIngest,
+  runTitleTranslation,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
@@ -201,6 +202,21 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const energy = await runEnergyIngest({ commit: true });
     const fertiliser = await runFertiliserIngest({ commit: true });
     const fuel = await runFuelIngest({ commit: true });
+    // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
+    // West Papua feeds) into clean English advisory titles AFTER the scrapers
+    // have written this run's rows. Isolated in its own try so an LLM/network
+    // failure can never fail the incident ingest — it just leaves display_title
+    // null and the UI falls back to the original title. Idempotent + bounded, so
+    // it converges across runs rather than re-translating settled rows.
+    try {
+      const titles = await runTitleTranslation({ commit: true });
+      logger.info(
+        { translated: titles.translated, candidates: titles.candidates, failed: titles.failed, skipped: titles.skipped },
+        "title translation pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "title translation pass failed");
+    }
     // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
     // can never fail the incident ingest — it just reports the error.
     let marketPrices: MarketPriceSummary;

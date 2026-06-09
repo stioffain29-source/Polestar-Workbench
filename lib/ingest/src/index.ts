@@ -10,6 +10,8 @@ export { runMarketSnapshotIngest } from "./marketSnapshot";
 export type { MarketSnapshotSummary } from "./marketSnapshot";
 export { runStrikesIngest } from "./strikes";
 export type { StrikesIngestSummary, StrikeTheatre } from "./strikes";
+export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
+export type { TitleTranslationSummary } from "./titleTranslate";
 export { classifySeverity } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";
