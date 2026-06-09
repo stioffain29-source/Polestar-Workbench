@@ -806,7 +806,7 @@ export default function CountryReport() {
           <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" countryName={effective.name} />
         </div>
         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
-          Where coordinates are available, the map plots incidents from the active reporting window ({active.incidents.length} record{active.incidents.length === 1 ? "" : "s"} in the {active.basisLabel} window). If coordinates are unavailable, the map shows country operating context only. It is not the full risk picture — read it alongside the 30 / 90-day context sections above.
+          Where coordinates are available, the map plots incidents from the active reporting window ({active.incidents.length} record{active.incidents.length === 1 ? "" : "s"} in the {active.basisLabel} window). If coordinates are unavailable, the map shows country operating context only.
         </div>
       </Section>
 

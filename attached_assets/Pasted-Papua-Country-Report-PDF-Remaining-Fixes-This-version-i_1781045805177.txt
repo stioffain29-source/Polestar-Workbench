@@ -1,0 +1,76 @@
+Papua Country Report PDF — Remaining Fixes
+
+This version is much improved. The Fast Facts wording is better, the 7 / 30 / 90-day structure works, and the disclaimer wording has been fixed.
+
+Remaining issues:
+
+1. Map fallback wording
+
+The map note is improved, but it is too long and slightly clumsy.
+
+Current wording:
+“Where coordinates are available, the map plots incidents from the active reporting window (6 7-day records); otherwise it shows the country operating context only.”
+
+Change to:
+“Where coordinates are available, the map plots incidents from the active reporting window. If coordinates are unavailable, the map shows country operating context only.”
+
+Also fix this:
+“6 7-day records”
+
+That should read:
+“6 records in the 7-day window”
+
+2. Map still looks like an incident map
+
+The map still includes a severity legend even though no incident points are visible.
+
+Please apply this rule:
+
+If no visible incident points are plotted, hide the severity legend.
+
+Only show the severity legend when plotted incident markers are actually visible.
+
+3. Related incidents table
+
+The title formatting is better, but some entries still look like raw scraped headlines.
+
+Examples:
+“Peneliti rekomendasikan situasi di Tanah Papua sebagai konflik bersenjata non internasional”
+“Negara tak pernah menjelaskan status konflik bersenjata di Tanah Papua”
+
+These are acceptable as source titles, but the table would be stronger if titles were normalised into cleaner incident descriptions.
+
+Preferred approach:
+- Keep scraped source title in backend if needed.
+- Display a cleaned advisory title in the PDF.
+
+Example:
+“Researchers classify Papua situation as non-international armed conflict”
+“Government criticised over lack of clarity on Papua armed-conflict status”
+
+4. Disclaimer page
+
+The final disclaimer page is mostly empty.
+
+This looks unfinished.
+
+Please either:
+- Pull the disclaimer up onto the previous page if space allows, or
+- Add useful final-page content above the disclaimer, such as methodology, source limitations, or reporting caveats.
+
+Do not leave a near-blank final page unless absolutely unavoidable.
+
+5. Page balance
+
+The report is now 5 internal pages plus cover. That is fine, but the content distribution needs tightening.
+
+Suggested target:
+- Cover
+- Page 1: Summary / Fast Facts / Situation
+- Page 2: Implications / Location Watchlist
+- Page 3: 30-day / 90-day / Map / Severity
+- Page 4: Incident Breakdown / Watch Next / Polestar View / Related Incidents / Disclaimer
+
+6. Overall
+
+This is now close to usable. Remaining work is mainly around map conditional logic, cleaner displayed incident titles, and avoiding the near-empty disclaimer page.

@@ -60,6 +60,16 @@ const INDONESIAN_MARKER_WORDS: readonly string[] = [
   "polisi", "aparat", "aksi", "wilayah", "kabupaten", "provinsi", "kembali",
   "terkait", "buntut", "imbas", "ratusan", "ribuan", "puluhan", "karena",
   "hingga", "pekan",
+  // West Papua conflict vocabulary. The Bahasa headlines from the Papua desks
+  // (e.g. "Konflik bersenjata di Tanah Papua…", "Negara tak pernah menjelaskan…")
+  // carried NONE of the function words above, so the candidate query never
+  // selected them and they shipped untranslated. Every word below is distinctly
+  // Indonesian — none is an English word — so adding them cannot snag a genuine
+  // English headline.
+  "konflik", "bersenjata", "senjata", "negara", "pemerintah", "keamanan",
+  "pasukan", "serangan", "penyerangan", "penembakan", "ditembak", "kekerasan",
+  "pembunuhan", "menewaskan", "peneliti", "menjelaskan", "rekomendasikan",
+  "situasi", "masyarakat", "dilaporkan", "anggota", "pernah",
 ];
 
 const NON_LATIN_RE = new RegExp(`[${NON_LATIN_CLASS}]`);
