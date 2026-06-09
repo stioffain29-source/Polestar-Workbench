@@ -343,12 +343,15 @@ export function summariseLookback(
   const ninety = layers.ninetyDay.length;
   const current = layers.current.length;
 
-  const thirtyDelta = thirty - current;
-  const ninetyDelta = ninety - thirty;
-
   // Client-safe wording only. Any framing around source health,
   // coverage gaps or feed staleness lives in the internal Source
   // Coverage screen-only block — never in client-facing prose.
+  //
+  // Counts are deliberately ABSENT from this narrative. Per the standing rule,
+  // record/incident counts live ONLY on the Fast Facts tiles and chart
+  // captions — never in prose. These sentences describe the SHAPE of each
+  // window (recent-week vs. earlier-month vs. deeper background) qualitatively,
+  // so adding a count branch here would reintroduce the violation.
   const baselineRef30 = "";
   const baselineRef90 = "";
 
@@ -356,17 +359,17 @@ export function summariseLookback(
     thirty === 0
       ? `No incidents are on file for ${name} across the rolling 30-day context window.${baselineRef30}`
       : current === 0
-        ? `All ${thirty} record${thirty === 1 ? "" : "s"} in the 30-day context window landed earlier in the month, with none in the most recent week — read this as background standing volume rather than current activity.${baselineRef30}`
+        ? `Activity across the 30-day context window predates the most recent week — read this as background standing volume rather than current activity.${baselineRef30}`
         : thirty === current
-          ? `All ${thirty} record${thirty === 1 ? "" : "s"} in the 30-day context window landed in the most recent week.${baselineRef30}`
-          : `Of the ${thirty} record${thirty === 1 ? "" : "s"} in the 30-day context window, ${current} landed in the most recent week and ${thirtyDelta} earlier in the month.${baselineRef30}`;
+          ? `All activity in the 30-day context window falls within the most recent week.${baselineRef30}`
+          : `The 30-day context window layers most-recent-week activity over earlier incidents from the month — read it as sustained background pressure rather than a single recent spike.${baselineRef30}`;
 
   const ninetyDay =
     ninety === 0
       ? `No incidents are on file for ${name} across the rolling 90-day background window.${baselineRef90}`
       : ninety === thirty
-        ? `The 90-day background window holds the same ${ninety} record${ninety === 1 ? "" : "s"} as the 30-day context — no older records on file.${baselineRef90}`
-        : `Across the rolling 90-day background window ${name} carries ${ninety} record${ninety === 1 ? "" : "s"}, ${ninetyDelta} of which sit beyond the 30-day context. Use them to size the background operating picture rather than to direct current movement decisions.`;
+        ? `The 90-day background window holds the same incidents as the 30-day context — no older records on file.${baselineRef90}`
+        : `The rolling 90-day background window reaches beyond the 30-day context with additional earlier incidents. Use it to size the background operating picture rather than to direct current movement decisions.${baselineRef90}`;
 
   return { thirtyDay, ninetyDay };
 }

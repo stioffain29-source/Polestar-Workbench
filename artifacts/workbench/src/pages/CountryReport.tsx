@@ -41,7 +41,7 @@ const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const ROBOTO = "Roboto, sans-serif";
-const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
+const BRAND_GRADIENT = "linear-gradient(to right, #0b0a3d 0%, #465bff 100%)";
 
 const SEV_COLOR: Record<string, string> = {
   extreme: "#A33232",
