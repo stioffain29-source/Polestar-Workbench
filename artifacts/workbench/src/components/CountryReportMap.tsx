@@ -146,6 +146,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   }, []);
 
   const unplotted = incidents.length - plottable.length;
+  const hasPlotted = plottable.length > 0;
 
   return (
     <div>
@@ -160,31 +161,47 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           background: "#fafafa",
         }}
       />
-      <div className="flex flex-wrap items-center gap-3 mt-3">
-        {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((k) => (
-          <div key={k} className="flex items-center gap-1.5">
-            <span
-              style={{
-                display: "inline-block",
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: SEV_COLOR[k],
-                border: `1px solid ${POLAR}`,
-              }}
-            />
-            <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
-              {SEV_LABEL[k]}
-            </span>
+      {hasPlotted ? (
+        <>
+          {/* Severity legend is shown ONLY when markers are actually plotted, so
+              the map never implies incident plotting on an empty/no-coordinate
+              window. */}
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((k) => (
+              <div key={k} className="flex items-center gap-1.5">
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: SEV_COLOR[k],
+                    border: `1px solid ${POLAR}`,
+                  }}
+                />
+                <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
+                  {SEV_LABEL[k]}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div
-        style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
-      >
-        Records without coordinates are included in totals and tables but not plotted on the map.
-        {unplotted > 0 ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} excluded from the map.` : ""}
-      </div>
+          <div
+            style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
+          >
+            Records without coordinates are included in totals and tables but not plotted on the map.
+            {unplotted > 0 ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} excluded from the map.` : ""}
+          </div>
+        </>
+      ) : (
+        // No record in the window carries usable coordinates: do NOT present the
+        // basemap as an incident map. Centred on the report country for context
+        // only, with an explicit note so no marker plotting is implied.
+        <div
+          style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
+        >
+          Map reflects country operating context only. Incident records in this reporting window do not contain sufficient coordinates for reliable plotting.
+        </div>
+      )}
     </div>
   );
 }

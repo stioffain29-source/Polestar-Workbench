@@ -45,7 +45,7 @@ export const DISCLAIMER_TEXT =
   "Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. " +
   "The information in this report is based on open sources and is assessed as accurate at the time of writing. " +
   "It is provided for general informational purposes only and does not constitute advice or a comprehensive " +
-  "assessment of all risks. No reliance should be placed on this information for decision making without " +
+  "assessment of all risks. No reliance should be placed on this information for operational decision-making without " +
   "further independent verification.";
 
 export const SOURCE_NOTES_TEXT =

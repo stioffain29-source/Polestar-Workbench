@@ -59,6 +59,50 @@ const SEV_LABEL: Record<string, string> = {
 };
 const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
 
+// Distribution-chart track. A lighter neutral than POLAR so the coloured
+// severity/type bars read as the dominant element and the empty remainder of
+// each bar recedes instead of competing with the data.
+const CHART_TRACK = "#eef0f3";
+
+/**
+ * Standardise a related-incidents title to the headline only. Open-source feeds
+ * (especially Google News RSS) append the publisher as a trailing
+ * " - Source" / " | Source" / " — Source" segment; some records carry it and
+ * some do not, so the Title column reads inconsistently. Strip a trailing
+ * separator + source segment so the column is the incident title only (the
+ * source already has its own provenance elsewhere; there is no source column).
+ */
+function cleanIncidentTitle(title?: string | null, source?: string | null): string {
+  let t = (title ?? "").trim();
+  const src = (source ?? "").trim();
+  if (!t) return "";
+  const seps = [" - ", " — ", " – ", " | "];
+  // First, strip an exact trailing "<sep><source>" when we know the source.
+  if (src) {
+    for (const sep of seps) {
+      const suffix = `${sep}${src}`;
+      if (t.toLowerCase().endsWith(suffix.toLowerCase())) {
+        return t.slice(0, t.length - suffix.length).trim();
+      }
+    }
+  }
+  // Fallback: drop a trailing " - Publisher" segment that the Google-News feed
+  // appends even when it doesn't match the stored source exactly. Kept
+  // deliberately conservative — only strips when the trailing segment LOOKS like
+  // a masthead (contains a publisher keyword) — so genuine titles that happen to
+  // end in a dashed subtitle survive untouched.
+  const m = t.match(/^(.*\S)\s[-–—|]\s([^-–—|]{2,40})$/);
+  if (m) {
+    const tail = m[2].trim();
+    const wordCount = tail.split(/\s+/).length;
+    const looksLikeMasthead = /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media)\b/i.test(tail);
+    if (wordCount <= 6 && !/\d/.test(tail) && looksLikeMasthead) {
+      return m[1].trim();
+    }
+  }
+  return t;
+}
+
 interface Draft {
   name: string;
   region: string;
@@ -762,7 +806,7 @@ export default function CountryReport() {
           <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" countryName={effective.name} />
         </div>
         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
-          The map reflects the active reporting window — {active.incidents.length} {active.basisLabel} record{active.incidents.length === 1 ? "" : "s"}. It is not the full risk picture — read it alongside the 30 / 90-day context sections above.
+          Where coordinates are available, the map plots incidents from the active reporting window ({active.incidents.length} {active.basisLabel} record{active.incidents.length === 1 ? "" : "s"}); otherwise it shows the country operating context only. It is not the full risk picture — read it alongside the 30 / 90-day context sections above.
         </div>
       </Section>
 
@@ -778,10 +822,10 @@ export default function CountryReport() {
               return (
                 <div key={k} className="grid items-center" style={{ gridTemplateColumns: "140px 1fr 40px", gap: 8 }}>
                   <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>{SEV_LABEL[k]}</div>
-                  <div style={{ background: POLAR, height: 12, borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: `${w}%`, height: "100%", background: SEV_COLOR[k] }} />
+                  <div style={{ background: CHART_TRACK, height: 18, borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ width: n === 0 ? "0%" : `${Math.max(w, 3)}%`, height: "100%", background: SEV_COLOR[k], borderRadius: 2 }} />
                   </div>
-                  <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 700, color: NAVY, textAlign: "right" }}>{n}</div>
+                  <div style={{ fontFamily: ROBOTO, fontSize: 13, fontWeight: 700, color: NAVY, textAlign: "right" }}>{n}</div>
                 </div>
               );
             })}
@@ -800,10 +844,10 @@ export default function CountryReport() {
               return (
                 <div key={d.label} className="grid items-center" style={{ gridTemplateColumns: "180px 1fr 40px", gap: 8 }}>
                   <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>{d.label}</div>
-                  <div style={{ background: POLAR, height: 12, borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: `${w}%`, height: "100%", background: ELECTRIC }} />
+                  <div style={{ background: CHART_TRACK, height: 18, borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ width: d.n === 0 ? "0%" : `${Math.max(w, 3)}%`, height: "100%", background: ELECTRIC, borderRadius: 2 }} />
                   </div>
-                  <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 700, color: NAVY, textAlign: "right" }}>{d.n}</div>
+                  <div style={{ fontFamily: ROBOTO, fontSize: 13, fontWeight: 700, color: NAVY, textAlign: "right" }}>{d.n}</div>
                 </div>
               );
             })}
@@ -840,7 +884,7 @@ export default function CountryReport() {
                 <div key={i.id} className="grid items-center" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
                   <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                   <div className="p-2.5">{classifyIncidentType(i)}</div>
-                  <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{i.title}</div>
+                  <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{cleanIncidentTitle(i.title, i.source)}</div>
                   <div className="p-2.5">
                     <span
                       style={{

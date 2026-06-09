@@ -249,10 +249,11 @@ export function computeCountryFastFacts(opts: {
         ? "Limited sample"
         : "Incidents in window",
   };
-  // Week severity. When a standing card sits beside it, relabel so the two
-  // severities read as a pair ("Severity This Week" + "Standing Risk").
+  // Week severity. Labelled "Highest Severity Recorded" (the highest incident
+  // severity in the 7-day window) so it never reads as an overall weekly risk
+  // rating; the 90-day "Standing Risk" card sits beside it for the background view.
   const weekSeverityCard: CountryFastFactCard = {
-    label: hasStanding ? "Severity This Week" : "Highest Severity",
+    label: "Highest Severity Recorded",
     value: highestLabel,
     severity: highestKey || undefined,
     note: highestKey

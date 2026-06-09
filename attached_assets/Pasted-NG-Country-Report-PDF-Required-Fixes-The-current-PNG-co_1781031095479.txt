@@ -1,0 +1,109 @@
+NG Country Report PDF — Required Fixes
+
+The current PNG country report is structurally good and close to usable, but the following issues need fixing before this becomes a stable client-ready template.
+
+Map logic
+
+The map section currently risks looking like an incident map even when incident records are not visibly plotted.
+
+Please update the logic as follows:
+
+If records have usable coordinates, plot them clearly on the map.
+
+If records do not have usable coordinates, do not present the map as an incident map.
+
+Use this fallback note when coordinates are not available:
+
+“Map reflects country operating context only. Incident records in this reporting window do not contain sufficient coordinates for reliable plotting.”
+
+The map should never imply incident plotting unless visible incident markers are actually shown.
+
+Fast Facts wording
+
+Change the KPI label:
+
+“Severity this week”
+
+to:
+
+“Highest severity recorded”
+
+Reason: the current wording sounds like an overall weekly risk rating, when it is actually the highest incident severity recorded in the 7-day window.
+
+Keep “Standing risk” for the 90-day background view.
+
+Related incidents table
+
+The incident titles are inconsistent. Some include the source name in the title, while others do not.
+
+Please standardise this.
+
+Recommended format:
+
+Title column = incident title only.
+
+Do not include source names in the title unless there is a dedicated source column.
+
+Executive summary
+
+The executive summary is slightly too long and repeats points that are also covered in Situation, What Happened and Polestar View.
+
+Please tighten the generated wording by around 20%.
+
+Each section should have a distinct purpose:
+
+Executive Summary = overall judgement.
+
+Situation = current operating picture.
+
+What Happened = incident pattern.
+
+What Matters = operational relevance.
+
+Polestar View = advisory assessment.
+
+Wording change
+
+Replace:
+
+“week-to-week reporting is sparse”
+
+with:
+
+“Open-source reporting is uneven week to week”
+
+This is more professional and avoids making the report sound weak.
+
+Disclaimer wording
+
+Change:
+
+“No reliance should be placed on this information for decision making without further independent verification.”
+
+to:
+
+“No reliance should be placed on this information for operational decision-making without further independent verification.”
+
+Keep the 7 / 30 / 90-day structure
+
+The active 7-day signal, 30-day context and 90-day background split works well. Keep this structure.
+
+It is one of the strongest parts of the report and should remain part of the template.
+
+Location Watchlist
+
+Keep the Location Watchlist section. It is commercially useful and gives the reader something actionable.
+
+Please ensure the 7D / 30D / 90D counts are generated from the same filtered dataset used elsewhere in the report.
+
+Severity distribution chart
+
+The chart is readable, but the grey background bars dominate the visual.
+
+Please make the actual severity bars more prominent and ensure the count numbers remain clearly visible.
+
+Overall output expectation
+
+The PDF should feel like a polished advisory report, not an automated data dump.
+
+The structure is good. The fixes are mainly around map logic, wording precision, title consistency and visual clarity.
