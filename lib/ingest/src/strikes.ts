@@ -222,25 +222,48 @@ function classifyMunition(t: string): string {
   return "unknown";
 }
 
+// --- Target / infrastructure signal regexes ---
+//
+// IMPORTANT: stems carry only a LEADING \b, never a trailing one, so common
+// inflections still match (refiner -> refinery, petrochem -> petrochemical,
+// "energy facilit" -> "energy facilities"). A trailing \b on a stem silently
+// drops every inflected form — the historical cause of energy/oil targets
+// reading "Unknown". Military is matched FIRST so an interception over a US /
+// military air base reads Military, never civil Aviation.
+const MILITARY_SIG =
+  /\b(air[\s-]?base|airbase|military (?:base|site|installation|facilit|camp|target)|us (?:forces|base|bases|troops|military|warship|warships|command)|u\.s\.? ?(?:forces|base|bases|troops|military)|american (?:base|forces|warship)|fifth fleet|5th fleet|naval base|navy base|army base|barrack|garrison|prince sultan|muwaffaq salti|al[\s-]?udeid|al[\s-]?dhafra|arifjan|ali al salem|centcom|central command|command (?:cent(?:er|re)|ship|post|hub)|radar (?:site|station)|defen[cs]e site|\btroops|\binstallation)/i;
+const OILGAS_SIG =
+  /\b(oil ?field|oil facilit|oil storage|oil depot|oil hub|oil refiner|oil installation|refiner|petrochem|\bcrude|gas field|gas plant|gas complex|gas pipeline|pipeline|aramco|adnoc|samref|habshan|mina al[\s-]?ahmadi|mina abdullah|ruwais|kharg|fuel depot|fuel storage|\blng\b|energy facilit|energy infrastructure)/i;
+const POWER_SIG =
+  /\b(power plant|power station|power grid|\bgrid\b|electric|substation|nuclear|reactor|barakah)/i;
+const VESSEL_SIG =
+  /\b(oil tanker|\btanker|\bvessel|cargo ship|container ship|merchant ship|merchant vessel|warship|\bfrigate|destroyer|naval vessel|command ship|bulk carrier|freighter|crude carrier|ship (?:hit|struck|attacked|sunk|sinks|sank|sinking)|tanker (?:hit|struck|attacked))/i;
+const PORT_SIG = /\b(\bport\b|harbour|harbor|jetty|\bdock|\bberth|anchorage)/i;
+const AIRPORT_SIG =
+  /\b(international airport|\bairport|air terminal|aviation|airfield|runway|terminal 1|terminal 2|civil aviation|passenger flight)/i;
+const GOVT_SIG = /\b(government building|ministry|palace|parliament|presidential|royal court|embassy)/i;
+const CIVIL_SIG =
+  /\b(residential|neighbou?rhood|civilian|\bhome\b|\bhouse|\bmarket|\bmall\b|school|hospital|mosque|housing|settlement|aluminium|aluminum)/i;
+
 function classifyTarget(t: string): string {
-  if (/\b(airport|air terminal|aviation|airfield|terminal 1|terminal 2)\b/i.test(t)) return "airport_aviation";
-  if (/\b(nuclear|reactor|power plant|power station|barakah|refinery|oil field|oilfield|pipeline|grid|substation)\b/i.test(t)) return "energy_infrastructure";
-  if (/\b(air ?base|airbase|base|camp|military|troops|forces|installation|radar|defen[cs]e site|barracks)\b/i.test(t)) return "military_site";
-  if (/\b(tanker|vessel|cargo ship|container ship|warship|frigate)\b/i.test(t)) return "vessel";
-  if (/\b(port|harbour|harbor|jetty|dock|terminal)\b/i.test(t)) return "port_maritime";
-  if (/\b(government|ministry|palace|parliament|presidential)\b/i.test(t)) return "government_facility";
-  if (/\b(residential|neighbou?rhood|civilian|home|house|market|mall|school|hospital)\b/i.test(t)) return "civilian_area";
+  if (MILITARY_SIG.test(t)) return "military_site";
+  if (OILGAS_SIG.test(t) || POWER_SIG.test(t)) return "energy_infrastructure";
+  if (VESSEL_SIG.test(t)) return "vessel";
+  if (AIRPORT_SIG.test(t)) return "airport_aviation";
+  if (PORT_SIG.test(t)) return "port_maritime";
+  if (GOVT_SIG.test(t)) return "government_facility";
+  if (CIVIL_SIG.test(t)) return "civilian_area";
   return "unknown";
 }
 
 function classifyInfrastructure(t: string): string {
-  if (/\b(airport|air terminal|aviation|airfield|terminal 1|terminal 2)\b/i.test(t)) return "airport";
-  if (/\b(nuclear|reactor|power plant|power station|barakah|grid|substation)\b/i.test(t)) return "power";
-  if (/\b(refinery|oil field|oilfield|pipeline|gas)\b/i.test(t)) return "oil_gas";
-  if (/\b(air ?base|airbase|base|camp|military|radar|barracks|installation)\b/i.test(t)) return "military";
-  if (/\b(port|harbour|harbor|jetty|dock)\b/i.test(t)) return "port";
-  if (/\b(government|ministry|palace|parliament|presidential)\b/i.test(t)) return "government";
-  if (/\b(residential|neighbou?rhood|home|house)\b/i.test(t)) return "civilian_residential";
+  if (POWER_SIG.test(t)) return "power";
+  if (OILGAS_SIG.test(t)) return "oil_gas";
+  if (AIRPORT_SIG.test(t)) return "airport";
+  if (MILITARY_SIG.test(t)) return "military";
+  if (PORT_SIG.test(t)) return "port";
+  if (GOVT_SIG.test(t)) return "government";
+  if (/\b(residential|neighbou?rhood|\bhome\b|\bhouse|housing)/i.test(t)) return "civilian_residential";
   return "unknown";
 }
 
@@ -248,8 +271,21 @@ const WORD_NUM: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
 };
 
-// Explicit death count only. Injuries are never counted, and a missing count
-// yields null — we do not infer casualties.
+// A successful air-defence interception with no harm word reported is a
+// no-casualty event: the munition did not reach its target, so 0 deaths is what
+// the source supports — not fabrication. Gated hard: only when an interception/
+// explicit-none phrase is present AND no casualty/injury word appears AND the
+// text does not also say a munition landed/impacted (a partial-interception
+// salvo where one round got through leaves casualties genuinely unstated).
+const INTERCEPT_SIG =
+  /\b(intercept(?:s|ed|ing|or|ors|ion)?|shot down|shoot down|shoots down|downed|destroyed (?:the |an |a )?(?:drone|missile|projectile|uav)|thwart(?:s|ed)?|repelled|fell harmless|fell in (?:an? )?uninhabited|no impact|no damage|caused no|without (?:casualt|damage)|no casualt|no injur|no deaths|no fatalit|no one (?:was )?(?:hurt|killed|injured)|nobody (?:hurt|injured|killed)|none (?:reported|injured|killed))/i;
+const HARM_SIG = /\b(killed|\bdead\b|deaths|fatalit|wounded|injur|casualt|\bhurt\b|martyr)/i;
+const LANDED_SIG =
+  /\b(impacted|landed|slammed|crashed into|made impact|struck (?:a|the|its|home|target|building|facility|residential))/i;
+
+// Death count from text. Explicit fatalities are parsed first; a clean,
+// no-harm interception yields 0 (no casualties reported); anything else yields
+// null — we never infer a wounded count as deaths.
 function parseCasualties(t: string): number | null {
   const clamp = (n: number): number | null => (Number.isFinite(n) && n > 0 && n <= 10000 ? n : null);
   let m = t.match(/(\d+)\s+(?:people\s+)?(?:killed|dead|deaths|fatalities)\b/i);
@@ -263,7 +299,26 @@ function parseCasualties(t: string): number | null {
   if (m) return clamp(WORD_NUM[m[1]!.toLowerCase()] ?? 0);
   if (/\b(?:a person|one person|an? \w+ citizen|an? \w+ national)\s+(?:was\s+)?killed\b/i.test(t)) return 1;
   if (/\bkill(?:s|ed|ing)?\s+(?:one|a)\b/i.test(t)) return 1;
+  // Successful interception / explicit none, no harm, nothing landed -> 0 dead.
+  if (INTERCEPT_SIG.test(t) && !HARM_SIG.test(t) && !LANDED_SIG.test(t)) return 0;
   return null;
+}
+
+// Re-derive all text-classified strike fields from a single text blob. Shared by
+// the live ingest and the one-off backfill so historical rows reclassify with
+// the identical logic the scraper now uses.
+export function classifyStrikeFields(text: string): {
+  munition: string;
+  targetCategory: string;
+  infrastructure: string;
+  casualties: number | null;
+} {
+  return {
+    munition: classifyMunition(text),
+    targetCategory: classifyTarget(text),
+    infrastructure: classifyInfrastructure(text),
+    casualties: parseCasualties(text),
+  };
 }
 
 const MAJOR_SOURCES = [

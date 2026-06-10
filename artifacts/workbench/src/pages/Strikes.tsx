@@ -81,6 +81,7 @@ function mapDbTarget(targetCategory: string, infrastructure: string): string | n
     case "port_maritime": return "Maritime";
     case "energy_infrastructure": return energy;
     case "civilian_area": return "Civilian";
+    case "government_facility": return "Government";
   }
   switch (inf) {
     case "military": return "Military";

@@ -1,6 +1,7 @@
 import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
+import { runStrikesBackfill } from "@workspace/ingest";
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
 
@@ -436,6 +437,54 @@ export async function runDataMigrations(): Promise<void> {
           { rows: res.rowCount ?? 0, marker: markerKey },
           "One-time purge of out-of-region mis-stamped fuel/energy/fertiliser rows",
         );
+      }
+    }
+
+    // 3e) ONE-TIME reclassification of auto-scraped strike columns.
+    //
+    //     The Missile Strike Tracker dashboard derives Target / Weapon /
+    //     Casualties from the DB columns FIRST, falling back to text only when a
+    //     column is "unknown" / null. Historical auto-scraped rows were
+    //     classified by an earlier, narrower ruleset (trailing-\b stem traps that
+    //     dropped refinery / petrochemical / energy targets; no interception->0
+    //     casualty rule), so they sat as "unknown" and pushed several charts past
+    //     the >50% "mostly unattributed" caveat threshold. Re-run the SAME
+    //     classifier the live scraper now uses over each row's stored summary,
+    //     filling only genuine non-unknown improvements (never overwriting an
+    //     analyst value or an existing casualty count). Marker-gated so it runs
+    //     once per deploy generation; bump the key if the classifier changes
+    //     materially and historical rows should be re-swept.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "strikes_reclassify_columns_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        try {
+          const summary = await runStrikesBackfill({ commit: true });
+          await db.execute(sql`
+            INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+            ON CONFLICT (key) DO NOTHING
+          `);
+          logger.info(
+            {
+              scanned: summary.scanned,
+              targetFilled: summary.targetFilled,
+              infraFilled: summary.infraFilled,
+              casualtiesFilled: summary.casualtiesFilled,
+              marker: markerKey,
+            },
+            "One-time reclassification of auto-scraped strike columns",
+          );
+        } catch (strikeErr) {
+          logger.error({ err: strikeErr }, "Strike column reclassification failed");
+        }
       }
     }
 
