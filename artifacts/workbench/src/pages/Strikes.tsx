@@ -53,19 +53,29 @@ const UNKNOWN_TARGET = "Unknown / unattributed";
 // Strong military / US-forces signal. Evaluated BEFORE the DB category and the
 // text fallback so interceptions over military or US-forces air bases read as
 // Military, never civil Aviation.
-const MILITARY_RE = /\b(air[\s-]?base|airbase|military (?:base|site|installation|facilit)|us (?:forces|base|bases|troops|military)|u\.s\.? ?(?:forces|base|bases|troops|military)|fifth fleet|5th fleet|naval base|army base|barrack|garrison|prince sultan|muwaffaq salti|al[\s-]?udeid|al[\s-]?dhafra|centcom|central command|command cent(?:er|re))\b/i;
+//
+// IMPORTANT: stems carry only a LEADING \b, never a trailing one, so common
+// inflections still match ("military site" -> "military sites", "facilit" ->
+// "facilities"). A trailing \b on a stem silently drops every inflected form —
+// the same trap fixed in lib/ingest/src/strikes.ts that left hand-entered seed
+// strikes naming a clear target ("refinery", "petrochemical") reading Unknown.
+const MILITARY_RE = /\b(air[\s-]?base|airbase|military (?:base|site|installation|facilit)|us (?:forces|base|bases|troops|military)|u\.s\.? ?(?:forces|base|bases|troops|military)|fifth fleet|5th fleet|naval base|army base|barrack|garrison|prince sultan|muwaffaq salti|al[\s-]?udeid|al[\s-]?dhafra|centcom|central command|command cent(?:er|re))/i;
 
 // Text fallback, only consulted when the DB category is "unknown". Order is
 // precedence. Military is handled separately above; civil aviation only matches
-// genuine airport/runway language here.
+// genuine airport/runway language here. Stems are leading-\b-only (see above);
+// short ambiguous tokens (crude, lng, grid, market, civilian, tanker) keep a
+// trailing boundary so they do not over-match (e.g. "kc-135 tankers" are aerial
+// refuelling aircraft, not vessels; "civilians injured" is a casualty count,
+// not a civilian-area target).
 const TARGET_TEXT: { label: string; re: RegExp }[] = [
-  { label: "Oil & Gas", re: /\b(oil field|oil facilit|oil refiner|gas field|gas pipeline|crude|refiner|petrochem|pipeline|aramco|adnoc|samref|lng|fuel depot|kharg)\b/i },
-  { label: "Power / Grid", re: /\b(power plant|power station|grid|electric|substation|nuclear|reactor|barakah)\b/i },
-  { label: "Maritime", re: /\b(oil tanker|tanker|vessel|warship|frigate|merchant ship|cargo ship|naval vessel)\b/i },
-  { label: "Aviation", re: /\b(international airport|airport terminal|airport|airfield|runway|civil aviation|passenger flight)\b/i },
-  { label: "Government", re: /\b(palace|ministry|presidential|parliament|royal court|embassy|government building)\b/i },
-  { label: "Civilian", re: /\b(civilian|residential|school|hospital|mosque|market|housing|settlement)\b/i },
-  { label: "Industrial", re: /\b(factory|warehouse|industrial zone|industrial estate)\b/i },
+  { label: "Oil & Gas", re: /\b(oil ?field|oil facilit|oil storage|oil depot|oil hub|oil refiner|oil installation|refiner|petrochem|\bcrude|gas field|gas plant|gas complex|gas pipeline|pipeline|aramco|adnoc|samref|kharg|fuel depot|fuel storage|\blng\b)/i },
+  { label: "Power / Grid", re: /\b(power plant|power station|power grid|\bgrid\b|electric|substation|nuclear|reactor|barakah)/i },
+  { label: "Maritime", re: /\b(oil tankers?|\btanker\b|\bvessel|warship|\bfrigate|merchant ship|cargo ship|naval vessel)/i },
+  { label: "Aviation", re: /\b(international airport|airport terminal|\bairport|airfield|runway|civil aviation|passenger flight)/i },
+  { label: "Government", re: /\b(palace|ministry|presidential|parliament|royal court|embassy|government building)/i },
+  { label: "Civilian", re: /\b(civilian\b|residential|school|hospital|mosque|\bmarket|housing|settlement)/i },
+  { label: "Industrial", re: /\b(factory|factories|warehouse|industrial zone|industrial estate)/i },
 ];
 
 // Map the DB `target_category` / `infrastructure` enums onto display labels.
