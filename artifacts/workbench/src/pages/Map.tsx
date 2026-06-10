@@ -74,9 +74,13 @@ type Point = {
 export default function MapPage() {
   const [view, setView] = useState<"incidents" | "maritime" | "land">("incidents");
   const [range, setRange] = useState<RangeKey>("1y");
-  const { data: incidents = [] } = useListIncidents({});
-  const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz" });
-  const { data: land = [] } = useListStrikes({ theatre: "land_gcc" });
+  // Fetch only the records within the selected window. Switching ranges issues a
+  // new request (React Query keys on the params) rather than re-filtering a full
+  // in-memory list, so the payload stays small as the table grows.
+  const days = RANGE_DAYS[range];
+  const { data: incidents = [] } = useListIncidents({ days });
+  const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz", days });
+  const { data: land = [] } = useListStrikes({ theatre: "land_gcc", days });
 
   const availableCategories = useMemo<readonly string[]>(() => {
     if (view === "incidents") return INCIDENT_CATEGORIES;
@@ -131,15 +135,9 @@ export default function MapPage() {
       }));
   }, [view, incidents, maritime, land]);
 
-  // Date window: keep points whose timestamp falls within the selected range.
-  // No lower bound, so a (possibly future-dated) record is never hidden.
-  const windowedPoints = useMemo(() => {
-    const cutoff = Date.now() - RANGE_DAYS[range] * 24 * 60 * 60 * 1000;
-    return allPoints.filter((p) => {
-      const t = new Date(p.when).getTime();
-      return Number.isFinite(t) && t >= cutoff;
-    });
-  }, [allPoints, range]);
+  // The API already returns only records within the selected window, so the
+  // fetched set is the windowed set — no client-side date filtering needed.
+  const windowedPoints = allPoints;
 
   const visiblePoints = useMemo(
     () => windowedPoints.filter((p) => activeCategories.has(p.category)),

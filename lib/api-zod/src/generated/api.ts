@@ -413,10 +413,14 @@ export const GetIncidentCountsByTopicResponseItem = zod.object({
 export const GetIncidentCountsByTopicResponse = zod.array(GetIncidentCountsByTopicResponseItem)
 
 
+export const listStrikesQueryDaysMax = 365;
+
+
+
 export const ListStrikesQueryParams = zod.object({
   "theatre": zod.enum(['maritime_hormuz', 'land_gcc']).optional(),
   "country": zod.coerce.string().optional(),
-  "days": zod.union([zod.literal(7),zod.literal(14),zod.literal(30),zod.literal(60),zod.literal(90),zod.literal(120)]).optional(),
+  "days": zod.coerce.number().min(1).max(listStrikesQueryDaysMax).optional().describe('Limit to strikes within the past N days'),
   "munition": zod.enum(['drone', 'ballistic_missile', 'cruise_missile', 'mixed', 'unknown']).optional()
 })
 

@@ -691,21 +691,14 @@ days?: number;
 export type ListStrikesParams = {
 theatre?: StrikeTheatre;
 country?: string;
-days?: ListStrikesDays;
+/**
+ * Limit to strikes within the past N days
+ * @minimum 1
+ * @maximum 365
+ */
+days?: number;
 munition?: Munition;
 };
-
-export type ListStrikesDays = typeof ListStrikesDays[keyof typeof ListStrikesDays];
-
-
-export const ListStrikesDays = {
-  NUMBER_7: 7,
-  NUMBER_14: 14,
-  NUMBER_30: 30,
-  NUMBER_60: 60,
-  NUMBER_90: 90,
-  NUMBER_120: 120,
-} as const;
 
 export type GetStrikeSummaryParams = {
 theatre?: StrikeTheatre;

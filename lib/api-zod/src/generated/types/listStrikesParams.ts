@@ -5,13 +5,17 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
-import type { ListStrikesDays } from './listStrikesDays';
 import type { Munition } from './munition';
 import type { StrikeTheatre } from './strikeTheatre';
 
 export type ListStrikesParams = {
 theatre?: StrikeTheatre;
 country?: string;
-days?: ListStrikesDays;
+/**
+ * Limit to strikes within the past N days
+ * @minimum 1
+ * @maximum 365
+ */
+days?: number;
 munition?: Munition;
 };

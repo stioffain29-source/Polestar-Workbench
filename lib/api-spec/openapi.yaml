@@ -201,7 +201,8 @@ paths:
           schema: { type: string }
         - name: days
           in: query
-          schema: { type: integer, enum: [7, 14, 30, 60, 90, 120] }
+          description: Limit to strikes within the past N days
+          schema: { type: integer, minimum: 1, maximum: 365 }
         - name: munition
           in: query
           schema: { $ref: "#/components/schemas/Munition" }

@@ -39,7 +39,6 @@ export * from './listIncidentsParams';
 export * from './listMarketPricesParams';
 export * from './listReportsParams';
 export * from './listSourcesParams';
-export * from './listStrikesDays';
 export * from './listStrikesParams';
 export * from './marketPrice';
 export * from './marketPriceTrajectoryPoint';

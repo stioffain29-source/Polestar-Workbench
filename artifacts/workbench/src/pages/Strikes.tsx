@@ -249,7 +249,7 @@ export default function Strikes() {
   const [weapon, setWeapon] = useState<string>("");
   const [target, setTarget] = useState<string>("");
 
-  const { data: strikes = [], isLoading } = useListStrikes({ theatre, days: days as 7 });
+  const { data: strikes = [], isLoading } = useListStrikes({ theatre, days });
 
   const filtered = useMemo(() => {
     return strikes.filter((s) =>
