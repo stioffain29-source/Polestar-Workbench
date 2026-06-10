@@ -20,7 +20,7 @@ import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftRepo
 import { ArrowLeft, Download, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
-import { DISCLAIMER_TEXT, METHODOLOGY_TEXT } from "@/lib/pdfChrome";
+import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import {
   incidentMatchesCountry,
@@ -953,14 +953,7 @@ export default function CountryReport() {
         </ul>
       </div>
 
-      {/* 11. Methodology & Source Limitations — fills the final page so the
-          Disclaimer never sits alone on a near-empty sheet, and states the
-          report's basis/limits honestly. */}
-      <Section title="Methodology & Source Limitations">
-        <Prose text={METHODOLOGY_TEXT} />
-      </Section>
-
-      {/* 12. Disclaimer */}
+      {/* Disclaimer */}
       <Section title="Disclaimer">
         <Prose text={DISCLAIMER_TEXT} />
       </Section>
