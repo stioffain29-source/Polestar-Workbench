@@ -534,6 +534,78 @@ export interface CountryBaselineInput {
   locationWatchlist?: CountryBaselineWatchlistItem[];
 }
 
+export interface ProseIncidentInput {
+  /** @nullable */
+  topic?: string | null;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  summary?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  severity?: string | null;
+  /** @nullable */
+  occurredAt?: string | null;
+  /** @nullable */
+  source?: string | null;
+}
+
+export interface ProseBaselineContext {
+  /** @nullable */
+  operatingEnvironment?: string | null;
+  /** @nullable */
+  securityContext?: string | null;
+  /** @nullable */
+  knownRiskAreas?: string[] | null;
+  /** @nullable */
+  keyCitiesProvinces?: string[] | null;
+  /** @nullable */
+  movementConstraints?: string | null;
+  /** @nullable */
+  infrastructureLimits?: string | null;
+  /** @nullable */
+  medicalEvac?: string | null;
+  /** @nullable */
+  resourceSectorExposure?: string | null;
+}
+
+export interface CountryProseSections {
+  executiveSummary: string;
+  situation: string;
+  whatHappened: string;
+  whatMatters: string;
+  implications: string[];
+  watchNext: string[];
+  polestarView: string;
+}
+
+export interface GenerateCountryProseInput {
+  region: string;
+  basisDays: number;
+  periodWord: string;
+  issueDate: string;
+  force?: boolean;
+  incidents: ProseIncidentInput[];
+  baseline?: ProseBaselineContext | null;
+}
+
+export interface EditCountryProseInput {
+  fingerprint: string;
+  sections: CountryProseSections;
+}
+
+export interface CountryProseResult {
+  available: boolean;
+  fingerprint: string;
+  sections: CountryProseSections;
+  edited?: CountryProseSections | null;
+  model: string;
+  generatedAt: string;
+}
+
 export interface DashboardTopicCard {
   topic: Topic;
   label: string;

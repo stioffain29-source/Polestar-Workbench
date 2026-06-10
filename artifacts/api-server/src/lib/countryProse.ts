@@ -28,6 +28,17 @@ const MAX_COMPLETION_TOKENS = 8192;
 // treated as stale and regenerated.
 export const PROSE_PROMPT_VERSION = "v1";
 
+// The model only ever sees this many incidents, and the cache fingerprint hashes
+// exactly the same capped set — so the cache key and the prompt input can never
+// diverge (a caller cannot append filler past the cap to force a cache miss while
+// the prompt is unchanged). The window set is small in practice.
+export const MAX_PROSE_INCIDENTS = 60;
+
+// Hard ceiling on the incidents a single request may submit before processing.
+// The prompt is capped to MAX_PROSE_INCIDENTS regardless; this bound keeps a
+// public caller from forcing unbounded JSON parsing / hashing work server-side.
+export const MAX_PROSE_INCIDENTS_ACCEPTED = 1000;
+
 export interface ProseIncidentInput {
   topic?: string | null;
   title?: string | null;
@@ -71,23 +82,47 @@ export function isLlmAvailable(): boolean {
   );
 }
 
-// A stable identity for one incident: the facts that, if changed, should change
-// the prose. Order-independent at the set level (we sort before hashing).
+// A stable identity for one incident: EVERY fact that reaches the model and could
+// change the prose. Summary, source, country and topic are included because the
+// prompt renders them, so a correction to any of them must flip the fingerprint
+// (otherwise cached prose could describe text the incident no longer holds).
 function incidentIdentity(i: ProseIncidentInput): string {
   const date = (i.occurredAt ?? "").slice(0, 10);
+  const norm = (v?: string | null) => (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
   return [
-    (i.title ?? "").trim().toLowerCase(),
+    norm(i.title),
     date,
-    (i.severity ?? "").trim().toLowerCase(),
-    (i.location ?? "").trim().toLowerCase(),
+    norm(i.severity),
+    norm(i.location),
+    norm(i.country),
+    norm(i.topic),
+    norm(i.source),
+    norm(i.summary),
   ].join("|");
 }
 
+// The canonical, capped incident set: deterministically ordered (most recent
+// first, then by title) and truncated to MAX_PROSE_INCIDENTS. BOTH the prompt and
+// the fingerprint derive from this exact list, so the cache key always matches
+// the input the model actually received.
+function canonicalIncidents(incidents: ProseIncidentInput[]): ProseIncidentInput[] {
+  return [...incidents]
+    .sort((a, b) => {
+      const da = (a.occurredAt ?? "").slice(0, 10);
+      const db = (b.occurredAt ?? "").slice(0, 10);
+      if (da !== db) return da < db ? 1 : -1; // most recent first
+      return (a.title ?? "").localeCompare(b.title ?? "");
+    })
+    .slice(0, MAX_PROSE_INCIDENTS);
+}
+
 /**
- * Deterministic fingerprint of the inputs the prose is grounded on. Two requests
- * with the same country, window basis and incident set (in any order) produce
- * the same fingerprint, so the cache hits; any change to the incidents (new
- * record, changed severity/date/location) flips it and forces a regenerate.
+ * Deterministic fingerprint of the inputs the prose is grounded on. Hashes the
+ * SAME capped/canonical incident set the model is given, so the cache hits for
+ * identical data and any change to the incidents (new record, changed
+ * severity/date/location/summary/source/country/topic) flips it and forces a
+ * regenerate. Incidents beyond the cap cannot affect prose, so they cannot
+ * affect the key.
  */
 export function computeProseFingerprint(input: {
   slug: string;
@@ -95,7 +130,7 @@ export function computeProseFingerprint(input: {
   basisDays: number;
   incidents: ProseIncidentInput[];
 }): string {
-  const ids = input.incidents.map(incidentIdentity).sort();
+  const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
   const payload = JSON.stringify({
     v: PROSE_PROMPT_VERSION,
     slug: input.slug,
@@ -158,8 +193,9 @@ function baselineBlock(b?: ProseBaselineContext | null): string {
 
 function incidentBlock(incidents: ProseIncidentInput[]): string {
   if (incidents.length === 0) return "No incidents recorded in this window.";
-  // Cap to keep the prompt bounded; the window set is small in practice.
-  const capped = incidents.slice(0, 60);
+  // Same canonical capped set the fingerprint hashes — prompt and cache key stay
+  // in lockstep.
+  const capped = canonicalIncidents(incidents);
   return capped
     .map((i, idx) => {
       const sev = (i.severity ?? "").trim() || "unrated";

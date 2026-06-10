@@ -71,6 +71,43 @@ export type StrikesRunResult =
     }
   | { ran: false; reason: "locked" };
 
+function emptyIncidentIngest(
+  topic: IngestSummary["topic"],
+  err: unknown,
+): IngestSummary {
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    topic,
+    mode: "commit",
+    sourcesFetched: 0,
+    itemsConsidered: 0,
+    acceptedRaw: 0,
+    acceptedUnique: 0,
+    duplicateInDb: 0,
+    newToInsert: 0,
+    inserted: 0,
+    rejected: 0,
+    totalAfter: null,
+    latestRecord: null,
+    lastUpdated: null,
+    perFeed: [],
+    countryCoverage: [],
+    logLines: [`${topic} ingest failed: ${msg}`],
+  };
+}
+
+async function runIncidentIngest(
+  topic: IngestSummary["topic"],
+  fn: () => Promise<IngestSummary>,
+): Promise<IngestSummary> {
+  try {
+    return await fn();
+  } catch (err) {
+    logger.error({ err, topic }, "incident ingest failed");
+    return emptyIncidentIngest(topic, err);
+  }
+}
+
 function emptyStrikes(err: unknown): StrikesIngestSummary {
   return {
     mode: "commit",
@@ -88,7 +125,9 @@ function emptyStrikes(err: unknown): StrikesIngestSummary {
     perFeed: [],
     byTheatre: [],
     byCountry: [],
-    logLines: [`strikes ingest failed: ${err instanceof Error ? err.message : String(err)}`],
+    logLines: [
+      `strikes ingest failed: ${err instanceof Error ? err.message : String(err)}`,
+    ],
   };
 }
 
@@ -97,7 +136,9 @@ function emptyMarketPrices(err: unknown): MarketPriceSummary {
     topic: "fuel_prices",
     mode: "commit",
     seriesFetched: 0,
-    seriesErrors: [{ id: "all", error: err instanceof Error ? err.message : String(err) }],
+    seriesErrors: [
+      { id: "all", error: err instanceof Error ? err.message : String(err) },
+    ],
     reportsConsidered: 0,
     reportsUpdated: 0,
     latest: { brent: null, wti: null, jet: null, asOf: null },
@@ -110,9 +151,13 @@ function emptyMarketSnapshot(err: unknown): MarketSnapshotSummary {
     mode: "commit",
     upserted: 0,
     considered: 0,
-    errors: [{ key: "all", error: err instanceof Error ? err.message : String(err) }],
+    errors: [
+      { key: "all", error: err instanceof Error ? err.message : String(err) },
+    ],
     rows: [],
-    logLines: [`market snapshot ingest failed: ${err instanceof Error ? err.message : String(err)}`],
+    logLines: [
+      `market snapshot ingest failed: ${err instanceof Error ? err.message : String(err)}`,
+    ],
   };
 }
 
@@ -195,13 +240,27 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       strikes = emptyStrikes(err);
     }
     // Sequential: these share the same DB pool and dedupe against the incidents
-    // table; running them one after another mirrors scrape:prod.
-    const flashpoint = await runFlashpointIngest({ commit: true });
-    const cargoWatch = await runCargoWatchIngest({ commit: true });
-    const shipping = await runShippingIngest({ commit: true });
-    const energy = await runEnergyIngest({ commit: true });
-    const fertiliser = await runFertiliserIngest({ commit: true });
-    const fuel = await runFuelIngest({ commit: true });
+    // table; running them one after another mirrors scrape:prod. Each is isolated
+    // in its own try so a DB or unexpected failure in one topic can never abort
+    // the rest of the chain (mirrors strikes / market prices below).
+    const flashpoint = await runIncidentIngest("flashpoint", () =>
+      runFlashpointIngest({ commit: true }),
+    );
+    const cargoWatch = await runIncidentIngest("cargo_watch", () =>
+      runCargoWatchIngest({ commit: true }),
+    );
+    const shipping = await runIncidentIngest("shipping", () =>
+      runShippingIngest({ commit: true }),
+    );
+    const energy = await runIncidentIngest("energy", () =>
+      runEnergyIngest({ commit: true }),
+    );
+    const fertiliser = await runIncidentIngest("fertiliser", () =>
+      runFertiliserIngest({ commit: true }),
+    );
+    const fuel = await runIncidentIngest("fuel", () =>
+      runFuelIngest({ commit: true }),
+    );
     // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
     // West Papua feeds) into clean English advisory titles AFTER the scrapers
     // have written this run's rows. Isolated in its own try so an LLM/network
@@ -211,7 +270,12 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     try {
       const titles = await runTitleTranslation({ commit: true });
       logger.info(
-        { translated: titles.translated, candidates: titles.candidates, failed: titles.failed, skipped: titles.skipped },
+        {
+          translated: titles.translated,
+          candidates: titles.candidates,
+          failed: titles.failed,
+          skipped: titles.skipped,
+        },
         "title translation pass complete",
       );
     } catch (err) {

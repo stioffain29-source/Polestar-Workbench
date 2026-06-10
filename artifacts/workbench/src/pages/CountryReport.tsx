@@ -8,8 +8,14 @@ import {
   useGetCountryBaseline,
   useUpsertCountryBaseline,
   useDeleteCountryBaseline,
+  useGenerateCountryProse,
+  useEditCountryProse,
   getGetCountryReportQueryKey,
   getGetCountryBaselineQueryKey,
+  type CountryProseSections,
+  type CountryProseResult,
+  type ProseIncidentInput,
+  type ProseBaselineContext,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -17,7 +23,7 @@ import DataAsOfBanner from "@/components/DataAsOfBanner";
 import { computeDataAsOf } from "@/lib/reportDataStatus";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
-import { ArrowLeft, Download, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Pencil, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
@@ -58,6 +64,12 @@ const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant",
 };
 const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
+
+// Render a bullet list (implications / watch-next) as newline-joined lines the
+// <Prose> component can lay out as paragraphs.
+function bulletJoin(xs: string[]): string {
+  return (xs ?? []).filter((s) => s && s.trim()).map((s) => `• ${s.trim()}`).join("\n");
+}
 
 // Distribution-chart track. A lighter neutral than POLAR so the coloured
 // severity/type bars read as the dominant element and the empty remainder of
@@ -332,6 +344,168 @@ export default function CountryReport() {
     });
   }, [country, active, issueDate]);
 
+  // --- AI-generated prose -------------------------------------------------
+  // The narrative is generated server-side, grounded strictly on the same
+  // window incidents the page renders, and cached by a fingerprint of that
+  // data. A cache hit is free; the prose regenerates only when the data
+  // changes (so it can never go stale) or on an explicit Redraft. When the
+  // LLM is unavailable the page falls back to the deterministic template.
+  const generateProse = useGenerateCountryProse();
+  const editProse = useEditCountryProse();
+  const [proseResult, setProseResult] = useState<CountryProseResult | null>(null);
+  const [proseUnavailable, setProseUnavailable] = useState(false);
+  const [proseDraft, setProseDraft] = useState<CountryProseSections | null>(null);
+  const proseRequestKey = useRef<string | null>(null);
+
+  const proseIncidents: ProseIncidentInput[] = useMemo(
+    () =>
+      active.incidents.map((i) => ({
+        topic: i.topic, title: i.title, summary: i.summary,
+        location: i.location, country: i.country,
+        severity: i.severity, occurredAt: i.occurredAt, source: i.source,
+      })),
+    [active],
+  );
+
+  const periodWord = useMemo(
+    () =>
+      active.basisDays >= 90 ? "this past quarter" : active.basisDays >= 30 ? "this past month" : "this week",
+    [active.basisDays],
+  );
+
+  // Stable identity of the window data — mirrors the inputs the server hashes
+  // into its fingerprint, so we fire at most one request per data state.
+  const proseContentKey = useMemo(() => {
+    const ids = proseIncidents
+      .map((i) =>
+        [
+          (i.title ?? "").trim().toLowerCase(),
+          (i.occurredAt ?? "").slice(0, 10),
+          (i.severity ?? "").toLowerCase(),
+          (i.location ?? "").trim().toLowerCase(),
+        ].join("~"),
+      )
+      .sort();
+    return `${slug}|${active.basisDays}|${ids.join("§")}`;
+  }, [proseIncidents, slug, active.basisDays]);
+
+  const baselineContext: ProseBaselineContext | null = useMemo(() => {
+    if (!persistedBaseline) return null;
+    return {
+      operatingEnvironment: persistedBaseline.operatingEnvironment,
+      securityContext: persistedBaseline.securityContext,
+      knownRiskAreas: persistedBaseline.knownRiskAreas,
+      keyCitiesProvinces: persistedBaseline.keyCitiesProvinces,
+      movementConstraints: persistedBaseline.movementConstraints,
+      infrastructureLimits: persistedBaseline.infrastructureLimits,
+      medicalEvac: persistedBaseline.medicalEvac,
+      resourceSectorExposure: persistedBaseline.resourceSectorExposure,
+    };
+  }, [persistedBaseline]);
+
+  useEffect(() => {
+    if (!country) return;
+    if (editing) return;
+    if (proseRequestKey.current === proseContentKey) return;
+    proseRequestKey.current = proseContentKey;
+    let cancelled = false;
+    setProseUnavailable(false);
+    generateProse
+      .mutateAsync({
+        slug,
+        data: {
+          region: country.region ?? "",
+          basisDays: active.basisDays,
+          periodWord,
+          issueDate,
+          incidents: proseIncidents,
+          baseline: baselineContext,
+          force: false,
+        },
+      })
+      .then((res) => {
+        if (!cancelled) setProseResult(res);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProseResult(null);
+          setProseUnavailable(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [country, slug, editing, proseContentKey, periodWord, issueDate, baselineContext]);
+
+  const redraft = async () => {
+    if (!country) return;
+    setProseUnavailable(false);
+    try {
+      const res = await generateProse.mutateAsync({
+        slug,
+        data: {
+          region: country.region ?? "",
+          basisDays: active.basisDays,
+          periodWord,
+          issueDate,
+          incidents: proseIncidents,
+          baseline: baselineContext,
+          force: true,
+        },
+      });
+      setProseResult(res);
+      setProseDraft(res.edited ?? res.sections);
+      proseRequestKey.current = proseContentKey;
+    } catch {
+      setProseUnavailable(true);
+    }
+  };
+
+  // Seed the editable prose draft when entering edit mode; clear on exit.
+  useEffect(() => {
+    if (editing && proseResult && !proseDraft) {
+      setProseDraft(proseResult.edited ?? proseResult.sections);
+    }
+    if (!editing && proseDraft) setProseDraft(null);
+  }, [editing, proseResult, proseDraft]);
+
+  // Unified, render-ready prose. While editing, the live draft drives the
+  // preview so edits are visible immediately (mirrors how name/region use
+  // `effective`). Otherwise prefer the server prose (edited override first),
+  // and fall back to the deterministic template when no AI prose exists.
+  const displayProse = useMemo(() => {
+    const src =
+      editing && proseDraft
+        ? proseDraft
+        : proseResult
+          ? (proseResult.edited ?? proseResult.sections)
+          : null;
+    if (src) {
+      return {
+        executiveSummary: src.executiveSummary,
+        situation: src.situation,
+        whatHappened: src.whatHappened,
+        whatMatters: src.whatMatters,
+        implications: bulletJoin(src.implications),
+        watchNext: bulletJoin(src.watchNext),
+        polestarView: src.polestarView,
+      };
+    }
+    return {
+      executiveSummary: draftedProse?.executiveSummary ?? "",
+      situation: draftedProse?.overview ?? "",
+      whatHappened: draftedProse?.trendSummary ?? "",
+      whatMatters: draftedProse?.whatMatters ?? "",
+      implications: draftedProse?.implications ?? "",
+      watchNext: draftedProse?.watchNext ?? "",
+      polestarView: draftedProse?.polestarView ?? "",
+    };
+  }, [editing, proseDraft, proseResult, draftedProse]);
+
+  const setProseField = (k: keyof CountryProseSections, v: string | string[]) =>
+    setProseDraft((d) => (d ? { ...d, [k]: v } : d));
+
   useEffect(() => {
     if (!country) return;
     if (!incidentsData) return;
@@ -441,6 +615,20 @@ export default function CountryReport() {
         qc.invalidateQueries({ queryKey: getGetCountryBaselineQueryKey(slug) });
         setBaselineDirty(false);
       }
+      // Persist analyst overrides to the AI prose. Bound to the fingerprint the
+      // draft was written against — a stale fingerprint (data moved on) is
+      // rejected server-side so an edit can never describe an old snapshot.
+      if (proseDraft && proseResult) {
+        try {
+          const res = await editProse.mutateAsync({
+            slug,
+            data: { fingerprint: proseResult.fingerprint, sections: proseDraft },
+          });
+          setProseResult(res);
+        } catch (err) {
+          console.error("[CountryReport] prose edit save failed", err);
+        }
+      }
       qc.invalidateQueries({ queryKey: getGetCountryReportQueryKey(slug) });
       setEditing(false);
     } catch (err) {
@@ -528,14 +716,30 @@ export default function CountryReport() {
               </button>
             </>
           ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm"
-              style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, color: DUSK, background: "#fff" }}
-              title="Edit report"
-            >
-              <Pencil className="w-3.5 h-3.5" /> Edit
-            </button>
+            <>
+              <button
+                onClick={redraft}
+                disabled={generateProse.isPending}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm disabled:opacity-60"
+                style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, color: DUSK, background: "#fff" }}
+                title="Regenerate the narrative from the current incidents"
+              >
+                {generateProse.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                {generateProse.isPending ? "Drafting..." : "Redraft"}
+              </button>
+              <button
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm"
+                style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, color: DUSK, background: "#fff" }}
+                title="Edit report"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </button>
+            </>
           )}
           <button
             onClick={downloadPdf}
@@ -549,6 +753,15 @@ export default function CountryReport() {
           </button>
         </div>
       </div>
+
+      {proseUnavailable && (
+        <div
+          className="no-print"
+          style={{ fontFamily: ROBOTO, fontSize: 12, color: "#A33232", marginTop: 8, fontStyle: "italic" }}
+        >
+          AI narrative is unavailable right now — showing the template draft. Try Redraft shortly.
+        </div>
+      )}
 
       {/* Polestar header band — matches Watch report cover treatment */}
       <div ref={reportPreviewRef} className="print-report bg-white" style={{ color: NAVY, fontFamily: ROBOTO }}>
@@ -743,8 +956,24 @@ export default function CountryReport() {
         </Section>
       )}
 
+      {editing && proseDraft && (
+        <Section title="Narrative (editable)">
+          <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
+            AI-generated from this window's incidents. Edits are saved against the current data; if the
+            data later changes, use Redraft to regenerate.
+          </div>
+          <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
+          <BaselineTextField label="Situation" value={proseDraft.situation} onChange={(v) => setProseField("situation", v)} />
+          <BaselineTextField label="What Happened" value={proseDraft.whatHappened} onChange={(v) => setProseField("whatHappened", v)} />
+          <BaselineTextField label="What Matters" value={proseDraft.whatMatters} onChange={(v) => setProseField("whatMatters", v)} />
+          <BaselineListField label="Implications for Business" items={proseDraft.implications} onChange={(v) => setProseField("implications", v)} placeholder="One implication per line" />
+          <BaselineListField label="Watch Next" items={proseDraft.watchNext} onChange={(v) => setProseField("watchNext", v)} placeholder="One indicator per line" />
+          <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
+        </Section>
+      )}
+
       <Section title="Executive Summary">
-        <Prose text={draftedProse?.executiveSummary ?? ""} />
+        <Prose text={displayProse.executiveSummary} />
       </Section>
 
       {/* 2. Fast Facts */}
@@ -763,22 +992,22 @@ export default function CountryReport() {
 
       {/* 3. Situation (auto — window-aware) */}
       <Section title="Situation">
-        <Prose text={draftedProse?.overview ?? ""} />
+        <Prose text={displayProse.situation} />
       </Section>
 
       {/* 4. What Happened (auto — window-aware) */}
       <Section title="What Happened">
-        <Prose text={draftedProse?.trendSummary ?? ""} />
+        <Prose text={displayProse.whatHappened} />
       </Section>
 
       {/* 5. What Matters (auto) */}
       <Section title="What Matters">
-        <Prose text={draftedProse?.whatMatters ?? ""} />
+        <Prose text={displayProse.whatMatters} />
       </Section>
 
       {/* 6. Implications for Business (auto — window-aware) */}
       <Section title="Implications for Business">
-        <Prose text={draftedProse?.implications ?? ""} />
+        <Prose text={displayProse.implications} />
       </Section>
 
       {/* 6b. Location Watchlist — read-only breakdown derived from the
@@ -857,12 +1086,12 @@ export default function CountryReport() {
 
       {/* Watch Next (auto) */}
       <Section title="Watch Next">
-        <Prose text={draftedProse?.watchNext ?? ""} />
+        <Prose text={displayProse.watchNext} />
       </Section>
 
       {/* Polestar View (auto) */}
       <Section title="Polestar View">
-        <Prose text={draftedProse?.polestarView ?? ""} />
+        <Prose text={displayProse.polestarView} />
       </Section>
 
       {/* 10. Related Incidents */}

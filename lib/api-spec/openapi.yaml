@@ -561,6 +561,56 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CountryReport" }
 
+  /countries/{slug}/prose:
+    post:
+      operationId: generateCountryProse
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerateCountryProseInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryProseResult" }
+        "404":
+          description: Country not found
+        "503":
+          description: Prose generation unavailable
+
+  /countries/{slug}/prose/edit:
+    put:
+      operationId: editCountryProse
+      tags: [countries]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditCountryProseInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryProseResult" }
+        "404":
+          description: No generated prose to edit
+        "409":
+          description: Fingerprint stale, regenerate first
+
 components:
   schemas:
     HealthStatus:
@@ -1170,6 +1220,88 @@ components:
         locationWatchlist:
           type: array
           items: { $ref: "#/components/schemas/CountryBaselineWatchlistItem" }
+
+    ProseIncidentInput:
+      type: object
+      properties:
+        topic: { type: ["string", "null"] }
+        title: { type: ["string", "null"] }
+        summary: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        country: { type: ["string", "null"] }
+        severity: { type: ["string", "null"] }
+        occurredAt: { type: ["string", "null"] }
+        source: { type: ["string", "null"] }
+
+    ProseBaselineContext:
+      type: object
+      properties:
+        operatingEnvironment: { type: ["string", "null"] }
+        securityContext: { type: ["string", "null"] }
+        knownRiskAreas:
+          type: ["array", "null"]
+          items: { type: string }
+        keyCitiesProvinces:
+          type: ["array", "null"]
+          items: { type: string }
+        movementConstraints: { type: ["string", "null"] }
+        infrastructureLimits: { type: ["string", "null"] }
+        medicalEvac: { type: ["string", "null"] }
+        resourceSectorExposure: { type: ["string", "null"] }
+
+    CountryProseSections:
+      type: object
+      required: [executiveSummary, situation, whatHappened, whatMatters, implications, watchNext, polestarView]
+      properties:
+        executiveSummary: { type: string }
+        situation: { type: string }
+        whatHappened: { type: string }
+        whatMatters: { type: string }
+        implications:
+          type: array
+          items: { type: string }
+        watchNext:
+          type: array
+          items: { type: string }
+        polestarView: { type: string }
+
+    GenerateCountryProseInput:
+      type: object
+      required: [region, basisDays, periodWord, issueDate, incidents]
+      properties:
+        region: { type: string }
+        basisDays: { type: integer }
+        periodWord: { type: string }
+        issueDate: { type: string }
+        force: { type: boolean }
+        incidents:
+          type: array
+          items: { $ref: "#/components/schemas/ProseIncidentInput" }
+        baseline:
+          oneOf:
+            - { $ref: "#/components/schemas/ProseBaselineContext" }
+            - { type: "null" }
+
+    EditCountryProseInput:
+      type: object
+      required: [fingerprint, sections]
+      properties:
+        fingerprint: { type: string }
+        sections: { $ref: "#/components/schemas/CountryProseSections" }
+
+    CountryProseResult:
+      type: object
+      required: [fingerprint, sections, model, generatedAt, available]
+      properties:
+        available: { type: boolean }
+        fingerprint: { type: string }
+        sections: { $ref: "#/components/schemas/CountryProseSections" }
+        edited:
+          oneOf:
+            - { $ref: "#/components/schemas/CountryProseSections" }
+            - { type: "null" }
+        model: { type: string }
+        generatedAt: { type: string, format: date-time }
 
     DashboardTopicCard:
       type: object

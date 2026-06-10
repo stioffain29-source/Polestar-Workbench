@@ -22,10 +22,13 @@ import type {
 import type {
   CountryBaseline,
   CountryBaselineInput,
+  CountryProseResult,
   CountryReport,
   CountryReportInput,
   CountryReportUpdate,
   DashboardOverview,
+  EditCountryProseInput,
+  GenerateCountryProseInput,
   GetIncidentCountsByTopicParams,
   GetRecentIncidentsParams,
   GetStrikeSummaryParams,
@@ -2409,5 +2412,137 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateCountryReportMutationOptions(options));
+    }
+
+export const getGenerateCountryProseUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/prose`
+}
+
+export const generateCountryProse = async (slug: string,
+    generateCountryProseInput: GenerateCountryProseInput, options?: RequestInit): Promise<CountryProseResult> => {
+
+  return customFetch<CountryProseResult>(getGenerateCountryProseUrl(slug),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateCountryProseInput,)
+  }
+);}
+
+
+
+
+export const getGenerateCountryProseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCountryProse>>, TError,{slug: string;data: BodyType<GenerateCountryProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateCountryProse>>, TError,{slug: string;data: BodyType<GenerateCountryProseInput>}, TContext> => {
+
+const mutationKey = ['generateCountryProse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateCountryProse>>, {slug: string;data: BodyType<GenerateCountryProseInput>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  generateCountryProse(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateCountryProseMutationResult = NonNullable<Awaited<ReturnType<typeof generateCountryProse>>>
+    export type GenerateCountryProseMutationBody = BodyType<GenerateCountryProseInput>
+    export type GenerateCountryProseMutationError = ErrorType<void>
+
+    export const useGenerateCountryProse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCountryProse>>, TError,{slug: string;data: BodyType<GenerateCountryProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateCountryProse>>,
+        TError,
+        {slug: string;data: BodyType<GenerateCountryProseInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateCountryProseMutationOptions(options));
+    }
+
+export const getEditCountryProseUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/prose/edit`
+}
+
+export const editCountryProse = async (slug: string,
+    editCountryProseInput: EditCountryProseInput, options?: RequestInit): Promise<CountryProseResult> => {
+
+  return customFetch<CountryProseResult>(getEditCountryProseUrl(slug),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      editCountryProseInput,)
+  }
+);}
+
+
+
+
+export const getEditCountryProseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editCountryProse>>, TError,{slug: string;data: BodyType<EditCountryProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof editCountryProse>>, TError,{slug: string;data: BodyType<EditCountryProseInput>}, TContext> => {
+
+const mutationKey = ['editCountryProse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editCountryProse>>, {slug: string;data: BodyType<EditCountryProseInput>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  editCountryProse(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditCountryProseMutationResult = NonNullable<Awaited<ReturnType<typeof editCountryProse>>>
+    export type EditCountryProseMutationBody = BodyType<EditCountryProseInput>
+    export type EditCountryProseMutationError = ErrorType<void>
+
+    export const useEditCountryProse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editCountryProse>>, TError,{slug: string;data: BodyType<EditCountryProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof editCountryProse>>,
+        TError,
+        {slug: string;data: BodyType<EditCountryProseInput>},
+        TContext
+      > => {
+      return useMutation(getEditCountryProseMutationOptions(options));
     }
 
