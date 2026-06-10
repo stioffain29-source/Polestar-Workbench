@@ -14,12 +14,13 @@ const WINDOWS = [7, 14, 30, 60, 90, 120] as const;
 // ---------------------------------------------------------------------------
 // Client-side derivation
 //
-// The strikes table currently stores `target_category` and `infrastructure`
-// as `unknown` for almost every row, `casualties` as NULL, and leaves
-// `summary` / `analyst_notes` blank — so the only signal we can use for the
-// dashboard breakdowns lives in the `source`, `sourceUrl` slug, `location`,
-// and (when present) `summary` fields. These deriver helpers parse those
-// fields into the seven Polestar-spec categories. When nothing matches we
+// The strikes table stores `target_category` / `infrastructure` for some rows
+// but leaves ~77% as `unknown`, `casualties` as NULL on ~99%, and a fair share
+// of `summary` / `analyst_notes` blank. So the dashboard breakdowns derive from
+// the DB category (when meaningful) plus the incident-descriptive text in
+// `summary`, `analyst_notes`, and `location`. We deliberately EXCLUDE the
+// `source` outlet name and the opaque base64 `sourceUrl` slug — both are noise
+// that previously polluted the target/impact regexes. When nothing matches we
 // return "Unknown" honestly; we never invent values.
 // ---------------------------------------------------------------------------
 
@@ -36,31 +37,75 @@ interface StrikeLike {
   sourceUrl?: string | null;
 }
 
+// Incident-descriptive text only. The outlet `source` and the base64
+// `sourceUrl` slug are intentionally excluded — they carry no target/impact
+// signal and corrupt the regex matching.
 function strikeText(s: StrikeLike): string {
   return [
     s.summary ?? "",
     s.analystNotes ?? "",
-    s.source ?? "",
-    (s.sourceUrl ?? "").replace(/[-_/]/g, " "),
     s.location ?? "",
   ].join(" ").toLowerCase();
 }
 
-const TARGETS = [
-  { label: "Oil & Gas", re: /\b(oil|gas|crude|refiner|petrochem|pipeline|aramco|adnoc|samref|lng|tanker|terminal|fuel depot|fujairah oil)\b/i },
-  { label: "Power / Grid", re: /\b(power|grid|electric|substation|nuclear|reactor|barakah)\b/i },
-  { label: "Aviation", re: /\b(airport|aviation|airbase|air base|airfield|runway|flight)\b/i },
-  { label: "Military", re: /\b(military|air[\s-]?defen[cs]e|barrack|base|garrison|naval|patriot|thaad|radar|missile site)\b/i },
-  { label: "Government", re: /\b(government|palace|ministry|presidential|parliament|royal court|embassy)\b/i },
-  { label: "Civilian", re: /\b(civilian|residential|school|hospital|mosque|market|housing)\b/i },
-  { label: "Industrial", re: /\b(industrial|factory|plant|warehouse|industry zone|industrial zone)\b/i },
+const UNKNOWN_TARGET = "Unknown / unattributed";
+
+// Strong military / US-forces signal. Evaluated BEFORE the DB category and the
+// text fallback so interceptions over military or US-forces air bases read as
+// Military, never civil Aviation.
+const MILITARY_RE = /\b(air[\s-]?base|airbase|military (?:base|site|installation|facilit)|us (?:forces|base|bases|troops|military)|u\.s\.? ?(?:forces|base|bases|troops|military)|fifth fleet|5th fleet|naval base|army base|barrack|garrison|prince sultan|muwaffaq salti|al[\s-]?udeid|al[\s-]?dhafra|centcom|central command|command cent(?:er|re))\b/i;
+
+// Text fallback, only consulted when the DB category is "unknown". Order is
+// precedence. Military is handled separately above; civil aviation only matches
+// genuine airport/runway language here.
+const TARGET_TEXT: { label: string; re: RegExp }[] = [
+  { label: "Oil & Gas", re: /\b(oil field|oil facilit|oil refiner|gas field|gas pipeline|crude|refiner|petrochem|pipeline|aramco|adnoc|samref|lng|fuel depot|kharg)\b/i },
+  { label: "Power / Grid", re: /\b(power plant|power station|grid|electric|substation|nuclear|reactor|barakah)\b/i },
+  { label: "Maritime", re: /\b(oil tanker|tanker|vessel|warship|frigate|merchant ship|cargo ship|naval vessel)\b/i },
+  { label: "Aviation", re: /\b(international airport|airport terminal|airport|airfield|runway|civil aviation|passenger flight)\b/i },
+  { label: "Government", re: /\b(palace|ministry|presidential|parliament|royal court|embassy|government building)\b/i },
+  { label: "Civilian", re: /\b(civilian|residential|school|hospital|mosque|market|housing|settlement)\b/i },
+  { label: "Industrial", re: /\b(factory|warehouse|industrial zone|industrial estate)\b/i },
 ];
+
+// Map the DB `target_category` / `infrastructure` enums onto display labels.
+// Prefer the more specific `target_category`; fall back to `infrastructure`.
+function mapDbTarget(targetCategory: string, infrastructure: string): string | null {
+  const tc = (targetCategory ?? "").toLowerCase();
+  const inf = (infrastructure ?? "").toLowerCase();
+  const energy = inf === "oil_gas" ? "Oil & Gas" : inf === "power" ? "Power / Grid" : "Energy";
+  switch (tc) {
+    case "military_site": return "Military";
+    case "airport_aviation": return "Aviation";
+    case "vessel":
+    case "port_maritime": return "Maritime";
+    case "energy_infrastructure": return energy;
+    case "civilian_area": return "Civilian";
+  }
+  switch (inf) {
+    case "military": return "Military";
+    case "airport": return "Aviation";
+    case "power": return "Power / Grid";
+    case "oil_gas": return "Oil & Gas";
+    case "civilian_residential": return "Civilian";
+    case "government": return "Government";
+    case "port": return "Maritime";
+  }
+  return null;
+}
 
 function deriveTarget(s: StrikeLike): string {
   const text = strikeText(s);
-  for (const t of TARGETS) if (t.re.test(text)) return t.label;
-  if (text.trim().length > 0 && /\battack|strike|hit|target\b/.test(text)) return "Other";
-  return "Unknown";
+  // 1. Military / US-forces air bases beat everything — fixes the old
+  //    "airbase -> civil Aviation" mis-bucketing.
+  if (MILITARY_RE.test(text)) return "Military";
+  // 2. Trust the DB category when it carries a real value.
+  const db = mapDbTarget(s.targetCategory, s.infrastructure);
+  if (db) return db;
+  // 3. Text fallback for the rows the DB left as "unknown".
+  for (const t of TARGET_TEXT) if (t.re.test(text)) return t.label;
+  // 4. No genuine target signal — unattributed, never a catch-all "Other".
+  return UNKNOWN_TARGET;
 }
 
 function deriveWeapon(s: StrikeLike): string {
@@ -82,14 +127,22 @@ function deriveWeapon(s: StrikeLike): string {
 
 function deriveCasualties(s: StrikeLike): string {
   if (typeof s.casualties === "number") {
-    return s.casualties === 0 ? "None reported" : "Reported";
+    return s.casualties === 0 ? "No casualties reported" : "Casualties reported";
   }
   const text = strikeText(s);
   // Check explicit negatives FIRST so "no casualties reported" doesn't get
   // misclassified as Reported by the generic casualty token.
-  if (/\b(no casualt|no injur|no deaths|no one (was )?hurt|nobody hurt|none (?:reported|injured|killed))\b/.test(text)) return "None reported";
-  if (/\b(killed|dead|fatalit|wounded|injur|casualt)\b/.test(text)) return "Reported";
-  return "Unknown";
+  if (/\b(no casualt|no injur|no deaths|no one (was )?hurt|nobody hurt|none (?:reported|injured|killed))\b/.test(text)) return "No casualties reported";
+  if (/\b(killed|dead|fatalit|wounded|injur|casualt)\b/.test(text)) return "Casualties reported";
+  return "Unknown / not reported";
+}
+
+// Compact casualty label for the dense strike-log table cell.
+function casualtyShort(s: StrikeLike): string {
+  const v = deriveCasualties(s);
+  if (v === "Casualties reported") return "Reported";
+  if (v === "No casualties reported") return "None";
+  return "—";
 }
 
 function deriveImpact(s: StrikeLike): string {
@@ -130,10 +183,28 @@ function deriveEmirate(s: StrikeLike): string {
   return "Unknown";
 }
 
-/** True when the bucket data carries no real signal (empty or only an Unknown bar). */
-function isAllUnknown(data: { key: string; count: number }[]): boolean {
-  if (data.length === 0) return true;
-  return data.every((d) => /^unknown$/i.test(d.key));
+/** Treat empty / unattributed / not-reported bars as carrying no real signal. */
+function isUnknownKey(key: string): boolean {
+  return /unknown|unattributed|not reported/i.test(key);
+}
+
+/** True when "Unknown"-type buckets account for more than half the records. */
+function dominatedByUnknown(data: { key: string; count: number }[]): boolean {
+  const total = data.reduce((a, b) => a + b.count, 0);
+  if (total === 0) return false;
+  const unknown = data.filter((d) => isUnknownKey(d.key)).reduce((a, b) => a + b.count, 0);
+  return unknown / total > 0.5;
+}
+
+const UNKNOWN_CAVEAT = "Mostly unattributed — limited public source detail, not an operational finding.";
+
+/** Strip outlet/code suffix and parenthetical from a raw location string. */
+function cleanLocation(s: StrikeLike): string {
+  const loc = (s.location ?? "").trim();
+  if (!loc || /^unknown$/i.test(loc)) return "Unknown / unattributed";
+  // "Al Taweelah (EGA), Abu Dhabi" -> "Al Taweelah"; "Fujairah, Fujairah" -> "Fujairah".
+  const head = loc.split(",")[0].replace(/\([^)]*\)/g, "").trim();
+  return head.length > 0 ? head : "Unknown / unattributed";
 }
 
 const SUBTITLE: Record<"maritime_hormuz" | "land_gcc", string> = {
@@ -196,20 +267,26 @@ export default function Strikes() {
   const byCountry = useMemo(() => groupCount(filtered, (s) => s.country), [filtered]);
   const byWeapon = useMemo(() => groupCount(filtered, deriveWeapon), [filtered]);
   const byTarget = useMemo(() => groupCount(filtered, deriveTarget), [filtered]);
-  const byInfra = useMemo(() => groupCount(filtered, deriveImpact), [filtered]);
+  const byImpact = useMemo(() => groupCount(filtered, deriveImpact), [filtered]);
   const byContext = useMemo(() => groupCount(filtered, deriveContext), [filtered]);
   const byCasualties = useMemo(() => groupCount(filtered, deriveCasualties), [filtered]);
-  const byEmirate = useMemo(() => {
-    const uae = filtered.filter((s) => /united arab|uae/i.test(s.country));
-    return groupCount(uae, deriveEmirate);
-  }, [filtered]);
-  const byLocation = useMemo(() => {
-    return groupCount(filtered, (s) => s.location ?? "Unknown").slice(0, 10);
-  }, [filtered]);
 
-  const uaeTotal = useMemo(
-    () => filtered.filter((s) => /united arab|uae/i.test(s.country)).length,
-    [filtered],
+  // Sub-location drill-down keyed to the selected country, or the most-affected
+  // country when no country filter is set. UAE drills to emirate; every other
+  // country drills to its cleaned location string.
+  const focusCountry = useMemo(
+    () => country || (byCountry[0]?.key ?? ""),
+    [country, byCountry],
+  );
+  const focusIsUae = /united arab|uae/i.test(focusCountry);
+  const bySubLocation = useMemo(() => {
+    const rows = filtered.filter((s) => s.country === focusCountry);
+    const keyed = groupCount(rows, focusIsUae ? deriveEmirate : cleanLocation);
+    return keyed.slice(0, 10);
+  }, [filtered, focusCountry, focusIsUae]);
+  const subLocationTotal = useMemo(
+    () => filtered.filter((s) => s.country === focusCountry).length,
+    [filtered, focusCountry],
   );
 
   const exportCsv = () => {
@@ -324,60 +401,60 @@ export default function Strikes() {
         </ResponsiveContainer>
       </Card>
 
-      {/* Two-column chart grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Top section: four standardised overview charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card
           title="Total strikes by country"
           subtitle={`All countries in window. Bars sum to ${filtered.length}.`}
         >
-          <CatBar data={byCountry} />
+          <CatBar data={byCountry} height={220} />
         </Card>
-        {theatre === "land_gcc" ? (
-          <Card
-            title="UAE strikes by emirate"
-            subtitle={`UAE only. "Unknown" = emirate not yet attributed. Bars sum to ${uaeTotal} (= UAE total above).`}
-          >
-            {byEmirate.length === 0 ? <Empty /> : <CatBar data={byEmirate} />}
-          </Card>
-        ) : (
-          <Card
-            title="Strikes by port / chokepoint"
-            subtitle={`Top maritime locations in window. Bars sum to ${byLocation.reduce((a, b) => a + b.count, 0)}.`}
-          >
-            {byLocation.length === 0 ? <Empty /> : <CatBar data={byLocation} />}
-          </Card>
-        )}
-        {!isAllUnknown(byTarget) && (
-          <Card
-            title="Strikes by target type"
-            subtitle={`Derived from source text and URL slug. Bars sum to ${byTarget.reduce((a, b) => a + b.count, 0)}.`}
-          >
-            <CatBar data={byTarget} />
-          </Card>
-        )}
-        {!isAllUnknown(byWeapon) && (
-          <Card
-            title="Weapon family"
-            subtitle={`Drone · ballistic · cruise · unknown. Bars sum to ${byWeapon.reduce((a, b) => a + b.count, 0)}.`}
-          >
-            <CatBar data={byWeapon} />
-          </Card>
-        )}
+        <Card
+          title={focusCountry ? `Sub-locations — ${focusCountry}` : "Strikes by sub-location"}
+          subtitle={
+            focusIsUae
+              ? `${focusCountry} by emirate. Bars sum to ${subLocationTotal} (= its total at left).`
+              : `Most-affected country${country ? " (selected)" : ""}. Bars sum to ${subLocationTotal}.`
+          }
+          caveat={dominatedByUnknown(bySubLocation) ? UNKNOWN_CAVEAT : undefined}
+        >
+          {bySubLocation.length === 0 ? <Empty /> : <CatBar data={bySubLocation} height={220} />}
+        </Card>
+        <Card
+          title="Attack context"
+          subtitle="Combined (multi-system) vs single-system attacks."
+          caveat={dominatedByUnknown(byContext) ? UNKNOWN_CAVEAT : undefined}
+        >
+          <CatBar data={byContext} height={220} />
+        </Card>
+        <Card
+          title="Weapon family"
+          subtitle="Drone · ballistic · cruise · unknown."
+          caveat={dominatedByUnknown(byWeapon) ? UNKNOWN_CAVEAT : undefined}
+        >
+          <CatBar data={byWeapon} height={220} />
+        </Card>
       </div>
 
       {/* Strike profile */}
       <div>
         <h2 className="font-serif font-bold uppercase text-primary text-sm tracking-wide">Strike profile</h2>
         <p className="text-xs text-muted-foreground font-sans mt-1 mb-3">
-          Bucket counts across the four standardised incident-level columns. Bars sum to {filtered.length}
-          {" "}(= rows below). Reflects current filters.
+          Standardised incident-level breakdown. Bars sum to {filtered.length} (= rows below). Reflects current filters.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {!isAllUnknown(byTarget) && <Card title="Target" compact><CatBar data={byTarget} height={170} /></Card>}
-          {!isAllUnknown(byWeapon) && <Card title="Weapon" compact><CatBar data={byWeapon} height={170} /></Card>}
-          {!isAllUnknown(byCasualties) && <Card title="Casualties" compact><CatBar data={byCasualties} height={170} /></Card>}
-          {!isAllUnknown(byInfra) && <Card title="Impact" compact><CatBar data={byInfra} height={170} /></Card>}
-          {!isAllUnknown(byContext) && <Card title="Attack context" compact><CatBar data={byContext} height={170} /></Card>}
+          <Card title="Target" compact caveat={dominatedByUnknown(byTarget) ? UNKNOWN_CAVEAT : undefined}>
+            <CatBar data={byTarget} height={190} />
+          </Card>
+          <Card title="Weapon" compact caveat={dominatedByUnknown(byWeapon) ? UNKNOWN_CAVEAT : undefined}>
+            <CatBar data={byWeapon} height={190} />
+          </Card>
+          <Card title="Casualties" compact caveat={dominatedByUnknown(byCasualties) ? UNKNOWN_CAVEAT : undefined}>
+            <CatBar data={byCasualties} height={190} />
+          </Card>
+          <Card title="Impact" compact caveat={dominatedByUnknown(byImpact) ? UNKNOWN_CAVEAT : undefined}>
+            <CatBar data={byImpact} height={190} />
+          </Card>
         </div>
       </div>
 
@@ -407,7 +484,7 @@ export default function Strikes() {
                 })()}</div>
                 <div className="p-3 text-xs uppercase font-serif">{deriveWeapon(s)}</div>
                 <div className="p-3 text-xs">{deriveTarget(s)}</div>
-                <div className="p-3 text-xs font-mono">{deriveCasualties(s)}</div>
+                <div className="p-3 text-xs font-mono">{casualtyShort(s)}</div>
                 <div className="p-3 text-xs uppercase font-serif">{s.confidence}</div>
               </div>
             ))}
@@ -419,13 +496,14 @@ export default function Strikes() {
 }
 
 function Card({
-  title, subtitle, children, compact,
-}: { title: string; subtitle?: string; children: React.ReactNode; compact?: boolean }) {
+  title, subtitle, children, compact, caveat,
+}: { title: string; subtitle?: string; children: React.ReactNode; compact?: boolean; caveat?: string }) {
   return (
     <div className={cn("bg-card border border-border rounded-sm", compact ? "p-3" : "p-4")}>
       <h3 className={cn("font-serif font-bold uppercase text-primary tracking-wide", compact ? "text-xs" : "text-sm")}>{title}</h3>
-      {subtitle && <p className="text-[11px] text-muted-foreground font-sans mt-0.5 mb-3">{subtitle}</p>}
-      {!subtitle && <div className="mb-3" />}
+      {subtitle && <p className="text-[11px] text-muted-foreground font-sans mt-0.5">{subtitle}</p>}
+      {caveat && <p className="text-[10px] text-muted-foreground font-sans italic mt-0.5">{caveat}</p>}
+      <div className="mb-3" />
       {children}
     </div>
   );
@@ -469,9 +547,9 @@ function CatBar({ data, height = 240 }: { data: { key: string; count: number }[]
           axisLine={{ stroke: "#e2e2e2" }}
           fontSize={10}
           interval={0}
-          angle={data.length > 4 ? -25 : 0}
-          textAnchor={data.length > 4 ? "end" : "middle"}
-          height={data.length > 4 ? 50 : 30}
+          angle={data.length > 3 ? -25 : 0}
+          textAnchor={data.length > 3 ? "end" : "middle"}
+          height={data.length > 3 ? 50 : 30}
         />
         <YAxis allowDecimals={false} tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} />
         <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />

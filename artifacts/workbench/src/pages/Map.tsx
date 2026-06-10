@@ -5,6 +5,12 @@ import { useListIncidents, useListStrikes } from "@workspace/api-client-react";
 import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
+import { RangeToggle } from "@/components/RangeToggle";
+
+// Date windows offered on the map. Distinct from the topic monitors' default
+// set: the map exposes 60d/120d (per request) instead of 90d/180d/2y.
+const MAP_RANGES: RangeKey[] = ["24h", "7d", "14d", "30d", "60d", "120d", "1y"];
 
 // Controlled category list per spec.
 const INCIDENT_CATEGORIES = [
@@ -67,6 +73,7 @@ type Point = {
 
 export default function MapPage() {
   const [view, setView] = useState<"incidents" | "maritime" | "land">("incidents");
+  const [range, setRange] = useState<RangeKey>("1y");
   const { data: incidents = [] } = useListIncidents({});
   const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz" });
   const { data: land = [] } = useListStrikes({ theatre: "land_gcc" });
@@ -124,9 +131,19 @@ export default function MapPage() {
       }));
   }, [view, incidents, maritime, land]);
 
+  // Date window: keep points whose timestamp falls within the selected range.
+  // No lower bound, so a (possibly future-dated) record is never hidden.
+  const windowedPoints = useMemo(() => {
+    const cutoff = Date.now() - RANGE_DAYS[range] * 24 * 60 * 60 * 1000;
+    return allPoints.filter((p) => {
+      const t = new Date(p.when).getTime();
+      return Number.isFinite(t) && t >= cutoff;
+    });
+  }, [allPoints, range]);
+
   const visiblePoints = useMemo(
-    () => allPoints.filter((p) => activeCategories.has(p.category)),
-    [allPoints, activeCategories],
+    () => windowedPoints.filter((p) => activeCategories.has(p.category)),
+    [windowedPoints, activeCategories],
   );
 
   function toggle(cat: string) {
@@ -140,24 +157,32 @@ export default function MapPage() {
 
   return (
     <div className="max-w-[1800px] mx-auto space-y-4">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight">Geospatial Map</h1>
           <p className="text-muted-foreground font-sans mt-1 text-sm">APAC and Middle East operating area</p>
         </div>
-        <div className="flex border border-border rounded-sm overflow-hidden">
-          {(["incidents", "maritime", "land"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={cn(
-                "px-4 py-2 text-xs uppercase tracking-wider font-serif font-medium",
-                view === v ? "bg-accent text-accent-foreground" : "bg-card hover:bg-muted",
-              )}
-            >
-              {v === "incidents" ? "Incidents" : v === "maritime" ? "Maritime Strikes" : "Land Strikes"}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] uppercase tracking-wider font-serif font-medium text-muted-foreground">
+              Range
+            </span>
+            <RangeToggle range={range} onChange={setRange} keys={MAP_RANGES} />
+          </div>
+          <div className="flex border border-border rounded-sm overflow-hidden">
+            {(["incidents", "maritime", "land"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "px-4 py-2 text-xs uppercase tracking-wider font-serif font-medium",
+                  view === v ? "bg-accent text-accent-foreground" : "bg-card hover:bg-muted",
+                )}
+              >
+                {v === "incidents" ? "Incidents" : v === "maritime" ? "Maritime Strikes" : "Land Strikes"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -225,7 +250,7 @@ export default function MapPage() {
         <aside className="bg-card border border-border rounded-sm p-4 h-fit">
           <div className="font-serif font-bold uppercase text-primary text-sm tracking-wide mb-1">Categories</div>
           <div className="text-[11px] font-sans text-muted-foreground mb-3">
-            Showing {visiblePoints.length} of {allPoints.length} markers
+            Showing {visiblePoints.length} of {windowedPoints.length} markers · {RANGE_NOTE[range]}
           </div>
           <div className="space-y-2">
             {availableCategories.map((cat) => {

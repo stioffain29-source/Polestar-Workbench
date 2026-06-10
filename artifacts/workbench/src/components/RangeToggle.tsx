@@ -5,13 +5,15 @@ import { RANGE_KEYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 export function RangeToggle({
   range,
   onChange,
+  keys = RANGE_KEYS,
 }: {
   range: RangeKey;
   onChange: (r: RangeKey) => void;
+  keys?: RangeKey[];
 }) {
   return (
     <div className="flex items-center gap-px bg-border rounded-sm overflow-hidden border border-border">
-      {RANGE_KEYS.map((k) => (
+      {keys.map((k) => (
         <button
           key={k}
           onClick={() => onChange(k)}
