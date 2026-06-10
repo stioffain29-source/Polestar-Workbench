@@ -3,6 +3,7 @@ export * from "./strikes";
 export * from "./sources";
 export * from "./reports";
 export * from "./countryReports";
+export * from "./countryReportProse";
 export * from "./countryBaselines";
 export * from "./appMigrationMarkers";
 export * from "./marketPrices";

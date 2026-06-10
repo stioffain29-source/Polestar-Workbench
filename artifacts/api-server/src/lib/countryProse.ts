@@ -1,0 +1,308 @@
+// AI country-report prose engine.
+//
+// Generates the narrative sections of a country brief grounded STRICTLY on the
+// actual window incidents the report is built from (the same set that drives the
+// Fast Facts tiles, map and table on the client), plus optional analyst-curated
+// standing background. The result is cached by a fingerprint of that incident
+// set, so the model is only ever called when the underlying data changes — this
+// keeps cost negligible AND means the prose can never go stale.
+//
+// LLM access uses the Replit OpenAI integration (AI_INTEGRATIONS_OPENAI_* env
+// vars, auto-provisioned). Self-contained fetch client with retries, backoff and
+// an abort timeout, mirroring lib/ingest/src/titleTranslate.ts so an unavailable
+// model degrades gracefully (the caller falls back to the deterministic template
+// generator) instead of failing the report.
+
+import { createHash } from "node:crypto";
+import type { CountryProseSections } from "@workspace/db";
+
+// gpt-5.4 is the most capable general-purpose model and prose quality is the
+// whole point of this feature; the call is cached so cost is a non-issue. A
+// generous completion budget avoids the truncated-JSON failures seen when a
+// reasoning model is given a tight token cap.
+const MODEL = "gpt-5.4";
+const REQUEST_TIMEOUT_MS = 60000;
+const MAX_COMPLETION_TOKENS = 8192;
+
+// Bump when the prompt or section contract changes so existing cache rows are
+// treated as stale and regenerated.
+export const PROSE_PROMPT_VERSION = "v1";
+
+export interface ProseIncidentInput {
+  topic?: string | null;
+  title?: string | null;
+  summary?: string | null;
+  location?: string | null;
+  country?: string | null;
+  severity?: string | null;
+  occurredAt?: string | null;
+  source?: string | null;
+}
+
+export interface ProseBaselineContext {
+  operatingEnvironment?: string | null;
+  securityContext?: string | null;
+  knownRiskAreas?: string[] | null;
+  keyCitiesProvinces?: string[] | null;
+  movementConstraints?: string | null;
+  infrastructureLimits?: string | null;
+  medicalEvac?: string | null;
+  resourceSectorExposure?: string | null;
+}
+
+export interface GenerateProseInput {
+  countryName: string;
+  region: string;
+  basisDays: number;
+  periodWord: string;
+  issueDate: string;
+  incidents: ProseIncidentInput[];
+  baseline?: ProseBaselineContext | null;
+}
+
+export type GenerateProseOutcome =
+  | { ok: true; sections: CountryProseSections; model: string }
+  | { ok: false; error: string; retryAfterMs?: number };
+
+/** True when the Replit OpenAI integration env vars are present. */
+export function isLlmAvailable(): boolean {
+  return Boolean(
+    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  );
+}
+
+// A stable identity for one incident: the facts that, if changed, should change
+// the prose. Order-independent at the set level (we sort before hashing).
+function incidentIdentity(i: ProseIncidentInput): string {
+  const date = (i.occurredAt ?? "").slice(0, 10);
+  return [
+    (i.title ?? "").trim().toLowerCase(),
+    date,
+    (i.severity ?? "").trim().toLowerCase(),
+    (i.location ?? "").trim().toLowerCase(),
+  ].join("|");
+}
+
+/**
+ * Deterministic fingerprint of the inputs the prose is grounded on. Two requests
+ * with the same country, window basis and incident set (in any order) produce
+ * the same fingerprint, so the cache hits; any change to the incidents (new
+ * record, changed severity/date/location) flips it and forces a regenerate.
+ */
+export function computeProseFingerprint(input: {
+  slug: string;
+  countryName: string;
+  basisDays: number;
+  incidents: ProseIncidentInput[];
+}): string {
+  const ids = input.incidents.map(incidentIdentity).sort();
+  const payload = JSON.stringify({
+    v: PROSE_PROMPT_VERSION,
+    slug: input.slug,
+    name: input.countryName,
+    basisDays: input.basisDays,
+    ids,
+  });
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+const SYSTEM_PROMPT = `You are a senior security-intelligence analyst writing a country brief for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded for a country over a reporting window, plus verified standing background, and you produce the narrative sections of the brief.
+
+GROUNDING — non-negotiable:
+- Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
+- You MAY use the supplied STANDING BACKGROUND (verified, analyst-curated) and well-established, uncontroversial facts about the country's operating environment for framing — but never present background as if it happened during this window.
+- If the window has few or no incidents, say so plainly and lean on the standing background. A quiet window reflects limited reporting, not safety: never imply the country has become calm, and never fabricate activity to fill space.
+
+WRITING RULES:
+- Each section does a DISTINCT job. Never repeat the same fact or sentence across sections; in particular do not restate the lead location or event type in more than one section.
+- Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the brief.
+- Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
+- Write concrete, information-dense sentences. Name the actual places, actors and event types from the incidents. No filler ("the pattern is clear enough to act on"), no hedging boilerplate, no generic risk-management truisms.
+- Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
+- Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
+- British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
+
+Return STRICT JSON with EXACTLY these keys and no others:
+{
+  "executiveSummary": string,  // 2-3 sentences: the headline judgement for this window and what it means for operations.
+  "situation": string,         // The operating picture: the standing environment framed against what this window actually shows.
+  "whatHappened": string,      // Only the window's actual events, told concretely with the specific places and event types from the incidents.
+  "whatMatters": string,       // Why it matters for staff movement, site access and continuity, and where to focus attention.
+  "implications": string[],    // 4-7 distinct concrete actions the client should take. Each a short imperative sentence. No numbering, no leading dash.
+  "watchNext": string[],       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
+  "polestarView": string       // The bottom-line analyst judgement and the recommended operating posture.
+}
+Return ONLY the JSON object.`;
+
+function baselineBlock(b?: ProseBaselineContext | null): string {
+  if (!b) return "none provided";
+  const parts: string[] = [];
+  const push = (label: string, v?: string | null) => {
+    const t = (v ?? "").trim();
+    if (t) parts.push(`${label}: ${t}`);
+  };
+  const pushList = (label: string, v?: string[] | null) => {
+    const list = (v ?? []).map((s) => s.trim()).filter(Boolean);
+    if (list.length) parts.push(`${label}: ${list.join("; ")}`);
+  };
+  push("Operating environment", b.operatingEnvironment);
+  push("Security context", b.securityContext);
+  pushList("Known risk areas", b.knownRiskAreas);
+  pushList("Key cities/provinces", b.keyCitiesProvinces);
+  push("Movement constraints", b.movementConstraints);
+  push("Infrastructure limits", b.infrastructureLimits);
+  push("Medical/evacuation", b.medicalEvac);
+  push("Resource-sector exposure", b.resourceSectorExposure);
+  return parts.length ? parts.join("\n") : "none provided";
+}
+
+function incidentBlock(incidents: ProseIncidentInput[]): string {
+  if (incidents.length === 0) return "No incidents recorded in this window.";
+  // Cap to keep the prompt bounded; the window set is small in practice.
+  const capped = incidents.slice(0, 60);
+  return capped
+    .map((i, idx) => {
+      const sev = (i.severity ?? "").trim() || "unrated";
+      const date = (i.occurredAt ?? "").slice(0, 10) || "undated";
+      const title = (i.title ?? "").trim() || "(untitled)";
+      const place = [i.location, i.country].map((s) => (s ?? "").trim()).filter(Boolean).join(", ") || "location unclear";
+      const src = (i.source ?? "").trim();
+      const summary = (i.summary ?? "").trim().replace(/\s+/g, " ").slice(0, 300);
+      const head = `${idx + 1}. [${sev}] ${date} — ${title} — ${place}${src ? ` (${src})` : ""}`;
+      return summary ? `${head}\n   ${summary}` : head;
+    })
+    .join("\n");
+}
+
+function buildUserPrompt(input: GenerateProseInput): string {
+  return [
+    `COUNTRY: ${input.countryName} (${input.region || "region unspecified"})`,
+    `REPORTING WINDOW: ${input.periodWord} (rolling ${input.basisDays}-day window ending ${input.issueDate})`,
+    "",
+    "STANDING BACKGROUND (verified; NOT this window):",
+    baselineBlock(input.baseline),
+    "",
+    "INCIDENTS (the ONLY source of this-window facts):",
+    incidentBlock(input.incidents),
+  ].join("\n");
+}
+
+function coerceStr(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function coerceList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x) => (typeof x === "string" ? x.trim().replace(/^[-*]\s*/, "") : ""))
+    .filter(Boolean);
+}
+
+function parseSections(content: string): CountryProseSections | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    // Some models wrap the JSON in prose/code fences; extract the first object.
+    const m = content.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      raw = JSON.parse(m[0]);
+    } catch {
+      return null;
+    }
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const sections: CountryProseSections = {
+    executiveSummary: coerceStr(o.executiveSummary),
+    situation: coerceStr(o.situation),
+    whatHappened: coerceStr(o.whatHappened),
+    whatMatters: coerceStr(o.whatMatters),
+    implications: coerceList(o.implications),
+    watchNext: coerceList(o.watchNext),
+    polestarView: coerceStr(o.polestarView),
+  };
+  // Require the core paragraphs; bullet lists may legitimately be short.
+  if (!sections.executiveSummary || !sections.situation || !sections.whatHappened) {
+    return null;
+  }
+  return sections;
+}
+
+async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome> {
+  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (!base || !key) return { ok: false, error: "llm-unavailable" };
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: buildUserPrompt(input) },
+        ],
+      }),
+      signal: ac.signal,
+    });
+
+    if (res.status === 429 || res.status >= 500) {
+      const ra = res.headers.get("retry-after");
+      let retryAfterMs: number | undefined;
+      if (ra) {
+        const secs = Number(ra);
+        if (Number.isFinite(secs)) retryAfterMs = secs * 1000;
+        else {
+          const when = Date.parse(ra);
+          if (Number.isFinite(when)) retryAfterMs = Math.max(0, when - Date.now());
+        }
+      }
+      return { ok: false, error: `http-${res.status}`, retryAfterMs };
+    }
+    if (!res.ok) return { ok: false, error: `http-${res.status}` };
+
+    const json = (await res.json()) as {
+      choices?: { message?: { content?: string }; finish_reason?: string }[];
+    };
+    const choice = json.choices?.[0];
+    const content = choice?.message?.content;
+    if (!content) return { ok: false, error: `empty-content(${choice?.finish_reason ?? "?"})` };
+
+    const sections = parseSections(content);
+    if (!sections) return { ok: false, error: "bad-json" };
+    return { ok: true, sections, model: MODEL };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: ac.signal.aborted ? "timeout" : msg };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const RETRYABLE = new Set(["timeout", "bad-json", "empty-content"]);
+
+/** Generate country prose with retries + exponential backoff. */
+export async function generateCountryProse(
+  input: GenerateProseInput,
+  retries = 2,
+): Promise<GenerateProseOutcome> {
+  let last: GenerateProseOutcome = { ok: false, error: "not-attempted" };
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    last = await callOnce(input);
+    if (last.ok) return last;
+    const retryable = RETRYABLE.has(last.error) || last.error.startsWith("http-");
+    if (!retryable || attempt === retries) return last;
+    const serverHint = !last.ok ? last.retryAfterMs : undefined;
+    const backoff = serverHint ?? 1000 * Math.pow(2, attempt);
+    const jitter = Math.random() * 500;
+    await new Promise((r) => setTimeout(r, Math.min(backoff, 15000) + jitter));
+  }
+  return last;
+}
