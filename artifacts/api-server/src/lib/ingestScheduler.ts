@@ -1,6 +1,15 @@
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { runIngestOnce, runMarketPricesOnce, runStrikesOnce } from "./ingestRunner";
+import {
+  summarizeIngestFailures,
+  summarizeMarketPriceFailures,
+  summarizeStrikesFailures,
+} from "./ingestFailureSummary";
+import {
+  runIngestOnce,
+  runMarketPricesOnce,
+  runStrikesOnce,
+} from "./ingestRunner";
 import { logger } from "./logger";
 
 // Automatic ingestion scheduler.
@@ -99,7 +108,12 @@ async function hoursSinceLastIngest(): Promise<number | null> {
 // otherwise a fresh flashpoint heartbeat would wrongly suppress the catch-up
 // while these sit weeks behind (exactly the "first boot after newly deploying
 // the scraper" gap that already applied to shipping).
-const SCRAPED_LAND_TOPICS = ["shipping", "energy", "fertiliser", "fuel"] as const;
+const SCRAPED_LAND_TOPICS = [
+  "shipping",
+  "energy",
+  "fertiliser",
+  "fuel",
+] as const;
 
 /**
  * For each scraped land topic, hours since its newest inserted incident (or
@@ -107,7 +121,9 @@ const SCRAPED_LAND_TOPICS = ["shipping", "energy", "fertiliser", "fuel"] as cons
  * shipping check. Returned per-topic so the boot gate can flag a single stale
  * topic even when the others are fresh.
  */
-async function hoursSinceNewestPerLandTopic(): Promise<Record<string, number | null>> {
+async function hoursSinceNewestPerLandTopic(): Promise<
+  Record<string, number | null>
+> {
   const res = await db.execute(sql`
     SELECT topic, MAX(created_at) AS last
     FROM incidents
@@ -118,7 +134,9 @@ async function hoursSinceNewestPerLandTopic(): Promise<Record<string, number | n
   const out: Record<string, number | null> = {};
   for (const t of SCRAPED_LAND_TOPICS) out[t] = null;
   for (const r of rows) {
-    out[r.topic] = r.last ? (Date.now() - new Date(r.last).getTime()) / MS_PER_HOUR : null;
+    out[r.topic] = r.last
+      ? (Date.now() - new Date(r.last).getTime()) / MS_PER_HOUR
+      : null;
   }
   return out;
 }
@@ -132,7 +150,9 @@ async function hoursSinceNewestPerLandTopic(): Promise<Record<string, number | n
  * weeks behind.
  */
 async function hoursSinceNewestStrike(): Promise<number | null> {
-  const res = await db.execute(sql`SELECT MAX(created_at) AS last FROM strikes`);
+  const res = await db.execute(
+    sql`SELECT MAX(created_at) AS last FROM strikes`,
+  );
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
@@ -152,23 +172,28 @@ async function tick(reason: string): Promise<boolean> {
       logger.info({ reason }, "scheduled ingest skipped (already running)");
       return false;
     }
-    logger.info(
-      {
-        reason,
-        flashpointInserted: result.flashpoint.inserted,
-        cargoWatchInserted: result.cargoWatch.inserted,
-        shippingInserted: result.shipping.inserted,
-        energyInserted: result.energy.inserted,
-        fertiliserInserted: result.fertiliser.inserted,
-        fuelInserted: result.fuel.inserted,
-        strikesInserted: result.strikes.inserted,
-        fuelReportsPriced: result.marketPrices.reportsUpdated,
-        fuelPriceAsOf: result.marketPrices.latest.asOf,
-        durationMs: result.durationMs,
-        flashpointLatest: result.flashpoint.latestRecord,
-      },
-      "scheduled ingest finished",
-    );
+    const failures = summarizeIngestFailures(result);
+    const payload = {
+      reason,
+      flashpointInserted: result.flashpoint.inserted,
+      cargoWatchInserted: result.cargoWatch.inserted,
+      shippingInserted: result.shipping.inserted,
+      energyInserted: result.energy.inserted,
+      fertiliserInserted: result.fertiliser.inserted,
+      fuelInserted: result.fuel.inserted,
+      strikesInserted: result.strikes.inserted,
+      fuelReportsPriced: result.marketPrices.reportsUpdated,
+      fuelPriceAsOf: result.marketPrices.latest.asOf,
+      marketSnapshotUpserted: result.marketSnapshot.upserted,
+      durationMs: result.durationMs,
+      flashpointLatest: result.flashpoint.latestRecord,
+      ingestFailures: failures,
+    };
+    if (failures.hadFailures) {
+      logger.warn(payload, "scheduled ingest finished with failures");
+    } else {
+      logger.info(payload, "scheduled ingest finished");
+    }
     return true;
   } catch (err) {
     logger.error({ err, reason }, "scheduled ingest failed");
@@ -188,16 +213,19 @@ async function priceTick(reason: string): Promise<void> {
       logger.info({ reason }, "price top-up skipped (already running)");
       return;
     }
-    logger.info(
-      {
-        reason,
-        fuelReportsPriced: result.marketPrices.reportsUpdated,
-        fuelPriceAsOf: result.marketPrices.latest.asOf,
-        seriesErrors: result.marketPrices.seriesErrors,
-        durationMs: result.durationMs,
-      },
-      "price top-up finished",
-    );
+    const failures = summarizeMarketPriceFailures(result.marketPrices);
+    const payload = {
+      reason,
+      fuelReportsPriced: result.marketPrices.reportsUpdated,
+      fuelPriceAsOf: result.marketPrices.latest.asOf,
+      durationMs: result.durationMs,
+      ingestFailures: failures,
+    };
+    if (failures.hadFailures) {
+      logger.warn(payload, "price top-up finished with failures");
+    } else {
+      logger.info(payload, "price top-up finished");
+    }
   } catch (err) {
     logger.error({ err, reason }, "price top-up failed");
   }
@@ -236,118 +264,153 @@ export function startIngestScheduler(): void {
   // Gated on strikes staleness so warm/repeat cold starts stay cheap. unref()'d
   // so it never holds the process open on its own.
   const STRIKES_BOOT_DELAY_MS = 8_000;
-  const strikesTimer = setTimeout(() => void (async () => {
-    try {
-      const strikeAge = await hoursSinceNewestStrike();
-      if (strikeAge !== null && strikeAge < hours) {
-        logger.info(
-          { strikeAgeHours: Math.round(strikeAge) },
-          "boot strikes: tracker fresh, skipping early strikes run",
-        );
-        return;
-      }
-      logger.info(
-        { strikeAgeHours: strikeAge === null ? null : Math.round(strikeAge) },
-        "boot strikes: tracker stale, running early strikes-only ingest",
-      );
-      const result = await runStrikesOnce();
-      if (!result.ran) {
-        logger.info("boot strikes: skipped (full ingest already running)");
-        return;
-      }
-      logger.info(
-        {
-          strikesInserted: result.strikes.inserted,
-          strikesLatest: result.strikes.latestRecord,
-          byTheatre: result.strikes.byTheatre,
-          durationMs: result.durationMs,
-        },
-        "boot strikes: early strikes-only ingest finished",
-      );
-    } catch (err) {
-      logger.error({ err }, "boot strikes: early strikes-only ingest failed");
-    }
-  })(), STRIKES_BOOT_DELAY_MS);
+  const strikesTimer = setTimeout(
+    () =>
+      void (async () => {
+        try {
+          const strikeAge = await hoursSinceNewestStrike();
+          if (strikeAge !== null && strikeAge < hours) {
+            logger.info(
+              { strikeAgeHours: Math.round(strikeAge) },
+              "boot strikes: tracker fresh, skipping early strikes run",
+            );
+            return;
+          }
+          logger.info(
+            {
+              strikeAgeHours: strikeAge === null ? null : Math.round(strikeAge),
+            },
+            "boot strikes: tracker stale, running early strikes-only ingest",
+          );
+          const result = await runStrikesOnce();
+          if (!result.ran) {
+            logger.info("boot strikes: skipped (full ingest already running)");
+            return;
+          }
+          const failures = summarizeStrikesFailures(result.strikes);
+          const payload = {
+            strikesInserted: result.strikes.inserted,
+            strikesLatest: result.strikes.latestRecord,
+            byTheatre: result.strikes.byTheatre,
+            durationMs: result.durationMs,
+            ingestFailures: failures,
+          };
+          if (failures.hadFailures) {
+            logger.warn(
+              payload,
+              "boot strikes: early strikes-only ingest finished with failures",
+            );
+          } else {
+            logger.info(
+              payload,
+              "boot strikes: early strikes-only ingest finished",
+            );
+          }
+        } catch (err) {
+          logger.error(
+            { err },
+            "boot strikes: early strikes-only ingest failed",
+          );
+        }
+      })(),
+    STRIKES_BOOT_DELAY_MS,
+  );
   strikesTimer.unref();
 
   // Boot catch-up: only scrape if data is already stale, so repeated cold
   // starts on autoscale stay cheap.
-  const bootTimer = setTimeout(() => void (async () => {
-    try {
-      // A new deploy carrying changed scraper/classifier rules forces ONE full
-      // ingest regardless of freshness, so the new rules reach prod immediately
-      // instead of waiting for the existing rows to age past the interval.
-      let forced = false;
-      try {
-        forced = await needsForcedIngest();
-      } catch (err) {
-        logger.error({ err }, "boot ingest: forced-version check failed");
-      }
-      if (forced) {
-        logger.info(
-          { forceVersion: INGEST_FORCE_VERSION },
-          "boot ingest: forced run for new ingest version, refreshing now",
-        );
-        const ran = await tick("boot-forced");
-        if (ran) {
-          // Only record the marker when a full ingest actually completed. A
-          // skipped run (another instance holds the lock) or a failed run must
-          // NOT consume the one guaranteed refresh — a later boot retries.
+  const bootTimer = setTimeout(
+    () =>
+      void (async () => {
+        try {
+          // A new deploy carrying changed scraper/classifier rules forces ONE full
+          // ingest regardless of freshness, so the new rules reach prod immediately
+          // instead of waiting for the existing rows to age past the interval.
+          let forced = false;
           try {
-            await markForcedIngestDone();
+            forced = await needsForcedIngest();
           } catch (err) {
-            logger.error({ err }, "boot ingest: failed to record forced-version marker");
+            logger.error({ err }, "boot ingest: forced-version check failed");
           }
-        } else {
-          logger.warn(
-            { forceVersion: INGEST_FORCE_VERSION },
-            "boot ingest: forced run did not complete (skipped or failed); will retry next boot",
+          if (forced) {
+            logger.info(
+              { forceVersion: INGEST_FORCE_VERSION },
+              "boot ingest: forced run for new ingest version, refreshing now",
+            );
+            const ran = await tick("boot-forced");
+            if (ran) {
+              // Only record the marker when a full ingest actually completed. A
+              // skipped run (another instance holds the lock) or a failed run must
+              // NOT consume the one guaranteed refresh — a later boot retries.
+              try {
+                await markForcedIngestDone();
+              } catch (err) {
+                logger.error(
+                  { err },
+                  "boot ingest: failed to record forced-version marker",
+                );
+              }
+            } else {
+              logger.warn(
+                { forceVersion: INGEST_FORCE_VERSION },
+                "boot ingest: forced run did not complete (skipped or failed); will retry next boot",
+              );
+            }
+            return;
+          }
+          const age = await hoursSinceLastIngest();
+          const landAges = await hoursSinceNewestPerLandTopic();
+          const strikeAge = await hoursSinceNewestStrike();
+          // A land topic is stale if it has no rows or its newest insert is older
+          // than the interval. ANY stale land topic forces a full run.
+          const staleLandTopics = SCRAPED_LAND_TOPICS.filter((t) => {
+            const a = landAges[t];
+            return a === null || a >= hours;
+          });
+          // Strikes live in their own table (no heartbeat), so check it the same way.
+          const strikesStale = strikeAge === null || strikeAge >= hours;
+          if (
+            age === null ||
+            age >= hours ||
+            staleLandTopics.length > 0 ||
+            strikesStale
+          ) {
+            logger.info(
+              {
+                ageHours: age === null ? null : Math.round(age),
+                landAgeHours: Object.fromEntries(
+                  SCRAPED_LAND_TOPICS.map((t) => [
+                    t,
+                    landAges[t] === null ? null : Math.round(landAges[t]!),
+                  ]),
+                ),
+                staleLandTopics,
+                strikeAgeHours:
+                  strikeAge === null ? null : Math.round(strikeAge),
+                strikesStale,
+              },
+              "boot ingest: data stale, running catch-up",
+            );
+            await tick("boot");
+            return;
+          }
+          // Incidents are fresh, so skip the expensive scrape. But the fuel-price
+          // feed is cheap (a few small FRED CSVs, ~0.5s) and the live report must
+          // always show the LATEST prices — never a week-old snapshot. So refresh
+          // prices on every boot. This also self-heals an earlier flaky FRED failure
+          // (which used to leave prices permanently empty when incidents stayed
+          // fresh). Runs under the same advisory lock as the full ingest.
+          logger.info(
+            { ageHours: Math.round(age) },
+            "boot ingest: incidents fresh, refreshing live fuel prices",
           );
+          await priceTick("boot-prices");
+        } catch (err) {
+          logger.error({ err }, "boot ingest freshness check failed");
         }
-        return;
-      }
-      const age = await hoursSinceLastIngest();
-      const landAges = await hoursSinceNewestPerLandTopic();
-      const strikeAge = await hoursSinceNewestStrike();
-      // A land topic is stale if it has no rows or its newest insert is older
-      // than the interval. ANY stale land topic forces a full run.
-      const staleLandTopics = SCRAPED_LAND_TOPICS.filter((t) => {
-        const a = landAges[t];
-        return a === null || a >= hours;
-      });
-      // Strikes live in their own table (no heartbeat), so check it the same way.
-      const strikesStale = strikeAge === null || strikeAge >= hours;
-      if (age === null || age >= hours || staleLandTopics.length > 0 || strikesStale) {
-        logger.info(
-          {
-            ageHours: age === null ? null : Math.round(age),
-            landAgeHours: Object.fromEntries(
-              SCRAPED_LAND_TOPICS.map((t) => [t, landAges[t] === null ? null : Math.round(landAges[t]!)]),
-            ),
-            staleLandTopics,
-            strikeAgeHours: strikeAge === null ? null : Math.round(strikeAge),
-            strikesStale,
-          },
-          "boot ingest: data stale, running catch-up",
-        );
-        await tick("boot");
-        return;
-      }
-      // Incidents are fresh, so skip the expensive scrape. But the fuel-price
-      // feed is cheap (a few small FRED CSVs, ~0.5s) and the live report must
-      // always show the LATEST prices — never a week-old snapshot. So refresh
-      // prices on every boot. This also self-heals an earlier flaky FRED failure
-      // (which used to leave prices permanently empty when incidents stayed
-      // fresh). Runs under the same advisory lock as the full ingest.
-      logger.info(
-        { ageHours: Math.round(age) },
-        "boot ingest: incidents fresh, refreshing live fuel prices",
-      );
-      await priceTick("boot-prices");
-    } catch (err) {
-      logger.error({ err }, "boot ingest freshness check failed");
-    }
-  })(), BOOT_INGEST_DELAY_MS);
+      })(),
+    BOOT_INGEST_DELAY_MS,
+  );
   bootTimer.unref();
 
   // Recurring refresh for warm/always-on processes. unref() so the timer never

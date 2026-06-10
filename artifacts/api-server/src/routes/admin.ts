@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { type IngestSummary } from "@workspace/ingest";
+import { summarizeIngestFailures } from "../lib/ingestFailureSummary";
 import { runIngestOnce } from "../lib/ingestRunner";
 
 const router: IRouter = Router();
@@ -31,7 +32,8 @@ function safeEqual(a: string, b: string): boolean {
 
 function presentedToken(req: Request): string | null {
   const auth = req.header("authorization");
-  if (auth && /^Bearer\s+/i.test(auth)) return auth.replace(/^Bearer\s+/i, "").trim();
+  if (auth && /^Bearer\s+/i.test(auth))
+    return auth.replace(/^Bearer\s+/i, "").trim();
   const headerToken = req.header("x-ingest-token");
   if (headerToken) return headerToken.trim();
   return null;
@@ -59,7 +61,9 @@ function trimmedSummary(s: IngestSummary) {
 router.post("/admin/ingest", async (req: Request, res: Response) => {
   const expected = process.env["INGEST_ADMIN_TOKEN"];
   if (!expected) {
-    req.log.warn("admin ingest called but INGEST_ADMIN_TOKEN is not configured");
+    req.log.warn(
+      "admin ingest called but INGEST_ADMIN_TOKEN is not configured",
+    );
     res.status(503).json({
       error: "ingestion_disabled",
       message: "INGEST_ADMIN_TOKEN is not configured on the server.",
@@ -81,19 +85,23 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       return;
     }
 
-    req.log.info(
-      {
-        flashpointInserted: result.flashpoint.inserted,
-        cargoWatchInserted: result.cargoWatch.inserted,
-        shippingInserted: result.shipping.inserted,
-        energyInserted: result.energy.inserted,
-        fertiliserInserted: result.fertiliser.inserted,
-        fuelInserted: result.fuel.inserted,
-        strikesInserted: result.strikes.inserted,
-        durationMs: result.durationMs,
-      },
-      "admin ingest finished",
-    );
+    const failures = summarizeIngestFailures(result);
+    const logPayload = {
+      flashpointInserted: result.flashpoint.inserted,
+      cargoWatchInserted: result.cargoWatch.inserted,
+      shippingInserted: result.shipping.inserted,
+      energyInserted: result.energy.inserted,
+      fertiliserInserted: result.fertiliser.inserted,
+      fuelInserted: result.fuel.inserted,
+      strikesInserted: result.strikes.inserted,
+      durationMs: result.durationMs,
+      ingestFailures: failures,
+    };
+    if (failures.hadFailures) {
+      req.log.warn(logPayload, "admin ingest finished with failures");
+    } else {
+      req.log.info(logPayload, "admin ingest finished");
+    }
     res.json({
       ok: true,
       startedAt: result.startedAt.toISOString(),
@@ -136,6 +144,12 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
         reportsUpdated: result.marketPrices.reportsUpdated,
         latest: result.marketPrices.latest,
       },
+      marketSnapshot: {
+        upserted: result.marketSnapshot.upserted,
+        considered: result.marketSnapshot.considered,
+        errors: result.marketSnapshot.errors,
+      },
+      failures,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

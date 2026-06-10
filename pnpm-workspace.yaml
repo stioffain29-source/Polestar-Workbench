@@ -155,6 +155,11 @@ overrides:
   "@expo/ngrok-bin>@expo/ngrok-bin-sunos-x64": "-"
   "@expo/ngrok-bin>@expo/ngrok-bin-win32-ia32": "-"
   "@expo/ngrok-bin>@expo/ngrok-bin-win32-x64": "-"
-  # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
+  # drizzle-kit still pulls @esbuild-kit/esm-loader; alias to tsx AND pin the nested
+  # esbuild@0.18.20 that core-utils would otherwise resolve (GHSA-67mh-4wv8-2f99).
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
+  "@esbuild-kit/core-utils>esbuild": "0.27.3"
+  "esbuild@0.18.20": "0.27.3"
+  # express@5.2.1 pins qs@6.15.1 (GHSA-q8mj-m7cp-5q26); bump to patched release
+  qs: ">=6.15.2"
   esbuild: "0.27.3"

@@ -9,7 +9,8 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:ci": "jest --passWithNoTests --coverage"
+    "test:ci": "jest --passWithNoTests --coverage",
+    "audit:deps": "pnpm audit"
   },
   "private": true,
   "devDependencies": {
