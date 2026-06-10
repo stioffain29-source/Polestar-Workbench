@@ -1398,6 +1398,250 @@ export const DeleteReportParams = zod.object({
 })
 
 
+export const ListSpotReportsQueryParams = zod.object({
+  "status": zod.enum(['draft', 'final']).optional()
+})
+
+export const ListSpotReportsResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'final']),
+  "reportDate": zod.coerce.date(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "country": zod.string().nullish(),
+  "province": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "severity": zod.union([zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']),zod.null()]).optional(),
+  "bluf": zod.string().nullish(),
+  "incidentDetails": zod.string().nullish(),
+  "currentSituation": zod.string().nullish(),
+  "operationalImpact": zod.string().nullish(),
+  "assessment": zod.string().nullish(),
+  "outlook": zod.string().nullish(),
+  "recommendedActions": zod.string().nullish(),
+  "analystNotes": zod.string().nullish(),
+  "confidenceLevel": zod.union([zod.enum(['low', 'medium', 'high']),zod.null()]).optional(),
+  "internalSourceNotes": zod.string().nullish(),
+  "showSourcesInExport": zod.boolean(),
+  "linkedIncidentIds": zod.array(zod.number()),
+  "mapEnabled": zod.boolean(),
+  "affectedRadiusKm": zod.number().nullish(),
+  "createdBy": zod.string().nullish(),
+  "exportHistory": zod.array(zod.object({
+  "format": zod.enum(['pdf', 'docx', 'text']),
+  "exportedAt": zod.coerce.date(),
+  "exportedBy": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+export const ListSpotReportsResponse = zod.array(ListSpotReportsResponseItem)
+
+
+
+
+
+export const CreateSpotReportBody = zod.object({
+  "title": zod.string().min(1),
+  "status": zod.enum(['draft', 'final']).optional(),
+  "reportDate": zod.coerce.date().optional(),
+  "incidentDate": zod.coerce.date().optional(),
+  "country": zod.string().optional(),
+  "province": zod.string().optional(),
+  "city": zod.string().optional(),
+  "latitude": zod.number().optional(),
+  "longitude": zod.number().optional(),
+  "category": zod.string().optional(),
+  "severity": zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']).optional(),
+  "bluf": zod.string().optional(),
+  "incidentDetails": zod.string().optional(),
+  "currentSituation": zod.string().optional(),
+  "operationalImpact": zod.string().optional(),
+  "assessment": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "recommendedActions": zod.string().optional(),
+  "analystNotes": zod.string().optional(),
+  "confidenceLevel": zod.enum(['low', 'medium', 'high']).optional(),
+  "internalSourceNotes": zod.string().optional(),
+  "showSourcesInExport": zod.boolean().optional(),
+  "linkedIncidentIds": zod.array(zod.number()).optional(),
+  "mapEnabled": zod.boolean().optional(),
+  "affectedRadiusKm": zod.number().optional(),
+  "createdBy": zod.string().optional()
+})
+
+
+export const GetSpotReportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetSpotReportResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'final']),
+  "reportDate": zod.coerce.date(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "country": zod.string().nullish(),
+  "province": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "severity": zod.union([zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']),zod.null()]).optional(),
+  "bluf": zod.string().nullish(),
+  "incidentDetails": zod.string().nullish(),
+  "currentSituation": zod.string().nullish(),
+  "operationalImpact": zod.string().nullish(),
+  "assessment": zod.string().nullish(),
+  "outlook": zod.string().nullish(),
+  "recommendedActions": zod.string().nullish(),
+  "analystNotes": zod.string().nullish(),
+  "confidenceLevel": zod.union([zod.enum(['low', 'medium', 'high']),zod.null()]).optional(),
+  "internalSourceNotes": zod.string().nullish(),
+  "showSourcesInExport": zod.boolean(),
+  "linkedIncidentIds": zod.array(zod.number()),
+  "mapEnabled": zod.boolean(),
+  "affectedRadiusKm": zod.number().nullish(),
+  "createdBy": zod.string().nullish(),
+  "exportHistory": zod.array(zod.object({
+  "format": zod.enum(['pdf', 'docx', 'text']),
+  "exportedAt": zod.coerce.date(),
+  "exportedBy": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
+export const UpdateSpotReportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateSpotReportBody = zod.object({
+  "title": zod.string().min(1).optional(),
+  "status": zod.enum(['draft', 'final']).optional(),
+  "reportDate": zod.coerce.date().optional(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "country": zod.string().optional(),
+  "province": zod.string().optional(),
+  "city": zod.string().optional(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "category": zod.string().optional(),
+  "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "bluf": zod.string().optional(),
+  "incidentDetails": zod.string().optional(),
+  "currentSituation": zod.string().optional(),
+  "operationalImpact": zod.string().optional(),
+  "assessment": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "recommendedActions": zod.string().optional(),
+  "analystNotes": zod.string().optional(),
+  "confidenceLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "internalSourceNotes": zod.string().optional(),
+  "showSourcesInExport": zod.boolean().optional(),
+  "linkedIncidentIds": zod.array(zod.number()).optional(),
+  "mapEnabled": zod.boolean().optional(),
+  "affectedRadiusKm": zod.number().nullish(),
+  "createdBy": zod.string().optional()
+})
+
+export const UpdateSpotReportResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'final']),
+  "reportDate": zod.coerce.date(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "country": zod.string().nullish(),
+  "province": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "severity": zod.union([zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']),zod.null()]).optional(),
+  "bluf": zod.string().nullish(),
+  "incidentDetails": zod.string().nullish(),
+  "currentSituation": zod.string().nullish(),
+  "operationalImpact": zod.string().nullish(),
+  "assessment": zod.string().nullish(),
+  "outlook": zod.string().nullish(),
+  "recommendedActions": zod.string().nullish(),
+  "analystNotes": zod.string().nullish(),
+  "confidenceLevel": zod.union([zod.enum(['low', 'medium', 'high']),zod.null()]).optional(),
+  "internalSourceNotes": zod.string().nullish(),
+  "showSourcesInExport": zod.boolean(),
+  "linkedIncidentIds": zod.array(zod.number()),
+  "mapEnabled": zod.boolean(),
+  "affectedRadiusKm": zod.number().nullish(),
+  "createdBy": zod.string().nullish(),
+  "exportHistory": zod.array(zod.object({
+  "format": zod.enum(['pdf', 'docx', 'text']),
+  "exportedAt": zod.coerce.date(),
+  "exportedBy": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
+export const DeleteSpotReportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const AppendSpotReportExportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AppendSpotReportExportBody = zod.object({
+  "format": zod.enum(['pdf', 'docx', 'text']),
+  "exportedBy": zod.string().optional()
+})
+
+export const AppendSpotReportExportResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'final']),
+  "reportDate": zod.coerce.date(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "country": zod.string().nullish(),
+  "province": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "severity": zod.union([zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']),zod.null()]).optional(),
+  "bluf": zod.string().nullish(),
+  "incidentDetails": zod.string().nullish(),
+  "currentSituation": zod.string().nullish(),
+  "operationalImpact": zod.string().nullish(),
+  "assessment": zod.string().nullish(),
+  "outlook": zod.string().nullish(),
+  "recommendedActions": zod.string().nullish(),
+  "analystNotes": zod.string().nullish(),
+  "confidenceLevel": zod.union([zod.enum(['low', 'medium', 'high']),zod.null()]).optional(),
+  "internalSourceNotes": zod.string().nullish(),
+  "showSourcesInExport": zod.boolean(),
+  "linkedIncidentIds": zod.array(zod.number()),
+  "mapEnabled": zod.boolean(),
+  "affectedRadiusKm": zod.number().nullish(),
+  "createdBy": zod.string().nullish(),
+  "exportHistory": zod.array(zod.object({
+  "format": zod.enum(['pdf', 'docx', 'text']),
+  "exportedAt": zod.coerce.date(),
+  "exportedBy": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
 export const ListCountryReportsResponseItem = zod.object({
   "id": zod.number(),
   "slug": zod.string(),

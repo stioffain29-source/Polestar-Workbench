@@ -9,8 +9,9 @@ import {
   type Incident,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Siren, Trash2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,7 @@ const WINDOWS = [7, 14, 30, 60, 90, 120];
 
 export default function Incidents() {
   const qc = useQueryClient();
+  const [, setLocation] = useLocation();
   const [topic, setTopic] = useState<string>("");
   const [country, setCountry] = useState("");
   const [severity, setSeverity] = useState<string>("");
@@ -97,7 +99,7 @@ export default function Incidents() {
       </div>
 
       <div className="bg-card border border-border rounded-sm overflow-hidden">
-        <div className="grid grid-cols-[180px_120px_1fr_140px_100px_100px_140px_40px] text-[10px] font-sans uppercase tracking-widest text-muted-foreground bg-muted/50 border-b border-border">
+        <div className="grid grid-cols-[180px_120px_1fr_140px_100px_100px_140px_72px] text-[10px] font-sans uppercase tracking-widest text-muted-foreground bg-muted/50 border-b border-border">
           <div className="p-3">Occurred</div>
           <div className="p-3">Topic</div>
           <div className="p-3">Title</div>
@@ -117,7 +119,7 @@ export default function Incidents() {
               <div
                 key={i.id}
                 onClick={() => setSelectedId(i.id)}
-                className="grid grid-cols-[180px_120px_1fr_140px_100px_100px_140px_40px] items-center hover:bg-muted/30 cursor-pointer text-sm"
+                className="grid grid-cols-[180px_120px_1fr_140px_100px_100px_140px_72px] items-center hover:bg-muted/30 cursor-pointer text-sm"
               >
                 <div className="p-3 font-mono text-xs">{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic] ?? i.topic}</span></div>
@@ -126,7 +128,15 @@ export default function Incidents() {
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
                 <div className="p-3 text-xs uppercase font-serif">{i.confidence}</div>
                 <div className="p-3 text-xs text-muted-foreground truncate">{i.source ?? "—"}</div>
-                <div className="p-3 flex items-center justify-center">
+                <div className="p-3 flex items-center justify-center gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setLocation(`/spot-reports/new?incidentId=${i.id}`); }}
+                    className="text-muted-foreground hover:text-accent"
+                    aria-label="Create spot report"
+                    title="Create spot report"
+                  >
+                    <Siren className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); if (confirm("Delete incident?")) deleteM.mutate({ id: i.id }, { onSuccess: invalidate }); }}
                     className="text-muted-foreground hover:text-destructive"
@@ -158,6 +168,7 @@ export default function Incidents() {
 }
 
 function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: () => void }) {
+  const [, setLocation] = useLocation();
   const [notes, setNotes] = useState(incident.analystNotes ?? "");
   const [severity, setSeverity] = useState<string>(incident.severity);
   const update = useUpdateIncident();
@@ -166,6 +177,13 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
       <SheetHeader>
         <SheetTitle className="font-serif uppercase tracking-wide">{incident.title}</SheetTitle>
       </SheetHeader>
+      <Button
+        variant="outline"
+        onClick={() => setLocation(`/spot-reports/new?incidentId=${incident.id}`)}
+        className="w-full rounded-sm"
+      >
+        <Siren className="w-4 h-4 mr-2" /> Create Spot Report
+      </Button>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <Meta label="Topic" value={TOPIC_LABELS[incident.topic] ?? incident.topic} />
         <Meta label="Country" value={incident.country} />

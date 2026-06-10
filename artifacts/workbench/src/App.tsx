@@ -19,6 +19,8 @@ import Countries from "./pages/Countries";
 import CountryReport from "./pages/CountryReport";
 import Reports from "./pages/Reports";
 import ReportEditor from "./pages/ReportEditor";
+import SpotReports from "./pages/SpotReports";
+import SpotReportEditor from "./pages/SpotReportEditor";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,8 @@ function Router() {
         <Route path="/countries/:slug" component={CountryReport} />
         <Route path="/reports" component={Reports} />
         <Route path="/reports/:id" component={ReportEditor} />
+        <Route path="/spot-reports" component={SpotReports} />
+        <Route path="/spot-reports/:id" component={SpotReportEditor} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

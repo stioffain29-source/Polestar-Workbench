@@ -40,6 +40,7 @@ import type {
   ListMarketPricesParams,
   ListReportsParams,
   ListSourcesParams,
+  ListSpotReportsParams,
   ListStrikesParams,
   MarketPrice,
   Report,
@@ -49,6 +50,10 @@ import type {
   SourceHealth,
   SourceInput,
   SourceUpdate,
+  SpotReport,
+  SpotReportExportInput,
+  SpotReportInput,
+  SpotReportUpdate,
   Strike,
   StrikeInput,
   StrikeSummary,
@@ -1938,6 +1943,416 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteReportMutationOptions(options));
+    }
+
+export const getListSpotReportsUrl = (params?: ListSpotReportsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/spot-reports?${stringifiedParams}` : `/api/spot-reports`
+}
+
+export const listSpotReports = async (params?: ListSpotReportsParams, options?: RequestInit): Promise<SpotReport[]> => {
+
+  return customFetch<SpotReport[]>(getListSpotReportsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSpotReportsQueryKey = (params?: ListSpotReportsParams,) => {
+    return [
+    `/api/spot-reports`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSpotReportsQueryOptions = <TData = Awaited<ReturnType<typeof listSpotReports>>, TError = ErrorType<unknown>>(params?: ListSpotReportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSpotReports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSpotReportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSpotReports>>> = ({ signal }) => listSpotReports(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSpotReports>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSpotReportsQueryResult = NonNullable<Awaited<ReturnType<typeof listSpotReports>>>
+export type ListSpotReportsQueryError = ErrorType<unknown>
+
+
+
+export function useListSpotReports<TData = Awaited<ReturnType<typeof listSpotReports>>, TError = ErrorType<unknown>>(
+ params?: ListSpotReportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSpotReports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSpotReportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSpotReportUrl = () => {
+
+
+
+
+  return `/api/spot-reports`
+}
+
+export const createSpotReport = async (spotReportInput: SpotReportInput, options?: RequestInit): Promise<SpotReport> => {
+
+  return customFetch<SpotReport>(getCreateSpotReportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotReportInput,)
+  }
+);}
+
+
+
+
+export const getCreateSpotReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSpotReport>>, TError,{data: BodyType<SpotReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSpotReport>>, TError,{data: BodyType<SpotReportInput>}, TContext> => {
+
+const mutationKey = ['createSpotReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSpotReport>>, {data: BodyType<SpotReportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSpotReport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSpotReportMutationResult = NonNullable<Awaited<ReturnType<typeof createSpotReport>>>
+    export type CreateSpotReportMutationBody = BodyType<SpotReportInput>
+    export type CreateSpotReportMutationError = ErrorType<unknown>
+
+    export const useCreateSpotReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSpotReport>>, TError,{data: BodyType<SpotReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSpotReport>>,
+        TError,
+        {data: BodyType<SpotReportInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSpotReportMutationOptions(options));
+    }
+
+export const getGetSpotReportUrl = (id: number,) => {
+
+
+
+
+  return `/api/spot-reports/${id}`
+}
+
+export const getSpotReport = async (id: number, options?: RequestInit): Promise<SpotReport> => {
+
+  return customFetch<SpotReport>(getGetSpotReportUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSpotReportQueryKey = (id: number,) => {
+    return [
+    `/api/spot-reports/${id}`
+    ] as const;
+    }
+
+
+export const getGetSpotReportQueryOptions = <TData = Awaited<ReturnType<typeof getSpotReport>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpotReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSpotReportQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSpotReport>>> = ({ signal }) => getSpotReport(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSpotReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSpotReportQueryResult = NonNullable<Awaited<ReturnType<typeof getSpotReport>>>
+export type GetSpotReportQueryError = ErrorType<unknown>
+
+
+
+export function useGetSpotReport<TData = Awaited<ReturnType<typeof getSpotReport>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpotReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSpotReportQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateSpotReportUrl = (id: number,) => {
+
+
+
+
+  return `/api/spot-reports/${id}`
+}
+
+export const updateSpotReport = async (id: number,
+    spotReportUpdate: SpotReportUpdate, options?: RequestInit): Promise<SpotReport> => {
+
+  return customFetch<SpotReport>(getUpdateSpotReportUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotReportUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateSpotReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSpotReport>>, TError,{id: number;data: BodyType<SpotReportUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSpotReport>>, TError,{id: number;data: BodyType<SpotReportUpdate>}, TContext> => {
+
+const mutationKey = ['updateSpotReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSpotReport>>, {id: number;data: BodyType<SpotReportUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSpotReport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSpotReportMutationResult = NonNullable<Awaited<ReturnType<typeof updateSpotReport>>>
+    export type UpdateSpotReportMutationBody = BodyType<SpotReportUpdate>
+    export type UpdateSpotReportMutationError = ErrorType<unknown>
+
+    export const useUpdateSpotReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSpotReport>>, TError,{id: number;data: BodyType<SpotReportUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSpotReport>>,
+        TError,
+        {id: number;data: BodyType<SpotReportUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateSpotReportMutationOptions(options));
+    }
+
+export const getDeleteSpotReportUrl = (id: number,) => {
+
+
+
+
+  return `/api/spot-reports/${id}`
+}
+
+export const deleteSpotReport = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteSpotReportUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSpotReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSpotReport>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSpotReport>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSpotReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSpotReport>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSpotReport(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSpotReportMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSpotReport>>>
+
+    export type DeleteSpotReportMutationError = ErrorType<unknown>
+
+    export const useDeleteSpotReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSpotReport>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSpotReport>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSpotReportMutationOptions(options));
+    }
+
+export const getAppendSpotReportExportUrl = (id: number,) => {
+
+
+
+
+  return `/api/spot-reports/${id}/exports`
+}
+
+export const appendSpotReportExport = async (id: number,
+    spotReportExportInput: SpotReportExportInput, options?: RequestInit): Promise<SpotReport> => {
+
+  return customFetch<SpotReport>(getAppendSpotReportExportUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotReportExportInput,)
+  }
+);}
+
+
+
+
+export const getAppendSpotReportExportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof appendSpotReportExport>>, TError,{id: number;data: BodyType<SpotReportExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof appendSpotReportExport>>, TError,{id: number;data: BodyType<SpotReportExportInput>}, TContext> => {
+
+const mutationKey = ['appendSpotReportExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof appendSpotReportExport>>, {id: number;data: BodyType<SpotReportExportInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  appendSpotReportExport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AppendSpotReportExportMutationResult = NonNullable<Awaited<ReturnType<typeof appendSpotReportExport>>>
+    export type AppendSpotReportExportMutationBody = BodyType<SpotReportExportInput>
+    export type AppendSpotReportExportMutationError = ErrorType<unknown>
+
+    export const useAppendSpotReportExport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof appendSpotReportExport>>, TError,{id: number;data: BodyType<SpotReportExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof appendSpotReportExport>>,
+        TError,
+        {id: number;data: BodyType<SpotReportExportInput>},
+        TContext
+      > => {
+      return useMutation(getAppendSpotReportExportMutationOptions(options));
     }
 
 export const getListCountryReportsUrl = () => {

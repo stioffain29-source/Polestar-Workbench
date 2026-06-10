@@ -2,6 +2,7 @@ export * from "./incidents";
 export * from "./strikes";
 export * from "./sources";
 export * from "./reports";
+export * from "./spotReports";
 export * from "./countryReports";
 export * from "./countryReportProse";
 export * from "./countryBaselines";

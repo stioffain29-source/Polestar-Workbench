@@ -452,6 +452,104 @@ paths:
         "204":
           description: Deleted
 
+  /spot-reports:
+    get:
+      operationId: listSpotReports
+      tags: [spotReports]
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/SpotReportStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SpotReport" }
+    post:
+      operationId: createSpotReport
+      tags: [spotReports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SpotReportInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpotReport" }
+
+  /spot-reports/{id}:
+    get:
+      operationId: getSpotReport
+      tags: [spotReports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpotReport" }
+    patch:
+      operationId: updateSpotReport
+      tags: [spotReports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SpotReportUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpotReport" }
+    delete:
+      operationId: deleteSpotReport
+      tags: [spotReports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /spot-reports/{id}/exports:
+    post:
+      operationId: appendSpotReportExport
+      tags: [spotReports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SpotReportExportInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpotReport" }
+
   /countries:
     get:
       operationId: listCountryReports
@@ -686,6 +784,10 @@ components:
     ReportStatus:
       type: string
       enum: [draft, review, published]
+
+    SpotReportStatus:
+      type: string
+      enum: [draft, final]
 
     Incident:
       type: object
@@ -1117,6 +1219,141 @@ components:
         polestarView: { type: string }
         watchNext: { type: string }
         author: { type: string }
+
+    SpotReportExportEntry:
+      type: object
+      required: [format, exportedAt]
+      properties:
+        format: { type: string, enum: [pdf, docx, text] }
+        exportedAt: { type: string, format: date-time }
+        exportedBy: { type: ["string", "null"] }
+
+    SpotReport:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - reportDate
+        - showSourcesInExport
+        - linkedIncidentIds
+        - mapEnabled
+        - exportHistory
+        - createdAt
+        - lastEditedAt
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        status: { $ref: "#/components/schemas/SpotReportStatus" }
+        reportDate: { type: string, format: date-time }
+        incidentDate: { type: ["string", "null"], format: date-time }
+        country: { type: ["string", "null"] }
+        province: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        category: { type: ["string", "null"] }
+        severity:
+          oneOf:
+            - { $ref: "#/components/schemas/Severity" }
+            - type: "null"
+        bluf: { type: ["string", "null"] }
+        incidentDetails: { type: ["string", "null"] }
+        currentSituation: { type: ["string", "null"] }
+        operationalImpact: { type: ["string", "null"] }
+        assessment: { type: ["string", "null"] }
+        outlook: { type: ["string", "null"] }
+        recommendedActions: { type: ["string", "null"] }
+        analystNotes: { type: ["string", "null"] }
+        confidenceLevel:
+          oneOf:
+            - { $ref: "#/components/schemas/Confidence" }
+            - type: "null"
+        internalSourceNotes: { type: ["string", "null"] }
+        showSourcesInExport: { type: boolean }
+        linkedIncidentIds:
+          type: array
+          items: { type: integer }
+        mapEnabled: { type: boolean }
+        affectedRadiusKm: { type: ["number", "null"] }
+        createdBy: { type: ["string", "null"] }
+        exportHistory:
+          type: array
+          items: { $ref: "#/components/schemas/SpotReportExportEntry" }
+        createdAt: { type: string, format: date-time }
+        lastEditedAt: { type: string, format: date-time }
+
+    SpotReportInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1 }
+        status: { $ref: "#/components/schemas/SpotReportStatus" }
+        reportDate: { type: string, format: date-time }
+        incidentDate: { type: string, format: date-time }
+        country: { type: string }
+        province: { type: string }
+        city: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        category: { type: string }
+        severity: { $ref: "#/components/schemas/Severity" }
+        bluf: { type: string }
+        incidentDetails: { type: string }
+        currentSituation: { type: string }
+        operationalImpact: { type: string }
+        assessment: { type: string }
+        outlook: { type: string }
+        recommendedActions: { type: string }
+        analystNotes: { type: string }
+        confidenceLevel: { $ref: "#/components/schemas/Confidence" }
+        internalSourceNotes: { type: string }
+        showSourcesInExport: { type: boolean }
+        linkedIncidentIds:
+          type: array
+          items: { type: integer }
+        mapEnabled: { type: boolean }
+        affectedRadiusKm: { type: number }
+        createdBy: { type: string }
+
+    SpotReportUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        status: { $ref: "#/components/schemas/SpotReportStatus" }
+        reportDate: { type: string, format: date-time }
+        incidentDate: { type: ["string", "null"], format: date-time }
+        country: { type: string }
+        province: { type: string }
+        city: { type: string }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        category: { type: string }
+        severity: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
+        bluf: { type: string }
+        incidentDetails: { type: string }
+        currentSituation: { type: string }
+        operationalImpact: { type: string }
+        assessment: { type: string }
+        outlook: { type: string }
+        recommendedActions: { type: string }
+        analystNotes: { type: string }
+        confidenceLevel: { type: ["string", "null"], enum: [low, medium, high, null] }
+        internalSourceNotes: { type: string }
+        showSourcesInExport: { type: boolean }
+        linkedIncidentIds:
+          type: array
+          items: { type: integer }
+        mapEnabled: { type: boolean }
+        affectedRadiusKm: { type: ["number", "null"] }
+        createdBy: { type: string }
+
+    SpotReportExportInput:
+      type: object
+      required: [format]
+      properties:
+        format: { type: string, enum: [pdf, docx, text] }
+        exportedBy: { type: string }
 
     CountryReport:
       type: object

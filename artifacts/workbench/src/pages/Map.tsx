@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { useLocation } from "wouter";
 import { useListIncidents, useListStrikes } from "@workspace/api-client-react";
 import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
 import { format } from "date-fns";
@@ -72,6 +73,7 @@ type Point = {
 };
 
 export default function MapPage() {
+  const [, setLocation] = useLocation();
   const [view, setView] = useState<"incidents" | "maritime" | "land">("incidents");
   const [range, setRange] = useState<RangeKey>("1y");
   // Fetch only the records within the selected window. Switching ranges issues a
@@ -239,6 +241,30 @@ export default function MapPage() {
                       )}
                     </div>
                   </LeafletTooltip>
+                  {p.id.startsWith("i-") && (
+                    <LeafletPopup>
+                      <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
+                        <div style={{ fontWeight: 700, color: "#0b0a3d" }}>{p.title}</div>
+                        <button
+                          onClick={() => setLocation(`/spot-reports/new?incidentId=${p.id.slice(2)}`)}
+                          style={{
+                            marginTop: 8,
+                            background: "#4655FF",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 2,
+                            padding: "6px 10px",
+                            fontSize: 12,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Create Spot Report
+                        </button>
+                      </div>
+                    </LeafletPopup>
+                  )}
                 </CircleMarker>
               );
             })}

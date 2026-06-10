@@ -127,6 +127,14 @@ export const ReportStatus = {
   published: 'published',
 } as const;
 
+export type SpotReportStatus = typeof SpotReportStatus[keyof typeof SpotReportStatus];
+
+
+export const SpotReportStatus = {
+  draft: 'draft',
+  final: 'final',
+} as const;
+
 export interface Incident {
   id: number;
   topic: Topic;
@@ -467,6 +475,179 @@ export interface ReportUpdate {
   author?: string;
 }
 
+export type SpotReportExportEntryFormat = typeof SpotReportExportEntryFormat[keyof typeof SpotReportExportEntryFormat];
+
+
+export const SpotReportExportEntryFormat = {
+  pdf: 'pdf',
+  docx: 'docx',
+  text: 'text',
+} as const;
+
+export interface SpotReportExportEntry {
+  format: SpotReportExportEntryFormat;
+  exportedAt: string;
+  /** @nullable */
+  exportedBy?: string | null;
+}
+
+export interface SpotReport {
+  id: number;
+  title: string;
+  status: SpotReportStatus;
+  reportDate: string;
+  /** @nullable */
+  incidentDate?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  province?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  category?: string | null;
+  severity?: Severity | null;
+  /** @nullable */
+  bluf?: string | null;
+  /** @nullable */
+  incidentDetails?: string | null;
+  /** @nullable */
+  currentSituation?: string | null;
+  /** @nullable */
+  operationalImpact?: string | null;
+  /** @nullable */
+  assessment?: string | null;
+  /** @nullable */
+  outlook?: string | null;
+  /** @nullable */
+  recommendedActions?: string | null;
+  /** @nullable */
+  analystNotes?: string | null;
+  confidenceLevel?: Confidence | null;
+  /** @nullable */
+  internalSourceNotes?: string | null;
+  showSourcesInExport: boolean;
+  linkedIncidentIds: number[];
+  mapEnabled: boolean;
+  /** @nullable */
+  affectedRadiusKm?: number | null;
+  /** @nullable */
+  createdBy?: string | null;
+  exportHistory: SpotReportExportEntry[];
+  createdAt: string;
+  lastEditedAt: string;
+}
+
+export interface SpotReportInput {
+  /** @minLength 1 */
+  title: string;
+  status?: SpotReportStatus;
+  reportDate?: string;
+  incidentDate?: string;
+  country?: string;
+  province?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  category?: string;
+  severity?: Severity;
+  bluf?: string;
+  incidentDetails?: string;
+  currentSituation?: string;
+  operationalImpact?: string;
+  assessment?: string;
+  outlook?: string;
+  recommendedActions?: string;
+  analystNotes?: string;
+  confidenceLevel?: Confidence;
+  internalSourceNotes?: string;
+  showSourcesInExport?: boolean;
+  linkedIncidentIds?: number[];
+  mapEnabled?: boolean;
+  affectedRadiusKm?: number;
+  createdBy?: string;
+}
+
+/**
+ * @nullable
+ */
+export type SpotReportUpdateSeverity = typeof SpotReportUpdateSeverity[keyof typeof SpotReportUpdateSeverity] | null;
+
+
+export const SpotReportUpdateSeverity = {
+  insignificant: 'insignificant',
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  extreme: 'extreme',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SpotReportUpdateConfidenceLevel = typeof SpotReportUpdateConfidenceLevel[keyof typeof SpotReportUpdateConfidenceLevel] | null;
+
+
+export const SpotReportUpdateConfidenceLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export interface SpotReportUpdate {
+  /** @minLength 1 */
+  title?: string;
+  status?: SpotReportStatus;
+  reportDate?: string;
+  /** @nullable */
+  incidentDate?: string | null;
+  country?: string;
+  province?: string;
+  city?: string;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  category?: string;
+  /** @nullable */
+  severity?: SpotReportUpdateSeverity;
+  bluf?: string;
+  incidentDetails?: string;
+  currentSituation?: string;
+  operationalImpact?: string;
+  assessment?: string;
+  outlook?: string;
+  recommendedActions?: string;
+  analystNotes?: string;
+  /** @nullable */
+  confidenceLevel?: SpotReportUpdateConfidenceLevel;
+  internalSourceNotes?: string;
+  showSourcesInExport?: boolean;
+  linkedIncidentIds?: number[];
+  mapEnabled?: boolean;
+  /** @nullable */
+  affectedRadiusKm?: number | null;
+  createdBy?: string;
+}
+
+export type SpotReportExportInputFormat = typeof SpotReportExportInputFormat[keyof typeof SpotReportExportInputFormat];
+
+
+export const SpotReportExportInputFormat = {
+  pdf: 'pdf',
+  docx: 'docx',
+  text: 'text',
+} as const;
+
+export interface SpotReportExportInput {
+  format: SpotReportExportInputFormat;
+  exportedBy?: string;
+}
+
 export interface CountryReport {
   id: number;
   slug: string;
@@ -725,5 +906,9 @@ status?: SourceStatus;
 export type ListReportsParams = {
 topic?: Topic;
 status?: ReportStatus;
+};
+
+export type ListSpotReportsParams = {
+status?: SpotReportStatus;
 };
 
