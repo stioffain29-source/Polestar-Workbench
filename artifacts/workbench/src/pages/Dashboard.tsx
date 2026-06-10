@@ -26,10 +26,14 @@ const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
 
 export default function Dashboard() {
   const { data: overview, isLoading, isError } = useGetDashboardOverview();
-  // Over-fetch every incident once (same relevance-gated list the reports read)
-  // and reconcile each topic to its "true" scoped set with the SHARED resolver,
-  // so the cards, the topic pages and the reports all tally to one number.
-  const { data: allIncidents = [], isLoading: incidentsLoading } = useListIncidents({});
+  // Fetch only the records inside the dashboard's largest selectable window
+  // (the max WINDOW_OPTIONS entry, 1y) rather than the whole table, so the
+  // payload stays bounded as the incidents table grows. Every per-card window
+  // (all <= 1y) and the 7-day KPI/recent lists are subsets of this set, so the
+  // numbers are unchanged. Reconciled to each topic's "true" scoped set with
+  // the SHARED resolver, so the cards, topic pages and reports tally alike.
+  const fetchDays = Math.max(...WINDOW_OPTIONS.map((w) => w.days));
+  const { data: allIncidents = [], isLoading: incidentsLoading } = useListIncidents({ days: fetchDays });
 
   const { trueByTopic, recentIncidents, kpi7d } = useMemo(() => {
     const byTopic = new Map<string, Incident[]>();

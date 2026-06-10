@@ -1,9 +1,21 @@
+import { useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
+import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
+import { RangeToggle } from "@/components/RangeToggle";
+
+// The /incidents API caps its `days` window at 365, so the timeline omits the
+// 2y range (730d) the topic monitors offer — requesting it would be rejected.
+const TIMELINE_RANGES: RangeKey[] = ["24h", "7d", "14d", "30d", "90d", "180d", "1y"];
 
 export default function Timeline() {
-  const { data: incidents = [], isLoading } = useListIncidents({});
+  // Fetch only the records within the selected window instead of the whole
+  // table. Switching ranges issues a new request (React Query keys on the
+  // params) rather than downloading every incident and grouping in memory, so
+  // the payload stays bounded as the incidents table grows.
+  const [range, setRange] = useState<RangeKey>("1y");
+  const { data: incidents = [], isLoading } = useListIncidents({ days: RANGE_DAYS[range] });
 
   const grouped = incidents.reduce<Record<string, typeof incidents>>((acc, i) => {
     const k = format(new Date(i.occurredAt), "yyyy-MM-dd");
@@ -14,9 +26,17 @@ export default function Timeline() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
-      <div>
-        <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight">Timeline</h1>
-        <p className="text-muted-foreground font-sans mt-1 text-sm">Chronological feed of recorded incidents</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight">Timeline</h1>
+          <p className="text-muted-foreground font-sans mt-1 text-sm">Chronological feed of recorded incidents · {RANGE_NOTE[range]}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wider font-serif font-medium text-muted-foreground">
+            Range
+          </span>
+          <RangeToggle range={range} onChange={setRange} keys={TIMELINE_RANGES} />
+        </div>
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
