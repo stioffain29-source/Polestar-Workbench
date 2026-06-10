@@ -1,0 +1,153 @@
+Build a separate **Spot Report** capability inside the Polestar Workbench.
+
+Spot Reports must be treated as a standalone report type, separate from Country Reports, Fuel Watch, Shipping Watch, Cargo Watch, Flashpoint, Missile Strike Trackers, and other scheduled products.
+
+Core requirement:
+
+Create a dedicated **Spot Report builder** that allows an analyst to quickly generate a short, incident-specific report from one or more selected incidents.
+
+The purpose is speed: this should support fast reporting on breaking or notable incidents without needing to generate a full country or weekly report.
+
+Required features:
+
+1. Separate menu item
+
+Add a dedicated navigation item:
+
+**Reports > Spot Reports**
+
+This should open a Spot Report workspace, not the existing report generator.
+
+2. Incident selection
+
+Allow the analyst to:
+
+* Select one incident from the incident table, map, or news feed
+* Select multiple related incidents if needed
+* Create a Spot Report directly from an incident card
+* Manually create a Spot Report if the incident is not yet fully ingested
+
+3. Spot Report fields
+
+Each Spot Report should include:
+
+* Report title
+* Date and time of report
+* Incident date/time
+* Location: country, province/state, city/town, coordinates if available
+* Incident category
+* Severity
+* Executive summary / BLUF
+* Incident details
+* Current situation
+* Operational impact
+* Assessment
+* Outlook / next 24–72 hours
+* Recommended actions
+* Analyst notes
+* Internal confidence level
+* Sources / source notes for internal use only
+
+4. Source handling
+
+Spot Reports must not show visible public source links in the exported client version.
+
+Sources should be retained internally for audit and analyst review, but the client-facing export should not display URLs or source lists unless manually enabled.
+
+5. Map support
+
+Each Spot Report should include an optional incident map.
+
+Map should show:
+
+* Incident point
+* Related incident points if multiple are selected
+* Radius or affected area if available
+* Country/province/town labels as appropriate
+
+Use the same Polestar map styling already used elsewhere in the Workbench.
+
+6. Export formats
+
+Spot Reports must export as:
+
+* PDF
+* Editable Word document if possible
+* Copy-ready text version for email or client updates
+
+The PDF should use Polestar branding and Roboto font.
+
+7. Template style
+
+Spot Reports should be concise and operational.
+
+Suggested structure:
+
+**SPOT REPORT**
+
+**Incident:** [Title]
+**Location:** [Location]
+**Date/Time:** [Incident date/time]
+**Severity:** [Severity]
+**Category:** [Category]
+
+**BLUF:**
+Short operational summary.
+
+**Situation:**
+What happened, where, when, and who/what was affected.
+
+**Operational Impact:**
+Likely impact on personnel, travel, sites, supply chain, business operations or client exposure.
+
+**Assessment:**
+Analyst judgement on significance, escalation potential, and relevance.
+
+**Outlook:**
+Expected development over the next 24–72 hours.
+
+**Recommended Actions:**
+Clear practical actions for the client.
+
+8. Storage and history
+
+Spot Reports should be saved separately from other report products.
+
+Each saved report should include:
+
+* Draft / final status
+* Created by
+* Created date
+* Last edited date
+* Linked incidents
+* Export history
+* Internal notes
+
+9. Dashboard integration
+
+From any incident record, add an action button:
+
+**Create Spot Report**
+
+This should pre-fill the Spot Report builder using the selected incident data.
+
+10. Quality controls
+
+Before export, the system should check for:
+
+* Missing title
+* Missing BLUF
+* Missing location
+* Missing severity
+* Missing assessment
+* Missing recommended actions
+* Duplicate or stale incident data
+* Missing coordinates if map is enabled
+
+Do not block export unless critical fields are missing, but clearly flag incomplete sections.
+
+11. Important distinction
+
+Spot Reports are not scheduled reports.
+
+They are incident-triggered, analyst-led, fast-turnaround reports for notable or breaking events.
