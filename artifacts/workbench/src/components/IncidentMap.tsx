@@ -84,6 +84,13 @@ export default function IncidentMap({
       mapRef.current = L.map(containerRef.current, {
         zoomControl: true,
         attributionControl: true,
+        // The incident markers/labels are a plain HTML overlay (so html2canvas
+        // can rasterise them into the PDF), which cannot ride Leaflet's zoom
+        // animation — with animation on they visibly drift away from the tiles
+        // mid-zoom. Disabling the animation makes every zoom step land cleanly
+        // with the overlay locked to the map: stable zoom in and out.
+        zoomAnimation: false,
+        markerZoomAnimation: false,
       });
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         attribution: "&copy; OpenStreetMap &copy; CARTO",
@@ -141,7 +148,7 @@ export default function IncidentMap({
         map.setView([0, 120], 2);
         lastFitKeyRef.current = fitKey;
       }
-      map.off("move zoom resize viewreset zoomanim", positionAll);
+      map.off("move zoom zoomend resize viewreset", positionAll);
       return;
     }
 
@@ -198,19 +205,24 @@ export default function IncidentMap({
 
     if (doFit) {
       if (latLngs.length === 1) {
-        map.setView(latLngs[0] as L.LatLngTuple, 8);
+        // A single incident opens close enough to read the surrounding street
+        // grid (it used to open at a wide regional zoom). The analyst can zoom
+        // in further still and — because the auto-fit only re-runs when the
+        // plotted point set changes — that manual framing is preserved through
+        // edits and the PDF export.
+        map.setView(latLngs[0] as L.LatLngTuple, 14);
       } else {
-        map.fitBounds(L.latLngBounds(latLngs), { padding: [32, 32], maxZoom: 9 });
+        map.fitBounds(L.latLngBounds(latLngs), { padding: [32, 32], maxZoom: 14 });
       }
       lastFitKeyRef.current = fitKey;
     }
 
     positionAll();
-    map.off("move zoom resize viewreset zoomanim", positionAll);
-    map.on("move zoom resize viewreset zoomanim", positionAll);
+    map.off("move zoom zoomend resize viewreset", positionAll);
+    map.on("move zoom zoomend resize viewreset", positionAll);
 
     return () => {
-      map.off("move zoom resize viewreset zoomanim", positionAll);
+      map.off("move zoom zoomend resize viewreset", positionAll);
     };
   }, [plottable, affectedRadiusKm, showLabels, locationLabel, fitKey]);
 
