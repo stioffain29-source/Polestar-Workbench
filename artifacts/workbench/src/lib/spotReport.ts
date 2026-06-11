@@ -113,7 +113,7 @@ export function spotReportSections(report: SpotReport): SpotSection[] {
     { heading: "Incident Details", body: report.incidentDetails },
     { heading: "Current Situation", body: report.currentSituation },
     { heading: "Operational Impact", body: report.operationalImpact },
-    { heading: "Assessment", body: report.assessment },
+    { heading: "Polestar View", body: report.assessment },
     { heading: "Outlook (24\u201372h)", body: report.outlook },
     { heading: "Recommended Actions", body: report.recommendedActions, bullets: true },
   ];
@@ -164,7 +164,7 @@ export function checkSpotReportQuality(
     errors.push("A location (country, province, or town) is required.");
   }
   if (!report.severity) errors.push("A severity rating is required.");
-  if (!report.assessment?.trim()) errors.push("Assessment is required.");
+  if (!report.assessment?.trim()) errors.push("Polestar View is required.");
   if (!report.recommendedActions?.trim()) {
     errors.push("Recommended actions are required.");
   }

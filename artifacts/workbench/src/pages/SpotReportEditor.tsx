@@ -682,7 +682,7 @@ export default function SpotReportEditor() {
             <Field label="Operational Impact">
               <Textarea value={form.operationalImpact} onChange={(e) => set("operationalImpact", e.target.value)} rows={3} className="rounded-sm" />
             </Field>
-            <Field label="Assessment">
+            <Field label="Polestar View">
               <Textarea value={form.assessment} onChange={(e) => set("assessment", e.target.value)} rows={3} className="rounded-sm" />
             </Field>
             <Field label="Outlook (24–72h)">

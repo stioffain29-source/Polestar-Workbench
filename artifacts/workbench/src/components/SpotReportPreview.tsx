@@ -111,6 +111,10 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
   const location = spotLocationLabel(report);
   const reportDate = report.reportDate ? new Date(report.reportDate) : null;
   const incidentDate = report.incidentDate ? new Date(report.incidentDate) : null;
+  // Incident Map renders at position 4 — immediately after Bottom Line Up Front
+  // and before Incident Details — so split BLUF from the remaining sections.
+  const blufSection = sections.find((s) => s.heading === "Bottom Line Up Front");
+  const otherSections = sections.filter((s) => s !== blufSection);
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: ROBOTO }}>
@@ -157,11 +161,15 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
 
       {/* Body */}
       <div style={{ padding: "28px" }}>
-        {sections.map((s) => (
-          <Section key={s.heading} title={s.heading}>
-            {s.bullets ? <Bullets text={s.body} /> : <Paragraphs text={s.body} />}
+        {blufSection && (
+          <Section title={blufSection.heading}>
+            {blufSection.bullets ? (
+              <Bullets text={blufSection.body} />
+            ) : (
+              <Paragraphs text={blufSection.body} />
+            )}
           </Section>
-        ))}
+        )}
 
         {report.mapEnabled && (
           <Section title="Incident Map">
@@ -174,6 +182,12 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
             />
           </Section>
         )}
+
+        {otherSections.map((s) => (
+          <Section key={s.heading} title={s.heading}>
+            {s.bullets ? <Bullets text={s.body} /> : <Paragraphs text={s.body} />}
+          </Section>
+        ))}
 
         {incidents.length > 0 && (
           <Section title="Reference Incidents">

@@ -37,6 +37,20 @@ create with a value, PATCH `{field:null}`, GET and confirm it persisted as null.
 **Why:** the map lives inside the live builder form; without this gate every keystroke
 in an unrelated field re-fit the bounds and jerked the viewport.
 
+## Section naming & order
+
+- The analyst-judgement section is labelled **"Polestar View"** in the UI and every
+  export, but is backed by the DB column / form key `assessment` (label-only change,
+  no migration). Grepping "Assessment" finds the column, NOT the heading — search
+  `report.assessment` to find the field.
+- The Incident Map is NOT part of `spotReportSections`; the preview injects it
+  separately at position 4 — after Bottom Line Up Front, before Incident Details
+  (split BLUF from the rest, render BLUF → map → rest). Text/.docx exports omit it.
+- Required render order: Header, metadata, BLUF, Incident Map, Incident Details,
+  Current Situation, Operational Impact, Polestar View, Outlook (24–72h),
+  Recommended Actions, Disclaimer (Reference Incidents / Sources are pre-existing
+  supplements before the disclaimer).
+
 ## Preview == every export
 
 - One shared dataset feeds the on-screen `SpotReportPreview` (`.print-report` DOM) and
