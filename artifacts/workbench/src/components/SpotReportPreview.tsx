@@ -83,10 +83,10 @@ function SeverityChip({ severity }: { severity?: string | null }) {
         fontFamily: ROBOTO,
         fontWeight: 700,
         fontSize: 10,
-        letterSpacing: "0.1em",
-        padding: "3px 10px",
-        minWidth: 64,
+        letterSpacing: "0.08em",
+        padding: "4px 11px",
         lineHeight: 1,
+        borderRadius: 2,
       }}
     >
       {SPOT_SEV_LABEL[k] ?? severity}

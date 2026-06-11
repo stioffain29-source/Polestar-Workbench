@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { SPOT_SEV_COLOR, SPOT_SEV_LABEL, POLAR, DUSK, ELECTRIC } from "@/lib/spotReport";
+import { SPOT_SEV_COLOR, SPOT_SEV_LABEL, NAVY, POLAR, DUSK, ELECTRIC } from "@/lib/spotReport";
 
 export interface IncidentMapPoint {
   lat: number;
@@ -114,7 +114,7 @@ export default function IncidentMap({
       }
       for (const lb of labelsRef.current) {
         const p = map.latLngToContainerPoint([lb.lat, lb.lng]);
-        lb.el.style.left = `${p.x + 12}px`;
+        lb.el.style.left = `${p.x + 15}px`;
         lb.el.style.top = `${p.y - 10}px`;
       }
       const r = radiusRef.current;
@@ -187,11 +187,11 @@ export default function IncidentMap({
     if (showLabels && locationLabel) {
       const label = document.createElement("div");
       label.style.position = "absolute";
-      label.style.background = "rgba(255, 255, 255, 0.9)";
-      label.style.border = `1px solid ${POLAR}`;
-      label.style.color = DUSK;
+      label.style.background = NAVY;
+      label.style.color = "#ffffff";
       label.style.font = "600 11px/1.2 Roboto, sans-serif";
-      label.style.padding = "2px 6px";
+      label.style.letterSpacing = "0.02em";
+      label.style.padding = "3px 8px";
       label.style.whiteSpace = "nowrap";
       label.style.borderRadius = "2px";
       label.textContent = locationLabel;
