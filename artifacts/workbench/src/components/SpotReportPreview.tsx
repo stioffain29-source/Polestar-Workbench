@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import polestarLogo from "@assets/Polestar_navy_logo_hor.png";
 import type { Incident, SpotReport } from "@workspace/api-client-react";
 import IncidentMap from "@/components/IncidentMap";
 import {
@@ -76,16 +76,17 @@ function SeverityChip({ severity }: { severity?: string | null }) {
   const bg = SPOT_SEV_COLOR[k] ?? "#999";
   return (
     <span
-      className="uppercase inline-block text-center"
+      className="uppercase inline-flex items-center justify-center"
       style={{
         background: bg,
         color: "#fff",
         fontFamily: ROBOTO,
         fontWeight: 700,
         fontSize: 10,
-        letterSpacing: "0.06em",
-        padding: "4px 10px",
-        minWidth: 72,
+        letterSpacing: "0.1em",
+        padding: "3px 10px",
+        minWidth: 64,
+        lineHeight: 1,
       }}
     >
       {SPOT_SEV_LABEL[k] ?? severity}
@@ -117,14 +118,14 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
   const otherSections = sections.filter((s) => s !== blufSection);
 
   return (
-    <div className="print-report bg-white" style={{ color: NAVY, fontFamily: ROBOTO }}>
+    <div className="print-report bg-white" style={{ color: DUSK, fontFamily: ROBOTO, fontWeight: 300 }}>
       {/* Header band */}
-      <div style={{ background: NAVY, color: "#fff", padding: "24px 28px" }}>
+      <div style={{ background: POLAR, color: DUSK, padding: "24px 28px" }}>
         <div className="flex items-start justify-between gap-6">
           <div>
             <div
               className="uppercase"
-              style={{ fontSize: 11, letterSpacing: "0.22em", color: POLAR, fontWeight: 700 }}
+              style={{ fontSize: 11, letterSpacing: "0.22em", color: DUSK, opacity: 0.65, fontWeight: 700 }}
             >
               Polestar Advisory · Spot Report
             </div>
@@ -135,7 +136,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
                 fontSize: 26,
                 lineHeight: 1.15,
                 marginTop: 8,
-                color: "#fff",
+                color: NAVY,
               }}
             >
               {report.title || "Untitled Spot Report"}
@@ -274,10 +275,19 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 9, letterSpacing: "0.16em", color: POLAR, textTransform: "uppercase" }}>
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.16em",
+          color: DUSK,
+          opacity: 0.6,
+          textTransform: "uppercase",
+          fontWeight: 600,
+        }}
+      >
         {label}
       </div>
-      <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, marginTop: 2 }}>{value}</div>
+      <div style={{ fontSize: 13, color: NAVY, fontWeight: 600, marginTop: 2 }}>{value}</div>
     </div>
   );
 }
