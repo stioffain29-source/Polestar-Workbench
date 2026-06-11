@@ -351,6 +351,17 @@ function titleSimilarity(a: string, b: string): number {
   return union === 0 ? 0 : inter / union;
 }
 
+/**
+ * Internal helpers exposed solely for unit tests. Not part of the public
+ * ingest API — import only from `__tests__`.
+ */
+export const flashpointTestHooks = {
+  classify,
+  resolvePapuaPng,
+  titleSimilarity,
+  eventSignatureTrigrams,
+};
+
 async function topicStats(): Promise<{ totalAfter: number; latestRecord: string | null; lastUpdated: string | null }> {
   const res = await db.execute(sql`
     SELECT COUNT(*)::int AS count,
