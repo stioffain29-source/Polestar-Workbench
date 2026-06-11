@@ -16,6 +16,7 @@ module.exports = {
     "^@workspace/db$": "<rootDir>/__tests__/mocks/db.ts",
     "^@workspace/db/schema$": "<rootDir>/lib/db/src/schema/index.ts",
     "^@workspace/ingest$": "<rootDir>/lib/ingest/src/index.ts",
+    "^@workspace/strike-targets$": "<rootDir>/lib/strike-targets/src/index.ts",
     "^@workspace/relevance$": "<rootDir>/lib/relevance/src/index.ts",
     "^@workspace/api-zod$": "<rootDir>/lib/api-zod/src/index.ts",
     "^@workspace/api-client-react$":
