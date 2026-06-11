@@ -51,6 +51,15 @@ in an unrelated field re-fit the bounds and jerked the viewport.
   Recommended Actions, Disclaimer (Reference Incidents / Sources are pre-existing
   supplements before the disclaimer).
 
+## Header band logo (light vs dark)
+
+- The band logo MUST contrast with the band colour. White reverse logo
+  (`Reverse_white_logo_hor`) is for DARK bands only; a Midnight Blue variant
+  (`Polestar_navy_logo_hor.png`, recolored from the white PNG via ImageMagick,
+  alpha preserved) is for LIGHT bands. The Spot Report band is light grey
+  (POLAR, matching the sibling report footers), so it uses the navy logo — the
+  white logo on grey is invisible.
+
 ## Preview == every export
 
 - One shared dataset feeds the on-screen `SpotReportPreview` (`.print-report` DOM) and
