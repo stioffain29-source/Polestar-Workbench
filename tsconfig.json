@@ -13,6 +13,9 @@
       "path": "./lib/relevance"
     },
     {
+      "path": "./lib/strike-targets"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

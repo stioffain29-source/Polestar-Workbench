@@ -9,6 +9,7 @@
   "dependencies": {
     "@workspace/db": "workspace:*",
     "@workspace/relevance": "workspace:*",
+    "@workspace/strike-targets": "workspace:*",
     "drizzle-orm": "catalog:",
     "exceljs": "^4.4.0",
     "rss-parser": "^3.13.0"

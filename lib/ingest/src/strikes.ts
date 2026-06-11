@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { geocode } from "./geocode";
 import { recordSourceHealth } from "./sourceHealth";
+import { classifyStrikeTarget, classifyStrikeInfrastructure } from "@workspace/strike-targets";
 import type { FeedStat } from "./types";
 
 // Missile Strike Tracker live ingest.
@@ -222,50 +223,12 @@ function classifyMunition(t: string): string {
   return "unknown";
 }
 
-// --- Target / infrastructure signal regexes ---
-//
-// IMPORTANT: stems carry only a LEADING \b, never a trailing one, so common
-// inflections still match (refiner -> refinery, petrochem -> petrochemical,
-// "energy facilit" -> "energy facilities"). A trailing \b on a stem silently
-// drops every inflected form — the historical cause of energy/oil targets
-// reading "Unknown". Military is matched FIRST so an interception over a US /
-// military air base reads Military, never civil Aviation.
-const MILITARY_SIG =
-  /\b(air[\s-]?base|airbase|military (?:base|site|installation|facilit|camp|target)|us (?:forces|base|bases|troops|military|warship|warships|command)|u\.s\.? ?(?:forces|base|bases|troops|military)|american (?:base|forces|warship)|fifth fleet|5th fleet|naval base|navy base|army base|barrack|garrison|prince sultan|muwaffaq salti|al[\s-]?udeid|al[\s-]?dhafra|arifjan|ali al salem|centcom|central command|command (?:cent(?:er|re)|ship|post|hub)|radar (?:site|station)|defen[cs]e site|\btroops|\binstallation)/i;
-const OILGAS_SIG =
-  /\b(oil ?field|oil facilit|oil storage|oil depot|oil hub|oil refiner|oil installation|refiner|petrochem|\bcrude|gas field|gas plant|gas complex|gas pipeline|pipeline|aramco|adnoc|samref|habshan|mina al[\s-]?ahmadi|mina abdullah|ruwais|kharg|fuel depot|fuel storage|\blng\b|energy facilit|energy infrastructure)/i;
-const POWER_SIG =
-  /\b(power plant|power station|power grid|\bgrid\b|electric|substation|nuclear|reactor|barakah)/i;
-const VESSEL_SIG =
-  /\b(oil tanker|\btanker|\bvessel|cargo ship|container ship|merchant ship|merchant vessel|warship|\bfrigate|destroyer|naval vessel|command ship|bulk carrier|freighter|crude carrier|ship (?:hit|struck|attacked|sunk|sinks|sank|sinking)|tanker (?:hit|struck|attacked))/i;
-const PORT_SIG = /\b(\bport\b|harbour|harbor|jetty|\bdock|\bberth|anchorage)/i;
-const AIRPORT_SIG =
-  /\b(international airport|\bairport|air terminal|aviation|airfield|runway|terminal 1|terminal 2|civil aviation|passenger flight)/i;
-const GOVT_SIG = /\b(government building|ministry|palace|parliament|presidential|royal court|embassy)/i;
-const CIVIL_SIG =
-  /\b(residential|neighbou?rhood|civilian|\bhome\b|\bhouse|\bmarket|\bmall\b|school|hospital|mosque|housing|settlement|aluminium|aluminum)/i;
-
-function classifyTarget(t: string): string {
-  if (MILITARY_SIG.test(t)) return "military_site";
-  if (OILGAS_SIG.test(t) || POWER_SIG.test(t)) return "energy_infrastructure";
-  if (VESSEL_SIG.test(t)) return "vessel";
-  if (AIRPORT_SIG.test(t)) return "airport_aviation";
-  if (PORT_SIG.test(t)) return "port_maritime";
-  if (GOVT_SIG.test(t)) return "government_facility";
-  if (CIVIL_SIG.test(t)) return "civilian_area";
-  return "unknown";
-}
-
-function classifyInfrastructure(t: string): string {
-  if (POWER_SIG.test(t)) return "power";
-  if (OILGAS_SIG.test(t)) return "oil_gas";
-  if (AIRPORT_SIG.test(t)) return "airport";
-  if (MILITARY_SIG.test(t)) return "military";
-  if (PORT_SIG.test(t)) return "port";
-  if (GOVT_SIG.test(t)) return "government";
-  if (/\b(residential|neighbou?rhood|\bhome\b|\bhouse|housing)/i.test(t)) return "civilian_residential";
-  return "unknown";
-}
+// Target / infrastructure classification (signal regexes + classify helpers)
+// lives in the shared @workspace/strike-targets rulebook so the ingest pipeline
+// and the dashboard never drift apart. classifyTarget / classifyInfrastructure
+// are thin aliases kept for readability at the call sites below.
+const classifyTarget = classifyStrikeTarget;
+const classifyInfrastructure = classifyStrikeInfrastructure;
 
 const WORD_NUM: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,

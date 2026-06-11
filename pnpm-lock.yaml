@@ -555,6 +555,9 @@ importers:
       '@workspace/relevance':
         specifier: workspace:*
         version: link:../../lib/relevance
+      '@workspace/strike-targets':
+        specifier: workspace:*
+        version: link:../../lib/strike-targets
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -688,6 +691,9 @@ importers:
       '@workspace/relevance':
         specifier: workspace:*
         version: link:../relevance
+      '@workspace/strike-targets':
+        specifier: workspace:*
+        version: link:../strike-targets
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)
@@ -703,6 +709,12 @@ importers:
         version: 25.6.2
 
   lib/relevance:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+
+  lib/strike-targets:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

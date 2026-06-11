@@ -8,6 +8,10 @@ import {
 import { RefreshCw, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { munitionLabel } from "@/lib/topics";
+import {
+  MILITARY_SIG, OILGAS_SIG, POWER_SIG, MARITIME_SIG, AIRPORT_SIG,
+  GOVT_SIG, CIVIL_SIG, INDUSTRIAL_SIG,
+} from "@workspace/strike-targets";
 
 const WINDOWS = [7, 14, 30, 60, 90, 120] as const;
 
@@ -52,30 +56,23 @@ const UNKNOWN_TARGET = "Unknown / unattributed";
 
 // Strong military / US-forces signal. Evaluated BEFORE the DB category and the
 // text fallback so interceptions over military or US-forces air bases read as
-// Military, never civil Aviation.
-//
-// IMPORTANT: stems carry only a LEADING \b, never a trailing one, so common
-// inflections still match ("military site" -> "military sites", "facilit" ->
-// "facilities"). A trailing \b on a stem silently drops every inflected form —
-// the same trap fixed in lib/ingest/src/strikes.ts that left hand-entered seed
-// strikes naming a clear target ("refinery", "petrochemical") reading Unknown.
-const MILITARY_RE = /\b(air[\s-]?base|airbase|military (?:base|site|installation|facilit)|us (?:forces|base|bases|troops|military)|u\.s\.? ?(?:forces|base|bases|troops|military)|fifth fleet|5th fleet|naval base|army base|barrack|garrison|prince sultan|muwaffaq salti|al[\s-]?udeid|al[\s-]?dhafra|centcom|central command|command cent(?:er|re))/i;
+// Military, never civil Aviation. Sourced from the shared @workspace/strike-
+// targets rulebook (MILITARY_SIG) so it can never drift from the ingest
+// classifier that writes target_category.
 
 // Text fallback, only consulted when the DB category is "unknown". Order is
-// precedence. Military is handled separately above; civil aviation only matches
-// genuine airport/runway language here. Stems are leading-\b-only (see above);
-// short ambiguous tokens (crude, lng, grid, market, civilian, tanker) keep a
-// trailing boundary so they do not over-match (e.g. "kc-135 tankers" are aerial
-// refuelling aircraft, not vessels; "civilians injured" is a casualty count,
-// not a civilian-area target).
+// precedence. Military is handled separately above. Every signal regex comes
+// from the shared rulebook — a single edit there covers ingest and the
+// dashboard. "Maritime" merges the rulebook's vessel + port signals, mirroring
+// how mapDbTarget renders both the `vessel` and `port_maritime` enums.
 const TARGET_TEXT: { label: string; re: RegExp }[] = [
-  { label: "Oil & Gas", re: /\b(oil ?field|oil facilit|oil storage|oil depot|oil hub|oil refiner|oil installation|refiner|petrochem|\bcrude|gas field|gas plant|gas complex|gas pipeline|pipeline|aramco|adnoc|samref|kharg|fuel depot|fuel storage|\blng\b)/i },
-  { label: "Power / Grid", re: /\b(power plant|power station|power grid|\bgrid\b|electric|substation|nuclear|reactor|barakah)/i },
-  { label: "Maritime", re: /\b(oil tankers?|\btanker\b|\bvessel|warship|\bfrigate|merchant ship|cargo ship|naval vessel)/i },
-  { label: "Aviation", re: /\b(international airport|airport terminal|\bairport|airfield|runway|civil aviation|passenger flight)/i },
-  { label: "Government", re: /\b(palace|ministry|presidential|parliament|royal court|embassy|government building)/i },
-  { label: "Civilian", re: /\b(civilian\b|residential|school|hospital|mosque|\bmarket|housing|settlement)/i },
-  { label: "Industrial", re: /\b(factory|factories|warehouse|industrial zone|industrial estate)/i },
+  { label: "Oil & Gas", re: OILGAS_SIG },
+  { label: "Power / Grid", re: POWER_SIG },
+  { label: "Maritime", re: MARITIME_SIG },
+  { label: "Aviation", re: AIRPORT_SIG },
+  { label: "Government", re: GOVT_SIG },
+  { label: "Civilian", re: CIVIL_SIG },
+  { label: "Industrial", re: INDUSTRIAL_SIG },
 ];
 
 // Map the DB `target_category` / `infrastructure` enums onto display labels.
@@ -109,7 +106,7 @@ function deriveTarget(s: StrikeLike): string {
   const text = strikeText(s);
   // 1. Military / US-forces air bases beat everything — fixes the old
   //    "airbase -> civil Aviation" mis-bucketing.
-  if (MILITARY_RE.test(text)) return "Military";
+  if (MILITARY_SIG.test(text)) return "Military";
   // 2. Trust the DB category when it carries a real value.
   const db = mapDbTarget(s.targetCategory, s.infrastructure);
   if (db) return db;
