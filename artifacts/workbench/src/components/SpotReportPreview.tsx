@@ -76,7 +76,7 @@ function SeverityChip({ severity }: { severity?: string | null }) {
   const bg = SPOT_SEV_COLOR[k] ?? "#999";
   return (
     <span
-      className="uppercase inline-flex items-center justify-center"
+      className="uppercase inline-block text-center"
       style={{
         background: bg,
         color: "#fff",
@@ -85,7 +85,6 @@ function SeverityChip({ severity }: { severity?: string | null }) {
         fontSize: 10,
         letterSpacing: "0.08em",
         padding: "4px 11px",
-        lineHeight: 1,
         borderRadius: 2,
       }}
     >

@@ -114,8 +114,8 @@ export default function IncidentMap({
       }
       for (const lb of labelsRef.current) {
         const p = map.latLngToContainerPoint([lb.lat, lb.lng]);
-        lb.el.style.left = `${p.x + 15}px`;
-        lb.el.style.top = `${p.y - 10}px`;
+        lb.el.style.left = `${p.x + 14}px`;
+        lb.el.style.top = `${p.y - 7}px`;
       }
       const r = radiusRef.current;
       if (r) {
@@ -187,13 +187,10 @@ export default function IncidentMap({
     if (showLabels && locationLabel) {
       const label = document.createElement("div");
       label.style.position = "absolute";
-      label.style.background = NAVY;
-      label.style.color = "#ffffff";
-      label.style.font = "600 11px/1.2 Roboto, sans-serif";
-      label.style.letterSpacing = "0.02em";
-      label.style.padding = "3px 8px";
+      label.style.color = NAVY;
+      label.style.font = "700 12px/1.2 Roboto, sans-serif";
+      label.style.letterSpacing = "0.01em";
       label.style.whiteSpace = "nowrap";
-      label.style.borderRadius = "2px";
       label.textContent = locationLabel;
       overlay.appendChild(label);
       labelsRef.current.push({ el: label, lat: primary.lat, lng: primary.lng });
