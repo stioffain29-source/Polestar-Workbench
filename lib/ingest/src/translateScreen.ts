@@ -13,10 +13,7 @@
 // here — the existing English classifier runs on the translated text downstream, so
 // there is a single severity authority across English and translated incidents.
 
-// gpt-4o-mini: fast, no reasoning-token overhead (gpt-5-mini's reasoning made a
-// scheduled ingest take minutes and occasionally truncated the JSON mid-output),
-// and equal-or-better slop discrimination on the local-language samples.
-const MODEL = "gpt-4o-mini";
+const MODEL = "gpt-5-mini";
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_COMPLETION_TOKENS = 1000;
 

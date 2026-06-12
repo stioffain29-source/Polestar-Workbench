@@ -71,7 +71,7 @@ type Verdict = {
 
 async function screen(it: Item): Promise<Verdict> {
   const body = {
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     max_completion_tokens: 600,
     response_format: { type: "json_object" },
     messages: [

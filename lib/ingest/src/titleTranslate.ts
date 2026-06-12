@@ -27,7 +27,7 @@ import { sql } from "drizzle-orm";
 import { db, incidentsTable } from "@workspace/db";
 import { isLlmAvailable } from "./translateScreen";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "gpt-5-mini";
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_COMPLETION_TOKENS = 200;
 
