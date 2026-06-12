@@ -560,6 +560,87 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3g) ONE-TIME correction of four more manually-reviewed mis-stored rows.
+    //
+    //     The role-aware classifier fix (attacker / responder / aircraft vs the
+    //     struck target — see @workspace/strike-targets) only changes FUTURE
+    //     auto-scraped rows; it is deliberately never blanket re-run over stored
+    //     data (the blank-only backfill in 3e protects analyst values, and a
+    //     blanket rulebook overwrite is UNSAFE because the stored value is right
+    //     far more often than not). A fresh read-only review of every prod strike
+    //     whose stored target_category disagrees with the now role-aware rulebook
+    //     found four genuine role-confusion mis-stores left from the OLD ruleset,
+    //     all of the same shape: a US force / CENTCOM named as the ATTACKER was
+    //     scored as a military target, when the thing actually struck is the ship
+    //     or tanker. The role-aware rulebook now agrees these are vessels:
+    //       - "US military fires missile on ... merchant vessel M/V Lian Star ..."
+    //       - "US military says it boarded, redirected Iranian-flagged oil tanker"
+    //       - "US military fires missile to disable ship in Gulf of Oman, CENTCOM ..."
+    //       - "US forces fire Hellfire missile to disable ship trying to break ..."
+    //     All four were stored military_site -> corrected to vessel.
+    //
+    //     Rows correctly stored despite a rulebook disagreement are LEFT ALONE
+    //     (the rulebook is the one that is wrong there): radar bases the rulebook
+    //     reads "civilian_area" off the word "housing"; an oil tanker the rulebook
+    //     reads "energy_infrastructure" off the destination "Kharg Island".
+    //
+    //     Matched by distinctive summary text AND the specific wrong stored value
+    //     (military_site) so each UPDATE is idempotent and can never touch a row
+    //     that is already vessel or a correctly-stored military target. New marker
+    //     key so it runs once even though 3f's marker is already applied elsewhere.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "strikes_mis_stored_target_correct_v2";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const lianStarFix = await db.execute(sql`
+          UPDATE strikes
+          SET target_category = 'vessel'
+          WHERE summary ILIKE '%M/V Lian Star%'
+            AND target_category = 'military_site'
+        `);
+        const redirectedTankerFix = await db.execute(sql`
+          UPDATE strikes
+          SET target_category = 'vessel'
+          WHERE summary ILIKE '%boarded, redirected Iranian-flagged oil tanker%'
+            AND target_category = 'military_site'
+        `);
+        const disableShipFix = await db.execute(sql`
+          UPDATE strikes
+          SET target_category = 'vessel'
+          WHERE summary ILIKE '%fires missile to disable ship in Gulf of Oman%'
+            AND target_category = 'military_site'
+        `);
+        const blockadeFix = await db.execute(sql`
+          UPDATE strikes
+          SET target_category = 'vessel'
+          WHERE summary ILIKE '%Hellfire missile to disable ship trying to break its blockade%'
+            AND target_category = 'military_site'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            lianStarFix: lianStarFix.rowCount ?? 0,
+            redirectedTankerFix: redirectedTankerFix.rowCount ?? 0,
+            disableShipFix: disableShipFix.rowCount ?? 0,
+            blockadeFix: blockadeFix.rowCount ?? 0,
+            marker: markerKey,
+          },
+          "One-time correction of manually-reviewed attacker-as-target mis-stored strike rows",
+        );
+      }
+    }
+
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never
