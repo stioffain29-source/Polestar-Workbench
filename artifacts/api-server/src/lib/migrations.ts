@@ -494,6 +494,72 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3f) ONE-TIME correction of two manually-reviewed mis-stored strike rows.
+    //
+    //     The fill-only-when-blank backfill (3e) deliberately never overwrites a
+    //     target_category that is already set, to protect analyst-entered values.
+    //     A manual review of every strike row whose stored target_category
+    //     disagrees with the @workspace/strike-targets rulebook found that the
+    //     vast majority are CORRECTLY stored and the rulebook would make them
+    //     WORSE — it cannot tell attacker from target ("US Central Command" /
+    //     "CENTCOM" is the striker, not a military target), aircraft from ship
+    //     ("KC-135 tankers" are refuelling AIRCRAFT, not vessels), or responder
+    //     from target ("HMS Lancaster first to respond" is not the thing hit).
+    //     A blanket rulebook overwrite is therefore UNSAFE and is intentionally
+    //     NOT applied.
+    //
+    //     Exactly two rows are genuine mis-stores and are corrected here by hand:
+    //       - "UAE energy infrastructure as gas field set ablaze, tanker struck"
+    //         leads with the energy target; it was stored as a vessel. Both the
+    //         stored infrastructure (oil_gas) and the rulebook agree it is energy.
+    //         vessel -> energy_infrastructure.
+    //       - "HMS Lancaster first to respond after ... drone attack on tanker"
+    //         was stored as military_site off the responding frigate's name; the
+    //         struck TANKER is the target. military_site -> vessel.
+    //
+    //     Matched by distinctive summary text AND the specific wrong stored value
+    //     so the UPDATE is idempotent (it cannot re-fire once corrected) and can
+    //     never touch a correctly-stored row. Marker-gated like the blocks above.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "strikes_mis_stored_target_correct_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const energyFix = await db.execute(sql`
+          UPDATE strikes
+          SET target_category = 'energy_infrastructure'
+          WHERE summary ILIKE '%UAE energy infrastructure as gas field set ablaze%'
+            AND target_category = 'vessel'
+        `);
+        const vesselFix = await db.execute(sql`
+          UPDATE strikes
+          SET target_category = 'vessel'
+          WHERE summary ILIKE '%HMS Lancaster%'
+            AND summary ILIKE '%tanker%'
+            AND target_category = 'military_site'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            energyFix: energyFix.rowCount ?? 0,
+            vesselFix: vesselFix.rowCount ?? 0,
+            marker: markerKey,
+          },
+          "One-time correction of manually-reviewed mis-stored strike target_category rows",
+        );
+      }
+    }
+
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never
