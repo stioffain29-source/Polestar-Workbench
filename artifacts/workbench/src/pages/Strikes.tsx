@@ -9,7 +9,8 @@ import { RefreshCw, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { munitionLabel } from "@/lib/topics";
 import {
-  MILITARY_SIG, OILGAS_SIG, POWER_SIG, MARITIME_SIG, AIRPORT_SIG,
+  hasMilitaryTargetSignal, hasVesselSignal,
+  OILGAS_SIG, POWER_SIG, PORT_SIG, AIRPORT_SIG,
   GOVT_SIG, CIVIL_SIG, INDUSTRIAL_SIG,
 } from "@workspace/strike-targets";
 
@@ -54,25 +55,28 @@ function strikeText(s: StrikeLike): string {
 
 const UNKNOWN_TARGET = "Unknown / unattributed";
 
-// Strong military / US-forces signal. Evaluated BEFORE the DB category and the
-// text fallback so interceptions over military or US-forces air bases read as
-// Military, never civil Aviation. Sourced from the shared @workspace/strike-
-// targets rulebook (MILITARY_SIG) so it can never drift from the ingest
-// classifier that writes target_category.
+// Strong military / US-forces signal (hasMilitaryTargetSignal). Evaluated
+// BEFORE the DB category and the text fallback so interceptions over military or
+// US-forces air bases read as Military, never civil Aviation. It is sourced from
+// the shared @workspace/strike-targets rulebook — which now distinguishes the
+// attacker/responder from the struck target — so it can never drift from the
+// ingest classifier that writes target_category.
 
 // Text fallback, only consulted when the DB category is "unknown". Order is
-// precedence. Military is handled separately above. Every signal regex comes
-// from the shared rulebook — a single edit there covers ingest and the
-// dashboard. "Maritime" merges the rulebook's vessel + port signals, mirroring
+// precedence. Military is handled separately above. Every signal comes from the
+// shared rulebook — a single edit there covers ingest and the dashboard.
+// Each entry tests the text via the shared rulebook. "Maritime" merges the
+// rulebook's role-aware vessel signal (which ignores refuelling-aircraft
+// "tankers" and warships that only responded) with the port signal, mirroring
 // how mapDbTarget renders both the `vessel` and `port_maritime` enums.
-const TARGET_TEXT: { label: string; re: RegExp }[] = [
-  { label: "Oil & Gas", re: OILGAS_SIG },
-  { label: "Power / Grid", re: POWER_SIG },
-  { label: "Maritime", re: MARITIME_SIG },
-  { label: "Aviation", re: AIRPORT_SIG },
-  { label: "Government", re: GOVT_SIG },
-  { label: "Civilian", re: CIVIL_SIG },
-  { label: "Industrial", re: INDUSTRIAL_SIG },
+const TARGET_TEXT: { label: string; test: (t: string) => boolean }[] = [
+  { label: "Oil & Gas", test: (t) => OILGAS_SIG.test(t) },
+  { label: "Power / Grid", test: (t) => POWER_SIG.test(t) },
+  { label: "Maritime", test: (t) => hasVesselSignal(t) || PORT_SIG.test(t) },
+  { label: "Aviation", test: (t) => AIRPORT_SIG.test(t) },
+  { label: "Government", test: (t) => GOVT_SIG.test(t) },
+  { label: "Civilian", test: (t) => CIVIL_SIG.test(t) },
+  { label: "Industrial", test: (t) => INDUSTRIAL_SIG.test(t) },
 ];
 
 // Map the DB `target_category` / `infrastructure` enums onto display labels.
@@ -105,13 +109,14 @@ function mapDbTarget(targetCategory: string, infrastructure: string): string | n
 function deriveTarget(s: StrikeLike): string {
   const text = strikeText(s);
   // 1. Military / US-forces air bases beat everything — fixes the old
-  //    "airbase -> civil Aviation" mis-bucketing.
-  if (MILITARY_SIG.test(text)) return "Military";
+  //    "airbase -> civil Aviation" mis-bucketing. Role-aware: a US force that
+  //    only fired/responded does not count as the struck target.
+  if (hasMilitaryTargetSignal(text)) return "Military";
   // 2. Trust the DB category when it carries a real value.
   const db = mapDbTarget(s.targetCategory, s.infrastructure);
   if (db) return db;
   // 3. Text fallback for the rows the DB left as "unknown".
-  for (const t of TARGET_TEXT) if (t.re.test(text)) return t.label;
+  for (const t of TARGET_TEXT) if (t.test(text)) return t.label;
   // 4. No genuine target signal — unattributed, never a catch-all "Other".
   return UNKNOWN_TARGET;
 }

@@ -1,6 +1,8 @@
 import {
   classifyStrikeTarget,
   classifyStrikeInfrastructure,
+  hasMilitaryTargetSignal,
+  hasVesselSignal,
 } from "@workspace/strike-targets";
 
 describe("classifyStrikeTarget", () => {
@@ -122,6 +124,106 @@ describe("classifyStrikeTarget", () => {
         "vessel",
       );
     });
+  });
+
+  describe("attacker / responder awareness", () => {
+    it("treats the US force as the attacker, not a military target", () => {
+      expect(
+        classifyStrikeTarget(
+          "US Central Command disables a tanker in the Gulf of Oman",
+        ),
+      ).toBe("vessel");
+      expect(
+        classifyStrikeTarget("US disables tanker bound for Iran: CENTCOM"),
+      ).toBe("vessel");
+      expect(
+        classifyStrikeTarget(
+          "US military fires missile on Gambia-flagged merchant vessel",
+        ),
+      ).toBe("vessel");
+    });
+
+    it("reads 'disable/seize/board ship' as a vessel target", () => {
+      expect(
+        classifyStrikeTarget(
+          "US military fires missile to disable ship in Gulf of Oman, CENTCOM says",
+        ),
+      ).toBe("vessel");
+      expect(classifyStrikeTarget("Ship seized off coast of UAE near Hormuz")).toBe(
+        "vessel",
+      );
+      expect(classifyStrikeTarget("One ship seized, another sunk near Hormuz")).toBe(
+        "vessel",
+      );
+    });
+
+    it("does NOT count a US force that only intercepted as a target", () => {
+      expect(
+        classifyStrikeTarget("US warship intercepts drone over Red Sea"),
+      ).toBe("unknown");
+      expect(
+        classifyStrikeTarget(
+          "US Central Command intercepts Iranian missile attacks on Bahrain",
+        ),
+      ).toBe("unknown");
+    });
+
+    it("still counts a US force that WAS struck (passive) as military", () => {
+      expect(
+        classifyStrikeTarget("US troops struck by rocket at al-Asad"),
+      ).toBe("military_site");
+      expect(
+        classifyStrikeTarget("US troops killed in drone attack in Jordan"),
+      ).toBe("military_site");
+    });
+
+    it("treats KC-135 refuelling tankers as military aircraft, not vessels", () => {
+      expect(
+        classifyStrikeTarget(
+          "Iran missile strike damages five KC-135 tankers in Saudi Arabia",
+        ),
+      ).toBe("military_site");
+    });
+
+    it("never reads a generic refuelling-aircraft 'tanker' as a vessel", () => {
+      // Not specifically routed to military, but crucially NOT a vessel.
+      expect(
+        classifyStrikeTarget("Refuelling tanker aircraft seen over the apron"),
+      ).not.toBe("vessel");
+      expect(
+        classifyStrikeTarget("KC-135 tankers refuel fighter jets over the Gulf"),
+      ).not.toBe("vessel");
+    });
+
+    it("does not read a responding warship as the struck vessel", () => {
+      expect(
+        classifyStrikeTarget("HMS Lancaster responds to a drone attack"),
+      ).toBe("unknown");
+      // The actual target (the tanker) still wins.
+      expect(
+        classifyStrikeTarget(
+          "HMS Lancaster first to respond after a drone attack on a tanker",
+        ),
+      ).toBe("vessel");
+    });
+  });
+});
+
+describe("hasMilitaryTargetSignal", () => {
+  it("is true for a struck base or struck force, false for an attacking force", () => {
+    expect(hasMilitaryTargetSignal("Saudi air base struck by missile")).toBe(true);
+    expect(hasMilitaryTargetSignal("US troops struck by rocket")).toBe(true);
+    expect(hasMilitaryTargetSignal("US Central Command disables a tanker")).toBe(
+      false,
+    );
+  });
+});
+
+describe("hasVesselSignal", () => {
+  it("is true for a struck ship, false for a refuelling aircraft or responder", () => {
+    expect(hasVesselSignal("Oil tanker hit by limpet mine")).toBe(true);
+    expect(hasVesselSignal("KC-135 tankers refuel fighter jets")).toBe(false);
+    expect(hasVesselSignal("US warship intercepts drone over Red Sea")).toBe(false);
   });
 });
 
