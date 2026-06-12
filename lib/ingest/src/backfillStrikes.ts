@@ -1,33 +1,37 @@
 import { db, strikesTable } from "@workspace/db";
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { classifyStrikeFields } from "./strikes";
 import type { IngestOptions } from "./types";
 
-// One-off (idempotent) reclassification of already-ingested strike rows.
+// One-off (idempotent) reclassification of already-stored strike rows.
 //
 // The Missile Strike Tracker dashboard derives Target / Weapon / Casualties from
 // the DB columns FIRST and only falls back to text when a column is "unknown" /
-// null. Historical auto-scraped rows were classified by an earlier, narrower set
-// of rules (trailing-\b stem traps that dropped refinery/petrochemical/energy
-// targets; no interception->0 casualty rule), so they sit as "unknown" and push
-// several charts past the >50% "mostly unattributed" caveat threshold.
+// null. Historical rows were classified by an earlier, narrower set of rules
+// (trailing-\b stem traps that dropped refinery/petrochemical/energy targets; no
+// interception->0 casualty rule), so they sit as "unknown" and push several
+// charts past the >50% "mostly unattributed" caveat threshold. A second class of
+// gaps are hand-entered SEED rows (e.g. the SAMREF / Mina al-Ahmadi refinery and
+// Aluminium Bahrain / EGA smelter strikes) that were recorded as unknown/unknown
+// before the rulebook learned those terms.
 //
 // This pass re-runs classifyStrikeFields() — the SAME logic the live scraper now
-// uses — over each auto-scraped row's stored `summary` (for auto-scraped rows the
-// summary is the cleaned headline, the only target/casualty signal available
-// post-ingest). It only WRITES a column when the new value is a genuine,
-// non-unknown improvement, so analyst edits and already-classified rows are never
-// regressed:
+// uses — over each row's stored `summary` + `source`. It only WRITES a column
+// when the new value is a genuine, non-unknown improvement, so analyst edits and
+// already-classified rows are never regressed:
 //   - target_category / infrastructure: overwrite only when the stored value is
 //     "unknown" and the reclassification produced a real category.
 //   - casualties: fill only when currently NULL (never overwrite an existing
 //     count) and only with a concrete value (explicit deaths or a clean
 //     interception -> 0).
 //
-// Scope is limited to auto-scraped rows (analyst_notes LIKE 'auto-scraped:%') so
-// manually entered strikes are untouched. Lives in the lib (not just a script) so
-// the API server can run the identical code against the writable prod DB — the
-// workspace only sees a read-only prod replica.
+// Scope covers ALL rows — auto-scraped AND hand-entered/seed rows. The
+// fill-only-when-blank rule above is what protects analyst work: a deliberately
+// chosen category/count is never "unknown"/NULL, so it is never touched; only
+// blanks get filled. (This intentionally REPLACES the earlier auto-scraped-only
+// scope, per an explicit decision to also refresh hand-entered records.) Lives in
+// the lib (not just a script) so the API server can run the identical code
+// against the writable prod DB — the workspace only sees a read-only prod replica.
 
 export type StrikesBackfillSummary = {
   mode: "commit" | "dry-run";
@@ -39,8 +43,9 @@ export type StrikesBackfillSummary = {
 };
 
 /**
- * Reclassify existing auto-scraped strike rows from their stored summary. Does
- * NOT close the shared DB pool — see runStrikesIngest for the rationale.
+ * Reclassify existing strike rows (auto-scraped AND hand-entered) from their
+ * stored summary + source, filling only blank columns. Does NOT close the shared
+ * DB pool — see runStrikesIngest for the rationale.
  */
 export async function runStrikesBackfill(opts: IngestOptions = {}): Promise<StrikesBackfillSummary> {
   const commit = opts.commit ?? false;
@@ -57,8 +62,7 @@ export async function runStrikesBackfill(opts: IngestOptions = {}): Promise<Stri
       infrastructure: strikesTable.infrastructure,
       casualties: strikesTable.casualties,
     })
-    .from(strikesTable)
-    .where(like(strikesTable.analystNotes, "auto-scraped:%"));
+    .from(strikesTable);
 
   const updates: {
     id: number;
@@ -89,7 +93,7 @@ export async function runStrikesBackfill(opts: IngestOptions = {}): Promise<Stri
   const infraFilled = updates.filter((u) => u.infrastructure != null).length;
   const casualtiesFilled = updates.filter((u) => u.casualties != null).length;
 
-  log(`  Scanned auto-scraped rows : ${rows.length}`);
+  log(`  Scanned rows              : ${rows.length}`);
   log(`  Rows to update            : ${updates.length}`);
   log(`    target_category filled  : ${targetFilled}`);
   log(`    infrastructure filled   : ${infraFilled}`);

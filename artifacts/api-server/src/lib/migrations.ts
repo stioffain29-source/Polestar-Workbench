@@ -440,20 +440,26 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
-    // 3e) ONE-TIME reclassification of auto-scraped strike columns.
+    // 3e) ONE-TIME reclassification of stored strike columns.
     //
     //     The Missile Strike Tracker dashboard derives Target / Weapon /
     //     Casualties from the DB columns FIRST, falling back to text only when a
-    //     column is "unknown" / null. Historical auto-scraped rows were
-    //     classified by an earlier, narrower ruleset (trailing-\b stem traps that
-    //     dropped refinery / petrochemical / energy targets; no interception->0
-    //     casualty rule), so they sat as "unknown" and pushed several charts past
-    //     the >50% "mostly unattributed" caveat threshold. Re-run the SAME
-    //     classifier the live scraper now uses over each row's stored summary,
-    //     filling only genuine non-unknown improvements (never overwriting an
-    //     analyst value or an existing casualty count). Marker-gated so it runs
-    //     once per deploy generation; bump the key if the classifier changes
-    //     materially and historical rows should be re-swept.
+    //     column is "unknown" / null. Historical rows were classified by an
+    //     earlier, narrower ruleset (trailing-\b stem traps that dropped refinery
+    //     / petrochemical / energy targets; no interception->0 casualty rule), so
+    //     they sat as "unknown" and pushed several charts past the >50% "mostly
+    //     unattributed" caveat threshold. Re-run the SAME classifier the live
+    //     scraper now uses over each row's stored summary, filling only genuine
+    //     non-unknown improvements (never overwriting an analyst value or an
+    //     existing casualty count). Marker-gated so it runs once per deploy
+    //     generation; bump the key if the classifier changes materially and
+    //     historical rows should be re-swept.
+    //
+    //     v2 broadens scope from auto-scraped-only to ALL rows so hand-entered
+    //     SEED rows (the SAMREF / Mina al-Ahmadi refinery and Aluminium Bahrain /
+    //     EGA smelter strikes, recorded as unknown/unknown before the rulebook
+    //     learned those terms) also get their blank columns filled — fill-only-
+    //     when-blank still protects any deliberately chosen analyst value.
     {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS app_migration_markers (
@@ -461,7 +467,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "strikes_reclassify_columns_v1";
+      const markerKey = "strikes_reclassify_columns_v2";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);

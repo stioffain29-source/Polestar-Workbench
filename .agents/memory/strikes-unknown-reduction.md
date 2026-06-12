@@ -23,17 +23,23 @@ refiner→refinery, petrochem→petrochemical, energy-facilit→facility. The ca
 rule treats a clean interception as 0 only when INTERCEPT_SIG && !HARM_SIG &&
 !LANDED_SIG (so "one impacted in the east" stays Unknown, not 0).
 
-**Backfill scope is auto-scraped rows only** (`analyst_notes LIKE
-'auto-scraped:%'`) — never overwrite analyst/manual data. Runs once in the
-deployment via a marker-gated boot block (prod DB is writable only there; the
-workspace sees a read-only replica). Idempotent: overwrite target/infra only
-when currently unknown, fill casualties only when NULL.
+**Backfill scope now covers ALL rows** — auto-scraped AND hand-entered/seed
+rows. (It was auto-scraped-only via `analyst_notes LIKE 'auto-scraped:%'`; an
+explicit decision broadened it so the refinery / petrochemical / aluminium-smelter
+SEED rows that sat unknown/unknown also get filled.) The protection that replaces
+the scope filter is the **fill-only-when-blank** rule: overwrite target/infra
+ONLY when currently unknown, fill casualties ONLY when NULL — a deliberately
+chosen analyst value is never blank, so it is never touched. Runs once in the
+deployment via a marker-gated boot block (prod DB writable only there; workspace
+sees a read-only replica). **Bump the boot marker** (`strikes_reclassify_columns_vN`
+in `artifacts/api-server/src/lib/migrations.ts`) whenever the classifier or the
+backfill scope changes and rows must be re-swept — the CLI ignores the marker but
+prod only re-runs on a marker change + republish.
 
-**Known residual:** the catchable rows that remain Unknown are MANUAL SEED rows
-(refinery / petrochemical / oil-storage targets) that the dashboard's OWN
-display-layer `TARGET_TEXT` regex misses — it still has the trailing-`\b` trap
-the ingest side fixed. Fixing that is a display-layer change (`Strikes.tsx`),
-distinct from "improve the ingest classifier", so it was left as a follow-up.
+**Known residual (display layer):** some rows still SHOW Unknown on the dashboard
+because `Strikes.tsx`'s OWN display-layer `TARGET_TEXT` regex misses them (it had
+a trailing-`\b` trap the ingest side fixed). That is a display-layer change,
+distinct from the stored-column backfill.
 
 **Real bug fixed:** `mapDbTarget` was missing `case "government_facility"`, so
 any government-classified column displayed as Unknown.
