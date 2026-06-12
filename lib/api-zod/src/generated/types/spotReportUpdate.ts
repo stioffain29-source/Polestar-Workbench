@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { SpotMapPoint } from './spotMapPoint';
 import type { SpotReportStatus } from './spotReportStatus';
 import type { SpotReportUpdateConfidenceLevel } from './spotReportUpdateConfidenceLevel';
 import type { SpotReportUpdateSeverity } from './spotReportUpdateSeverity';
@@ -42,5 +43,6 @@ export interface SpotReportUpdate {
   mapEnabled?: boolean;
   /** @nullable */
   affectedRadiusKm?: number | null;
+  mapPoints?: SpotMapPoint[];
   createdBy?: string;
 }

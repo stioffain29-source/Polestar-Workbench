@@ -7,6 +7,7 @@
  */
 import type { Confidence } from './confidence';
 import type { Severity } from './severity';
+import type { SpotMapPoint } from './spotMapPoint';
 import type { SpotReportExportEntry } from './spotReportExportEntry';
 import type { SpotReportStatus } from './spotReportStatus';
 
@@ -54,6 +55,7 @@ export interface SpotReport {
   mapEnabled: boolean;
   /** @nullable */
   affectedRadiusKm?: number | null;
+  mapPoints?: SpotMapPoint[];
   /** @nullable */
   createdBy?: string | null;
   exportHistory: SpotReportExportEntry[];

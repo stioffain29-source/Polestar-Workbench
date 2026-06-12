@@ -37,6 +37,31 @@ create with a value, PATCH `{field:null}`, GET and confirm it persisted as null.
 **Why:** the map lives inside the live builder form; without this gate every keystroke
 in an unrelated field re-fit the bounds and jerked the viewport.
 
+## Analyst-placed multi-point map markers (`mapPoints`)
+
+- Beyond the single primary coord (`report.latitude/longitude`) and linked-incident
+  coords, a Spot Report carries `mapPoints` — a `jsonb` array of
+  `{lat, lng, label?, severity?}` — so an analyst can plot arbitrary extra markers.
+- `buildSpotMapPoints` is the ONE place that assembles every plotted point (primary +
+  linked + manual); manual points use key `m-${idx}`, `primary:false`. `IncidentMap`
+  labels ONLY the primary point — manual/linked dots get a severity colour + hover
+  title, no text label on the map.
+- A manual point with no (or blank) severity INHERITS `report.severity`. Use
+  `spotSevKey(m.severity) || spotSevKey(report.severity)` — `||` not `??`, because an
+  empty-string severity (API-written) must still fall back instead of rendering the
+  off-palette neutral dot.
+- The editor sends `mapPoints` as a (possibly empty) array on BOTH create AND update;
+  rows with missing/NaN coords are filtered out, blank label/severity omitted, so the
+  stored shape stays clean.
+
+**Why no boot-time DDL for the new column:** the first cut added an
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` at the top of `runDataMigrations()` on the
+false premise that "prod doesn't run drizzle push". WRONG — Publish introspects dev+prod
+and applies the schema diff automatically, and startup-time DDL to self-heal prod is
+explicitly forbidden (see the database skill's migrations-on-publish reference). Make
+the schema change in the Drizzle source of truth, push to dev, and re-publish; never
+self-heal prod from the app entrypoint.
+
 ## Section naming & order
 
 - The analyst-judgement section is labelled **"Polestar View"** in the UI and every

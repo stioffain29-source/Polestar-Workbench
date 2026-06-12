@@ -58,6 +58,7 @@ export * from './sourceInput';
 export * from './sourceStatus';
 export * from './sourceType';
 export * from './sourceUpdate';
+export * from './spotMapPoint';
 export * from './spotReport';
 export * from './spotReportExportEntry';
 export * from './spotReportExportEntryFormat';

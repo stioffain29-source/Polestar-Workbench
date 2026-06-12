@@ -1276,6 +1276,9 @@ components:
           items: { type: integer }
         mapEnabled: { type: boolean }
         affectedRadiusKm: { type: ["number", "null"] }
+        mapPoints:
+          type: array
+          items: { $ref: "#/components/schemas/SpotMapPoint" }
         createdBy: { type: ["string", "null"] }
         exportHistory:
           type: array
@@ -1314,6 +1317,9 @@ components:
           items: { type: integer }
         mapEnabled: { type: boolean }
         affectedRadiusKm: { type: number }
+        mapPoints:
+          type: array
+          items: { $ref: "#/components/schemas/SpotMapPoint" }
         createdBy: { type: string }
 
     SpotReportUpdate:
@@ -1346,6 +1352,9 @@ components:
           items: { type: integer }
         mapEnabled: { type: boolean }
         affectedRadiusKm: { type: ["number", "null"] }
+        mapPoints:
+          type: array
+          items: { $ref: "#/components/schemas/SpotMapPoint" }
         createdBy: { type: string }
 
     SpotReportExportInput:
@@ -1354,6 +1363,15 @@ components:
       properties:
         format: { type: string, enum: [pdf, docx, text] }
         exportedBy: { type: string }
+
+    SpotMapPoint:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+        label: { type: string }
+        severity: { type: string }
 
     CountryReport:
       type: object

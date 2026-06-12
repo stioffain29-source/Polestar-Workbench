@@ -92,6 +92,28 @@ export function buildSpotMapPoints(
       });
     }
   }
+  // Analyst-placed extra markers (report.mapPoints). Each carries its own
+  // coordinates and an optional label/severity; a point with no severity
+  // inherits the report's severity colour. These plot alongside the primary
+  // point and any linked incidents.
+  const manualPoints = report.mapPoints ?? [];
+  manualPoints.forEach((m, idx) => {
+    if (typeof m.lat === "number" && typeof m.lng === "number") {
+      const label = (m.label ?? "").trim();
+      // A point with no (or blank) severity inherits the report's severity
+      // colour — `||` rather than `??` so an empty-string severity also falls
+      // back instead of rendering the off-palette neutral fallback.
+      const severity = spotSevKey(m.severity) || spotSevKey(report.severity);
+      points.push({
+        key: `m-${idx}`,
+        lat: m.lat,
+        lng: m.lng,
+        severity,
+        title: label || spotLocationLabel(report) || report.title,
+        primary: false,
+      });
+    }
+  });
   return points;
 }
 

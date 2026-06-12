@@ -46,6 +46,13 @@ import { useToast } from "@/hooks/use-toast";
 
 type ExportFormat = "pdf" | "docx" | "text";
 
+interface MapPointForm {
+  lat: string;
+  lng: string;
+  label: string;
+  severity: string;
+}
+
 interface FormState {
   title: string;
   status: string;
@@ -72,6 +79,7 @@ interface FormState {
   linkedIncidentIds: number[];
   mapEnabled: boolean;
   affectedRadiusKm: string;
+  mapPoints: MapPointForm[];
   createdBy: string;
 }
 
@@ -111,6 +119,7 @@ function emptyForm(): FormState {
     linkedIncidentIds: [],
     mapEnabled: false,
     affectedRadiusKm: "",
+    mapPoints: [],
     createdBy: "",
   };
 }
@@ -142,6 +151,12 @@ function formFromReport(r: SpotReport): FormState {
     linkedIncidentIds: r.linkedIncidentIds ?? [],
     mapEnabled: r.mapEnabled ?? false,
     affectedRadiusKm: r.affectedRadiusKm != null ? String(r.affectedRadiusKm) : "",
+    mapPoints: (r.mapPoints ?? []).map((m) => ({
+      lat: m.lat != null ? String(m.lat) : "",
+      lng: m.lng != null ? String(m.lng) : "",
+      label: m.label ?? "",
+      severity: m.severity ?? "",
+    })),
     createdBy: r.createdBy ?? "",
   };
 }
@@ -266,6 +281,20 @@ export default function SpotReportEditor() {
       linkedIncidentIds: form.linkedIncidentIds,
       mapEnabled: form.mapEnabled,
       affectedRadiusKm: num(form.affectedRadiusKm),
+      mapPoints: form.mapPoints
+        .map((m) => ({
+          lat: num(m.lat),
+          lng: num(m.lng),
+          label: m.label.trim(),
+          severity: m.severity,
+        }))
+        .filter((m) => m.lat !== null && m.lng !== null)
+        .map((m) => ({
+          lat: m.lat as number,
+          lng: m.lng as number,
+          ...(m.label ? { label: m.label } : {}),
+          ...(m.severity ? { severity: m.severity } : {}),
+        })),
       createdBy: form.createdBy || null,
       exportHistory: report?.exportHistory ?? [],
       createdAt: report?.createdAt ?? new Date().toISOString(),
@@ -275,6 +304,24 @@ export default function SpotReportEditor() {
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function addMapPoint() {
+    setForm((f) => ({
+      ...f,
+      mapPoints: [...f.mapPoints, { lat: "", lng: "", label: "", severity: "" }],
+    }));
+  }
+
+  function updateMapPoint(idx: number, key: keyof MapPointForm, value: string) {
+    setForm((f) => ({
+      ...f,
+      mapPoints: f.mapPoints.map((p, i) => (i === idx ? { ...p, [key]: value } : p)),
+    }));
+  }
+
+  function removeMapPoint(idx: number) {
+    setForm((f) => ({ ...f, mapPoints: f.mapPoints.filter((_, i) => i !== idx) }));
   }
 
   function buildData(forCreate: boolean): Record<string, unknown> {
@@ -346,6 +393,24 @@ export default function SpotReportEditor() {
       out.longitude = lng;
       out.affectedRadiusKm = rad;
     }
+
+    // Multi-point map markers always travel as a (possibly empty) array on both
+    // create and update — invalid rows (missing/NaN coordinates) are dropped and
+    // blank label/severity are omitted so the stored shape stays clean.
+    out.mapPoints = form.mapPoints
+      .map((m) => ({
+        lat: num(m.lat),
+        lng: num(m.lng),
+        label: m.label.trim(),
+        severity: m.severity,
+      }))
+      .filter((m) => m.lat !== null && m.lng !== null)
+      .map((m) => ({
+        lat: m.lat as number,
+        lng: m.lng as number,
+        ...(m.label ? { label: m.label } : {}),
+        ...(m.severity ? { severity: m.severity } : {}),
+      }));
     return out;
   }
 
@@ -624,6 +689,77 @@ export default function SpotReportEditor() {
               />
               <span>Include incident map in the report</span>
             </label>
+          </Card>
+
+          <Card title="Additional Map Points">
+            <p className="text-xs text-muted-foreground mb-3">
+              Plot extra coordinate markers on the report map — one row per point.
+              Each appears as a dot (coloured by its severity) alongside the
+              primary location and any linked incidents.
+            </p>
+            {form.mapPoints.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {form.mapPoints.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-[1fr_1fr_1.4fr_1.1fr_auto] gap-2 items-center"
+                  >
+                    <Input
+                      value={p.lat}
+                      onChange={(e) => updateMapPoint(idx, "lat", e.target.value)}
+                      placeholder="Latitude"
+                      className="rounded-sm"
+                    />
+                    <Input
+                      value={p.lng}
+                      onChange={(e) => updateMapPoint(idx, "lng", e.target.value)}
+                      placeholder="Longitude"
+                      className="rounded-sm"
+                    />
+                    <Input
+                      value={p.label}
+                      onChange={(e) => updateMapPoint(idx, "label", e.target.value)}
+                      placeholder="Label (optional)"
+                      className="rounded-sm"
+                    />
+                    <Select
+                      value={p.severity || "none"}
+                      onValueChange={(v) =>
+                        updateMapPoint(idx, "severity", v === "none" ? "" : v)
+                      }
+                    >
+                      <SelectTrigger className="rounded-sm">
+                        <SelectValue placeholder="Severity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">—</SelectItem>
+                        {SEVERITY_LEVELS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeMapPoint(idx)}
+                      className="rounded-sm text-muted-foreground hover:text-destructive h-9 px-2"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addMapPoint}
+              className="rounded-sm"
+            >
+              Add point
+            </Button>
           </Card>
 
           <Card title="Linked Incidents">

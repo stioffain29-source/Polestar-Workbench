@@ -1429,6 +1429,12 @@ export const ListSpotReportsResponseItem = zod.object({
   "linkedIncidentIds": zod.array(zod.number()),
   "mapEnabled": zod.boolean(),
   "affectedRadiusKm": zod.number().nullish(),
+  "mapPoints": zod.array(zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "label": zod.string().optional(),
+  "severity": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -1470,6 +1476,12 @@ export const CreateSpotReportBody = zod.object({
   "linkedIncidentIds": zod.array(zod.number()).optional(),
   "mapEnabled": zod.boolean().optional(),
   "affectedRadiusKm": zod.number().optional(),
+  "mapPoints": zod.array(zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "label": zod.string().optional(),
+  "severity": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().optional()
 })
 
@@ -1505,6 +1517,12 @@ export const GetSpotReportResponse = zod.object({
   "linkedIncidentIds": zod.array(zod.number()),
   "mapEnabled": zod.boolean(),
   "affectedRadiusKm": zod.number().nullish(),
+  "mapPoints": zod.array(zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "label": zod.string().optional(),
+  "severity": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -1549,6 +1567,12 @@ export const UpdateSpotReportBody = zod.object({
   "linkedIncidentIds": zod.array(zod.number()).optional(),
   "mapEnabled": zod.boolean().optional(),
   "affectedRadiusKm": zod.number().nullish(),
+  "mapPoints": zod.array(zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "label": zod.string().optional(),
+  "severity": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().optional()
 })
 
@@ -1579,6 +1603,12 @@ export const UpdateSpotReportResponse = zod.object({
   "linkedIncidentIds": zod.array(zod.number()),
   "mapEnabled": zod.boolean(),
   "affectedRadiusKm": zod.number().nullish(),
+  "mapPoints": zod.array(zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "label": zod.string().optional(),
+  "severity": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -1631,6 +1661,12 @@ export const AppendSpotReportExportResponse = zod.object({
   "linkedIncidentIds": zod.array(zod.number()),
   "mapEnabled": zod.boolean(),
   "affectedRadiusKm": zod.number().nullish(),
+  "mapPoints": zod.array(zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "label": zod.string().optional(),
+  "severity": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),

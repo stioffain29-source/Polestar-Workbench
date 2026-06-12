@@ -29,6 +29,19 @@ export interface SpotReportExportEntry {
  * still incomplete; the pre-export quality check (not the DB) enforces which
  * fields must be present before a client-facing export.
  */
+/**
+ * One analyst-placed marker on a spot report's incident map. Lets a report plot
+ * several coordinate points (e.g. multiple sites of a coordinated event) beyond
+ * the single primary location and any linked incidents. Label and severity are
+ * optional; a point with no severity inherits the report's severity colour.
+ */
+export interface SpotMapMarker {
+  lat: number;
+  lng: number;
+  label?: string;
+  severity?: string;
+}
+
 export const spotReportsTable = pgTable("spot_reports", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -76,6 +89,13 @@ export const spotReportsTable = pgTable("spot_reports", {
   // Optional incident map.
   mapEnabled: boolean("map_enabled").notNull().default(false),
   affectedRadiusKm: doublePrecision("affected_radius_km"),
+
+  // Analyst-placed extra markers beyond the primary lat/long and linked
+  // incidents — each its own coordinate with an optional label and severity.
+  mapPoints: jsonb("map_points")
+    .$type<SpotMapMarker[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
 
   // Analyst-entered authorship (NOT authenticated identity — workbench is public).
   createdBy: text("created_by"),

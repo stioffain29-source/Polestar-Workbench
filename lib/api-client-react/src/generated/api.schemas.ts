@@ -491,6 +491,13 @@ export interface SpotReportExportEntry {
   exportedBy?: string | null;
 }
 
+export interface SpotMapPoint {
+  lat: number;
+  lng: number;
+  label?: string;
+  severity?: string;
+}
+
 export interface SpotReport {
   id: number;
   title: string;
@@ -535,6 +542,7 @@ export interface SpotReport {
   mapEnabled: boolean;
   /** @nullable */
   affectedRadiusKm?: number | null;
+  mapPoints?: SpotMapPoint[];
   /** @nullable */
   createdBy?: string | null;
   exportHistory: SpotReportExportEntry[];
@@ -569,6 +577,7 @@ export interface SpotReportInput {
   linkedIncidentIds?: number[];
   mapEnabled?: boolean;
   affectedRadiusKm?: number;
+  mapPoints?: SpotMapPoint[];
   createdBy?: string;
 }
 
@@ -631,6 +640,7 @@ export interface SpotReportUpdate {
   mapEnabled?: boolean;
   /** @nullable */
   affectedRadiusKm?: number | null;
+  mapPoints?: SpotMapPoint[];
   createdBy?: string;
 }
 
