@@ -340,39 +340,75 @@ const FUEL: ReportPack = {
 // Fertiliser Watch
 // ---------------------------------------------------------------------------
 const FERTILISER: ReportPack = {
+  // Executive Summary: three short paragraphs — the headline judgement, what
+  // the incident reporting adds, and the business meaning.
   exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
-    const driver = types || "pricing, export controls and production disruption";
+    const period = cadence === "monthly" ? "month" : "week";
+    const driver = types || "pricing, supply security and export policy";
     const geo = lead
-      ? ` ${lead} saw the most activity${countries && countries !== lead ? `, supported by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      ? ` ${lead} carried the most reporting${countries && countries !== lead ? `, with more from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Fertiliser pressure was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const para1 = `Fertiliser risk this ${period} is a cost-and-supply story rather than a single dramatic event. The pressure showed up as ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const para2 = `The reporting tracks the affordability and availability of urea, DAP and ammonia — the inputs that set planting economics. Price moves, import and subsidy decisions, and any production interruption are the levers that decide whether farmers and downstream food costs feel relief or strain.`;
+    const para3 = `For business users, the priority is forward cover: secure the input lines you depend on, watch for export or subsidy shifts that can reset prices quickly, and keep contingency for single-source urea and potash exposure while this picture holds.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
   },
-  situation: ({ types }) => {
-    const focus = types ? `Supply, price and export decisions stay front of mind, currently showing up as ${types}.` : "Supply, price and export decisions stay front of mind, with farmer access and planting timing the operational concern.";
-    return `${focus} The chain runs from input price into farm output and onward food cost.`;
+  situation: ({ types, lead }) => {
+    const focus = types
+      ? `Supply security, pricing and export policy stay front of mind, currently showing up as ${types}.`
+      : "Supply security, pricing and export policy stay front of mind, with farmer access and planting timing the operational concern.";
+    const where = lead ? ` ${lead} sits at the centre of the current reporting.` : "";
+    return `${focus} The chain runs from input price and availability into farm output and onward food cost.${where}`;
   },
-  whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Activity centred on ${types}.` : `Activity was light, with little to go on.`;
-    const geo = countries ? ` Reporting clustered around ${countries}.` : "";
-    return `${lead}${geo}${sevTail(sev)}`;
+  whatHappened: ({ types, countries, sev, lead }) => {
+    if (!types) {
+      return `Fertiliser reporting was light recently, with no single pattern standing out.${sevTail(sev)}`;
+    }
+    const secondaries = countries && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` Reporting concentrated on ${lead}${secondaries ? `, with more from ${secondaries}` : ""}.`
+      : "";
+    return `Activity centred on ${types}.${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ lead }) => {
-    const where = lead ? ` Exposure to ${lead} matters most for forward stock cover and supplier conversations.` : "";
-    return `Movement in fertiliser pricing and supply rolls forward into planting decisions, farm input cost and the wider food security picture.${where}`;
+    const where = lead ? ` Exposure to ${lead} is the live pressure point for forward stock cover and supplier conversations.` : "";
+    const para1 = `Fertiliser pricing and availability feed straight into planting decisions and farm input cost, and from there into the wider food security picture. When urea or DAP gets dearer or harder to source, the cost lands on the next planting cycle rather than the current invoice.${where}`;
+    const para2 = `Where price pressure meets a supply or production interruption, the impact compounds: subsidy bills rise, import bills stretch, and governments lean on export controls or emergency procurement. Those interventions are the points where a slow cost story turns into a short-notice availability problem worth planning against now.`;
+    return `${para1}\n\n${para2}`;
   },
-  implications: () =>
-    "Walk through supplier diversification, forward stock cover, exposure to single-source urea and potash, and contingency for export-ban announcements.",
-  watchNext: () =>
-    "Keep eyes on export restrictions, plant maintenance and outage announcements, farmer protest activity and any government subsidy moves.",
-  polestarView: ({ lead }) => {
-    const tail = lead ? ` ${lead} is the country to watch when planning forward cover.` : "";
-    return `The standing concern is supply continuity rather than the number of headlines.${tail}`;
+  implications: () => {
+    const lines = [
+      "Secure forward cover on the urea, DAP and ammonia lines you depend on rather than waiting for the next price move to confirm.",
+      "Map single-source exposure to urea and potash, and line up alternate suppliers before a shortage forces the conversation.",
+      "Track subsidy and export-policy signals — a single notice can reset input economics and availability quickly.",
+      "Stress-test planting and production budgets against a short-notice price spike or import interruption.",
+      "Pull procurement conversations forward where shortage, plant outage or feedstock pressure is being reported.",
+    ];
+    return lines.map((l) => `- ${l}`).join("\n");
   },
-  zeroExec: "Fertiliser reporting was quiet this month. Read that as a gap in reporting rather than proof of market calm.",
-  zeroSituation: "Supply, price and export decisions remain the operating concern even when little is reported.",
-  zeroWhatHappened: "Little fertiliser reporting came through, so the picture rests on recent weeks rather than fresh reporting.",
-  zeroWhatMatters: "Farm input cost, planting decisions and downstream food price pressure stay live exposures whatever is reported.",
-  zeroPolestar: "Nothing useful came through on fertiliser this month. Hold the recent assessment until fresh reporting arrives.",
+  watchNext: () => {
+    const lines = [
+      "Export restrictions and quotas — bans or curbs on urea, DAP or potash reset regional availability fast.",
+      "Subsidy and budget decisions — changes to the subsidy regime feed straight into farm-gate prices.",
+      "Plant maintenance and production outages — ammonia or urea unit interruptions tighten supply within weeks.",
+      "Import tenders and procurement deals — tender pricing and volume signal the next cost direction.",
+      "Farmer access and protest activity — queues, rationing and unrest are the fastest operational tells.",
+    ];
+    return lines.join("\n");
+  },
+  polestarView: ({ lead, countries }) => {
+    const pressure = lead
+      ? ` ${lead} is the clearest country to watch when planning forward cover${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      : " No single country stands out right now.";
+    return `Fertiliser Watch is flagging a supply-continuity and cost risk, not simply a rise in headlines. The standing concern is whether input price and availability hold steady enough for planting economics to work. For business users, the priority is to protect forward cover and supplier resilience against short-notice price or availability shocks.${pressure}`;
+  },
+  zeroExec: "Fertiliser reporting was quiet this month. Read that as a gap in reporting rather than proof of market calm. The standing exposures — input price, supply security and export policy — still set the picture for planting economics and food cost until fresh reporting comes through.",
+  zeroSituation: "Supply security, pricing and export decisions remain the operating concern even when little is reported.",
+  zeroWhatHappened: "Little fertiliser reporting came through, so the picture rests on recent months rather than fresh reporting.",
+  zeroWhatMatters: "Farm input cost, planting decisions and downstream food price pressure stay live exposures whatever is reported. With nothing fresh this month, treat the recent assessment as the working baseline.",
+  zeroPolestar: "Nothing useful came through on fertiliser this month. Hold the recent assessment and keep forward-cover measures in place until fresh reporting arrives.",
   thinNote: "Fertiliser reporting was light this month. Treat that as a gap in reporting, not proof of supply stability.",
 };
 

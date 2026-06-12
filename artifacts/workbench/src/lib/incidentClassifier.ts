@@ -94,13 +94,19 @@ function classifyFuel(t: string): string {
 
 // Fertiliser ---------------------------------------------------------------
 function classifyFertiliser(t: string): string {
-  if (/\bshortage|stockout\b/.test(t)) return "Fertiliser shortage";
-  if (/\bprice (increase|hike|rise|rises|jump|surge)/.test(t)) return "Price increase";
-  if (/\bexport (restrict|ban|curb|quota)/.test(t)) return "Export restriction";
-  if (/\bimport (disruption|delay|block)/.test(t)) return "Import disruption";
-  if (/\bproduction (disruption|halt|cut|outage)/.test(t)) return "Production disruption";
-  if (/\bfarmer.{0,15}protest|farmers protest/.test(t)) return "Farmer protest";
-  if (/\bsupply chain|logistics/.test(t)) return "Supply chain disruption";
+  // Farmer-led action over inputs reads as the event itself, ahead of the
+  // underlying shortage or price driver that triggered it.
+  if (/\bfarmers?.{0,25}(protest|agitation|rally|march|blockade|stir|demonstrat)|protest.{0,25}(urea|fertili[sz]er|dap)/.test(t)) return "Farmer protest";
+  if (/\bexport (restrict|ban|curb|quota|control)/.test(t)) return "Export restriction";
+  if (/\b(shortage|stockout|scarcity|run(s|ning) out|unavailab|not available|deficit|crunch)\b/.test(t)) return "Fertiliser shortage";
+  if (/\bsubsid/.test(t)) return "Subsidy pressure";
+  if (/\bprices?\b.{0,15}(drop|fall|falls|fell|crash|crashes|ease|easing|decline|cool|cooling|lower|slump|tumble|down)\b|\b(relief|cheaper).{0,25}(urea|fertili[sz]er|farmer|price|import)/.test(t)) return "Price relief";
+  if (/\bprices?\b.{0,15}(increase|hike|rise|rises|rising|jump|surge|soar|climb|higher|spike|up)\b|\b(cost|costs)\b.{0,15}(rise|rising|higher|surge|climb|jump|up|%)/.test(t)) return "Price increase";
+  if (/\b(production|output)\b.{0,20}(disrupt|halt|cut|outage|hit|hits|reduce|shut|stoppage|squeeze)|\b(ammonia|urea|dap)\b.{0,15}(plant|unit|production)/.test(t)) return "Production disruption";
+  if (/\bgas supply|feedstock|raw material/.test(t)) return "Feedstock supply";
+  if (/\b(imports?|importing|procure|procurement|tender|secure .{0,20}supply|sourcing|deal for)\b/.test(t)) return "Fertiliser imports";
+  if (/\bsupply (interruption|disruption|cut|halt|squeeze|chain|security)|logistics|distribution\b/.test(t)) return "Supply chain disruption";
+  if (/\b(food (security|shortage|price)|crop|harvest|sowing|planting|yield|kharif|paddy)\b/.test(t)) return "Food security pressure";
   return "Other fertiliser incident";
 }
 
