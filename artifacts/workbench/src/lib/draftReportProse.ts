@@ -20,7 +20,7 @@
 //     flashpoint, energy) — no generic paragraph pattern shared across topics
 //   - if data is thin, say so plainly; never invent confidence
 
-import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
+import { resolveReportWindow, filterIncidentsToWindow, reportCadence } from "./reportWindow";
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
 import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
 import { selectFlashpointUsable } from "./flashpointReportDataset";
@@ -182,7 +182,9 @@ function periodPhrase(topic: string, issueDate: string): string {
 }
 
 function cadenceWord(topic: string): string {
-  return topic === "cargo_watch" ? "monthly" : "weekly";
+  // Single source of truth: defer to reportWindow so prose voice ("this month"
+  // vs "this week") never drifts from the actual report window/cadence.
+  return reportCadence(topic);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,9 +228,10 @@ function sevTail(sev: string): string {
   return sev ? ` The most serious reached ${sev}.` : "";
 }
 
-function thinTail(thin: boolean, total: number): string {
+function thinTail(thin: boolean, total: number, cadence: string): string {
   if (!thin || total === 0) return "";
-  return " There is little to go on this week, so treat this as a rough guide.";
+  const period = cadence === "monthly" ? "month" : "week";
+  return ` There is little to go on this ${period}, so treat this as a rough guide.`;
 }
 
 // Fuel Watch tracks cost-and-continuity pressure, not casualty-grade events.
@@ -259,7 +262,7 @@ const FUEL: ReportPack = {
     const geo = lead
       ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with more reported from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    const para1 = `Fuel risk this ${cadence === "monthly" ? "month" : "week"} is mainly about cost and continuity rather than a single dramatic event. The pressure came from ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total)}`;
+    const para1 = `Fuel risk this ${cadence === "monthly" ? "month" : "week"} is mainly about cost and continuity rather than a single dramatic event. The pressure came from ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total, cadence)}`;
     const para2 = `Cost indicators are holding above easy-budget levels, and the incident picture adds operational stress — shortages, forecourt disruption, subsidy moves and route pressure where they appear — rather than relief.`;
     const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
@@ -337,12 +340,12 @@ const FUEL: ReportPack = {
 // Fertiliser Watch
 // ---------------------------------------------------------------------------
 const FERTILISER: ReportPack = {
-  exec: ({ types, lead, countries, sev, thin, total }) => {
+  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
     const driver = types || "pricing, export controls and production disruption";
     const geo = lead
       ? ` ${lead} saw the most activity${countries && countries !== lead ? `, supported by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Fertiliser pressure was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    return `Fertiliser pressure was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Supply, price and export decisions stay front of mind, currently showing up as ${types}.` : "Supply, price and export decisions stay front of mind, with farmer access and planting timing the operational concern.";
@@ -365,24 +368,24 @@ const FERTILISER: ReportPack = {
     const tail = lead ? ` ${lead} is the country to watch when planning forward cover.` : "";
     return `The standing concern is supply continuity rather than the number of headlines.${tail}`;
   },
-  zeroExec: "Fertiliser reporting was quiet this week. Read that as a gap in reporting rather than proof of market calm.",
+  zeroExec: "Fertiliser reporting was quiet this month. Read that as a gap in reporting rather than proof of market calm.",
   zeroSituation: "Supply, price and export decisions remain the operating concern even when little is reported.",
   zeroWhatHappened: "Little fertiliser reporting came through, so the picture rests on recent weeks rather than fresh reporting.",
   zeroWhatMatters: "Farm input cost, planting decisions and downstream food price pressure stay live exposures whatever is reported.",
-  zeroPolestar: "Nothing useful came through on fertiliser this week. Hold the recent assessment until fresh reporting arrives.",
-  thinNote: "Fertiliser reporting was light this week. Treat that as a gap in reporting, not proof of supply stability.",
+  zeroPolestar: "Nothing useful came through on fertiliser this month. Hold the recent assessment until fresh reporting arrives.",
+  thinNote: "Fertiliser reporting was light this month. Treat that as a gap in reporting, not proof of supply stability.",
 };
 
 // ---------------------------------------------------------------------------
 // Cargo Watch
 // ---------------------------------------------------------------------------
 const CARGO: ReportPack = {
-  exec: ({ types, lead, countries, sev, thin, total }) => {
+  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
     const driver = types || "theft, pilferage and warehouse loss";
     const geo = lead
       ? ` ${lead} saw the most consistent reporting${countries && countries !== lead ? `, alongside ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Cargo loss this month was shaped by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    return `Cargo loss this month was shaped by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
   },
   situation: ({ types, lead }) => {
     const focus = types ? `Warehouse, depot and road corridors hold the live exposure, currently visible in ${types}.` : "Warehouse, depot and road corridors hold the live exposure, with route knowledge and insider risk as the persistent drivers.";
@@ -418,12 +421,12 @@ const CARGO: ReportPack = {
 // Shipping Watch
 // ---------------------------------------------------------------------------
 const SHIPPING: ReportPack = {
-  exec: ({ types, lead, countries, sev, thin, total }) => {
+  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
     const driver = types || "chokepoint exposure, vessel risk and freight-side pressure";
     const geo = lead
       ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with less from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : " No single country stands out, and several reports do not pin down a precise location.";
-    return `Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    return `Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Chokepoints and major ports remain the standing pressure points, currently showing up as ${types}.` : "Chokepoints and major ports remain the standing pressure points, with vessel and freight-side risk close behind.";
@@ -510,12 +513,12 @@ const FLASHPOINT: ReportPack = {
 // Energy Watch
 // ---------------------------------------------------------------------------
 const ENERGY: ReportPack = {
-  exec: ({ types, lead, countries, sev, thin, total }) => {
+  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
     const driver = types || "outage events, load shedding and generation shortfall";
     const geo = lead
       ? ` ${lead} carried the most visible grid strain${countries && countries !== lead ? `, alongside ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    return `Power and grid pressure this week was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total)}`;
+    return `Power and grid pressure this week was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Capacity strain shows through ${types}, with fuel-to-power supply the underlying weakness.` : "Capacity strain remains the background condition, with fuel-to-power supply the underlying weakness.";

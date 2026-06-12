@@ -31,7 +31,7 @@ export const CANONICAL_TOPIC: Record<string, CanonicalTopic> = {
   flashpoint:  { topicLine: "Flashpoint",    cadence: "Weekly",  title: "Flashpoint", subtitle: "Activism, Protests & Civil Unrest" },
   protests:    { topicLine: "Flashpoint",    cadence: "Weekly",  title: "Flashpoint", subtitle: "Activism, Protests & Civil Unrest" },
   energy:      { topicLine: "Energy / Grid", cadence: "Weekly",  title: "Energy Watch" },
-  fertiliser:  { topicLine: "Fertiliser",    cadence: "Weekly",  title: "Fertiliser Watch" },
+  fertiliser:  { topicLine: "Fertiliser",    cadence: "Monthly", title: "Fertiliser Watch" },
 };
 
 export function canonicalTopic(topic: string): CanonicalTopic {

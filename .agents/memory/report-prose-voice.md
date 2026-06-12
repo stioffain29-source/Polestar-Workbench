@@ -18,12 +18,19 @@ business briefs, not pipeline logs, across ALL report topics.
 
 ## Per-topic cadence — the easy-to-miss trap
 
-- **Cargo Watch is MONTHLY** → use "this month" / "a quiet month" / "two clean
-  months in a row".
-- **Every other topic is WEEKLY** (fuel, fertiliser, shipping, flashpoint,
-  energy, protests, country) → "this week".
+- **Cargo Watch and Fertiliser are MONTHLY** (30-day window) → use "this month"
+  / "a quiet month". Single source of truth is the `MONTHLY_TOPICS` set in
+  `reportWindow.ts` (`reportCadence`); `cadenceWord` in `draftReportProse.ts`
+  and the `cadence` field in `reportNaming.ts`'s `CANONICAL_TOPIC` table must
+  agree with it — three places, flip all together when a topic changes cadence.
+- **Every other topic is WEEKLY** (fuel, shipping, flashpoint, energy, protests,
+  country) → "this week".
 - Shared/generic stat surfaces used across topics (e.g. `topicFastFacts`) are
   cadence-neutral → "this period".
+- A monthly report window matches the topic dashboard's 30D range (both read the
+  relevance-gated `/incidents`); the report anchors to its issue date/latest
+  record while the dashboard is today-relative, so a ~1-record boundary-day
+  difference is BY DESIGN, not a sync bug — do not force exact equality.
 - **Real-world timeframes are NOT cadence** and stay as-is even in cargo:
   underwriter/insurance lag ("one to two weeks"), copycat-theft window ("within
   two weeks"), tight clustering ("repeat operator names in the same week").

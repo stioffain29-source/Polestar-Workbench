@@ -7,9 +7,13 @@ import { latestRecordDate } from "./reportDataStatus";
 
 export type Cadence = "weekly" | "monthly";
 
+// Topics published on a monthly cadence (30-day window). Everything else is
+// weekly. Fertiliser joins Cargo Watch here so its report window matches the
+// Fertiliser dashboard's 30-day scope instead of a 7-day slice.
+const MONTHLY_TOPICS = new Set<string>(["cargo_watch", "fertiliser"]);
+
 export function reportCadence(topic: string): Cadence {
-  // Cargo Watch is the only monthly product; everything else is weekly.
-  return topic === "cargo_watch" ? "monthly" : "weekly";
+  return MONTHLY_TOPICS.has(topic) ? "monthly" : "weekly";
 }
 
 // Default report window.
