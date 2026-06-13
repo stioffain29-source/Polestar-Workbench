@@ -211,15 +211,6 @@ function dominatedByUnknown(data: { key: string; count: number }[]): boolean {
 
 const UNKNOWN_CAVEAT = "Mostly unattributed — limited public source detail, not an operational finding.";
 
-/** Strip outlet/code suffix and parenthetical from a raw location string. */
-function cleanLocation(s: StrikeLike): string {
-  const loc = (s.location ?? "").trim();
-  if (!loc || /^unknown$/i.test(loc)) return "Unknown / unattributed";
-  // "Al Taweelah (EGA), Abu Dhabi" -> "Al Taweelah"; "Fujairah, Fujairah" -> "Fujairah".
-  const head = loc.split(",")[0].replace(/\([^)]*\)/g, "").trim();
-  return head.length > 0 ? head : "Unknown / unattributed";
-}
-
 const SUBTITLE: Record<"maritime_hormuz" | "land_gcc", string> = {
   land_gcc:
     "Land-based missile and drone strikes against Saudi Arabia, Kuwait, UAE, Oman, Bahrain, Qatar, and Jordan. Maritime incidents, naval interceptions, and threat-only reports are excluded.",
@@ -283,24 +274,6 @@ export default function Strikes() {
   const byImpact = useMemo(() => groupCount(filtered, deriveImpact), [filtered]);
   const byContext = useMemo(() => groupCount(filtered, deriveContext), [filtered]);
   const byCasualties = useMemo(() => groupCount(filtered, deriveCasualties), [filtered]);
-
-  // Sub-location drill-down keyed to the selected country, or the most-affected
-  // country when no country filter is set. UAE drills to emirate; every other
-  // country drills to its cleaned location string.
-  const focusCountry = useMemo(
-    () => country || (byCountry[0]?.key ?? ""),
-    [country, byCountry],
-  );
-  const focusIsUae = /united arab|uae/i.test(focusCountry);
-  const bySubLocation = useMemo(() => {
-    const rows = filtered.filter((s) => s.country === focusCountry);
-    const keyed = groupCount(rows, focusIsUae ? deriveEmirate : cleanLocation);
-    return keyed.slice(0, 10);
-  }, [filtered, focusCountry, focusIsUae]);
-  const subLocationTotal = useMemo(
-    () => filtered.filter((s) => s.country === focusCountry).length,
-    [filtered, focusCountry],
-  );
 
   const exportCsv = () => {
     const headers = [
@@ -414,24 +387,13 @@ export default function Strikes() {
         </ResponsiveContainer>
       </Card>
 
-      {/* Top section: four standardised overview charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top section: three standardised overview charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card
           title="Total strikes by country"
           subtitle={`All countries in window. Bars sum to ${filtered.length}.`}
         >
           <CatBar data={byCountry} height={220} />
-        </Card>
-        <Card
-          title={focusCountry ? `Sub-locations — ${focusCountry}` : "Strikes by sub-location"}
-          subtitle={
-            focusIsUae
-              ? `${focusCountry} by emirate. Bars sum to ${subLocationTotal} (= its total at left).`
-              : `Most-affected country${country ? " (selected)" : ""}. Bars sum to ${subLocationTotal}.`
-          }
-          caveat={dominatedByUnknown(bySubLocation) ? UNKNOWN_CAVEAT : undefined}
-        >
-          {bySubLocation.length === 0 ? <Empty /> : <CatBar data={bySubLocation} height={220} />}
         </Card>
         <Card
           title="Attack context"
