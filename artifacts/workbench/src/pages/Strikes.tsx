@@ -165,7 +165,7 @@ function deriveImpact(s: StrikeLike): string {
   if (/\b(destroyed|severe damage|major damage|leveled|massive)\b/.test(text)) return "Severe";
   if (/\b(damage|damaged|fire|blast|explosion)\b/.test(text)) return "Damage";
   if (/\b(disrupt|suspend|delay|outage|shutdown|halt|closure|closed|evacuat)\b/.test(text)) return "Disruption";
-  return "Unknown";
+  return "Not reported";
 }
 
 function deriveContext(s: StrikeLike): string {
