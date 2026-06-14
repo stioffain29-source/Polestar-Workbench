@@ -460,6 +460,16 @@ export async function runDataMigrations(): Promise<void> {
     //     EGA smelter strikes, recorded as unknown/unknown before the rulebook
     //     learned those terms) also get their blank columns filled — fill-only-
     //     when-blank still protects any deliberately chosen analyst value.
+    //
+    //     v3 re-sweeps after the rulebook's VESSEL_TARGET_FRAME gained the
+    //     ship/tanker/vessel "seized / sunk / boarded / disabled / redirected"
+    //     framing (added with the role-aware vessel work AFTER v2 had already
+    //     run in prod). Several genuine vessel events — "One ship seized, another
+    //     sunk", "Ship seized off coast of UAE", "Ship seized near Hormuz"
+    //     (prod ids 159/160/176/182/183) — were left stuck at target_category
+    //     'unknown' because the classifier at v2-time did not recognise that
+    //     wording. The classifier now returns 'vessel' for them; this fill-only-
+    //     when-blank re-run picks them up without touching any non-blank value.
     {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS app_migration_markers (
@@ -467,7 +477,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "strikes_reclassify_columns_v2";
+      const markerKey = "strikes_reclassify_columns_v3";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);
