@@ -19,7 +19,17 @@ import {
   type BrandSettings,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, Save, Trash2, LayoutTemplate, ImagePlus, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Save,
+  Trash2,
+  LayoutTemplate,
+  ImagePlus,
+  Sparkles,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +40,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { MasterCard } from "@/components/MasterCard";
 import {
@@ -193,7 +217,7 @@ export default function CardBuilder() {
             .join(" · "),
         }));
     }
-    return incidents.slice(0, 150).map((i) => ({
+    return incidents.map((i) => ({
       id: String(i.id),
       label: [
         new Date(i.occurredAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
@@ -455,22 +479,11 @@ export default function CardBuilder() {
                   <SelectItem value="report">Report</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={sourceId} onValueChange={setSourceId}>
-                <SelectTrigger className="rounded-sm">
-                  <SelectValue placeholder="Select a source…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sourceOptions.length === 0 ? (
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No sources available</div>
-                  ) : (
-                    sourceOptions.map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.label}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <SourceCombobox
+                options={sourceOptions}
+                value={sourceId}
+                onChange={setSourceId}
+              />
             </div>
             <Button
               variant="outline"
@@ -724,5 +737,105 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </label>
       {children}
     </div>
+  );
+}
+
+const SOURCE_RENDER_LIMIT = 100;
+
+// Typeahead picker for the "Pull from live data" source list. Filters the full
+// option set client-side (by the rendered label, which carries title, country,
+// and date), so no entry is ever hidden behind a hard cap — typing always
+// narrows to the one the analyst wants. Only the first matches are rendered to
+// keep the popover responsive as incident counts grow.
+function SourceCombobox({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: string; label: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const selected = options.find((o) => o.id === value);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, search]);
+
+  const shown = filtered.slice(0, SOURCE_RENDER_LIMIT);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setSearch("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={options.length === 0}
+          className="rounded-sm w-full justify-between font-normal"
+        >
+          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+            {options.length === 0
+              ? "No sources available"
+              : selected
+                ? selected.label
+                : "Select a source…"}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0 w-[--radix-popover-trigger-width]"
+        align="start"
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search by title, country, date…"
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            <CommandEmpty>No sources found.</CommandEmpty>
+            <CommandGroup>
+              {shown.map((o) => (
+                <CommandItem
+                  key={o.id}
+                  value={o.id}
+                  onSelect={() => {
+                    onChange(o.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4 shrink-0",
+                      value === o.id ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="truncate">{o.label}</span>
+                </CommandItem>
+              ))}
+              {filtered.length > shown.length && (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  Showing {shown.length} of {filtered.length} — keep typing to narrow.
+                </div>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
