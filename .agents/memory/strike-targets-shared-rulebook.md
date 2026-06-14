@@ -30,6 +30,21 @@ inflected form — the historical cause of energy/oil/military targets reading
 keep a trailing boundary so they don't over-match ("civilians injured" is a
 casualty count, not a civilian-area target).
 
+**Vessel framing must cover passive + plural + follow-on, not just active.**
+`VESSEL_TARGET_FRAME` recognises a vessel target when ship/tanker/vessel is the
+struck thing. Active framing ("ship seized") is the easy case; the harder ones
+that kept landing in Unknown: PASSIVE ("ship was seized", "vessel has been
+sunk") needs an optional auxiliary span (`(?:was|were|is|are|has|have|had|been|
+being|got)\s+){0,3}` between noun and participle; PLURAL needs an optional `s?`
+on the noun ("ships were sunk"); and a FOLLOW-ON clause ("One ship seized,
+another sunk") needs a separate `another <participle>` check gated on a vessel
+noun also being present (VESSEL_NOUN_SIG && ANOTHER_ATTACKED_FRAME) so it can't
+fire on an unrelated "another sunk". The participle list is attack-only —
+interception/escort/patrol stay OUT (those frame a responder, not the target).
+Attacker gating is unaffected: military-force-as-attacker is decided in the
+earlier military branch via MILITARY_ACTOR_FRAME, so "US forces seized a tanker"
+still resolves with the tanker as the vessel target.
+
 **Consolidation chose the comprehensive ingest signals as canonical**, with one
 best-of-both tweak: CIVIL uses `civilian\b` (was bare `civilian` in ingest).
 Net effect on the dev DB: exactly 3 strike rows moved Unknown→correct category

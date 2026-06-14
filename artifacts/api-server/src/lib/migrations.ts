@@ -470,6 +470,13 @@ export async function runDataMigrations(): Promise<void> {
     //     'unknown' because the classifier at v2-time did not recognise that
     //     wording. The classifier now returns 'vessel' for them; this fill-only-
     //     when-blank re-run picks them up without touching any non-blank value.
+    //
+    //     v4 re-sweeps after VESSEL_TARGET_FRAME learned PASSIVE vessel framing
+    //     ("ship was seized", "vessel has been sunk", "tankers have been
+    //     boarded"), plural nouns ("ships were sunk"), and the follow-on clause
+    //     "another sunk / seized / boarded" when a vessel noun appears earlier in
+    //     the sentence. Rows whose only attack wording was passive were still
+    //     landing in 'unknown'; the fill-only-when-blank re-run recovers them.
     {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS app_migration_markers (
@@ -477,7 +484,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "strikes_reclassify_columns_v3";
+      const markerKey = "strikes_reclassify_columns_v4";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);

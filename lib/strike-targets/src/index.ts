@@ -169,8 +169,27 @@ function stripAircraftTankers(t: string): string {
 // Explicit ship-as-target framing (incl. disable/seize/board/redirect/blockade)
 // so "US military fires missile to disable ship" reads as a vessel target, not
 // the US force. Operates on aircraft-tanker-stripped text.
+//
+// The noun->verb branch allows an OPTIONAL passive auxiliary span between the
+// noun and the participle so passive framings classify too: "ship was seized",
+// "vessel has been sunk", "tankers have been boarded". The noun carries an
+// optional trailing `s?` so plurals ("ships were sunk") match as well. The verb
+// list is the SET of attack participles a struck vessel takes — interception /
+// escort / patrol words are deliberately excluded (those frame a responder, not
+// the target).
 const VESSEL_TARGET_FRAME =
-  /\b(?:ship|tanker|vessel)\s+(?:hit|struck|attacked|sunk|sinks|sank|sinking|seized|boarded|disabled|redirected)\b|\b(?:disabl\w*|seiz\w*|board\w*|redirect\w*|sink\w*|blockad\w*)\s+(?:a |an |the |its )?(?:ship|tanker|vessel)\b/i;
+  /\b(?:ship|tanker|vessel)s?\s+(?:(?:was|were|is|are|has|have|had|been|being|got)\s+){0,3}(?:hit|struck|attacked|sunk|sinks|sank|sinking|seized|boarded|disabled|redirected)\b|\b(?:disabl\w*|seiz\w*|board\w*|redirect\w*|sink\w*|blockad\w*)\s+(?:a |an |the |its )?(?:ship|tanker|vessel)s?\b/i;
+
+// A bare vessel noun anywhere in the text (used only to confirm context for the
+// follow-on "another sunk" clause below).
+const VESSEL_NOUN_SIG = /\b(?:ship|tanker|vessel)s?\b/i;
+
+// A follow-on clause whose subject ("another") refers back to a vessel named
+// earlier in the sentence: "One ship seized, another sunk", "Two tankers hit,
+// another boarded overnight". Only counts when a vessel noun is also present
+// (see hasVesselSignal) so it cannot fire on an unrelated "another sunk".
+const ANOTHER_ATTACKED_FRAME =
+  /\banother\s+(?:(?:was|were|has|have|had|been|being|got)\s+){0,3}(?:sunk|seized|boarded|disabled|hit|struck|attacked)\b/i;
 
 /**
  * Whether the text describes a MILITARY target that was struck — base/aircraft
@@ -193,6 +212,7 @@ export function hasVesselSignal(t: string): boolean {
   const s = stripAircraftTankers(t);
   if (MERCHANT_VESSEL_SIG.test(s)) return true;
   if (VESSEL_TARGET_FRAME.test(s)) return true;
+  if (VESSEL_NOUN_SIG.test(s) && ANOTHER_ATTACKED_FRAME.test(s)) return true;
   if (COMBATANT_SIG.test(s) && !COMBATANT_ACTOR_FRAME.test(s)) return true;
   return false;
 }
