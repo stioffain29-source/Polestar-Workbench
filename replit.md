@@ -25,6 +25,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - Data-status model (live/manual/static + "Data as of" line): `artifacts/workbench/src/lib/reportDataStatus.ts` (`computeDataAsOf`, `formatDataAsOfLine`, `latestRecordDate`).
 - On-screen/in-PDF provenance strip: `artifacts/workbench/src/components/DataAsOfBanner.tsx`; headless equivalent `drawDataAsOf` in `src/lib/pdfChrome.ts`.
 - Scrapers (data ingestion): `scripts/src/scrape-flashpoint.ts`, `scripts/src/scrape-cargo-watch.ts` (run via `pnpm --filter @workspace/scripts run scrape:flashpoint|scrape:cargo-watch`, add `--commit` to write).
+- Publication calendar (route `/calendar`): per-topic last-published list (Green ≤7d / Amber 8–14d / Red >14d flags + cadence-derived next-due) and a month grid, unified across topic/spot/country reports. Page `artifacts/workbench/src/pages/PublicationCalendar.tsx`; pure helpers `artifacts/workbench/src/lib/publicationCalendar.ts`. Read-only, no backend change; keys off `issueDate`/`reportDate`/`createdAt` as the publish date.
 
 ## Architecture decisions
 

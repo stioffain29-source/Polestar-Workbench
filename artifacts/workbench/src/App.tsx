@@ -21,6 +21,7 @@ import Reports from "./pages/Reports";
 import ReportEditor from "./pages/ReportEditor";
 import SpotReports from "./pages/SpotReports";
 import SpotReportEditor from "./pages/SpotReportEditor";
+import PublicationCalendar from "./pages/PublicationCalendar";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ function Router() {
         <Route path="/reports/:id" component={ReportEditor} />
         <Route path="/spot-reports" component={SpotReports} />
         <Route path="/spot-reports/:id" component={SpotReportEditor} />
+        <Route path="/calendar" component={PublicationCalendar} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

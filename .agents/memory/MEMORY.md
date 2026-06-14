@@ -50,3 +50,4 @@
 - [Report "thin content" diagnosis](report-thin-content-diagnosis.md) — "thin" report = thin ReportPack AND a coarse classifier dumping plurality into "Other X" → "Data quality issue" Fast Fact; fix both; verify classifier on relevance-filtered+windowed rows.
 - [Spot Report capability](spot-report-capability.md) — enum clear-on-UPDATE; map re-fit gated on point-SET (fitKey); preview==every export; analyst-placed multi-point markers via mapPoints jsonb.
 - [Cloud Run uptime outages](cloudrun-uptime-outages.md) — outage alert with no crash/error + same pid alive = transient blip; min-instances=1 fixes it (takes effect after republish).
+- [Reports publish-status reality](report-status-data-reality.md) — reports stay status='draft' (none 'published'); treat issueDate as the publish date; country_slug NULL; country/region come from country+spot reports.
