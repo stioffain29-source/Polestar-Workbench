@@ -59,7 +59,22 @@ async function fetchBody(url: string, timeoutMs: number): Promise<string> {
       const retryable = res.status === 429 || res.status >= 500;
       throw new FeedFetchError(`Status code ${res.status}`, retryable);
     }
-    return await res.text();
+    try {
+      return await res.text();
+    } catch (err) {
+      // The timeout can fire while the response BODY is still streaming (the
+      // Google-News-throttle signature: headers arrive fast, body stalls). That
+      // abort is thrown here, by the body read, not by the fetch() above. Treat
+      // it exactly like a headers timeout — clean message + retryable — so it
+      // runs through the normal backoff retries instead of leaking the raw
+      // "This operation was aborted" AbortError and failing the feed at once.
+      if (ctrl.signal.aborted) {
+        throw new FeedFetchError(`Request timed out after ${timeoutMs}ms`, true);
+      }
+      // A genuine (non-abort) body read error is not retried — fail fast,
+      // exactly as before (matches parse failures and permanent 4xx handling).
+      throw err;
+    }
   } finally {
     clearTimeout(timer);
   }
