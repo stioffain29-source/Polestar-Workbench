@@ -131,6 +131,28 @@ const FLASHPOINT_DENY: RegExp[] = [
   /\([A-Za-z0-9_-]{0,14}[a-z][A-Z][A-Za-z0-9_-]{0,14}\)/,
 ];
 
+// Out-of-region (UK / Ireland) location guard. Country-edition Google-News
+// feeds cross-syndicate UK stories that get mis-stamped onto an APAC country
+// two ways: (a) the source masthead leaks the country — a Belfast riot from
+// "Japan Today" was stamped Japan, the publisher name surviving into BOTH the
+// title AND the summary so a title-only masthead strip cannot catch it; and
+// (b) a diaspora protest names an APAC country as its SUBJECT while physically
+// taking place abroad ("Sri Lankan Tamil groups protest in London",
+// "...Bangladesh High Commission in London"). Neither is an APAC-located
+// incident, so both are rejected here regardless of any APAC country the text
+// happens to name. Two tiers keep precision high:
+//   - BARE tokens are unambiguous CITY names with no APAC namesake and no
+//     sports-club homonym (Belfast, Glasgow, Edinburgh, Dublin, ...).
+//   - VENUE-gated names require a location preposition ("in London", "in the
+//     United Kingdom"). This tier holds (a) cities whose bare word collides
+//     with English football clubs that surface in sports wires about APAC
+//     athletes ("Japan captain ... season with Liverpool"), and (b) country /
+//     region names that are often a mere ACTOR reference ("UK condemns ...")
+//     rather than the event location. The preposition gate keeps both classes
+//     of false positive out of the reject path.
+const FOREIGN_LOCATION: RegExp =
+  /\b(?:belfast|glasgow|edinburgh|cardiff|dublin|londonderry|derry)\b|\b(?:in|at|outside|near|across|to)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:london|manchester|birmingham|liverpool|leeds|sheffield|bristol|nottingham|newcastle|united kingdom|northern ireland|great britain)\b/i;
+
 // Pacific (PNG / West Papua) civilian crime & communal-violence cues.
 // PNG's security signal is overwhelmingly violent CRIME (armed robbery,
 // carjacking, raskol gangs, tribal fighting), which carries none of the
@@ -225,6 +247,13 @@ function classify(title: string, summary: string): {
 
   for (const re of FLASHPOINT_DENY) {
     if (re.test(hay)) return { kept: false, reason: `deny:${re.source.slice(0, 30)}`, country: null };
+  }
+
+  // Reject UK / Ireland-located events that a feed mis-stamped onto an APAC
+  // country (leaked source masthead, or a diaspora protest held abroad). Runs
+  // BEFORE country resolution so the masthead-leaked country never matters.
+  if (FOREIGN_LOCATION.test(hay)) {
+    return { kept: false, reason: "out-of-region:uk-ireland", country: null };
   }
 
   // Country must appear in TITLE or SUMMARY (broader than cargo-watch

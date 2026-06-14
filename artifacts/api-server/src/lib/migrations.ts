@@ -441,6 +441,69 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-2) ONE-TIME purge of out-of-region (UK / Ireland) flashpoint rows.
+    //
+    //       The Protests & Civil Unrest tracker is scoped to APAC-LOCATED
+    //       incidents, but two cross-syndication paths mis-stamped UK events
+    //       onto an APAC country: (a) a leaked source masthead — a Belfast riot
+    //       from "Japan Today" stamped Japan, the publisher name surviving into
+    //       BOTH title and summary so a title-only strip could not catch it; and
+    //       (b) diaspora protests that name an APAC country as their SUBJECT
+    //       while physically taking place abroad ("Sri Lankan Tamil groups
+    //       protest in London", "...Bangladesh High Commission in London").
+    //       These are not APAC-located incidents. The ingest classifier now
+    //       rejects them at the source (FOREIGN_LOCATION); this clears the rows
+    //       already stored. Delete (not relocate) — they belong to no APAC
+    //       country report.
+    //
+    //       Unlike the commodity purge above, this canNOT use an in-region
+    //       protective guard: these rows DO legitimately name an in-region
+    //       country (Sri Lanka / Bangladesh / Japan) — the defect is the foreign
+    //       LOCATION, not a foreign subject. So the predicate keys off the same
+    //       two-tier foreign-location signal the ingest guard uses: BARE tokens
+    //       with no APAC namesake, plus VENUE-gated cities (preposition + city)
+    //       so football-club homonyms ("season with Liverpool") that collide
+    //       with sports wires about APAC athletes are NOT swept. Marker-gated.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      // Backslashes DOUBLED (\\y) — JS template literal first (see 3d note).
+      // Mirrors lib/ingest FOREIGN_LOCATION exactly: bare CITY tokens, plus a
+      // venue-preposition-gated tier (with the optional the/central/greater/
+      // downtown modifiers the runtime regex allows) for football-club homonyms
+      // and actor-reference country/region names.
+      const FOREIGN_BARE =
+        "belfast|glasgow|edinburgh|cardiff|dublin|londonderry|derry";
+      const FOREIGN_VENUE =
+        "london|manchester|birmingham|liverpool|leeds|sheffield|bristol|nottingham|newcastle|united kingdom|northern ireland|great britain";
+      const markerKey = "flashpoint_out_of_region_uk_purge_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM incidents
+          WHERE topic = 'flashpoint'
+            AND (
+              (COALESCE(title,'') || ' ' || COALESCE(summary,'')) ~* ('\\y(' || ${FOREIGN_BARE} || ')\\y')
+              OR (COALESCE(title,'') || ' ' || COALESCE(summary,'')) ~* ('\\y(in|at|outside|near|across|to)[[:space:]]+(the[[:space:]]+|central[[:space:]]+|greater[[:space:]]+|downtown[[:space:]]+)?(' || ${FOREIGN_VENUE} || ')\\y')
+            )
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time purge of out-of-region (UK/Ireland) mis-stamped flashpoint rows",
+        );
+      }
+    }
+
     // 3e) ONE-TIME reclassification of stored strike columns.
     //
     //     The Missile Strike Tracker dashboard derives Target / Weapon /

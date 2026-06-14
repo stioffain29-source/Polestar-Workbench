@@ -55,6 +55,75 @@ describe("classify", () => {
     expect(result.country).toBeNull();
     expect(result.reason).toMatch(/^deny:/);
   });
+
+  it("rejects a UK riot mis-stamped to an APAC country via the source masthead", () => {
+    // The publisher name "Japan Today" leaks into both title AND summary, so
+    // the only "Japan" signal is the masthead — but the event is in Belfast.
+    const result = classify(
+      "Thousands rally in Belfast to condemn anti-immigrant rioting that followed stabbing - Japan Today",
+      "Thousands rally in Belfast to condemn anti-immigrant rioting that followed stabbing Japan Today",
+    );
+    expect(result.kept).toBe(false);
+    expect(result.country).toBeNull();
+    expect(result.reason).toBe("out-of-region:uk-ireland");
+  });
+
+  it("rejects a diaspora protest held abroad even when it names an APAC country", () => {
+    const result = classify(
+      "Sri Lankan Tamil groups protest in London - Daily Mirror",
+      "",
+    );
+    expect(result.kept).toBe(false);
+    expect(result.country).toBeNull();
+    expect(result.reason).toBe("out-of-region:uk-ireland");
+  });
+
+  it("rejects a protest at an APAC high commission located in London", () => {
+    const result = classify(
+      "Khalistanis Disrupt Hindus' Protests At Bangladesh High Commission In London - NDTV",
+      "",
+    );
+    expect(result.kept).toBe(false);
+    expect(result.reason).toBe("out-of-region:uk-ireland");
+  });
+
+  it("rejects a venue with an optional locality modifier (in central London)", () => {
+    const result = classify("Activists clash with police in central London", "");
+    expect(result.kept).toBe(false);
+    expect(result.reason).toBe("out-of-region:uk-ireland");
+  });
+
+  it("rejects an event located 'in the United Kingdom'", () => {
+    const result = classify("Tamil groups stage a protest in the United Kingdom", "");
+    expect(result.kept).toBe(false);
+    expect(result.reason).toBe("out-of-region:uk-ireland");
+  });
+
+  it("keeps an in-region protest that only cites the UK as an actor", () => {
+    // "United Kingdom" here is the SUBJECT, not the venue (no preposition), so
+    // the venue gate must not reject this genuinely Jakarta-located event.
+    const result = classify("Protesters rally in Jakarta against United Kingdom trade deal", "");
+    expect(result.kept).toBe(true);
+    expect(result.country).toBe("Indonesia");
+    expect(result.reason).toMatch(/^allow:/);
+  });
+
+  it("does NOT treat an English football club as an out-of-region location", () => {
+    // "with Liverpool" is club membership, not a venue — the preposition gate
+    // must keep this sports wire out of the foreign-location reject path.
+    const result = classify(
+      "Japan captain Wataru Endo retires after injury-plagued season with Liverpool",
+      "Endo has been replaced in the national team squad",
+    );
+    expect(result.reason).not.toBe("out-of-region:uk-ireland");
+  });
+
+  it("still accepts a genuine in-region protest", () => {
+    const result = classify("Workers rally over wages", "Mass demonstration in Manila");
+    expect(result.kept).toBe(true);
+    expect(result.country).toBe("Philippines");
+    expect(result.reason).toMatch(/^allow:/);
+  });
 });
 
 describe("rehash helpers", () => {
