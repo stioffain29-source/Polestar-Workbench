@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES, sourceStatusClass } from "@/lib/topics";
+import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
+import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp } from "@/lib/sourceHealth";
 import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 // Operational-impact playbook for non-operational sources. Each entry
@@ -122,7 +122,7 @@ export default function Sources() {
         <Kpi label="Manual Review" value={health?.manualReviewCount ?? 0} alert={(health?.manualReviewCount ?? 0) > 0} />
         {SOURCE_STATUSES.map((s) => {
           const c = health?.byStatus.find((b) => b.status === s)?.count ?? 0;
-          return <Kpi key={s} label={s.replace(/_/g, " ")} value={c} />;
+          return <Kpi key={s} label={sourceStatusLabel(s)} value={c} />;
         })}
       </div>
 
@@ -150,8 +150,8 @@ export default function Sources() {
                       {TOPIC_LABELS[s.topic] ?? s.topic}
                     </div>
                     <div className="mt-1">
-                      <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusClass(s.status))}>
-                        {s.status.replace(/_/g, " ")}
+                      <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusBadgeClass(s.status))}>
+                        {sourceStatusLabel(s.status)}
                       </span>
                     </div>
                   </div>
@@ -170,8 +170,8 @@ export default function Sources() {
                     <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Owner / Status</div>
                     <div className="text-foreground">{s.notes?.trim() || "Unassigned — assign an owner in source notes."}</div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Last success: {s.lastSuccessAt ? format(new Date(s.lastSuccessAt), "dd MMM HH:mm") : "—"}
-                      {s.lastFailureAt ? ` · Last failure: ${format(new Date(s.lastFailureAt), "dd MMM HH:mm")}` : ""}
+                      Last success: {formatSourceTimestamp(s.lastSuccessAt)}
+                      {s.lastFailureAt ? ` · Last failure: ${formatSourceTimestamp(s.lastFailureAt)}` : ""}
                     </div>
                   </div>
                 </div>
@@ -216,10 +216,10 @@ export default function Sources() {
                 </div>
                 <div className="p-3 text-xs">{TOPIC_LABELS[s.topic]}</div>
                 <div className="p-3 text-xs uppercase font-serif">{s.sourceType}</div>
-                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusClass(s.status))}>{s.status.replace(/_/g, " ")}</span></div>
+                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusBadgeClass(s.status))}>{sourceStatusLabel(s.status)}</span></div>
                 <div className="p-3"><Dots filled={s.reliability} /></div>
-                <div className="p-3 text-xs font-mono text-muted-foreground">{s.lastSuccessAt ? format(new Date(s.lastSuccessAt), "dd MMM HH:mm") : "—"}</div>
-                <div className="p-3 text-xs font-mono text-muted-foreground">{s.lastFailureAt ? format(new Date(s.lastFailureAt), "dd MMM HH:mm") : "—"}</div>
+                <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastSuccessAt)}</div>
+                <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastFailureAt)}</div>
                 <div className="p-3 text-xs text-muted-foreground truncate">{s.errorMessage ?? "—"}</div>
                 <div className="p-3 flex items-center gap-2">
                   <button onClick={() => setEditing(s)} className="text-muted-foreground hover:text-accent"><Pencil className="w-3.5 h-3.5" /></button>
