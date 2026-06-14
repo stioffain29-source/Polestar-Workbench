@@ -111,14 +111,21 @@ function classifyFertiliser(t: string): string {
 }
 
 // Energy / Grid ------------------------------------------------------------
+// Plurals matter: "power cuts" / "power outages" are the common headline form,
+// so every outage/cut token allows a trailing "s" — a missing one dumps real
+// outage stories into the residual bucket and trips the "Data quality issue"
+// Fast Fact. Power-outage and load-shedding lead because they are the dominant
+// grid event; load shedding stays below outage so a story that reports an
+// outage with a "load shedding reprieve" reads as the outage it is.
 function classifyEnergy(t: string): string {
-  if (/\b(blackout|power outage|outage|power cut)\b/.test(t)) return "Power outage";
-  if (/\bload[ -]shedd/.test(t)) return "Load shedding";
-  if (/\bgrid (failure|disruption|collapse|trip|fault)\b/.test(t)) return "Grid disruption";
+  if (/\b(blackouts?|power outages?|outages?|power cuts?|electricity (cut|cuts|outage|outages))\b/.test(t)) return "Power outage";
+  if (/\bload[ -]shedd|(power|electricity|energy) rationing\b/.test(t)) return "Load shedding";
+  if (/\bgrid (failure|disruption|collapse|trip|fault|overload|instability)\b/.test(t)) return "Grid disruption";
   if (/\bsubstation\b/.test(t)) return "Substation incident";
-  if (/\b(generation shortfall|capacity shortfall|under[ -]capacity)\b/.test(t)) return "Generation shortfall";
-  if (/\b(transmission|pipeline|energy infrastructure)\b/.test(t)) return "Energy infrastructure incident";
-  if (/\b(fuel.*power|gas.*power|diesel.*power)\b/.test(t)) return "Fuel-to-power disruption";
+  if (/\b(generation shortfall|capacity shortfall|under[ -]capacity|supply shortfall|power shortage|electricity shortage)\b/.test(t)) return "Generation shortfall";
+  if (/\b(transmission|pipeline|energy infrastructure|power (plant|station|line))\b/.test(t)) return "Energy infrastructure incident";
+  if (/\b(fuel.*power|gas.*power|diesel.*power|fuel supply|gas supply)\b/.test(t)) return "Fuel-to-power disruption";
+  if (/\b(tariff|electricity price|power price|fixed charge|power bill|surcharge|levy)\b/.test(t)) return "Power tariff / pricing";
   return "Other energy incident";
 }
 

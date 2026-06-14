@@ -549,35 +549,70 @@ const FLASHPOINT: ReportPack = {
 // Energy Watch
 // ---------------------------------------------------------------------------
 const ENERGY: ReportPack = {
+  // Executive Summary: three short paragraphs — the headline judgement, the
+  // structural picture behind the events, and the business meaning.
   exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
-    const driver = types || "outage events, load shedding and generation shortfall";
-    const geo = lead
-      ? ` ${lead} carried the most visible grid strain${countries && countries !== lead ? `, alongside ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+    const driver = types || "power outages, load shedding and generation shortfall";
+    const secondaries = countries && lead && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
-    return `Power and grid pressure this week was led by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const geo = lead
+      ? ` ${lead} carried the most visible grid strain${secondaries ? `, alongside ${secondaries}` : ""}.`
+      : "";
+    const para1 = `Grid risk this ${cadence === "monthly" ? "month" : "week"} is a reliability-and-continuity story rather than a single dramatic failure. The pressure came from ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const para2 = `Behind the individual events sits the structural picture: thin generation margins, ageing transmission and a heavy dependence on fuel-to-power supply that turns a hot afternoon or a tripped substation into hours of lost load. Outages, load shedding and shortfall are the symptoms; the underlying weakness is a grid with little room to absorb a shock.`;
+    const para3 = `For business users the implication is operational, not abstract: unplanned downtime, generator hours and the running cost of keeping critical sites lit. Backup power, fuel cover for extended outages and a clear view of single-source grid dependence are the measures that earn their keep while this picture holds.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
   },
-  situation: ({ types }) => {
-    const focus = types ? `Capacity strain shows through ${types}, with fuel-to-power supply the underlying weakness.` : "Capacity strain remains the background condition, with fuel-to-power supply the underlying weakness.";
-    return `${focus} Industrial continuity sits squarely in the firing line when outages run long.`;
+  situation: ({ lead }) => {
+    const where = lead ? ` ${lead} sits at the centre of the current reporting.` : "";
+    return `Capacity margins stay thin and fuel-to-power supply remains the underlying weakness, so the grid has little headroom when demand peaks or a feeder trips. This matters because reliability and cost move together here: every hour of lost load is both a continuity problem and a generator-fuel bill, and long restorations turn a brief dip into real operational disruption.${where}`;
   },
-  whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Grid reporting was shaped by ${types}.` : `Grid reporting was light this week.`;
-    const geo = countries ? ` Visible stress traced back to ${countries}.` : "";
-    return `${lead}${geo}${sevTail(sev)}`;
+  whatHappened: ({ types, countries, sev, lead }) => {
+    if (!types) {
+      return `Grid reporting was light this week, with no single pattern standing out.${sevTail(sev)}`;
+    }
+    const secondaries = countries && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` Reporting concentrated on ${lead}${secondaries ? `, with more from ${secondaries}` : ""}.`
+      : "";
+    return `Reporting centred on ${types}.${geo}${sevTail(sev)}`;
   },
-  whatMatters: ({ countries }) => {
-    const where = countries ? ` Sites in ${countries} are the live cost centres for backup and continuity spend.` : "";
-    return `Reliability gaps land on site uptime, generator load and the running cost of business continuity.${where}`;
+  whatMatters: ({ lead }) => {
+    const where = lead ? ` Exposure to ${lead} is the live pressure point for backup power, generator fuel and continuity spend.` : "";
+    const para1 = `Reliability gaps land first on site uptime and generator load, then on the running cost of business continuity. When outages run long the cost shifts from inconvenience to fuel burn, spoiled stock, missed production and overtime to recover.${where}`;
+    const para2 = `Where weak generation margins meet a transmission fault or a fuel-supply squeeze, the impact compounds: load shedding deepens, restoration slows, and sites on a single grid feed lose the buffer they assumed they had. That is the exposure worth planning against now, rather than after the next peak-demand failure.`;
+    return `${para1}\n\n${para2}`;
   },
-  implications: () =>
-    "Review backup generator cover, fuel stock for extended outage, UPS run-time on critical sites and any single-source dependency on the public grid.",
-  watchNext: () =>
-    "Keep an eye on fresh load-shedding schedules, substation incidents, fuel-to-power supply moves and weather events that pressure peak demand.",
-  polestarView: ({ lead }) => {
-    const tail = lead ? ` ${lead} is where backup and continuity spend earn their keep this week.` : "";
-    return `The grid story is one of standing fragility rather than a single dramatic event.${tail}`;
+  implications: () => {
+    const lines = [
+      "Check backup generator cover and service status against a multi-hour outage, not just a brief dip.",
+      "Hold fuel stock for extended generator runtime wherever the public grid is the only feed.",
+      "Confirm UPS run-time and failover on critical loads — servers, cold chain, life-safety and security systems.",
+      "Map single-source dependence on the public grid and line up alternate supply or on-site generation before the next peak.",
+      "Build outage cost into continuity budgets — fuel burn, spoilage, lost production and recovery overtime add up fast on long restorations.",
+    ];
+    return lines.map((l) => `- ${l}`).join("\n");
   },
-  zeroExec: "Grid reporting was quiet this week. Read that as a gap in reporting rather than evidence that the grid is stable.",
+  watchNext: () => {
+    const lines = [
+      "Load-shedding schedules — fresh rationing notices are the clearest sign generation margins are tightening.",
+      "Substation and transmission faults — repeat trips on the same network point to ageing infrastructure, not one-off events.",
+      "Fuel-to-power supply — gas, diesel and coal availability decides whether plants can actually run to capacity.",
+      "Peak-demand weather — heatwaves and cold snaps push demand past the margin and trigger shedding.",
+      "Generation outages and maintenance — planned and forced unit outages tighten the supply buffer within days.",
+    ];
+    return lines.join("\n");
+  },
+  polestarView: ({ lead, countries }) => {
+    const pressure = lead
+      ? ` ${lead} is the clearest country pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      : " No single country stands out right now.";
+    return `Energy Watch is flagging standing grid fragility rather than a single dramatic failure. The risk is structural — thin generation margins and heavy fuel-to-power dependence — so the operational answer is resilience: backup power, fuel cover and a clear view of single-grid dependence.${pressure}`;
+  },
+  zeroExec: "Grid reporting was quiet this week. Read that as a gap in reporting rather than evidence that the grid is stable. The standing exposures — thin generation margins, ageing transmission and fuel-to-power dependence — still set the picture for site uptime and continuity cost until fresh reporting comes through.",
   zeroSituation: "Capacity strain and fuel-to-power supply weakness remain the background condition whether or not new reporting lands.",
   zeroWhatHappened: "No notable grid stress came through, so the picture carries forward from recent weeks.",
   zeroWhatMatters: "Site uptime, generator load and continuity spend stay the operational concern on regional grids.",
