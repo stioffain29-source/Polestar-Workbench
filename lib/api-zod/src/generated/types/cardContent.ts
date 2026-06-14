@@ -20,6 +20,14 @@ export interface CardContent {
   outlook?: string;
   mapLocation?: string;
   mapImage?: string;
+  /** Visual panel mode: 'image' (uploaded) or 'map' (rendered Leaflet map). */
+  mapMode?: string;
+  /** Map centre / marker latitude when mapMode is 'map'. */
+  mapLat?: number;
+  /** Map centre / marker longitude when mapMode is 'map'. */
+  mapLng?: number;
+  /** Optional Leaflet zoom level when mapMode is 'map'. */
+  mapZoom?: number;
   sourceNote?: string;
   logoImage?: string;
   footerText?: string;

@@ -8,6 +8,7 @@ import {
   cardRatingLabel,
   templateMeta,
 } from "@/lib/cardTemplates";
+import CardMap from "@/components/CardMap";
 
 export interface MasterCardProps {
   templateKey: string;
@@ -43,6 +44,11 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
     while (keyPoints.length < 3) keyPoints.push("");
 
     const SAFE = 64; // safe-zone padding
+
+    const mapLat = typeof content.mapLat === "number" ? content.mapLat : NaN;
+    const mapLng = typeof content.mapLng === "number" ? content.mapLng : NaN;
+    const useMap =
+      content.mapMode === "map" && !Number.isNaN(mapLat) && !Number.isNaN(mapLng);
 
     return (
       <div
@@ -157,7 +163,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
             minHeight: 0,
             margin: `${SAFE * 0.5}px ${SAFE}px`,
             border: `2px solid ${polar}`,
-            background: content.mapImage ? "#ffffff" : "#F4F5F7",
+            background: useMap || content.mapImage ? "#ffffff" : "#F4F5F7",
             position: "relative",
             overflow: "hidden",
             display: "flex",
@@ -165,7 +171,15 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
             justifyContent: "center",
           }}
         >
-          {content.mapImage ? (
+          {useMap ? (
+            <CardMap
+              lat={mapLat}
+              lng={mapLng}
+              zoom={typeof content.mapZoom === "number" ? content.mapZoom : 6}
+              color={electric}
+              label={content.mapLocation || undefined}
+            />
+          ) : content.mapImage ? (
             <img
               src={content.mapImage}
               alt="visual"
@@ -186,7 +200,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
               {meta.panelLabel}
             </div>
           )}
-          {(content.mapLocation || content.mapImage) && content.mapLocation && (
+          {!useMap && content.mapLocation && (
             <div
               style={{
                 position: "absolute",

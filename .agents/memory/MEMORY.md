@@ -51,3 +51,4 @@
 - [Spot Report capability](spot-report-capability.md) — enum clear-on-UPDATE; map re-fit gated on point-SET (fitKey); preview==every export; analyst-placed multi-point markers via mapPoints jsonb.
 - [Cloud Run uptime outages](cloudrun-uptime-outages.md) — outage alert with no crash/error + same pid alive = transient blip; min-instances=1 fixes it (takes effect after republish).
 - [Reports publish-status reality](report-status-data-reality.md) — reports stay status='draft' (none 'published'); treat issueDate as the publish date; country_slug NULL; country/region come from country+spot reports.
+- [Card visual panel map](card-map-html2canvas.md) — card PNG export CLONES the DOM then html2canvas's it; any card widget must rasterise from static DOM (HTML overlay dots + img tiles, NO canvas/SVG markers) like IncidentMap.

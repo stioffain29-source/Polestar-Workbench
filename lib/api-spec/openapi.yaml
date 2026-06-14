@@ -1566,6 +1566,10 @@ components:
         outlook: { type: string }
         mapLocation: { type: string }
         mapImage: { type: string }
+        mapMode: { type: string, description: "Visual panel mode: 'image' (uploaded) or 'map' (rendered Leaflet map)." }
+        mapLat: { type: number, description: "Map centre / marker latitude when mapMode is 'map'." }
+        mapLng: { type: number, description: "Map centre / marker longitude when mapMode is 'map'." }
+        mapZoom: { type: number, description: "Optional Leaflet zoom level when mapMode is 'map'." }
         sourceNote: { type: string }
         logoImage: { type: string }
         footerText: { type: string }

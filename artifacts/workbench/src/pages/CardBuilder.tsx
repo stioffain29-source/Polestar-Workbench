@@ -66,6 +66,7 @@ function emptyContent(templateKey: string): CardContent {
     outlook: "",
     mapLocation: "",
     mapImage: "",
+    mapMode: "image",
     sourceNote: "",
     logoImage: "",
     footerText: "",
@@ -107,12 +108,21 @@ export default function CardBuilder() {
   const [content, setContent] = useState<CardContent>(() => emptyContent("country_risk"));
   const [loaded, setLoaded] = useState(false);
 
+  // Raw text mirrors for the numeric map fields, so typing "-", "6." or a
+  // partial number stays editable (parseFloat would otherwise drop them).
+  const [mapLatStr, setMapLatStr] = useState("");
+  const [mapLngStr, setMapLngStr] = useState("");
+  const [mapZoomStr, setMapZoomStr] = useState("");
+
   // Hydrate from a saved draft once.
   useEffect(() => {
     if (isNew || !draft || loaded) return;
     setTitle(draft.title);
     setTemplateKey(draft.templateKey || "country_risk");
     setContent({ ...emptyContent(draft.templateKey || "country_risk"), ...draft.content });
+    setMapLatStr(draft.content?.mapLat != null ? String(draft.content.mapLat) : "");
+    setMapLngStr(draft.content?.mapLng != null ? String(draft.content.mapLng) : "");
+    setMapZoomStr(draft.content?.mapZoom != null ? String(draft.content.mapZoom) : "");
     setLoaded(true);
   }, [isNew, draft, loaded]);
 
@@ -145,6 +155,14 @@ export default function CardBuilder() {
     const kp = [...keyPoints];
     kp[i] = value;
     patch({ keyPoints: kp });
+  }
+
+  function setMapNum(field: "mapLat" | "mapLng" | "mapZoom", raw: string) {
+    if (field === "mapLat") setMapLatStr(raw);
+    else if (field === "mapLng") setMapLngStr(raw);
+    else setMapZoomStr(raw);
+    const n = parseFloat(raw);
+    patch({ [field]: Number.isFinite(n) ? n : undefined } as Partial<CardContent>);
   }
 
   function onPickTemplate(key: string) {
@@ -227,6 +245,9 @@ export default function CardBuilder() {
     if (!t) return;
     setTemplateKey(t.templateKey || "country_risk");
     setContent({ ...emptyContent(t.templateKey || "country_risk"), ...t.content });
+    setMapLatStr(t.content?.mapLat != null ? String(t.content.mapLat) : "");
+    setMapLngStr(t.content?.mapLng != null ? String(t.content.mapLng) : "");
+    setMapZoomStr(t.content?.mapZoom != null ? String(t.content.mapZoom) : "");
     toast({ title: `Loaded "${t.name}"` });
   }
 
@@ -409,7 +430,54 @@ export default function CardBuilder() {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <Field label="Visual panel">
+            <Select
+              value={content.mapMode ?? "image"}
+              onValueChange={(v) => patch({ mapMode: v })}
+            >
+              <SelectTrigger className="rounded-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="image">Uploaded image</SelectItem>
+                <SelectItem value="map">Rendered map (lat / lng)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {content.mapMode === "map"
+                ? "Drops a point on a Leaflet map captured into the PNG."
+                : "Upload a static image for the visual panel."}
+            </p>
+          </Field>
+
+          {content.mapMode === "map" ? (
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Latitude">
+                <Input
+                  value={mapLatStr}
+                  onChange={(e) => setMapNum("mapLat", e.target.value)}
+                  placeholder="-6.31"
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Longitude">
+                <Input
+                  value={mapLngStr}
+                  onChange={(e) => setMapNum("mapLng", e.target.value)}
+                  placeholder="143.96"
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Zoom (1–18)">
+                <Input
+                  value={mapZoomStr}
+                  onChange={(e) => setMapNum("mapZoom", e.target.value)}
+                  placeholder="6"
+                  className="rounded-sm"
+                />
+              </Field>
+            </div>
+          ) : (
             <Field label="Visual / map image">
               <label className="flex items-center gap-2 text-sm border border-input rounded-sm px-3 h-10 cursor-pointer hover:bg-muted">
                 <ImagePlus className="w-4 h-4" />
@@ -430,27 +498,28 @@ export default function CardBuilder() {
                 </button>
               )}
             </Field>
-            <Field label="Logo override (optional)">
-              <label className="flex items-center gap-2 text-sm border border-input rounded-sm px-3 h-10 cursor-pointer hover:bg-muted">
-                <ImagePlus className="w-4 h-4" />
-                {content.logoImage ? "Replace logo" : "Upload logo"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => onUploadImage("logoImage", e.target.files?.[0])}
-                />
-              </label>
-              {content.logoImage && (
-                <button
-                  className="text-xs text-destructive mt-1"
-                  onClick={() => patch({ logoImage: "" })}
-                >
-                  Use brand logo
-                </button>
-              )}
-            </Field>
-          </div>
+          )}
+
+          <Field label="Logo override (optional)">
+            <label className="flex items-center gap-2 text-sm border border-input rounded-sm px-3 h-10 cursor-pointer hover:bg-muted">
+              <ImagePlus className="w-4 h-4" />
+              {content.logoImage ? "Replace logo" : "Upload logo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onUploadImage("logoImage", e.target.files?.[0])}
+              />
+            </label>
+            {content.logoImage && (
+              <button
+                className="text-xs text-destructive mt-1"
+                onClick={() => patch({ logoImage: "" })}
+              >
+                Use brand logo
+              </button>
+            )}
+          </Field>
 
           <Field label="Source note">
             <Input
