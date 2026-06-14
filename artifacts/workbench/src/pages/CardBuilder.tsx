@@ -11,6 +11,7 @@ import {
   useListCountryReports,
   useListIncidents,
   useListSpotReports,
+  useListReports,
   getGetCardDraftQueryKey,
   getListCardDraftsQueryKey,
   getListCardTemplatesQueryKey,
@@ -44,9 +45,11 @@ import { exportCardToPng, slugifyForFilename } from "@/lib/exportCardPng";
 import {
   countryReportToCard,
   incidentToCard,
+  reportToCard,
   spotReportToCard,
   type CardSourceKind,
 } from "@/lib/cardAutofill";
+import { resolveReportTitle } from "@/lib/reportNaming";
 
 const DEFAULT_BRAND: BrandSettings = {
   id: 1,
@@ -108,6 +111,7 @@ export default function CardBuilder() {
   const { data: countryReports = [] } = useListCountryReports();
   const { data: incidents = [] } = useListIncidents();
   const { data: spotReports = [] } = useListSpotReports();
+  const { data: reports = [] } = useListReports();
   const brand = brandData ?? DEFAULT_BRAND;
 
   const createDraft = useCreateCardDraft();
@@ -172,6 +176,23 @@ export default function CardBuilder() {
         label: [r.title, r.country].filter(Boolean).join(" · "),
       }));
     }
+    if (sourceKind === "report") {
+      return [...reports]
+        .sort((a, b) => (a.issueDate < b.issueDate ? 1 : -1))
+        .map((r) => ({
+          id: String(r.id),
+          label: [
+            new Date(r.issueDate).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            resolveReportTitle(r.topic, r.title),
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        }));
+    }
     return incidents.slice(0, 150).map((i) => ({
       id: String(i.id),
       label: [
@@ -182,7 +203,7 @@ export default function CardBuilder() {
         .filter(Boolean)
         .join(" · "),
     }));
-  }, [sourceKind, countryReports, incidents, spotReports]);
+  }, [sourceKind, countryReports, incidents, spotReports, reports]);
 
   function pullFromSource() {
     if (!sourceId) return;
@@ -193,6 +214,14 @@ export default function CardBuilder() {
     } else if (sourceKind === "spot") {
       const rep = spotReports.find((r) => String(r.id) === sourceId);
       if (rep) next = spotReportToCard(rep);
+    } else if (sourceKind === "report") {
+      const rep = reports.find((r) => String(r.id) === sourceId);
+      if (rep) {
+        const countryName = rep.countrySlug
+          ? countryReports.find((c) => c.slug === rep.countrySlug)?.name
+          : undefined;
+        next = reportToCard(rep, countryName);
+      }
     } else {
       const inc = incidents.find((i) => String(i.id) === sourceId);
       if (inc) next = incidentToCard(inc);
@@ -405,7 +434,8 @@ export default function CardBuilder() {
               <Sparkles className="w-3.5 h-3.5" /> Pull from live data
             </div>
             <p className="text-xs text-muted-foreground">
-              Pre-fill the card from a country, incident, or spot report. Every field stays editable.
+              Pre-fill the card from a country, incident, spot report, or published report. Every
+              field stays editable.
             </p>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <Select
@@ -422,6 +452,7 @@ export default function CardBuilder() {
                   <SelectItem value="country">Country baseline</SelectItem>
                   <SelectItem value="incident">Incident</SelectItem>
                   <SelectItem value="spot">Spot report</SelectItem>
+                  <SelectItem value="report">Report</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={sourceId} onValueChange={setSourceId}>

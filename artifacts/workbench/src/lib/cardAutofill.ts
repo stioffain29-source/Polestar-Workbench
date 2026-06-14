@@ -2,13 +2,14 @@ import type {
   CardContent,
   CountryReport,
   Incident,
+  Report,
   SpotReport,
 } from "@workspace/api-client-react";
-import { canonicalTopic } from "./reportNaming";
+import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { CARD_RATINGS } from "./cardTemplates";
 
 // Sources an analyst can pull card content from.
-export type CardSourceKind = "country" | "incident" | "spot";
+export type CardSourceKind = "country" | "incident" | "spot" | "report";
 
 function formatDate(iso?: string | null): string {
   if (!iso) return "";
@@ -35,6 +36,25 @@ function normaliseRating(severity?: string | null): string | undefined {
   if (!severity) return undefined;
   const s = severity.toLowerCase();
   return (CARD_RATINGS as readonly string[]).includes(s) ? s : undefined;
+}
+
+// Reports carry no explicit severity field, so infer the card rating from the
+// five-tier risk vocabulary used in the prose, taking the highest tier present.
+const RATING_TIERS: readonly string[] = [
+  "extreme",
+  "high",
+  "moderate",
+  "low",
+  "insignificant",
+];
+
+function inferRatingFromProse(...parts: Array<string | null | undefined>): string | undefined {
+  const text = parts.filter(Boolean).join(" ").toLowerCase();
+  if (!text) return undefined;
+  for (const tier of RATING_TIERS) {
+    if (new RegExp(`\\b${tier}\\b`).test(text)) return tier;
+  }
+  return undefined;
 }
 
 // Split prose into clean sentences for key-point derivation.
@@ -117,5 +137,44 @@ export function countryReportToCard(rep: CountryReport): Partial<CardContent> {
     keyPoints,
     outlook: implications.slice(0, 2).join(" ") || "",
     mapLocation: rep.name,
+  };
+}
+
+// Pull from a published topic/country briefing. `countryName` resolves the
+// report's countrySlug to a display name when the caller has it; otherwise the
+// country field is left blank for topic reports that aren't country-scoped.
+export function reportToCard(rep: Report, countryName?: string): Partial<CardContent> {
+  const situation = sentences(rep.situation);
+  const whatMatters = sentences(rep.whatMatters);
+  const implications = sentences(rep.implications);
+  const whatHappened = sentences(rep.whatHappened);
+  // Prefer the analyst's "What Matters" / "Implications" findings; fall back to
+  // "What Happened" so a report without those sections still pulls usefully.
+  const findings = [
+    ...whatMatters.slice(0, 2),
+    ...implications.slice(0, 1),
+    ...whatHappened.slice(0, 2),
+  ].filter(Boolean);
+  const keyPoints = threeKeyPoints(findings);
+  const country = (countryName ?? "").trim() || primaryCountry(rep.countrySlug);
+  return {
+    topic: canonicalTopic(rep.topic).topicLine,
+    country,
+    rating:
+      inferRatingFromProse(
+        rep.situation,
+        rep.whatMatters,
+        rep.implications,
+        rep.whatHappened,
+      ) ?? "moderate",
+    headline: resolveReportTitle(rep.topic, rep.title),
+    bluf:
+      situation.slice(0, 2).join(" ") ||
+      rep.situation?.trim() ||
+      whatHappened.slice(0, 2).join(" ") ||
+      "",
+    keyPoints,
+    outlook: sentences(rep.watchNext).slice(0, 2).join(" ") || "",
+    mapLocation: country,
   };
 }
