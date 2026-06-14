@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import {
   addMonths,
+  differenceInCalendarDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -46,6 +47,7 @@ import {
   buildPubItems,
   buildTopicRows,
   CALENDAR_TOPICS,
+  pubFlag,
   PUB_FLAG_COLORS,
   PUB_KIND_COLORS,
   PUB_KIND_LABELS,
@@ -120,6 +122,19 @@ export default function PublicationCalendar() {
     [allItems, topic, country, region, status, showTopicList],
   );
   const overdueCount = topicRows.filter((r) => r.flag.flag === "red").length;
+
+  // Country briefs and spot reports are ad-hoc (no cadence), so they get their
+  // own list rather than the cadence-driven per-topic table. Oldest first.
+  const productRows = useMemo(() => {
+    const now = new Date();
+    return calendarItems
+      .filter((i) => i.kind !== "topic")
+      .map((item) => {
+        const daysSince = differenceInCalendarDays(now, parseISO(item.date));
+        return { item, daysSince, flag: pubFlag(daysSince) };
+      })
+      .sort((a, b) => a.item.date.localeCompare(b.item.date));
+  }, [calendarItems]);
 
   // Default the grid to the month of the most recent publication; null = follow
   // data, otherwise the user-navigated month.
@@ -253,6 +268,63 @@ export default function PublicationCalendar() {
                         <ArrowRight className="w-4 h-4" />
                       </Link>
                     )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Country briefs & spot reports (ad-hoc products) */}
+      {productRows.length > 0 && (
+        <div className="bg-card border border-border rounded-sm">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <h2 className="font-serif font-bold text-primary uppercase tracking-wide text-sm">Country &amp; spot reports</h2>
+            <Legend />
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[3%]" />
+                <TableHead>Report</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Region</TableHead>
+                <TableHead>Published</TableHead>
+                <TableHead className="text-right">Days since</TableHead>
+                <TableHead className="text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {productRows.map((r) => (
+                <TableRow key={r.item.key}>
+                  <TableCell>
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: r.flag.color }}
+                      title={`Published ${r.daysSince}d ago`}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium text-primary max-w-[320px]">
+                    <Link href={r.item.href} className="hover:text-accent transition-colors truncate block">
+                      {r.item.title}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
+                      style={{ backgroundColor: PUB_KIND_COLORS[r.item.kind] }}
+                    >
+                      {r.item.typeLabel}
+                    </span>
+                  </TableCell>
+                  <TableCell className="font-sans text-xs text-muted-foreground">{r.item.region || "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{format(parseISO(r.item.date), "d MMM yyyy")}</TableCell>
+                  <TableCell className="text-right font-mono text-xs">{r.daysSince}d</TableCell>
+                  <TableCell className="text-right">
+                    <Link href={r.item.href} className="text-accent inline-flex items-center">
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
