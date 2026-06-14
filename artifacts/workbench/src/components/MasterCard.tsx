@@ -35,6 +35,11 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
     const electric = brand.colorElectric || "#4655FF";
     const dusk = brand.colorDusk || "#303030";
     const polar = brand.colorPolar || "#E2E2E2";
+    // Brand band gradient — the same navy→electric diagonal the report previews
+    // and PDF chrome use (BRAND_GRADIENT in ReportPreview/pdfChrome) so the card
+    // header and rating footer match the reports. Built from the brand-editable
+    // colours rather than hardcoded hex.
+    const brandGradient = `linear-gradient(-130deg, ${midnight} 0%, ${electric} 100%)`;
     const headingFont = `'${brand.fontHeading || "Roboto Condensed"}', sans-serif`;
     const bodyFont = `'${brand.fontBody || "Roboto"}', sans-serif`;
     const logo = content.logoImage || brand.logoImage || "";
@@ -69,7 +74,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
         {/* ---- Region 1: Top header ---- */}
         <div
           style={{
-            background: midnight,
+            background: brandGradient,
             color: "#ffffff",
             padding: `${SAFE * 0.7}px ${SAFE}px`,
             display: "flex",
@@ -265,7 +270,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
         {/* ---- Region 5: Rating + outlook footer ---- */}
         <div
           style={{
-            background: midnight,
+            background: brandGradient,
             color: "#ffffff",
             padding: `${SAFE * 0.55}px ${SAFE}px`,
             flex: "0 0 auto",
