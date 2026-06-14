@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CardHighlight } from './cardHighlight';
 
 /**
  * Editable content of one infographic card; all fields optional so drafts can be partial.
@@ -13,10 +14,16 @@ export interface CardContent {
   topic?: string;
   country?: string;
   eventDate?: string;
+  /** Optional time-of-day line shown beside the date in the card header meta column. */
+  eventTime?: string;
   headline?: string;
   bluf?: string;
   keyPoints?: string[];
+  /** Right-column callouts (icon + label + body); up to four are rendered. */
+  highlights?: CardHighlight[];
   rating?: string;
+  /** Optional one-line descriptor under the rating; falls back to a per-tier default. */
+  ratingNote?: string;
   outlook?: string;
   mapLocation?: string;
   mapImage?: string;

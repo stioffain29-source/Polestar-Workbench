@@ -669,16 +669,32 @@ export const CardTemplateKey = {
 } as const;
 
 /**
+ * One callout in the card's right-hand highlights column (icon tile + label + body).
+ */
+export interface CardHighlight {
+  label?: string;
+  body?: string;
+  /** Key into the curated card highlight icon set (e.g. 'crowd', 'police', 'traffic'). */
+  icon?: string;
+}
+
+/**
  * Editable content of one infographic card; all fields optional so drafts can be partial.
  */
 export interface CardContent {
   topic?: string;
   country?: string;
   eventDate?: string;
+  /** Optional time-of-day line shown beside the date in the card header meta column. */
+  eventTime?: string;
   headline?: string;
   bluf?: string;
   keyPoints?: string[];
+  /** Right-column callouts (icon + label + body); up to four are rendered. */
+  highlights?: CardHighlight[];
   rating?: string;
+  /** Optional one-line descriptor under the rating; falls back to a per-tier default. */
+  ratingNote?: string;
   outlook?: string;
   mapLocation?: string;
   mapImage?: string;

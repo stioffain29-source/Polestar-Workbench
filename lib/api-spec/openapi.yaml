@@ -1550,6 +1550,14 @@ components:
       type: string
       enum: [country_risk, protest_disruption, incident_update, market_entry]
 
+    CardHighlight:
+      type: object
+      description: One callout in the card's right-hand highlights column (icon tile + label + body).
+      properties:
+        label: { type: string }
+        body: { type: string }
+        icon: { type: string, description: "Key into the curated card highlight icon set (e.g. 'crowd', 'police', 'traffic')." }
+
     CardContent:
       type: object
       description: Editable content of one infographic card; all fields optional so drafts can be partial.
@@ -1557,12 +1565,18 @@ components:
         topic: { type: string }
         country: { type: string }
         eventDate: { type: string }
+        eventTime: { type: string, description: "Optional time-of-day line shown beside the date in the card header meta column." }
         headline: { type: string }
         bluf: { type: string }
         keyPoints:
           type: array
           items: { type: string }
+        highlights:
+          type: array
+          description: Right-column callouts (icon + label + body); up to four are rendered.
+          items: { $ref: "#/components/schemas/CardHighlight" }
         rating: { type: string }
+        ratingNote: { type: string, description: "Optional one-line descriptor under the rating; falls back to a per-tier default." }
         outlook: { type: string }
         mapLocation: { type: string }
         mapImage: { type: string }

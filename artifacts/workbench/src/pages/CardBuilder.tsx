@@ -16,6 +16,7 @@ import {
   getListCardDraftsQueryKey,
   getListCardTemplatesQueryKey,
   type CardContent,
+  type CardHighlight,
   type BrandSettings,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,6 +30,8 @@ import {
   Sparkles,
   Check,
   ChevronsUpDown,
+  Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +63,8 @@ import {
   CARD_RATINGS,
   CARD_TEMPLATES,
   CARD_TEMPLATE_KEYS,
+  CARD_HIGHLIGHT_ICONS,
+  DEFAULT_HIGHLIGHT_ICON_KEY,
   CARD_WIDTH,
   CARD_HEIGHT,
   cardRatingLabel,
@@ -95,10 +100,13 @@ function emptyContent(templateKey: string): CardContent {
     topic: meta.defaults.topic ?? "",
     country: "",
     eventDate: "",
+    eventTime: "",
     headline: "",
     bluf: "",
     keyPoints: ["", "", ""],
+    highlights: [],
     rating: meta.defaults.rating ?? "moderate",
+    ratingNote: "",
     outlook: "",
     mapLocation: "",
     mapImage: "",
@@ -268,6 +276,25 @@ export default function CardBuilder() {
     const kp = [...keyPoints];
     kp[i] = value;
     patch({ keyPoints: kp });
+  }
+
+  function setHighlight(i: number, p: Partial<CardHighlight>) {
+    const list = [...(content.highlights ?? [])];
+    list[i] = { ...list[i], ...p };
+    patch({ highlights: list });
+  }
+
+  function addHighlight() {
+    const list = [...(content.highlights ?? [])];
+    if (list.length >= 4) return;
+    list.push({ label: "", body: "", icon: DEFAULT_HIGHLIGHT_ICON_KEY });
+    patch({ highlights: list });
+  }
+
+  function removeHighlight(i: number) {
+    const list = [...(content.highlights ?? [])];
+    list.splice(i, 1);
+    patch({ highlights: list });
   }
 
   function setMapNum(field: "mapLat" | "mapLng" | "mapZoom", raw: string) {
@@ -512,14 +539,24 @@ export default function CardBuilder() {
             </Field>
           </div>
 
-          <Field label="Date / time">
-            <Input
-              value={content.eventDate ?? ""}
-              onChange={(e) => patch({ eventDate: e.target.value })}
-              placeholder="e.g. 14 Jun 2026, 14:00 PGT"
-              className="rounded-sm"
-            />
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Date">
+              <Input
+                value={content.eventDate ?? ""}
+                onChange={(e) => patch({ eventDate: e.target.value })}
+                placeholder="e.g. 14 Jun 2026"
+                className="rounded-sm"
+              />
+            </Field>
+            <Field label="Time">
+              <Input
+                value={content.eventTime ?? ""}
+                onChange={(e) => patch({ eventTime: e.target.value })}
+                placeholder="e.g. 14:00 WIB"
+                className="rounded-sm"
+              />
+            </Field>
+          </div>
 
           <Field label="Headline">
             <Input
@@ -552,6 +589,73 @@ export default function CardBuilder() {
             </div>
           </Field>
 
+          <Field label="Highlights (up to four)">
+            <div className="space-y-3">
+              {(content.highlights ?? []).map((h, i) => (
+                <div
+                  key={i}
+                  className="space-y-2 rounded-sm border border-border p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={h.icon ?? DEFAULT_HIGHLIGHT_ICON_KEY}
+                      onValueChange={(v) => setHighlight(i, { icon: v })}
+                    >
+                      <SelectTrigger className="rounded-sm w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CARD_HIGHLIGHT_ICONS.map((opt) => (
+                          <SelectItem key={opt.key} value={opt.key}>
+                            <span className="flex items-center gap-2">
+                              <opt.Icon className="h-4 w-4" />
+                              {opt.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={h.label ?? ""}
+                      onChange={(e) => setHighlight(i, { label: e.target.value })}
+                      placeholder="Label"
+                      className="rounded-sm flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-sm shrink-0"
+                      onClick={() => removeHighlight(i)}
+                      aria-label="Remove highlight"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={h.body ?? ""}
+                    onChange={(e) => setHighlight(i, { body: e.target.value })}
+                    rows={2}
+                    placeholder="Short detail (one or two lines)"
+                    className="rounded-sm"
+                  />
+                </div>
+              ))}
+              {(content.highlights ?? []).length < 4 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-sm"
+                  onClick={addHighlight}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add highlight
+                </Button>
+              )}
+            </div>
+          </Field>
+
           <div className="grid grid-cols-2 gap-4">
             <Field label="Risk rating">
               <Select value={content.rating ?? "moderate"} onValueChange={(v) => patch({ rating: v })}>
@@ -575,6 +679,15 @@ export default function CardBuilder() {
               />
             </Field>
           </div>
+
+          <Field label="Rating note (optional)">
+            <Input
+              value={content.ratingNote ?? ""}
+              onChange={(e) => patch({ ratingNote: e.target.value })}
+              placeholder="Leave blank for the default tier descriptor"
+              className="rounded-sm"
+            />
+          </Field>
 
           <Field label="Outlook">
             <Textarea

@@ -12,6 +12,7 @@ export * from './cardContent';
 export * from './cardDraft';
 export * from './cardDraftInput';
 export * from './cardDraftUpdate';
+export * from './cardHighlight';
 export * from './cardTemplate';
 export * from './cardTemplateInput';
 export * from './cardTemplateKey';

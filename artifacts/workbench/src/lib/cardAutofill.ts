@@ -22,6 +22,20 @@ function formatDate(iso?: string | null): string {
   });
 }
 
+// Time-of-day for the header clock row. Only emitted when the source timestamp
+// carries a non-midnight time, so date-only records don't show a fake "00:00".
+function formatTime(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return "";
+  return d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }) + " UTC";
+}
+
 // First non-empty country from a semicolon-separated tag, ignoring "Unknown".
 function primaryCountry(raw?: string | null): string {
   if (!raw) return "";
@@ -87,6 +101,7 @@ export function incidentToCard(inc: Incident): Partial<CardContent> {
     bluf: summarySentences.slice(0, 2).join(" ") || inc.summary,
     keyPoints,
     eventDate: formatDate(inc.occurredAt),
+    eventTime: formatTime(inc.occurredAt),
     mapLocation: inc.location?.trim() || primaryCountry(inc.country),
     sourceNote: inc.source?.trim() || "",
   };
@@ -111,6 +126,7 @@ export function spotReportToCard(rep: SpotReport): Partial<CardContent> {
     keyPoints,
     outlook: rep.outlook?.trim() || "",
     eventDate: formatDate(rep.incidentDate || rep.reportDate),
+    eventTime: formatTime(rep.incidentDate),
     mapLocation: place || primaryCountry(rep.country),
   };
 }
