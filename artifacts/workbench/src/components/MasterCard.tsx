@@ -26,12 +26,23 @@ export interface MasterCardProps {
 const TAGLINE = "Intelligence. Precision. Protection.";
 
 // Clamp text to N lines without overflowing the fixed-height bands.
-function clampLines(lines: number): React.CSSProperties {
+// NOTE: html2canvas (used to rasterise the card to PNG) does NOT support
+// `-webkit-line-clamp` / `display: -webkit-box` — it renders the box as a
+// legacy flexbox and vertically centre-clips the text, slicing letters in half.
+// So we clamp with an explicit em-based max-height + overflow:hidden, which the
+// browser preview and html2canvas export rasterise identically.
+function clampLines(lines: number, lineHeight: number): React.CSSProperties {
   return {
-    display: "-webkit-box",
-    WebkitLineClamp: lines,
-    WebkitBoxOrient: "vertical" as const,
+    display: "block",
     overflow: "hidden",
+    lineHeight,
+    boxSizing: "content-box",
+    maxHeight: `${(lines * lineHeight).toFixed(3)}em`,
+    // html2canvas renders text a touch lower than the browser, so a clip edge
+    // flush with the last line shears the glyph bottoms (descenders + the last
+    // visible line). A small bottom pad drops the clip edge below the text
+    // without revealing the next line — fixes the sheared-text export.
+    paddingBottom: "0.3em",
   };
 }
 
@@ -58,9 +69,11 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
     const electric = brand.colorElectric || "#4655FF";
     const dusk = brand.colorDusk || "#303030";
     const polar = brand.colorPolar || "#E2E2E2";
-    // Brand band gradient — the same navy→electric diagonal the report previews
-    // and PDF chrome use, kept on the header so the card stays branded.
-    const brandGradient = `linear-gradient(-130deg, ${midnight} 0%, ${electric} 100%)`;
+    // Brand band gradient on the header. The report chrome uses -130deg, but on
+    // this wide header that drops the bright electric on the LEFT and midnight on
+    // the right — backwards. Mirror it to 130deg so the gradient reads midnight
+    // (left) -> electric (right), the way it should.
+    const brandGradient = `linear-gradient(130deg, ${midnight} 0%, ${electric} 100%)`;
     const headingFont = `'${brand.fontHeading || "Roboto Condensed"}', sans-serif`;
     const bodyFont = `'${brand.fontBody || "Roboto"}', sans-serif`;
     const logo = content.logoImage || brand.logoImage || defaultLogo;
@@ -153,7 +166,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
               color: polar,
               textAlign: "right",
               maxWidth: 560,
-              ...clampLines(2),
+              ...clampLines(2, 1.15),
             }}
           >
             {content.topic || meta.kicker}
@@ -181,7 +194,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
               lineHeight: 1.02,
               color: midnight,
               textTransform: "uppercase",
-              ...clampLines(3),
+              ...clampLines(3, 1.02),
             }}
           >
             {content.headline || "Headline"}
@@ -208,7 +221,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                       fontSize: 23,
                       lineHeight: 1.2,
                       color: midnight,
-                      ...clampLines(2),
+                      ...clampLines(2, 1.2),
                     }}
                   >
                     {text}
@@ -283,7 +296,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                 fontSize: 25,
                 lineHeight: 1.32,
                 padding: "18px 26px",
-                ...clampLines(2),
+                ...clampLines(2, 1.32),
               }}
             >
               {content.bluf}
@@ -409,7 +422,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                           textTransform: "uppercase",
                           color: midnight,
                           lineHeight: 1.1,
-                          ...clampLines(1),
+                          ...clampLines(1, 1.1),
                         }}
                       >
                         {h.label || ""}
@@ -422,7 +435,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                             lineHeight: 1.25,
                             color: dusk,
                             marginTop: 4,
-                            ...clampLines(2),
+                            ...clampLines(2, 1.25),
                           }}
                         >
                           {h.body}
@@ -490,7 +503,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                     lineHeight: 1.28,
                     color: dusk,
                     paddingTop: 2,
-                    ...clampLines(4),
+                    ...clampLines(4, 1.28),
                   }}
                 >
                   {kp || "Key point"}
@@ -546,7 +559,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                 lineHeight: 1.25,
                 color: dusk,
                 marginTop: 10,
-                ...clampLines(2),
+                ...clampLines(2, 1.25),
               }}
             >
               {ratingNote}
@@ -581,7 +594,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                   fontSize: 22,
                   lineHeight: 1.3,
                   color: dusk,
-                  ...clampLines(3),
+                  ...clampLines(3, 1.3),
                 }}
               >
                 {content.outlook || "—"}
