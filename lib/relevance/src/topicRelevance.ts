@@ -353,14 +353,20 @@ const ENERGY_EXCLUDE: RegExp[] = [
   /\b(duke energy|dominion energy|consumers energy|nv energy|pg&e|pacific gas|con ?ed(ison)?|comed|exelon|xcel energy|georgia power|florida power|entergy|first ?energy|ameren|dte energy|eversource|hydro[- ]?quebec|bc hydro|hydro one|pseg|appalachian power|oncor|centerpoint)\b/,
   // US-local distribution vocabulary + "outage tracker" SEO pages.
   /\b(downed (tree|power line|line)|fallen tree|tree crew|outage (tracker|map)|in your area)\b/,
-  // US TV-station call signs that syndicate local outage notices.
-  /\b(abc\d{1,2}|wfaa|fox\d{1,2}|nbc\d{1,2}|cbs\d{1,2}|king ?5)\b/,
+  // US TV-station call signs that syndicate local storm/outage wires
+  // (e.g. WBAL-TV Baltimore bylined the Annapolis MD storm). CURATED
+  // LITERALS only (like wfaa/king5): a broad /\b[wk]..-tv\b/ pattern would
+  // hard-drop in-scope national broadcasters that share the W/K prefix —
+  // KBS (South Korea), WIN (regional Australia), WION (India).
+  /\b(abc\d{1,2}|wfaa|fox\d{1,2}|nbc\d{1,2}|cbs\d{1,2}|king ?5|wbal|wjz|wmar|wusa|wtop|wbz|wcvb|wsb|wgn|ktla|ktvu)\b/,
   // US / Canadian geography markers (none collide with in-scope theatres).
-  /\b(county|township|ohio|texas|california|nevada|michigan|virginia|florida|illinois|oregon|washington state|ontario|quebec|alberta|british columbia)\b/,
+  // "georgia" is deliberately omitted (collides with the country); bare
+  // "washington" stays scoped to "washington state" (D.C. / surname noise).
+  /\b(county|township|ohio|texas|california|nevada|michigan|virginia|florida|illinois|oregon|washington state|maryland|new york|new jersey|pennsylvania|massachusetts|connecticut|north carolina|south carolina|tennessee|kentucky|indiana|wisconsin|minnesota|missouri|arizona|colorado|oklahoma|kansas|ontario|quebec|alberta|british columbia)\b/,
   // US city names — country-edition feeds mis-attribute US storm/outage stories
-  // (esp. Texas/ERCOT) to an in-scope byline. Curated to clearly-US cities with
-  // no in-scope APAC/ME/AU collision.
-  /\b(austin|houston|dallas|fort worth|san antonio|el paso|denver|atlanta|seattle|sacramento|baltimore|memphis|nashville|tulsa|cleveland|milwaukee|minneapolis|detroit)\b/,
+  // (esp. Texas/ERCOT, and East-Coast storms like Annapolis MD) to an in-scope
+  // byline. Curated to clearly-US cities with no in-scope APAC/ME/AU collision.
+  /\b(annapolis|austin|houston|dallas|fort worth|san antonio|el paso|denver|atlanta|seattle|sacramento|baltimore|memphis|nashville|tulsa|cleveland|milwaukee|minneapolis|detroit)\b/,
   // Out-of-region countries that recur in the energy feed.
   /\b(canada|canadian|kenya|kenyan|nersa|ferrochrome|nigeria|south africa|eskom|ghana|zimbabwe|zambia)\b/,
   // Out-of-region grid stories the country-edition feeds mis-attribute to

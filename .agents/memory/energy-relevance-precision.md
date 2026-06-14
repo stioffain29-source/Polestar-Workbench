@@ -32,10 +32,24 @@ energy-infrastructure strike stories); `national grid` (Indian usage → false-d
 storm/outage stories (esp. Texas/ERCOT) to an in-scope byline, and "power outages"
 satisfies REQUIRED, so a US-state token alone misses any title without the state name
 (e.g. "Austin power outages drop after severe storms" → mis-tagged Philippines). A
-curated clearly-US city list (austin/houston/dallas/etc., no in-scope collision) is in
-the exclude. Also excluded: outage **recovery** framing ("outages drop|fall|decline|
-recede|subside") — the opposite of an incident (omit "ease", which appears in
-ongoing-crisis prose).
+curated clearly-US city list (austin/houston/dallas/annapolis/etc., no in-scope
+collision) is in the exclude. Also excluded: outage **recovery** framing ("outages drop|
+fall|decline|recede|subside") — the opposite of an incident (omit "ease", which appears
+in ongoing-crisis prose).
+
+**US TV call signs are CURATED LITERALS, never a broad `\b[wk]..-tv\b` pattern.** A US
+storm wire can carry NEITHER a listed city NOR a state (e.g. "Annapolis storm leaves
+power outages and road closures — WBAL-TV"): the city/state lists missed Annapolis +
+Maryland, so the affiliate call sign in the summary was the only out-of-region signal.
+**Do NOT generalise to `\b[wk][a-z]{2,3}-(tv|dt|am|fm)\b`** — it hard-drops in-scope
+national broadcasters that share the W/K prefix: **KBS** (South Korea), **WIN** (regional
+Australia), **WION** (India). Add specific US call signs to the existing alternation
+instead (wbal/wjz/wmar/wusa/wtop/wbz/wcvb/wsb/wgn/ktla/ktvu, like the pre-existing
+wfaa/king5). **Why the bug matters:** when such a story slips REQUIRED, the per-feed
+**default country** geocodes it to that feed's centroid — the Kuwait energy edition
+tagged the Annapolis storm as **Kuwait (29.31/47.48)**. Stop it at the relevance EXCLUDE;
+the geocode default is downstream and can't tell US-from-Gulf. Expanded the state list
+too (maryland + NE/Midwest), still omitting `georgia` (country collision).
 
 **Mechanism reminder:** any rule change here needs a `RELEVANCE_RULE_VERSION` bump
 (`evaluate.ts`) so the api-server boot backfill re-evaluates stored rows; otherwise the
