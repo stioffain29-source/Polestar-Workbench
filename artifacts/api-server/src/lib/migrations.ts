@@ -1,4 +1,5 @@
-import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable } from "@workspace/db";
+import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable } from "@workspace/db";
+import type { CardContent, InsertBrandSettings } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import { runStrikesBackfill } from "@workspace/ingest";
@@ -853,6 +854,92 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (delErr) {
       logger.error({ err: delErr }, "Dead placeholder source removal failed");
+    }
+
+    // Card builder: seed the four built-in card templates and ensure the
+    // singleton brand-settings row exists. Marker-gated so an analyst who later
+    // edits a built-in's defaults is never overwritten on the next boot.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "card_builder_builtins_seeded_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const BUILT_IN_TEMPLATES: Array<{
+          name: string;
+          templateKey: string;
+          content: CardContent;
+        }> = [
+          {
+            name: "Country Risk Snapshot",
+            templateKey: "country_risk",
+            content: {
+              topic: "Country Risk",
+              rating: "moderate",
+              keyPoints: ["", "", ""],
+              outlook: "",
+            },
+          },
+          {
+            name: "Protest & Disruption Update",
+            templateKey: "protest_disruption",
+            content: {
+              topic: "Protests & Civil Unrest",
+              rating: "high",
+              keyPoints: ["", "", ""],
+              outlook: "",
+            },
+          },
+          {
+            name: "Incident Update",
+            templateKey: "incident_update",
+            content: {
+              topic: "Incident",
+              rating: "moderate",
+              keyPoints: ["", "", ""],
+              outlook: "",
+            },
+          },
+          {
+            name: "Market Entry Snapshot",
+            templateKey: "market_entry",
+            content: {
+              topic: "Market Entry",
+              rating: "low",
+              keyPoints: ["", "", ""],
+              outlook: "",
+            },
+          },
+        ];
+        for (const t of BUILT_IN_TEMPLATES) {
+          await db.insert(cardTemplatesTable).values({
+            name: t.name,
+            templateKey: t.templateKey,
+            isBuiltIn: true,
+            content: t.content,
+          });
+        }
+        await db
+          .insert(brandSettingsTable)
+          .values({ id: 1 } as InsertBrandSettings)
+          .onConflictDoNothing();
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { count: BUILT_IN_TEMPLATES.length, marker: markerKey },
+          "Seeded built-in card templates and brand settings",
+        );
+      }
+    } catch (cardErr) {
+      logger.error({ err: cardErr }, "Card builder seed failed");
     }
 
     try {

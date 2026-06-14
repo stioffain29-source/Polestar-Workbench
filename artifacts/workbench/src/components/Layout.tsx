@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays
+  Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_white_logo_vert_1779500138062.png";
@@ -62,6 +62,13 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Publication Calendar", href: "/calendar", icon: CalendarDays },
         { label: "Report Builder", href: "/reports", icon: FileText },
         { label: "Spot Reports", href: "/spot-reports", icon: Siren },
+      ]
+    },
+    {
+      title: "CARD STUDIO",
+      items: [
+        { label: "Infographic Cards", href: "/card-builder", icon: ImageIcon },
+        { label: "Brand Settings", href: "/card-settings", icon: Settings },
       ]
     }
   ];

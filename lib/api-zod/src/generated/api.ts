@@ -1678,6 +1678,320 @@ export const AppendSpotReportExportResponse = zod.object({
 })
 
 
+export const ListCardDraftsResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "templateKey": zod.string(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+export const ListCardDraftsResponse = zod.array(ListCardDraftsResponseItem)
+
+
+
+
+
+export const CreateCardDraftBody = zod.object({
+  "title": zod.string().min(1),
+  "templateKey": zod.string().optional(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
+})
+
+
+export const GetCardDraftParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCardDraftResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "templateKey": zod.string(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
+export const UpdateCardDraftParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateCardDraftBody = zod.object({
+  "title": zod.string().min(1).optional(),
+  "templateKey": zod.string().optional(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
+})
+
+export const UpdateCardDraftResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "templateKey": zod.string(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
+export const DeleteCardDraftParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const ListCardTemplatesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "templateKey": zod.string(),
+  "isBuiltIn": zod.boolean(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+export const ListCardTemplatesResponse = zod.array(ListCardTemplatesResponseItem)
+
+
+
+
+
+export const CreateCardTemplateBody = zod.object({
+  "name": zod.string().min(1),
+  "templateKey": zod.string(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
+})
+
+
+export const GetCardTemplateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCardTemplateResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "templateKey": zod.string(),
+  "isBuiltIn": zod.boolean(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
+export const UpdateCardTemplateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateCardTemplateBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "templateKey": zod.string().optional(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
+})
+
+export const UpdateCardTemplateResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "templateKey": zod.string(),
+  "isBuiltIn": zod.boolean(),
+  "content": zod.object({
+  "topic": zod.string().optional(),
+  "country": zod.string().optional(),
+  "eventDate": zod.string().optional(),
+  "headline": zod.string().optional(),
+  "bluf": zod.string().optional(),
+  "keyPoints": zod.array(zod.string()).optional(),
+  "rating": zod.string().optional(),
+  "outlook": zod.string().optional(),
+  "mapLocation": zod.string().optional(),
+  "mapImage": zod.string().optional(),
+  "sourceNote": zod.string().optional(),
+  "logoImage": zod.string().optional(),
+  "footerText": zod.string().optional()
+}).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
+  "createdAt": zod.coerce.date(),
+  "lastEditedAt": zod.coerce.date()
+})
+
+
+export const DeleteCardTemplateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Card-builder brand configuration (singleton)
+ */
+export const GetBrandSettingsResponse = zod.object({
+  "id": zod.number(),
+  "colorMidnight": zod.string(),
+  "colorElectric": zod.string(),
+  "colorDusk": zod.string(),
+  "colorPolar": zod.string(),
+  "colorExtreme": zod.string(),
+  "logoImage": zod.string().nullish(),
+  "fontHeading": zod.string(),
+  "fontBody": zod.string(),
+  "footerText": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const UpdateBrandSettingsBody = zod.object({
+  "colorMidnight": zod.string().optional(),
+  "colorElectric": zod.string().optional(),
+  "colorDusk": zod.string().optional(),
+  "colorPolar": zod.string().optional(),
+  "colorExtreme": zod.string().optional(),
+  "logoImage": zod.string().nullish(),
+  "fontHeading": zod.string().optional(),
+  "fontBody": zod.string().optional(),
+  "footerText": zod.string().optional()
+})
+
+export const UpdateBrandSettingsResponse = zod.object({
+  "id": zod.number(),
+  "colorMidnight": zod.string(),
+  "colorElectric": zod.string(),
+  "colorDusk": zod.string(),
+  "colorPolar": zod.string(),
+  "colorExtreme": zod.string(),
+  "logoImage": zod.string().nullish(),
+  "fontHeading": zod.string(),
+  "fontBody": zod.string(),
+  "footerText": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+
+
 export const ListCountryReportsResponseItem = zod.object({
   "id": zod.number(),
   "slug": zod.string(),

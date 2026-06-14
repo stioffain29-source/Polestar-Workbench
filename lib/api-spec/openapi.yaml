@@ -15,6 +15,7 @@ tags:
   - name: reports
   - name: countries
   - name: dashboard
+  - name: cards
 
 paths:
   /healthz:
@@ -549,6 +550,178 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SpotReport" }
+
+  /card-drafts:
+    get:
+      operationId: listCardDrafts
+      tags: [cards]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CardDraft" }
+    post:
+      operationId: createCardDraft
+      tags: [cards]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardDraftInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardDraft" }
+
+  /card-drafts/{id}:
+    get:
+      operationId: getCardDraft
+      tags: [cards]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardDraft" }
+    patch:
+      operationId: updateCardDraft
+      tags: [cards]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardDraftUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardDraft" }
+    delete:
+      operationId: deleteCardDraft
+      tags: [cards]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /card-templates:
+    get:
+      operationId: listCardTemplates
+      tags: [cards]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CardTemplate" }
+    post:
+      operationId: createCardTemplate
+      tags: [cards]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardTemplateInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardTemplate" }
+
+  /card-templates/{id}:
+    get:
+      operationId: getCardTemplate
+      tags: [cards]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardTemplate" }
+    patch:
+      operationId: updateCardTemplate
+      tags: [cards]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardTemplateUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardTemplate" }
+    delete:
+      operationId: deleteCardTemplate
+      tags: [cards]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /brand-settings:
+    get:
+      operationId: getBrandSettings
+      tags: [cards]
+      summary: Card-builder brand configuration (singleton)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BrandSettings" }
+    put:
+      operationId: updateBrandSettings
+      tags: [cards]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BrandSettingsUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BrandSettings" }
 
   /countries:
     get:
@@ -1372,6 +1545,122 @@ components:
         lng: { type: number }
         label: { type: string }
         severity: { type: string }
+
+    CardTemplateKey:
+      type: string
+      enum: [country_risk, protest_disruption, incident_update, market_entry]
+
+    CardContent:
+      type: object
+      description: Editable content of one infographic card; all fields optional so drafts can be partial.
+      properties:
+        topic: { type: string }
+        country: { type: string }
+        eventDate: { type: string }
+        headline: { type: string }
+        bluf: { type: string }
+        keyPoints:
+          type: array
+          items: { type: string }
+        rating: { type: string }
+        outlook: { type: string }
+        mapLocation: { type: string }
+        mapImage: { type: string }
+        sourceNote: { type: string }
+        logoImage: { type: string }
+        footerText: { type: string }
+
+    CardDraft:
+      type: object
+      required: [id, title, templateKey, content, createdAt, lastEditedAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        templateKey: { type: string }
+        content: { $ref: "#/components/schemas/CardContent" }
+        createdAt: { type: string, format: date-time }
+        lastEditedAt: { type: string, format: date-time }
+
+    CardDraftInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1 }
+        templateKey: { type: string }
+        content: { $ref: "#/components/schemas/CardContent" }
+
+    CardDraftUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        templateKey: { type: string }
+        content: { $ref: "#/components/schemas/CardContent" }
+
+    CardTemplate:
+      type: object
+      required: [id, name, templateKey, isBuiltIn, content, createdAt, lastEditedAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        templateKey: { type: string }
+        isBuiltIn: { type: boolean }
+        content: { $ref: "#/components/schemas/CardContent" }
+        createdAt: { type: string, format: date-time }
+        lastEditedAt: { type: string, format: date-time }
+
+    CardTemplateInput:
+      type: object
+      required: [name, templateKey]
+      properties:
+        name: { type: string, minLength: 1 }
+        templateKey: { type: string }
+        content: { $ref: "#/components/schemas/CardContent" }
+
+    CardTemplateUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        templateKey: { type: string }
+        content: { $ref: "#/components/schemas/CardContent" }
+
+    BrandSettings:
+      type: object
+      required:
+        - id
+        - colorMidnight
+        - colorElectric
+        - colorDusk
+        - colorPolar
+        - colorExtreme
+        - fontHeading
+        - fontBody
+        - footerText
+        - updatedAt
+      properties:
+        id: { type: integer }
+        colorMidnight: { type: string }
+        colorElectric: { type: string }
+        colorDusk: { type: string }
+        colorPolar: { type: string }
+        colorExtreme: { type: string }
+        logoImage: { type: ["string", "null"] }
+        fontHeading: { type: string }
+        fontBody: { type: string }
+        footerText: { type: string }
+        updatedAt: { type: string, format: date-time }
+
+    BrandSettingsUpdate:
+      type: object
+      properties:
+        colorMidnight: { type: string }
+        colorElectric: { type: string }
+        colorDusk: { type: string }
+        colorPolar: { type: string }
+        colorExtreme: { type: string }
+        logoImage: { type: ["string", "null"] }
+        fontHeading: { type: string }
+        fontBody: { type: string }
+        footerText: { type: string }
 
     CountryReport:
       type: object

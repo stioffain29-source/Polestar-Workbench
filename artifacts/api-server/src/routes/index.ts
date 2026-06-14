@@ -12,6 +12,7 @@ import dashboardRouter from "./dashboard";
 import marketPricesRouter from "./marketPrices";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
+import cardsRouter from "./cards";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(proseRouter);
 router.use(countriesRouter);
 router.use(dashboardRouter);
 router.use(marketPricesRouter);
+router.use(cardsRouter);
 
 export default router;

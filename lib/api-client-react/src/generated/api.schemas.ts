@@ -658,6 +658,110 @@ export interface SpotReportExportInput {
   exportedBy?: string;
 }
 
+export type CardTemplateKey = typeof CardTemplateKey[keyof typeof CardTemplateKey];
+
+
+export const CardTemplateKey = {
+  country_risk: 'country_risk',
+  protest_disruption: 'protest_disruption',
+  incident_update: 'incident_update',
+  market_entry: 'market_entry',
+} as const;
+
+/**
+ * Editable content of one infographic card; all fields optional so drafts can be partial.
+ */
+export interface CardContent {
+  topic?: string;
+  country?: string;
+  eventDate?: string;
+  headline?: string;
+  bluf?: string;
+  keyPoints?: string[];
+  rating?: string;
+  outlook?: string;
+  mapLocation?: string;
+  mapImage?: string;
+  sourceNote?: string;
+  logoImage?: string;
+  footerText?: string;
+}
+
+export interface CardDraft {
+  id: number;
+  title: string;
+  templateKey: string;
+  content: CardContent;
+  createdAt: string;
+  lastEditedAt: string;
+}
+
+export interface CardDraftInput {
+  /** @minLength 1 */
+  title: string;
+  templateKey?: string;
+  content?: CardContent;
+}
+
+export interface CardDraftUpdate {
+  /** @minLength 1 */
+  title?: string;
+  templateKey?: string;
+  content?: CardContent;
+}
+
+export interface CardTemplate {
+  id: number;
+  name: string;
+  templateKey: string;
+  isBuiltIn: boolean;
+  content: CardContent;
+  createdAt: string;
+  lastEditedAt: string;
+}
+
+export interface CardTemplateInput {
+  /** @minLength 1 */
+  name: string;
+  templateKey: string;
+  content?: CardContent;
+}
+
+export interface CardTemplateUpdate {
+  /** @minLength 1 */
+  name?: string;
+  templateKey?: string;
+  content?: CardContent;
+}
+
+export interface BrandSettings {
+  id: number;
+  colorMidnight: string;
+  colorElectric: string;
+  colorDusk: string;
+  colorPolar: string;
+  colorExtreme: string;
+  /** @nullable */
+  logoImage?: string | null;
+  fontHeading: string;
+  fontBody: string;
+  footerText: string;
+  updatedAt: string;
+}
+
+export interface BrandSettingsUpdate {
+  colorMidnight?: string;
+  colorElectric?: string;
+  colorDusk?: string;
+  colorPolar?: string;
+  colorExtreme?: string;
+  /** @nullable */
+  logoImage?: string | null;
+  fontHeading?: string;
+  fontBody?: string;
+  footerText?: string;
+}
+
 export interface CountryReport {
   id: number;
   slug: string;
