@@ -9,6 +9,10 @@ import {
   templateMeta,
 } from "@/lib/cardTemplates";
 import CardMap from "@/components/CardMap";
+// Default Polestar wordmark baked into every card so analysts never have to
+// upload it. Reverse-white horizontal lockup reads cleanly on the dark brand
+// gradient header. A per-card or brand-level logo upload still overrides it.
+import defaultLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 export interface MasterCardProps {
   templateKey: string;
@@ -42,7 +46,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
     const brandGradient = `linear-gradient(-130deg, ${midnight} 0%, ${electric} 100%)`;
     const headingFont = `'${brand.fontHeading || "Roboto Condensed"}', sans-serif`;
     const bodyFont = `'${brand.fontBody || "Roboto"}', sans-serif`;
-    const logo = content.logoImage || brand.logoImage || "";
+    const logo = content.logoImage || brand.logoImage || defaultLogo;
     const footer = content.footerText || brand.footerText || "Polestar Advisory";
 
     const keyPoints = (content.keyPoints ?? []).slice(0, 3);
