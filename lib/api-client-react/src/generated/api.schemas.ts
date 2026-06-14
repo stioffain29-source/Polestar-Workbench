@@ -679,6 +679,28 @@ export interface CardHighlight {
 }
 
 /**
+ * One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. '$2.4M') and falls back to the numeric value.
+ */
+export interface CardChartBar {
+  label: string;
+  value: number;
+  /** Optional formatted display value (e.g. '$2.4M'); falls back to the numeric value. */
+  valueLabel?: string;
+  /** Optional risk tier key ('insignificant'..'extreme') to colour the bar; falls back to brand electric. */
+  rating?: string;
+}
+
+/**
+ * A card-native bar chart rebuilt from a dashboard's data. Rendered as plain HTML/div bars (never SVG) so it rasterises cleanly into the exported PNG.
+ */
+export interface CardChart {
+  title?: string;
+  /** Optional caption under the chart (e.g. 'Top 6 / source-stated USD only'). */
+  note?: string;
+  bars?: CardChartBar[];
+}
+
+/**
  * Editable content of one infographic card; all fields optional so drafts can be partial.
  */
 export interface CardContent {
@@ -698,7 +720,7 @@ export interface CardContent {
   outlook?: string;
   mapLocation?: string;
   mapImage?: string;
-  /** Visual panel mode: 'image' (uploaded) or 'map' (rendered Leaflet map). */
+  /** Visual panel mode: 'image' (uploaded), 'map' (rendered Leaflet map), or 'chart' (card-native bar chart from a dashboard). */
   mapMode?: string;
   /** Map centre / marker latitude when mapMode is 'map'. */
   mapLat?: number;
@@ -709,6 +731,7 @@ export interface CardContent {
   sourceNote?: string;
   logoImage?: string;
   footerText?: string;
+  chart?: CardChart;
 }
 
 export interface CardDraft {

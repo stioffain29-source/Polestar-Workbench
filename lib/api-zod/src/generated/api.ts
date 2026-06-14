@@ -1700,13 +1700,23 @@ export const ListCardDraftsResponseItem = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
   "createdAt": zod.coerce.date(),
   "lastEditedAt": zod.coerce.date()
@@ -1738,13 +1748,23 @@ export const CreateCardDraftBody = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
 })
 
@@ -1775,13 +1795,23 @@ export const GetCardDraftResponse = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
   "createdAt": zod.coerce.date(),
   "lastEditedAt": zod.coerce.date()
@@ -1816,13 +1846,23 @@ export const UpdateCardDraftBody = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
 })
 
@@ -1848,13 +1888,23 @@ export const UpdateCardDraftResponse = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
   "createdAt": zod.coerce.date(),
   "lastEditedAt": zod.coerce.date()
@@ -1889,13 +1939,23 @@ export const ListCardTemplatesResponseItem = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
   "createdAt": zod.coerce.date(),
   "lastEditedAt": zod.coerce.date()
@@ -1927,13 +1987,23 @@ export const CreateCardTemplateBody = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
 })
 
@@ -1965,13 +2035,23 @@ export const GetCardTemplateResponse = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
   "createdAt": zod.coerce.date(),
   "lastEditedAt": zod.coerce.date()
@@ -2006,13 +2086,23 @@ export const UpdateCardTemplateBody = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).optional().describe('Editable content of one infographic card; all fields optional so drafts can be partial.')
 })
 
@@ -2039,13 +2129,23 @@ export const UpdateCardTemplateResponse = zod.object({
   "outlook": zod.string().optional(),
   "mapLocation": zod.string().optional(),
   "mapImage": zod.string().optional(),
-  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded) or \'map\' (rendered Leaflet map).'),
+  "mapMode": zod.string().optional().describe('Visual panel mode: \'image\' (uploaded), \'map\' (rendered Leaflet map), or \'chart\' (card-native bar chart from a dashboard).'),
   "mapLat": zod.number().optional().describe('Map centre \/ marker latitude when mapMode is \'map\'.'),
   "mapLng": zod.number().optional().describe('Map centre \/ marker longitude when mapMode is \'map\'.'),
   "mapZoom": zod.number().optional().describe('Optional Leaflet zoom level when mapMode is \'map\'.'),
   "sourceNote": zod.string().optional(),
   "logoImage": zod.string().optional(),
-  "footerText": zod.string().optional()
+  "footerText": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "note": zod.string().optional().describe('Optional caption under the chart (e.g. \'Top 6 \/ source-stated USD only\').'),
+  "bars": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "valueLabel": zod.string().optional().describe('Optional formatted display value (e.g. \'$2.4M\'); falls back to the numeric value.'),
+  "rating": zod.string().optional().describe('Optional risk tier key (\'insignificant\'..\'extreme\') to colour the bar; falls back to brand electric.')
+}).describe('One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. \'$2.4M\') and falls back to the numeric value.')).optional()
+}).optional().describe('A card-native bar chart rebuilt from a dashboard\'s data. Rendered as plain HTML\/div bars (never SVG) so it rasterises cleanly into the exported PNG.')
 }).describe('Editable content of one infographic card; all fields optional so drafts can be partial.'),
   "createdAt": zod.coerce.date(),
   "lastEditedAt": zod.coerce.date()

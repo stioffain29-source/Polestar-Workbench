@@ -8,6 +8,8 @@
 
 export * from './brandSettings';
 export * from './brandSettingsUpdate';
+export * from './cardChart';
+export * from './cardChartBar';
 export * from './cardContent';
 export * from './cardDraft';
 export * from './cardDraftInput';

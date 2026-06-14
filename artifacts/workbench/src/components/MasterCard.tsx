@@ -95,6 +95,14 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
     const useMap =
       content.mapMode === "map" && !Number.isNaN(mapLat) && !Number.isNaN(mapLng);
 
+    // Card-native chart: only when explicitly selected AND it carries bars, so
+    // an empty chart never blanks the visual panel — it falls back to the label.
+    const chartBars = (content.chart?.bars ?? []).filter(
+      (b) => (b.label ?? "").trim() !== "" && Number.isFinite(b.value),
+    );
+    const useChart = content.mapMode === "chart" && chartBars.length > 0;
+    const chartMax = Math.max(1, ...chartBars.map((b) => Math.max(0, b.value)));
+
     // Header meta column rows — only rendered when a value is present, so a
     // bare card never shows empty icon rows.
     const locationText = [content.country, content.mapLocation]
@@ -319,7 +327,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
               flex: hasHighlights ? "1.35 1 0" : "1 1 0",
               minWidth: 0,
               border: `2px solid ${polar}`,
-              background: useMap || content.mapImage ? "#ffffff" : "#F4F5F7",
+              background: useMap || useChart || content.mapImage ? "#ffffff" : "#F4F5F7",
               position: "relative",
               overflow: "hidden",
               display: "flex",
@@ -327,7 +335,94 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
               justifyContent: "center",
             }}
           >
-            {useMap ? (
+            {useChart ? (
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "28px 30px",
+                  boxSizing: "border-box",
+                  background: "#ffffff",
+                }}
+              >
+                {content.chart?.title?.trim() && (
+                  <div
+                    style={{
+                      fontFamily: headingFont,
+                      fontWeight: 700,
+                      fontSize: 30,
+                      lineHeight: 1.1,
+                      color: midnight,
+                      marginBottom: 22,
+                    }}
+                  >
+                    {content.chart.title}
+                  </div>
+                )}
+                <div
+                  style={{
+                    flex: "1 1 auto",
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    gap: 16,
+                  }}
+                >
+                  {chartBars.map((b, i) => {
+                    const pct = Math.max(
+                      0,
+                      Math.min(100, (Math.max(0, b.value) / chartMax) * 100),
+                    );
+                    const fill = b.rating ? cardRatingColor(b.rating) : electric;
+                    const display = (b.valueLabel ?? "").trim() || String(b.value);
+                    return (
+                      <div
+                        key={i}
+                        style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "baseline",
+                            fontFamily: bodyFont,
+                          }}
+                        >
+                          <span style={{ fontSize: 22, color: dusk, fontWeight: 500 }}>
+                            {b.label}
+                          </span>
+                          <span
+                            style={{ fontSize: 22, color: midnight, fontWeight: 700 }}
+                          >
+                            {display}
+                          </span>
+                        </div>
+                        <div style={{ width: "100%", height: 22, background: polar }}>
+                          <div
+                            style={{ width: `${pct}%`, height: "100%", background: fill }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {content.chart?.note?.trim() && (
+                  <div
+                    style={{
+                      fontFamily: bodyFont,
+                      fontSize: 18,
+                      color: muted,
+                      marginTop: 18,
+                    }}
+                  >
+                    {content.chart.note}
+                  </div>
+                )}
+              </div>
+            ) : useMap ? (
               <CardMap
                 lat={mapLat}
                 lng={mapLng}
@@ -356,7 +451,7 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
                 {meta.panelLabel}
               </div>
             )}
-            {!useMap && content.mapLocation && (
+            {!useMap && !useChart && content.mapLocation && (
               <div
                 style={{
                   position: "absolute",

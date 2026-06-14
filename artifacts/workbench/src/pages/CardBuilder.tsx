@@ -12,11 +12,14 @@ import {
   useListIncidents,
   useListSpotReports,
   useListReports,
+  useListStrikes,
   getGetCardDraftQueryKey,
   getListCardDraftsQueryKey,
   getListCardTemplatesQueryKey,
   type CardContent,
   type CardHighlight,
+  type CardChart,
+  type CardChartBar,
   type BrandSettings,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -79,6 +82,7 @@ import {
   type CardSourceKind,
 } from "@/lib/cardAutofill";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { CHART_SOURCES, buildCardChart } from "@/lib/cardCharts";
 
 const DEFAULT_BRAND: BrandSettings = {
   id: 1,
@@ -179,6 +183,7 @@ export default function CardBuilder() {
   const { data: incidents = [] } = useListIncidents();
   const { data: spotReports = [] } = useListSpotReports();
   const { data: reports = [] } = useListReports();
+  const { data: strikes = [] } = useListStrikes();
   const brand = brandData ?? DEFAULT_BRAND;
 
   const createDraft = useCreateCardDraft();
@@ -192,6 +197,8 @@ export default function CardBuilder() {
   const [loaded, setLoaded] = useState(false);
   const [sourceKind, setSourceKind] = useState<CardSourceKind>("country");
   const [sourceId, setSourceId] = useState<string>("");
+  const [chartSourceKey, setChartSourceKey] = useState<string>(CHART_SOURCES[0].key);
+  const [chartTypeKey, setChartTypeKey] = useState<string>(CHART_SOURCES[0].types[0].key);
 
   // Raw text mirrors for the numeric map fields, so typing "-", "6." or a
   // partial number stays editable (parseFloat would otherwise drop them).
@@ -361,6 +368,39 @@ export default function CardBuilder() {
     const list = [...(content.highlights ?? [])];
     list.splice(i, 1);
     patch({ highlights: list });
+  }
+
+  function setChartField(p: Partial<CardChart>) {
+    patch({ chart: { ...(content.chart ?? {}), ...p } });
+  }
+
+  function setChartBar(i: number, p: Partial<CardChartBar>) {
+    const bars = [...(content.chart?.bars ?? [])];
+    bars[i] = { ...bars[i], ...p };
+    setChartField({ bars });
+  }
+
+  function addChartBar() {
+    const bars = [...(content.chart?.bars ?? [])];
+    if (bars.length >= 6) return;
+    bars.push({ label: "", value: 0 });
+    setChartField({ bars });
+  }
+
+  function removeChartBar(i: number) {
+    const bars = [...(content.chart?.bars ?? [])];
+    bars.splice(i, 1);
+    setChartField({ bars });
+  }
+
+  function fillChart() {
+    const chart = buildCardChart(chartSourceKey, chartTypeKey, { incidents, strikes });
+    if (!chart || (chart.bars ?? []).length === 0) {
+      toast({ title: "No data for that chart yet", variant: "destructive" });
+      return;
+    }
+    patch({ chart });
+    toast({ title: "Chart filled — edit any bar before exporting" });
   }
 
   function setMapNum(field: "mapLat" | "mapLng" | "mapZoom", raw: string) {
@@ -798,12 +838,15 @@ export default function CardBuilder() {
               <SelectContent>
                 <SelectItem value="image">Uploaded image</SelectItem>
                 <SelectItem value="map">Rendered map (lat / lng)</SelectItem>
+                <SelectItem value="chart">Chart (from a dashboard)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
               {content.mapMode === "map"
                 ? "Drops a point on a Leaflet map captured into the PNG."
-                : "Upload a static image for the visual panel."}
+                : content.mapMode === "chart"
+                  ? "Builds card-native bars from a dashboard — survives the PNG export."
+                  : "Upload a static image for the visual panel."}
             </p>
           </Field>
 
@@ -830,6 +873,144 @@ export default function CardBuilder() {
                   value={mapZoomStr}
                   onChange={(e) => setMapNum("mapZoom", e.target.value)}
                   placeholder="6"
+                  className="rounded-sm"
+                />
+              </Field>
+            </div>
+          ) : content.mapMode === "chart" ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Dashboard">
+                  <Select
+                    value={chartSourceKey}
+                    onValueChange={(v) => {
+                      setChartSourceKey(v);
+                      const src = CHART_SOURCES.find((s) => s.key === v);
+                      if (src) setChartTypeKey(src.types[0].key);
+                    }}
+                  >
+                    <SelectTrigger className="rounded-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CHART_SOURCES.map((s) => (
+                        <SelectItem key={s.key} value={s.key}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Chart">
+                  <Select value={chartTypeKey} onValueChange={setChartTypeKey}>
+                    <SelectTrigger className="rounded-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(CHART_SOURCES.find((s) => s.key === chartSourceKey)?.types ?? []).map(
+                        (t) => (
+                          <SelectItem key={t.key} value={t.key}>
+                            {t.label}
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-sm"
+                onClick={fillChart}
+              >
+                <Sparkles className="mr-1 h-4 w-4" />
+                Fill chart from dashboard
+              </Button>
+              <Field label="Chart title">
+                <Input
+                  value={content.chart?.title ?? ""}
+                  onChange={(e) => setChartField({ title: e.target.value })}
+                  placeholder="e.g. Missile Tracker — by country"
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Bars (max 6)">
+                <div className="space-y-2">
+                  {(content.chart?.bars ?? []).map((b, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        value={b.label ?? ""}
+                        onChange={(e) => setChartBar(i, { label: e.target.value })}
+                        placeholder="Label"
+                        className="rounded-sm flex-1"
+                      />
+                      <Input
+                        value={String(b.value ?? 0)}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value);
+                          setChartBar(i, { value: Number.isFinite(n) ? n : 0 });
+                        }}
+                        placeholder="Value"
+                        inputMode="decimal"
+                        className="rounded-sm w-20"
+                      />
+                      <Input
+                        value={b.valueLabel ?? ""}
+                        onChange={(e) => setChartBar(i, { valueLabel: e.target.value })}
+                        placeholder="Shown"
+                        className="rounded-sm w-20"
+                      />
+                      <Select
+                        value={b.rating ?? "none"}
+                        onValueChange={(v) =>
+                          setChartBar(i, { rating: v === "none" ? undefined : v })
+                        }
+                      >
+                        <SelectTrigger className="rounded-sm w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Brand blue</SelectItem>
+                          {CARD_RATINGS.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {cardRatingLabel(r)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-sm shrink-0"
+                        onClick={() => removeChartBar(i)}
+                        aria-label="Remove bar"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {(content.chart?.bars ?? []).length < 6 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-sm"
+                      onClick={addChartBar}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Add bar
+                    </Button>
+                  )}
+                </div>
+              </Field>
+              <Field label="Chart note (optional)">
+                <Input
+                  value={content.chart?.note ?? ""}
+                  onChange={(e) => setChartField({ note: e.target.value })}
+                  placeholder="e.g. Top 6 / source-stated USD only"
                   className="rounded-sm"
                 />
               </Field>

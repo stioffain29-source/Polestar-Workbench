@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CardChart } from './cardChart';
 import type { CardHighlight } from './cardHighlight';
 
 /**
@@ -27,7 +28,7 @@ export interface CardContent {
   outlook?: string;
   mapLocation?: string;
   mapImage?: string;
-  /** Visual panel mode: 'image' (uploaded) or 'map' (rendered Leaflet map). */
+  /** Visual panel mode: 'image' (uploaded), 'map' (rendered Leaflet map), or 'chart' (card-native bar chart from a dashboard). */
   mapMode?: string;
   /** Map centre / marker latitude when mapMode is 'map'. */
   mapLat?: number;
@@ -38,4 +39,5 @@ export interface CardContent {
   sourceNote?: string;
   logoImage?: string;
   footerText?: string;
+  chart?: CardChart;
 }

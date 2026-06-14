@@ -1558,6 +1558,26 @@ components:
         body: { type: string }
         icon: { type: string, description: "Key into the curated card highlight icon set (e.g. 'crowd', 'police', 'traffic')." }
 
+    CardChartBar:
+      type: object
+      description: One bar in a card-native chart. `value` drives the bar length; `valueLabel` is the formatted text shown (e.g. '$2.4M') and falls back to the numeric value.
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value: { type: number }
+        valueLabel: { type: string, description: "Optional formatted display value (e.g. '$2.4M'); falls back to the numeric value." }
+        rating: { type: string, description: "Optional risk tier key ('insignificant'..'extreme') to colour the bar; falls back to brand electric." }
+
+    CardChart:
+      type: object
+      description: A card-native bar chart rebuilt from a dashboard's data. Rendered as plain HTML/div bars (never SVG) so it rasterises cleanly into the exported PNG.
+      properties:
+        title: { type: string }
+        note: { type: string, description: "Optional caption under the chart (e.g. 'Top 6 / source-stated USD only')." }
+        bars:
+          type: array
+          items: { $ref: "#/components/schemas/CardChartBar" }
+
     CardContent:
       type: object
       description: Editable content of one infographic card; all fields optional so drafts can be partial.
@@ -1580,13 +1600,14 @@ components:
         outlook: { type: string }
         mapLocation: { type: string }
         mapImage: { type: string }
-        mapMode: { type: string, description: "Visual panel mode: 'image' (uploaded) or 'map' (rendered Leaflet map)." }
+        mapMode: { type: string, description: "Visual panel mode: 'image' (uploaded), 'map' (rendered Leaflet map), or 'chart' (card-native bar chart from a dashboard)." }
         mapLat: { type: number, description: "Map centre / marker latitude when mapMode is 'map'." }
         mapLng: { type: number, description: "Map centre / marker longitude when mapMode is 'map'." }
         mapZoom: { type: number, description: "Optional Leaflet zoom level when mapMode is 'map'." }
         sourceNote: { type: string }
         logoImage: { type: string }
         footerText: { type: string }
+        chart: { $ref: "#/components/schemas/CardChart" }
 
     CardDraft:
       type: object
