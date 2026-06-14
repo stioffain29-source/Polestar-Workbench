@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
-import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
+import { DISCLAIMER_TEXT, SEV_COLOR, sevKey } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
@@ -43,17 +43,9 @@ const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
-// Canonical severity palette — kept SEPARATE from brand colours.
-// Brand (#0b0a3d / #465bff / #363636 / #e2e2e2) is reserved for chrome,
-// headings and non-severity chart fills. #a33232 is reserved exclusively
-// for the Fuel Watch fail-closed banner and must never appear here.
-const SEV_COLOR: Record<string, string> = {
-  Extreme: "#800000",
-  High: "#C0392B",
-  Moderate: "#E67E22",
-  Low: "#6FB872",
-  Insignificant: "#B8C2CC",
-};
+// Severity accent colours come from the shared SEV_COLOR ramp in pdfChrome
+// (lowercase keys, Extreme = #A33232) so the on-screen Fast Facts accent
+// matches the PDF exporter and every other risk surface exactly.
 
 export interface ReportPreviewData {
   title?: string;
@@ -166,7 +158,8 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {cards.map((c, i) => {
-        const accent = c.severity && SEV_COLOR[c.severity] ? SEV_COLOR[c.severity] : ELECTRIC;
+        const sevK = c.severity ? sevKey(c.severity) : "";
+        const accent = sevK && SEV_COLOR[sevK] ? SEV_COLOR[sevK] : ELECTRIC;
         return (
           <div
             key={i}
