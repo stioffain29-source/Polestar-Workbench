@@ -8,6 +8,9 @@ import {
   useListCardTemplates,
   useCreateCardTemplate,
   useGetBrandSettings,
+  useListCountryReports,
+  useListIncidents,
+  useListSpotReports,
   getGetCardDraftQueryKey,
   getListCardDraftsQueryKey,
   getListCardTemplatesQueryKey,
@@ -15,7 +18,7 @@ import {
   type BrandSettings,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, Save, Trash2, LayoutTemplate, ImagePlus } from "lucide-react";
+import { ArrowLeft, Download, Save, Trash2, LayoutTemplate, ImagePlus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +41,12 @@ import {
   templateMeta,
 } from "@/lib/cardTemplates";
 import { exportCardToPng, slugifyForFilename } from "@/lib/exportCardPng";
+import {
+  countryReportToCard,
+  incidentToCard,
+  spotReportToCard,
+  type CardSourceKind,
+} from "@/lib/cardAutofill";
 
 const DEFAULT_BRAND: BrandSettings = {
   id: 1,
@@ -96,6 +105,9 @@ export default function CardBuilder() {
   });
   const { data: brandData } = useGetBrandSettings();
   const { data: templates = [] } = useListCardTemplates();
+  const { data: countryReports = [] } = useListCountryReports();
+  const { data: incidents = [] } = useListIncidents();
+  const { data: spotReports = [] } = useListSpotReports();
   const brand = brandData ?? DEFAULT_BRAND;
 
   const createDraft = useCreateCardDraft();
@@ -107,6 +119,8 @@ export default function CardBuilder() {
   const [templateKey, setTemplateKey] = useState<string>("country_risk");
   const [content, setContent] = useState<CardContent>(() => emptyContent("country_risk"));
   const [loaded, setLoaded] = useState(false);
+  const [sourceKind, setSourceKind] = useState<CardSourceKind>("country");
+  const [sourceId, setSourceId] = useState<string>("");
 
   // Raw text mirrors for the numeric map fields, so typing "-", "6." or a
   // partial number stays editable (parseFloat would otherwise drop them).
@@ -146,6 +160,52 @@ export default function CardBuilder() {
     while (kp.length < 3) kp.push("");
     return kp.slice(0, 3);
   }, [content.keyPoints]);
+
+  // Options for the "Pull from…" item picker, keyed by the selected source kind.
+  const sourceOptions = useMemo(() => {
+    if (sourceKind === "country") {
+      return countryReports.map((c) => ({ id: String(c.id), label: `${c.name} · ${c.region}` }));
+    }
+    if (sourceKind === "spot") {
+      return spotReports.map((r) => ({
+        id: String(r.id),
+        label: [r.title, r.country].filter(Boolean).join(" · "),
+      }));
+    }
+    return incidents.slice(0, 150).map((i) => ({
+      id: String(i.id),
+      label: [
+        new Date(i.occurredAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+        i.country?.split(/[;,]/)[0]?.trim(),
+        (i.displayTitle?.trim() || i.title).slice(0, 70),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+  }, [sourceKind, countryReports, incidents, spotReports]);
+
+  function pullFromSource() {
+    if (!sourceId) return;
+    let next: Partial<CardContent> | null = null;
+    if (sourceKind === "country") {
+      const rep = countryReports.find((c) => String(c.id) === sourceId);
+      if (rep) next = countryReportToCard(rep);
+    } else if (sourceKind === "spot") {
+      const rep = spotReports.find((r) => String(r.id) === sourceId);
+      if (rep) next = spotReportToCard(rep);
+    } else {
+      const inc = incidents.find((i) => String(i.id) === sourceId);
+      if (inc) next = incidentToCard(inc);
+    }
+    if (!next) {
+      toast({ title: "Source not found", variant: "destructive" });
+      return;
+    }
+    // Pulling overwrites the mapped fields only; uploads, footer, logo, and any
+    // unmapped fields the analyst set are preserved.
+    patch(next);
+    toast({ title: "Card pre-filled — edit any field before exporting" });
+  }
 
   function patch(p: Partial<CardContent>) {
     setContent((c) => ({ ...c, ...p }));
@@ -339,6 +399,57 @@ export default function CardBuilder() {
               </Select>
             </Field>
           )}
+
+          <div className="border border-border rounded-sm p-4 bg-muted/30 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-sans uppercase tracking-widest text-muted-foreground">
+              <Sparkles className="w-3.5 h-3.5" /> Pull from live data
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Pre-fill the card from a country, incident, or spot report. Every field stays editable.
+            </p>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <Select
+                value={sourceKind}
+                onValueChange={(v) => {
+                  setSourceKind(v as CardSourceKind);
+                  setSourceId("");
+                }}
+              >
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="country">Country baseline</SelectItem>
+                  <SelectItem value="incident">Incident</SelectItem>
+                  <SelectItem value="spot">Spot report</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sourceId} onValueChange={setSourceId}>
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue placeholder="Select a source…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sourceOptions.length === 0 ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No sources available</div>
+                  ) : (
+                    sourceOptions.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.label}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              onClick={pullFromSource}
+              disabled={!sourceId}
+              className="rounded-sm w-full"
+            >
+              <Sparkles className="w-4 h-4 mr-2" /> Pull into card
+            </Button>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Topic">
