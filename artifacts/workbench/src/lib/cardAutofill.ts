@@ -7,6 +7,7 @@ import type {
 } from "@workspace/api-client-react";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { CARD_RATINGS } from "./cardTemplates";
+import { clampIssueDateToLatestRecord, filterIncidentsToWindow } from "./reportWindow";
 
 // Sources an analyst can pull card content from.
 export type CardSourceKind = "country" | "incident" | "spot" | "report";
@@ -69,6 +70,50 @@ function inferRatingFromProse(...parts: Array<string | null | undefined>): strin
     if (new RegExp(`\\b${tier}\\b`).test(text)) return tier;
   }
   return undefined;
+}
+
+// CARD_RATINGS ordered weakest→strongest, so a tier's index is its rank.
+const RATING_RANK: Record<string, number> = Object.fromEntries(
+  CARD_RATINGS.map((r, i) => [r, i]),
+);
+
+// A flashpoint/protests report draws from BOTH data buckets (live `flashpoint`
+// scraper + legacy `protests` import); every other report matches its topic
+// exactly. Mirrors the scoping used by the report builders.
+function reportDataTopics(topic: string): Set<string> {
+  if (topic === "flashpoint" || topic === "protests") {
+    return new Set(["flashpoint", "protests"]);
+  }
+  return new Set([topic]);
+}
+
+// Canonical report risk rating, derived from the incidents inside the report's
+// reporting window. Reports have no stored severity, so the report's own risk
+// level is the worst credible tier among the events it covers — the standard
+// "peak threat in period" posture, with `extreme` reserved for casualty/
+// emergency signals by the upstream classifier. Scoping mirrors the report
+// builders: restrict to the report's data bucket(s), clamp the issue date down
+// to the latest available record (Option A honest dating), then take the window.
+// Returns undefined when no scoped incident carries a usable rating, so callers
+// can fall back to the prose heuristic.
+export function ratingFromScopedIncidents(
+  rep: Report,
+  incidents: Incident[],
+): string | undefined {
+  if (!incidents.length) return undefined;
+  const topics = reportDataTopics(rep.topic);
+  const scoped = incidents.filter((i) => i.topic != null && topics.has(i.topic));
+  if (!scoped.length) return undefined;
+  const issueDate = clampIssueDateToLatestRecord(rep.issueDate, scoped);
+  const windowed = filterIncidentsToWindow(scoped, rep.topic, issueDate);
+  let bestRank = -1;
+  for (const inc of windowed) {
+    const tier = inc.severity?.toLowerCase();
+    if (!tier) continue;
+    const rank = RATING_RANK[tier];
+    if (rank !== undefined && rank > bestRank) bestRank = rank;
+  }
+  return bestRank >= 0 ? CARD_RATINGS[bestRank] : undefined;
 }
 
 // Split prose into clean sentences for key-point derivation.
@@ -159,7 +204,11 @@ export function countryReportToCard(rep: CountryReport): Partial<CardContent> {
 // Pull from a published topic/country briefing. `countryName` resolves the
 // report's countrySlug to a display name when the caller has it; otherwise the
 // country field is left blank for topic reports that aren't country-scoped.
-export function reportToCard(rep: Report, countryName?: string): Partial<CardContent> {
+export function reportToCard(
+  rep: Report,
+  countryName?: string,
+  incidents: Incident[] = [],
+): Partial<CardContent> {
   const situation = sentences(rep.situation);
   const whatMatters = sentences(rep.whatMatters);
   const implications = sentences(rep.implications);
@@ -177,12 +226,14 @@ export function reportToCard(rep: Report, countryName?: string): Partial<CardCon
     topic: canonicalTopic(rep.topic).topicLine,
     country,
     rating:
+      ratingFromScopedIncidents(rep, incidents) ??
       inferRatingFromProse(
         rep.situation,
         rep.whatMatters,
         rep.implications,
         rep.whatHappened,
-      ) ?? "moderate",
+      ) ??
+      "moderate",
     headline: resolveReportTitle(rep.topic, rep.title),
     bluf:
       situation.slice(0, 2).join(" ") ||

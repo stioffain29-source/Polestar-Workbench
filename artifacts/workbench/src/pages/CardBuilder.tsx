@@ -252,7 +252,7 @@ export default function CardBuilder() {
         const countryName = rep.countrySlug
           ? countryReports.find((c) => c.slug === rep.countrySlug)?.name
           : undefined;
-        next = reportToCard(rep, countryName);
+        next = reportToCard(rep, countryName, incidents);
       }
     } else {
       const inc = incidents.find((i) => String(i.id) === sourceId);
