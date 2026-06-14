@@ -30,7 +30,7 @@ class FeedFetchError extends Error {
   }
 }
 
-async function fetchBody(url: string, timeoutMs: number): Promise<string> {
+export async function fetchBody(url: string, timeoutMs: number): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -85,6 +85,8 @@ export interface FetchFeedOptions {
   attempts?: number;
   /** Per-attempt abort timeout in ms. Default 20000. */
   timeoutMs?: number;
+  /** Base exponential-backoff delay between retries in ms. Default 2500. */
+  backoffMs?: number;
   /** Add an initial 0-400ms jitter to desynchronise feeds in the same batch. */
   stagger?: boolean;
 }
@@ -107,6 +109,7 @@ export async function fetchFeed(
 ) {
   const attempts = opts.attempts ?? DEFAULT_ATTEMPTS;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const baseBackoffMs = opts.backoffMs ?? BASE_BACKOFF_MS;
   if (opts.stagger) await sleep(Math.random() * 400);
   let lastErr: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -119,7 +122,7 @@ export async function fetchFeed(
       // 4xx responses are not worth a second 20s attempt — fail fast.
       const retryable = err instanceof FeedFetchError && err.retryable;
       if (retryable && attempt < attempts - 1) {
-        const backoff = BASE_BACKOFF_MS * 2 ** attempt + Math.random() * 600;
+        const backoff = baseBackoffMs * 2 ** attempt + Math.random() * 600;
         await sleep(backoff);
       } else {
         break;
