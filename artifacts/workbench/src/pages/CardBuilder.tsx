@@ -117,6 +117,41 @@ function emptyContent(templateKey: string): CardContent {
   };
 }
 
+// Fields the per-source mappers can populate, with reader-friendly labels for
+// the overwrite-confirmation prompt.
+const MAPPED_FIELDS: (keyof CardContent)[] = [
+  "topic",
+  "country",
+  "rating",
+  "headline",
+  "bluf",
+  "keyPoints",
+  "eventDate",
+  "mapLocation",
+  "sourceNote",
+  "outlook",
+];
+
+const FIELD_LABELS: Record<string, string> = {
+  topic: "Topic",
+  country: "Country",
+  rating: "Risk rating",
+  headline: "Headline",
+  bluf: "BLUF",
+  keyPoints: "Key points",
+  eventDate: "Date / time",
+  mapLocation: "Map location",
+  sourceNote: "Source note",
+  outlook: "Outlook",
+};
+
+// A field "has content" if it holds a non-empty string (or, for key points, at
+// least one non-empty entry).
+function hasContent(v: unknown): boolean {
+  if (Array.isArray(v)) return v.some((x) => typeof x === "string" && x.trim() !== "");
+  return typeof v === "string" ? v.trim() !== "" : v != null;
+}
+
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -237,34 +272,65 @@ export default function CardBuilder() {
     }));
   }, [sourceKind, countryReports, incidents, spotReports, reports]);
 
-  function pullFromSource() {
-    if (!sourceId) return;
-    let next: Partial<CardContent> | null = null;
+  // The content the selected source would pull, computed up-front so the panel
+  // can preview it before the analyst commits.
+  const pullCandidate = useMemo<Partial<CardContent> | null>(() => {
+    if (!sourceId) return null;
     if (sourceKind === "country") {
       const rep = countryReports.find((c) => String(c.id) === sourceId);
-      if (rep) next = countryReportToCard(rep);
-    } else if (sourceKind === "spot") {
-      const rep = spotReports.find((r) => String(r.id) === sourceId);
-      if (rep) next = spotReportToCard(rep);
-    } else if (sourceKind === "report") {
-      const rep = reports.find((r) => String(r.id) === sourceId);
-      if (rep) {
-        const countryName = rep.countrySlug
-          ? countryReports.find((c) => c.slug === rep.countrySlug)?.name
-          : undefined;
-        next = reportToCard(rep, countryName, incidents);
-      }
-    } else {
-      const inc = incidents.find((i) => String(i.id) === sourceId);
-      if (inc) next = incidentToCard(inc);
+      return rep ? countryReportToCard(rep) : null;
     }
-    if (!next) {
+    if (sourceKind === "spot") {
+      const rep = spotReports.find((r) => String(r.id) === sourceId);
+      return rep ? spotReportToCard(rep) : null;
+    }
+    if (sourceKind === "report") {
+      const rep = reports.find((r) => String(r.id) === sourceId);
+      if (!rep) return null;
+      const countryName = rep.countrySlug
+        ? countryReports.find((c) => c.slug === rep.countrySlug)?.name
+        : undefined;
+      return reportToCard(rep, countryName, incidents);
+    }
+    const inc = incidents.find((i) => String(i.id) === sourceId);
+    return inc ? incidentToCard(inc) : null;
+  }, [sourceId, sourceKind, countryReports, spotReports, reports, incidents]);
+
+  // Mapped fields the analyst has already filled with their own content that the
+  // pull would replace with a different value. Template defaults and fields that
+  // already match the incoming value are not treated as conflicts.
+  const overwriteConflicts = useMemo<string[]>(() => {
+    if (!pullCandidate) return [];
+    const defaults = emptyContent(templateKey);
+    const conflicts: string[] = [];
+    for (const field of MAPPED_FIELDS) {
+      const incoming = pullCandidate[field];
+      if (!hasContent(incoming)) continue;
+      const current = content[field];
+      if (!hasContent(current)) continue;
+      if (JSON.stringify(current) === JSON.stringify(defaults[field])) continue;
+      if (JSON.stringify(current) === JSON.stringify(incoming)) continue;
+      conflicts.push(FIELD_LABELS[field] ?? field);
+    }
+    return conflicts;
+  }, [pullCandidate, content, templateKey]);
+
+  function pullFromSource() {
+    if (!pullCandidate) {
       toast({ title: "Source not found", variant: "destructive" });
+      return;
+    }
+    if (
+      overwriteConflicts.length > 0 &&
+      !confirm(
+        `This will overwrite your edits to: ${overwriteConflicts.join(", ")}. Pull anyway?`,
+      )
+    ) {
       return;
     }
     // Pulling overwrites the mapped fields only; uploads, footer, logo, and any
     // unmapped fields the analyst set are preserved.
-    patch(next);
+    patch(pullCandidate);
     toast({ title: "Card pre-filled — edit any field before exporting" });
   }
 
@@ -512,6 +578,29 @@ export default function CardBuilder() {
                 onChange={setSourceId}
               />
             </div>
+            {pullCandidate && (
+              <div className="border border-border rounded-sm bg-background p-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-sans uppercase tracking-widest text-muted-foreground">
+                    Preview
+                  </span>
+                  <span className="text-xs font-sans uppercase tracking-wider text-muted-foreground">
+                    {cardRatingLabel(pullCandidate.rating ?? "moderate")}
+                  </span>
+                </div>
+                <div className="text-sm font-serif font-bold leading-snug">
+                  {pullCandidate.headline || "Untitled"}
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-4">
+                  {pullCandidate.bluf || "No summary available for this source."}
+                </p>
+                {overwriteConflicts.length > 0 && (
+                  <p className="text-xs font-medium text-foreground pt-1">
+                    Pulling will overwrite your edits to {overwriteConflicts.join(", ")}.
+                  </p>
+                )}
+              </div>
+            )}
             <Button
               variant="outline"
               onClick={pullFromSource}
