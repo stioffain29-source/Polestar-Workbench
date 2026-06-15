@@ -7,6 +7,7 @@
  */
 import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { KpiCard } from './kpiCard';
+import type { ReportRiskRating } from './reportRiskRating';
 import type { ReportStatus } from './reportStatus';
 import type { Topic } from './topic';
 
@@ -18,6 +19,8 @@ export interface Report {
   countrySlug?: string | null;
   status: ReportStatus;
   issueDate: Date;
+  /** @nullable */
+  riskRating?: ReportRiskRating;
   /** @nullable */
   situation?: string | null;
   /** @nullable */

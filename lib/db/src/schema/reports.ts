@@ -88,6 +88,10 @@ export const reportsTable = pgTable("reports", {
   countrySlug: text("country_slug"),
   status: text("status").notNull(),
   issueDate: date("issue_date").notNull(),
+  // Analyst-set risk rating (five-tier vocabulary). Optional: left null the
+  // card pull falls back to the rating computed from the report's scoped
+  // incidents, then to the prose heuristic. See cardAutofill.reportToCard.
+  riskRating: text("risk_rating"),
   situation: text("situation"),
   whatHappened: text("what_happened"),
   hardNumbers: jsonb("hard_numbers").$type<FuelHardNumbers>(),

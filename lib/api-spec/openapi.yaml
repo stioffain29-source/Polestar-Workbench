@@ -1225,6 +1225,7 @@ components:
         countrySlug: { type: ["string", "null"] }
         status: { $ref: "#/components/schemas/ReportStatus" }
         issueDate: { type: string, format: date }
+        riskRating: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
         situation: { type: ["string", "null"] }
         whatHappened: { type: ["string", "null"] }
         hardNumbers:
@@ -1359,6 +1360,7 @@ components:
         countrySlug: { type: string }
         status: { $ref: "#/components/schemas/ReportStatus" }
         issueDate: { type: string, format: date }
+        riskRating: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:
@@ -1380,6 +1382,7 @@ components:
         countrySlug: { type: string }
         status: { $ref: "#/components/schemas/ReportStatus" }
         issueDate: { type: string, format: date }
+        riskRating: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:

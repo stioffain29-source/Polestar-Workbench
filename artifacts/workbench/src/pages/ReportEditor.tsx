@@ -33,6 +33,8 @@ import {
   type DraftableIncident,
 } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { autoReportRating } from "@/lib/cardAutofill";
+import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate } from "@/lib/reportDataStatus";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 import { format, parseISO } from "date-fns";
@@ -79,6 +81,8 @@ interface FormState {
   topic: string;
   status: string;
   issueDate: string;
+  // "" = no override; falls back to the computed/auto rating on card pull.
+  riskRating: string;
   executiveSummary: string;
   situation: string;
   whatHappened: string;
@@ -94,6 +98,7 @@ const EMPTY: FormState = {
   topic: "fuel",
   status: "draft",
   issueDate: new Date().toISOString().slice(0, 10),
+  riskRating: "",
   executiveSummary: "",
   situation: "",
   whatHappened: "",
@@ -354,6 +359,7 @@ export default function ReportEditor() {
       topic,
       status: report.status ?? "draft",
       issueDate,
+      riskRating: report.riskRating ?? "",
       executiveSummary: exec.trim() ? exec : draft.executiveSummary,
       situation: pick(report.situation, draft.situation),
       whatHappened: pick(report.whatHappened, draft.whatHappened),
@@ -455,6 +461,9 @@ export default function ReportEditor() {
     //   * Otherwise → assemble from the form. Empty form → clear
     //     payload with `hardNumbers: null`.
     const payload: Record<string, unknown> = { ...persistable };
+    // Empty override → clear the stored rating (card pull falls back to the
+    // computed/auto value). A set value persists the analyst's choice.
+    payload.riskRating = form.riskRating ? form.riskRating : null;
     if (form.topic === "fuel") {
       if (showFuelJson) {
         if (!hardNumbersText.trim()) {
@@ -627,6 +636,25 @@ export default function ReportEditor() {
     );
 
   const scope = scopeFor(form.topic);
+  // The rating a card pull would derive if the analyst leaves the override
+  // blank: worst credible tier among scoped incidents, else the prose
+  // heuristic. Built from the live form so it tracks topic / issue-date /
+  // prose edits, mirroring exactly what cardAutofill.reportToCard computes.
+  const computedRating =
+    report != null
+      ? autoReportRating(
+          {
+            ...report,
+            topic: form.topic as typeof report.topic,
+            issueDate: form.issueDate,
+            situation: form.situation,
+            whatMatters: form.whatMatters,
+            implications: form.implications,
+            whatHappened: form.whatHappened,
+          },
+          incidents ?? [],
+        )
+      : undefined;
   // Live freshness warning — recomputes as the author edits the issue date.
   const staleProse = computeStale(form.topic, form.issueDate);
   // Option A enforcement on manual edits: a report must never be dated past
@@ -783,6 +811,37 @@ export default function ReportEditor() {
               onChange={(e) => set("author", e.target.value)}
               className="rounded-sm"
             />
+          </Field>
+          <Field label="Risk Rating">
+            <Select
+              value={form.riskRating || "__auto__"}
+              onValueChange={(v) =>
+                set("riskRating", v === "__auto__" ? "" : v)
+              }
+            >
+              <SelectTrigger className="rounded-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__auto__">
+                  {computedRating
+                    ? `Auto — ${CARD_RATING_LABELS[computedRating]} (from data)`
+                    : "Auto (from data)"}
+                </SelectItem>
+                {CARD_RATINGS.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {CARD_RATING_LABELS[r]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {form.riskRating
+                ? "Overrides the rating computed from incidents when this report is pulled into a card."
+                : computedRating
+                  ? `Left on Auto: this report rates ${CARD_RATING_LABELS[computedRating]} from its incidents.`
+                  : "Left on Auto: rating is computed from incidents when pulled into a card."}
+            </p>
           </Field>
           <Field label="Executive Summary">
             <Textarea

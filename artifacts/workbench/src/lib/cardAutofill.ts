@@ -116,6 +116,25 @@ export function ratingFromScopedIncidents(
   return bestRank >= 0 ? CARD_RATINGS[bestRank] : undefined;
 }
 
+// The auto-derived report rating: the worst credible tier among the report's
+// scoped incidents, falling back to the five-tier vocabulary inferred from the
+// prose when no scoped incident carries a usable rating. This is the value the
+// stored `riskRating` defaults to when an analyst leaves the override blank.
+export function autoReportRating(
+  rep: Report,
+  incidents: Incident[] = [],
+): string | undefined {
+  return (
+    ratingFromScopedIncidents(rep, incidents) ??
+    inferRatingFromProse(
+      rep.situation,
+      rep.whatMatters,
+      rep.implications,
+      rep.whatHappened,
+    )
+  );
+}
+
 // Split prose into clean sentences for key-point derivation.
 function sentences(text?: string | null): string[] {
   if (!text) return [];
@@ -225,14 +244,11 @@ export function reportToCard(
   return {
     topic: canonicalTopic(rep.topic).topicLine,
     country,
+    // Prefer the analyst's stored override, then the rating computed from the
+    // report's scoped incidents, then the prose heuristic, then a safe default.
     rating:
-      ratingFromScopedIncidents(rep, incidents) ??
-      inferRatingFromProse(
-        rep.situation,
-        rep.whatMatters,
-        rep.implications,
-        rep.whatHappened,
-      ) ??
+      normaliseRating(rep.riskRating) ??
+      autoReportRating(rep, incidents) ??
       "moderate",
     headline: resolveReportTitle(rep.topic, rep.title),
     bluf:

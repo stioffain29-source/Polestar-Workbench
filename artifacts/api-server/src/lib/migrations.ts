@@ -149,6 +149,14 @@ const RETIRED_REPORT_TITLES: string[] = [
 export async function runDataMigrations(): Promise<void> {
   logger.info("runDataMigrations: starting");
   try {
+    // Schema: analyst-overridable stored risk rating on reports. drizzle-kit
+    // push only reaches the dev database; production schema changes must be
+    // applied here so the deployment runtime (the only place with a writable
+    // prod primary) gains the column on boot. Idempotent — IF NOT EXISTS.
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS risk_rating text`,
+    );
+
     // 0) Country report narrative is now fully data-driven: the Situation,
     //    What Happened and Implications sections are generated from the live
     //    7-day window at render time and the stored overview / trend_summary

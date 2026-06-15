@@ -355,6 +355,20 @@ export interface SourceHealth {
   byStatus: SourceHealthBucket[];
 }
 
+/**
+ * @nullable
+ */
+export type ReportRiskRating = typeof ReportRiskRating[keyof typeof ReportRiskRating] | null;
+
+
+export const ReportRiskRating = {
+  insignificant: 'insignificant',
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  extreme: 'extreme',
+} as const;
+
 export interface KpiCard {
   label: string;
   value: string;
@@ -426,6 +440,8 @@ export interface Report {
   status: ReportStatus;
   issueDate: string;
   /** @nullable */
+  riskRating?: ReportRiskRating;
+  /** @nullable */
   situation?: string | null;
   /** @nullable */
   whatHappened?: string | null;
@@ -443,12 +459,28 @@ export interface Report {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type ReportInputRiskRating = typeof ReportInputRiskRating[keyof typeof ReportInputRiskRating] | null;
+
+
+export const ReportInputRiskRating = {
+  insignificant: 'insignificant',
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  extreme: 'extreme',
+} as const;
+
 export interface ReportInput {
   title: string;
   topic: Topic;
   countrySlug?: string;
   status: ReportStatus;
   issueDate: string;
+  /** @nullable */
+  riskRating?: ReportInputRiskRating;
   situation?: string;
   whatHappened?: string;
   hardNumbers?: FuelHardNumbers | KpiCard[];
@@ -459,12 +491,28 @@ export interface ReportInput {
   author?: string;
 }
 
+/**
+ * @nullable
+ */
+export type ReportUpdateRiskRating = typeof ReportUpdateRiskRating[keyof typeof ReportUpdateRiskRating] | null;
+
+
+export const ReportUpdateRiskRating = {
+  insignificant: 'insignificant',
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  extreme: 'extreme',
+} as const;
+
 export interface ReportUpdate {
   title?: string;
   topic?: Topic;
   countrySlug?: string;
   status?: ReportStatus;
   issueDate?: string;
+  /** @nullable */
+  riskRating?: ReportUpdateRiskRating;
   situation?: string;
   whatHappened?: string;
   hardNumbers?: FuelHardNumbers | KpiCard[];

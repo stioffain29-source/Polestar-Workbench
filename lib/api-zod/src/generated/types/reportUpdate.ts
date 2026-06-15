@@ -8,6 +8,7 @@
 import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { KpiCard } from './kpiCard';
 import type { ReportStatus } from './reportStatus';
+import type { ReportUpdateRiskRating } from './reportUpdateRiskRating';
 import type { Topic } from './topic';
 
 export interface ReportUpdate {
@@ -16,6 +17,8 @@ export interface ReportUpdate {
   countrySlug?: string;
   status?: ReportStatus;
   issueDate?: Date;
+  /** @nullable */
+  riskRating?: ReportUpdateRiskRating;
   situation?: string;
   whatHappened?: string;
   hardNumbers?: FuelHardNumbers | KpiCard[];
