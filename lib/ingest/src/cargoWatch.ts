@@ -83,6 +83,11 @@ const LOCAL_FEEDS: LocalFeed[] = [
 // runs cheap, and this caps the cost of the first cold run.
 const MAX_SCREEN_PER_FEED = 50;
 
+// Mirrors the in-scope Middle East set the workbench renders
+// (artifacts/workbench/src/lib/cargoAnalysis.ts → MIDDLE_EAST). Turkey is
+// intentionally excluded; Iran is included. Keep this aligned with both the
+// frontend scope AND SCOPE_CANON below, or English feeds starve countries the
+// page still counts as in-scope.
 const ME_COUNTRIES = [
   "United Arab Emirates",
   "Saudi Arabia",
@@ -91,8 +96,19 @@ const ME_COUNTRIES = [
   "Bahrain",
   "Kuwait",
   "Jordan",
+  "Iran",
+  "Iraq",
+  "Yemen",
+  "Israel",
+  "Lebanon",
+  "Syria",
 ];
 
+// Mirrors the in-scope APAC set the workbench renders
+// (artifacts/workbench/src/lib/cargoAnalysis.ts → APAC). The feed list and the
+// display scope MUST stay aligned: querying only a subset starves the report of
+// genuine in-scope incidents (the original 8-country list left China, Japan,
+// Korea, Australia, Bangladesh etc. with no feed even though they are in scope).
 const APAC_COUNTRIES = [
   "Singapore",
   "Malaysia",
@@ -100,8 +116,20 @@ const APAC_COUNTRIES = [
   "Thailand",
   "Vietnam",
   "Philippines",
+  "Cambodia",
+  "Laos",
+  "Myanmar",
   "India",
   "Pakistan",
+  "Bangladesh",
+  "Sri Lanka",
+  "China",
+  "Taiwan",
+  "South Korea",
+  "Japan",
+  "Australia",
+  "New Zealand",
+  "Papua New Guinea",
 ];
 
 const ORG_QUERIES: { label: string; q: string }[] = [
@@ -135,6 +163,13 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Bahrain", aliases: ["bahrain", "manama"] },
   { canonical: "Kuwait", aliases: ["kuwait"] },
   { canonical: "Jordan", aliases: ["jordan", "amman", "aqaba"] },
+  { canonical: "Iran", aliases: ["iran", "tehran", "bandar abbas", "bushehr"] },
+  { canonical: "Iraq", aliases: ["iraq", "baghdad", "basra", "umm qasr"] },
+  { canonical: "Yemen", aliases: ["yemen", "sanaa", "aden", "hodeidah"] },
+  { canonical: "Israel", aliases: ["israel", "tel aviv", "haifa", "ashdod"] },
+  // "tripoli" deliberately omitted — it collides with Libya (out of scope).
+  { canonical: "Lebanon", aliases: ["lebanon", "beirut"] },
+  { canonical: "Syria", aliases: ["syria", "damascus", "aleppo", "latakia", "tartus"] },
   { canonical: "Singapore", aliases: ["singapore"] },
   { canonical: "Malaysia", aliases: ["malaysia", "kuala lumpur", "penang", "johor", "port klang"] },
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "surabaya", "tanjung priok", "soekarno-hatta"] },
@@ -143,6 +178,18 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Philippines", aliases: ["philippines", "manila", "cebu"] },
   { canonical: "India", aliases: ["india", "mumbai", "delhi", "chennai", "kolkata", "bengaluru", "nhava sheva"] },
   { canonical: "Pakistan", aliases: ["pakistan", "karachi", "lahore", "port qasim"] },
+  { canonical: "Bangladesh", aliases: ["bangladesh", "dhaka", "chittagong", "chattogram"] },
+  { canonical: "Sri Lanka", aliases: ["sri lanka", "colombo"] },
+  { canonical: "China", aliases: ["china", "beijing", "shanghai", "guangzhou", "shenzhen", "ningbo", "qingdao", "hong kong"] },
+  { canonical: "Taiwan", aliases: ["taiwan", "taipei", "kaohsiung"] },
+  { canonical: "South Korea", aliases: ["south korea", "korea", "seoul", "busan", "incheon"] },
+  { canonical: "Japan", aliases: ["japan", "tokyo", "osaka", "yokohama", "nagoya", "kobe"] },
+  { canonical: "Australia", aliases: ["australia", "sydney", "melbourne", "brisbane", "perth", "adelaide"] },
+  { canonical: "New Zealand", aliases: ["new zealand", "auckland", "wellington", "christchurch"] },
+  { canonical: "Cambodia", aliases: ["cambodia", "phnom penh", "sihanoukville"] },
+  { canonical: "Laos", aliases: ["laos", "vientiane"] },
+  { canonical: "Myanmar", aliases: ["myanmar", "burma", "yangon"] },
+  { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "lae"] },
 ];
 
 // Allowlist: at least one must hit in title+summary for the item to qualify.
@@ -246,7 +293,10 @@ type Classified = {
 const FOREIGN_CONTEXT = [
   "california", "canada", "united states", "u.s.", "usa",
   "united kingdom", "britain", "europe", "european", "germany",
-  "mexico", "brazil", "south africa", "japan", "china",
+  "mexico", "brazil", "south africa",
+  // North Korea is OUT of scope but the bare "korea" alias maps to South Korea,
+  // so guard against a DPRK story being mis-tagged ROK.
+  "north korea", "pyongyang", "dprk",
 ];
 
 function classify(title: string, summary: string): Classified {
@@ -273,6 +323,24 @@ function classify(title: string, summary: string): Classified {
 
   return { kept: true, reason: `allow:${allowHit}`, country: countryMatch.canonical };
 }
+
+// Strip the Google News " - Source Name" masthead, THEN classify. The country
+// gate is title-only, so classifying the raw title would let a publisher
+// masthead ("South China Morning Post", "Bangkok Post", "Japan Today") satisfy
+// the in-scope-country requirement and mis-tag an out-of-country story to its
+// publisher's country. Returns the cleaned headline + the extracted masthead.
+function classifyFeedItem(
+  rawTitle: string,
+  summary: string,
+): { cleanTitle: string; sourceName: string | null; result: Classified } {
+  const dashIdx = rawTitle.lastIndexOf(" - ");
+  const sourceName = dashIdx > 0 ? rawTitle.slice(dashIdx + 3).trim() : null;
+  const cleanTitle = dashIdx > 0 ? rawTitle.slice(0, dashIdx).trim() : rawTitle;
+  return { cleanTitle, sourceName, result: classify(cleanTitle, summary) };
+}
+
+// Test-only surface (mirrors flashpointTestHooks).
+export const cargoTestHooks = { classify, classifyFeedItem };
 
 function dedupeKey(title: string, when: Date, country: string): string {
   return [
@@ -420,28 +488,25 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
       const items = parsed.items ?? [];
       perFeed[feed.label].found = items.length;
       for (const item of items) {
-        const title = cleanText(item.title);
+        const rawTitle = cleanText(item.title);
         const summary = cleanText(item.contentSnippet || item.content || "");
         const when = parseDate(item.isoDate || item.pubDate);
         const link = item.link?.trim();
 
-        if (!title || !when || !link) {
-          rejected.push({ title: title || "(no title)", reason: "missing-required-field", feedLabel: feed.label });
+        if (!rawTitle || !when || !link) {
+          rejected.push({ title: rawTitle || "(no title)", reason: "missing-required-field", feedLabel: feed.label });
           perFeed[feed.label].rejected++;
           continue;
         }
 
-        const c = classify(title, summary);
+        // Strip the Google News masthead before classifying (see classifyFeedItem).
+        const { cleanTitle, sourceName: masthead, result: c } = classifyFeedItem(rawTitle, summary);
         if (!c.kept || !c.country) {
-          rejected.push({ title, reason: c.reason, feedLabel: feed.label });
+          rejected.push({ title: cleanTitle, reason: c.reason, feedLabel: feed.label });
           perFeed[feed.label].rejected++;
           continue;
         }
-
-        // Google News titles often append " - Source Name". Extract it.
-        const dashIdx = title.lastIndexOf(" - ");
-        const sourceName = dashIdx > 0 ? title.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
-        const cleanTitle = dashIdx > 0 ? title.slice(0, dashIdx).trim() : title;
+        const sourceName = masthead ?? parsed.title ?? feed.label;
 
         accepted.push({
           title: cleanTitle.slice(0, 500),
