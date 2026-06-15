@@ -47,3 +47,35 @@ html2canvas build (`node_modules/.pnpm/html2canvas@1.4.1/.../html2canvas.min.js`
 injected via `addScriptTag({content})`), clone the 1080x1350 card, rasterise at
 scale 1, and *view the PNG*. Preview screenshots alone will NOT reveal the shear
 — it is html2canvas-specific.
+
+## Third failure mode: badge/chip text renders vertically off-centre
+
+Same root cause (html2canvas draws text low), different symptom. A small coloured
+severity **chip** (the Spot Report risk-rating badge) that is perfectly centred
+on screen renders with its label sitting LOW in the box in the exported PDF —
+big colour gap above the text, almost none below. CSS centering does NOT survive:
+`line-height == box-height`, flex `align-items:center`, padding tweaks all fail
+because html2canvas ignores them and still draws the glyph baseline low.
+
+**The only deterministic fix is to NOT let html2canvas lay out the text** —
+replace the chip with a real `<canvas>` at export time. The browser draws the
+canvas bitmap with `ctx.textBaseline = "middle"` + `fillText(text, w/2, h/2)`
+(pixel-perfect both axes), and html2canvas rasterises the canvas bitmap verbatim.
+This is exactly what the country-report TABLE chips already do (`severityChip()`
+in exportPdf.ts). The pattern: tag the on-screen chip span with a data attribute
+(e.g. `data-sev-chip` + label/color), and in `applySeverityBadgeExportLayout`
+`node.replaceWith(canvasChip)` for tagged nodes BEFORE the generic span-restyle
+loop so they aren't double-processed. Scope by the data attribute so other
+reports' badges are untouched.
+
+**Why this is the right call, not CSS:** the in-app "Download PDF" rasterises the
+`.print-report` DOM, so the only stable text in an html2canvas export is text it
+doesn't lay out (canvas bitmap or pre-rendered image). Reach for canvas whenever
+exact text placement matters in a rasterised export.
+
+**Match on-screen size** so preview==PDF parity holds: replicate the chip's
+fontSize / letter-spacing / padding / height / border-radius in the canvas. Set
+`ctx.letterSpacing` (feature-detect with `"letterSpacing" in ctx`) BEFORE both
+`measureText` (to size the box) and `fillText`. NOTE `canvas.width=`/`height=`
+RESETS all ctx state — re-apply scale, font, letterSpacing, fillStyle, align,
+baseline after sizing.

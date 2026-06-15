@@ -144,6 +144,17 @@ function applyCountryMapExportLayout(root: HTMLElement): void {
 }
 
 function applySeverityBadgeExportLayout(root: HTMLElement): void {
+  // Tagged chips (spot report) become pixel-perfect canvases so the label stays
+  // centred — html2canvas renders CSS text low. Done first so the span path below
+  // no longer sees them.
+  root.querySelectorAll<HTMLElement>("[data-sev-chip]").forEach((node) => {
+    const label = (node.dataset.sevLabel || node.textContent || "").trim();
+    const color =
+      node.dataset.sevColor || node.style.background || node.style.backgroundColor;
+    if (!label || !color) return;
+    node.replaceWith(sidebarSeverityChipCanvas(label, color));
+  });
+
   const labels = new Set(["EXTREME", "HIGH", "MODERATE", "LOW", "INSIGNIFICANT"]);
   root.querySelectorAll<HTMLElement>("span").forEach((node) => {
     const label = (node.textContent ?? "").trim().toUpperCase();
@@ -205,6 +216,64 @@ function severityChip(label: string, color: string, width = 92, height = 20): HT
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(displayLabel, width / 2, height / 2);
+
+  return canvas;
+}
+
+// html2canvas renders CSS text baselines low, so a span-based severity chip ends
+// up vertically off-centre in the exported PDF even with line-height centering.
+// A real <canvas> (drawn by the browser, rasterised verbatim by html2canvas) is
+// the only deterministic way to keep the label centred. Sized/styled to match the
+// on-screen chip exactly (fontSize 10, letter-spacing 0.08em, padding 11px,
+// height 20px, 2px radius) so preview and PDF agree.
+function sidebarSeverityChipCanvas(label: string, color: string): HTMLCanvasElement {
+  const text = label.toUpperCase();
+  const fontPx = 10;
+  const letterSpacingPx = 0.08 * fontPx;
+  const padX = 11;
+  const height = 20;
+  const radius = 2;
+  const scale = 3;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d") as
+    | (CanvasRenderingContext2D & { letterSpacing?: string })
+    | null;
+
+  let textW = text.length * 6.4;
+  if (ctx) {
+    ctx.font = `700 ${fontPx}px Roboto, Arial, sans-serif`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${letterSpacingPx}px`;
+    textW = ctx.measureText(text).width;
+  }
+  const width = Math.round(textW + padX * 2);
+
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.style.display = "inline-block";
+  canvas.style.verticalAlign = "middle";
+  canvas.style.borderRadius = `${radius}px`;
+  canvas.style.flex = "0 0 auto";
+
+  if (!ctx) return canvas;
+  ctx.scale(scale, scale);
+  ctx.fillStyle = color || "#999999";
+  ctx.beginPath();
+  ctx.moveTo(radius, 0);
+  ctx.arcTo(width, 0, width, height, radius);
+  ctx.arcTo(width, height, 0, height, radius);
+  ctx.arcTo(0, height, 0, 0, radius);
+  ctx.arcTo(0, 0, width, 0, radius);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.font = `700 ${fontPx}px Roboto, Arial, sans-serif`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${letterSpacingPx}px`;
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, width / 2, height / 2);
 
   return canvas;
 }

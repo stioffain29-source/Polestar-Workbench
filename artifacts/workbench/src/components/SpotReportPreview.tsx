@@ -76,6 +76,9 @@ function SeverityChip({ severity }: { severity?: string | null }) {
   const bg = SPOT_SEV_COLOR[k] ?? "#999";
   return (
     <span
+      data-sev-chip="true"
+      data-sev-label={SPOT_SEV_LABEL[k] ?? severity ?? ""}
+      data-sev-color={bg}
       className="uppercase inline-block text-center"
       style={{
         background: bg,
