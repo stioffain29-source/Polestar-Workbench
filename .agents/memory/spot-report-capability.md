@@ -76,14 +76,17 @@ self-heal prod from the app entrypoint.
   Recommended Actions, Disclaimer (Reference Incidents / Sources are pre-existing
   supplements before the disclaimer).
 
-## Header band logo (light vs dark)
+## Title block & PDF masthead
 
-- The band logo MUST contrast with the band colour. White reverse logo
-  (`Reverse_white_logo_hor`) is for DARK bands only; a Midnight Blue variant
-  (`Polestar_navy_logo_hor.png`, recolored from the white PNG via ImageMagick,
-  alpha preserved) is for LIGHT bands. The Spot Report band is light grey
-  (POLAR, matching the sibling report footers), so it uses the navy logo — the
-  white logo on grey is invisible.
+- The body title block is WHITE with a 2px Electric-blue bottom underline (it
+  matches the section headings); it carries NO logo — just the eyebrow, report
+  title, risk chip, and dates. (It was previously a grey/POLAR band carrying the
+  navy logo; that band background + the logo were removed by user request.)
+- The dark PDF masthead shows the logo + the words "SPOT REPORT" (NOT the report
+  title — the title already appears in the body block). Driven by
+  `data-masthead-label="Spot Report"` on the `.print-report` root, which
+  `reportTitleFrom()` (exportPdf.ts) reads and uppercases. Any report can pin its
+  masthead text the same way; others fall back to the h1 / filename.
 
 ## Preview == every export
 
@@ -91,3 +94,23 @@ self-heal prod from the app entrypoint.
   all exports; in-app PDF rasterises that DOM (`exportElementToPdf`) so screen==PDF is
   automatic, matching the rest of the workbench. .docx and plain-text render the same
   sections in the same order. Each export appends an export-history entry.
+
+## Single-page fit (DOM-rasterise) & map attribution parity
+
+- The DOM-rasterise export emits ONE page only when the clone's `scrollHeight` ≤
+  `pageCssHeight` (~1199px at the 960px export width). `buildPageSlices` has NO
+  orphan / sparse-last-page handling: ANY overflow (even a few px) breaks at the
+  last section top and dumps the remainder onto a near-empty next page. To keep a
+  SHORT report on one page, cut content height — the spot locator map is the
+  biggest lever (one dot doesn't need 360px; set to 220, applied to the React
+  preview so screen==PDF). This is a product fit, not a general pagination fix;
+  long reports still paginate. The body raster height == the clone's CSS height,
+  so a quick offscreen 960px clone `scrollHeight` measure predicts the break
+  exactly; verify the real output by rendering the in-app PDF headless via
+  Playwright (system Nix Chromium) and checking the page count.
+- `IncidentMap` is SPOT-ONLY (the country report uses a separate
+  `CountryReportMap`). It renders its OWN attribution caption into the legend row
+  (`attributionControl:false`) so attribution is identical on screen and in PDF
+  and never clashes with the in-map location label. Because of that,
+  `applyMapExportLayout` must be called with `appendAttribution=false` for
+  `spot-report-map` (else the PDF shows it twice); the country map still appends.

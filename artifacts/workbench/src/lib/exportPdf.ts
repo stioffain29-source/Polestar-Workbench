@@ -84,17 +84,26 @@ function applyExportOnlyLayout(root: HTMLElement): void {
     }
   `);
 
-  applyCountryMapExportLayout(root);
+  applyMapExportLayout(root, "country-report-map", 400);
+  // The spot map (IncidentMap) renders its own attribution into the legend so
+  // it is identical on screen and in the PDF, so the export must NOT append a
+  // second one.
+  applyMapExportLayout(root, "spot-report-map", undefined, false);
   applySeverityBadgeExportLayout(root);
   applyCountryTableExportLayout(root);
   applyBarChartExportLayout(root);
 }
 
-function applyCountryMapExportLayout(root: HTMLElement): void {
-  const map = root.querySelector<HTMLElement>("#country-report-map");
+function applyMapExportLayout(
+  root: HTMLElement,
+  mapId: string,
+  height?: number,
+  appendAttribution = true,
+): void {
+  const map = root.querySelector<HTMLElement>(`#${mapId}`);
   if (!map) return;
 
-  map.style.height = "400px";
+  if (height) map.style.height = `${height}px`;
   map.style.overflow = "hidden";
   map.style.position = "relative";
   map.querySelectorAll<HTMLElement>(".leaflet-control-attribution").forEach((node) => {
@@ -132,6 +141,8 @@ function applyCountryMapExportLayout(root: HTMLElement): void {
     el.style.gap = "6px";
     el.style.lineHeight = "1";
   });
+
+  if (!appendAttribution) return;
 
   const attribution = document.createElement("div");
   attribution.textContent = "Leaflet | (c) OpenStreetMap (c) CARTO";
@@ -582,6 +593,11 @@ function drawBrandGradient(pdf: jsPDF, x: number, y: number, w: number, h: numbe
 }
 
 function reportTitleFrom(element: HTMLElement, filename: string): string {
+  // A report can pin its masthead label via data-masthead-label (e.g. Spot
+  // Reports show "SPOT REPORT", since the title already appears in the body
+  // title block). Other reports fall back to the h1 / filename.
+  const mastheadLabel = element.dataset.mastheadLabel?.trim();
+  if (mastheadLabel) return mastheadLabel.toUpperCase();
   const heading = element.querySelector("h1")?.textContent?.trim();
   if (heading) return heading.toUpperCase();
   return filename

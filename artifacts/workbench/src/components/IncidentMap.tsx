@@ -83,7 +83,11 @@ export default function IncidentMap({
     if (!mapRef.current) {
       mapRef.current = L.map(containerRef.current, {
         zoomControl: true,
-        attributionControl: true,
+        // Leaflet's built-in attribution control is disabled: it sits inside the
+        // map and clashed with the location label. Instead a clean attribution
+        // caption is rendered into the legend row below (in React), so it reads
+        // identically on screen and in the rasterised PDF.
+        attributionControl: false,
         // The incident markers/labels are a plain HTML overlay (so html2canvas
         // can rasterise them into the PDF), which cannot ride Leaflet's zoom
         // animation — with animation on they visibly drift away from the tiles
@@ -274,6 +278,17 @@ export default function IncidentMap({
               </span>
             </div>
           ))}
+          <span
+            style={{
+              marginLeft: "auto",
+              fontFamily: "Roboto, sans-serif",
+              fontSize: 10,
+              color: DUSK,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Leaflet | (c) OpenStreetMap (c) CARTO
+          </span>
         </div>
       ) : (
         <div

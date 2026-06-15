@@ -1,5 +1,4 @@
 import { format } from "date-fns";
-import polestarLogo from "@assets/Polestar_navy_logo_hor.png";
 import type { Incident, SpotReport } from "@workspace/api-client-react";
 import IncidentMap from "@/components/IncidentMap";
 import {
@@ -21,9 +20,9 @@ const ROBOTO = "Roboto, sans-serif";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="report-section mb-8">
+    <div className="report-section mb-6">
       <h2
-        className="uppercase pb-2 mb-4 tracking-wide"
+        className="uppercase pb-2 mb-3 tracking-wide"
         style={{
           color: NAVY,
           fontFamily: ROBOTO,
@@ -120,32 +119,40 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
   const otherSections = sections.filter((s) => s !== blufSection);
 
   return (
-    <div className="print-report bg-white" style={{ color: DUSK, fontFamily: ROBOTO, fontWeight: 300 }}>
-      {/* Header band */}
-      <div style={{ background: POLAR, color: DUSK, padding: "24px 28px" }}>
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <div
-              className="uppercase"
-              style={{ fontSize: 11, letterSpacing: "0.22em", color: DUSK, opacity: 0.65, fontWeight: 700 }}
-            >
-              Polestar Advisory · Spot Report
-            </div>
-            <h1
-              style={{
-                fontFamily: ROBOTO,
-                fontWeight: 700,
-                fontSize: 26,
-                lineHeight: 1.15,
-                marginTop: 8,
-                color: NAVY,
-              }}
-            >
-              {report.title || "Untitled Spot Report"}
-            </h1>
-          </div>
-          <img src={polestarLogo} alt="Polestar Advisory" style={{ width: 150, height: "auto" }} />
+    <div
+      className="print-report bg-white"
+      data-masthead-label="Spot Report"
+      style={{ color: DUSK, fontFamily: ROBOTO, fontWeight: 300 }}
+    >
+      {/* Title block — underlined in Electric Blue like every section heading
+          (replaces the former grey band; the logo now lives only in the PDF
+          masthead, and the masthead carries the "SPOT REPORT" label). */}
+      <div
+        style={{
+          background: "#fff",
+          color: DUSK,
+          padding: "28px 28px 16px",
+          borderBottom: `2px solid ${ELECTRIC}`,
+        }}
+      >
+        <div
+          className="uppercase"
+          style={{ fontSize: 11, letterSpacing: "0.22em", color: DUSK, opacity: 0.65, fontWeight: 700 }}
+        >
+          Polestar Advisory · Spot Report
         </div>
+        <h1
+          style={{
+            fontFamily: ROBOTO,
+            fontWeight: 700,
+            fontSize: 26,
+            lineHeight: 1.15,
+            marginTop: 8,
+            color: NAVY,
+          }}
+        >
+          {report.title || "Untitled Spot Report"}
+        </h1>
 
         <div className="flex flex-wrap items-center gap-x-8 gap-y-2 mt-5">
           <div className="flex items-center gap-2">
@@ -182,6 +189,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
               affectedRadiusKm={report.affectedRadiusKm}
               showLabels
               locationLabel={location}
+              height={220}
             />
           </Section>
         )}
