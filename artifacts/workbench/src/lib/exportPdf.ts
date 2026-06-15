@@ -508,6 +508,27 @@ function applyBarChartExportLayout(root: HTMLElement): void {
   });
 }
 
+// Per-line top offsets (relative to rootTop) for every wrapped text line inside
+// an element, via Range rects. Used to let a tall prose paragraph split across a
+// page boundary instead of being pushed whole.
+function lineBreakTops(el: HTMLElement, rootTop: number): number[] {
+  const tops: number[] = [];
+  const range = document.createRange();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let node: Node | null = walker.nextNode();
+  while (node) {
+    if (node.textContent && node.textContent.trim()) {
+      range.selectNodeContents(node);
+      const rects = range.getClientRects();
+      for (let i = 0; i < rects.length; i++) {
+        tops.push(Math.round(rects[i].top - rootTop));
+      }
+    }
+    node = walker.nextNode();
+  }
+  return tops.sort((a, b) => a - b);
+}
+
 function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): number[] {
   const rootRect = root.getBoundingClientRect();
   const selectors = [
@@ -525,11 +546,28 @@ function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): numbe
     if (top > 0 && top < root.scrollHeight) candidates.add(top);
   });
 
-  return Array.from(candidates)
+  // Line-level break points inside opted-in prose (data-pdf-flow). Without these
+  // a paragraph taller than the page remainder is shoved whole onto the next
+  // page, leaving a half-empty page. Skip each element's first line so the
+  // preceding heading keeps at least its first line of body text.
+  root.querySelectorAll<HTMLElement>("[data-pdf-flow]").forEach((el) => {
+    lineBreakTops(el, rootRect.top)
+      .slice(1)
+      .forEach((top) => {
+        if (top > 0 && top < root.scrollHeight) candidates.add(top);
+      });
+  });
+
+  const sorted = Array.from(candidates)
     .filter((y) => y >= 0 && y <= root.scrollHeight)
-    .sort((a, b) => a - b)
-    .filter((y, index, all) => index === 0 || Math.abs(y - all[index - 1]) > PAGE_BREAK_GUARD_PX)
-    .filter((y) => y === 0 || y === root.scrollHeight || y > pageCssHeight * 0.15);
+    .sort((a, b) => a - b);
+  // De-dupe against the previous KEPT candidate (not the immediate predecessor)
+  // so a run of evenly-spaced line tops isn't cascade-dropped down to one.
+  const kept: number[] = [];
+  for (const y of sorted) {
+    if (kept.length === 0 || y - kept[kept.length - 1] > PAGE_BREAK_GUARD_PX) kept.push(y);
+  }
+  return kept.filter((y) => y === 0 || y === root.scrollHeight || y > pageCssHeight * 0.15);
 }
 
 function buildPageSlices(

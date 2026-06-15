@@ -45,6 +45,7 @@ function Paragraphs({ text }: { text: string }) {
       {parts.map((p, i) => (
         <p
           key={i}
+          data-pdf-flow="true"
           className="text-[14px] leading-[1.7] mb-3 font-light"
           style={{ color: DUSK, fontFamily: ROBOTO }}
         >
