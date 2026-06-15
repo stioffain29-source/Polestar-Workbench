@@ -1,0 +1,285 @@
+Rebuild the current Card Studio as the Polestar Visual Brief Builder.
+
+The current version is too form heavy. It feels like a data entry screen, not a visual briefing product. The new version needs to work more like Canva for intelligence products, but locked to Polestar branding.
+
+The purpose of this tool is to let me create polished visual intelligence briefs that combine maps, icons, charts, timelines, text panels, summary boxes, risk ratings and recommendations in one finished branded output.
+
+The visual brief must be the main workspace. The user should build and edit directly on the canvas, not through a long static form.
+
+SCREEN LAYOUT
+
+Use a three panel layout.
+
+LEFT PANEL
+
+This should contain the layout and block library.
+
+Include:
+
+Layouts
+Text blocks
+Icon blocks
+Map blocks
+Timeline blocks
+Chart blocks
+Risk rating blocks
+Executive summary blocks
+Recommendation blocks
+Image blocks
+Saved presets
+Brand assets
+
+CENTRE CANVAS
+
+This is the main workspace.
+
+The user must be able to:
+
+Edit text directly on the canvas
+Drag and resize blocks
+Duplicate blocks
+Delete blocks
+Snap blocks into alignment
+Move blocks forward and backward
+See safe export margins
+Change output size
+Export the finished visual
+
+Supported output sizes should include:
+
+LinkedIn portrait
+LinkedIn square
+A4 portrait
+A4 landscape
+Report page
+Presentation slide
+
+RIGHT PANEL
+
+The right panel should only show controls for the selected item.
+
+Do not show every field all the time.
+
+If a text block is selected, show:
+
+Font size
+Font weight
+Alignment
+Line spacing
+Text colour
+Box style
+Border style
+Padding
+
+If a map block is selected, show:
+
+Location search
+Latitude
+Longitude
+Zoom level
+Markers
+Route lines
+Labels
+Legend
+Highlighted areas
+
+If a timeline block is selected, show:
+
+Timeline items
+Times
+Labels
+Icons
+Risk colour
+Direction
+Number of stages
+
+If a chart block is selected, show:
+
+Chart type
+Data values
+Labels
+Legend
+Style
+
+TEMPLATES AND LAYOUTS
+
+Templates must be visual layouts, not report categories.
+
+Do not build the template system around subjects like Country Risk, Protest Update, Maritime Disruption or Spot Report. Those are topics. The tool must be more flexible than that.
+
+The user should choose the shape of the output, then use it for any topic.
+
+Create the following starting layouts:
+
+Map led brief
+
+A large map with supporting text panels, key points, risk rating and outlook.
+
+Route and movement brief
+
+A map with route line, direction arrows, start and end points, legend, timing and movement assessment.
+
+Event awareness brief
+
+Headline, date, key locations, likely timeline, watch areas, advice and executive summary.
+
+Timeline led brief
+
+Horizontal or vertical timeline with supporting risk and impact panels.
+
+Operations advisory brief
+
+Advice focused layout with icons, actions, warnings, affected areas and recommended posture.
+
+Executive visual summary
+
+Clean senior leadership layout with key judgement, impact, outlook, rating and next steps.
+
+Multi panel infographic
+
+Dense layout combining map, icons, text boxes, timeline, watch areas, advice and summary table.
+
+Social media visual
+
+Simplified external facing layout for LinkedIn or X.
+
+The same layout should be usable for any topic, including protests, port disruption, strikes, border closures, weather events, kidnapping trends, supply chain issues, travel disruption, facility security issues, political risk updates and operational disruption.
+
+REQUIRED BLOCK TYPES
+
+Create reusable modular blocks.
+
+Required blocks:
+
+Header block
+Date and time block
+Headline block
+BLUF block
+Key points block
+Icon list block
+Risk rating block
+Impact rating block
+Outlook block
+Executive summary block
+Recommendation block
+Map block
+Route map block
+Timeline block
+Table block
+Bar chart block
+Line chart block
+Donut chart block
+Image block
+Footer block
+
+Every block should be draggable, resizable and editable.
+
+MAP FUNCTIONALITY
+
+The map block must support:
+
+City maps
+Country maps
+Pin markers
+Route lines
+Direction arrows
+Highlighted areas
+Labels
+Legend boxes
+Manual latitude and longitude entry
+Auto search by place name
+Export ready rendering
+
+The route map block must allow the user to draw a route line on the map and label key points.
+
+TIMELINE FUNCTIONALITY
+
+The timeline block must support:
+
+Horizontal timeline
+Vertical timeline
+Time labels
+Event labels
+Icons per stage
+Colour coded risk points
+Adjustable number of timeline items
+
+CHART FUNCTIONALITY
+
+Support simple branded charts:
+
+Bar chart
+Line chart
+Donut chart
+Risk trend chart
+Comparison chart
+
+Charts should automatically use the Polestar visual style.
+
+BRAND SYSTEM
+
+Create a locked Polestar brand layer so the output always looks polished and consistent.
+
+The brand system should control:
+
+Fonts
+Colour palette
+Header style
+Footer style
+Icon style
+Border radius
+Line weights
+Panel spacing
+Risk rating colours
+Map label style
+Export quality
+
+The user should not need to manually design each output from scratch.
+
+AI HELPER PANEL
+
+Add an optional AI helper panel, but do not make it the main interface.
+
+The user should be able to paste rough notes, a report, an alert or a WhatsApp style update and ask the system to suggest:
+
+Headline
+BLUF
+Key points
+Timeline items
+Risk rating
+Outlook
+Recommendations
+Map labels
+LinkedIn blurb
+
+The AI output should populate editable blocks on the canvas.
+
+Everything must remain fully editable manually.
+
+EXPORT REQUIREMENTS
+
+Support:
+
+PNG export
+PDF export
+Copy image to clipboard
+Save as reusable layout
+Save as finished brief
+Duplicate previous brief
+Export with transparent background where suitable
+
+WHAT THIS MUST NOT BE
+
+Do not create another long form based card editor.
+
+Do not force the user to choose fixed report types.
+
+Do not make the preview secondary.
+
+Do not make the user fill every field manually before seeing the output.
+
+PRODUCT AIM
+
+The finished product should let the user quickly create high polish Polestar visual intelligence products containing maps, icons, graphs, timelines and text.
+
+The user chooses a visual layout, drops in content, adjusts the canvas and exports a finished professional brief.
