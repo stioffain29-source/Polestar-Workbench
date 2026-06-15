@@ -44,8 +44,12 @@ in an unrelated field re-fit the bounds and jerked the viewport.
   `{lat, lng, label?, severity?}` — so an analyst can plot arbitrary extra markers.
 - `buildSpotMapPoints` is the ONE place that assembles every plotted point (primary +
   linked + manual); manual points use key `m-${idx}`, `primary:false`. `IncidentMap`
-  labels ONLY the primary point — manual/linked dots get a severity colour + hover
-  title, no text label on the map.
+  draws a TEXT caption beside the primary point (its location label) AND beside any
+  MANUAL point whose `label` is non-blank — the manual `label` flows
+  `SpotMapPoint.label` → `IncidentMapPoint.label` and renders as an HTML overlay div
+  (so it rasterises into the PDF, screen==PDF). LINKED-incident dots get only a
+  severity colour + hover title, no on-map text. NOTE: `pointsSig` (the memo key that
+  gates the viewport re-fit) MUST include `label`, or editing a label wouldn't redraw.
 - A manual point with no (or blank) severity INHERITS `report.severity`. Use
   `spotSevKey(m.severity) || spotSevKey(report.severity)` — `||` not `??`, because an
   empty-string severity (API-written) must still fall back instead of rendering the

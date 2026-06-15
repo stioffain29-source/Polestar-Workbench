@@ -10,6 +10,8 @@ export interface IncidentMapPoint {
   title?: string | null;
   /** The primary point is drawn larger with a ring; related points are plain. */
   primary?: boolean;
+  /** Optional caption drawn as text beside this marker on the map. */
+  label?: string | null;
 }
 
 export interface IncidentMapProps {
@@ -53,7 +55,7 @@ export default function IncidentMap({
   // the effect below re-ran on every keystroke and re-fired fitBounds/setView,
   // resetting the analyst's manual pan/zoom.
   const pointsSig = JSON.stringify(
-    points.map((p) => [p.lat, p.lng, p.severity ?? "", p.title ?? "", !!p.primary]),
+    points.map((p) => [p.lat, p.lng, p.severity ?? "", p.title ?? "", p.label ?? "", !!p.primary]),
   );
   const plottable = useMemo(
     () =>
@@ -193,6 +195,22 @@ export default function IncidentMap({
       overlay.appendChild(dot);
       dotsRef.current.push({ el: dot, lat: p.lat, lng: p.lng, size });
       latLngs.push([p.lat, p.lng]);
+
+      // Analyst-typed marker caption (e.g. a manual map point labelled "MINES").
+      // The primary point gets its location label from the block below, so it is
+      // excluded here to avoid a double label.
+      const pointLabel = (p.label ?? "").trim();
+      if (showLabels && pointLabel && !p.primary) {
+        const lbl = document.createElement("div");
+        lbl.style.position = "absolute";
+        lbl.style.color = NAVY;
+        lbl.style.font = "700 12px/1.2 Roboto, sans-serif";
+        lbl.style.letterSpacing = "0.01em";
+        lbl.style.whiteSpace = "nowrap";
+        lbl.textContent = pointLabel;
+        overlay.appendChild(lbl);
+        labelsRef.current.push({ el: lbl, lat: p.lat, lng: p.lng });
+      }
     }
 
     if (showLabels && locationLabel) {

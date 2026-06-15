@@ -57,6 +57,8 @@ export interface SpotMapPoint {
   severity: string;
   title: string;
   primary: boolean;
+  /** Analyst-typed caption drawn beside the marker on the map. */
+  label?: string;
 }
 
 /**
@@ -111,6 +113,8 @@ export function buildSpotMapPoints(
         severity,
         title: label || spotLocationLabel(report) || report.title,
         primary: false,
+        // The analyst-typed label is drawn as text beside the marker on the map.
+        label: label || undefined,
       });
     }
   });
