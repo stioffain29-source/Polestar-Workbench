@@ -210,6 +210,30 @@ runs must be purged separately (dev was cleaned with a scoped DELETE; prod never
 held them). **Why:** the user asked for GENUINE security events only — accident
 casualties misrepresent the theatre and inflate the date.
 
+**Conflict-regency place names + "detained by" were the next recall hole ("PNG
+and Papua looking thin", Jun-2026).** Genuine recent West Papua security items
+were still dropped because (1) Papua Highlands/lowlands conflict REGENCIES that
+omit the word "Papua" in the headline (Lanny Jaya, Tolikara, Pegunungan Bintang,
+Dogiyai, Deiyai, Mappi, Keerom, Sarmi, Waropen, Supiori, Boven Digoel) were not
+in `WEST_PAPUA_MARKERS`, so "Teenager in Lanny Jaya killed by landmine" resolved
+to no-apac-country; and (2) a security-force DETENTION ("Four Yahukimo Residents
+Detained by Security Task Force and Marines") resolved correctly but carried no
+PACIFIC_CRIME cue → no-flashpoint-cue. Fix (lockstep): add the regency markers to
+`WEST_PAPUA_MARKERS` (flashpoint.ts) AND `WEST_PAPUA_CONTEXT_RE` +
+`PAPUA_STRICT_LOCAL_RE` (countryMatch.ts); add `ambush|landmine|land mine|
+detained by <security|police|military|tni|marines|soldiers|joint|task force>` to
+PACIFIC_CRIME (which only fires once the country already resolved Pacific, so the
+"detained by" cue cannot leak non-Pacific — regression-tested with a Jakarta
+fraud-detention that must still need a protest cue). **Why:** the regency words
+are the ONLY in-text geography for Highlands-conflict stories; without them the
+detention/landmine class of genuine insurgency-theatre events is silently lost.
+Verified by probe (West Papua accepted 3→5, zero new junk). Prod recall reaches
+the live feed only after a republish (FORCE_VERSION bump forces one ingest); it
+does NOT restore HISTORICAL prod rows that aged out of the feeds — those need the
+token-gated /api/admin/incidents/backfill route, and the workspace currently has
+no INGEST_ADMIN_TOKEN to call it (PROD_DATABASE_URL value isn't sandbox-readable
+either), so historical dev→prod depth parity is out of reach from the workspace.
+
 **How to apply:** new PNG/Pacific feeds go in FLASHPOINT_REGIONAL_SOURCES in
 `artifacts/api-server/src/lib/migrations.ts` (seeded on boot, reaches prod on
 deploy; repairFlashpointSeedUrls updates existing rows' URLs). Any new Google

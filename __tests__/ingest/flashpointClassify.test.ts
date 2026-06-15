@@ -124,6 +124,45 @@ describe("classify", () => {
     expect(result.country).toBe("Philippines");
     expect(result.reason).toMatch(/^allow:/);
   });
+
+  it("resolves a Papua Highlands regency (Lanny Jaya) to West Papua", () => {
+    // Conflict regencies that omit "Papua" in the headline previously resolved
+    // to no country, dropping genuine West Papua security events at ingest.
+    const result = classify(
+      "Teenager in Lanny Jaya Reportedly Killed After Stepping on Suspected Landmine - Jubi.id",
+      "",
+    );
+    expect(result.kept).toBe(true);
+    expect(result.country).toBe("West Papua");
+    expect(result.reason).toMatch(/^allow:/);
+  });
+
+  it("accepts a security-force detention in the Papua theatre", () => {
+    // "detained by <security force>" is a genuine Pacific security-operation cue
+    // that the protest-only / crime-only cue set previously missed.
+    const result = classify(
+      "Four Yahukimo Residents Reportedly Detained by Security Task Force and Marines - Jubi.id",
+      "",
+    );
+    expect(result.kept).toBe(true);
+    expect(result.country).toBe("West Papua");
+    expect(result.reason).toBe("allow:pacific-crime");
+  });
+
+  it("accepts a West Papua rebel ambush", () => {
+    const result = classify("OPM ambush kills two soldiers in Nduga", "");
+    expect(result.kept).toBe(true);
+    expect(result.country).toBe("West Papua");
+    expect(result.reason).toMatch(/^allow:/);
+  });
+
+  it("does NOT let the new detention cue leak outside the Pacific", () => {
+    // "detained by police" with a non-Pacific country must still require a
+    // protest/unrest cue — the detention cue is Pacific-scoped only.
+    const result = classify("Two men detained by police in Jakarta over fraud", "");
+    expect(result.kept).toBe(false);
+    expect(result.reason).toBe("no-flashpoint-cue");
+  });
 });
 
 describe("rehash helpers", () => {

@@ -93,7 +93,7 @@ export function incidentMatchesCountry(
 // Indonesian West Papua context markers (provinces, cities, Indonesian
 // state/security actors, and the RNZ "pacific_west-papua" feed path).
 const WEST_PAPUA_CONTEXT_RE =
-  /\b(west papua|papua barat|west[- ]papua|jayapura|biak|wamena|manokwari|sorong|merauke|nabire|timika|fakfak|free west papua|opm|tpnpb|tni|indonesian|indonesia|intan jaya|bilogai|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|kiwirok|maybrat|beoga|kenyam|mulia|damai cartenz|koops habema|kodam cenderawasih)\b/i;
+  /\b(west papua|papua barat|west[- ]papua|jayapura|biak|wamena|manokwari|sorong|merauke|nabire|timika|fakfak|free west papua|opm|tpnpb|tni|indonesian|indonesia|intan jaya|bilogai|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|kiwirok|maybrat|beoga|kenyam|mulia|damai cartenz|koops habema|kodam cenderawasih|lanny jaya|tolikara|pegunungan bintang|dogiyai|deiyai|mappi|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
 
 // Genuine Papua New Guinea markers (the state, its cities, provinces and
 // institutions). If any of these appear, the record is directly relevant
@@ -133,7 +133,7 @@ const PNG_STRICT_LOCAL_RE =
 
 // STRICT Indonesian Papua markers (province capitals and proper nouns).
 const PAPUA_STRICT_LOCAL_RE =
-  /\b(west papua|papua barat|jayapura|biak|wamena|manokwari|sorong|merauke|nabire|timika|fakfak|intan jaya|bilogai|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|kiwirok|maybrat|beoga|kenyam|mulia|damai cartenz|koops habema|kodam cenderawasih)\b/i;
+  /\b(west papua|papua barat|jayapura|biak|wamena|manokwari|sorong|merauke|nabire|timika|fakfak|intan jaya|bilogai|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|kiwirok|maybrat|beoga|kenyam|mulia|damai cartenz|koops habema|kodam cenderawasih|lanny jaya|tolikara|pegunungan bintang|dogiyai|deiyai|mappi|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
 
 /** Count the non-overlapping matches of a regex in a string. */
 function countMatches(re: RegExp, text: string): number {
