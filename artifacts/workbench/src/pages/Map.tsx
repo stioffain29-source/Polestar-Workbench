@@ -59,6 +59,13 @@ function munitionRating(munition: string): string {
   return "low";
 }
 
+type Corroboration = {
+  id: number;
+  url: string;
+  reportTitle: string;
+  sourceAgency?: string | null;
+};
+
 type Point = {
   id: string;
   lat: number;
@@ -70,6 +77,7 @@ type Point = {
   when: string;
   rating: string;
   summary: string;
+  corroborations: Corroboration[];
 };
 
 export default function MapPage() {
@@ -116,6 +124,7 @@ export default function MapPage() {
           when: i.occurredAt,
           rating: i.severity,
           summary: i.summary,
+          corroborations: i.corroborations ?? [],
           };
         });
     }
@@ -134,6 +143,7 @@ export default function MapPage() {
         when: s.occurredAt,
         rating: munitionRating(s.munition),
         summary: `${s.munition.replace(/_/g, " ")} on ${s.targetCategory.replace(/_/g, " ")} in ${s.country}.`,
+        corroborations: [],
       }));
   }, [view, incidents, maritime, land]);
 
@@ -245,6 +255,35 @@ export default function MapPage() {
                     <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d" }}>{p.title}</div>
+                        {p.corroborations.length > 0 && (
+                          <div style={{ marginTop: 6 }}>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.08em",
+                                color: "#4655FF",
+                              }}
+                            >
+                              Corroborated by UN OCHA (ReliefWeb)
+                            </div>
+                            <ul style={{ listStyle: "none", margin: "4px 0 0", padding: 0 }}>
+                              {p.corroborations.map((c) => (
+                                <li key={c.id} style={{ marginTop: 2 }}>
+                                  <a
+                                    href={c.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ fontSize: 11, color: "#4655FF", textDecoration: "underline" }}
+                                  >
+                                    {c.sourceAgency ?? c.reportTitle}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         <button
                           onClick={() => setLocation(`/spot-reports/new?incidentId=${p.id.slice(2)}`)}
                           style={{
