@@ -19,6 +19,17 @@ const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant",
 };
 
+// Severity ordering used to pick the colour for a marker that represents several
+// incidents sharing one coordinate — the HIGHEST severity present wins, so an
+// Extreme record is never hidden under a lower-severity dot.
+const SEV_RANK: Record<string, number> = {
+  extreme: 5,
+  high: 4,
+  moderate: 3,
+  low: 2,
+  insignificant: 1,
+};
+
 const POLAR = "#e2e2e2";
 const DUSK = "#363636";
 
@@ -53,19 +64,22 @@ function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: numbe
  * key required). Plots incidents that have valid latitude+longitude.
  *
  * Markers are rendered as plain absolutely-positioned HTML <div> dots in an
- * overlay layered over the Leaflet container (NOT Leaflet circleMarkers). This
- * is deliberate: the in-app "Download PDF" rasterises the on-screen DOM with
- * html2canvas, which does NOT reliably capture Leaflet's canvas/SVG marker
- * panes — so canvas markers showed on screen but vanished in the PDF, leaving
- * a legend with no visible points. Plain HTML dots rasterise faithfully, so the
- * screen and the PDF agree. Dots are re-projected on every map move/zoom.
- * Records without coordinates are not plotted but remain in totals and tables.
+ * overlay layered over the Leaflet container (NOT Leaflet circleMarkers, and NOT
+ * <canvas> elements). This is deliberate: the in-app "Download PDF" rasterises
+ * the on-screen DOM with html2canvas, which does NOT reliably capture Leaflet's
+ * canvas/SVG marker panes NOR standalone <canvas> overlay elements — both show on
+ * screen but vanish in the PDF, leaving a legend with no visible points. Plain
+ * HTML <div> dots rasterise faithfully, so the screen and the PDF agree. One dot
+ * is drawn per distinct coordinate (coloured by the highest severity present and
+ * badged with the incident count when several share a point), and dots are
+ * re-projected on every map move/zoom. Records without coordinates are not
+ * plotted but remain in totals and tables.
  */
 export default function CountryReportMap({ incidents, domId, countryName }: CountryReportMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const dotsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number; dx: number; dy: number }>>([]);
+  const dotsRef = useRef<Array<{ el: HTMLElement; lat: number; lng: number; half: number }>>([]);
 
   const plottable = incidents.filter(
     (i) => typeof i.latitude === "number" && typeof i.longitude === "number"
@@ -109,8 +123,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     const positionDots = () => {
       for (const d of dotsRef.current) {
         const p = map.latLngToContainerPoint([d.lat, d.lng]);
-        d.el.style.left = `${p.x - 7 + d.dx}px`;
-        d.el.style.top = `${p.y - 7 + d.dy}px`;
+        d.el.style.left = `${p.x - d.half}px`;
+        d.el.style.top = `${p.y - d.half}px`;
       }
     };
 
@@ -129,13 +143,16 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       return;
     }
 
-    // Fan co-located incidents out in SCREEN space so records sharing a city or
-    // country centroid do not stack into a single dot — many country-report
-    // records geocode to the same centroid, so without this the map shows far
-    // fewer dots than there are incidents. Distinct coordinates are left exactly
-    // where they are; only true ties are spread onto a small pixel ring. Screen-
-    // space offsets are zoom-independent and rasterise identically through
-    // html2canvas, so the on-screen map and the in-app PDF stay in agreement.
+    // Many country-report records geocode to the SAME city or country centroid,
+    // so several incidents legitimately share one coordinate. We deliberately do
+    // NOT stack them (which hides all but the top dot) and do NOT fan them out in
+    // screen space (a fixed pixel ring pushes coastal-city markers off the
+    // coastline into the sea, implying maritime incidents that never happened and
+    // there is no reliable client-side way to know which direction is inland).
+    // Instead we render ONE dot per distinct coordinate, coloured by the
+    // HIGHEST severity present there and badged with the incident COUNT. Each
+    // dot therefore stays exactly on land, every incident is accounted for, and
+    // an Extreme record is never obscured by a lower-severity dot.
     const groups = new Map<string, number[]>();
     plottable.forEach((i, idx) => {
       const key = `${i.latitude},${i.longitude}`;
@@ -143,44 +160,75 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       if (arr) arr.push(idx);
       else groups.set(key, [idx]);
     });
-    const offsets: Array<[number, number]> = plottable.map(() => [0, 0]);
-    for (const idxs of groups.values()) {
-      if (idxs.length <= 1) continue;
-      const r = 8 + idxs.length * 2.2;
-      idxs.forEach((gi, k) => {
-        const ang = (2 * Math.PI * k) / idxs.length;
-        offsets[gi] = [Math.cos(ang) * r, Math.sin(ang) * r];
-      });
-    }
 
     const latLngs: L.LatLngExpression[] = [];
-    plottable.forEach((i, idx) => {
-      const sk = (i.severity ?? "").toLowerCase();
-      const color = SEV_COLOR[sk] ?? "#999999";
-      const lat = i.latitude as number;
-      const lng = i.longitude as number;
-      const [dx, dy] = offsets[idx];
 
+    for (const idxs of groups.values()) {
+      const members = idxs.map((gi) => plottable[gi]);
+      const lat = members[0].latitude as number;
+      const lng = members[0].longitude as number;
+      const count = members.length;
+
+      // Highest severity present at this coordinate drives the marker colour.
+      let worst = members[0];
+      let worstRank = SEV_RANK[(worst.severity ?? "").toLowerCase()] ?? 0;
+      for (const m of members) {
+        const r = SEV_RANK[(m.severity ?? "").toLowerCase()] ?? 0;
+        if (r > worstRank) {
+          worst = m;
+          worstRank = r;
+        }
+      }
+      const color = SEV_COLOR[(worst.severity ?? "").toLowerCase()] ?? "#999999";
+
+      const size = count > 1 ? 22 : 14;
+      const half = size / 2;
+
+      // Plain absolutely-positioned <div> dot — html2canvas rasterises these
+      // faithfully (a standalone <canvas> marker is silently dropped from the
+      // exported PDF, breaking screen==PDF parity). When several incidents share
+      // the coordinate the dot carries the count as a centred white numeral.
       const dot = document.createElement("div");
       dot.style.position = "absolute";
-      dot.style.width = "14px";
-      dot.style.height = "14px";
+      dot.style.width = `${size}px`;
+      dot.style.height = `${size}px`;
       dot.style.borderRadius = "50%";
       dot.style.background = color;
       dot.style.border = "2px solid #ffffff";
       dot.style.boxSizing = "border-box";
+      // The overlay is pointer-events:none; re-enable on the dot so the native
+      // hover tooltip (dot.title) listing the incidents at this point fires.
+      dot.style.pointerEvents = "auto";
+      if (count > 1) {
+        dot.style.display = "flex";
+        dot.style.alignItems = "center";
+        dot.style.justifyContent = "center";
+        dot.style.color = "#ffffff";
+        dot.style.fontFamily = "Roboto, sans-serif";
+        dot.style.fontWeight = "700";
+        dot.style.fontSize = "11px";
+        dot.style.lineHeight = "1";
+        // html2canvas renders text slightly low; a small bottom pad re-centres
+        // the numeral in the exported PDF without shifting it on screen much.
+        dot.style.paddingBottom = "2px";
+        dot.textContent = String(count);
+      }
 
-      const loc = (i.location ?? "").trim();
-      const sevDisplay = SEV_LABEL[sk] ?? i.severity ?? "";
-      const title = ((i.displayTitle && i.displayTitle.trim()) || i.title || "Incident").trim();
-      dot.title = [title, loc, sevDisplay ? `Severity: ${sevDisplay}` : ""]
-        .filter(Boolean)
-        .join(" — ");
+      const loc = (members.find((m) => (m.location ?? "").trim())?.location ?? "").trim();
+      const lines = members.map((m) => {
+        const t = ((m.displayTitle && m.displayTitle.trim()) || m.title || "Incident").trim();
+        const sd = SEV_LABEL[(m.severity ?? "").toLowerCase()] ?? m.severity ?? "";
+        return sd ? `${t} (${sd})` : t;
+      });
+      dot.title = [
+        loc ? `${loc} — ${count} incident${count === 1 ? "" : "s"}` : `${count} incident${count === 1 ? "" : "s"}`,
+        ...lines,
+      ].join("\n");
 
       overlay.appendChild(dot);
-      dotsRef.current.push({ el: dot, lat, lng, dx, dy });
+      dotsRef.current.push({ el: dot, lat, lng, half });
       latLngs.push([lat, lng]);
-    });
+    }
 
     if (latLngs.length === 1) {
       map.setView(latLngs[0] as L.LatLngTuple, 8);
@@ -254,7 +302,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
-            Records without coordinates are included in totals and tables but not plotted on the map.
+            Where several incidents share a location, one marker shows the incident count and is coloured by the highest severity recorded there.
+            {" "}Records without coordinates are included in totals and tables but not plotted on the map.
             {unplotted > 0 ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} excluded from the map.` : ""}
           </div>
         </>
