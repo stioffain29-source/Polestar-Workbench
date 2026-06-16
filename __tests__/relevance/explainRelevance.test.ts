@@ -140,4 +140,71 @@ describe("explainRelevance", () => {
       expect(result.reason).toContain("fuel off-topic");
     });
   });
+
+  describe("conflict", () => {
+    it("drops former-combatant humanitarian relief stories", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Ex-rebels help in relief operations for Mindanao quake victims",
+          summary: "Former combatants joined aid groups distributing relief to earthquake victims.",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops former-rebel reintegration/livelihood stories", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Former rebels turn to farming under reintegration program",
+          summary: "Ex-combatants received livelihood support and started planting crops.",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("keeps a relief convoy that is ambushed (violence override)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Relief convoy ambushed while aiding earthquake victims",
+          summary: "Gunmen opened fire on the aid trucks in a firefight.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps a peace process with former rebels that collapses after an ambush", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Peace process with former rebels collapses after ambush",
+          summary: "An ambush on a patrol derailed the talks.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps genuine armed-clash incidents", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Rebels ambush army patrol, three soldiers killed",
+          summary: "Insurgents opened fire in a gun battle, killing three soldiers.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+  });
 });

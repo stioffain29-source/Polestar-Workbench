@@ -390,6 +390,34 @@ const ENERGY_EXCLUDE: RegExp[] = [
   /\bno load[- ]?shedding\b/,
 ];
 
+// Conflict topic off-topic noise. The conflict REQUIRED gate keys off actor
+// words (rebel/insurgent/militia/...) and kinetic verbs, so a PEACE/RELIEF
+// story that merely NAMES former combatants slips through ("Ex rebels help in
+// relief operations for quake victims"). These excludes run BEFORE the conflict
+// required gate to drop humanitarian / reintegration / peace-process / natural-
+// disaster-relief items that carry no live armed-violence signal. Kept narrow:
+// each pattern binds the conflict actor word (or a disaster) to an explicitly
+// NON-violent frame, so a genuine ambush/firefight/bombing is never dropped.
+const CONFLICT_EXCLUDE: RegExp[] = [
+  // Former/ex combatants in a peaceful role: relief, aid, reintegration,
+  // livelihood, farming, rebuilding, surrender/disarmament, amnesty, peace.
+  /\b(ex|former)[- ]?(rebel|combatant|insurgent|militant|militia|guerrilla|fighter|separatist)s?\b[^.]{0,80}\b(relief|aid|humanitarian|rehabilitat|reintegrat|reintegration|livelihood|farm|farming|plant(ing|ed)?|crop|harvest|develop|rebuild|reconstruct|donat|volunteer|charity|community|peace|amnesty|surrender|laid down|lay(ing)? down|disarm|decommission)/,
+  /\b(relief|aid|humanitarian|rehabilitat|reintegrat|reintegration|livelihood|rebuild|reconstruct|donat|volunteer|charity|amnesty|peace deal|peace accord|peace process|disarm|decommission)\b[^.]{0,80}\b(ex|former)[- ]?(rebel|combatant|insurgent|militant|militia|guerrilla|fighter|separatist)s?\b/,
+  // Natural-disaster relief framing (quake/flood/typhoon victims + aid/relief/
+  // rescue/recovery) — humanitarian, not armed conflict.
+  /\b(earthquake|quake|flood(s|ing)?|typhoon|cyclone|landslide|tsunami|drought|volcan(o|ic)|eruption|mudslide) [^.]{0,40}\b(victim|survivor|relief|aid|evacuee|rescue|recovery|rehabilitat|displaced)/,
+  /\b(relief|aid|rescue|recovery|humanitarian) (operation|effort|work|mission|team|convoy|drive)s?\b[^.]{0,60}\b(earthquake|quake|flood|typhoon|cyclone|landslide|tsunami|drought|disaster|victim|survivor)/,
+];
+
+// Hard ARMED-violence signal. When present, the relief/peace excludes above are
+// SKIPPED so a genuine kinetic event still reaches the REQUIRED gate — e.g. a
+// relief convoy that is AMBUSHED, or a peace process with former rebels that
+// COLLAPSES after an ambush. Deliberately ARMED-specific: bare death words
+// (killed/dead/wounded) are excluded because they also describe disaster tolls
+// ("earthquake kills 30"), which would re-open the relief noise this fix closes.
+const CONFLICT_VIOLENCE_OVERRIDE: RegExp =
+  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
+
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
     /\bfuel (shortage|crisis|emergency|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
@@ -631,6 +659,10 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   if (topic === "energy") {
     const m = firstMatch(text, ENERGY_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: energy off-topic (/${m.source}/)` };
+  }
+  if (topic === "conflict" && !CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
+    const m = firstMatch(text, CONFLICT_EXCLUDE);
+    if (m) return { relevant: false, reason: `excluded: conflict off-topic relief/peace (/${m.source}/)` };
   }
 
   if (topic === "flashpoint" || topic === "protests") {
