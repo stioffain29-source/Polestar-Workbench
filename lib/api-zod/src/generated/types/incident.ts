@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Confidence } from './confidence';
+import type { Corroboration } from './corroboration';
 import type { Severity } from './severity';
 import type { Topic } from './topic';
 
@@ -33,4 +34,5 @@ export interface Incident {
   /** @nullable */
   analystNotes?: string | null;
   createdAt: Date;
+  corroborations: Corroboration[];
 }

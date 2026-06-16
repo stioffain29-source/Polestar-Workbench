@@ -57,7 +57,16 @@ export const GetDashboardOverviewResponse = zod.object({
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "corroborations": zod.array(zod.object({
+  "id": zod.number(),
+  "provider": zod.string(),
+  "reportTitle": zod.string(),
+  "sourceAgency": zod.string().nullish(),
+  "reportDate": zod.coerce.date().nullish(),
+  "url": zod.string(),
+  "matchScore": zod.number()
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
 })),
   "sourceAlerts": zod.array(zod.object({
   "id": zod.number(),
@@ -272,7 +281,16 @@ export const ListIncidentsResponseItem = zod.object({
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "corroborations": zod.array(zod.object({
+  "id": zod.number(),
+  "provider": zod.string(),
+  "reportTitle": zod.string(),
+  "sourceAgency": zod.string().nullish(),
+  "reportDate": zod.coerce.date().nullish(),
+  "url": zod.string(),
+  "matchScore": zod.number()
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
 })
 export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
@@ -317,7 +335,16 @@ export const GetIncidentResponse = zod.object({
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "corroborations": zod.array(zod.object({
+  "id": zod.number(),
+  "provider": zod.string(),
+  "reportTitle": zod.string(),
+  "sourceAgency": zod.string().nullish(),
+  "reportDate": zod.coerce.date().nullish(),
+  "url": zod.string(),
+  "matchScore": zod.number()
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
 })
 
 
@@ -357,7 +384,16 @@ export const UpdateIncidentResponse = zod.object({
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "corroborations": zod.array(zod.object({
+  "id": zod.number(),
+  "provider": zod.string(),
+  "reportTitle": zod.string(),
+  "sourceAgency": zod.string().nullish(),
+  "reportDate": zod.coerce.date().nullish(),
+  "url": zod.string(),
+  "matchScore": zod.number()
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
 })
 
 
@@ -393,7 +429,16 @@ export const GetRecentIncidentsResponseItem = zod.object({
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "corroborations": zod.array(zod.object({
+  "id": zod.number(),
+  "provider": zod.string(),
+  "reportTitle": zod.string(),
+  "sourceAgency": zod.string().nullish(),
+  "reportDate": zod.coerce.date().nullish(),
+  "url": zod.string(),
+  "matchScore": zod.number()
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
 })
 export const GetRecentIncidentsResponse = zod.array(GetRecentIncidentsResponseItem)
 

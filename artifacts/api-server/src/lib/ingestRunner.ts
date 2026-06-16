@@ -11,10 +11,12 @@ import {
   runMarketSnapshotIngest,
   runStrikesIngest,
   runTitleTranslation,
+  runReliefWebCorroboration,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
   type StrikesIngestSummary,
+  type ReliefWebCorroborationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 
@@ -50,6 +52,7 @@ export type IngestRunResult =
       marketPrices: MarketPriceSummary;
       marketSnapshot: MarketSnapshotSummary;
       strikes: StrikesIngestSummary;
+      corroboration: ReliefWebCorroborationSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -145,6 +148,22 @@ function emptyMarketPrices(err: unknown): MarketPriceSummary {
     reportsUpdated: 0,
     latest: { brent: null, wti: null, jet: null, asOf: null },
     logLines: [],
+  };
+}
+
+function emptyCorroboration(err: unknown): ReliefWebCorroborationSummary {
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    provider: "reliefweb",
+    mode: "commit",
+    incidentsConsidered: 0,
+    countriesQueried: 0,
+    reportsFetched: 0,
+    linksInserted: 0,
+    incidentsCorroborated: 0,
+    fetchOk: false,
+    errors: [msg],
+    logLines: [`ReliefWeb corroboration failed: ${msg}`],
   };
 }
 
@@ -307,6 +326,28 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "market snapshot ingest failed");
       marketSnapshot = emptyMarketSnapshot(err);
     }
+    // ReliefWeb (UN OCHA) corroboration. Cross-checks the incidents just
+    // scraped (and a bounded back-fill of older rows) against UN OCHA's
+    // ReliefWeb reports and attaches official corroborating references — a
+    // SEPARATE signal that never overwrites confidence. Runs LAST so the
+    // newest incidents already exist; isolated in its own try so a ReliefWeb
+    // outage can never fail the incident ingest.
+    let corroboration: ReliefWebCorroborationSummary;
+    try {
+      corroboration = await runReliefWebCorroboration({ commit: true });
+      logger.info(
+        {
+          incidentsConsidered: corroboration.incidentsConsidered,
+          linksInserted: corroboration.linksInserted,
+          incidentsCorroborated: corroboration.incidentsCorroborated,
+          countriesQueried: corroboration.countriesQueried,
+        },
+        "ReliefWeb corroboration pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "ReliefWeb corroboration pass failed");
+      corroboration = emptyCorroboration(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
@@ -322,6 +363,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       marketPrices,
       marketSnapshot,
       strikes,
+      corroboration,
     };
   });
   if (!res.ran) return res;

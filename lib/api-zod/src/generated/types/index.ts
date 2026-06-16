@@ -20,6 +20,7 @@ export * from './cardTemplateInput';
 export * from './cardTemplateKey';
 export * from './cardTemplateUpdate';
 export * from './confidence';
+export * from './corroboration';
 export * from './countryBaseline';
 export * from './countryBaselineInput';
 export * from './countryBaselineWatchlistItem';

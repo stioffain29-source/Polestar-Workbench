@@ -28,6 +28,12 @@ export const incidentsTable = pgTable("incidents", {
   relevanceReason: text("relevance_reason"),
   relevanceVersion: text("relevance_version"),
   relevanceEvaluatedAt: timestamp("relevance_evaluated_at", { withTimezone: true }),
+  // Last time the ReliefWeb corroboration pass examined this incident. Nullable
+  // = never checked. Drives the bounded back-match: the pass re-checks recent
+  // rows (official sitreps lag the news) and back-fills never-checked older rows
+  // a batch at a time, stamping this so it converges across runs rather than
+  // re-querying every un-corroborated row forever.
+  corroborationCheckedAt: timestamp("corroboration_checked_at", { withTimezone: true }),
 });
 
 export type Incident = typeof incidentsTable.$inferSelect;

@@ -14,6 +14,8 @@ export { runStrikesBackfill } from "./backfillStrikes";
 export type { StrikesBackfillSummary } from "./backfillStrikes";
 export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
+export { runReliefWebCorroboration } from "./reliefweb";
+export type { ReliefWebCorroborationSummary } from "./reliefweb";
 export { classifySeverity } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";

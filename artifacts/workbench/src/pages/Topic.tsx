@@ -15,7 +15,7 @@ import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { MarketPricesSection, IncidentDerivedPanel, type DerivedIncidentRow } from "@/components/MarketPrices";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, BadgeCheck } from "lucide-react";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -559,7 +559,29 @@ export default function Topic() {
                         {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
                       </td>
                       <td className="p-2 text-xs">{i.country ?? "—"}</td>
-                      <td className="p-2 font-medium">{i.title}</td>
+                      <td className="p-2 font-medium">
+                        {i.title}
+                        {i.corroborations?.length ? (
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-sans font-semibold uppercase tracking-wider text-accent">
+                              <BadgeCheck className="w-3 h-3" />
+                              Corroborated by UN OCHA (ReliefWeb)
+                            </span>
+                            {i.corroborations.map((c) => (
+                              <a
+                                key={c.id}
+                                href={c.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-0.5 text-[11px] text-accent hover:underline"
+                              >
+                                {c.sourceAgency ?? c.reportTitle}
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            ))}
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="p-2">
                         <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
                           {SEVERITY_LABELS[i.severity] ?? i.severity}

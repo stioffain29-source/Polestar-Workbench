@@ -136,6 +136,21 @@ export const SpotReportStatus = {
   final: 'final',
 } as const;
 
+/**
+ * An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident's confidence.
+ */
+export interface Corroboration {
+  id: number;
+  provider: string;
+  reportTitle: string;
+  /** @nullable */
+  sourceAgency?: string | null;
+  /** @nullable */
+  reportDate?: string | null;
+  url: string;
+  matchScore: number;
+}
+
 export interface Incident {
   id: number;
   topic: Topic;
@@ -160,6 +175,7 @@ export interface Incident {
   /** @nullable */
   analystNotes?: string | null;
   createdAt: string;
+  corroborations: Corroboration[];
 }
 
 export interface IncidentInput {

@@ -11,7 +11,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { Plus, Search, Siren, Trash2 } from "lucide-react";
+import { Plus, Search, Siren, Trash2, BadgeCheck, ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,7 +123,15 @@ export default function Incidents() {
               >
                 <div className="p-3 font-mono text-xs">{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic] ?? i.topic}</span></div>
-                <div className="p-3 font-medium truncate">{i.title}</div>
+                <div className="p-3 font-medium truncate flex items-center gap-1.5">
+                  <span className="truncate">{i.title}</span>
+                  {i.corroborations?.length ? (
+                    <BadgeCheck
+                      className="w-3.5 h-3.5 shrink-0 text-accent"
+                      aria-label="Corroborated by UN OCHA (ReliefWeb)"
+                    />
+                  ) : null}
+                </div>
                 <div className="p-3 text-xs">{i.country}</div>
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
                 <div className="p-3 text-xs uppercase font-serif">{i.confidence}</div>
@@ -201,6 +209,35 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
           <a className="text-accent hover:underline" href={incident.sourceUrl} target="_blank" rel="noreferrer">{incident.sourceUrl}</a>
         </div>
       )}
+      {incident.corroborations?.length ? (
+        <div className="border border-border rounded-sm p-3 bg-muted/20">
+          <div className="flex items-center gap-1.5 text-[11px] font-sans font-semibold uppercase tracking-wider text-accent">
+            <BadgeCheck className="w-3.5 h-3.5" />
+            Corroborated by UN OCHA (ReliefWeb)
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+            Independent official reporting covering the same country and timeframe. A separate signal — it does not change the assessed confidence.
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {incident.corroborations.map((c) => (
+              <li key={c.id} className="text-xs">
+                <a
+                  href={c.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-start gap-1 text-accent hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>
+                    {c.reportTitle}
+                    {c.sourceAgency ? ` — ${c.sourceAgency}` : ""}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div>
         <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Severity</label>
         <Select value={severity} onValueChange={setSeverity}>

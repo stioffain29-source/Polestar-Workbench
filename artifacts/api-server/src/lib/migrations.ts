@@ -169,6 +169,39 @@ export async function runDataMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS consecutive_failures integer NOT NULL DEFAULT 0
     `);
 
+    // Schema: ReliefWeb (UN OCHA) incident corroboration. Same rationale as
+    // above — drizzle push only reaches dev, so the prod primary gains the
+    // column + child table here on boot. All idempotent (IF NOT EXISTS).
+    //   - incidents.corroboration_checked_at: drives the bounded back-match
+    //     (which rows the corroboration pass still owes a look).
+    //   - incident_corroborations: child table of attached OFFICIAL references
+    //     (a separate signal — never overwrites confidence).
+    await db.execute(
+      sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS corroboration_checked_at timestamptz`,
+    );
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS incident_corroborations (
+        id serial PRIMARY KEY,
+        incident_id integer NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+        provider text NOT NULL,
+        external_id text NOT NULL,
+        report_title text NOT NULL,
+        source_agency text,
+        report_date timestamptz,
+        url text NOT NULL,
+        match_score double precision NOT NULL,
+        matched_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS incident_corroborations_unique
+        ON incident_corroborations (incident_id, provider, external_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS incident_corroborations_incident_idx
+        ON incident_corroborations (incident_id)
+    `);
+
     // 0) Country report narrative is now fully data-driven: the Situation,
     //    What Happened and Implications sections are generated from the live
     //    7-day window at render time and the stored overview / trend_summary

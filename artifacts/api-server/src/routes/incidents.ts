@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, incidentsTable } from "@workspace/db";
-import { and, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { db, incidentsTable, incidentCorroborationsTable } from "@workspace/db";
+import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   CreateIncidentBody,
   UpdateIncidentBody,
@@ -17,6 +17,41 @@ function parseId(raw: string | string[] | undefined): number {
   const v = Array.isArray(raw) ? raw[0] : raw;
   const n = parseInt(v ?? "", 10);
   return Number.isNaN(n) ? -1 : n;
+}
+
+type IncidentRow = typeof incidentsTable.$inferSelect;
+
+/**
+ * Attach each incident's OFFICIAL corroborating references (ReliefWeb etc.) as
+ * a `corroborations` array. Batched (one query for all ids) and grouped in
+ * memory so the list endpoint stays a single extra round-trip. Returns rows
+ * with an always-present (possibly empty) array. Corroboration is a SEPARATE
+ * signal — it is additive read-only context and never alters `confidence`.
+ */
+async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const links = await db
+    .select({
+      incidentId: incidentCorroborationsTable.incidentId,
+      id: incidentCorroborationsTable.id,
+      provider: incidentCorroborationsTable.provider,
+      reportTitle: incidentCorroborationsTable.reportTitle,
+      sourceAgency: incidentCorroborationsTable.sourceAgency,
+      reportDate: incidentCorroborationsTable.reportDate,
+      url: incidentCorroborationsTable.url,
+      matchScore: incidentCorroborationsTable.matchScore,
+    })
+    .from(incidentCorroborationsTable)
+    .where(inArray(incidentCorroborationsTable.incidentId, ids))
+    .orderBy(desc(incidentCorroborationsTable.matchScore));
+  const byIncident = new Map<number, Omit<(typeof links)[number], "incidentId">[]>();
+  for (const { incidentId, ...rest } of links) {
+    const bucket = byIncident.get(incidentId);
+    if (bucket) bucket.push(rest);
+    else byIncident.set(incidentId, [rest]);
+  }
+  return rows.map((r) => ({ ...r, corroborations: byIncident.get(r.id) ?? [] }));
 }
 
 router.get("/incidents", async (req, res): Promise<void> => {
@@ -49,7 +84,7 @@ router.get("/incidents", async (req, res): Promise<void> => {
     .from(incidentsTable)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(incidentsTable.occurredAt));
-  res.json(rows);
+  res.json(await withCorroborations(rows));
 });
 
 router.get("/incidents/recent", async (req, res): Promise<void> => {
@@ -61,7 +96,7 @@ router.get("/incidents/recent", async (req, res): Promise<void> => {
     .where(wantsRaw(req.query) ? undefined : defaultRelevanceCondition())
     .orderBy(desc(incidentsTable.occurredAt))
     .limit(limit);
-  res.json(rows);
+  res.json(await withCorroborations(rows));
 });
 
 router.get("/incidents/by-topic", async (req, res): Promise<void> => {
@@ -89,7 +124,8 @@ router.get("/incidents/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(row);
+  const [withCorr] = await withCorroborations([row]);
+  res.json(withCorr);
 });
 
 router.post("/incidents", async (req, res): Promise<void> => {

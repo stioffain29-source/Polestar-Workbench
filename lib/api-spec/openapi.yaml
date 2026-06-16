@@ -963,9 +963,25 @@ components:
       type: string
       enum: [draft, final]
 
+    Corroboration:
+      type: object
+      description: >-
+        An independent OFFICIAL corroborating reference for an incident (e.g. a
+        UN OCHA ReliefWeb report covering the same country, timeframe and event).
+        A separate signal — it never overwrites the incident's confidence.
+      required: [id, provider, reportTitle, url, matchScore]
+      properties:
+        id: { type: integer }
+        provider: { type: string }
+        reportTitle: { type: string }
+        sourceAgency: { type: ["string", "null"] }
+        reportDate: { type: ["string", "null"], format: date-time }
+        url: { type: string }
+        matchScore: { type: number }
+
     Incident:
       type: object
-      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt]
+      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt, corroborations]
       properties:
         id: { type: integer }
         topic: { $ref: "#/components/schemas/Topic" }
@@ -983,6 +999,9 @@ components:
         sourceUrl: { type: ["string", "null"] }
         analystNotes: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+        corroborations:
+          type: array
+          items: { $ref: "#/components/schemas/Corroboration" }
 
     IncidentInput:
       type: object
