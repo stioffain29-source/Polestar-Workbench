@@ -16,7 +16,6 @@ import {
   drawPolestarCover,
   beginBodyPages,
   prepareCoverImage,
-  drawDataAsOf,
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
   setFill,
@@ -32,7 +31,6 @@ import {
   sevKey,
   type Ctx,
 } from "./pdfChrome";
-import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
@@ -311,15 +309,6 @@ export async function exportConflictReportPdf(
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 
   drawDisclaimer(ctx);
-  drawDataAsOf(
-    ctx,
-    formatDataAsOfLine(
-      computeDataAsOf({
-        topic: data.topic,
-        incidents,
-      }),
-    ),
-  );
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

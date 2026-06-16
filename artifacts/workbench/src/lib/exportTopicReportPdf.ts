@@ -13,7 +13,6 @@ import {
   drawPolestarCover,
   beginBodyPages,
   prepareCoverImage,
-  drawDataAsOf,
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
   setFill,
@@ -33,7 +32,6 @@ import {
   type Ctx,
   type KpiCardData,
 } from "./pdfChrome";
-import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import {
   resolveReportWindow,
   filterIncidentsToWindow,
@@ -1088,10 +1086,6 @@ export async function exportTopicReportPdf(
   }
 
   drawDisclaimer(ctx);
-  drawDataAsOf(
-    ctx,
-    formatDataAsOfLine(computeDataAsOf({ topic: data.topic, incidents })),
-  );
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

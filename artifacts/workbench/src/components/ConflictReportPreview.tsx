@@ -2,8 +2,6 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
-import DataAsOfBanner from "@/components/DataAsOfBanner";
-import { computeDataAsOf } from "@/lib/reportDataStatus";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildConflictReportDataset,
@@ -484,13 +482,6 @@ export default function ConflictReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        <DataAsOfBanner
-          data={computeDataAsOf({
-            topic: report.topic ?? "conflict",
-            incidents,
-          })}
-        />
-
         <Section title="Situation">
           <Paragraphs text={pickProse(report.situation, ds.autoSituation)} />
         </Section>

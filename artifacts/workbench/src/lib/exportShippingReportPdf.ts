@@ -16,7 +16,6 @@ import {
   drawPolestarCover,
   beginBodyPages,
   prepareCoverImage,
-  drawDataAsOf,
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
   setFill,
@@ -33,7 +32,6 @@ import {
   sevKey,
   type Ctx,
 } from "./pdfChrome";
-import { computeDataAsOf, formatDataAsOfLine } from "./reportDataStatus";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
@@ -711,10 +709,6 @@ export async function exportShippingReportPdf(
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 
   drawDisclaimer(ctx);
-  drawDataAsOf(
-    ctx,
-    formatDataAsOfLine(computeDataAsOf({ topic: "shipping", incidents })),
-  );
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

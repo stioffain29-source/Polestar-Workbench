@@ -33,8 +33,6 @@ import {
   cargoUsdNote,
   cargoCommodityNote,
 } from "@/lib/cargoReportData";
-import DataAsOfBanner from "@/components/DataAsOfBanner";
-import { computeDataAsOf } from "@/lib/reportDataStatus";
 import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
 
 const NAVY = "#0b0a3d";
@@ -622,16 +620,6 @@ export default function ReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        <DataAsOfBanner
-          data={computeDataAsOf({
-            topic: report.topic ?? "fuel",
-            incidents,
-            marketAsOf:
-              report.topic === "fuel"
-                ? fuelMarketLatestDate(report.hardNumbers)
-                : null,
-          })}
-        />
         {report.executiveSummary && report.executiveSummary.trim() && (
           <Section title="Executive Summary">
             <Paragraphs text={report.executiveSummary} />
