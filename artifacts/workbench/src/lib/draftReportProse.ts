@@ -26,6 +26,7 @@ import { classifyConflictCategory, CATEGORY_CARD_LABEL } from "./conflictAnalysi
 import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
 import { selectFlashpointUsable } from "./flashpointReportDataset";
 import { buildShippingReportDataset, type ShippingReportIncident } from "./shippingReportDataset";
+import { buildConflictReportDataset, type ConflictReportIncident } from "./conflictReportDataset";
 
 export interface DraftableIncident extends ClassifiableIncident {
   id?: number | string;
@@ -870,6 +871,39 @@ export function draftTopicReportProse(opts: {
       // form text is byte-identical to what the preview/PDF fall back to.
       whatMatters: ds.autoWhatMatters,
       implications: ds.autoImplications,
+      watchNext: ds.autoWatchNext,
+      polestarView: ds.autoPolestarView,
+    };
+  }
+  // Conflict Watch reports seed their persisted prose directly from the
+  // Conflict report dataset — the SAME dataset that drives the on-screen
+  // preview and the PDF. Only the four persisted/editable sections are
+  // seeded (Situation, What Matters, Watch Next, Polestar View); the
+  // location-led Top Activity Areas / Other Watched Theatres are rendered
+  // at export time and are never persisted. Executive Summary is dropped
+  // for conflict, so executiveSummary/whatHappened/implications stay blank.
+  if (topic === "conflict") {
+    const conflictIncidents: ConflictReportIncident[] = incidents.map(
+      (r, i) => ({
+        id: r.id ?? i,
+        title: r.title,
+        topic: r.topic,
+        severity: r.severity,
+        occurredAt: r.occurredAt,
+        country: r.country ?? null,
+        summary: r.summary ?? null,
+        source: r.source ?? null,
+        sourceUrl: r.sourceUrl ?? null,
+        location: r.location ?? null,
+      }),
+    );
+    const ds = buildConflictReportDataset(conflictIncidents, topic, issueDate);
+    return {
+      executiveSummary: "",
+      situation: ds.autoSituation,
+      whatHappened: "",
+      whatMatters: ds.autoWhatMatters,
+      implications: "",
       watchNext: ds.autoWatchNext,
       polestarView: ds.autoPolestarView,
     };

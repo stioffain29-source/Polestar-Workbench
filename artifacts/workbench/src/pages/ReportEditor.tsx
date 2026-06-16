@@ -23,11 +23,13 @@ import { TOPICS, TOPIC_LABELS, REPORT_STATUSES } from "@/lib/topics";
 import ReportPreview from "@/components/ReportPreview";
 import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
+import ConflictReportPreview from "@/components/ConflictReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
+import { exportConflictReportPdf } from "@/lib/exportConflictReportPdf";
 import {
   draftTopicReportProse,
   type DraftableIncident,
@@ -239,6 +241,8 @@ export default function ReportEditor() {
         );
       } else if (form.topic === "shipping") {
         await exportShippingReportPdf(pdfPayload, incidentsForExport, filename);
+      } else if (form.topic === "conflict") {
+        await exportConflictReportPdf(pdfPayload, incidentsForExport, filename);
       } else {
         await exportTopicReportPdf(
           {
@@ -451,8 +455,18 @@ export default function ReportEditor() {
 
   const save = () => {
     const { executiveSummary, ...persistable } = form;
+    // Conflict Watch is location-led: it drops the Executive Summary, What
+    // Happened and Implications sections. Only Situation / What Matters /
+    // Watch Next / Polestar View are editable + persisted; the rest of the
+    // spine (Top Activity Areas, Other Watched Theatres) is render-time
+    // auto-prose. So never write those dropped fields for conflict.
+    const isConflict = form.topic === "conflict";
     try {
-      if (typeof window !== "undefined" && window.localStorage) {
+      if (
+        !isConflict &&
+        typeof window !== "undefined" &&
+        window.localStorage
+      ) {
         window.localStorage.setItem(
           execSummaryStorageKey(id),
           executiveSummary,
@@ -468,6 +482,13 @@ export default function ReportEditor() {
     //   * Otherwise → assemble from the form. Empty form → clear
     //     payload with `hardNumbers: null`.
     const payload: Record<string, unknown> = { ...persistable };
+    // Conflict reports never persist the dropped narrative fields — they are
+    // hidden from the form and rendered nowhere, so leaving them out of the
+    // payload keeps the DB free of stale boilerplate written from form state.
+    if (isConflict) {
+      delete payload.whatHappened;
+      delete payload.implications;
+    }
     // Empty override → clear the stored rating (card pull falls back to the
     // computed/auto value). A set value persists the analyst's choice.
     payload.riskRating = form.riskRating ? form.riskRating : null;
@@ -850,14 +871,18 @@ export default function ReportEditor() {
                   : "Left on Auto: rating is computed from incidents when pulled into a card."}
             </p>
           </Field>
-          <Field label="Executive Summary">
-            <Textarea
-              rows={4}
-              value={form.executiveSummary}
-              onChange={(e) => set("executiveSummary", e.target.value)}
-              className="rounded-sm"
-            />
-          </Field>
+          {/* Conflict Watch is location-led: Situation leads and the
+              Executive Summary section is dropped entirely. */}
+          {form.topic !== "conflict" && (
+            <Field label="Executive Summary">
+              <Textarea
+                rows={4}
+                value={form.executiveSummary}
+                onChange={(e) => set("executiveSummary", e.target.value)}
+                className="rounded-sm"
+              />
+            </Field>
+          )}
           <Field label="Situation">
             <Textarea
               rows={4}
@@ -866,14 +891,16 @@ export default function ReportEditor() {
               className="rounded-sm"
             />
           </Field>
-          <Field label="What Happened">
-            <Textarea
-              rows={5}
-              value={form.whatHappened}
-              onChange={(e) => set("whatHappened", e.target.value)}
-              className="rounded-sm"
-            />
-          </Field>
+          {form.topic !== "conflict" && (
+            <Field label="What Happened">
+              <Textarea
+                rows={5}
+                value={form.whatHappened}
+                onChange={(e) => set("whatHappened", e.target.value)}
+                className="rounded-sm"
+              />
+            </Field>
+          )}
           <Field label="What Matters">
             <Textarea
               rows={4}
@@ -882,14 +909,16 @@ export default function ReportEditor() {
               className="rounded-sm"
             />
           </Field>
-          <Field label="Implications for Business">
-            <Textarea
-              rows={4}
-              value={form.implications}
-              onChange={(e) => set("implications", e.target.value)}
-              className="rounded-sm"
-            />
-          </Field>
+          {form.topic !== "conflict" && (
+            <Field label="Implications for Business">
+              <Textarea
+                rows={4}
+                value={form.implications}
+                onChange={(e) => set("implications", e.target.value)}
+                className="rounded-sm"
+              />
+            </Field>
+          )}
           <Field label="Watch Next">
             <Textarea
               rows={3}
@@ -1307,6 +1336,11 @@ export default function ReportEditor() {
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview
+              report={form}
+              incidents={incidentsForExport}
+            />
+          ) : form.topic === "conflict" ? (
+            <ConflictReportPreview
               report={form}
               incidents={incidentsForExport}
             />
