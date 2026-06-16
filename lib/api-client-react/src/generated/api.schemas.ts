@@ -1061,11 +1061,82 @@ export interface MarketPrice {
   updatedAt?: string;
 }
 
+export type LiveuamapRegion = typeof LiveuamapRegion[keyof typeof LiveuamapRegion];
+
+
+export const LiveuamapRegion = {
+  asia: 'asia',
+  'middle-east': 'middle-east',
+  india: 'india',
+  pakistan: 'pakistan',
+  china: 'china',
+  myanmar: 'myanmar',
+  thailand: 'thailand',
+  vietnam: 'vietnam',
+  bangladesh: 'bangladesh',
+  indonesia: 'indonesia',
+  philippines: 'philippines',
+  taiwan: 'taiwan',
+  'hong-kong': 'hong-kong',
+  japan: 'japan',
+  koreas: 'koreas',
+  'central-asia': 'central-asia',
+  'israel-palestine': 'israel-palestine',
+  iran: 'iran',
+  iraq: 'iraq',
+  syria: 'syria',
+  yemen: 'yemen',
+  lebanon: 'lebanon',
+  afghanistan: 'afghanistan',
+  kashmir: 'kashmir',
+} as const;
+
+export interface LiveuamapEvent {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  time: string;
+  /** @nullable */
+  link?: string | null;
+  /** @nullable */
+  source?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  category?: string | null;
+}
+
+export interface LiveuamapEventsResponse {
+  configured: boolean;
+  cached: boolean;
+  region: string;
+  count: number;
+  /** @nullable */
+  fetchedAt: string | null;
+  /** @nullable */
+  freerequests?: number | null;
+  events: LiveuamapEvent[];
+}
+
 export type ListMarketPricesParams = {
 /**
  * Limit to one monitor group (fuel | energy | fertiliser)
  */
 group?: string;
+};
+
+export type ListLiveuamapEventsParams = {
+/**
+ * Approved APAC / Middle East region to fetch
+ */
+region?: LiveuamapRegion;
+/**
+ * Max number of latest events to return (1-100)
+ * @minimum 1
+ * @maximum 100
+ */
+count?: number;
 };
 
 export type ListIncidentsParams = {

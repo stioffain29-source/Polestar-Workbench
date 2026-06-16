@@ -45,11 +45,13 @@ import type {
   IncidentInput,
   IncidentUpdate,
   ListIncidentsParams,
+  ListLiveuamapEventsParams,
   ListMarketPricesParams,
   ListReportsParams,
   ListSourcesParams,
   ListSpotReportsParams,
   ListStrikesParams,
+  LiveuamapEventsResponse,
   MarketPrice,
   Report,
   ReportInput,
@@ -307,6 +309,90 @@ export function useListMarketPrices<TData = Awaited<ReturnType<typeof listMarket
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMarketPricesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListLiveuamapEventsUrl = (params?: ListLiveuamapEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/liveuamap/events?${stringifiedParams}` : `/api/liveuamap/events`
+}
+
+/**
+ * @summary Live conflict-event points from Liveuamap for a region (cached server-side proxy)
+ */
+export const listLiveuamapEvents = async (params?: ListLiveuamapEventsParams, options?: RequestInit): Promise<LiveuamapEventsResponse> => {
+
+  return customFetch<LiveuamapEventsResponse>(getListLiveuamapEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLiveuamapEventsQueryKey = (params?: ListLiveuamapEventsParams,) => {
+    return [
+    `/api/liveuamap/events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListLiveuamapEventsQueryOptions = <TData = Awaited<ReturnType<typeof listLiveuamapEvents>>, TError = ErrorType<unknown>>(params?: ListLiveuamapEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLiveuamapEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLiveuamapEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLiveuamapEvents>>> = ({ signal }) => listLiveuamapEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLiveuamapEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLiveuamapEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listLiveuamapEvents>>>
+export type ListLiveuamapEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Live conflict-event points from Liveuamap for a region (cached server-side proxy)
+ */
+
+export function useListLiveuamapEvents<TData = Awaited<ReturnType<typeof listLiveuamapEvents>>, TError = ErrorType<unknown>>(
+ params?: ListLiveuamapEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLiveuamapEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLiveuamapEventsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

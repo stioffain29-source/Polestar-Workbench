@@ -16,6 +16,7 @@ tags:
   - name: countries
   - name: dashboard
   - name: cards
+  - name: liveuamap
 
 paths:
   /healthz:
@@ -62,6 +63,27 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/MarketPrice" }
+
+  /liveuamap/events:
+    get:
+      operationId: listLiveuamapEvents
+      tags: [liveuamap]
+      summary: Live conflict-event points from Liveuamap for a region (cached server-side proxy)
+      parameters:
+        - name: region
+          in: query
+          description: Approved APAC / Middle East region to fetch
+          schema: { $ref: "#/components/schemas/LiveuamapRegion" }
+        - name: count
+          in: query
+          description: Max number of latest events to return (1-100)
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiveuamapEventsResponse" }
 
   /incidents:
     get:
@@ -1978,3 +2000,59 @@ components:
           type: ["array", "null"]
           items: { $ref: "#/components/schemas/MarketPriceTrajectoryPoint" }
         updatedAt: { type: string, format: date-time }
+
+    LiveuamapRegion:
+      type: string
+      enum:
+        - asia
+        - middle-east
+        - india
+        - pakistan
+        - china
+        - myanmar
+        - thailand
+        - vietnam
+        - bangladesh
+        - indonesia
+        - philippines
+        - taiwan
+        - hong-kong
+        - japan
+        - koreas
+        - central-asia
+        - israel-palestine
+        - iran
+        - iraq
+        - syria
+        - yemen
+        - lebanon
+        - afghanistan
+        - kashmir
+
+    LiveuamapEvent:
+      type: object
+      required: [id, name, lat, lng, time]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        time: { type: string }
+        link: { type: ["string", "null"] }
+        source: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+
+    LiveuamapEventsResponse:
+      type: object
+      required: [configured, cached, region, count, fetchedAt, events]
+      properties:
+        configured: { type: boolean }
+        cached: { type: boolean }
+        region: { type: string }
+        count: { type: integer }
+        fetchedAt: { type: ["string", "null"] }
+        freerequests: { type: ["integer", "null"] }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/LiveuamapEvent" }

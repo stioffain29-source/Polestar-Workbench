@@ -253,6 +253,39 @@ export const ListMarketPricesResponseItem = zod.object({
 export const ListMarketPricesResponse = zod.array(ListMarketPricesResponseItem)
 
 
+/**
+ * @summary Live conflict-event points from Liveuamap for a region (cached server-side proxy)
+ */
+export const listLiveuamapEventsQueryCountMax = 100;
+
+
+
+export const ListLiveuamapEventsQueryParams = zod.object({
+  "region": zod.enum(['asia', 'middle-east', 'india', 'pakistan', 'china', 'myanmar', 'thailand', 'vietnam', 'bangladesh', 'indonesia', 'philippines', 'taiwan', 'hong-kong', 'japan', 'koreas', 'central-asia', 'israel-palestine', 'iran', 'iraq', 'syria', 'yemen', 'lebanon', 'afghanistan', 'kashmir']).optional().describe('Approved APAC \/ Middle East region to fetch'),
+  "count": zod.coerce.number().min(1).max(listLiveuamapEventsQueryCountMax).optional().describe('Max number of latest events to return (1-100)')
+})
+
+export const ListLiveuamapEventsResponse = zod.object({
+  "configured": zod.boolean(),
+  "cached": zod.boolean(),
+  "region": zod.string(),
+  "count": zod.number(),
+  "fetchedAt": zod.string().nullable(),
+  "freerequests": zod.number().nullish(),
+  "events": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "time": zod.string(),
+  "link": zod.string().nullish(),
+  "source": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "category": zod.string().nullish()
+}))
+})
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 

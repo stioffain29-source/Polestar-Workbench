@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { useLocation } from "wouter";
-import { useListIncidents, useListStrikes } from "@workspace/api-client-react";
+import {
+  useListIncidents,
+  useListStrikes,
+  useListLiveuamapEvents,
+  getListLiveuamapEventsQueryKey,
+  LiveuamapRegion,
+} from "@workspace/api-client-react";
 import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -59,6 +65,15 @@ function munitionRating(munition: string): string {
   return "low";
 }
 
+// Slug -> human label for the Liveuamap region selector (e.g. "hong-kong" ->
+// "Hong Kong").
+function regionLabel(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
 type Corroboration = {
   id: number;
   url: string;
@@ -91,6 +106,22 @@ export default function MapPage() {
   const { data: incidents = [] } = useListIncidents({ days });
   const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz", days });
   const { data: land = [] } = useListStrikes({ theatre: "land_gcc", days });
+
+  // Liveuamap live overlay — a separate reference layer, kept apart from the
+  // curated incident data. It only fetches while the toggle is on (no paid call
+  // otherwise) and refreshes every 5 minutes. The key lives server-side; if it
+  // is unconfigured the response reports configured:false and we show a note
+  // instead of markers.
+  const [liveOn, setLiveOn] = useState(false);
+  const [liveRegion, setLiveRegion] = useState<LiveuamapRegion>("asia");
+  const liveParams = { region: liveRegion, count: 75 };
+  const { data: live } = useListLiveuamapEvents(liveParams, {
+    query: {
+      enabled: liveOn,
+      refetchInterval: liveOn ? 5 * 60 * 1000 : false,
+      queryKey: getListLiveuamapEventsQueryKey(liveParams),
+    },
+  });
 
   const availableCategories = useMemo<readonly string[]>(() => {
     if (view === "incidents") return INCIDENT_CATEGORIES;
@@ -192,6 +223,32 @@ export default function MapPage() {
                 {v === "incidents" ? "Incidents" : v === "maritime" ? "Maritime Strikes" : "Land Strikes"}
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLiveOn((on) => !on)}
+              className={cn(
+                "px-4 py-2 text-xs uppercase tracking-wider font-serif font-medium border rounded-sm",
+                liveOn
+                  ? "bg-accent text-accent-foreground border-accent"
+                  : "bg-card hover:bg-muted border-border",
+              )}
+            >
+              Live (Liveuamap)
+            </button>
+            {liveOn && (
+              <select
+                value={liveRegion}
+                onChange={(e) => setLiveRegion(e.target.value as LiveuamapRegion)}
+                className="px-2 py-2 text-xs font-sans border border-border rounded-sm bg-card"
+              >
+                {Object.values(LiveuamapRegion).map((r) => (
+                  <option key={r} value={r}>
+                    {regionLabel(r)}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       </div>
@@ -307,6 +364,64 @@ export default function MapPage() {
                 </CircleMarker>
               );
             })}
+            {liveOn &&
+              live?.configured &&
+              live.events.map((e) => (
+                <CircleMarker
+                  key={`lua-${e.id}`}
+                  center={[e.lat, e.lng]}
+                  radius={6}
+                  pathOptions={{
+                    color: "#4655FF",
+                    opacity: 0.95,
+                    weight: 2,
+                    fillColor: "#4655FF",
+                    fillOpacity: 0.55,
+                  }}
+                >
+                  <LeafletTooltip direction="top" offset={[0, -6]}>
+                    <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 280 }}>
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#4655FF" }}>
+                        Liveuamap
+                      </div>
+                      <div style={{ fontWeight: 700, color: "#0b0a3d", marginTop: 2 }}>{e.name}</div>
+                      <div style={{ fontSize: 11, color: "#363636", marginTop: 4 }}>
+                        {e.location && (
+                          <div>
+                            <strong>Location:</strong> {e.location}
+                          </div>
+                        )}
+                        <div>
+                          <strong>Time:</strong> {format(new Date(e.time), "dd MMM yyyy HH:mm")}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 10, color: "#666", marginTop: 6 }}>Data: Liveuamap</div>
+                    </div>
+                  </LeafletTooltip>
+                  {e.link && (
+                    <LeafletPopup>
+                      <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
+                        <div style={{ fontWeight: 700, color: "#0b0a3d" }}>{e.name}</div>
+                        <a
+                          href={e.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: 11,
+                            color: "#4655FF",
+                            textDecoration: "underline",
+                            display: "inline-block",
+                            marginTop: 6,
+                          }}
+                        >
+                          {e.source ?? "Open source"}
+                        </a>
+                        <div style={{ fontSize: 10, color: "#666", marginTop: 6 }}>Data: Liveuamap</div>
+                      </div>
+                    </LeafletPopup>
+                  )}
+                </CircleMarker>
+              ))}
           </MapContainer>
         </div>
 
@@ -331,6 +446,21 @@ export default function MapPage() {
               );
             })}
           </div>
+          {liveOn && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <div className="font-serif font-bold uppercase text-primary text-sm tracking-wide mb-1">Liveuamap</div>
+              {live?.configured ? (
+                <div className="text-[11px] font-sans text-muted-foreground">
+                  {live.events.length} live events · {regionLabel(liveRegion)}
+                  {live.cached ? " · cached" : ""}
+                </div>
+              ) : (
+                <div className="text-[11px] font-sans text-muted-foreground">
+                  Live layer not configured yet.
+                </div>
+              )}
+            </div>
+          )}
         </aside>
       </div>
 
@@ -349,6 +479,15 @@ export default function MapPage() {
               {SEVERITY_LABELS[r]}
             </span>
           ))}
+          {liveOn && (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: "#4655FF", opacity: 0.78, border: "1.5px solid #4655FF" }}
+              />
+              Liveuamap (live)
+            </span>
+          )}
         </span>
       </div>
     </div>
