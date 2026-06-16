@@ -1,0 +1,858 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.gdeltcloud.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# API v2
+
+> Clean Events, Stories, Entities, Energy Data, and geo discovery endpoints for generated GDELT Cloud data.
+
+API v2 is the simplified user-facing interface for generated GDELT Cloud products. v1 remains available for existing integrations; v2 is the recommended surface for new dashboards, monitoring workflows, and ad-hoc search.
+
+v2 focuses on:
+
+* Generated structured Events: `conflict` and `cameoplus`.
+* Generated clustered Stories.
+* Generated metrics for Events and Stories.
+* Entity discovery and entity-to-Story/Event linking.
+* Entity Tone and Share of Voice beta analytics for cached, evidence-gated media-tone workflows. Entity Tone requires side-table score data and is not a production polling metric.
+* Global Energy Monitor energy asset search, summaries, maps, and detail records.
+
+v2 does not expose raw GDELT-only fields or legacy tuning knobs such as `scope`, `detail`, `geo_scope`, `event_readiness`, `cluster_certainty`, `language`, `quad_class`, or raw `total_events`.
+
+## Entity Tone and Share of Voice Beta
+
+Entity Tone is an opt-in, evidence-gated beta surface for media tone toward a resolved entity. It is not polling data or a direct measure of public opinion. Missing tone rows mean `not_available` or `insufficient_entity_evidence`, not neutral. On-demand runs are queued beta records unless the gated background scoring worker is enabled.
+
+* `GET /api/v2/entity-tone?entity_id=...&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
+* `GET /api/v2/entities/{entity_id}/tone?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
+* `GET /api/v2/entities/{entity_id}?include_tone=true`
+* `GET /api/v2/stories/{story_id}?include_entity_tone=true`
+* `POST /api/v2/entity-tone/runs` for async/on-demand scoring estimates and durable beta queue rows
+
+Tone and risk are separate: `tone_score` is returned on a `-100..100` scale (`very_negative` to `very_positive`), while `risk_score` is returned on a `0..100` scale.
+
+Share of Voice is intentionally denominator-explicit:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/share-of-voice?entities=Saudi%20Aramco,ADNOC&start_date=2026-06-01&end_date=2026-06-07&query=Gulf%20energy%20transition" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+`/api/v2/share-of-voice` requires `entities`, `start_date`, `end_date`, and at least one denominator-defining filter such as `query`, `topic`, `category`, `country`, `region`, `languages`, or `source_set`. Requests without a denominator return `DENOMINATOR_REQUIRED` so callers cannot accidentally report a percentage without a defined media space.
+
+Share of Voice responses include a plot-ready `timeline` array with every denominator bucket represented and zero-filled entity points when an entity has no matching stories in that bucket. Each point includes `story_share`, `article_share`, `weighted_share`, and `delta_from_previous_bucket`.
+
+Add `include_tone=true` to join cached entity-tone aggregates into both the entity summary and each timeline bucket. Tone is returned separately from SOV with `tone_coverage_ratio`, `tone_label_counts`, and `avg_tone_score`; it is not a positive/negative split of the SOV denominator. Aggregate tone status can be `scored`, `reviewable`, `partial`, or `not_available`.
+
+Add `include_drivers=true` for citable per-bucket drilldowns: top story drivers with source article URLs, top source domains, top co-mentioned entities, and linked events where available.
+
+## Authentication
+
+Use the same API key format as v1:
+
+```bash theme={null}
+Authorization: Bearer gdelt_sk_...
+```
+
+## Geography
+
+Use plain English country names in docs and examples:
+
+```bash theme={null}
+country=France
+country=United States
+country=South Korea
+```
+
+The backend also accepts ISO-3 and legacy FIPS aliases for compatibility, but responses normalize country output to the plain English name.
+
+`region` and `continent` expand to ISO-3 country lists on the backend. Event queries match those countries against Event location plus actor-origin countries. Story queries use the same country-list expansion through linked Event location only. `admin1` is optional and filters only the event/story location.
+
+The `geo` object is the primary event/story location. For Events, when a broad geo filter matches actor-origin geography instead, use `geo_context.actor_origin_countries` to see why the record matched. For Stories, `geo_context.actor_origin_countries` is returned for context but does not drive the Story geo filter.
+
+### Bounding box
+
+Use `bbox` for sub-country geographic filters such as straits, ports, basins, border zones, or any custom viewport. The parameter is a comma-separated string in latitude-first order:
+
+```bash theme={null}
+bbox=lat_min,lon_min,lat_max,lon_max
+```
+
+`lat` must be in `[-90, 90]` and `lon` in `[-180, 180]`. The filter is applied to the Event's primary `geo.latitude` / `geo.longitude` (and to the location of linked Events for Stories). Records without geocoded coordinates are excluded from `bbox` queries.
+
+`bbox` is supported on `/api/v2/events`, `/api/v2/events/summary`, `/api/v2/stories`, and `/api/v2/stories/summary`. The energy endpoint `/api/v2/energy/assets` accepts the same `lat_min,lon_min,lat_max,lon_max` `bbox` form on asset coordinates, plus a separate `near=lat,lon,radius_km` proximity filter.
+
+Use `bbox` when a country filter is too coarse — for example, the Bab-el-Mandeb strait spans Djibouti, Eritrea, and Yemen, but the operational area is a tight rectangle:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?bbox=11.5,42.5,13.5,44.5&category=Explosions%2FRemote%20violence&subcategory=Air%2Fdrone%20strike&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+`bbox` can be combined with `country`, `region`, `continent`, `admin1`, `category`, `subcategory`, `has_fatalities`, `civilian_targeting`, `search`, and `sort`. The deprecated `event_family` and `domain` parameters are still accepted for compatibility. When combined with a country filter, records must match both. A pure-`bbox` query (no country) is typically faster than country-only because the ClickHouse storage layout prunes by coordinate range before applying other predicates.
+
+Discover valid `admin1` values one country at a time:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/geo/admin1?country=France" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+## Response Objects
+
+List endpoints return a success envelope with `data` and `pagination`; detail endpoints return a single `data` object; summary endpoints return `group_by` and grouped `data` buckets. Energy map endpoints return a map `mode` plus map-ready aggregate or fine-grained rows.
+
+```json theme={null}
+{
+  "success": true,
+  "data": [],
+  "pagination": {
+    "limit": 25,
+    "cursor": null,
+    "next_cursor": "25"
+  }
+}
+```
+
+## Result Coverage
+
+Event, Story, and Entity list endpoints default to the exact past 24 hours while preserving broad discovery coverage so developers and agents can discover useful records before narrowing with structured filters. Confidence tuning is handled internally by the API. Detail endpoints remain exhaustive by ID: `GET /api/v2/events/{event_id}` and `GET /api/v2/stories/{story_id}` resolve known records directly.
+
+### Event card
+
+Returned by `GET /api/v2/events` and `GET /api/v2/events/{event_id}`.
+
+```json theme={null}
+{
+  "id": "conflict_20260417_example",
+  "url": "https://gdeltcloud.com/story/example-story",
+  "primary_story_url": "https://gdeltcloud.com/story/example-story",
+  "family": "conflict",
+  "title": "Example event title",
+  "summary": "Short generated event summary.",
+  "event_date": "2026-04-17",
+  "category": "Protests",
+  "subcategory": "Peaceful protest",
+  "domain": "CONFLICT",
+  "event_code": "ACLED-123",
+  "geo": {
+    "country": "France",
+    "region": "Europe",
+    "continent": "Europe",
+    "admin1": "Ile-de-France",
+    "location": "Paris",
+    "latitude": 48.8566,
+    "longitude": 2.3522
+  },
+  "geo_context": {
+    "location_country": "France",
+    "actor_origin_countries": ["France"]
+  },
+  "actors": [
+    {
+      "name": "Protesters",
+      "country": "France",
+      "role": "actor1"
+    }
+  ],
+  "metrics": {
+    "significance": 0.72,
+    "goldstein_scale": -2,
+    "magnitude": null,
+    "systemic_importance": null,
+    "propagation_potential": null,
+    "market_sensitivity": null,
+    "confidence": 0.91,
+    "article_count": 4
+  },
+  "has_fatalities": false,
+  "fatalities": 0,
+  "civilian_targeting": false,
+  "civilian_targeting_label": null,
+  "story_refs": [
+    {
+      "id": "story_20260417_example",
+      "url": "https://gdeltcloud.com/story/example-story",
+      "title": "Example story",
+      "story_date": "2026-04-17",
+      "article_count": 4
+    }
+  ],
+  "entity_refs": [
+    {
+      "id": "Paris",
+      "name": "Paris",
+      "type": "LOCATION",
+      "wikipedia_url": "https://en.wikipedia.org/wiki/Paris"
+    }
+  ],
+  "top_articles": [
+    {
+      "url": "https://example.com/article",
+      "title": "Example article",
+      "rank": 1
+    }
+  ]
+}
+```
+
+| Field                                            | Description                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                                             | Stable v2 Event identifier.                                                                                                                                                                                                                                                                                                                                                                      |
+| `url`, `primary_story_url`                       | Public GDELT Cloud Story URL for citation when the Event has a linked Story.                                                                                                                                                                                                                                                                                                                     |
+| `family`                                         | `conflict` or `cameoplus`.                                                                                                                                                                                                                                                                                                                                                                       |
+| `title`, `summary`                               | Generated Event headline and concise summary.                                                                                                                                                                                                                                                                                                                                                    |
+| `event_date`                                     | Event date in `YYYY-MM-DD`.                                                                                                                                                                                                                                                                                                                                                                      |
+| `category`, `subcategory`                        | Product taxonomy fields. Conflict Events use event types such as `Battles`, `Protests`, or `Riots` as `category`, then sub-event types such as `Armed clash` or `Peaceful protest` as `subcategory`; CAMEO+ Events use domains as `category` and stable event codes such as `TE01` or `IN03` as `subcategory`. Responses display canonical codebook labels such as `TE01 · AI Capability Event`. |
+| `domain`                                         | CAMEO+ domain, or `CONFLICT` for conflict Events.                                                                                                                                                                                                                                                                                                                                                |
+| `event_code`                                     | Source event id, CAMEO+ event code, or null.                                                                                                                                                                                                                                                                                                                                                     |
+| `geo`                                            | Primary Event location.                                                                                                                                                                                                                                                                                                                                                                          |
+| `geo_context`                                    | Explains broad geography matches, especially actor-origin matches.                                                                                                                                                                                                                                                                                                                               |
+| `actors`                                         | Event actors with `name`, normalized `country`, and `role`.                                                                                                                                                                                                                                                                                                                                      |
+| `metrics`                                        | Event significance and generated metric inputs.                                                                                                                                                                                                                                                                                                                                                  |
+| `has_fatalities`, `fatalities`                   | Fatality flag and count.                                                                                                                                                                                                                                                                                                                                                                         |
+| `civilian_targeting`, `civilian_targeting_label` | Conflict-only ACLED civilian-targeting flag and label. `true` means civilians were coded as the primary target.                                                                                                                                                                                                                                                                                  |
+| `story_refs`                                     | Linked Story references with public URLs.                                                                                                                                                                                                                                                                                                                                                        |
+| `entity_refs`                                    | Linked Entities with names, types, and Wikipedia URLs when available.                                                                                                                                                                                                                                                                                                                            |
+| `top_articles`                                   | Top 3 inline source articles. Use the Story articles endpoint for full article lists.                                                                                                                                                                                                                                                                                                            |
+
+### Story card
+
+Returned by `GET /api/v2/stories` and `GET /api/v2/stories/{story_id}`.
+
+```json theme={null}
+{
+  "id": "story_20260417_example",
+  "url": "https://gdeltcloud.com/story/example-story",
+  "title": "Example story title",
+  "story_date": "2026-04-17",
+  "category": "infrastructure",
+  "subcategory": null,
+  "geo": {
+    "country": "Japan",
+    "region": "East Asia",
+    "continent": "Asia",
+    "admin1": "Tokyo",
+    "location": "Tokyo",
+    "latitude": 35.6762,
+    "longitude": 139.6503
+  },
+  "geo_context": {
+    "location_country": "Japan",
+    "actor_origin_countries": ["Japan", "United States"]
+  },
+  "metrics": {
+    "significance": 0.82,
+    "article_count": 12,
+    "linked_event_count": 2,
+    "max_linked_event_significance": 0.76
+  },
+  "has_events": true,
+  "has_fatalities": false,
+  "fatalities": 0,
+  "linked_events": [
+    {
+      "id": "cameoplus_20260417_example",
+      "title": "Example linked Event"
+    }
+  ],
+  "entity_refs": [
+    {
+      "id": "Tokyo",
+      "name": "Tokyo",
+      "type": "LOCATION",
+      "wikipedia_url": "https://en.wikipedia.org/wiki/Tokyo"
+    }
+  ],
+  "top_articles": [
+    {
+      "url": "https://example.com/article",
+      "title": "Example article",
+      "domain": "example.com",
+      "rank": 1
+    }
+  ]
+}
+```
+
+| Field                          | Description                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------ |
+| `id`                           | Stable v2 Story cluster identifier.                                                        |
+| `url`                          | Public GDELT Cloud Story URL for citation.                                                 |
+| `title`, `story_date`          | Cluster headline and cluster date.                                                         |
+| `category`, `subcategory`      | Story category and linked-Event subcategory context when available.                        |
+| `geo`                          | Primary geography inferred through linked Events.                                          |
+| `geo_context`                  | Location country plus actor-origin countries from linked Events.                           |
+| `metrics`                      | Story significance, article volume, linked Event count, and max linked Event significance. |
+| `has_events`, `linked_events`  | Whether structured Events link to the Story, plus up to 10 linked Event refs.              |
+| `has_fatalities`, `fatalities` | Whether linked Events include fatalities, plus total linked fatalities.                    |
+| `entity_refs`                  | Linked Entities with names, types, and Wikipedia URLs when available.                      |
+| `top_articles`                 | Top 3 inline source articles for evidence preview.                                         |
+
+### Event summary bucket and Story summary bucket
+
+Returned by `GET /api/v2/events/summary` and `GET /api/v2/stories/summary`.
+
+```json theme={null}
+{
+  "success": true,
+  "group_by": "country",
+  "data": [
+    {
+      "key": "France",
+      "group_by": "country",
+      "event_count": 12,
+      "conflict_event_count": 4,
+      "cameoplus_event_count": 8,
+      "fatality_event_count": 2,
+      "fatalities": 6,
+      "fatality_event_rate": 0.1667,
+      "country_count": 1,
+      "region_count": 1,
+      "article_count": 40,
+      "avg_article_count": 3.333,
+      "min_article_count": 1,
+      "max_article_count": 12,
+      "avg_significance": 0.42,
+      "max_significance": 0.91,
+      "min_significance": 0.05,
+      "avg_goldstein_scale": -3.8,
+      "metrics": {
+        "significance": { "avg": 0.42, "max": 0.91, "min": 0.05 },
+        "goldstein_scale": { "avg": -3.8, "min": -8, "max": 2, "avg_severity": 4.2 },
+        "goldstein_severity": { "avg": 4.2, "min": 0.5, "max": 8 },
+        "cameoplus": {
+          "magnitude": { "avg": 6.1, "min": 1.2, "max": 9 },
+          "systemic_importance": { "avg": 0.52, "min": 0.11, "max": 0.9 },
+          "propagation_potential": { "avg": 0.47, "min": 0.07, "max": 0.81 },
+          "market_sensitivity": { "avg": 0.31, "min": 0.03, "max": 0.75 }
+        },
+        "confidence": { "avg": 0.83, "min": 0.44, "max": 0.98 },
+        "article_count": { "total": 40, "avg": 3.333, "min": 1, "max": 12 },
+        "fatalities": { "events": 2, "rate": 0.1667, "total": 6 }
+      },
+      "metric_stats": {
+        "significance": { "avg": 0.42, "max": 0.91, "min": 0.05 }
+      }
+    }
+  ]
+}
+```
+
+| Field                                                                                                         | Description                                                                                   |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `key`                                                                                                         | Bucket value for the selected `group_by`. Country keys are normalized to plain English names. |
+| `group_by`                                                                                                    | Concrete grouping label returned by the API.                                                  |
+| `event_count`, `story_count`                                                                                  | Number of Events or Stories in the bucket.                                                    |
+| `conflict_event_count`, `cameoplus_event_count`                                                               | Event-family counts for Event summaries.                                                      |
+| `article_count`, `avg_article_count`, `min_article_count`, `max_article_count`                                | Total, average, min, and max article evidence volume.                                         |
+| `fatality_event_count`, `stories_with_fatalities`, `fatalities`, `fatality_event_rate`, `fatality_story_rate` | Fatality coverage fields.                                                                     |
+| `country_count`, `region_count`                                                                               | Distinct geography counts represented in the bucket.                                          |
+| `avg_*`, `max_*`, `min_*`                                                                                     | Flat aggregate fields retained for simple clients.                                            |
+| `metrics`                                                                                                     | Nested aggregate statistics for significance and its input metrics.                           |
+| `metric_stats`                                                                                                | Alias of `metrics` for clients that prefer explicit statistical naming.                       |
+
+Story summary buckets use the same envelope and include `story_count`, `stories_with_events`, `story_only_count`, `linked_event_count`, `min_linked_event_count`, `avg_linked_event_count`, `max_linked_event_count`, `avg_recency_score`, and nested `metrics.linked_events` for linked Event significance, Goldstein, CAMEO+, confidence, and market-sensitivity aggregates. `linked_event_count` is the number of Story-to-Event links in the Story bucket, not a second Event total; use `event_count` from Event summaries for distinct Events.
+
+### Articles, Entities, Admin1, And Errors
+
+Story article responses:
+
+```json theme={null}
+{
+  "success": true,
+  "data": [
+    {
+      "id": "article_123",
+      "url": "https://example.com/article",
+      "title": "Example article",
+      "domain": "example.com",
+      "article_date": "2026-04-17",
+      "rank": 1,
+      "role": "representative"
+    }
+  ],
+  "pagination": {
+    "limit": 25,
+    "cursor": null,
+    "next_cursor": null
+  }
+}
+```
+
+Entity list responses return Entity cards. Each entity is **canonical, deduplicated by Wikipedia URL**: multiple raw\_name variants (e.g. "Trump" + "Donald Trump", "U.S. House" + "House of Representatives") collapse to one card. Only People and Organizations with linked Wikipedia pages are surfaced; disambiguation pages, common nouns, and extraction artifacts are filtered server-side.
+
+```json theme={null}
+{
+  "id": "person:Example%20Person",
+  "url": "https://gdeltcloud.com/entities/person-example-person",
+  "name": "Example Person",
+  "type": "person",
+  "wikipedia_url": "https://en.wikipedia.org/wiki/Example_Person",
+  "latest_date": "2026-04-17",
+  "metrics": {
+    "article_count": 20,
+    "story_count": 8,
+    "event_count": 3
+  }
+}
+```
+
+Entity detail responses add linked references:
+
+```json theme={null}
+{
+  "success": true,
+  "data": {
+    "id": "person:Example%20Person",
+    "url": "https://gdeltcloud.com/entities/person-example-person",
+    "name": "Example Person",
+    "type": "person",
+    "wikipedia_url": "https://en.wikipedia.org/wiki/Example_Person",
+    "image_url": "https://upload.wikimedia.org/...thumb.jpg",
+    "wikipedia": {
+      "thumbnail_url": "https://upload.wikimedia.org/...thumb.jpg",
+      "description": "Brief Wikipedia descriptor",
+      "summary": "First paragraph of the Wikipedia article…",
+      "page_url": "https://en.wikipedia.org/wiki/Example_Person"
+    },
+    "metrics": {
+      "article_count": 20,
+      "story_count": 8,
+      "event_count": 3
+    },
+    "story_refs": [
+      {
+        "id": "story_20260417_example",
+        "title": "Example story",
+        "story_date": "2026-04-17",
+        "category": "cameoplus_political",
+        "article_count": 4,
+        "url": "https://gdeltcloud.com/story/example-story"
+      }
+    ],
+    "event_refs": [
+      {
+        "id": "conflict_20260417_example",
+        "title": "Example event",
+        "family": "conflict",
+        "event_date": "2026-04-17",
+        "story_id": "story_20260417_example",
+        "story_title": "Example story",
+        "story_url": "https://gdeltcloud.com/story/example-story"
+      }
+    ]
+  }
+}
+```
+
+<Note>
+  Raw per-article mention counts and entity salience scores are **not** part of the V2 entity contract. GDELT Cloud surfaces aggregated Story, Article, and Event counts as the canonical activity signals. Internally we still use mention counts for ranking, but they are not shipped.
+</Note>
+
+`GET /api/v2/geo/admin1` returns:
+
+```json theme={null}
+{
+  "success": true,
+  "country": "France",
+  "admin1": ["Bretagne", "Ile-de-France"],
+  "source": "gdelt_cloud.events"
+}
+```
+
+Standard error responses:
+
+```json theme={null}
+{
+  "success": false,
+  "error": "Invalid continent. Use one of: Africa, Asia, Europe, North America, South America, Oceania",
+  "code": "INVALID_CONTINENT",
+  "details": {
+    "param": "continent",
+    "invalid_value": "Atlantis",
+    "accepted_values": ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"],
+    "example": "?continent=Asia"
+  }
+}
+```
+
+Invalid category/subcategory responses also include `accepted_values`, `nearest_values` when practical, and a corrected example so agents can retry the next call without guessing. `subcategory` requires its parent `category`; for CAMEO+ categories, prefer stable event codes such as `TE01` over label text. `event_family` is deprecated because category implies Conflict vs CAMEO+.
+
+## Events
+
+### List Events
+
+```http theme={null}
+GET /api/v2/events
+```
+
+Common filters:
+
+* `date_start`, `date_end`: `YYYY-MM-DD`
+* `country`, `region`, `continent`, `admin1`
+* `bbox`: `lat_min,lon_min,lat_max,lon_max` — sub-country viewport filter on Event `geo.latitude` / `geo.longitude`. See the [Bounding box](#bounding-box) section.
+* `category`, `subcategory`; `category` accepts a single value or comma-separated values such as `Protests,TECHNOLOGY`. `subcategory` requires `category` and must belong to at least one selected category. Use ACLED sub-event labels for Conflict categories and stable CAMEO+ event codes such as `TE01` for CAMEO+ categories.
+* `event_family`: deprecated legacy filter (`conflict` or `cameoplus`). Prefer `category`, which implies the family.
+* `domain`: deprecated legacy CAMEO+ filter. Prefer `category`.
+* `has_fatalities`: `true` or `false`
+* `civilian_targeting`: `true` or `false` for Conflict Events where civilians are the primary target
+* Metric filters: append `_min` or `_max` to `significance`, `confidence`, `goldstein_scale`, `goldstein_severity`, `magnitude`, `systemic_importance`, `propagation_potential`, or `market_sensitivity`
+* `search`: free text
+* `sort`: `significance` or `recent`
+* `include_images`: `true` default, or `false` to skip article sharing-image and Entity-thumbnail enrichment
+* `limit`, `cursor`
+
+Example:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?country=France&category=Protests&subcategory=Peaceful%20protest&date_start=2026-04-01&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+Event cards include `id`, `url`, `primary_story_url`, `family`, `title`, `summary`, `image_url`, `event_date`, category fields, normalized `geo` with `admin1`, `geo_context`, actors, metrics, fatality fields, civilian-targeting fields, linked Stories, linked Entities, and `top_articles`.
+
+Events default to the past 24 hours. Start with date/geography/category filters, then narrow with `subcategory`, `has_fatalities`, `civilian_targeting`, semantic `search`, or `sort=recent` as needed. Explicit `date_start`/`date_end` windows filter by event date and may not exceed 30 days.
+
+Metric filters use canonical response-field names. `significance` and `confidence` apply across Event families; `magnitude`, `systemic_importance`, `propagation_potential`, and `market_sensitivity` only match CAMEO+ Events with those scores; `goldstein_scale` and `goldstein_severity` match Conflict Events and CAMEO+ `POLITICAL` Events where Goldstein is meaningful. `goldstein_severity` is absolute intensity, not signed valence.
+
+Country, region, and continent filters match Events by either event location country or actor-origin country. Use `geo.location_country` and `geo_context.actor_origin_countries` to label results as location matches, actor matches, or both in dashboards.
+
+Use `url` or `primary_story_url` as the public GDELT Cloud citation when present. `story_refs[].url` points to the linked public Story page.
+
+`top_articles` is always limited to the top 3 inline articles. Inline article records include `domain`, `domain_avatar_url`, and `image_url` when the GDELT GKG sharing-image layer has a current article image. Linked Entity refs include Wikipedia thumbnail-derived `image_url` / `avatar_url` when available.
+
+### Fetch Event
+
+```http theme={null}
+GET /api/v2/events/{event_id}
+```
+
+### Event Summary
+
+```http theme={null}
+GET /api/v2/events/summary
+```
+
+Use `group_by=date|country|region|continent|category|subcategory`. Summary buckets include the simple counts plus aggregate metric statistics for the generated inputs behind Event significance: Goldstein scale/severity, CAMEO+ magnitude, systemic importance, propagation potential, market sensitivity, confidence, article evidence, and fatality counts/rates. `group_by=subcategory` returns observed category-scoped buckets and counts: for example, `category=Battles&group_by=subcategory` returns ACLED sub-event buckets such as `Government regains territory`, which can then be passed to `/api/v2/events?category=Battles&subcategory=Government%20regains%20territory` to fetch instances. Use `group_by=date` for time-series charts; each bucket is one chronological observation, and clients should plot enough recent history to make the current day legible rather than fabricating two-point sparklines.
+
+Event summaries use the same broad result coverage as Event lists. Summary endpoints do not accept `search`. Use the list endpoint for semantic retrieval, then call the summary endpoint with structured filters.
+
+Event summary accepts the same metric `_min` / `_max` filters as Event list, and applies them before aggregation.
+
+Example:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events/summary?region=Middle%20East&category=Explosions%2FRemote%20violence&subcategory=Air%2Fdrone%20strike&has_fatalities=true&group_by=country&date_start=2026-04-01&date_end=2026-04-17" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events/summary?category=Battles&group_by=subcategory&date_start=2026-04-01&date_end=2026-04-17" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+## Stories
+
+### List Stories
+
+```http theme={null}
+GET /api/v2/stories
+```
+
+Common filters:
+
+* `date_start`, `date_end`
+* `country`, `region`, `continent`, `admin1`
+* `bbox`: `lat_min,lon_min,lat_max,lon_max` — sub-country viewport filter applied through linked-Event location. See the [Bounding box](#bounding-box) section.
+* `category`, `subcategory`; `subcategory` requires `category` and must belong to at least one selected linked-Event category. `domain` and `event_category` remain accepted as deprecated aliases for older linked-Event filters.
+* `has_events` — `true` narrows to Stories with at least one linked Event. `false` (default) returns all Stories. `has_fatalities` narrows to Stories with linked fatal Events. `civilian_targeting` narrows by linked Conflict Events where civilians are the primary target.
+* `article_count_min`, `article_count_max`
+* `search`
+* `sort`: `significance` or `recent`
+* `include_images`: `true` default, or `false` to skip article sharing-image and Entity-thumbnail enrichment
+* `limit`, `cursor`
+
+Example:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/stories?continent=Asia&search=new%20data%20center%20projects&article_count_min=2&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+Story cards include `id`, `url`, `title`, `image_url`, `story_date`, category fields, normalized `geo` with `admin1`, `geo_context`, metrics, linked Event refs, Entity refs, fatality flags, and `top_articles`.
+
+Stories default to the exact past 24 hours by cluster update time while preserving broad discovery coverage across narrative clusters, with duplicate-family handling applied where needed before pagination or aggregation. Explicit date windows may not exceed 30 days.
+
+Use `category` when you want Stories whose linked Events match a Conflict event type such as `Battles` or `Protests`, or a CAMEO+ domain such as `POLITICAL` or `CRIME`; pair `category=Protests` with subcategories such as `Peaceful protest`. `story_category` remains available for legacy Story cluster categories such as `conflict_security`. `event_category` is a deprecated alias for Story linked-Event filters.
+
+Use `url` as the public GDELT Cloud citation for the cluster. Use `top_articles` as direct source evidence. Article records include `domain`, `domain_avatar_url`, and `image_url` when available; Story and Event cards promote the first available article image to card-level `image_url`. Entity refs include Wikipedia thumbnail-derived `image_url` / `avatar_url` when available.
+
+### Fetch Story
+
+```http theme={null}
+GET /api/v2/stories/{story_id}
+```
+
+### Fetch Story Articles
+
+```http theme={null}
+GET /api/v2/stories/{story_id}/articles
+```
+
+Use this cursor endpoint for the full article list. Story list/detail endpoints only return the top 3 articles inline. Article-list rows include source `domain`, `domain_avatar_url`, and `image_url` when available.
+
+### Story Summary
+
+```http theme={null}
+GET /api/v2/stories/summary
+```
+
+Use `group_by=date|country|region|continent|category|subcategory`. Summary buckets include Story counts plus aggregate statistics for Story significance inputs: article volume, linked Event counts and metrics, linked Event Goldstein/CAMEO+ aggregates, recency, and fatalities. Story summaries use the same broad coverage behavior and duplicate-family handling as Story lists. Use `category`/`subcategory` to summarize Stories through linked Event taxonomy, and `story_category` only for legacy Story cluster categories. When `group_by=category` or `group_by=subcategory`, Story summary buckets are based on linked Event taxonomy and therefore count event-linked coverage; narrative-only Stories remain included in date/geography summaries when no linked-Event filter requires otherwise. Use `group_by=date` for coverage-trend plots and for Brief signal benchmark history.
+
+Summary endpoints do not accept `search`. Use the list endpoint for semantic retrieval, then call the summary endpoint with structured filters.
+
+## Entities
+
+```http theme={null}
+GET /api/v2/entities
+GET /api/v2/entities/{entity_id}
+```
+
+Entity cards and profiles include public `url` values when a GDELT Cloud entity page can be constructed, plus linked Story/Event refs. Entity search covers people and organizations, defaults to the exact past 24 hours by linked evidence time, and accepts the same 30-day maximum date window. When a Wikipedia match has a thumbnail, responses include `image_url`, `avatar_url`, and a compact `wikipedia` object so clients and Briefs can render recognizable people and organizations without reimplementing Entity-page enrichment.
+
+Entity endpoints accept `include_images=false` to skip Wikipedia thumbnail enrichment.
+
+Entity list filters include `search`, `type=person|organization`, `category`, `subcategory`, `has_fatalities`, `civilian_targeting`, `sort`, `limit`, and `cursor`. Entity taxonomy filters operate on linked Story/Event evidence. `subcategory` requires `category`; `event_family` and `domain` remain accepted as deprecated compatibility filters, but new integrations should use `category`.
+
+## Briefs
+
+A **Monitoring Brief** is a short, source-backed intelligence memo answering four questions — *What changed? Why does it matter? What evidence supports it? What should I watch next?* — quantified against a baseline window and grounded in clickable GDELT Cloud Events, Stories, and Entities.
+
+<Note>
+  **Briefs is a plan-gated add-on.** These endpoints require a plan with Briefs access (`can_use_briefs`). Requests on a plan without it return `403` with `{"code": "BRIEF_ACCESS_DENIED"}`. Each plan includes a fixed number of Brief runs per billing period; once exhausted, requests return `403` with `{"code": "BRIEF_LIMIT_REACHED"}` until you add more. See your plan on the [pricing page](https://gdeltcloud.com/pricing). Brief runs are metered **separately** and do **not** consume your plan's query-unit (QU) quota.
+</Note>
+
+### Create Brief
+
+```http theme={null}
+POST /api/v2/briefs
+```
+
+Creating a Brief **kicks off the agent run and returns immediately** with `202 Accepted` — a Brief takes \~5–10 minutes to generate, so poll `GET /api/v2/briefs/{id}` for status and content. The request body is JSON:
+
+* `scope_text` (**required**): one or two plain sentences describing what to monitor — the situation, where it is, who/what is affected, and the decision it informs (8–2400 chars).
+* `time_window`: recent window the Brief analyses — one of `6h`, `24h`, `72h`, `7d`, `30d`. Default `24h`.
+* `baseline_window`: earlier comparison window for change detection — one of `7d`, `14d`, `30d`. Default chosen from `time_window`.
+* `audience`: framing and length — `executive` (default), `analyst`, or `operator`.
+* `depth`: density — `skim`, `standard` (default), or `detailed`.
+* `countries`: optional ISO-3 country codes to scope the Brief, e.g. `["YEM","SAU"]`.
+* `regions`, `locations`: optional plain-English geographies.
+* **Sharpen retrieval** (all optional — they narrow and focus what the agent gathers): `search_topics` — free-text focus terms or phrases (e.g. `["port congestion","tanker insurance"]`); `actors` and `entities` — named actors, people, or organizations to emphasize (e.g. `["Houthi","Maersk"]`); `sectors` — business or mission sectors (e.g. `["shipping","energy"]`); `assets` — named facilities or infrastructure.
+* `public_link`: when `true`, also mint a public, shareable report URL (default `false` / private).
+* `title`: optional; auto-generated from `scope_text` when omitted.
+* `brief_type`: optional; defaults to `monitoring_brief`, the only generally-available Brief type.
+
+```bash theme={null}
+curl -X POST "https://gdeltcloud.com/api/v2/briefs" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope_text": "Monitor Red Sea maritime disruption risk to shipping across Yemen, the Red Sea, and the Gulf of Aden.",
+    "time_window": "7d",
+    "baseline_window": "30d",
+    "audience": "executive",
+    "countries": ["YEM", "SAU"]
+  }'
+```
+
+Returns `202` with `id`, `status` (`queued`), `brief_type`, `title`, `created_at`, `web_url`, `public_url` (when `public_link=true`), and a `message`.
+
+### List Briefs
+
+```http theme={null}
+GET /api/v2/briefs
+```
+
+Returns `{ "briefs": [...] }` — each entry has `id`, `title`, `brief_type`, `status`, `created_at`, `updated_at`, `error_message`, `public_url`, and `web_url`. Still-running Briefs are reconciled before the list is returned so statuses are current.
+
+### Fetch Brief
+
+```http theme={null}
+GET /api/v2/briefs/{id}
+```
+
+Returns the full Brief: `status`, the original `input`, the structured `document` (the Monitoring Brief content schema — bottom line, what-changed, key developments, evidence, watch items, negative findings, confidence), `citations`, the evidence `appendix` (the full tool-call ledger), and report URLs. A still-running Brief is reconciled first so the status and content are current.
+
+**Status values:** `queued` → `generating` → `building` → `ready`, or `failed` (with `error_message`).
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/briefs/$BRIEF_ID" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+## Ranking
+
+The default sort is `sort=significance`.
+
+Event significance combines Goldstein severity where meaningful, CAMEO+ magnitude/systemic/propagation/market metrics where present, fatality presence for Conflict Events, article evidence volume, and confidence.
+
+The Event significance formula is:
+
+`Goldstein severity 25% + CAMEO+ magnitude 20% + systemic importance 15% + propagation potential 10% + market sensitivity 10% + fatalities 10% + article evidence 5% + confidence 5%`.
+
+`goldstein_scale` is the signed -10 to +10 scale. `goldstein_severity` is `abs(goldstein_scale)` and exists only as an aggregate/statistical helper for significance inputs.
+
+Story significance combines linked Event significance, capped article count, and recency. Use `sort=recent` when freshness is more important than significance.
+
+`goldstein_scale` is public:
+
+* Present for all Conflict Events.
+* Present for CAMEO+ `POLITICAL` Events.
+* Null for non-political CAMEO+ domains where the metric is not meaningful.
+* Exposed as one canonical public Event metric. Family-specific physical source columns remain internal implementation details.
+
+## Recommended Usage Cookbook
+
+Use Events when you need structured incidents, actors, event category/subcategory, fatalities, Goldstein scale, or event-level metrics. Use Stories when you need a clustered narrative with top article evidence. Use summaries for dashboard totals and trend charts, then drill down into Events or Stories with the same filters.
+
+Prefer these defaults:
+
+* Use `limit=10` for exploratory/API Playground requests, then raise it when you need more rows.
+* Use `sort=significance` for monitoring and dashboards.
+* Use `sort=recent` when freshness matters more than importance.
+* Use plain English geography in docs and apps, for example `country=United States`.
+* When writing code, pass query parameters through your HTTP client's `params` option or `URLSearchParams` instead of hand-building URLs. Spaces do not need manual `%20` handling in code: clients encode `United States` correctly, and the API decodes both `%20` and `+` in query strings.
+* Omit dates for the past 24 hours. When you pass `date_start` and `date_end` explicitly, they filter by event or story date and the window must be 30 days or less.
+* Start broad, then narrow with geography, category, subcategory, date windows, and semantic `search`.
+* Use `search` for true semantic retrieval on list endpoints only: v2 embeds the query text, applies the structured filters as the candidate set, and ranks records by cosine similarity against stored Event or Story embeddings. Summary endpoints do not accept `search`.
+* Use `admin1` only after discovering valid values through `/api/v2/geo/admin1?country=...`.
+* Treat inline `top_articles` as evidence preview only; use `/api/v2/stories/{story_id}/articles` for the full paginated source list.
+
+### Country, Region, Or Continent Monitoring
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?country=United%20States&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/stories?continent=Asia&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Infrastructure Events
+
+Use CAMEO+ `category=INFRASTRUCTURE` as the canonical pattern:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?category=INFRASTRUCTURE&country=United%20States&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+For high-propagation infrastructure incidents:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?category=INFRASTRUCTURE&propagation_potential_min=0.6&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+For high-significance Events across families:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?significance_min=0.7&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Semantic Event Search
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?search=attacks%20on%20energy%20infrastructure&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Protests Today Or Recently
+
+For a current list:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?category=Protests&subcategory=Peaceful%20protest&country=India&date_start=2026-04-17&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+For a daily dashboard trend:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events/summary?category=Protests&subcategory=Peaceful%20protest&country=India&group_by=date&date_start=2026-04-11&date_end=2026-04-17" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### New Data Center Projects In Asia
+
+Use Stories first because this is a narrative discovery task. Keep `article_count_min=1` for emerging project discovery; raise it only when you want more source volume.
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/stories?continent=Asia&search=new%20data%20center%20projects&article_count_min=1&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+Then use Events if you need structured infrastructure event records:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?category=INFRASTRUCTURE&continent=Asia&search=data%20center%20projects&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Fatal Conflict Monitoring
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?category=Explosions%2FRemote%20violence&subcategory=Air%2Fdrone%20strike&has_fatalities=true&country=Lebanon&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Admin1 Drilldown
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/geo/admin1?country=United%20States" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?country=United%20States&admin1=District%20of%20Columbia&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Bounding Box Drilldown
+
+When `country` or `admin1` is too coarse — straits, ports, basins, border zones, custom viewports — filter directly on Event coordinates with `bbox=lat_min,lon_min,lat_max,lon_max`:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?bbox=11.5,42.5,13.5,44.5&category=Explosions%2FRemote%20violence&subcategory=Air%2Fdrone%20strike&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/stories/summary?bbox=26,55,30,58&group_by=date&date_start=2026-04-11&date_end=2026-04-17" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+Combine with `country` when you want events in a specific area of a specific country:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/events?country=United%20States&bbox=38,-77.2,39,-76.8&date_start=2026-04-11&date_end=2026-04-17&sort=significance" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+### Story Articles
+
+Story list and detail responses return only the top 3 inline articles. Use the articles endpoint for the full source set:
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/stories/{story_id}/articles?limit=25" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```
+
+```bash theme={null}
+curl "https://gdeltcloud.com/api/v2/stories/{story_id}/articles?limit=25&cursor={next_cursor}" \
+  -H "Authorization: Bearer $GDELT_CLOUD_API_KEY"
+```

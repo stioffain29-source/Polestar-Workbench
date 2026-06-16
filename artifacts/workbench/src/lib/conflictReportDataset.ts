@@ -717,12 +717,12 @@ function buildWhatMatters(
   const where = f.hasFocus
     ? joinList(f.labels)
     : `the affected areas in ${lead.theatre}`;
-  const para1 = `The first issue is simple: people. Anyone moving through or working near ${where} could be caught up in attacks, security operations, checkpoints or sudden road closures.`;
+  const para1 = `The priority is people. Anyone travelling through or working near ${where} risks being caught in an attack, a security sweep, a checkpoint or a sudden road closure.`;
   const scope =
     f.hasFocus && f.localised
-      ? `tighter controls around ${where}, not a blanket change across the rest of ${lead.theatre}`
-      : `tighter controls wherever the activity is, kept under review as the picture moves`;
-  const para2 = `For business, this calls for ${scope}. Firm up journey planning and route choice, keep an eye on site access, and make sure any depot, worksite or journey in those areas has a clear plan to pause, reroute or move people out quickly. Agree the evacuation triggers before anyone is under pressure.`;
+      ? `tighter precautions around ${where}, rather than a blanket change across the rest of ${lead.theatre}`
+      : `tighter precautions wherever the activity is heaviest, reviewed as the picture shifts`;
+  const para2 = `For business, that means ${scope}. Plan journeys and routes with care, confirm site access before staff set out, and give every depot, worksite and route a clear way to pause, reroute or pull people out at short notice. Set your evacuation triggers now, while there is still room to decide calmly.`;
   return `${para1}\n\n${para2}`;
 }
 
@@ -737,17 +737,17 @@ function buildWatchNext(
   const activity = activityList(lead.topCategories);
   const lines: string[] = [];
   lines.push(
-    `Watch for more ${activity} in ${leadWhere}, especially if the same districts or routes are hit again.`,
+    `Expect further ${activity} in ${leadWhere}. The signal to watch is repetition — the same districts or routes being hit more than once.`,
   );
   lines.push(
-    `The clearest escalation sign is spread — incidents reaching neighbouring areas, or new checkpoints, road closures, curfews or security operations — which would mean the fighting is widening rather than easing.`,
+    `The clearest sign of escalation is spread: violence reaching neighbouring areas, or fresh checkpoints, road closures and curfews. That would mean the fighting is widening rather than easing.`,
   );
   if (categoriesPresent.has("Abduction & Crime"))
     lines.push(
-      "Any abductions or a rising casualty count, especially anything aimed at staff, contractors or convoys.",
+      "Watch closely for abductions or fresh casualty reports, particularly anything aimed at staff, contractors or convoys.",
     );
   lines.push(
-    "Watch too for any attack near a depot, worksite, convoy route or key infrastructure. That is where this turns from background reporting into a live duty-of-care problem.",
+    "Above all, watch for any attack close to a depot, worksite, convoy route or key infrastructure. That is the point where this stops being background reading and becomes a live duty-of-care concern.",
   );
   return lines.join("\n");
 }
@@ -774,7 +774,7 @@ function buildPolestarView(
     fLead.hasFocus && fLead.localised
       ? `Most of the armed activity sits in ${leadWhere}${tail}.`
       : `${leadWhere} carries the most armed activity this period${tail}.`;
-  const action = ` The practical response is clear: keep people away from the worst-hit areas, tighten journey planning and route checks, harden the sites that matter most, and set clear evacuation triggers before anyone is under pressure.`;
+  const action = ` The response is straightforward: keep people clear of the worst-hit areas, tighten journey and route planning, protect the sites that matter most, and agree evacuation triggers well in advance.`;
   return `${opening}${action}`;
 }
 
@@ -902,6 +902,18 @@ const GENERIC_CONFLICT_PHRASES = [
   // these drop the confusing single-country framing for the location-led read.
   "It is a focused armed-risk picture",
   "The business response should be focused",
+  // Superseded auto prose (pre plainer-voice rewrite of What Matters / Watch Next
+  // / Polestar action). Saved reports carrying these reseed the cleaner wording.
+  "The first issue is simple",
+  "could be caught up in attacks",
+  "Firm up journey planning and route choice",
+  "keep an eye on site access",
+  "before anyone is under pressure",
+  "especially if the same districts or routes are hit again",
+  "The clearest escalation sign is spread",
+  "background reporting into a live duty-of-care problem",
+  "The practical response is clear",
+  "keep people away from the worst-hit areas",
 ];
 
 export function isGenericConflictProse(text: string): boolean {
