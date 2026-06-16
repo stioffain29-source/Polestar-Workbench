@@ -1,0 +1,127 @@
+Update the Conflict Watch writing prompt so the prose is more natural, direct and less stilted.
+
+The current output is technically correct but reads awkwardly. It uses too many stacked analytical phrases such as “operational concern”, “pressure is concentrated”, “casualty grade kinetic risk”, “wider reporting picture” and “local movement concern”. Replace this with clearer, more human business writing.
+
+Conflict Watch should read like a sharp analyst note, not a generic risk template.
+
+Core style rules:
+
+Use plain English.
+Use short paragraphs.
+Write naturally.
+Avoid stiff corporate phrasing.
+Avoid repeating the same sentence structure across sections.
+Avoid overusing words like operational, exposure, posture, disruption and kinetic.
+Do not over explain.
+Do not sound like a machine trying to be serious.
+
+The writing should answer three things clearly:
+
+What happened?
+Where is the real pressure?
+What should a business do about it?
+
+Keep the structure location led and dynamic:
+
+1. SITUATION
+One short paragraph.
+Say what the overall picture is and name the main pressure point.
+Do not write a generic conflict summary if country specific activity is available.
+
+2. TOP ACTIVITY AREAS
+Select the top three countries or theatres dynamically from the reporting.
+The top three must change each reporting cycle based on severity, casualties, number of incidents and business relevance.
+
+For each country or theatre, write one short paragraph covering:
+What happened
+Where it happened
+Why it matters
+Who or what is exposed
+
+Use natural phrasing.
+
+Good example:
+Pakistan is the main concern. The worst activity sits around the Afghan border and Khyber Pakhtunkhwa, where attacks, airstrikes and security operations can quickly affect routes, checkpoints, convoy movement and nearby worksites.
+
+Bad example:
+The pressure is concentrated in the Afghan border and Khyber Pakhtunkhwa. The most exposed are military and government sites, road, checkpoint and convoy movement and civilian harm and displacement.
+
+3. WHAT MATTERS FOR BUSINESS
+This section should not sound abstract.
+Start with people.
+
+Preferred style:
+The first issue is simple: people. Anyone moving through or working near the affected areas could be caught by attacks, security operations, checkpoints or sudden road closures.
+
+Then explain the business impact in practical terms:
+Travel limits
+Route control
+Site access
+Convoy movement
+Fixed sites
+Evacuation triggers
+Duty of care
+
+Avoid clumsy phrases like:
+These were violent and, in places, deadly events
+The pressure is concentrated
+The most exposed are
+Operations elsewhere are largely unaffected
+
+Use cleaner alternatives:
+Pakistan is the main concern
+The wider picture is more contained
+This calls for tighter controls in the affected areas, not a blanket change across the country
+Any depot, worksite or journey in those areas needs a clear plan to pause, reroute or move people out quickly
+
+4. WATCH NEXT
+Do not produce a single weak bullet.
+Write 3 short watch points or 2 short paragraphs.
+
+Watch Next should explain what would show escalation.
+
+Include indicators such as:
+Repeat attacks in the same district or on the same routes
+Spread into neighbouring areas
+New checkpoints, road closures, curfews or security operations
+Attacks near depots, worksites, convoys or critical infrastructure
+Abductions or rising casualty levels
+New movement restrictions
+
+Preferred style:
+Watch for more attacks in Khyber Pakhtunkhwa or along the Afghan border, especially if they hit the same districts or routes again.
+
+The key escalation sign is spread. More incidents across neighbouring areas, new checkpoints, road closures, curfews or security operations would suggest the fighting is widening rather than easing.
+
+Also watch for any attack near a depot, worksite, convoy route or critical infrastructure. That is where this shifts quickly from background conflict reporting to a live duty of care issue.
+
+5. POLESTAR VIEW
+One clear judgement paragraph.
+Do not just repeat the summary.
+Do not list every country again unless needed.
+Say what the reporting means for decision makers.
+
+Preferred style:
+This is not a general country risk shift. It is a localised armed risk picture, led by Pakistan’s Afghan border areas and Khyber Pakhtunkhwa. India and the Philippines remain on the watch list, but the immediate business response should be focused: keep people out of the worst affected areas, tighten journey control, check exposed sites and make sure evacuation triggers are agreed before anyone is under pressure.
+
+Selection logic for top three:
+
+Rank countries or theatres by:
+Highest severity
+Casualties
+Number of incidents
+Business relevance
+Impact on movement, sites, convoys, critical infrastructure or evacuation decisions
+
+Important:
+Do not hard code Pakistan, India and Philippines.
+They are examples only.
+The top three must change based on the reporting in each update.
+
+Final tone:
+Sharp.
+Natural.
+Operationally useful.
+No filler.
+No generic risk language.
+No stiff template prose.

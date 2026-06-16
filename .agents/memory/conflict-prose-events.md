@@ -34,4 +34,21 @@ new signatures the saved report keeps rendering the old prose forever. The Top
 Activity Area paragraphs are always auto (not editable) so they update automatically;
 the four editable fields do not.
 **How to apply:** pick phrases distinctive enough not to collide with analyst-authored
-text (low but non-zero risk). Verify by reloading the saved report in the editor.
+text (low but non-zero risk). Verify by reloading the saved report in the editor. The
+new signatures must NOT appear in the NEW auto prose either, or `pickProse` would treat
+fresh auto text as generic too (idempotent for the editable fields, but the
+`isGenericConflictProse(autoSituation/autoPolestarView)===false` tests will fail).
+
+## Trap 3 — localisation-honesty applies to EVERY section, not just the area paragraphs
+**Rule:** any "rest of the country is quieter" / "not a country-wide shift" /
+"concentrated rather than countrywide" containment claim must be gated on
+`focus.hasFocus && focus.localised` (≥50% of incidents in named hotspots). The
+no-focus / scattered branch must just NAME the lead theatre, never imply the rest is
+safe — this includes `buildPolestarView`'s headline judgement, not only
+`buildAreaParagraph` and Situation/What Matters.
+**Why:** a sub-50%-coverage theatre is NOT contained; calling it "not country-wide"
+falsely reassures. A prior rewrite gated the area paragraphs and Situation but left
+Polestar's else-branch saying "uneven rather than country-wide" for scattered data.
+**How to apply:** every section's localised-only sentence branches on the SAME
+`hasFocus && localised` predicate; the fallback branch names the lead with no
+geographic-containment language.

@@ -77,7 +77,7 @@ describe("buildConflictReportDataset — dynamic ranking", () => {
     const lead = ds.topActivityAreas[0];
     expect(lead.casualtySignalCount).toBeGreaterThan(0);
     // The casualty signal must surface in the location paragraph, never as a count.
-    expect(lead.paragraph).toContain("casualties reported");
+    expect(lead.paragraph).toMatch(/deadly|killed/i);
   });
 
   it("breaks a severity+casualty tie on incident count", () => {
@@ -227,7 +227,10 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
   it("names the hotspot but does not call a sub-50% theatre concentrated", () => {
     expect(lead.theatre).toBe("India");
     expect(lead.paragraph).toContain("Manipur");
-    expect(lead.paragraph).toContain("clustered mainly around");
+    expect(lead.paragraph).toContain("The worst activity sits around");
+    // The "rest of the country is far quieter" reassurance is reserved for
+    // genuinely localised theatres (≥50% coverage) — never a scattered one.
+    expect(lead.paragraph).not.toContain("far quieter");
     expect(lead.paragraph).not.toContain("rather than spread across the country");
     expect(lead.paragraph).not.toContain("not the country as a whole");
   });
@@ -237,6 +240,9 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
     expect(ds.autoSituation).not.toContain("concentrated in");
     expect(ds.autoWhatMatters).not.toContain("largely unaffected");
     expect(ds.autoPolestarView).not.toContain("carries on as normal");
+    // A sub-50% theatre must not be called country-wide-contained either.
+    expect(ds.autoPolestarView).not.toMatch(/countrywide|country-wide/i);
+    expect(ds.autoWhatMatters).not.toContain("not a blanket change");
     // It still names the flashpoint — honesty cuts both ways.
     expect(ds.autoPolestarView).toContain("Manipur");
   });
@@ -270,7 +276,9 @@ describe("buildConflictReportDataset — high severity, no casualties", () => {
 
   it("still flags the High severity honestly", () => {
     expect(ds.worstSeverityLabel).toBe("High");
-    expect(ds.autoPolestarView).toContain("serious violence");
+    // No false "deadly" framing, but the decision guidance still lands.
+    expect(ds.autoPolestarView).not.toMatch(/\bdeadly\b/i);
+    expect(ds.autoPolestarView).toContain("evacuation triggers");
   });
 });
 
