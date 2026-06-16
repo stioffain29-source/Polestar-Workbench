@@ -204,6 +204,10 @@ interface BuildCtx {
   period: string;      // "18 May - 24 May"
   cadence: string;     // "weekly" | "monthly"
   thin: boolean;       // total < 3
+  // Optional headline naming the single dominant development this cycle (e.g.
+  // a Strait-of-Hormuz reopening). When supplied, the Executive Summary leads
+  // with it by name so the report can never omit the story driving the window.
+  leadDevelopment?: string;
 }
 
 type SectionBuilder = (ctx: BuildCtx) => string;
@@ -457,12 +461,15 @@ const CARGO: ReportPack = {
 // Shipping Watch
 // ---------------------------------------------------------------------------
 const SHIPPING: ReportPack = {
-  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
+  exec: ({ types, lead, countries, sev, thin, total, cadence, leadDevelopment }) => {
     const driver = types || "chokepoint exposure, vessel risk and freight-side pressure";
     const geo = lead
       ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with less from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : " No single country stands out, and several reports do not pin down a precise location.";
-    return `Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const headline = leadDevelopment
+      ? `The week was dominated by the report that "${leadDevelopment}". `
+      : "";
+    return `${headline}Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
   },
   situation: ({ types }) => {
     const focus = types ? `Chokepoints and major ports remain the standing pressure points, currently showing up as ${types}.` : "Chokepoints and major ports remain the standing pressure points, with vessel and freight-side risk close behind.";
@@ -753,6 +760,7 @@ export function draftTopicReportProse(opts: {
       period: periodPhrase(topic, issueDate),
       cadence: cadenceWord(topic),
       thin: sTotal > 0 && sTotal < 3,
+      leadDevelopment: ds.leadDevelopment ?? undefined,
     };
     return {
       executiveSummary: sTotal === 0 ? SHIPPING.zeroExec : SHIPPING.exec(shipCtx),

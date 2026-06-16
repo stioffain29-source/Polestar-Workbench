@@ -360,7 +360,14 @@ export default function ReportEditor() {
       status: report.status ?? "draft",
       issueDate,
       riskRating: report.riskRating ?? "",
-      executiveSummary: exec.trim() ? exec : draft.executiveSummary,
+      // executiveSummary is browser-local (no DB column) so its "saved" value is
+      // the localStorage copy. It must honour the SAME staleness guard as every
+      // other narrative field: when the window has advanced or live data is
+      // newer, a localStorage summary written against the old window is stale and
+      // must be reseeded from the fresh draft — otherwise the lead development
+      // (the week's dominant headline) silently fails to surface for a browser
+      // that saved an earlier copy. Fresh, non-stale reports keep the saved copy.
+      executiveSummary: pick(exec, draft.executiveSummary),
       situation: pick(report.situation, draft.situation),
       whatHappened: pick(report.whatHappened, draft.whatHappened),
       whatMatters: pick(report.whatMatters, draft.whatMatters),

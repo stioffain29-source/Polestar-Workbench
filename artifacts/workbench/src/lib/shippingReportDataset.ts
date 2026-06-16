@@ -80,6 +80,10 @@ export interface ShippingReportDataset {
   regionRows: BarRow[];
   countryRows: BarRow[];
   commercialRows: EnrichedIncident[];
+  /** Title of the single dominant chokepoint development in the window — the
+   *  headline the report names up front (Executive Summary + Chokepoint Read).
+   *  Null when no chokepoint-tied record sits in the window. */
+  leadDevelopment: string | null;
   /** Analyst-prose reads. Each one introduces the data that follows it. */
   chokepointRouteRead: string;
   vesselPiracyRead: string;
@@ -689,11 +693,17 @@ export function buildShippingReportDataset(
   // recent", "The leading patterns are") and answers what changed,
   // where the pressure is heaviest and what the reader should track.
   const cpRanked = [...chokepointRows].filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
+  // The dominant chokepoint development this week — named up front in both the
+  // Chokepoint / Route Read (below) and the Executive Summary (seeded via
+  // ds.leadDevelopment), so the report can never bury the lead story in the
+  // closing table again.
+  const leadDevelopmentIncident = selectLeadDevelopment(enriched, cpRanked);
   const chokepointRouteRead = buildChokepointRouteRead({
     cpRanked,
     transitRecords,
     weeklyEnriched: enriched,
     thirtyDayLabel: thirtyDayShortLabel,
+    leadDevelopment: leadDevelopmentIncident,
   });
 
   // Vessel Threat and Piracy Read — built from the 30-day vessel and
@@ -811,6 +821,7 @@ export function buildShippingReportDataset(
     regionRows,
     countryRows,
     commercialRows: commercialRecords,
+    leadDevelopment: leadDevelopmentIncident ? cleanLeadTitle(leadDevelopmentIncident.title) : null,
     chokepointRouteRead,
     vesselPiracyRead,
     commercialImpactRead,
@@ -971,13 +982,104 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
+// Strip a trailing outlet/masthead segment ("... - News and Statistics",
+// "... | Reuters"): Google-News titles append the source after a final ASCII
+// " - " or " | ". Only a SHORT tail (<= 6 words) is removed so genuine headline
+// content containing a dash survives, and em-dashes (—) are left intact because
+// they separate real clauses rather than the masthead.
+function cleanLeadTitle(title: string): string {
+  const t = title.trim();
+  const m = t.match(/^(.*\S)\s+[-|]\s+(\S[^-|]{0,59})$/);
+  if (m && m[2].trim().split(/\s+/).length <= 6) return m[1].trim();
+  return t;
+}
+
+// Name-only chokepoint matchers for LEAD-development selection. detectChokepoints
+// (used for the route-count table) deliberately requires an operational maritime
+// keyword so a passing policy/commentary "Hormuz" mention does not inflate the
+// route counts. But the development DOMINATING a week is frequently a political
+// headline — "US-Iran deal, Strait of Hormuz to reopen" — that names the
+// chokepoint with NO operational word, so it fails that gate and would be
+// invisible to the lead picker. The lead pool therefore keys on the chokepoint
+// NAME alone, keeping such headlines eligible to lead.
+const CHOKEPOINT_NAME_RE: Record<ChokepointKey, RegExp> = {
+  "Strait of Hormuz": /\bhormuz\b/i,
+  "Gulf of Oman": /\bgulf of oman\b/i,
+  "Arabian / Persian Gulf": /\b(arabian|persian)\s+gulf\b/i,
+  "Red Sea": /\bred sea\b/i,
+  "Bab el-Mandeb": /\b(bab[\s-]?el[\s-]?mandeb|mandeb)\b/i,
+  "Malacca Strait": /\bmalacca\b/i,
+};
+
+// The single dominant chokepoint development in the window — the headline the
+// report names up front. Among records that NAME the busiest chokepoint, it
+// picks the MOST CORROBORATED story: the headline sharing the most significant
+// vocabulary with the rest of the window, i.e. the one actually "dominating the
+// headlines" (e.g. a Strait-of-Hormuz reopening reported across dozens of
+// wires), not a lone high-severity outlier. Ties break to the newest day, then
+// severity, then the newest record. This is what lets the Executive Summary and
+// the Chokepoint / Route Read name the development driving the cycle instead of
+// leaving it buried in the closing Related Incidents table.
+function selectLeadDevelopment(
+  rows: EnrichedIncident[],
+  cpRanked: ChokepointRow[],
+): EnrichedIncident | null {
+  const leadName = cpRanked[0]?.name;
+  const nameRe = leadName ? CHOKEPOINT_NAME_RE[leadName] : undefined;
+  const blobOf = (r: EnrichedIncident) =>
+    `${r.title} ${r.summary ?? ""} ${r.location ?? ""}`;
+  const onLead = nameRe ? rows.filter((r) => nameRe.test(blobOf(r))) : [];
+  const onChokepoint = rows.filter((r) => detectChokepoints(r).length > 0);
+  const pool = onLead.length > 0 ? onLead : onChokepoint;
+  if (pool.length === 0) return null;
+  // Significant-token set per headline (drop stopwords + short words).
+  const toks = pool.map(
+    (r) =>
+      new Set(
+        normaliseTitle(r.title)
+          .split(" ")
+          .filter((w) => w.length >= 4 && !TITLE_STOP.has(w)),
+      ),
+  );
+  // Corroboration = how many OTHER headlines are near-duplicates, measured by
+  // Jaccard overlap (intersection / union) of significant tokens. Jaccard is
+  // length-normalised, which matters: a raw shared-token count rewards one long
+  // headline that brushes every other (e.g. a verbose closure notice listing
+  // tankers, vessels, strikes), whereas the genuinely dominant story is a tight
+  // cluster of many near-identically-worded wires ("US-Iran deal, Strait of
+  // Hormuz to reopen"). The 0.34 floor means roughly a third of the combined
+  // vocabulary must overlap to count as the same story.
+  const dayOf = (r: EnrichedIncident) => r.date.toISOString().slice(0, 10);
+  const scored = pool.map((r, i) => {
+    let corroboration = 0;
+    for (let j = 0; j < pool.length; j++) {
+      if (j === i) continue;
+      let inter = 0;
+      for (const t of toks[i]) if (toks[j].has(t)) inter++;
+      const union = toks[i].size + toks[j].size - inter;
+      if (union > 0 && inter / union >= 0.34) corroboration++;
+    }
+    return { r, corroboration };
+  });
+  scored.sort((a, b) => {
+    if (b.corroboration !== a.corroboration) return b.corroboration - a.corroboration;
+    const da = dayOf(a.r), db = dayOf(b.r);
+    if (da !== db) return da < db ? 1 : -1; // newer day first
+    const s = (SEV_RANK[sevKey(b.r.severity)] ?? 0) - (SEV_RANK[sevKey(a.r.severity)] ?? 0);
+    if (s !== 0) return s; // more serious first
+    return a.r.date.getTime() < b.r.date.getTime() ? 1 : -1; // newer time first
+  });
+  return scored[0]?.r ?? null;
+}
+
 function buildChokepointRouteRead(opts: {
   cpRanked: ChokepointRow[];
   transitRecords: EnrichedIncident[];
   weeklyEnriched: EnrichedIncident[];
   thirtyDayLabel: string;
+  leadDevelopment: EnrichedIncident | null;
 }): string {
-  const { cpRanked, transitRecords, weeklyEnriched, thirtyDayLabel } = opts;
+  const { cpRanked, transitRecords, weeklyEnriched, thirtyDayLabel, leadDevelopment } = opts;
   if (cpRanked.length === 0 && transitRecords.length === 0) {
     return `Little was reported on chokepoints or route disruption recently (${thirtyDayLabel}). Read this as a gap in reporting rather than proof that pressure has eased — warnings on these routes come in bursts, and a quiet spell does not change the underlying risk around Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep watching maritime advisories, naval movements and any operator decisions on routing or war-risk insurance. A return of activity usually shows up in advisories before it reaches commercial freight rates.`;
   }
@@ -986,6 +1088,12 @@ function buildChokepointRouteRead(opts: {
   const cpPhrase = lead
     ? `The busiest route this week is ${lead.name}${lead.highestSeverityKey ? `, where the most serious incident reached ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} comes next.` : ""}`
     : "Little was reported on chokepoints this week, but movement along the routes still deserves attention.";
+  // Name the development driving the cycle so the route read leads with the
+  // dominant headline (e.g. a Strait-of-Hormuz reopening) instead of only
+  // citing severity and count.
+  const leadLine = leadDevelopment
+    ? ` The development driving the picture this week is the report that "${cleanLeadTitle(leadDevelopment.title)}".`
+    : "";
   const weeklyTransit = weeklyEnriched.filter((r) =>
     TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   ).length;
@@ -995,7 +1103,7 @@ function buildChokepointRouteRead(opts: {
   const watch = lead
     ? `Keep an eye on new naval advisories for ${lead.name}, any changes to war-risk insurance and what operators say about rerouting. These are the early warning signs of escalation; freight rates follow a few days later.`
     : `Keep an eye on new advisories and any operator decisions to divert — these move ahead of headline freight rates and show where pressure is building.`;
-  return `${cpPhrase}\n\n${transitLine}\n\n${watch}`;
+  return `${cpPhrase}${leadLine}\n\n${transitLine}\n\n${watch}`;
 }
 
 function buildVesselPiracyRead(opts: {
