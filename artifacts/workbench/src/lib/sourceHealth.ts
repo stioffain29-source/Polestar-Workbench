@@ -51,6 +51,32 @@ export function isSourceActionRequired(s: {
   return effectiveSourceStatus(s) !== "operational";
 }
 
+// Number of CONSECUTIVE failed ingest runs at which the ingest pipeline
+// escalates a feed from "operational" to "failing". Mirrors
+// FAILURE_ESCALATION_THRESHOLD in `@workspace/ingest` (lib/ingest/src/
+// sourceHealth.ts) — kept in sync so the table's early-warning window matches
+// the exact point at which a feed tips over into the red Action Required panel.
+export const RETRY_ESCALATION_THRESHOLD = 3;
+
+// A feed that has failed 1..threshold-1 ingest runs in a row is quietly
+// retrying: still EFFECTIVELY operational (so it stays out of Action Required),
+// but degrading. This gives operators an early, non-alarming warning before the
+// feed tips over to "failing". Returns false once the feed is genuinely failing
+// (action-required) or has fully recovered (consecutiveFailures reset to 0).
+export function isSourceRetrying(s: {
+  status: string;
+  lastSuccessAt?: string | Date | null;
+  lastFailureAt?: string | Date | null;
+  consecutiveFailures?: number | null;
+}): boolean {
+  const failures = s.consecutiveFailures ?? 0;
+  return (
+    !isSourceActionRequired(s) &&
+    failures >= 1 &&
+    failures < RETRY_ESCALATION_THRESHOLD
+  );
+}
+
 // Render a source health timestamp (last success / last failure) the way the
 // table and Action Required panel do, falling back to an em dash when absent.
 export function formatSourceTimestamp(

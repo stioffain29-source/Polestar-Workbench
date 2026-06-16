@@ -4,6 +4,8 @@ import {
   formatSourceTimestamp,
   effectiveSourceStatus,
   isSourceActionRequired,
+  isSourceRetrying,
+  RETRY_ESCALATION_THRESHOLD,
 } from "../../artifacts/workbench/src/lib/sourceHealth";
 import { SOURCE_STATUSES } from "../../artifacts/workbench/src/lib/topics";
 
@@ -141,5 +143,48 @@ describe("action-required derivation", () => {
     expect(
       isSourceActionRequired({ status: "operational", lastSuccessAt: later, lastFailureAt: null }),
     ).toBe(false);
+  });
+});
+
+describe("retrying derivation (early-warning, not action-required)", () => {
+  const earlier = "2026-06-15T01:00:00Z";
+  const later = "2026-06-15T03:00:00Z";
+
+  it("flags a feed that has failed 1..threshold-1 runs in a row", () => {
+    for (let n = 1; n < RETRY_ESCALATION_THRESHOLD; n++) {
+      expect(
+        isSourceRetrying({ status: "operational", consecutiveFailures: n }),
+      ).toBe(true);
+    }
+  });
+
+  it("does not flag a fully recovered feed (no failure streak)", () => {
+    expect(
+      isSourceRetrying({ status: "operational", consecutiveFailures: 0 }),
+    ).toBe(false);
+    expect(isSourceRetrying({ status: "operational" })).toBe(false);
+  });
+
+  it("does not flag a genuinely failing feed as merely retrying", () => {
+    expect(
+      isSourceRetrying({
+        status: "failing",
+        consecutiveFailures: RETRY_ESCALATION_THRESHOLD,
+        lastSuccessAt: earlier,
+        lastFailureAt: later,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not double-count: a retrying feed never appears in Action Required", () => {
+    const s = { status: "operational", consecutiveFailures: 1 };
+    expect(isSourceRetrying(s)).toBe(true);
+    expect(isSourceActionRequired(s)).toBe(false);
+  });
+
+  it("treats a manual alarm state as action-required, not retrying", () => {
+    const s = { status: "blocked", consecutiveFailures: 1 };
+    expect(isSourceRetrying(s)).toBe(false);
+    expect(isSourceActionRequired(s)).toBe(true);
   });
 });

@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
-import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired } from "@/lib/sourceHealth";
+import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired, isSourceRetrying } from "@/lib/sourceHealth";
 import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -73,7 +73,10 @@ export default function Sources() {
       allSources.filter(
         (s) =>
           (!topic || s.topic === topic) &&
-          (!status || effectiveSourceStatus(s) === status),
+          (!status ||
+            (status === "retrying"
+              ? isSourceRetrying(s)
+              : effectiveSourceStatus(s) === status)),
       ),
     [allSources, topic, status],
   );
@@ -198,6 +201,7 @@ export default function Sources() {
           <SelectTrigger className="rounded-sm w-48"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="retrying">retrying</SelectItem>
             {SOURCE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -221,7 +225,15 @@ export default function Sources() {
                 </div>
                 <div className="p-3 text-xs">{TOPIC_LABELS[s.topic]}</div>
                 <div className="p-3 text-xs uppercase font-serif">{s.sourceType}</div>
-                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusBadgeClass(effectiveSourceStatus(s)))}>{sourceStatusLabel(effectiveSourceStatus(s))}</span></div>
+                <div className="p-3">
+                  <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusBadgeClass(effectiveSourceStatus(s)))}>{sourceStatusLabel(effectiveSourceStatus(s))}</span>
+                  {isSourceRetrying(s) && (
+                    <div className="flex items-center gap-1 mt-1" title={`Failed ${s.consecutiveFailures}x in a row — retrying on the next ingest run, not yet a sustained outage`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span className="text-[10px] font-sans uppercase tracking-wider text-amber-600">Retrying ({s.consecutiveFailures}x)</span>
+                    </div>
+                  )}
+                </div>
                 <div className="p-3"><Dots filled={s.reliability} /></div>
                 <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastSuccessAt)}</div>
                 <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastFailureAt)}</div>
