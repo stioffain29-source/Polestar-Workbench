@@ -125,6 +125,7 @@ const REQUIRED_TOPIC_REPORTS: Array<{
   { topic: "cargo_watch", title: "APAC Cargo Watch" },
   { topic: "shipping",    title: "Hormuz Maritime Watch" },
   { topic: "protests",    title: "APAC Flashpoint" },
+  { topic: "conflict",    title: "Conflict Watch" },
 ];
 
 // Reports that were previously auto-seeded but have since been retired.

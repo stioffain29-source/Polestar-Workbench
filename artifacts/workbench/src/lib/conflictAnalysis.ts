@@ -59,13 +59,15 @@ export function classifyConflictCategory(i: ConflictTextLike): ConflictCategory 
   return "Armed Clash";
 }
 
-// Category colours — drawn ONLY from the existing Polestar palette plus the
-// existing high-severity red for the highest-lethality category. No new palette.
-// All four are dark enough to carry white chip text.
+// Category colours — drawn ONLY from the Polestar brand family: Electric Blue,
+// Midnight Blue, Dusk Gray and a muted steel-blue Midnight tint for the
+// highest-lethality category. Red is deliberately NOT used here — subdued red
+// (#A33232) is reserved for Extreme severity only. All four are dark enough to
+// carry white chip text.
 export const CATEGORY_COLOR: Record<ConflictCategory, string> = {
   "Armed Clash": "#465bff", // Electric Blue
   Insurgency: "#0b0a3d", // Midnight Blue
-  "Bombing & Airstrike": "#C0392B", // existing High-severity red
+  "Bombing & Airstrike": "#4D5C7A", // Steel Blue (muted Midnight tint)
   "Abduction & Armed Crime": "#363636", // Dusk Gray
 };
 

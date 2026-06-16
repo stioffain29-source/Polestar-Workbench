@@ -461,6 +461,20 @@ export default function ReportPreview({
       )
     : null;
   const cargoCountry = isCargo ? buildCargoCountryBreakdown(cargoWindow) : null;
+  // Related Incidents table — shared selection (selectRelatedIncidents) so the
+  // preview lists the SAME rows, in the same order, as the PDF's
+  // drawRelatedIncidents (parity guarantee). The window here matches the PDF's
+  // windowIncidents exactly (filterTopicReportIncidents == the PDF filter).
+  // Fuel has its own bespoke preview branch and is excluded.
+  const relatedRows =
+    !isFuel && report.topic && report.issueDate
+      ? selectRelatedIncidents(
+          isCargo
+            ? cargoWindow
+            : filterTopicReportIncidents(incidents, report.topic, report.issueDate),
+          report.topic,
+        )
+      : [];
   if (cargoExtras) {
     fastFacts.push({
       label: "Est. Cargo Loss (USD)",
@@ -770,15 +784,11 @@ export default function ReportPreview({
                       ? pick(report.polestarView, buildCargoPolestarView(cargoWindow))
                       : report.polestarView}
                   />
-                  {isCargo && (() => {
-                    const related = selectRelatedIncidents(cargoWindow, "cargo_watch");
-                    if (related.length === 0) return null;
-                    return (
-                      <Section title="Related Incidents">
-                        <RelatedIncidentsTable rows={related} />
-                      </Section>
-                    );
-                  })()}
+                  {relatedRows.length > 0 && (
+                    <Section title="Related Incidents">
+                      <RelatedIncidentsTable rows={relatedRows} />
+                    </Section>
+                  )}
                 </>
               );
             })()}

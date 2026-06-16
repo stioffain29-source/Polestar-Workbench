@@ -38,7 +38,6 @@ import {
   resolveReportWindow,
   filterIncidentsToWindow,
   reportCadence,
-  relatedIncidentsLimit,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { selectRelatedIncidents } from "./relatedIncidents";
@@ -704,128 +703,10 @@ function drawRelatedIncidents(
   topic: string,
   _topicLabels: Record<string, string>,
 ) {
-  if (windowIncidents.length === 0) return;
-  const { max } = relatedIncidentsLimit(topic);
-  // Prioritise operationally meaningful rows. When the classifier
-  // returns its weakest bucket (e.g. "Other fuel incident") we push
-  // those rows to the bottom; if we have at least a handful of
-  // operationally classified rows, the weakest bucket is dropped
-  // entirely so the table does not drag the report down.
-  function weakBucket(label: string): boolean {
-    return (
-      /^other\s.+incident$/i.test(label) ||
-      label === "Unclassified maritime record"
-    );
-  }
-  // For Cargo specifically the source data carries a lot of generic
-  // "Warehouse theft - Other" / "Container theft - Other" /
-  // "Warehouse theft - Electronics" titles that repeat across the
-  // window. Treat any title ending in a generic suffix as a weak row
-  // so the table prefers named-place / named-corridor / named-cargo
-  // records when they exist.
-  function isGenericCargoTitle(title: string): boolean {
-    const t = (title ?? "").trim();
-    // Generic synthetic titles take the shape
-    //   "<bucket> theft <dash> <single category word>"
-    // where <dash> can be ASCII hyphen, en-dash or em-dash, and the
-    // category word carries no place, route or modus operandi signal.
-    // We treat any single trailing token after a dash as generic; only
-    // titles that add a named place / corridor / operator survive.
-    return (
-      /\b(warehouse|container|cargo|truck|depot)\s+(theft|hijack|hijacking|robbery|loss|raid)\s+[-\u2013\u2014]\s+\S+\s*$/i.test(
-        t,
-      ) ||
-      // Also drop the matching "Other land-based cargo theft - <word>"
-      // pattern surfaced by the classifier's fallback bucket.
-      /^other\s+land[- ]based\s+cargo\s+theft\s+[-\u2013\u2014]\s+\S+\s*$/i.test(
-        t,
-      )
-    );
-  }
-  // Title-based dedupe: collapse syndicated / repeated rows so the
-  // Related Incidents table does not list the same loss four times.
-  function titleKey(s: string): string {
-    const STOP = new Set([
-      "the",
-      "a",
-      "an",
-      "of",
-      "in",
-      "on",
-      "at",
-      "to",
-      "for",
-      "and",
-      "as",
-      "by",
-      "off",
-      "near",
-      "after",
-      "amid",
-      "with",
-      "from",
-      "into",
-      "over",
-      "says",
-      "say",
-      "said",
-      "reports",
-      "report",
-    ]);
-    return (s ?? "")
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .split(" ")
-      .filter((w) => w && !STOP.has(w))
-      .slice(0, 8)
-      .join(" ");
-  }
-  const seen = new Set<string>();
-  const deduped: TopicReportIncident[] = [];
-  for (const i of windowIncidents) {
-    const k = titleKey(i.title);
-    if (k && seen.has(k)) continue;
-    if (k) seen.add(k);
-    deduped.push(i);
-  }
-  const annotated = deduped.map((i) => ({
-    i,
-    weak:
-      weakBucket(classifyIncidentType(i)) ||
-      (topic === "cargo_watch" && isGenericCargoTitle(i.title)),
-  }));
-  const strong = annotated.filter((r) => !r.weak).map((r) => r.i);
-  const weak = annotated.filter((r) => r.weak).map((r) => r.i);
-  const STRONG_FLOOR = 4;
-  // Cargo: generic-suffix titles ("Warehouse theft - Other" /
-  // "Container theft - Electronics" etc.) are hard-excluded regardless
-  // of strong-row count — they add noise without operational signal.
-  // Other topics keep the existing weak-fallback behaviour so sparse
-  // windows still produce a usable table.
-  const ordered =
-    topic === "cargo_watch"
-      ? strong
-      : strong.length >= STRONG_FLOOR
-        ? strong
-        : [...strong, ...weak];
-  const sorted = [...ordered].sort(
-    (a, b) =>
-      new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
-  );
-  // Per-topic caps. Fuel was already tighter; Cargo and the generic
-  // path are now held at 10 so the Source Notes / Disclaimer block can
-  // be pulled back onto the same page rather than orphaned on a near-
-  // empty final page.
-  const effectiveMax =
-    topic === "fuel"
-      ? Math.min(max, 8)
-      : topic === "cargo_watch"
-        ? Math.min(max, 10)
-        : Math.min(max, 10);
-  const rows = sorted.slice(0, effectiveMax);
-  const truncated = sorted.length - rows.length;
+  // Row selection (title dedupe, weak-bucket filtering, recency order, cap)
+  // is delegated to the ONE shared selector so this PDF table renders the
+  // exact same rows the on-screen preview does.
+  const rows = selectRelatedIncidents(windowIncidents, topic);
   if (rows.length === 0) return;
 
   drawSectionHeading(ctx, "Related Incidents");
@@ -914,11 +795,6 @@ function drawRelatedIncidents(
   }
   ctx.y += 8;
 
-  // Client-facing reports intentionally omit the "Showing N latest of M"
-  // notice. The table cap is internal Workbench logic and surfacing it
-  // weakens the PDF.
-  void truncated;
-  void sorted;
   // Touch the cadence helper so removing it would not silently regress —
   // and to make the per-cadence behaviour obvious to readers of this code.
   void reportCadence(topic);
@@ -995,8 +871,10 @@ export async function exportTopicReportPdf(
     { byTopic: true },
   );
   // Strip records that match the topic field but are not operationally on
-  // topic (e.g. hiking obituary that happens to mention "fuel"). The filter
-  // is applied once and used for Fast Facts, prose data and the table.
+  // topic (e.g. hiking obituary that happens to mention "fuel"). Used for
+  // Fast Facts and prose data. The Related Incidents table does NOT read this
+  // set — it derives its rows from filterTopicReportIncidents (the same input
+  // the on-screen preview uses) so the two surfaces cannot disagree.
   const windowIncidents = rawWindow.filter((i) =>
     isTopicRelevant(data.topic, {
       topic: i.topic,
@@ -1195,7 +1073,19 @@ export async function exportTopicReportPdf(
     }
   }
 
-  drawRelatedIncidents(ctx, windowIncidents, data.topic, topicLabels);
+  // Related Incidents shares the preview's exact input
+  // (filterTopicReportIncidents) and selector (selectRelatedIncidents) so the
+  // PDF table can never disagree with the on-screen preview. Fuel uses a
+  // bespoke price-led layout that intentionally carries no related table, so
+  // the PDF omits it here too (matching the fuel preview branch).
+  if (data.topic !== "fuel") {
+    drawRelatedIncidents(
+      ctx,
+      filterTopicReportIncidents(incidents, data.topic, data.issueDate),
+      data.topic,
+      topicLabels,
+    );
+  }
 
   drawDisclaimer(ctx);
   drawDataAsOf(

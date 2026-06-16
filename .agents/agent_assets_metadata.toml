@@ -1,5 +1,10 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "tSelDDwGHjxc-Qp0IZQvP"
+uri = "file://attached_assets/conflict_watch_cover.png"
+type = "image"
+title = "conflict watch cover"
 
 [[outputs]]
 id = "aG0_NFVvJ-AacOw78yV51"

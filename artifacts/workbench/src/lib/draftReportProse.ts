@@ -22,6 +22,7 @@
 
 import { resolveReportWindow, filterIncidentsToWindow, reportCadence } from "./reportWindow";
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
+import { classifyConflictCategory, CATEGORY_CARD_LABEL } from "./conflictAnalysis";
 import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
 import { selectFlashpointUsable } from "./flashpointReportDataset";
 import { buildShippingReportDataset, type ShippingReportIncident } from "./shippingReportDataset";
@@ -162,6 +163,28 @@ function topTypesText(rows: DraftableIncident[]): string {
     if (cleaned.length === 3) break;
   }
   return joinList(cleaned);
+}
+
+// Conflict Watch describes WHAT KIND of armed event happened using the same
+// four kinetic categories the Conflict monitor uses (Armed Clash, Insurgency,
+// Bombing & Airstrike, Abduction & Armed Crime). The generic classifier has no
+// conflict case and would fall back to protest/strike-style labels, so the
+// conflict report derives its "types" text from classifyConflictCategory to
+// keep the report and the monitor speaking the same vocabulary.
+function topConflictTypesText(rows: DraftableIncident[]): string {
+  const counts = countBy(rows, (r) =>
+    CATEGORY_CARD_LABEL[
+      classifyConflictCategory({ title: r.title ?? "", summary: r.summary ?? null })
+    ],
+  );
+  if (counts.length === 0) return "";
+  const labels: string[] = [];
+  for (const [label] of counts) {
+    const l = label.toLowerCase();
+    if (l && !labels.includes(l)) labels.push(l);
+    if (labels.length === 3) break;
+  }
+  return joinList(labels);
 }
 
 function highestSeverity(rows: DraftableIncident[]): string {
@@ -686,8 +709,85 @@ const PROTESTS: ReportPack = {
   thinNote: "Public-order reporting was light this week. Treat that as a gap in reporting, not proof of calm.",
 };
 
+// ---------------------------------------------------------------------------
+// Conflict Watch — kinetic, casualty-grade armed activity (war, insurgency,
+// bombings/airstrikes, abduction & armed crime). A SEPARATE theatre from the
+// protest/public-order Flashpoint feed, so the vocabulary leads with people
+// safety and access rather than operational tempo.
+// ---------------------------------------------------------------------------
+const CONFLICT: ReportPack = {
+  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
+    const driver = types || "armed clashes, insurgency and bombing or airstrike activity";
+    const secondaries = countries && lead && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` ${lead} carried the heaviest activity${secondaries ? `, alongside ${secondaries}` : ""}.`
+      : "";
+    const para1 = `Conflict risk this ${cadence === "monthly" ? "month" : "week"} is a kinetic, casualty-grade picture rather than a question of public order. The activity was driven by ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const para2 = `These are armed events — firefights, insurgent raids, bombings and abductions — where the danger to people and assets is immediate. Staff moving near contested areas, fixed sites within range and convoys on exposed routes are the points where this risk turns operational fastest.`;
+    const para3 = `For business users the implication is direct: protect people first, continuity second. That means hard limits on travel into contested areas, reviewed security at fixed sites, and clear triggers to pause operations or evacuate while this picture holds.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
+  },
+  situation: ({ lead }) => {
+    const where = lead ? ` ${lead} sits at the centre of the current reporting.` : "";
+    return `Armed activity is the standing condition across the watched theatres, and it moves quickly from a single incident to a wider security operation. This matters because kinetic risk is a people-safety problem before it is a continuity one: casualties, road closures and lockdowns can follow a single clash within hours.${where}`;
+  },
+  whatHappened: ({ types, countries, sev, lead }) => {
+    if (!types) {
+      return `Conflict reporting was light this week, with no single pattern standing out.${sevTail(sev)}`;
+    }
+    const secondaries = countries && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` Reporting concentrated on ${lead}${secondaries ? `, with more from ${secondaries}` : ""}.`
+      : "";
+    return `Reporting centred on ${types}.${geo}${sevTail(sev)}`;
+  },
+  whatMatters: ({ lead }) => {
+    const where = lead ? ` Exposure to ${lead} is the live pressure point for staff movement, fixed-site security and evacuation planning.` : "";
+    const para1 = `Kinetic events land first on people: casualties, abductions and the risk to anyone moving through or working near a contested area. They land second on access — checkpoints, road closures, security operations and lockdowns that cut off routes and sites with little warning.${where}`;
+    const para2 = `Where armed activity meets fixed assets — a depot, a worksite, a convoy or critical infrastructure within range — the impact compounds: operations pause, insurance and duty-of-care obligations sharpen, and the decision shifts from managing disruption to protecting and moving people. That is the exposure worth planning against now.`;
+    return `${para1}\n\n${para2}`;
+  },
+  implications: () => {
+    const lines = [
+      "Set hard no-go limits on travel into contested districts, and require pre-movement approval for anything near them.",
+      "Review fixed-site security — perimeter, access control and standoff distance — against blast, small-arms and intrusion threats.",
+      "Confirm journey-management and convoy procedures, with named on-call contacts and a clear escalation path.",
+      "Pre-position medical and evacuation arrangements, including out-of-area casualty routing, before any exposed deployment.",
+      "Agree pause-and-evacuate triggers in advance — clashes within a set radius, road closures or security operations — rather than deciding under pressure.",
+    ];
+    return lines.map((l) => `- ${l}`).join("\n");
+  },
+  watchNext: () => {
+    const lines = [
+      "Repeat or escalating clashes in the same area — a sign of a widening operation rather than a one-off event.",
+      "Bombing, airstrike or IED activity, which raises the threat to fixed sites and main routes within range.",
+      "Abduction and armed-crime activity targeting staff, contractors or convoys.",
+      "Security-force operations and lockdowns that close roads, checkpoints and districts at short notice.",
+      "Spillover toward energy, transport or maritime infrastructure that turns a security event into a continuity one.",
+    ];
+    return lines.join("\n");
+  },
+  polestarView: ({ lead, countries }) => {
+    const pressure = lead
+      ? ` ${lead} is the clearest country pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      : " No single country stands out right now.";
+    return `Conflict Watch is flagging kinetic, casualty-grade risk rather than a rise in headlines. The danger is to people first and continuity second, so the operational answer is protective: hard travel limits, hardened fixed sites and rehearsed evacuation rather than headline tracking.${pressure}`;
+  },
+  zeroExec: "Conflict reporting was quiet this week. Read that as a gap in reporting rather than evidence the fighting has stopped. The standing exposures — armed clashes, insurgency and the risk to people moving near contested areas — still set the picture until fresh reporting comes through.",
+  zeroSituation: "Armed activity remains the background condition across the watched theatres whether or not new reporting lands.",
+  zeroWhatHappened: "No notable armed activity came through, so the picture carries forward from recent weeks.",
+  zeroWhatMatters: "People safety, site security and evacuation readiness stay the operational concern in the watched theatres.",
+  zeroPolestar: "Nothing useful came through on conflict this week. The standing kinetic risks in the watched theatres remain.",
+  thinNote: "Conflict reporting was light this week. Treat that as a gap in reporting, not proof of calm.",
+};
+
 const PACKS: Record<string, ReportPack> = {
   fuel: FUEL,
+  conflict: CONFLICT,
   fertiliser: FERTILISER,
   cargo_watch: CARGO,
   shipping: SHIPPING,
@@ -807,7 +907,7 @@ export function draftTopicReportProse(opts: {
     total,
     countries: topCountriesPlain(inWindow),
     lead: leadCountry(inWindow),
-    types: topTypesText(inWindow),
+    types: topic === "conflict" ? topConflictTypesText(inWindow) : topTypesText(inWindow),
     sev: highestSeverity(inWindow),
     period: periodPhrase(topic, issueDate),
     cadence: cadenceWord(topic),

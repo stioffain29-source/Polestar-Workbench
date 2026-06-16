@@ -47,11 +47,11 @@ function sevKey(s: string): string {
  * Exposed so callers (e.g. ReportEditor) can pass a pre-filtered list
  * straight into related-incident tables without re-filtering.
  */
-export function filterTopicReportIncidents(
-  incidents: TopicFastFactsIncident[],
+export function filterTopicReportIncidents<T extends TopicFastFactsIncident>(
+  incidents: T[],
   topic: string,
   issueDate: string,
-): TopicFastFactsIncident[] {
+): T[] {
   // Flashpoint reports span BOTH `flashpoint` (live scraper) and `protests`
   // (legacy) topic buckets — see flashpointReportDataset.ts for the same
   // alias. Mirror it here so KPI cards in the editor match the PDF.

@@ -15,9 +15,21 @@ preview rendered NO Related Incidents table at all — a silent preview/PDF pari
 gap. The distrustful user treats any screen-vs-PDF disagreement as the report
 lying. If you reintroduce per-surface selection the two WILL drift.
 
+**Input must match too, not just the selector.** Parity needs the SAME rows fed
+in AND the same selector. Both surfaces now feed `filterTopicReportIncidents(...)`
+(which internally applies the cargo `isCargoInScope` scope and the
+flashpoint↔protests alias) into `selectRelatedIncidents`. The PDF's `windowIncidents`
+(`filterIncidentsToWindow(byTopic)+isTopicRelevant`) is for Fast Facts/prose ONLY —
+do NOT feed it to the Related Incidents table or cargo/flashpoint will diverge.
+Fuel renders NO related table on EITHER surface (preview `!isFuel`, PDF call guarded
+`if (topic !== "fuel")`). `filterTopicReportIncidents` is generic
+(`<T extends TopicFastFactsIncident>`) so it preserves the caller's element type.
+
 **How to apply:**
 - Never re-inline the dedupe/weak/cap logic in either surface. Both call
   `selectRelatedIncidents`.
+- Feed the table from `filterTopicReportIncidents`, never the prose window. Keep the
+  fuel skip in lockstep on both surfaces.
 - The selector classifies via `classifyIncidentType` from `./incidentClassifier`
   (NOT `cargoAnalysis` — different classifier), which requires a `topic` field on
   the input. `RelatedIncidentInput` therefore carries `topic`; both caller row

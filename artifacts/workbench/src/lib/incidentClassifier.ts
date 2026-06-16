@@ -8,6 +8,8 @@
 // Inputs are derived from the title, summary, source text, location and the
 // existing topic (used only as a routing hint, never as a label).
 
+import { classifyConflictCategory } from "./conflictAnalysis";
+
 export interface ClassifiableIncident {
   topic: string;
   title: string;
@@ -189,6 +191,12 @@ export function classifyIncidentType(i: ClassifiableIncident): string {
     case "energy":
     case "grid":
       return classifyEnergy(t);
+    case "conflict":
+      // Conflict Watch owns its own kinetic vocabulary in conflictAnalysis —
+      // the single source of truth shared with the monitor. Classify on the
+      // headline + summary only (no source/url pollution) and return the
+      // singular canonical category the monitor's incident table uses.
+      return classifyConflictCategory({ title: i.title, summary: i.summary });
     case "protests":
     case "flashpoint":
       return classifyUnrest(t);
