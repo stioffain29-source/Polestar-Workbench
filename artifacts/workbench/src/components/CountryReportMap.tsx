@@ -65,7 +65,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const dotsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number }>>([]);
+  const dotsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number; dx: number; dy: number }>>([]);
 
   const plottable = incidents.filter(
     (i) => typeof i.latitude === "number" && typeof i.longitude === "number"
@@ -109,8 +109,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     const positionDots = () => {
       for (const d of dotsRef.current) {
         const p = map.latLngToContainerPoint([d.lat, d.lng]);
-        d.el.style.left = `${p.x - 7}px`;
-        d.el.style.top = `${p.y - 7}px`;
+        d.el.style.left = `${p.x - 7 + d.dx}px`;
+        d.el.style.top = `${p.y - 7 + d.dy}px`;
       }
     };
 
@@ -129,12 +129,37 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       return;
     }
 
+    // Fan co-located incidents out in SCREEN space so records sharing a city or
+    // country centroid do not stack into a single dot — many country-report
+    // records geocode to the same centroid, so without this the map shows far
+    // fewer dots than there are incidents. Distinct coordinates are left exactly
+    // where they are; only true ties are spread onto a small pixel ring. Screen-
+    // space offsets are zoom-independent and rasterise identically through
+    // html2canvas, so the on-screen map and the in-app PDF stay in agreement.
+    const groups = new Map<string, number[]>();
+    plottable.forEach((i, idx) => {
+      const key = `${i.latitude},${i.longitude}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(idx);
+      else groups.set(key, [idx]);
+    });
+    const offsets: Array<[number, number]> = plottable.map(() => [0, 0]);
+    for (const idxs of groups.values()) {
+      if (idxs.length <= 1) continue;
+      const r = 8 + idxs.length * 2.2;
+      idxs.forEach((gi, k) => {
+        const ang = (2 * Math.PI * k) / idxs.length;
+        offsets[gi] = [Math.cos(ang) * r, Math.sin(ang) * r];
+      });
+    }
+
     const latLngs: L.LatLngExpression[] = [];
-    for (const i of plottable) {
+    plottable.forEach((i, idx) => {
       const sk = (i.severity ?? "").toLowerCase();
       const color = SEV_COLOR[sk] ?? "#999999";
       const lat = i.latitude as number;
       const lng = i.longitude as number;
+      const [dx, dy] = offsets[idx];
 
       const dot = document.createElement("div");
       dot.style.position = "absolute";
@@ -153,9 +178,9 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         .join(" — ");
 
       overlay.appendChild(dot);
-      dotsRef.current.push({ el: dot, lat, lng });
+      dotsRef.current.push({ el: dot, lat, lng, dx, dy });
       latLngs.push([lat, lng]);
-    }
+    });
 
     if (latLngs.length === 1) {
       map.setView(latLngs[0] as L.LatLngTuple, 8);
