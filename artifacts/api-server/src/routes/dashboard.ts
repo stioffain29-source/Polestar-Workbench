@@ -13,6 +13,7 @@ const TOPICS: Record<string, string> = {
   energy: "Energy",
   shipping: "Shipping",
   cargo_watch: "Cargo Watch",
+  conflict: "Conflict Watch",
 };
 
 router.get("/dashboard/overview", async (_req, res): Promise<void> => {
