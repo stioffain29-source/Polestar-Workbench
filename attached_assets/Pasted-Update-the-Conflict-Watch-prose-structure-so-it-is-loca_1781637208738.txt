@@ -1,0 +1,95 @@
+Update the Conflict Watch prose structure so it is location led and dynamically generated from the reporting.
+
+The current structure is too generic. Conflict Watch should first tell the reader where the main armed activity occurred, then explain why it matters.
+
+Required structure:
+
+1. SITUATION
+Write one short overview paragraph.
+This should summarise the overall conflict picture, identify the main pressure point for this reporting cycle, and state whether the most serious activity reached Severe or Extreme.
+
+2. TOP ACTIVITY AREAS
+Create this section dynamically from the reporting.
+Select the top three countries or theatres based on the reporting in that specific update.
+
+The top three must not be fixed.
+For example, if Pakistan has the highest severity or most significant reporting, Pakistan should appear first. If the next report is led by Myanmar, Philippines and Thailand, then those should become the top three instead.
+
+Each top activity area should have:
+Country or theatre name as the heading
+One short paragraph explaining:
+What happened
+Where it happened if available
+Who was involved if available
+Why it matters operationally
+Likely business exposure such as travel, road movement, site access, fixed assets, duty of care or evacuation triggers
+
+Do not write generic paragraphs such as “reporting centred on insurgency and armed clashes” when country specific activity is available.
+
+Example format:
+
+Pakistan
+Pakistan accounted for the most serious reporting, with insurgency related attacks, bombings, airstrikes and armed clashes driving the highest concern level. The immediate exposure is to personnel movement, road access and operations near contested districts, where security force activity, checkpoints and short notice closures can follow quickly after an incident.
+
+India
+India featured in the wider reporting picture, although activity was less severe than Pakistan. The main issue for business is localised disruption around security operations, sensitive districts, border linked areas or protest crossover. This does not automatically require a wider travel posture change, but it does require routing awareness and local monitoring.
+
+Philippines
+The Philippines remained a watched theatre due to insurgency and armed group activity, particularly where incidents affect rural roads, security force movements or areas outside major urban centres. The main operational concern is local movement rather than national disruption.
+
+3. OTHER WATCHED THEATRES
+Include a short paragraph covering lower priority countries or theatres that appeared in the reporting but did not make the top three.
+Keep this brief.
+Do not over explain minor activity.
+
+4. WHAT MATTERS FOR BUSINESS
+Explain the operational impact, not the news summary.
+Focus on:
+People safety
+Road movement
+Site access
+Fixed assets
+Convoys and journey management
+Medical and evacuation planning
+Insurance and duty of care
+Escalation triggers
+
+5. WATCH NEXT
+List the key indicators to monitor next.
+These should be specific to the reporting, not generic.
+Examples:
+Repeat attacks in the same district
+Spread into neighbouring areas
+Road closures
+Security operations near key routes
+Attacks near fixed assets
+Increased casualty levels
+Abductions
+Movement restrictions
+New advisories or curfews
+
+6. POLESTAR VIEW
+One clear judgement paragraph.
+This should explain what the reporting means for business decision makers.
+It should not just repeat the summary.
+It should state the main pressure point and the practical posture required.
+
+Selection logic for TOP ACTIVITY AREAS:
+
+Rank countries or theatres using:
+Highest severity first
+Then casualty level
+Then number of incidents
+Then operational relevance to business
+Then whether the activity affects movement, fixed sites, critical infrastructure or evacuation decisions
+
+The output must change every reporting cycle based on the actual input data.
+
+Writing rules:
+Use plain English.
+Use short paragraphs.
+Avoid generic filler.
+Avoid repeating the same point across sections.
+Do not produce a fixed Pakistan, India, Philippines structure unless those are genuinely the top three in that report.
+Keep the tone analytical and operational.
+Focus on what happened, where it happened and what it means for business.
