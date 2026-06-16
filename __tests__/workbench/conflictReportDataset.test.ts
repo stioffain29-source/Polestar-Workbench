@@ -242,6 +242,38 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
   });
 });
 
+describe("buildConflictReportDataset — high severity, no casualties", () => {
+  // Deadly language must track the casualty SIGNAL, not the severity rank: a
+  // High-severity window with no confirmed casualties must never read "deadly"
+  // or affirmatively claim "casualties reported".
+  const ds = buildConflictReportDataset(
+    [
+      inc({ id: 1, country: "Philippines", severity: "high", title: NO_CASUALTY }),
+      inc({ id: 2, country: "Myanmar", severity: "high", title: NO_CASUALTY }),
+    ],
+    "conflict",
+    ISSUE_DATE,
+  );
+  const narrative = [
+    ds.autoSituation,
+    ds.autoWhatMatters,
+    ds.autoPolestarView,
+    ...ds.topActivityAreas.map((a) => a.paragraph),
+  ];
+
+  it("never claims deadly violence when no casualties are detected", () => {
+    for (const text of narrative) {
+      expect(text).not.toMatch(/\bdeadly\b/i);
+      expect(text).not.toContain("casualties reported");
+    }
+  });
+
+  it("still flags the High severity honestly", () => {
+    expect(ds.worstSeverityLabel).toBe("High");
+    expect(ds.autoPolestarView).toContain("serious violence");
+  });
+});
+
 describe("isGenericConflictProse", () => {
   it("flags legacy CONFLICT-pack seeds so they get replaced by auto-prose", () => {
     expect(

@@ -192,6 +192,69 @@ function exposurePhrases(impacts: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Concrete event extraction. The report's substance is the actual incidents —
+// what happened, where and when — so the prose cites the period's standout
+// events by name rather than describing risk in the abstract. Headlines carry
+// the place ("...in Bannu", "...in Khyber Pakhtunkhwa"), so the cleaned
+// headline plus its date is enough; no record counts ever appear.
+// ---------------------------------------------------------------------------
+function isCasualtyEvent(i: ConflictReportIncident): boolean {
+  return detectOperationalImpacts(textOf(i)).includes("Casualties reported");
+}
+
+// Tidy a raw news headline for use as an event phrase: drop the trailing
+// "| Source" tail and "– OpEd" marker, strip a leading "Place:" label (the
+// place is named separately), and collapse whitespace.
+function cleanHeadline(text: string): string {
+  let t = (text ?? "").trim();
+  if (!t) return "";
+  t = t.split(" | ")[0]!.trim();
+  t = t.replace(/\s*[–—-]\s*OpEd\s*$/i, "").trim();
+  t = t.replace(/^[A-Z][A-Za-z'’.&\- ]{2,22}:\s+/, "").trim();
+  return t.replace(/\s+/g, " ").trim();
+}
+
+// Lowercase a leading ordinary word so a headline reads naturally mid-sentence
+// ("Police kill five" -> "police kill five"), but leave acronyms (NIA, TTP)
+// untouched.
+function lcFirst(s: string): string {
+  if (!s) return s;
+  const first = s.split(/\s+/)[0] ?? "";
+  if (/^[A-Z]{2,}$/.test(first)) return s;
+  if (/^[A-Z][a-z]+$/.test(first)) return s[0]!.toLowerCase() + s.slice(1);
+  return s;
+}
+
+// One concrete event clause: cleaned headline + date, e.g. "four suicide
+// bombers killed as security forces repelled an attack ... on 15 Jun".
+function eventClause(i: ConflictEnrichedIncident): string {
+  const head = lcFirst(cleanHeadline(i.displayTitle ?? i.title));
+  const when =
+    !isNaN(i.date.getTime()) && i.date.getTime() > 0
+      ? ` on ${format(i.date, "d MMM")}`
+      : "";
+  return `${head}${when}`;
+}
+
+// The most significant incidents in a theatre: worst severity first, then
+// casualty signal, then most recent.
+function topEvents(
+  rows: ConflictEnrichedIncident[],
+  max: number,
+): ConflictEnrichedIncident[] {
+  return [...rows]
+    .map((i) => ({
+      i,
+      sev: SEV_RANK[sevKey(i.severity)] ?? 0,
+      deadly: isCasualtyEvent(i) ? 1 : 0,
+      t: i.date.getTime(),
+    }))
+    .sort((a, b) => b.sev - a.sev || b.deadly - a.deadly || b.t - a.t)
+    .slice(0, max)
+    .map((x) => x.i);
+}
+
+// ---------------------------------------------------------------------------
 // Sub-national hotspots. Conflict incidents almost never carry a structured
 // location, but the headline reliably names the actual trouble spot (e.g.
 // "Manipur", "Balochistan"). Naming a whole country is misleading when the
@@ -430,7 +493,14 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
     read = `The practical concern is keeping staff clear of any flare-up and ready to move.`;
   }
 
-  return [open, toll, read].join(" ");
+  // Concrete events — the actual standout incidents, named with their dates,
+  // so the paragraph reports what happened rather than only characterising it.
+  const events = topEvents(area.incidents, 2);
+  const eventSentence = events.length
+    ? `Notable incidents included ${joinList(events.map(eventClause))}.`
+    : "";
+
+  return [open, toll, eventSentence, read].filter(Boolean).join(" ");
 }
 
 function buildArea(
@@ -634,15 +704,24 @@ function buildSituation(
     leadClause = `${lead.theatre} is the main pressure point${second ? `, with ${second} the next most active` : ""}.`;
   }
   const sevRank = SEV_RANK[worstKey] ?? 0;
-  const sevClause =
-    sevRank >= 4
-      ? `The worst incidents reached ${worstLabel}, a casualty-grade level, so people safety leads the read.`
-      : `The most serious activity reached ${worstLabel}.`;
+  const hasCasualty = areas.some((a) => a.casualtySignalCount > 0);
+  let sevClause: string;
+  if (sevRank >= 4 && hasCasualty) {
+    sevClause = `The worst incidents reached ${worstLabel} and turned deadly, so people safety leads the read.`;
+  } else if (sevRank >= 4) {
+    sevClause = `The worst incidents reached ${worstLabel}, though no casualties were confirmed.`;
+  } else {
+    sevClause = `The most serious activity reached ${worstLabel}.`;
+  }
   const opener =
     f.hasFocus && f.localised
-      ? "Armed activity is the running backdrop across the watched theatres this period, but it sits in specific places rather than countrywide."
-      : "Armed activity is the running backdrop across the watched theatres this period.";
-  return `${opener} ${leadClause} ${sevClause} The read names where the fighting actually is and who is exposed, not just which countries are involved.`;
+      ? "The fighting this period stayed tied to specific places rather than spreading countrywide."
+      : "Armed activity ran across several of the watched theatres this period.";
+  const leadEvent = topEvents(lead.incidents, 1)[0];
+  const evClause = leadEvent
+    ? ` The most serious was ${eventClause(leadEvent)}.`
+    : "";
+  return `${opener} ${leadClause} ${sevClause}${evClause}`;
 }
 
 function buildOtherWatched(areas: ConflictActivityArea[]): string {
@@ -665,15 +744,15 @@ function buildWhatMatters(
     ? joinList(f.labels)
     : `the active districts in ${lead.theatre}`;
   const exposure = joinList(exposurePhrases(allImpacts).slice(0, 3));
-  const exposureClause = exposure
-    ? ` The clearest operational exposure runs to ${exposure}.`
-    : "";
+  const exposureClause = exposure ? ` The most exposed are ${exposure}.` : "";
   const elsewhere =
     f.hasFocus && f.localised
       ? ` Operations elsewhere in ${lead.theatre} are largely unaffected.`
       : "";
-  const para1 = `Kinetic events hit people before they hit operations — casualties, abductions and the danger to anyone near the fighting come first, then access, as checkpoints, road closures and security sweeps shut routes at short notice.`;
-  const para2 = `The live pressure sits in ${where}.${exposureClause} Where a depot, worksite or convoy falls inside those areas, the call shifts from managing disruption to protecting and moving people.${elsewhere}`;
+  const para1 = areas.some((a) => a.casualtySignalCount > 0)
+    ? `These were violent and, in places, deadly events, so the first concern is the safety of anyone near them — staff, contractors and their families — ahead of any disruption to work.`
+    : `These were armed incidents, so the first concern is the safety of anyone near them — staff, contractors and their families — ahead of any disruption to work.`;
+  const para2 = `The pressure is concentrated in ${where}.${exposureClause} Any depot, worksite or convoy inside those areas should be ready to move people out at short notice, not just to manage delays.${elsewhere}`;
   return `${para1}\n\n${para2}`;
 }
 
@@ -687,7 +766,7 @@ function buildWatchNext(
   const f = focusOf(lead);
   const leadWhere = f.hasFocus ? joinList(f.labels) : lead.theatre;
   lines.push(
-    `Fresh or escalating ${activityPhrase(lead.topCategories)} in ${leadWhere} — the clearest sign the fighting is widening rather than a one-off.`,
+    `More ${activityPhrase(lead.topCategories)} in ${leadWhere}, which would show the fighting is widening rather than easing.`,
   );
   if (categoriesPresent.has("Bombings & Airstrikes"))
     lines.push(
@@ -725,14 +804,23 @@ function buildPolestarView(
     return fa.hasFocus ? `${joinList(fa.labels)} in ${a.theatre}` : a.theatre;
   });
   const othersClause = others.length ? `, then ${joinList(others)}` : "";
-  const grade = (SEV_RANK[worstKey] ?? 0) >= 4 ? "casualty-grade" : "contained but live";
-  // Only claim the rest of the country carries on as normal when the lead theatre's
-  // activity is genuinely concentrated in its named flashpoints.
-  const watchTail =
-    fLead.hasFocus && fLead.localised
-      ? " — named flashpoints, not whole countries, and the rest of each country largely carries on as normal."
-      : ".";
-  return `Conflict Watch is flagging ${grade} kinetic risk, not a jump in headlines. The danger is to people first and continuity second, so the response is protective: hard travel limits, hardened sites and rehearsed evacuation, not headline tracking. The watch sits on ${leadWhere}${othersClause}${watchTail}`;
+  const hasCasualty = areas.some((a) => a.casualtySignalCount > 0);
+  const sevRank = SEV_RANK[worstKey] ?? 0;
+  // "Deadly" is driven by the actual casualty signal, never by severity rank
+  // alone — a High/Extreme window with no confirmed casualties must not read
+  // as deadly.
+  const grade = hasCasualty ? "deadly" : sevRank >= 4 ? "serious" : "lower-level";
+  // Only claim concentration / countrywide-normality when the lead theatre's
+  // activity is genuinely localised in its named flashpoints.
+  let placeClause: string;
+  if (fLead.hasFocus && fLead.localised) {
+    placeClause = `concentrated in ${leadWhere}${othersClause} — named flashpoints, not whole countries, and the rest of each country largely carries on as normal.`;
+  } else if (fLead.hasFocus) {
+    placeClause = `with the worst of it around ${leadWhere}${othersClause}.`;
+  } else {
+    placeClause = `led by ${leadWhere}${othersClause}.`;
+  }
+  return `This period brought ${grade} violence, ${placeClause} The risk is to people first and continuity second, so the response is protective: firm limits on travel into those areas, hardened sites, and a rehearsed way to get staff out if it escalates.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -838,6 +926,13 @@ const GENERIC_CONFLICT_PHRASES = [
   "Kinetic events land on people first: casualties",
   "a sign of a widening operation rather than a one-off event",
   "the operational answer is protective",
+  // Superseded auto-prose (pre concrete-events rewrite). Saved Conflict reports
+  // carrying these phrases drop the abstract boilerplate and pick up the new
+  // event-led prose without a manual reseed.
+  "Armed activity is the running backdrop across the watched theatres",
+  "Kinetic events hit people before they hit operations",
+  "kinetic risk, not a jump in headlines",
+  "the clearest sign the fighting is widening rather than a one-off",
 ];
 
 export function isGenericConflictProse(text: string): boolean {
