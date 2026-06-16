@@ -206,6 +206,42 @@ describe("buildConflictReportDataset — empty window", () => {
   });
 });
 
+describe("buildConflictReportDataset — sub-national honesty", () => {
+  // India is the lead theatre but only ONE of three incidents names a hotspot
+  // (Manipur). Coverage is 1/3 < 0.5, so the theatre is NOT "localised": the
+  // prose may name the flashpoint but must NOT claim the rest of the country is
+  // safe. This guards the honesty failure the hotspot work was built to prevent.
+  const MANIPUR =
+    "Armed clashes between troops and militants reported in Manipur";
+  const ds = buildConflictReportDataset(
+    [
+      inc({ id: 1, country: "India", severity: "high", title: MANIPUR }),
+      inc({ id: 2, country: "India", severity: "high", title: NO_CASUALTY }),
+      inc({ id: 3, country: "India", severity: "high", title: NO_CASUALTY }),
+    ],
+    "conflict",
+    ISSUE_DATE,
+  );
+  const lead = ds.topActivityAreas[0];
+
+  it("names the hotspot but does not call a sub-50% theatre concentrated", () => {
+    expect(lead.theatre).toBe("India");
+    expect(lead.paragraph).toContain("Manipur");
+    expect(lead.paragraph).toContain("clustered mainly around");
+    expect(lead.paragraph).not.toContain("rather than spread across the country");
+    expect(lead.paragraph).not.toContain("not the country as a whole");
+  });
+
+  it("withholds countrywide-safety claims across all sections when coverage <50%", () => {
+    expect(ds.autoSituation).not.toContain("rather than countrywide");
+    expect(ds.autoSituation).not.toContain("concentrated in");
+    expect(ds.autoWhatMatters).not.toContain("largely unaffected");
+    expect(ds.autoPolestarView).not.toContain("carries on as normal");
+    // It still names the flashpoint — honesty cuts both ways.
+    expect(ds.autoPolestarView).toContain("Manipur");
+  });
+});
+
 describe("isGenericConflictProse", () => {
   it("flags legacy CONFLICT-pack seeds so they get replaced by auto-prose", () => {
     expect(

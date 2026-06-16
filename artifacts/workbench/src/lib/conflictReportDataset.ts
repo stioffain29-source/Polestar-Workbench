@@ -59,6 +59,10 @@ export interface ConflictActivityArea {
   siteMovementScore: number;
   topCategories: string[];
   topImpacts: string[];
+  /** Named sub-national hotspots, ranked by how many incidents reference them. */
+  hotspots: HotspotHit[];
+  /** Incidents that named at least one known hotspot (basis for "localised"). */
+  hotspotCoveredCount: number;
   latestDate: Date;
   paragraph: string;
 }
@@ -154,16 +158,24 @@ function categoryPhrase(label: string): string {
   return label.toLowerCase().replace(/\s*&\s*/g, " and ");
 }
 
-// A cautious "who" clause derived only from the category mix present — no
-// actor names are invented, just the broad nature of the armed activity.
-function actorClause(topCategories: string[]): string {
-  const set = new Set(topCategories);
-  if (set.has("Insurgency")) return "insurgent and militant groups are active";
-  if (set.has("Abduction & Crime"))
-    return "armed criminal groups are operating";
-  if (set.has("Bombings & Airstrikes"))
-    return "the activity points to organised armed forces";
-  return "armed fighters are engaged";
+function capitalize(s: string): string {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+// A natural noun phrase for the dominant armed activity in a theatre, built
+// from the one or two most common categories present. No actor names are
+// invented — just the plain nature of the fighting.
+const CATEGORY_ACTIVITY: Record<string, string> = {
+  Insurgency: "insurgent attacks",
+  "Bombings & Airstrikes": "bombings and airstrikes",
+  "Abduction & Crime": "abductions and armed crime",
+  "Armed Clashes": "armed clashes",
+};
+function activityPhrase(topCategories: string[]): string {
+  const phrases = topCategories
+    .slice(0, 2)
+    .map((c) => CATEGORY_ACTIVITY[c] ?? categoryPhrase(c));
+  return phrases.length ? joinList(phrases) : "armed activity";
 }
 
 function exposurePhrases(impacts: string[]): string[] {
@@ -180,24 +192,245 @@ function exposurePhrases(impacts: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Sub-national hotspots. Conflict incidents almost never carry a structured
+// location, but the headline reliably names the actual trouble spot (e.g.
+// "Manipur", "Balochistan"). Naming a whole country is misleading when the
+// violence is isolated to one or two regions — "India is worth watching" reads
+// as alarmist when the activity is confined to Manipur and the Maoist belt
+// while Delhi, Mumbai and the economic centres are untouched. These curated
+// keyword sets let the prose lead with WHERE the fighting actually is. Add new
+// regions here as theatres open; no actor names are invented.
+// ---------------------------------------------------------------------------
+interface HotspotHit {
+  label: string;
+  count: number;
+}
+
+const COUNTRY_HOTSPOTS: Record<string, { label: string; terms: string[] }[]> = {
+  India: [
+    {
+      label: "Manipur",
+      terms: [
+        "manipur", "imphal", "kuki", "kuki-naga", "churachandpur", "kangpokpi",
+        "moreh",
+      ],
+    },
+    {
+      label: "the Maoist (Naxal) belt",
+      terms: [
+        "maoist", "naxal", "naxalite", "chhattisgarh", "sukma", "bastar",
+        "dantewada", "bijapur", "narayanpur", "abujhmad", "malkangiri", "odisha",
+        "jharkhand", "palamu", "latehar", "gadchiroli",
+      ],
+    },
+    {
+      label: "Jammu & Kashmir",
+      terms: [
+        "kashmir", "jammu", "srinagar", "pulwama", "baramulla", "kupwara",
+        "anantnag", "poonch",
+      ],
+    },
+    { label: "Assam", terms: ["assam"] },
+    { label: "Nagaland", terms: ["nagaland", "dimapur"] },
+    { label: "Punjab", terms: ["punjab"] },
+  ],
+  Pakistan: [
+    {
+      label: "Khyber Pakhtunkhwa",
+      terms: [
+        "khyber pakhtunkhwa", "khyber-pakhtunkhwa", "khyber", "bannu",
+        "waziristan", "peshawar", "tank", "dera ismail", "bajaur", "kurram",
+        "north-west", "northwest",
+      ],
+    },
+    {
+      label: "Balochistan",
+      terms: [
+        "balochistan", "baluchistan", "quetta", "gwadar", "mastung", "turbat",
+        "khuzdar", "kech",
+      ],
+    },
+    {
+      label: "the Afghan border",
+      terms: [
+        "afghan border", "afghanistan border", "afghanistan", "afghan",
+        "durand", "spin boldak",
+      ],
+    },
+    { label: "Punjab", terms: ["punjab"] },
+    { label: "Sindh", terms: ["sindh", "karachi"] },
+  ],
+  Myanmar: [
+    { label: "Rakhine State", terms: ["rakhine", "arakan", "sittwe", "maungdaw"] },
+    { label: "Shan State", terms: ["shan state", "lashio", "kokang", "laukkai", "muse"] },
+    { label: "Sagaing Region", terms: ["sagaing", "kalay", "kale", "monywa", "shwebo"] },
+    { label: "Kachin State", terms: ["kachin", "myitkyina", "bhamo", "hpakant"] },
+    { label: "Kayah (Karenni) State", terms: ["kayah", "karenni", "loikaw"] },
+    { label: "Karen State", terms: ["karen state", "kayin", "myawaddy", "hpa-an", "shwe kokko"] },
+    { label: "Chin State", terms: ["chin state", "chinland", "hakha"] },
+    { label: "Magway Region", terms: ["magway", "magwe", "gangaw"] },
+  ],
+  Philippines: [
+    {
+      label: "Mindanao",
+      terms: [
+        "mindanao", "marawi", "cotabato", "maguindanao", "bangsamoro", "barmm",
+        "sulu", "jolo", "basilan", "zamboanga", "lanao", "sultan kudarat",
+      ],
+    },
+  ],
+  Thailand: [
+    {
+      label: "the Deep South",
+      terms: ["pattani", "yala", "narathiwat", "deep south", "songkhla"],
+    },
+  ],
+  Bangladesh: [
+    {
+      label: "the Chittagong Hill Tracts",
+      terms: ["chittagong hill", "rangamati", "bandarban", "khagrachari"],
+    },
+  ],
+  "West Papua": [
+    {
+      label: "the central highlands",
+      terms: [
+        "nduga", "intan jaya", "puncak", "ilaga", "yahukimo", "dekai", "paniai",
+        "mimika", "timika", "grasberg", "freeport", "wamena",
+      ],
+    },
+  ],
+  "Papua New Guinea": [
+    {
+      label: "the Highlands",
+      terms: ["highlands", "enga", "hela", "tari", "mount hagen", "porgera", "wabag"],
+    },
+  ],
+};
+
+// Word-boundary substring test (handles multi-word terms like "deep south").
+function mentions(text: string, term: string): boolean {
+  const haystack = ` ${text.toLowerCase()} `;
+  const needle = term.toLowerCase();
+  const isWordChar = (c: string | undefined) =>
+    c !== undefined && /[a-z0-9]/.test(c);
+  let from = 0;
+  for (;;) {
+    const i = haystack.indexOf(needle, from);
+    if (i === -1) return false;
+    if (!isWordChar(haystack[i - 1]) && !isWordChar(haystack[i + needle.length]))
+      return true;
+    from = i + needle.length;
+  }
+}
+
+// Tally which named sub-national hotspots a theatre's incidents reference, by
+// scanning each headline (+ summary). Returns hotspots ranked by how many
+// incidents mention them, plus how many incidents matched any hotspot at all
+// (the basis for "concentrated in X" vs "scattered" framing).
+function detectHotspots(
+  country: string,
+  rows: ConflictEnrichedIncident[],
+): { hits: HotspotHit[]; coveredCount: number } {
+  const defs = COUNTRY_HOTSPOTS[country];
+  if (!defs) return { hits: [], coveredCount: 0 };
+  const counts = new Map<string, number>();
+  let covered = 0;
+  for (const r of rows) {
+    const text = `${r.displayTitle ?? r.title} ${r.summary ?? ""}`;
+    let matchedAny = false;
+    for (const def of defs) {
+      if (def.terms.some((t) => mentions(text, t))) {
+        counts.set(def.label, (counts.get(def.label) ?? 0) + 1);
+        matchedAny = true;
+      }
+    }
+    if (matchedAny) covered += 1;
+  }
+  const order = defs.map((d) => d.label);
+  const hits = Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort(
+      (a, b) =>
+        b.count - a.count || order.indexOf(a.label) - order.indexOf(b.label),
+    );
+  return { hits, coveredCount: covered };
+}
+
+// Where a theatre's activity sits: the top named hotspots, and whether the
+// reporting is concentrated enough to call it localised (most incidents in a
+// named spot). Drives the honest "isolated to X, not countrywide" framing.
+function focusOf(area: ConflictActivityArea): {
+  labels: string[];
+  localised: boolean;
+  hasFocus: boolean;
+} {
+  const labels = area.hotspots.slice(0, 2).map((h) => h.label);
+  if (labels.length === 0) return { labels, localised: false, hasFocus: false };
+  const coverage =
+    area.incidentCount > 0 ? area.hotspotCoveredCount / area.incidentCount : 0;
+  return { labels, localised: coverage >= 0.5, hasFocus: true };
+}
+
+// ---------------------------------------------------------------------------
 // Per-theatre paragraph (what / where / who / why-operationally / exposure).
 // No parenthetical record counts — counts live only on the Fast Facts cards.
+// Leads with the sub-national hotspots so a huge country is never painted as
+// uniformly dangerous.
 // ---------------------------------------------------------------------------
-function buildAreaParagraph(area: ConflictActivityArea): string {
-  const cats = area.topCategories.slice(0, 2).map(categoryPhrase);
-  const what = cats.length ? joinList(cats) : "armed activity";
-  const casualtyClause =
-    area.casualtySignalCount > 0 ? ", with casualties reported" : "";
-  const exposure = exposurePhrases(area.topImpacts).slice(0, 3);
-  const exposureSentence =
-    exposure.length > 0
-      ? `For operations the exposure runs to ${joinList(exposure)}, so staff movement and fixed-site security are the live concerns.`
-      : `For operations the main exposure is to staff moving through or working near the affected areas, so movement control and site security are the live concerns.`;
-  return [
-    `${area.theatre} recorded ${what} over the reporting period.`,
-    `The most serious activity reached ${area.worstSeverityLabel}${casualtyClause}, and ${actorClause(area.topCategories)}.`,
-    exposureSentence,
-  ].join(" ");
+function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
+  const what = activityPhrase(area.topCategories);
+  const sev = area.worstSeverityLabel;
+  const sevRank = SEV_RANK[area.worstSeverity] ?? 0;
+  const deadly = area.casualtySignalCount > 0;
+  const focus = focusOf(area);
+  const where = joinList(focus.labels);
+
+  // Opener — leads with the theatre name, then says WHERE inside the country
+  // the activity actually sits. The verb varies by rank so the top three never
+  // read off the same skeleton.
+  const leadVerbs = [
+    "led the watch this period",
+    "ran close behind",
+    "also stayed in the picture",
+  ];
+  const leadVerb =
+    rank < leadVerbs.length ? leadVerbs[rank] : "carried lower-level activity";
+  let focusSentence: string;
+  if (focus.hasFocus && focus.localised) {
+    focusSentence = `Activity stayed concentrated in ${where}, driven by ${what}, rather than spread across the country.`;
+  } else if (focus.hasFocus) {
+    focusSentence = `Activity clustered mainly around ${where}, driven by ${what}.`;
+  } else {
+    focusSentence = `Activity was driven by ${what}, with no single area standing out this period.`;
+  }
+  const open = `${area.theatre} ${leadVerb}. ${focusSentence}`;
+
+  // Severity and human cost in plain language. The casualty branches keep the
+  // explicit signal; numeric counts never appear in narrative prose.
+  let toll: string;
+  if (deadly && sevRank >= 4) {
+    toll = `The sharpest incidents turned deadly, with casualties reported as severity peaked at ${sev}.`;
+  } else if (deadly) {
+    toll = `Some of the fighting drew blood, with casualties reported even as severity held at ${sev}.`;
+  } else if (sevRank >= 4) {
+    toll = `Severity climbed to ${sev}, though no casualties were confirmed.`;
+  } else {
+    toll = `Severity stayed contained at ${sev}.`;
+  }
+
+  // Operational read — names who is exposed and, when the activity is genuinely
+  // localised, says plainly that the rest of the country is not the flashpoint.
+  let read: string;
+  if (focus.hasFocus && focus.localised) {
+    read = `Exposure is local to ${where} — ${area.theatre}'s main cities and economic centres sit away from the fighting, so the real risk is to staff and sites inside those areas, not the country as a whole.`;
+  } else if (focus.hasFocus) {
+    read = `Exposure centres on staff and sites around ${where}, where movement and security calls get made.`;
+  } else {
+    read = `The practical concern is keeping staff clear of any flare-up and ready to move.`;
+  }
+
+  return [open, toll, read].join(" ");
 }
 
 function buildArea(
@@ -237,6 +470,10 @@ function buildArea(
     (m, i) => (i.date > m ? i.date : m),
     rows[0]?.date ?? new Date(0),
   );
+  const { hits: hotspots, coveredCount: hotspotCoveredCount } = detectHotspots(
+    theatre,
+    rows,
+  );
   const area: ConflictActivityArea = {
     theatre,
     incidents: rows,
@@ -248,10 +485,13 @@ function buildArea(
     siteMovementScore: siteScore,
     topCategories,
     topImpacts,
+    hotspots,
+    hotspotCoveredCount,
     latestDate,
     paragraph: "",
   };
-  area.paragraph = buildAreaParagraph(area);
+  // Paragraph is assigned after ranking so it can vary by the theatre's
+  // position in the table (see the main builder).
   return area;
 }
 
@@ -378,21 +618,40 @@ function buildSituation(
   worstLabel: string,
 ): string {
   if (areas.length === 0) return ZERO_SITUATION;
-  const lead = areas[0].theatre;
+  const lead = areas[0];
+  const f = focusOf(lead);
+  const where = joinList(f.labels);
   const second = areas[1]?.theatre ?? "";
-  const leadClause = ` ${lead} is the main pressure point${second ? `, with ${second} close behind` : ""}.`;
+  const focusTail = second ? `; ${second} is the next most active` : "";
+  let leadClause: string;
+  if (f.hasFocus && f.localised) {
+    // Genuinely concentrated — safe to say the rest of the country is not the flashpoint.
+    leadClause = `${lead.theatre} is the main pressure point, with the violence concentrated in ${where} rather than countrywide${focusTail}.`;
+  } else if (f.hasFocus) {
+    // Some named hotspots, but not most of the activity — name them without the countrywide-safety claim.
+    leadClause = `${lead.theatre} is the main pressure point, with the worst of it around ${where}${focusTail}.`;
+  } else {
+    leadClause = `${lead.theatre} is the main pressure point${second ? `, with ${second} the next most active` : ""}.`;
+  }
   const sevRank = SEV_RANK[worstKey] ?? 0;
   const sevClause =
     sevRank >= 4
-      ? ` The worst incidents reached ${worstLabel}, a casualty-grade level that puts people safety first.`
-      : ` The most serious activity reached ${worstLabel}.`;
-  return `Armed activity across the watched theatres is the standing condition this period.${leadClause}${sevClause} Kinetic risk is a people-safety problem before it is a continuity one, so this read leads with where the fighting is and who is exposed.`;
+      ? `The worst incidents reached ${worstLabel}, a casualty-grade level, so people safety leads the read.`
+      : `The most serious activity reached ${worstLabel}.`;
+  const opener =
+    f.hasFocus && f.localised
+      ? "Armed activity is the running backdrop across the watched theatres this period, but it sits in specific places rather than countrywide."
+      : "Armed activity is the running backdrop across the watched theatres this period.";
+  return `${opener} ${leadClause} ${sevClause} The read names where the fighting actually is and who is exposed, not just which countries are involved.`;
 }
 
 function buildOtherWatched(areas: ConflictActivityArea[]): string {
   if (areas.length === 0) return ZERO_OTHER;
-  const named = areas.slice(0, 6).map((a) => a.theatre);
-  return `Beyond the lead theatres, lower-level armed activity was also reported in ${joinList(named)}. These carry a thinner record this period but stay on watch — a single clash or bombing can move any of them up the list quickly.`;
+  const parts = areas.slice(0, 6).map((a) => {
+    const f = focusOf(a);
+    return f.hasFocus ? `${a.theatre} (${joinList(f.labels)})` : a.theatre;
+  });
+  return `Lower-level activity also showed in ${joinList(parts)}. The record is thinner there this period, but any of them can climb the list quickly on a single clash or attack, so they stay on watch.`;
 }
 
 function buildWhatMatters(
@@ -400,13 +659,21 @@ function buildWhatMatters(
   allImpacts: string[],
 ): string {
   if (areas.length === 0) return ZERO_WHAT_MATTERS;
-  const lead = areas[0].theatre;
+  const lead = areas[0];
+  const f = focusOf(lead);
+  const where = f.hasFocus
+    ? joinList(f.labels)
+    : `the active districts in ${lead.theatre}`;
   const exposure = joinList(exposurePhrases(allImpacts).slice(0, 3));
-  const para1 = `Kinetic events land on people first: casualties, abductions and the danger to anyone moving through or working near a contested area. They land next on access — checkpoints, road closures and security operations that cut routes and sites at short notice.`;
   const exposureClause = exposure
-    ? ` Across the window the clearest operational exposure is to ${exposure}.`
+    ? ` The clearest operational exposure runs to ${exposure}.`
     : "";
-  const para2 = `Exposure to ${lead} is the live pressure point for staff movement, fixed-site security and evacuation planning.${exposureClause} Where armed activity meets a depot, worksite or convoy within range, operations pause and duty-of-care obligations sharpen, and the decision shifts from managing disruption to protecting and moving people.`;
+  const elsewhere =
+    f.hasFocus && f.localised
+      ? ` Operations elsewhere in ${lead.theatre} are largely unaffected.`
+      : "";
+  const para1 = `Kinetic events hit people before they hit operations — casualties, abductions and the danger to anyone near the fighting come first, then access, as checkpoints, road closures and security sweeps shut routes at short notice.`;
+  const para2 = `The live pressure sits in ${where}.${exposureClause} Where a depot, worksite or convoy falls inside those areas, the call shifts from managing disruption to protecting and moving people.${elsewhere}`;
   return `${para1}\n\n${para2}`;
 }
 
@@ -416,11 +683,12 @@ function buildWatchNext(
 ): string {
   if (areas.length === 0) return ZERO_WATCH_NEXT;
   const lines: string[] = [];
-  const leadNames = areas.slice(0, 2).map((a) => a.theatre);
-  if (leadNames.length > 0)
-    lines.push(
-      `Repeat or escalating armed activity in ${joinList(leadNames)} — a sign of a widening operation rather than a one-off event.`,
-    );
+  const lead = areas[0];
+  const f = focusOf(lead);
+  const leadWhere = f.hasFocus ? joinList(f.labels) : lead.theatre;
+  lines.push(
+    `Fresh or escalating ${activityPhrase(lead.topCategories)} in ${leadWhere} — the clearest sign the fighting is widening rather than a one-off.`,
+  );
   if (categoriesPresent.has("Bombings & Airstrikes"))
     lines.push(
       "Further bombing, airstrike or IED activity, which raises the threat to fixed sites and main routes within range.",
@@ -431,7 +699,7 @@ function buildWatchNext(
     );
   if (categoriesPresent.has("Insurgency"))
     lines.push(
-      "Insurgent raids or ambushes that extend the contested area into new districts.",
+      "Insurgent raids or ambushes that push the contested ground into new districts.",
     );
   lines.push(
     "Security-force operations and lockdowns that close roads, checkpoints and districts at short notice.",
@@ -447,11 +715,24 @@ function buildPolestarView(
   worstKey: string,
 ): string {
   if (areas.length === 0) return ZERO_POLESTAR;
-  const lead = areas[0].theatre;
-  const others = areas.slice(1, 3).map((a) => a.theatre);
-  const pressure = ` ${lead} is the clearest pressure point${others.length ? `, with ${joinList(others)} also worth watching` : ""}.`;
+  const lead = areas[0];
+  const fLead = focusOf(lead);
+  const leadWhere = fLead.hasFocus
+    ? `${joinList(fLead.labels)} in ${lead.theatre}`
+    : lead.theatre;
+  const others = areas.slice(1, 3).map((a) => {
+    const fa = focusOf(a);
+    return fa.hasFocus ? `${joinList(fa.labels)} in ${a.theatre}` : a.theatre;
+  });
+  const othersClause = others.length ? `, then ${joinList(others)}` : "";
   const grade = (SEV_RANK[worstKey] ?? 0) >= 4 ? "casualty-grade" : "contained but live";
-  return `Conflict Watch is flagging ${grade} kinetic risk rather than a rise in headlines. The danger is to people first and continuity second, so the operational answer is protective: hard travel limits, hardened fixed sites and rehearsed evacuation rather than headline tracking.${pressure}`;
+  // Only claim the rest of the country carries on as normal when the lead theatre's
+  // activity is genuinely concentrated in its named flashpoints.
+  const watchTail =
+    fLead.hasFocus && fLead.localised
+      ? " — named flashpoints, not whole countries, and the rest of each country largely carries on as normal."
+      : ".";
+  return `Conflict Watch is flagging ${grade} kinetic risk, not a jump in headlines. The danger is to people first and continuity second, so the response is protective: hard travel limits, hardened sites and rehearsed evacuation, not headline tracking. The watch sits on ${leadWhere}${othersClause}${watchTail}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +767,12 @@ export function buildConflictReportDataset(
   const areas: ConflictActivityArea[] = [];
   for (const [theatre, rows] of byCountry) areas.push(buildArea(theatre, rows));
   areas.sort(compareAreas);
+  // Paragraphs are written here, after ranking, so each theatre's opening and
+  // operational read vary by its position — the top three never read off the
+  // same template.
+  areas.forEach((area, idx) => {
+    area.paragraph = buildAreaParagraph(area, idx);
+  });
 
   const topActivityAreas = areas.slice(0, 3);
   const otherWatchedTheatres = areas.slice(3);
@@ -544,6 +831,13 @@ const GENERIC_CONFLICT_PHRASES = [
   "People safety, site security and evacuation readiness stay the operational concern",
   "Nothing useful came through on conflict this week",
   "No notable armed activity came through",
+  // Earlier data-driven auto-prose (pre sub-national-hotspot rewrite). Listed so
+  // already-saved Conflict reports drop the country-only boilerplate and pick up
+  // the location-led prose without a manual reseed.
+  "Kinetic risk is a people-safety problem before it is a continuity one",
+  "Kinetic events land on people first: casualties",
+  "a sign of a widening operation rather than a one-off event",
+  "the operational answer is protective",
 ];
 
 export function isGenericConflictProse(text: string): boolean {
