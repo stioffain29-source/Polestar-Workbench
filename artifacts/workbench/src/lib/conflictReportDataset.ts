@@ -763,18 +763,19 @@ function buildPolestarView(
     ? `${joinList(fLead.labels)} in ${lead.theatre}`
     : lead.theatre;
   const others = areas.slice(1, 3).map((a) => a.theatre);
-  // The "this is not a country-wide shift" containment claim is only honest when
-  // the lead theatre's activity is genuinely localised; a scattered or no-focus
-  // theatre just names the lead without implying the rest of the country is safe.
-  const judgement =
-    fLead.hasFocus && fLead.localised
-      ? `This is not a country-wide risk shift. It is a focused armed-risk picture, led by ${leadWhere}.`
-      : `${leadWhere} leads the armed-risk picture this period.`;
-  const watchOthers = others.length
-    ? ` ${joinList(others)} stay on the watch list.`
+  const tail = others.length
+    ? `, with ${joinList(others)} quieter but still worth watching`
     : "";
-  const action = ` The business response should be focused: keep people out of the worst-affected areas, tighten journey control, check exposed sites, and agree evacuation triggers before anyone is under pressure.`;
-  return `${judgement}${watchOthers}${action}`;
+  // Describe where the activity actually sits rather than judging whether one
+  // country is "country-wide" — that framing reads as a contradiction when the
+  // report spans several countries. The "wider picture is calmer" sense is only
+  // honest when the lead is genuinely localised (>=50% in named hotspots).
+  const opening =
+    fLead.hasFocus && fLead.localised
+      ? `Most of the armed activity sits in ${leadWhere}${tail}.`
+      : `${leadWhere} carries the most armed activity this period${tail}.`;
+  const action = ` The practical response is clear: keep people away from the worst-hit areas, tighten journey planning and route checks, harden the sites that matter most, and set clear evacuation triggers before anyone is under pressure.`;
+  return `${opening}${action}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -897,6 +898,10 @@ const GENERIC_CONFLICT_PHRASES = [
   "which would show the fighting is widening rather than easing",
   "named flashpoints, not whole countries",
   "so the response is protective: firm limits on travel into those areas",
+  // Superseded auto Polestar (pre "country-wide" removal). Saved reports carrying
+  // these drop the confusing single-country framing for the location-led read.
+  "It is a focused armed-risk picture",
+  "The business response should be focused",
 ];
 
 export function isGenericConflictProse(text: string): boolean {

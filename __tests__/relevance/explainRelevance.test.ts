@@ -206,5 +206,68 @@ describe("explainRelevance", () => {
       expect(result.relevant).toBe(true);
       expect(result.reason).toContain("required topic phrase");
     });
+
+    it("drops post-insurgency investment/business stories", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "In first post-Naxal investment push, Chhattisgarh receives proposals worth Rs 9,580 crore",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops diplomacy-to-prevent-spillover analysis", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Pakistan's U.S.-Iran Diplomacy Sought to Prevent a Militant Spillover",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("does not treat a Maoist bounty (Rs 8 lakh) as an investment story", () => {
+      // A bounty/reward in lakh/crore must NOT trip the economic-investment
+      // exclude — that broad money wording is only off-topic when bound to an
+      // explicit investment frame. Verdict aside, it must never be dropped by
+      // the new relief/peace exclude.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Chhattisgarh: Maoist with reward of Rs 8 lakh killed",
+        }),
+      );
+      expect(result.reason).not.toContain("relief/peace");
+    });
+
+    it("keeps militant-violence reporting around talks (not pure diplomacy)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Pakistan sees militant violence fall after China-mediated talks with Afghanistan",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps an insurgent ceasefire declaration", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Philippine communist insurgents declare Christmas ceasefire",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
   });
 });

@@ -52,3 +52,17 @@ Polestar's else-branch saying "uneven rather than country-wide" for scattered da
 **How to apply:** every section's localised-only sentence branches on the SAME
 `hasFocus && localised` predicate; the fallback branch names the lead with no
 geographic-containment language.
+
+## Trap 4 — never say "country-wide" in a multi-country report
+**Rule:** do NOT phrase the Polestar/judgement as "this is not a country-wide risk
+shift" (or similar single-country yes/no framing). The conflict report spans several
+theatres, so a reader sees 3 countries listed and reads "not country-wide" as a flat
+contradiction. Describe WHERE the activity sits instead ("Most of the armed activity
+sits in <hotspots> in <country>, with <others> quieter but still worth watching").
+**Why:** user rejected "This is not a country-wide risk shift… India and Philippines
+stay on the watch list" as nonsense — three countries are named.
+**How to apply:** keep the within-country "rest of <country> is far quieter" line ONLY
+inside a single theatre's area paragraph (unambiguous); the Polestar/cross-report
+judgement must be location-led, not a country-wide verdict. A test asserts
+`autoPolestarView` never matches /country-?wide/. Also avoid banned-root words: no
+"exposed/exposure", and don't repeat "focused".

@@ -407,6 +407,21 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // rescue/recovery) — humanitarian, not armed conflict.
   /\b(earthquake|quake|flood(s|ing)?|typhoon|cyclone|landslide|tsunami|drought|volcan(o|ic)|eruption|mudslide) [^.]{0,40}\b(victim|survivor|relief|aid|evacuee|rescue|recovery|rehabilitat|displaced)/,
   /\b(relief|aid|rescue|recovery|humanitarian) (operation|effort|work|mission|team|convoy|drive)s?\b[^.]{0,60}\b(earthquake|quake|flood|typhoon|cyclone|landslide|tsunami|drought|disaster|victim|survivor)/,
+  // Economic / investment / development stories that merely reference a past or
+  // "post-" insurgency as background ("In first post-Naxal investment push,
+  // Chhattisgarh receives proposals worth Rs 9,580 crore"). These are business
+  // news, not armed-violence incidents. Bound to an explicit money/investment
+  // frame so a Maoist BOUNTY ("reward of Rs 8 lakh") or a real attack that cites
+  // economic damage is NOT dropped (the violence override also protects kinetic
+  // events).
+  /\b(post[- ]?naxal|post[- ]?insurgen|post[- ]?conflict|ex[- ]?naxal|former (naxal|maoist|insurgent|rebel|militant))\b[^.]{0,90}\b(investment|investor|invest|proposal|economic|industrial|business summit|development push|development project|fdi|gdp|tourism)\b/,
+  /\b(naxal(ite)?|maoist|insurgen(t|ts|cy)|militan(t|ts|cy)|rebel|separatis(t|ts|m))\b[^.]{0,80}\b(investment push|investor(s)?(['’]| )?(meet|summit)|woo(s|ing)? investors|proposals? worth|investment summit|economic (zone|corridor|package|revival)|industrial (park|corridor))\b/,
+  // Diplomacy / prevention analysis whose only conflict tie is a hypothetical
+  // "spillover" ("Pakistan's U.S.-Iran Diplomacy Sought to Prevent a Militant
+  // Spillover"). Gated TIGHTLY on a diplomacy/prevention verb adjacent to the
+  // word "spillover" so genuine reports of militant violence around talks
+  // ("militant violence falls after China-mediated talks") are NOT dropped.
+  /\b(diploma(cy|tic|t)|prevent(s|ed|ing)?|avert(s|ed|ing)?|forestall|contain(s|ed|ing)?|stave off|avoid(s|ed|ing)?)\b[^.]{0,50}\bspillover\b/,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are
