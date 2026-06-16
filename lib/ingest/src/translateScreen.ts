@@ -15,7 +15,12 @@
 
 const MODEL = "gpt-5-mini";
 const REQUEST_TIMEOUT_MS = 20000;
-const MAX_COMPLETION_TOKENS = 1000;
+// gpt-5-mini is a REASONING model — max_completion_tokens is consumed by reasoning
+// tokens before the JSON verdict is emitted. A low cap risks finish_reason="length"
+// with empty content, which silently drops in-scope local-language cargo items. Per
+// the OpenAI integration skill, keep this at 8192 (reasoning headroom; the JSON
+// verdict itself is tiny) and never lower it.
+const MAX_COMPLETION_TOKENS = 8192;
 
 export type ScreenInput = { title: string; summary: string };
 

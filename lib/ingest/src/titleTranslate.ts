@@ -29,7 +29,14 @@ import { isLlmAvailable } from "./translateScreen";
 
 const MODEL = "gpt-5-mini";
 const REQUEST_TIMEOUT_MS = 20000;
-const MAX_COMPLETION_TOKENS = 200;
+// gpt-5-mini is a REASONING model: max_completion_tokens covers reasoning tokens
+// FIRST, then the visible answer. A small cap (we previously used 200) is spent
+// entirely on reasoning, so the model returns finish_reason="length" with EMPTY
+// content and every translation fails (observed in prod: translated=0 failed=3,
+// raw Bahasa headlines shipped to readers). Per the OpenAI integration skill, set
+// this to 8192 and never lower — a one-line headline only emits ~30 answer tokens,
+// so the extra budget is reasoning headroom, not extra cost on the output.
+const MAX_COMPLETION_TOKENS = 8192;
 
 // Unicode ranges that are unambiguously non-English script: Cyrillic, Arabic,
 // Thai, Hiragana, Katakana, CJK, Hangul. Stored as [start,end] codepoint pairs
