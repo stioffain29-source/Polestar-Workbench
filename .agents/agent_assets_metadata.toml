@@ -552,3 +552,9 @@ id = "DWOmJPsAsEYlYMna4stie"
 uri = "file://AUDIT.md"
 type = "text"
 title = "Polestar Workbench — Honest Code Audit"
+
+[[outputs]]
+id = "eJu5woVjWhf0KUDfBACVD"
+uri = "file://.local/prod_map.png"
+type = "image"
+title = "Live production map — document-asset-manager-stioffain29.replit.app/countries/papua (10 markers)"
