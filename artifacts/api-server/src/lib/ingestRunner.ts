@@ -6,6 +6,7 @@ import {
   runEnergyIngest,
   runFertiliserIngest,
   runFuelIngest,
+  runConflictIngest,
   runMarketPricesIngest,
   runMarketSnapshotIngest,
   runStrikesIngest,
@@ -45,6 +46,7 @@ export type IngestRunResult =
       energy: IngestSummary;
       fertiliser: IngestSummary;
       fuel: IngestSummary;
+      conflict: IngestSummary;
       marketPrices: MarketPriceSummary;
       marketSnapshot: MarketSnapshotSummary;
       strikes: StrikesIngestSummary;
@@ -261,6 +263,11 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const fuel = await runIncidentIngest("fuel", () =>
       runFuelIngest({ commit: true }),
     );
+    // War / armed conflict / insurgency / armed crime — a SEPARATE topic from
+    // flashpoint (which stays activism / protests / strikes / civil disorder).
+    const conflict = await runIncidentIngest("conflict", () =>
+      runConflictIngest({ commit: true }),
+    );
     // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
     // West Papua feeds) into clean English advisory titles AFTER the scrapers
     // have written this run's rows. Isolated in its own try so an LLM/network
@@ -311,6 +318,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       energy,
       fertiliser,
       fuel,
+      conflict,
       marketPrices,
       marketSnapshot,
       strikes,

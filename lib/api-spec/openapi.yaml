@@ -901,6 +901,7 @@ components:
         - energy
         - shipping
         - cargo_watch
+        - conflict
 
     Severity:
       type: string

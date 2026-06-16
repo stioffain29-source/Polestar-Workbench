@@ -6,6 +6,7 @@ export const TOPIC_LABELS: Record<string, string> = {
   energy: "Energy",
   shipping: "Shipping",
   cargo_watch: "Cargo Watch",
+  conflict: "Conflict",
 };
 
 export const TOPICS = Object.keys(TOPIC_LABELS) as Array<keyof typeof TOPIC_LABELS>;

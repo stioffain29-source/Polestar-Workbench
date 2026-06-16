@@ -20,7 +20,8 @@ export type SeverityTopic =
   | "shipping"
   | "energy"
   | "fertiliser"
-  | "fuel";
+  | "fuel"
+  | "conflict";
 
 // Fatalities, mass casualties, emergency rule. Reserved tier — drives the
 // subdued-red marker only.
@@ -153,6 +154,26 @@ export function classifySeverity(
   if (topic === "fertiliser") {
     if (
       /\b(shortage|stockout|supply (crisis|cut|halt|squeeze|disruption)|export ban|export halt|black market|panic buying|plant (closure|shutdown|outage|halt)|rationing)\b/i.test(hay)
+    ) {
+      return "moderate";
+    }
+  }
+
+  // Conflict: an active armed engagement (clash / firefight / gun battle /
+  // ambush / shootout / IED / bombing / insurgent or militant attack) is a
+  // high-severity event even without a confirmed casualty word (fatalities and
+  // mass casualties already escalate to EXTREME above via the shared tiers). A
+  // raid / operation / arrest / standoff / blockade by security forces is a
+  // moderate operational event. Forward-looking / advisory framing falls
+  // through to insignificant / low.
+  if (topic === "conflict") {
+    if (
+      /\b(armed clash|armed clashes|gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|ambush(ed|es)?|ied|improvised explosive|roadside bomb|land ?mine|car bomb|grenade attack|bomb(ing|s)? attack|suicide bomb|airstrike|air strike|drone strike|insurgent attack|militant attack|rebel attack|armed attack|armed assault|massacre|kidnap(ped|ping)?|abduct(ed|ion)?|hostage)\b/i.test(hay)
+    ) {
+      return "high";
+    }
+    if (
+      /\b(raid(ed|s)?|offensive|operation|crackdown|arrest(s|ed)?|detain(ed|ment)?|stand[- ]?off|blockade|roadblock|curfew|patrol|deploy(ed|ment)?|skirmish|incursion|seiz(e|ed|ure))\b/i.test(hay)
     ) {
       return "moderate";
     }

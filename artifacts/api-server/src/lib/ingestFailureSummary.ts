@@ -92,6 +92,7 @@ export function summarizeIngestFailures(
     { topic: "energy", summary: result.energy },
     { topic: "fertiliser", summary: result.fertiliser },
     { topic: "fuel", summary: result.fuel },
+    { topic: "conflict", summary: result.conflict },
   ];
 
   const topicFailures: IngestFailureSummary["topicFailures"] = [];

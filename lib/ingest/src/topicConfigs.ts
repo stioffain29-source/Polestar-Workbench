@@ -324,8 +324,154 @@ const FUEL_CONFIG: NewsTopicConfig = {
   countryAliases: COUNTRY_ALIASES,
 };
 
+// -------------------------------------------------------------- conflict ----
+// War / armed conflict / insurgency / armed crime. This is a SEPARATE topic
+// from `flashpoint` (which stays strictly activism / protests / strikes / civil
+// disorder). Conflict feeds the COUNTRY and SPOT reports with kinetic, armed
+// events: insurgencies, firefights, bombings, ambushes, named armed groups and
+// serious armed crime. It must never write protest/demonstration rows.
+//
+// Country attribution uses a Papua-first alias map so a Freeport / Grasberg /
+// Timika mine-security story resolves to "West Papua" (its own country report)
+// rather than being swallowed by the broad "Indonesia" alias.
+const CONFLICT_ALIASES: CountryAlias[] = [
+  { canonical: "West Papua", aliases: ["west papua", "papua barat", "tembagapura", "grasberg", "freeport", "pt freeport", "timika", "mimika", "kuala kencana", "intan jaya", "puncak jaya", "nduga", "ilaga", "sugapa", "paniai", "enarotali", "yahukimo", "dekai", "oksibil", "beoga", "kenyam", "wamena", "nabire", "jayapura", "merauke", "manokwari", "sorong", "biak", "tpnpb"] },
+  { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "bougainville", "enga", "hela", "mount hagen", "goroka", "wewak", "raskol"] },
+  { canonical: "India", aliases: ["india", "indian", "delhi", "mumbai", "kashmir", "jammu", "srinagar", "manipur", "imphal", "chhattisgarh", "jharkhand", "bastar", "naxal", "maoist", "assam", "nagaland"] },
+  { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "balochistan", "quetta", "waziristan", "khyber", "peshawar", "karachi", "lahore", "islamabad"] },
+  { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram"] },
+  { canonical: "Sri Lanka", aliases: ["sri lanka", "sri lankan", "colombo"] },
+  { canonical: "Nepal", aliases: ["nepal", "nepali", "kathmandu"] },
+  { canonical: "Myanmar", aliases: ["myanmar", "burma", "burmese", "yangon", "naypyidaw", "mandalay", "rakhine", "arakan", "shan state", "kachin", "chin state", "sagaing", "karen state", "kayah", "magway", "rohingya"] },
+  { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "sulawesi", "poso", "aceh"] },
+  { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "mindanao", "sulu", "jolo", "basilan", "maguindanao", "cotabato", "marawi", "zamboanga", "abu sayyaf", "bangsamoro"] },
+  { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
+  { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "pattani", "yala", "narathiwat", "songkhla"] },
+  { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak"] },
+  { canonical: "China", aliases: ["china", "chinese", "xinjiang", "beijing"] },
+];
+
+const CONFLICT_COUNTRIES = [...SOUTH_APAC, "Malaysia"];
+
+const CONFLICT_TERMS = `("armed clash" OR "gun battle" OR firefight OR shootout OR insurgent OR insurgency OR militant OR rebel OR separatist OR ambush OR "roadside bomb" OR "armed group" OR "armed attack" OR gunmen OR "armed robbery" OR kidnapping OR abduction OR "shot dead")`;
+
+const CONFLICT_CONFIG: NewsTopicConfig = {
+  topic: "conflict",
+  feeds: [
+    ...countryFeeds(CONFLICT_COUNTRIES, CONFLICT_TERMS),
+    // Dedicated insurgency / armed-group feeds for the active APAC theatres.
+    { label: "Papua mine security (Freeport/Grasberg)", q: `("Freeport" OR "Grasberg" OR "Tembagapura" OR "Timika" OR Mimika OR "PT Freeport") (shooting OR shot OR killed OR clash OR attack OR ambush OR gunmen OR TPNPB OR "armed group" OR rebel OR security OR blockade OR kidnap)`, defaultCountry: "West Papua" },
+    { label: "Papua insurgency (TPNPB/OPM)", q: `(Papua OR "West Papua") (TPNPB OR "free papua" OR "armed group" OR rebel OR separatist OR shooting OR ambush OR "shot dead" OR gunmen OR insurgent OR "security forces")`, defaultCountry: "West Papua" },
+    { label: "Papua New Guinea tribal conflict", q: `("Papua New Guinea" OR Enga OR Hela OR Highlands) ("tribal fight" OR "tribal clash" OR "tribal war" OR ambush OR massacre OR "armed men" OR raskol OR gunmen OR killed)`, defaultCountry: "Papua New Guinea" },
+    { label: "Myanmar civil war", q: `(Myanmar OR Burma) (junta OR airstrike OR "air strike" OR offensive OR "armed clash" OR clash OR resistance OR insurgent OR militia OR "ethnic armed" OR "Arakan Army" OR fighting)`, defaultCountry: "Myanmar" },
+    { label: "Philippines insurgency", q: `(Philippines OR Mindanao OR Sulu) ("New People's Army" OR NPA OR "Abu Sayyaf" OR BIFF OR "armed encounter" OR clash OR ambush OR insurgent OR firefight)`, defaultCountry: "Philippines", ...(EDITIONS["Philippines"] ?? {}) },
+    { label: "Thailand deep south", q: `(Thailand OR Pattani OR Yala OR Narathiwat OR Songkhla) (insurgent OR bombing OR "roadside bomb" OR shooting OR ambush OR militant OR "armed attack")`, defaultCountry: "Thailand", ...(EDITIONS["Thailand"] ?? {}) },
+    { label: "India insurgency", q: `(India OR Manipur OR Kashmir OR Chhattisgarh OR Jharkhand) (Naxal OR Maoist OR militant OR insurgent OR "security forces" OR encounter OR ambush OR "gun battle" OR firefight)`, defaultCountry: "India", ...(EDITIONS["India"] ?? {}) },
+    { label: "Pakistan militancy", q: `(Pakistan OR Balochistan OR Waziristan OR "Khyber Pakhtunkhwa") ("Pakistani Taliban" OR militant OR insurgent OR "bomb blast" OR ambush OR "security forces" OR "armed attack")`, defaultCountry: "Pakistan", ...(EDITIONS["Pakistan"] ?? {}) },
+  ],
+  allow: [
+    "armed clash",
+    "armed clashes",
+    "armed conflict",
+    "armed attack",
+    "armed assault",
+    "armed group",
+    "armed men",
+    "armed gang",
+    "armed robbery",
+    "armed hold-up",
+    "gun battle",
+    "gunbattle",
+    "gun fight",
+    "gunfight",
+    "firefight",
+    "shootout",
+    "shoot-out",
+    "crossfire",
+    "cross-fire",
+    "exchange of fire",
+    "opened fire",
+    "insurgent",
+    "insurgency",
+    "militant",
+    "rebel",
+    "separatist",
+    "guerrilla",
+    "paramilitary",
+    "militia",
+    "warlord",
+    "junta",
+    "ambush",
+    "incursion",
+    "skirmish",
+    "improvised explosive",
+    "roadside bomb",
+    "landmine",
+    "land mine",
+    "car bomb",
+    "truck bomb",
+    "grenade attack",
+    "bomb blast",
+    "suicide bomb",
+    "drone strike",
+    "airstrike",
+    "air strike",
+    "abduction",
+    "abducted",
+    "kidnap",
+    "kidnapped",
+    "kidnapping",
+    "hostage",
+    "gunmen",
+    "gunman",
+    "shot dead",
+    "gunned down",
+    "mass shooting",
+    "massacre",
+    "tpnpb",
+    "free papua",
+    "new people's army",
+    "abu sayyaf",
+    "bangsamoro",
+    "tehrik",
+    "pakistani taliban",
+    "baloch",
+    "naxal",
+    "maoist",
+    "arakan army",
+    "ethnic armed",
+  ],
+  deny: [
+    ...COMMON_DENY,
+    "box office",
+    "movie",
+    "film review",
+    "trailer",
+    "video game",
+    "gameplay",
+    "match report",
+    "match preview",
+    "full match",
+    "highlights",
+    "boxing",
+    "wrestling",
+    "ufc",
+    "esports",
+    "military exercise",
+    "joint exercise",
+    "war game",
+    "war games",
+    "book review",
+  ],
+  countryAliases: CONFLICT_ALIASES,
+};
+
 export function runEnergyIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(ENERGY_CONFIG, opts);
+}
+
+export function runConflictIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
+  return runNewsTopicIngest(CONFLICT_CONFIG, opts);
 }
 
 export function runFertiliserIngest(opts: IngestOptions = {}): Promise<IngestSummary> {

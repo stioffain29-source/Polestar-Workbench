@@ -44,7 +44,7 @@ const MS_PER_HOUR = 60 * 60 * 1000;
 // freshness, so a deploy that changes what the scrapers accept/reject takes
 // effect immediately. The marker is stored in app_migration_markers keyed by
 // version, so the forced run happens once per environment per version bump.
-const INGEST_FORCE_VERSION = 13;
+const INGEST_FORCE_VERSION = 14;
 
 /**
  * True when the current INGEST_FORCE_VERSION has not yet run in this
@@ -113,6 +113,7 @@ const SCRAPED_LAND_TOPICS = [
   "energy",
   "fertiliser",
   "fuel",
+  "conflict",
 ] as const;
 
 /**
@@ -127,7 +128,7 @@ async function hoursSinceNewestPerLandTopic(): Promise<
   const res = await db.execute(sql`
     SELECT topic, MAX(created_at) AS last
     FROM incidents
-    WHERE topic IN ('shipping', 'energy', 'fertiliser', 'fuel')
+    WHERE topic IN ('shipping', 'energy', 'fertiliser', 'fuel', 'conflict')
     GROUP BY topic
   `);
   const rows = res.rows as Array<{ topic: string; last: Date | string | null }>;
@@ -181,6 +182,7 @@ async function tick(reason: string): Promise<boolean> {
       energyInserted: result.energy.inserted,
       fertiliserInserted: result.fertiliser.inserted,
       fuelInserted: result.fuel.inserted,
+      conflictInserted: result.conflict.inserted,
       strikesInserted: result.strikes.inserted,
       fuelReportsPriced: result.marketPrices.reportsUpdated,
       fuelPriceAsOf: result.marketPrices.latest.asOf,

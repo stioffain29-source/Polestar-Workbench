@@ -31,7 +31,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "failingSources": zod.number(),
   "reportsInProgress": zod.number(),
   "topicCards": zod.array(zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "label": zod.string(),
   "incidentCount": zod.number(),
   "incidentCount7d": zod.number(),
@@ -41,7 +41,7 @@ export const GetDashboardOverviewResponse = zod.object({
 })),
   "recentIncidents": zod.array(zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "summary": zod.string(),
@@ -60,7 +60,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "sourceAlerts": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().nullish(),
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
@@ -75,7 +75,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "reportsPipeline": zod.array(zod.object({
   "id": zod.number(),
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "countrySlug": zod.string().nullish(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
@@ -246,7 +246,7 @@ export const listIncidentsQueryDaysMax = 365;
 
 
 export const ListIncidentsQueryParams = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "country": zod.coerce.string().optional(),
   "severity": zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']).optional(),
   "days": zod.coerce.number().min(1).max(listIncidentsQueryDaysMax).optional().describe('Limit to incidents within the past N days'),
@@ -255,7 +255,7 @@ export const ListIncidentsQueryParams = zod.object({
 
 export const ListIncidentsResponseItem = zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "summary": zod.string(),
@@ -278,7 +278,7 @@ export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
 
 export const CreateIncidentBody = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "title": zod.string().min(1),
   "summary": zod.string(),
   "country": zod.string(),
@@ -300,7 +300,7 @@ export const GetIncidentParams = zod.object({
 
 export const GetIncidentResponse = zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "summary": zod.string(),
@@ -323,7 +323,7 @@ export const UpdateIncidentParams = zod.object({
 })
 
 export const UpdateIncidentBody = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "title": zod.string().optional(),
   "summary": zod.string().optional(),
   "country": zod.string().optional(),
@@ -340,7 +340,7 @@ export const UpdateIncidentBody = zod.object({
 
 export const UpdateIncidentResponse = zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "summary": zod.string(),
@@ -376,7 +376,7 @@ export const GetRecentIncidentsQueryParams = zod.object({
 
 export const GetRecentIncidentsResponseItem = zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "summary": zod.string(),
@@ -407,7 +407,7 @@ export const GetIncidentCountsByTopicQueryParams = zod.object({
 })
 
 export const GetIncidentCountsByTopicResponseItem = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "count": zod.number(),
   "criticalCount": zod.number()
 })
@@ -570,7 +570,7 @@ export const GetStrikeSummaryResponse = zod.object({
 
 
 export const ListSourcesQueryParams = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']).optional()
 })
 
@@ -582,7 +582,7 @@ export const listSourcesResponseReliabilityMax = 5;
 export const ListSourcesResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().nullish(),
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
@@ -604,7 +604,7 @@ export const createSourceBodyReliabilityMax = 5;
 
 export const CreateSourceBody = zod.object({
   "name": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().optional(),
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
@@ -628,7 +628,7 @@ export const updateSourceBodyReliabilityMax = 5;
 
 export const UpdateSourceBody = zod.object({
   "name": zod.string().optional(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']).optional(),
   "url": zod.string().optional(),
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']).optional(),
@@ -648,7 +648,7 @@ export const updateSourceResponseReliabilityMax = 5;
 export const UpdateSourceResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().nullish(),
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
@@ -681,14 +681,14 @@ export const GetSourceHealthResponse = zod.object({
 
 
 export const ListReportsQueryParams = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "status": zod.enum(['draft', 'review', 'published']).optional()
 })
 
 export const ListReportsResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "countrySlug": zod.string().nullish(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
@@ -830,7 +830,7 @@ export const ListReportsResponse = zod.array(ListReportsResponseItem)
 
 export const CreateReportBody = zod.object({
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "countrySlug": zod.string().optional(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
@@ -975,7 +975,7 @@ export const GetReportParams = zod.object({
 export const GetReportResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "countrySlug": zod.string().nullish(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
@@ -1120,7 +1120,7 @@ export const UpdateReportParams = zod.object({
 
 export const UpdateReportBody = zod.object({
   "title": zod.string().optional(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "countrySlug": zod.string().optional(),
   "status": zod.enum(['draft', 'review', 'published']).optional(),
   "issueDate": zod.coerce.date().optional(),
@@ -1260,7 +1260,7 @@ export const UpdateReportBody = zod.object({
 export const UpdateReportResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "countrySlug": zod.string().nullish(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),

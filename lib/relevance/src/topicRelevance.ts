@@ -461,6 +461,26 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\blogistics crime/,
     /\b(broken seal|seal break|seal broken)/,
   ],
+  // War / armed conflict / insurgency / armed crime. DELIBERATELY excludes the
+  // protest/demonstration/strike/civil-disorder vocabulary — that is the
+  // `flashpoint` topic's job and must not be duplicated here. These rules keep
+  // KINETIC and armed events: organised armed groups, firefights, bombings,
+  // ambushes, named insurgencies, and serious armed crime (armed robbery,
+  // kidnapping). The global EXCLUDE_PHRASES already strip sports/finance/
+  // entertainment noise before this gate runs.
+  conflict: [
+    /\b(armed (clash|clashes|conflict|attack|assault|group|gang|men|robbery|robbers|raid|raiders|fighters?|militants?))\b/,
+    /\b(gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|opened fire|hail of (gunfire|bullets))\b/,
+    /\b(insurgen(t|ts|cy)|militan(t|ts|cy)|rebel(s|lion)?|separatis(t|ts|m)|guerrilla|paramilitar(y|ies)|militia(s|men)?|warlord|junta (forces|troops|airstrike|soldiers))\b/,
+    /\b(ambush(ed|es)?|incursion|firefights?|skirmish(es)?)\b/,
+    /\b(ied|improvised explosive|roadside bomb|land ?mine|car bomb|truck bomb|grenade attack|bomb blast|suicide bomb(er|ing)?|drone strike|air ?strike (kill|hit|target|hits|kills|on))\b/,
+    /\b(abduct(ed|ion|ions)?|kidnap(ped|ping|pings|pers)?|hostage(s)?|held hostage)\b/,
+    /\b(gunm[ae]n|armed assailant|shot dead|gunned down|mass shooting|gun rampage|massacre)\b/,
+    /\b(tpnpb|opm|free papua|west papua (rebel|fighter|insurgen|liberation|armed)|npa|new people'?s army|abu sayyaf|biff|bifm|bangsamoro|moro (rebel|fighter|front)|ttp|tehrik[- ]?i[- ]?taliban|baloch(istan)? (liberation|insurgen|army|militant)|naxal(ite)?|maoist (rebel|insurgent|attack|guerrilla)|arakan army|ethnic armed (group|organisation|organization))\b/,
+    /\b(troops|soldiers|security forces|police|army|navy|marines) .{0,30}(killed|kill|ambush(ed)?|attack(ed)?|clash(ed)?|wounded|gunned down|firefight)\b/,
+    /\b(killed|wounded|injured|dead|casualt) .{0,30}(clash|fighting|gun ?battle|firefight|ambush|insurgen|militan|rebel|raid|shoot[- ]?out|armed attack)\b/,
+    /\b(armed robbery|armed heist|armed hold[- ]?up|at gunpoint|extortion racket|kidnap[- ]for[- ]ransom)\b/,
+  ],
   // Protests / Flashpoint use a two-tier match: an UNAMBIGUOUS phrase
   // alone is sufficient, but the ambiguous tokens "rally", "strike"
   // and "student(s)" must additionally co-occur with a public-order

@@ -1,7 +1,7 @@
 export { runFlashpointIngest } from "./flashpoint";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
-export { runEnergyIngest, runFertiliserIngest, runFuelIngest } from "./topicConfigs";
+export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest } from "./topicConfigs";
 export { runNewsTopicIngest } from "./newsTopic";
 export type { NewsTopicConfig, TopicFeed, CountryAlias } from "./newsTopic";
 export { runMarketPricesIngest } from "./marketPrices";
