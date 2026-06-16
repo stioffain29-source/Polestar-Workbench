@@ -563,3 +563,9 @@ id = "eJu5woVjWhf0KUDfBACVD"
 uri = "file://.local/prod_map.png"
 type = "image"
 title = "Live production map — document-asset-manager-stioffain29.replit.app/countries/papua (10 markers)"
+
+[[outputs]]
+id = "fjQUuS1Fj15ZLIARNvBRY"
+uri = "file://screenshots/conflict_cover.jpg"
+type = "image"
+title = "Conflict Watch — Cover"
