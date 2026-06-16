@@ -9,10 +9,22 @@ import { and, eq } from "drizzle-orm";
 // This is what replaces the old dead placeholder rows on the Source Health
 // page — every catalogued source is now a feed the pipeline genuinely monitors.
 //
-// Status is only ever "operational" (the feed responded) or "failing" (the
-// fetch threw). The other enum states (stale/blocked/delayed/not_configured)
-// are reserved for manual analyst classification — the auto pipeline never
-// fabricates them.
+// Status is only ever "operational" (the feed responded, OR a single transient
+// failure that has not yet crossed the escalation threshold) or "failing" (the
+// fetch threw on enough CONSECUTIVE runs to be a sustained outage). The other
+// enum states (stale/blocked/delayed/not_configured) are reserved for manual
+// analyst classification — the auto pipeline never fabricates them.
+
+// Number of CONSECUTIVE failed ingest runs a feed must accumulate before it is
+// escalated from "operational" to "failing".
+//
+// A single transient Google-News timeout (already retried with backoff inside
+// fetchFeed) must NOT flip a healthy feed to "failing" and park it in the red
+// Action Required panel until the next run — on an autoscale deployment that run
+// can be hours away, so a self-healing blip would masquerade as a hard outage
+// and erode trust in the panel. Only a feed that fails this many runs in a row
+// is treated as a genuine, sustained outage worth an operator's attention.
+export const FAILURE_ESCALATION_THRESHOLD = 3;
 
 export interface FeedHealth {
   /** Stable display name; the upsert key is (name, topic). */
@@ -24,9 +36,16 @@ export interface FeedHealth {
 }
 
 /**
- * Upsert one source row per feed, keyed on (name, topic). A successful fetch
- * stamps last_success_at and clears the error; a failed fetch stamps
- * last_failure_at and records the error message.
+ * Upsert one source row per feed, keyed on (name, topic).
+ *
+ * A successful fetch stamps last_success_at, clears the error and resets the
+ * consecutive-failure counter to 0.
+ *
+ * A failed fetch stamps last_failure_at and increments the counter. While the
+ * counter is below FAILURE_ESCALATION_THRESHOLD the feed STAYS "operational"
+ * (a quiet transient state recorded in error_message) so a momentary blip never
+ * reaches the Action Required panel; once it crosses the threshold the feed
+ * escalates to "failing" with its real error so a genuine outage is visible.
  *
  * Telemetry must never break ingestion, so the whole operation is wrapped: any
  * DB error is swallowed (the incident/price insert is the critical path, this
@@ -42,39 +61,78 @@ export async function recordSourceHealth(
   try {
     for (const f of feeds) {
       if (!f.name) continue;
-      const status = f.ok ? "operational" : "failing";
-      const errorMessage = f.ok ? null : (f.error ?? "Feed fetch failed").slice(0, 500);
       const [existing] = await db
-        .select({ id: sourcesTable.id })
+        .select({
+          id: sourcesTable.id,
+          consecutiveFailures: sourcesTable.consecutiveFailures,
+        })
         .from(sourcesTable)
         .where(and(eq(sourcesTable.name, f.name), eq(sourcesTable.topic, topic)));
+
+      // Analyst-facing metadata is only written when the caller supplies it.
+      const meta = {
+        ...(opts.reliability !== undefined ? { reliability: opts.reliability } : {}),
+        ...(opts.notes !== undefined ? { notes: opts.notes } : {}),
+      };
+
+      let healthFields: {
+        url: string;
+        sourceType: string;
+        status: string;
+        errorMessage: string | null;
+        consecutiveFailures: number;
+        lastSuccessAt?: Date;
+        lastFailureAt?: Date;
+      };
+
+      if (f.ok) {
+        // A successful fetch clears the error and the failure streak. Do NOT
+        // touch last_failure_at — leaving it lets the UI see "recovered" (latest
+        // success newer than latest failure).
+        healthFields = {
+          url: f.url,
+          sourceType,
+          status: "operational",
+          errorMessage: null,
+          consecutiveFailures: 0,
+          lastSuccessAt: now,
+        };
+      } else {
+        const next = (existing?.consecutiveFailures ?? 0) + 1;
+        const escalate = next >= FAILURE_ESCALATION_THRESHOLD;
+        const rawError = (f.error ?? "Feed fetch failed").slice(0, 500);
+        // Below the threshold the feed STAYS operational so a transient blip
+        // never reaches Action Required; the error is still recorded with a
+        // quiet "retrying" note so the table shows the feed self-healing.
+        healthFields = {
+          url: f.url,
+          sourceType,
+          status: escalate ? "failing" : "operational",
+          errorMessage: escalate
+            ? rawError
+            : `Transient fetch issue (failed ${next}x, retrying next run): ${rawError}`.slice(
+                0,
+                500,
+              ),
+          consecutiveFailures: next,
+          lastFailureAt: now,
+        };
+      }
 
       if (existing) {
         await db
           .update(sourcesTable)
-          .set({
-            url: f.url,
-            sourceType,
-            status,
-            errorMessage,
-            ...(f.ok ? { lastSuccessAt: now } : { lastFailureAt: now }),
-            ...(opts.reliability !== undefined ? { reliability: opts.reliability } : {}),
-            ...(opts.notes !== undefined ? { notes: opts.notes } : {}),
-          })
+          .set({ ...healthFields, ...meta })
           .where(eq(sourcesTable.id, existing.id));
       } else {
         await db.insert(sourcesTable).values({
           name: f.name,
           topic,
-          sourceType,
-          url: f.url,
-          status,
-          errorMessage,
+          manualReviewRequired: false,
           lastSuccessAt: f.ok ? now : null,
           lastFailureAt: f.ok ? null : now,
-          manualReviewRequired: false,
-          ...(opts.reliability !== undefined ? { reliability: opts.reliability } : {}),
-          ...(opts.notes !== undefined ? { notes: opts.notes } : {}),
+          ...healthFields,
+          ...meta,
         });
       }
     }

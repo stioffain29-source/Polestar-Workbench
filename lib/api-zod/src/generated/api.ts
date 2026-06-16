@@ -19,6 +19,8 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Operational overview across all topic areas
  */
+export const getDashboardOverviewResponseSourceAlertsItemConsecutiveFailuresMin = 0;
+
 export const getDashboardOverviewResponseSourceAlertsItemReliabilityMin = 0;
 export const getDashboardOverviewResponseSourceAlertsItemReliabilityMax = 5;
 
@@ -67,6 +69,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "lastSuccessAt": zod.coerce.date().nullish(),
   "lastFailureAt": zod.coerce.date().nullish(),
   "errorMessage": zod.string().nullish(),
+  "consecutiveFailures": zod.number().min(getDashboardOverviewResponseSourceAlertsItemConsecutiveFailuresMin).optional(),
   "reliability": zod.number().min(getDashboardOverviewResponseSourceAlertsItemReliabilityMin).max(getDashboardOverviewResponseSourceAlertsItemReliabilityMax),
   "manualReviewRequired": zod.boolean(),
   "notes": zod.string().nullish(),
@@ -574,6 +577,8 @@ export const ListSourcesQueryParams = zod.object({
   "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']).optional()
 })
 
+export const listSourcesResponseConsecutiveFailuresMin = 0;
+
 export const listSourcesResponseReliabilityMin = 0;
 export const listSourcesResponseReliabilityMax = 5;
 
@@ -589,6 +594,7 @@ export const ListSourcesResponseItem = zod.object({
   "lastSuccessAt": zod.coerce.date().nullish(),
   "lastFailureAt": zod.coerce.date().nullish(),
   "errorMessage": zod.string().nullish(),
+  "consecutiveFailures": zod.number().min(listSourcesResponseConsecutiveFailuresMin).optional(),
   "reliability": zod.number().min(listSourcesResponseReliabilityMin).max(listSourcesResponseReliabilityMax),
   "manualReviewRequired": zod.boolean(),
   "notes": zod.string().nullish(),
@@ -640,6 +646,8 @@ export const UpdateSourceBody = zod.object({
   "notes": zod.string().optional()
 })
 
+export const updateSourceResponseConsecutiveFailuresMin = 0;
+
 export const updateSourceResponseReliabilityMin = 0;
 export const updateSourceResponseReliabilityMax = 5;
 
@@ -655,6 +663,7 @@ export const UpdateSourceResponse = zod.object({
   "lastSuccessAt": zod.coerce.date().nullish(),
   "lastFailureAt": zod.coerce.date().nullish(),
   "errorMessage": zod.string().nullish(),
+  "consecutiveFailures": zod.number().min(updateSourceResponseConsecutiveFailuresMin).optional(),
   "reliability": zod.number().min(updateSourceResponseReliabilityMin).max(updateSourceResponseReliabilityMax),
   "manualReviewRequired": zod.boolean(),
   "notes": zod.string().nullish(),

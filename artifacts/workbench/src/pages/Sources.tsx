@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
-import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp } from "@/lib/sourceHealth";
+import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired } from "@/lib/sourceHealth";
 import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +71,9 @@ export default function Sources() {
   const sources = useMemo(
     () =>
       allSources.filter(
-        (s) => (!topic || s.topic === topic) && (!status || s.status === status),
+        (s) =>
+          (!topic || s.topic === topic) &&
+          (!status || effectiveSourceStatus(s) === status),
       ),
     [allSources, topic, status],
   );
@@ -79,13 +81,16 @@ export default function Sources() {
   const actionItems = useMemo(
     () =>
       allSources
-        .filter((s) => s.status !== "operational")
+        // A source recovered by timestamp (latest success newer than latest
+        // failure) drops out immediately, so a self-healed transient blip never
+        // lingers in Action Required until the next ingest run.
+        .filter((s) => isSourceActionRequired(s))
         .sort((a, b) => {
           const order: Record<string, number> = {
             failing: 0, blocked: 1, stale: 2, not_configured: 3, delayed: 4,
           };
-          const oa = order[a.status] ?? 9;
-          const ob = order[b.status] ?? 9;
+          const oa = order[effectiveSourceStatus(a)] ?? 9;
+          const ob = order[effectiveSourceStatus(b)] ?? 9;
           if (oa !== ob) return oa - ob;
           return a.name.localeCompare(b.name);
         }),
@@ -216,7 +221,7 @@ export default function Sources() {
                 </div>
                 <div className="p-3 text-xs">{TOPIC_LABELS[s.topic]}</div>
                 <div className="p-3 text-xs uppercase font-serif">{s.sourceType}</div>
-                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusBadgeClass(s.status))}>{sourceStatusLabel(s.status)}</span></div>
+                <div className="p-3"><span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", sourceStatusBadgeClass(effectiveSourceStatus(s)))}>{sourceStatusLabel(effectiveSourceStatus(s))}</span></div>
                 <div className="p-3"><Dots filled={s.reliability} /></div>
                 <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastSuccessAt)}</div>
                 <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastFailureAt)}</div>

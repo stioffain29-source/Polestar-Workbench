@@ -19,6 +19,38 @@ export function sourceStatusBadgeClass(status: string): string {
   return sourceStatusClass(status);
 }
 
+// Effective status for a source row. A feed auto-escalated to "failing" whose
+// latest successful fetch is newer than its latest failure has already
+// self-recovered, so we treat it as operational immediately rather than waiting
+// for the next ingest run to reset it (which on autoscale can be hours away).
+// Recovery only overrides the auto "failing" status — manual classifications
+// (blocked / stale / delayed / not_configured) are never auto-cleared.
+export function effectiveSourceStatus(s: {
+  status: string;
+  lastSuccessAt?: string | Date | null;
+  lastFailureAt?: string | Date | null;
+}): string {
+  if (
+    s.status === "failing" &&
+    s.lastSuccessAt &&
+    s.lastFailureAt &&
+    new Date(s.lastSuccessAt).getTime() > new Date(s.lastFailureAt).getTime()
+  ) {
+    return "operational";
+  }
+  return s.status;
+}
+
+// A source needs operations follow-up (appears in Action Required) only when
+// its EFFECTIVE status is not operational.
+export function isSourceActionRequired(s: {
+  status: string;
+  lastSuccessAt?: string | Date | null;
+  lastFailureAt?: string | Date | null;
+}): boolean {
+  return effectiveSourceStatus(s) !== "operational";
+}
+
 // Render a source health timestamp (last success / last failure) the way the
 // table and Action Required panel do, falling back to an em dash when absent.
 export function formatSourceTimestamp(

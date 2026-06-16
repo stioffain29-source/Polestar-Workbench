@@ -1,4 +1,4 @@
-import { recordSourceHealth } from "../../lib/ingest/src/sourceHealth";
+import { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "../../lib/ingest/src/sourceHealth";
 import { db, sourcesTable } from "@workspace/db";
 
 // Intercept drizzle's eq/and so we can assert what column/value the upsert is
@@ -19,7 +19,10 @@ interface Captured {
 }
 
 function setupDb(
-  opts: { existing?: { id: number }[]; throwOn?: "select" | "insert" | "update" } = {},
+  opts: {
+    existing?: { id: number; consecutiveFailures?: number }[];
+    throwOn?: "select" | "insert" | "update";
+  } = {},
 ): Captured {
   const cap: Captured = { selectWhere: [], inserts: [], updates: [] };
 
@@ -85,7 +88,7 @@ describe("recordSourceHealth", () => {
     expect(row.errorMessage).toBeNull();
   });
 
-  it("inserts a failing row with lastFailureAt and the error message on a failed feed", async () => {
+  it("keeps a feed operational with a transient note on the first failure (insert path)", async () => {
     const cap = setupDb();
 
     await recordSourceHealth("energy", [
@@ -94,10 +97,14 @@ describe("recordSourceHealth", () => {
 
     expect(cap.inserts).toHaveLength(1);
     const row = cap.inserts[0];
-    expect(row.status).toBe("failing");
+    // A single transient timeout must NOT flip a healthy feed to "failing".
+    expect(row.status).toBe("operational");
+    expect(row.consecutiveFailures).toBe(1);
     expect(row.lastFailureAt).toBeInstanceOf(Date);
     expect(row.lastSuccessAt).toBeNull();
-    expect(row.errorMessage).toBe("timed out after 20000ms");
+    expect(row.errorMessage).toBe(
+      "Transient fetch issue (failed 1x, retrying next run): timed out after 20000ms",
+    );
   });
 
   it("truncates the error message to 500 characters", async () => {
@@ -115,7 +122,9 @@ describe("recordSourceHealth", () => {
 
     await recordSourceHealth("fuel", [{ name: "Quiet Feed", url: "http://d.test/rss", ok: false }]);
 
-    expect(cap.inserts[0].errorMessage).toBe("Feed fetch failed");
+    expect(cap.inserts[0].errorMessage).toBe(
+      "Transient fetch issue (failed 1x, retrying next run): Feed fetch failed",
+    );
   });
 
   it("skips feeds with no name", async () => {
@@ -144,7 +153,7 @@ describe("recordSourceHealth", () => {
   });
 
   it("updates the existing row instead of inserting when one already exists", async () => {
-    const cap = setupDb({ existing: [{ id: 7 }] });
+    const cap = setupDb({ existing: [{ id: 7, consecutiveFailures: 0 }] });
 
     await recordSourceHealth("shipping", [
       { name: "Feed A", url: "http://a.test/rss", ok: false, error: "boom" },
@@ -152,9 +161,46 @@ describe("recordSourceHealth", () => {
 
     expect(cap.inserts).toHaveLength(0);
     expect(cap.updates).toHaveLength(1);
-    expect(cap.updates[0].set.status).toBe("failing");
+    // First failure off a healthy row stays operational (transient), counter -> 1.
+    expect(cap.updates[0].set.status).toBe("operational");
+    expect(cap.updates[0].set.consecutiveFailures).toBe(1);
     expect(cap.updates[0].set.lastFailureAt).toBeInstanceOf(Date);
-    expect(cap.updates[0].set.errorMessage).toBe("boom");
+    expect(cap.updates[0].set.errorMessage).toBe(
+      "Transient fetch issue (failed 1x, retrying next run): boom",
+    );
+  });
+
+  it("escalates to failing once consecutive failures reach the threshold", async () => {
+    const cap = setupDb({
+      existing: [{ id: 7, consecutiveFailures: FAILURE_ESCALATION_THRESHOLD - 1 }],
+    });
+
+    await recordSourceHealth("shipping", [
+      { name: "Feed A", url: "http://a.test/rss", ok: false, error: "still down" },
+    ]);
+
+    expect(cap.updates).toHaveLength(1);
+    expect(cap.updates[0].set.status).toBe("failing");
+    expect(cap.updates[0].set.consecutiveFailures).toBe(FAILURE_ESCALATION_THRESHOLD);
+    // Once escalated the raw error surfaces (no transient prefix) for operators.
+    expect(cap.updates[0].set.errorMessage).toBe("still down");
+    expect(cap.updates[0].set.lastFailureAt).toBeInstanceOf(Date);
+  });
+
+  it("resets the failure counter and clears the error on a successful fetch", async () => {
+    const cap = setupDb({ existing: [{ id: 7, consecutiveFailures: 5 }] });
+
+    await recordSourceHealth("shipping", [
+      { name: "Feed A", url: "http://a.test/rss", ok: true },
+    ]);
+
+    expect(cap.updates).toHaveLength(1);
+    expect(cap.updates[0].set.status).toBe("operational");
+    expect(cap.updates[0].set.consecutiveFailures).toBe(0);
+    expect(cap.updates[0].set.errorMessage).toBeNull();
+    expect(cap.updates[0].set.lastSuccessAt).toBeInstanceOf(Date);
+    // A success must not stamp a new failure timestamp (lets the UI see recovery).
+    expect(cap.updates[0].set.lastFailureAt).toBeUndefined();
   });
 
   it("never throws when the database errors (best-effort telemetry)", async () => {

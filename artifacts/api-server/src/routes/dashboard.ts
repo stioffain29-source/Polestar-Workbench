@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, incidentsTable, sourcesTable, reportsTable } from "@workspace/db";
 import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { defaultRelevanceCondition } from "../lib/relevanceFilter";
+import { effectiveSourceStatusSql } from "../lib/sourceHealthSql";
 
 const router: IRouter = Router();
 
@@ -27,10 +28,14 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
     .from(incidentsTable)
     .where(and(gte(incidentsTable.occurredAt, since7d), defaultRelevanceCondition()));
 
+  // Count by EFFECTIVE status so an auto-failing feed that has since recovered
+  // (latest success newer than latest failure) is not double-counted as a
+  // problem on the dashboard — consistent with the Source Health page.
+  const effStatus = effectiveSourceStatusSql();
   const [sourceCounts] = await db
     .select({
-      active: sql<number>`sum(case when ${sourcesTable.status} = 'operational' then 1 else 0 end)::int`,
-      failing: sql<number>`sum(case when ${sourcesTable.status} in ('failing','blocked','stale') then 1 else 0 end)::int`,
+      active: sql<number>`sum(case when ${effStatus} = 'operational' then 1 else 0 end)::int`,
+      failing: sql<number>`sum(case when ${effStatus} in ('failing','blocked','stale') then 1 else 0 end)::int`,
     })
     .from(sourcesTable);
 
@@ -82,7 +87,7 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
   const sourceAlerts = await db
     .select()
     .from(sourcesTable)
-    .where(ne(sourcesTable.status, "operational"))
+    .where(sql`${effStatus} <> 'operational'`)
     .orderBy(desc(sourcesTable.lastFailureAt))
     .limit(8);
 

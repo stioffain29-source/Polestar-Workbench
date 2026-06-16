@@ -1157,6 +1157,7 @@ components:
         lastSuccessAt: { type: ["string", "null"], format: date-time }
         lastFailureAt: { type: ["string", "null"], format: date-time }
         errorMessage: { type: ["string", "null"] }
+        consecutiveFailures: { type: integer, minimum: 0 }
         reliability: { type: integer, minimum: 0, maximum: 5 }
         manualReviewRequired: { type: boolean }
         notes: { type: ["string", "null"] }

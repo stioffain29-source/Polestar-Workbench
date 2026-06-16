@@ -7,6 +7,7 @@ import {
   ListSourcesQueryParams,
 } from "@workspace/api-zod";
 import { requireAdminToken } from "../lib/adminAuth.js";
+import { effectiveSourceStatusSql } from "../lib/sourceHealthSql.js";
 
 const router: IRouter = Router();
 
@@ -41,10 +42,14 @@ router.get("/sources/health", async (_req, res): Promise<void> => {
       manualReviewCount: sql<number>`sum(case when ${sourcesTable.manualReviewRequired} then 1 else 0 end)::int`,
     })
     .from(sourcesTable);
+  // Group by EFFECTIVE status so an auto-failing feed that has since succeeded
+  // (latest success newer than latest failure) counts as operational, keeping
+  // the KPIs consistent with the Action Required panel.
+  const effStatus = effectiveSourceStatusSql();
   const byStatus = await db
-    .select({ status: sourcesTable.status, count: sql<number>`count(*)::int` })
+    .select({ status: effStatus, count: sql<number>`count(*)::int` })
     .from(sourcesTable)
-    .groupBy(sourcesTable.status);
+    .groupBy(effStatus);
   res.json({
     total: totals?.total ?? 0,
     manualReviewCount: totals?.manualReviewCount ?? 0,

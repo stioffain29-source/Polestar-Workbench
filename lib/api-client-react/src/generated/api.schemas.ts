@@ -298,6 +298,8 @@ export interface Source {
   lastFailureAt?: string | null;
   /** @nullable */
   errorMessage?: string | null;
+  /** @minimum 0 */
+  consecutiveFailures?: number;
   /**
      * @minimum 0
      * @maximum 5

@@ -23,6 +23,8 @@ export interface Source {
   lastFailureAt?: Date | null;
   /** @nullable */
   errorMessage?: string | null;
+  /** @minimum 0 */
+  consecutiveFailures?: number;
   /**
      * @minimum 0
      * @maximum 5

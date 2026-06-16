@@ -158,6 +158,17 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS risk_rating text`,
     );
 
+    // 0a) Schema: per-feed consecutive-failure counter on `sources`.
+    //     drizzle `push` adds this in dev, but the writable prod DB is reached
+    //     only from the deployment runtime, so add it idempotently on boot too.
+    //     Source Health uses it to require several consecutive failed ingest
+    //     runs before a feed escalates to "failing", so a transient Google-News
+    //     timeout no longer false-alarms the Action Required panel.
+    await db.execute(sql`
+      ALTER TABLE sources
+      ADD COLUMN IF NOT EXISTS consecutive_failures integer NOT NULL DEFAULT 0
+    `);
+
     // 0) Country report narrative is now fully data-driven: the Situation,
     //    What Happened and Implications sections are generated from the live
     //    7-day window at render time and the stored overview / trend_summary

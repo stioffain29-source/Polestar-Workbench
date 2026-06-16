@@ -10,6 +10,11 @@ export const sourcesTable = pgTable("sources", {
   lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
   lastFailureAt: timestamp("last_failure_at", { withTimezone: true }),
   errorMessage: text("error_message"),
+  // Number of CONSECUTIVE failed ingest runs for this feed. A successful run
+  // resets it to 0; the Source Health pipeline only escalates a feed to
+  // "failing" once this crosses the escalation threshold, so a single transient
+  // timeout never flips a healthy feed into the Action Required panel.
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
   reliability: integer("reliability").notNull().default(3),
   manualReviewRequired: boolean("manual_review_required").notNull().default(false),
   notes: text("notes"),

@@ -81,7 +81,7 @@ export async function fetchBody(url: string, timeoutMs: number): Promise<string>
 }
 
 export interface FetchFeedOptions {
-  /** Total attempts including the first. Default 2 (one retry). */
+  /** Total attempts including the first. Default 3 (two retries). */
   attempts?: number;
   /** Per-attempt abort timeout in ms. Default 20000. */
   timeoutMs?: number;

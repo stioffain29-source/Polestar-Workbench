@@ -2,6 +2,8 @@ import {
   sourceStatusLabel,
   sourceStatusBadgeClass,
   formatSourceTimestamp,
+  effectiveSourceStatus,
+  isSourceActionRequired,
 } from "../../artifacts/workbench/src/lib/sourceHealth";
 import { SOURCE_STATUSES } from "../../artifacts/workbench/src/lib/topics";
 
@@ -73,5 +75,71 @@ describe("source health timestamps", () => {
 
   it("always produces the dd MMM HH:mm shape for a real timestamp", () => {
     expect(formatSourceTimestamp(new Date())).toMatch(/^\d{2} \w{3} \d{2}:\d{2}$/);
+  });
+});
+
+describe("effective source status (timestamp-based recovery)", () => {
+  const earlier = "2026-06-15T01:00:00Z";
+  const later = "2026-06-15T03:00:00Z";
+
+  it("treats an auto-failing feed as operational once its latest success is newer than its latest failure", () => {
+    expect(
+      effectiveSourceStatus({ status: "failing", lastSuccessAt: later, lastFailureAt: earlier }),
+    ).toBe("operational");
+  });
+
+  it("keeps a feed failing while its latest failure is newer than its latest success", () => {
+    expect(
+      effectiveSourceStatus({ status: "failing", lastSuccessAt: earlier, lastFailureAt: later }),
+    ).toBe("failing");
+  });
+
+  it("keeps a feed failing when it has failed but never succeeded", () => {
+    expect(
+      effectiveSourceStatus({ status: "failing", lastSuccessAt: null, lastFailureAt: later }),
+    ).toBe("failing");
+  });
+
+  it("never auto-clears a manual classification, even if success is newer than failure", () => {
+    for (const status of ["blocked", "stale", "delayed", "not_configured"]) {
+      expect(
+        effectiveSourceStatus({ status, lastSuccessAt: later, lastFailureAt: earlier }),
+      ).toBe(status);
+    }
+  });
+
+  it("leaves an operational feed operational", () => {
+    expect(
+      effectiveSourceStatus({ status: "operational", lastSuccessAt: later, lastFailureAt: earlier }),
+    ).toBe("operational");
+  });
+});
+
+describe("action-required derivation", () => {
+  const earlier = "2026-06-15T01:00:00Z";
+  const later = "2026-06-15T03:00:00Z";
+
+  it("does not flag a recovered failing feed for operations follow-up", () => {
+    expect(
+      isSourceActionRequired({ status: "failing", lastSuccessAt: later, lastFailureAt: earlier }),
+    ).toBe(false);
+  });
+
+  it("flags a genuinely failing feed for operations follow-up", () => {
+    expect(
+      isSourceActionRequired({ status: "failing", lastSuccessAt: earlier, lastFailureAt: later }),
+    ).toBe(true);
+  });
+
+  it("flags manual alarm states (blocked) for follow-up", () => {
+    expect(
+      isSourceActionRequired({ status: "blocked", lastSuccessAt: later, lastFailureAt: earlier }),
+    ).toBe(true);
+  });
+
+  it("does not flag a healthy operational feed", () => {
+    expect(
+      isSourceActionRequired({ status: "operational", lastSuccessAt: later, lastFailureAt: null }),
+    ).toBe(false);
   });
 });
