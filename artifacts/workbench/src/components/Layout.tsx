@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings
+  Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_white_logo_vert_1779500138062.png";
@@ -32,6 +32,7 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Shipping", href: "/topics/shipping", icon: Ship },
         { label: "Cargo Watch", href: "/topics/cargo-watch", icon: Package },
         { label: "Civil Protests & Civil Unrest", href: "/topics/protests", icon: Users },
+        { label: "Conflict Watch", href: "/topics/conflict", icon: Swords },
       ]
     },
     {
