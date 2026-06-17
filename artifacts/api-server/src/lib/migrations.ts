@@ -927,6 +927,39 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3i) Delete another PR/political headline the analyst removed — not a
+    //     security incident. Marker-gated, runs once per environment.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "delete_nia_punjab_property_incident_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const deleted = await db
+          .delete(incidentsTable)
+          .where(
+            and(
+              like(incidentsTable.title, "%NIA Seizes Punjab Property%"),
+              like(incidentsTable.analystNotes, "auto-scraped:%"),
+            ),
+          );
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { deleted: deleted.rowCount ?? 0, marker: markerKey },
+          "One-time deletion of PR/political headline (not an incident)",
+        );
+      }
+    }
+
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never
