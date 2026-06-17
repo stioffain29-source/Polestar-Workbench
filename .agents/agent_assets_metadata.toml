@@ -569,3 +569,9 @@ id = "fjQUuS1Fj15ZLIARNvBRY"
 uri = "file://screenshots/conflict_cover.jpg"
 type = "image"
 title = "Conflict Watch — Cover"
+
+[[outputs]]
+id = "3wG8GZnqGa0iJ-nV5eLaY"
+uri = "file://docs/workbench-audit-2026-06-17.md"
+type = "text"
+title = "Workbench Audit — 17 Jun 2026"
