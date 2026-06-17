@@ -1,8 +1,16 @@
 import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
-import { sql, eq, or, ne, isNull, inArray } from "drizzle-orm";
+import { sql, eq, or, ne, isNull, inArray, and, like } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
-import { runStrikesBackfill } from "@workspace/ingest";
+import {
+  runStrikesBackfill,
+  classifySeverity,
+  isReactionLed,
+  severityFromFatalities,
+  maxSeverity,
+  SEVERITY_RANK,
+  type Severity,
+} from "@workspace/ingest";
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
 
@@ -801,6 +809,83 @@ export async function runDataMigrations(): Promise<void> {
             marker: markerKey,
           },
           "One-time correction of manually-reviewed attacker-as-target mis-stored strike rows",
+        );
+      }
+    }
+
+    // 3h) ONE-TIME downgrade of reaction / advocacy headlines mis-rated High/Extreme.
+    //
+    //     The civil-unrest / conflict severity classifier historically fired the
+    //     reserved Extreme/High tiers off casualty words ("slain", "killed") even
+    //     when the headline is an ADVOCACY / STATEMENT item that merely REFERENCES
+    //     a past event — e.g. "<group> demands ban ... seeks justice for six slain
+    //     Nagas". classifySeverity now guards this (isReactionLed / REACTION_LEAD_RE
+    //     in @workspace/ingest), so NEW rows rate correctly, but the scrapers'
+    //     read-then-insert dedupe never re-touches a stored row, so existing
+    //     mis-rated rows keep their old chip.
+    //
+    //     This pass re-rates ONLY auto-scraped flashpoint/conflict rows that are
+    //     (a) currently High/Extreme AND (b) reaction-led, setting each to the
+    //     current reaction-guarded classifySeverity result — and ONLY when that is
+    //     strictly LOWER than the stored tier (downgrade-only; it can never
+    //     escalate). The reaction-led gate keeps it from touching rows that merely
+    //     differ from the current classifier for unrelated reasons, so it cannot
+    //     alter analyst severities, other topics, or correctly-rated fresh-attack
+    //     rows. Marker-gated → runs once per environment.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_reaction_downgrade_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, ["flashpoint", "conflict"]),
+              inArray(incidentsTable.severity, ["high", "extreme"]),
+              like(incidentsTable.analystNotes, "auto-scraped:%"),
+            ),
+          );
+        let changed = 0;
+        for (const r of candidates) {
+          if (!isReactionLed(r.title)) continue;
+          const topic = r.topic === "conflict" ? "conflict" : "flashpoint";
+          // Never downgrade below the floor implied by a structured GDELT
+          // fatality count — a confirmed-fatality row stays Extreme even if its
+          // headline reads as a reaction, mirroring runSeverityBackfill.
+          const fromText = classifySeverity(r.title, r.summary ?? "", topic);
+          const floor = severityFromFatalities(r.fatalities);
+          const next = floor ? maxSeverity(fromText, floor) : fromText;
+          if (SEVERITY_RANK[next] < SEVERITY_RANK[r.severity as Severity]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            changed++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: candidates.length, changed, marker: markerKey },
+          "One-time downgrade of reaction-led mis-rated incident severities",
         );
       }
     }

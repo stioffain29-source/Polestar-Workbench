@@ -85,6 +85,29 @@ const INSIGNIFICANT: RegExp[] = [
   /\b(plan(s|ned|ning)? to|call(s|ed|ing)? for|threaten(s|ed|ing)? to|vow(s|ed)? to|set to|to hold (a )?(protest|strike|rally)|may (strike|protest)|could (strike|protest)|urg(e|ed|ing)|appeal(ed|s)? for|warn(s|ed|ing) of|advisory|alert issued|postpon(e|ed)|call(ed)? off|suspend(ed)? (the )?strike)\b/i,
 ];
 
+// A headline LED by an advocacy / statement / commemoration verb — "<group>
+// demands ban / seeks justice / condemns / mourns / pays tribute ...". The
+// event being reported is the REACTION; any casualty or violence words it
+// carries ("...for six slain", "condemns the killing of") are REFERENCES to a
+// prior event, not a fresh attack — so they must not drive the reserved
+// Extreme / High tiers (see the reaction guard in classifySeverity). Anchored
+// on the first few words so a fresh-attack headline that merely ENDS with a
+// reaction ("3 injured in armed attack, mob protests treatment") is NOT caught.
+// Protest / rally / clash words are deliberately excluded — they can BE the
+// violent event ("Protest turns deadly, dozens killed").
+const REACTION_LEAD_RE =
+  /^(?:[\w’'".&()\-]+[\s,;:]+){0,4}(demand(s|ed|ing)?|seek(s|ing)?\s+(justice|a\s+ban|ban|probe|inquiry|action|accountability|compensation|redress)|call(s|ed|ing)?\s+for|condemn(s|ed|ing|ation)?|denounc(e|es|ed|ing|ation)|decr(y|ies|ied)|urg(e|es|ed|ing)\b|appeal(s|ed|ing)?\s+for|mourn(s|ed|ing)?|pay(s|ing)?\s+tribute|tribute|condol|vigil|petition(s|ed|ing)?|memorandum|boycott(s|ed|ing)?|slam(s|med|ming)?|blame(s|d)?|accus(e|es|ed|ing)|hail(s|ed|ing)?|welcom(e|es|ed|ing)|reject(s|ed|ing)?|refus(e|es|ed|ing|al)|summon(s|ed|ing)?)/i;
+
+/**
+ * True if the headline is led by an advocacy / statement verb — i.e. it reports
+ * a REACTION to a prior event rather than a fresh incident. Mirrors the gate
+ * applied inside classifySeverity; exported so the one-time DB heal can scope
+ * its downgrade to exactly this class of mis-rated rows.
+ */
+export function isReactionLed(title: string): boolean {
+  return REACTION_LEAD_RE.test(title);
+}
+
 /**
  * Rate an incident's severity from its text.
  *
@@ -105,8 +128,18 @@ export function classifySeverity(
 ): Severity {
   const hay = `${title}\n${summary}`;
 
-  if (EXTREME.some((re) => re.test(hay))) return "extreme";
-  if (HIGH.some((re) => re.test(hay))) return "high";
+  // Reaction guard (civil unrest + conflict only). A headline led by an
+  // advocacy / statement verb is reporting a REACTION to a prior event, so its
+  // casualty / violence words are references — they must not trigger the
+  // reserved Extreme / High tiers. The underlying attack, if newsworthy, carries
+  // its own row. Scoped to flashpoint/conflict because in commodity / maritime
+  // topics a reaction-framed deadly attack is far more likely to be the only
+  // record of a genuine kinetic event, so their escalation stays intact.
+  const reactionLed =
+    (topic === "flashpoint" || topic === "conflict") && REACTION_LEAD_RE.test(title);
+
+  if (!reactionLed && EXTREME.some((re) => re.test(hay))) return "extreme";
+  if (!reactionLed && HIGH.some((re) => re.test(hay))) return "high";
   if (MODERATE.some((re) => re.test(hay))) return "moderate";
 
   // Cargo crime: an actual theft (stolen/robbery/burglary/heist) without
@@ -198,6 +231,7 @@ export function classifySeverity(
   // through to insignificant / low.
   if (topic === "conflict") {
     if (
+      !reactionLed &&
       /\b(armed clash|armed clashes|gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|ambush(ed|es)?|ied|improvised explosive|roadside bomb|land ?mine|car bomb|grenade attack|bomb(ing|s)? attack|suicide bomb|airstrike|air strike|drone strike|insurgent attack|militant attack|rebel attack|armed attack|armed assault|massacre|kidnap(ped|ping)?|abduct(ed|ion)?|hostage)\b/i.test(hay)
     ) {
       return "high";

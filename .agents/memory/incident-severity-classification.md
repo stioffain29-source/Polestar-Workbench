@@ -23,3 +23,26 @@ deployment runtime which owns the writable DB.
 
 **How to apply:** if you change the classifier signals, re-run `pnpm --filter @workspace/scripts run
 backfill:severity -- --commit` on dev, and run the equivalent in the deployment to fix prod.
+
+## Reaction / advocacy headline guard
+
+A headline LED by an advocacy/statement verb ("<group> demands ban … seeks justice for six slain
+Nagas") is a REACTION to a prior event — its casualty words ("slain", "killing") are references, not
+a fresh attack — so it must NOT trigger the reserved Extreme/High tiers. `isReactionLed(title)` /
+`REACTION_LEAD_RE` (title-lead anchored, {0,4} words; EXCLUDES protest/rally/clash, which can BE the
+violent event) gates the shared Extreme, shared High, and conflict armed-clash High **only for
+topic ∈ {flashpoint, conflict}**. Other topics (shipping/cargo/fuel/…) keep escalation on purpose: a
+reaction-framed deadly maritime attack is often the ONLY record of a real kinetic event.
+
+## Healing existing rows after a CLASSIFIER change — surgical migration, NOT the full backfill
+
+**Why:** wiring `runSeverityBackfill` into `runIngestOnce` (or broadening its scope to re-rate the
+whole auto-scraped table) re-applies the GDELT **fatality floor** (`severityFromFatalities`) and
+historical classifier drift to ~every row — a dry-run flipped 217 rows and *increased* Extreme by
+~59. That is off-scope drift for a targeted "stop over-rating X" bug and risks new complaints.
+**How to apply:** heal existing rows with a marker-gated boot migration in `migrations.ts` that is
+(a) auto-scraped only, (b) current High/Extreme only, (c) gated on the exact change (e.g.
+`isReactionLed`), (d) **downgrade-only** (`SEVERITY_RANK[next] < stored`), and (e) STILL applies the
+fatality floor (`next = floor ? maxSeverity(text, floor) : text`) so a confirmed-fatality row is
+never downgraded. Fix the migration BODY (don't bump the marker key) when prod hasn't run it yet —
+prod runs each marker once, and an uncorrected earlier body would execute first there.

@@ -20,7 +20,7 @@ export { runReliefWebCorroboration } from "./reliefweb";
 export type { ReliefWebCorroborationSummary } from "./reliefweb";
 export { runGdeltEnrich } from "./gdeltEnrich";
 export type { GdeltEnrichSummary } from "./gdeltEnrich";
-export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK } from "./severity";
+export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, isReactionLed } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";
 export type { SeverityBackfillSummary } from "./backfillSeverity";
