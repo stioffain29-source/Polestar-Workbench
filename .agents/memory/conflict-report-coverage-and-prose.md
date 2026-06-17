@@ -99,12 +99,28 @@ only re-orders WITHIN a severity tier — it never overrides the tier.
 **Concentration claims are gated on localised focus.** "its activity concentrated around
 <hotspot>" may only be used when the lead theatre is localised (≥50% of incidents inside
 named hotspots, `focusOf().localised`). For a sub-50% theatre, name the flashpoint with
-softer wording ("with <hotspot> among the worst-hit areas") or omit it. This applies in
+softer wording ("with <hotspot> among the areas most affected") or omit it. This applies in
 EVERY section, including the Polestar View — an architect caught the Polestar View saying
 "concentrated around Manipur" while the theatre's own paragraph correctly read "the
 heaviest activity around Manipur": same dataset, two surfaces, self-contradiction.
 **How to apply:** a sub-national-honesty test asserts `autoPolestarView` never matches
 `/concentrated around <hotspot>/i` when coverage <50%.
+
+**A bare country is NEVER the grammatical subject of a seriousness judgement.** A large
+country is never wholesale "the main concern" / "the most serious theatre" unless the whole
+country is at war — only its NAMED PARTS can carry that claim. Make the SUBJECT the
+*activity* or the *region*, with the country as location: "The most serious activity this
+period is in <Country>, around <hotspots>" (Situation/Polestar lead), "<Country>'s sharpest
+activity centres on <hotspots>" (area paragraph), "<Country> also saw serious activity this
+period" (secondary) — never "<Country> is the most serious theatre / is the main concern /
+is/was/remained serious". This applies to Situation, Polestar AND secondary clauses, not
+just the area paragraph (the user re-opened the complaint precisely because the first fix
+only scoped the area paragraph and left Situation/Polestar saying "India is the most serious
+theatre"). **Why:** a huge country (India) read as if entirely at war.
+**How to apply:** tests ban, across the whole rendered narrative, `/is the main concern/i`,
+`/is the most serious theatre/i`, `/are the most serious theatres/i`,
+`/\b(is|was|remained) (the most )?serious\b/i`, and `/\bworst\b/i` (the word "worst" was
+over-repeated — use varied vocab: sharpest/heaviest/hardest-hit-once/affected/most exposed).
 
 **Section wording must vary; Situation and Polestar must not read verbatim-identical.**
 Rank-vary the area-paragraph openings (`v = min(rank, 2)`) and give `secondaryClause` a

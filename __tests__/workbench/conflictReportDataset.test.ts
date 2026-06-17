@@ -188,6 +188,62 @@ describe("buildConflictReportDataset — vocabulary & prose hygiene", () => {
   });
 });
 
+describe("buildConflictReportDataset — no 'worst', no whole-country claim", () => {
+  // The user rejected two things outright: a large country being called "the main
+  // concern" as a whole (only PARTS of a country are ever the concern), and the
+  // word "worst" being repeated across the report.
+  const inManipur =
+    "Armed clashes between troops and militants reported in Manipur";
+  const ds = buildConflictReportDataset(
+    [
+      inc({ id: 1, country: "India", severity: "high", title: inManipur }),
+      inc({ id: 2, country: "India", severity: "high", title: inManipur }),
+      inc({ id: 3, country: "India", severity: "high", title: inManipur }),
+      inc({ id: 4, country: "Myanmar", severity: "moderate", title: NO_CASUALTY }),
+    ],
+    "conflict",
+    ISSUE_DATE,
+  );
+  const narrative = [
+    ds.autoSituation,
+    ds.autoOtherWatched,
+    ds.autoWhatMatters,
+    ds.autoWatchNext,
+    ds.autoPolestarView,
+    ...ds.topActivityAreas.map((a) => a.paragraph),
+    ...ds.otherWatchedTheatres.map((a) => a.paragraph),
+  ];
+
+  it("never uses the word 'worst' in narrative prose", () => {
+    for (const text of narrative) {
+      expect(text).not.toMatch(/\bworst\b/i);
+    }
+  });
+
+  it("never frames a whole country as the concern or 'most serious theatre'", () => {
+    // The grammatical subject of the lead judgement must be the activity or the
+    // named region, never a bare country. Banned: "India is the main concern",
+    // "India is the most serious theatre", "India is/was/remained serious".
+    // Allowed: "the most serious activity ... is in India, around Manipur" and
+    // "India also saw serious activity this period".
+    for (const text of narrative) {
+      expect(text).not.toMatch(/is the main concern/i);
+      expect(text).not.toMatch(/is the most serious theatre/i);
+      expect(text).not.toMatch(/are the most serious theatres/i);
+      expect(text).not.toMatch(/\b(is|was|remained) (the most )?serious\b/i);
+    }
+  });
+
+  it("scopes the lead to its region, not the whole country", () => {
+    const lead = ds.topActivityAreas[0]!;
+    expect(lead.theatre).toBe("India");
+    expect(lead.paragraph).toContain("Manipur");
+    // The block is country-grouped so it still opens with the country word, but
+    // the SUBJECT is the region — never a blanket "India is the concern".
+    expect(lead.paragraph.startsWith("India")).toBe(true);
+  });
+});
+
 describe("buildConflictReportDataset — empty window", () => {
   const ds = buildConflictReportDataset([], "conflict", ISSUE_DATE);
 
@@ -231,7 +287,7 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
   it("names the hotspot but does not call a sub-50% theatre concentrated", () => {
     expect(lead.theatre).toBe("India");
     expect(lead.paragraph).toContain("Manipur");
-    expect(lead.paragraph).toContain("the heaviest activity around");
+    expect(lead.paragraph).toContain("sharpest activity around");
     // The "rest of the country is far quieter" reassurance is reserved for
     // genuinely localised theatres (≥50% coverage) — never a scattered one.
     expect(lead.paragraph).not.toContain("far quieter");

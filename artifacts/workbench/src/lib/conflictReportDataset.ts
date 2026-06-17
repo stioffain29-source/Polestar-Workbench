@@ -656,10 +656,12 @@ function leadTheatres(
 }
 
 // Describe the theatres BELOW the lead(s). A High/Extreme or casualty-bearing
-// second theatre is "also serious" — it must NEVER be lumped into "lower level"
-// alongside a genuinely quiet one (the old wording flattened a deadly Extreme
-// second into the same clause as a single Low incident, contradicting its own
-// theatre block). Only Low/Moderate, casualty-free theatres read as "quieter".
+// second theatre "also saw serious activity" — it must NEVER be lumped into
+// "lower level" alongside a genuinely quiet one (the old wording flattened a
+// deadly Extreme second into the same clause as a single Low incident,
+// contradicting its own theatre block), and the country is never the bare
+// subject of a seriousness judgement (the activity is). Only Low/Moderate,
+// casualty-free theatres read as "quieter".
 function secondaryClause(
   areas: ConflictActivityArea[],
   fromIdx: number,
@@ -681,9 +683,7 @@ function secondaryClause(
       if (p) where = ` in ${p}`;
     }
     const verb =
-      variant === 1
-        ? "remained serious too"
-        : `${serious.length > 1 ? "were" : "was"} also serious this period`;
+      variant === 1 ? "saw further serious activity" : "also saw serious activity this period";
     parts.push(`${names} ${verb}${deadly ? `, with deadly attacks${where}` : ""}.`);
   }
   if (minor.length) {
@@ -735,15 +735,13 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
   const where = joinList(focus.labels);
   const v = Math.min(rank, 2); // variant index — keeps the top three distinct
 
-  // Opening clause — position varies by rank so paragraphs never start alike.
-  const positions = ["is the main concern", "comes next", "also features"];
-  const position = rank < positions.length ? positions[rank] : "is worth watching";
-
-  // "What / where / what it can hit", merged into the opening so it reads as
-  // prose, not a checklist. The reach verb and the "rest of the country is
-  // quieter" reassurance both vary by rank. The reassurance is added ONLY when
-  // the activity is genuinely localised — never for a scattered theatre, which
-  // would falsely imply the rest is safe.
+  // Opening — lead with the REGION where the violence sits, never a blanket
+  // "the whole country is the concern" claim. A large country is never wholesale
+  // at war; only parts of it are, so the named hotspots are the subject, with the
+  // country as context. The emphasis verb varies by rank so paragraphs never
+  // start alike, and the "rest of the country is quieter" reassurance is added
+  // ONLY when the activity is genuinely localised — never for a scattered
+  // theatre, which would falsely imply the rest is safe.
   const reach = [
     `where ${activity} are threatening ${impacts}`,
     `where ${activity} can reach ${impacts}`,
@@ -756,11 +754,27 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
   ][v];
   let opening: string;
   if (focus.hasFocus && focus.localised) {
-    opening = `${area.theatre} ${position}, with the worst of it around ${where}, ${reach}. ${calm}`;
+    const stem = [
+      `${area.theatre}'s sharpest activity this period centres on`,
+      `${area.theatre} sees its heaviest fighting around`,
+      `${area.theatre} also flares around`,
+    ][v];
+    opening = `${stem} ${where}, ${reach}. ${calm}`;
   } else if (focus.hasFocus) {
-    opening = `${area.theatre} ${position}, the heaviest activity around ${where}, ${reach}.`;
+    // Scattered theatre: name the flashpoint but make NO countrywide claim.
+    const stem = [
+      `${area.theatre} saw its sharpest activity around`,
+      `${area.theatre} saw heavier activity around`,
+      `${area.theatre} also registered activity around`,
+    ][v];
+    opening = `${stem} ${where}, ${reach}.`;
   } else {
-    opening = `${area.theatre} ${position}, with ${activity} reported across the country and ${impacts} most exposed.`;
+    const stem = [
+      `${area.theatre} saw`,
+      `${area.theatre} also saw`,
+      `${area.theatre} likewise saw`,
+    ][v];
+    opening = `${stem} ${activity} reported across the country, with ${impacts} most exposed.`;
   }
 
   // Concrete events — real attacks first (eventScore), named with their dates.
@@ -1007,14 +1021,17 @@ function buildSituation(
   if (leaders.length > 1) {
     // Co-leading theatres get equal billing — a tied theatre is never demoted.
     // Lead by IMPACT ("most serious"), not by volume ("similar levels").
-    placeSentence = `${joinList(
+    placeSentence = `The most serious activity this period spans ${joinList(
       leaders.map((a) => a.theatre),
-    )} are the most serious theatres this period.`;
+    )}.`;
     othersStart = leaders.length;
   } else {
-    placeSentence = f.hasFocus
-      ? `${lead.theatre} is the most serious theatre this period, with the worst activity around ${where}.`
-      : `${lead.theatre} is the most serious theatre this period.`;
+    const focusBit = f.hasFocus
+      ? f.localised
+        ? `, around ${where}`
+        : `, with recent attacks around ${where}`
+      : "";
+    placeSentence = `The most serious activity this period is in ${lead.theatre}${focusBit}.`;
     othersStart = 1;
   }
   // The standout incident is drawn from across the co-leaders, not just areas[0].
@@ -1074,7 +1091,7 @@ function buildWhatMatters(
   // Refer back to the worst-hit areas generically — they are named in full in
   // the Situation overview and the lead theatre block above.
   const where = f.hasFocus
-    ? `the worst-hit parts of ${lead.theatre}`
+    ? `the hardest-hit parts of ${lead.theatre}`
     : `the affected areas in ${lead.theatre}`;
   const para1 = `The priority is people. Anyone travelling through or working near ${where} risks being caught in an attack, a security sweep, a checkpoint or a sudden road closure.`;
   const scope =
@@ -1142,9 +1159,9 @@ function buildPolestarView(
     // Co-leading theatres are named jointly; the theatres below them are handled
     // by secondaryClause (a deadly second reads "also serious", never demoted
     // alongside a quiet one). Lead by IMPACT.
-    opening = `${joinList(
+    opening = `The most serious activity this period spans ${joinList(
       leaders.map((a) => a.theatre),
-    )} are the most serious theatres this period.${secondaryClause(
+    )}.${secondaryClause(
       areas,
       leaders.length,
       1,
@@ -1158,11 +1175,11 @@ function buildPolestarView(
     // paragraph and the sub-national honesty rule.
     const focusClause =
       primary && fLead.localised
-        ? `, its activity concentrated around ${primary}`
+        ? `, concentrated around ${primary}`
         : primary
-          ? `, with ${primary} among the worst-hit areas`
+          ? `, with ${primary} among the areas most affected`
           : "";
-    opening = `${lead.theatre} is the most serious theatre this period${focusClause}.${secondaryClause(
+    opening = `The most serious activity this period is in ${lead.theatre}${focusClause}.${secondaryClause(
       areas,
       1,
       1,
@@ -1175,7 +1192,7 @@ function buildPolestarView(
         pulledNames.length > 1 ? "warrant" : "warrants"
       } watching after high-impact attacks just before this period.`
     : "";
-  const action = ` The response is straightforward: keep people clear of the worst-hit areas, tighten journey and route planning, protect the sites that matter most, and agree evacuation triggers well in advance.`;
+  const action = ` The response is straightforward: keep people clear of the affected areas, tighten journey and route planning, protect the sites that matter most, and agree evacuation triggers well in advance.`;
   return `${opening}${pulledSentence}${action}`;
 }
 
