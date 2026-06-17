@@ -66,7 +66,13 @@ export const GetDashboardOverviewResponse = zod.object({
   "reportDate": zod.coerce.date().nullish(),
   "url": zod.string(),
   "matchScore": zod.number()
-}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.')),
+  "fatalities": zod.number().nullish(),
+  "actors": zod.string().nullish(),
+  "gdeltEventType": zod.string().nullish(),
+  "gdeltSubEventType": zod.string().nullish(),
+  "gdeltConfidence": zod.number().nullish(),
+  "gdeltEnrichedAt": zod.coerce.date().nullish()
 })),
   "sourceAlerts": zod.array(zod.object({
   "id": zod.number(),
@@ -323,7 +329,13 @@ export const ListIncidentsResponseItem = zod.object({
   "reportDate": zod.coerce.date().nullish(),
   "url": zod.string(),
   "matchScore": zod.number()
-}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.')),
+  "fatalities": zod.number().nullish(),
+  "actors": zod.string().nullish(),
+  "gdeltEventType": zod.string().nullish(),
+  "gdeltSubEventType": zod.string().nullish(),
+  "gdeltConfidence": zod.number().nullish(),
+  "gdeltEnrichedAt": zod.coerce.date().nullish()
 })
 export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
@@ -377,7 +389,13 @@ export const GetIncidentResponse = zod.object({
   "reportDate": zod.coerce.date().nullish(),
   "url": zod.string(),
   "matchScore": zod.number()
-}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.')),
+  "fatalities": zod.number().nullish(),
+  "actors": zod.string().nullish(),
+  "gdeltEventType": zod.string().nullish(),
+  "gdeltSubEventType": zod.string().nullish(),
+  "gdeltConfidence": zod.number().nullish(),
+  "gdeltEnrichedAt": zod.coerce.date().nullish()
 })
 
 
@@ -426,7 +444,13 @@ export const UpdateIncidentResponse = zod.object({
   "reportDate": zod.coerce.date().nullish(),
   "url": zod.string(),
   "matchScore": zod.number()
-}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.')),
+  "fatalities": zod.number().nullish(),
+  "actors": zod.string().nullish(),
+  "gdeltEventType": zod.string().nullish(),
+  "gdeltSubEventType": zod.string().nullish(),
+  "gdeltConfidence": zod.number().nullish(),
+  "gdeltEnrichedAt": zod.coerce.date().nullish()
 })
 
 
@@ -471,7 +495,13 @@ export const GetRecentIncidentsResponseItem = zod.object({
   "reportDate": zod.coerce.date().nullish(),
   "url": zod.string(),
   "matchScore": zod.number()
-}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.'))
+}).describe('An independent OFFICIAL corroborating reference for an incident (e.g. a UN OCHA ReliefWeb report covering the same country, timeframe and event). A separate signal — it never overwrites the incident\'s confidence.')),
+  "fatalities": zod.number().nullish(),
+  "actors": zod.string().nullish(),
+  "gdeltEventType": zod.string().nullish(),
+  "gdeltSubEventType": zod.string().nullish(),
+  "gdeltConfidence": zod.number().nullish(),
+  "gdeltEnrichedAt": zod.coerce.date().nullish()
 })
 export const GetRecentIncidentsResponse = zod.array(GetRecentIncidentsResponseItem)
 

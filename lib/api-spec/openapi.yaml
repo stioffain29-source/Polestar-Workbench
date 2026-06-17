@@ -1024,6 +1024,15 @@ components:
         corroborations:
           type: array
           items: { $ref: "#/components/schemas/Corroboration" }
+        # GDELT precision-enrichment fields (additive). Null unless the GDELT
+        # pass matched this incident to a structured ACLED-style event; every
+        # surface falls back to the base fields when absent.
+        fatalities: { type: ["integer", "null"] }
+        actors: { type: ["string", "null"] }
+        gdeltEventType: { type: ["string", "null"] }
+        gdeltSubEventType: { type: ["string", "null"] }
+        gdeltConfidence: { type: ["number", "null"] }
+        gdeltEnrichedAt: { type: ["string", "null"], format: date-time }
 
     IncidentInput:
       type: object

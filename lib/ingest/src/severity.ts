@@ -13,6 +13,36 @@
 
 export type Severity = "insignificant" | "low" | "moderate" | "high" | "extreme";
 
+// Ordinal rank for the five-tier vocabulary, lowest -> highest. Used to take
+// the STRONGER of two severities (e.g. a text-classified tier vs a tier implied
+// by a structured GDELT fatality count) without ever silently downgrading.
+export const SEVERITY_RANK: Record<Severity, number> = {
+  insignificant: 0,
+  low: 1,
+  moderate: 2,
+  high: 3,
+  extreme: 4,
+};
+
+/** Return whichever severity is the more severe of the two. */
+export function maxSeverity(a: Severity, b: Severity): Severity {
+  return SEVERITY_RANK[a] >= SEVERITY_RANK[b] ? a : b;
+}
+
+/**
+ * Severity FLOOR implied by a confirmed fatality count from a structured feed
+ * (GDELT). A protest/unrest event with one or more confirmed deaths is at least
+ * Extreme (matching the EXTREME tier's casualty signals); a fatality count of
+ * zero is informative but carries no floor. Null when no count is known. This
+ * lets severity scoring consume the structured fatality field where present and
+ * fall back to text classification when absent.
+ */
+export function severityFromFatalities(fatalities: number | null | undefined): Severity | null {
+  if (fatalities === null || fatalities === undefined) return null;
+  if (!Number.isFinite(fatalities) || fatalities <= 0) return null;
+  return "extreme";
+}
+
 // Topics whose incidents are content-classified by classifySeverity.
 export type SeverityTopic =
   | "flashpoint"

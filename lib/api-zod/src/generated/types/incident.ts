@@ -35,4 +35,16 @@ export interface Incident {
   analystNotes?: string | null;
   createdAt: Date;
   corroborations: Corroboration[];
+  /** @nullable */
+  fatalities?: number | null;
+  /** @nullable */
+  actors?: string | null;
+  /** @nullable */
+  gdeltEventType?: string | null;
+  /** @nullable */
+  gdeltSubEventType?: string | null;
+  /** @nullable */
+  gdeltConfidence?: number | null;
+  /** @nullable */
+  gdeltEnrichedAt?: Date | null;
 }

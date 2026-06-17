@@ -202,6 +202,27 @@ export async function runDataMigrations(): Promise<void> {
         ON incident_corroborations (incident_id)
     `);
 
+    // Schema: GDELT precision-enrichment layer (additive). Same rationale as the
+    // corroboration columns above — drizzle push only reaches dev, so the prod
+    // primary gains these nullable columns here on boot. All IF NOT EXISTS /
+    // idempotent. They hold the structured ACLED-style fields GDELT attaches to
+    // matched flashpoint rows (precise geo lives in latitude/longitude/location
+    // which already exist); every column is nullable so un-matched rows are
+    // unaffected and every surface falls back to the base fields.
+    //   - fatalities          : confirmed death count from the AI-coded event.
+    //   - actors              : named actor pair ("Protesters / Police").
+    //   - gdelt_event_type    : ACLED event_type (Protests / Riots).
+    //   - gdelt_sub_event_type: finer ACLED sub_event_type.
+    //   - gdelt_confidence    : AI coding confidence 0..1.
+    //   - gdelt_enriched_at   : last time the enrichment pass examined the row
+    //     (drives the bounded, low-cadence back-match / QU throttle).
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS fatalities integer`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS actors text`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_event_type text`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_sub_event_type text`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_confidence double precision`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_enriched_at timestamptz`);
+
     // 0) Country report narrative is now fully data-driven: the Situation,
     //    What Happened and Implications sections are generated from the live
     //    7-day window at render time and the stored overview / trend_summary

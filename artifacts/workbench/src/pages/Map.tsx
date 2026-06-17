@@ -93,6 +93,13 @@ type Point = {
   rating: string;
   summary: string;
   corroborations: Corroboration[];
+  // GDELT precision-enrichment fields — present only when the GDELT pass matched
+  // this incident; the popup shows them when set and is silent otherwise.
+  fatalities: number | null;
+  actors: string | null;
+  gdeltEventType: string | null;
+  gdeltSubEventType: string | null;
+  gdeltConfidence: number | null;
 };
 
 export default function MapPage() {
@@ -156,6 +163,11 @@ export default function MapPage() {
           rating: i.severity,
           summary: i.summary,
           corroborations: i.corroborations ?? [],
+          fatalities: i.fatalities ?? null,
+          actors: i.actors ?? null,
+          gdeltEventType: i.gdeltEventType ?? null,
+          gdeltSubEventType: i.gdeltSubEventType ?? null,
+          gdeltConfidence: i.gdeltConfidence ?? null,
           };
         });
     }
@@ -175,6 +187,11 @@ export default function MapPage() {
         rating: munitionRating(s.munition),
         summary: `${s.munition.replace(/_/g, " ")} on ${s.targetCategory.replace(/_/g, " ")} in ${s.country}.`,
         corroborations: [],
+        fatalities: null,
+        actors: null,
+        gdeltEventType: null,
+        gdeltSubEventType: null,
+        gdeltConfidence: null,
       }));
   }, [view, incidents, maritime, land]);
 
@@ -339,6 +356,48 @@ export default function MapPage() {
                                 </li>
                               ))}
                             </ul>
+                          </div>
+                        )}
+                        {(p.fatalities != null ||
+                          p.actors ||
+                          p.gdeltEventType ||
+                          p.gdeltSubEventType ||
+                          p.gdeltConfidence != null) && (
+                          <div style={{ marginTop: 6 }}>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.08em",
+                                color: "#4655FF",
+                              }}
+                            >
+                              GDELT structured coding
+                            </div>
+                            <div style={{ fontSize: 11, color: "#363636", marginTop: 2, lineHeight: 1.35 }}>
+                              {p.fatalities != null && (
+                                <div>
+                                  <strong>Fatalities:</strong> {p.fatalities}
+                                </div>
+                              )}
+                              {p.actors && (
+                                <div>
+                                  <strong>Actors:</strong> {p.actors}
+                                </div>
+                              )}
+                              {(p.gdeltEventType || p.gdeltSubEventType) && (
+                                <div>
+                                  <strong>Event:</strong>{" "}
+                                  {[p.gdeltEventType, p.gdeltSubEventType].filter(Boolean).join(" · ")}
+                                </div>
+                              )}
+                              {p.gdeltConfidence != null && (
+                                <div>
+                                  <strong>Confidence:</strong> {Math.round(p.gdeltConfidence * 100)}%
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                         <button

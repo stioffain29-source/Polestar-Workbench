@@ -1,6 +1,6 @@
 import { db, incidentsTable } from "@workspace/db";
 import { and, eq, like, inArray } from "drizzle-orm";
-import { classifySeverity, type Severity } from "./severity";
+import { classifySeverity, maxSeverity, severityFromFatalities, type Severity } from "./severity";
 import type { IngestOptions } from "./types";
 
 // One-off (idempotent) reclassification of already-ingested rows.
@@ -51,6 +51,7 @@ export async function runSeverityBackfill(opts: IngestOptions = {}): Promise<Sev
       title: incidentsTable.title,
       summary: incidentsTable.summary,
       severity: incidentsTable.severity,
+      fatalities: incidentsTable.fatalities,
     })
     .from(incidentsTable)
     .where(
@@ -65,7 +66,12 @@ export async function runSeverityBackfill(opts: IngestOptions = {}): Promise<Sev
 
   for (const r of rows) {
     const topic = r.topic === "cargo_watch" ? "cargo_watch" : "flashpoint";
-    const next = classifySeverity(r.title, r.summary ?? "", topic);
+    // Text classification is the base, but never below the floor implied by a
+    // structured GDELT fatality count — otherwise this re-rate would silently
+    // revert a fatal-protest Extreme back to a keyword-only tier.
+    const fromText = classifySeverity(r.title, r.summary ?? "", topic);
+    const floor = severityFromFatalities(r.fatalities);
+    const next = floor ? maxSeverity(fromText, floor) : fromText;
     distribution[next]++;
     if (next !== r.severity) updates.push({ id: r.id, severity: next });
   }

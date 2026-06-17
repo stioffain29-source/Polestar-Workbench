@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, doublePrecision, integer } from "drizzle-orm/pg-core";
 
 export const incidentsTable = pgTable("incidents", {
   id: serial("id").primaryKey(),
@@ -34,6 +34,31 @@ export const incidentsTable = pgTable("incidents", {
   // a batch at a time, stamping this so it converges across runs rather than
   // re-querying every un-corroborated row forever.
   corroborationCheckedAt: timestamp("corroboration_checked_at", { withTimezone: true }),
+  // ---------------------------------------------------------------------------
+  // GDELT precision-enrichment layer (additive — see @workspace/ingest
+  // gdeltEnrich.ts). A low-cadence GDELT Conflict-Events pull cross-matches the
+  // keyword-scraped flashpoint rows and attaches the STRUCTURED, ACLED-style
+  // fields the keyword scraper cannot produce. All nullable: a row only carries
+  // these when GDELT matched it; every surface falls back to the base fields
+  // when absent. The keyword feed is NEVER replaced — GDELT only enriches.
+  // ---------------------------------------------------------------------------
+  // Confirmed fatality count from GDELT's AI-coded event (0+). Null = GDELT
+  // reported no count / no match. Feeds severity scoring (a fatal protest reads
+  // Extreme even when the headline carried no casualty word).
+  fatalities: integer("fatalities"),
+  // Named actor pair ("Protesters / Police"), GDELT actor1 / actor2.
+  actors: text("actors"),
+  // ACLED event_type (Protests / Riots) and finer sub_event_type.
+  gdeltEventType: text("gdelt_event_type"),
+  gdeltSubEventType: text("gdelt_sub_event_type"),
+  // GDELT AI coding confidence 0..1 for the matched event.
+  gdeltConfidence: doublePrecision("gdelt_confidence"),
+  // Last time the GDELT enrichment pass EXAMINED this incident (matched or
+  // not). Nullable = never checked. Drives the bounded, low-cadence back-match
+  // exactly like corroborationCheckedAt: the pass only re-checks rows it has
+  // not seen within the cadence interval, so QU usage stays inside the free
+  // budget and the pass converges across runs.
+  gdeltEnrichedAt: timestamp("gdelt_enriched_at", { withTimezone: true }),
 });
 
 export type Incident = typeof incidentsTable.$inferSelect;

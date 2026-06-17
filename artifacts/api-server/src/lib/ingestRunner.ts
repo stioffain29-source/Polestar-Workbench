@@ -12,11 +12,13 @@ import {
   runStrikesIngest,
   runTitleTranslation,
   runReliefWebCorroboration,
+  runGdeltEnrich,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
   type StrikesIngestSummary,
   type ReliefWebCorroborationSummary,
+  type GdeltEnrichSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 
@@ -53,6 +55,7 @@ export type IngestRunResult =
       marketSnapshot: MarketSnapshotSummary;
       strikes: StrikesIngestSummary;
       corroboration: ReliefWebCorroborationSummary;
+      gdeltEnrich: GdeltEnrichSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -164,6 +167,27 @@ function emptyCorroboration(err: unknown): ReliefWebCorroborationSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`ReliefWeb corroboration failed: ${msg}`],
+  };
+}
+
+function emptyGdeltEnrich(err: unknown): GdeltEnrichSummary {
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    provider: "gdelt",
+    mode: "commit",
+    enabled: true,
+    ran: false,
+    reason: "ok",
+    incidentsConsidered: 0,
+    countriesQueried: 0,
+    incidentsMatched: 0,
+    fieldsEnriched: 0,
+    geoUpgraded: 0,
+    severityRaised: 0,
+    quSpent: 0,
+    fetchOk: false,
+    errors: [msg],
+    logLines: [`GDELT enrichment failed: ${msg}`],
   };
 }
 
@@ -348,6 +372,29 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ReliefWeb corroboration pass failed");
       corroboration = emptyCorroboration(err);
     }
+    // GDELT precision enrichment. ADDITIVE — attaches structured ACLED-style
+    // fields (precise sub-national geo, fatality counts, named actors, event
+    // coding, AI confidence) onto EXISTING flashpoint rows; never replaces the
+    // keyword feed. Self-throttled (cadence gate + hard QU cap) so it no-ops on
+    // most runs and stays inside the free GDELT budget. Runs LAST and isolated
+    // in its own try so a GDELT outage or budget cap can never fail the ingest.
+    let gdeltEnrich: GdeltEnrichSummary;
+    try {
+      gdeltEnrich = await runGdeltEnrich({ commit: true });
+      logger.info(
+        {
+          ran: gdeltEnrich.ran,
+          reason: gdeltEnrich.reason,
+          incidentsMatched: gdeltEnrich.incidentsMatched,
+          countriesQueried: gdeltEnrich.countriesQueried,
+          quSpent: gdeltEnrich.quSpent,
+        },
+        "GDELT enrichment pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "GDELT enrichment pass failed");
+      gdeltEnrich = emptyGdeltEnrich(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
@@ -364,6 +411,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       marketSnapshot,
       strikes,
       corroboration,
+      gdeltEnrich,
     };
   });
   if (!res.ran) return res;

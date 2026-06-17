@@ -176,6 +176,18 @@ export interface Incident {
   analystNotes?: string | null;
   createdAt: string;
   corroborations: Corroboration[];
+  /** @nullable */
+  fatalities?: number | null;
+  /** @nullable */
+  actors?: string | null;
+  /** @nullable */
+  gdeltEventType?: string | null;
+  /** @nullable */
+  gdeltSubEventType?: string | null;
+  /** @nullable */
+  gdeltConfidence?: number | null;
+  /** @nullable */
+  gdeltEnrichedAt?: string | null;
 }
 
 export interface IncidentInput {
