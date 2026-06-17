@@ -890,6 +890,43 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3h) Delete a specific advocacy/demand headline the analyst removed
+    //     repeatedly — not a security incident. Marker-gated so it runs once
+    //     per environment (prod is writable only in the deployment runtime).
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "delete_zeliangrong_advocacy_incident_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const deleted = await db
+          .delete(incidentsTable)
+          .where(
+            and(
+              eq(
+                incidentsTable.title,
+                "Zeliangrong Intellectual Group Demands Ban on Kuki Militant Groups, Seeks Justice for Six Slain Nagas",
+              ),
+              like(incidentsTable.analystNotes, "auto-scraped:%"),
+            ),
+          );
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { deleted: deleted.rowCount ?? 0, marker: markerKey },
+          "One-time deletion of advocacy/demand headline (not an incident)",
+        );
+      }
+    }
+
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never
