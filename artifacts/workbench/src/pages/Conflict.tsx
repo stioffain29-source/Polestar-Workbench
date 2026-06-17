@@ -17,6 +17,7 @@ import {
   OPERATIONAL_IMPACTS, type ConflictCategory,
 } from "@/lib/conflictAnalysis";
 import { ExternalLink } from "lucide-react";
+import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -478,7 +479,10 @@ export default function Conflict() {
                     >
                       <LeafletTooltip>
                         <div className="text-xs">
-                          <div className="font-bold">{displayTitle(i)}</div>
+                          <div className="font-bold">
+                            {displayTitle(i)}
+                            <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
+                          </div>
                           <div>{i.country ?? "Location not identified"} · {i.category}</div>
                         </div>
                       </LeafletTooltip>
@@ -519,6 +523,7 @@ export default function Conflict() {
                           {isNaN(r.occurredDate.getTime()) ? "—" : format(r.occurredDate, "dd MMM")}
                         </span>
                         {displayTitle(r)}
+                        <UntranslatedBadge title={r.title} displayTitle={r.displayTitle} className="ml-1.5" />
                       </li>
                     ))}
                     {row.count > 3 && (
@@ -574,7 +579,10 @@ export default function Conflict() {
                         </span>
                       </td>
                       <td className="p-2 text-xs">{i.country ?? "—"}</td>
-                      <td className="p-2 font-medium">{displayTitle(i)}</td>
+                      <td className="p-2 font-medium">
+                        {displayTitle(i)}
+                        <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
+                      </td>
                       <td className="p-2 text-xs text-foreground/80">
                         {i.impacts.length > 0 ? i.impacts[0] : <span className="text-muted-foreground">—</span>}
                       </td>

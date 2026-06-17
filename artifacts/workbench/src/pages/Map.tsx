@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup } from "react-leaflet";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
+import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import "leaflet/dist/leaflet.css";
 import { useLocation } from "wouter";
 import {
@@ -86,6 +88,9 @@ type Point = {
   lat: number;
   lng: number;
   title: string;
+  // English advisory title when the ingest translation produced one; null
+  // otherwise. Lets the map flag a headline that is still in a foreign language.
+  displayTitle: string | null;
   category: string;
   country: string;
   location: string | null;
@@ -156,6 +161,7 @@ export default function MapPage() {
           lat: i.latitude! + dLat,
           lng: i.longitude! + dLng,
           title: i.title,
+          displayTitle: i.displayTitle ?? null,
           category: topicToCategory(i.topic),
           country: i.country,
           location: i.location ?? null,
@@ -180,6 +186,7 @@ export default function MapPage() {
         lat: s.latitude!,
         lng: s.longitude!,
         title: `${s.munition.replace(/_/g, " ")} · ${s.targetCategory.replace(/_/g, " ")}`,
+        displayTitle: null,
         category: fixedCat,
         country: s.country,
         location: s.location ?? null,
@@ -271,7 +278,16 @@ export default function MapPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
-        <div className="rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
+        <div className="relative rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
+          {liveOn && live && (!live.configured || !live.fetchedAt) && (
+            <div
+              className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 rounded-sm border border-border bg-card/95 text-[11px] font-sans text-muted-foreground shadow-none"
+            >
+              {!live.configured
+                ? "Liveuamap overlay unavailable — not configured."
+                : "Liveuamap overlay unavailable — upstream unreachable."}
+            </div>
+          )}
           <MapContainer
             center={[15, 80]}
             zoom={4}
@@ -305,7 +321,12 @@ export default function MapPage() {
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#666" }}>
                         {p.category}
                       </div>
-                      <div style={{ fontWeight: 700, color: "#0b0a3d", marginTop: 2 }}>{p.title}</div>
+                      <div style={{ fontWeight: 700, color: "#0b0a3d", marginTop: 2 }}>
+                        {displayIncidentTitle(p.title, p.displayTitle)}
+                        {p.id.startsWith("i-") && (
+                          <UntranslatedBadge title={p.title} displayTitle={p.displayTitle} className="ml-1.5" />
+                        )}
+                      </div>
                       <div style={{ fontSize: 11, color: "#363636", marginTop: 4 }}>
                         <div>
                           <strong>Country:</strong> {p.country}
@@ -328,7 +349,10 @@ export default function MapPage() {
                   {p.id.startsWith("i-") && (
                     <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
-                        <div style={{ fontWeight: 700, color: "#0b0a3d" }}>{p.title}</div>
+                        <div style={{ fontWeight: 700, color: "#0b0a3d" }}>
+                          {displayIncidentTitle(p.title, p.displayTitle)}
+                          <UntranslatedBadge title={p.title} displayTitle={p.displayTitle} className="ml-1.5" />
+                        </div>
                         {p.corroborations.length > 0 && (
                           <div style={{ marginTop: 6 }}>
                             <div
@@ -514,7 +538,7 @@ export default function MapPage() {
                 </div>
               ) : !live.configured ? (
                 <div className="text-[11px] font-sans text-muted-foreground">
-                  Live layer not configured yet.
+                  Overlay unavailable — not configured. The incident map is unaffected.
                 </div>
               ) : live.fetchedAt ? (
                 <div className="text-[11px] font-sans text-muted-foreground">
@@ -523,7 +547,7 @@ export default function MapPage() {
                 </div>
               ) : (
                 <div className="text-[11px] font-sans text-muted-foreground">
-                  Live layer temporarily unavailable.
+                  Overlay unavailable — upstream unreachable.
                 </div>
               )}
             </div>

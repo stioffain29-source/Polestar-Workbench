@@ -797,6 +797,31 @@ export const GetSourceHealthResponse = zod.object({
 })
 
 
+/**
+ * Unified status for each external integration (GDELT, ReliefWeb, Liveuamap, OpenAI). Reports configuration state and graceful-degradation evidence only — never the secret values themselves. Public endpoint.
+
+ * @summary Configuration and health status of external integrations
+ */
+export const GetIntegrationStatusResponse = zod.object({
+  "generatedAt": zod.coerce.date(),
+  "integrations": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['working', 'not_configured', 'failing_upstream', 'no_data', 'disabled', 'unknown']),
+  "summary": zod.string(),
+  "detail": zod.string().nullish(),
+  "configured": zod.boolean(),
+  "optional": zod.boolean(),
+  "envVars": zod.array(zod.string()),
+  "metrics": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string()
+})),
+  "docsUrl": zod.string().nullish()
+}))
+})
+
+
 export const ListReportsQueryParams = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "status": zod.enum(['draft', 'review', 'published']).optional()

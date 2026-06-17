@@ -16,10 +16,20 @@ export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
 export { runResolveGoogleNewsUrls, resolveGoogleNewsUrl, isGoogleNewsRedirect } from "./googleNewsUrl";
 export type { ResolveUrlSummary } from "./googleNewsUrl";
-export { runReliefWebCorroboration } from "./reliefweb";
+export {
+  runReliefWebCorroboration,
+  isReliefWebConfigured,
+  RELIEFWEB_NOT_CONFIGURED_MESSAGE,
+} from "./reliefweb";
 export type { ReliefWebCorroborationSummary } from "./reliefweb";
-export { runGdeltEnrich } from "./gdeltEnrich";
+export {
+  runGdeltEnrich,
+  isGdeltConfigured,
+  isGdeltEnrichEnabled,
+} from "./gdeltEnrich";
 export type { GdeltEnrichSummary } from "./gdeltEnrich";
+export { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "./sourceHealth";
+export type { FeedHealth } from "./sourceHealth";
 export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, isReactionLed } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";

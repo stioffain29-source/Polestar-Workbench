@@ -44,6 +44,7 @@ import type {
   Incident,
   IncidentInput,
   IncidentUpdate,
+  IntegrationStatusResponse,
   ListIncidentsParams,
   ListLiveuamapEventsParams,
   ListMarketPricesParams,
@@ -1683,6 +1684,85 @@ export function useGetSourceHealth<TData = Awaited<ReturnType<typeof getSourceHe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSourceHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetIntegrationStatusUrl = () => {
+
+
+
+
+  return `/api/integrations/status`
+}
+
+/**
+ * Unified status for each external integration (GDELT, ReliefWeb, Liveuamap, OpenAI). Reports configuration state and graceful-degradation evidence only — never the secret values themselves. Public endpoint.
+
+ * @summary Configuration and health status of external integrations
+ */
+export const getIntegrationStatus = async ( options?: RequestInit): Promise<IntegrationStatusResponse> => {
+
+  return customFetch<IntegrationStatusResponse>(getGetIntegrationStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntegrationStatusQueryKey = () => {
+    return [
+    `/api/integrations/status`
+    ] as const;
+    }
+
+
+export const getGetIntegrationStatusQueryOptions = <TData = Awaited<ReturnType<typeof getIntegrationStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntegrationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntegrationStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntegrationStatus>>> = ({ signal }) => getIntegrationStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntegrationStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntegrationStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getIntegrationStatus>>>
+export type GetIntegrationStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Configuration and health status of external integrations
+ */
+
+export function useGetIntegrationStatus<TData = Awaited<ReturnType<typeof getIntegrationStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntegrationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntegrationStatusQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

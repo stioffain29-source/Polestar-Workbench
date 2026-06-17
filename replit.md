@@ -20,6 +20,17 @@ _Replace the heading above with the project's name, and this line with one sente
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
+## Integration secrets (all OPTIONAL — each degrades gracefully)
+
+The four external integrations are non-essential: the core product (incident feeds, reports, PDFs, the map base layer) works with none of them set. Each one no-ops cleanly when its secret is absent. Live config + evidence is surfaced PUBLICLY on Source Health → "External Integrations" (and `GET /api/integrations/status`), which reports STATE and EVIDENCE only — never the secret values. Six states: `working`, `not_configured`, `failing_upstream`, `no_data`, `disabled`, `unknown`. Manage secrets via the environment-secrets workflow, never by hand-editing `.env`.
+
+- **GDELT Conflict Events** — `GDELT_CLOUD_API_KEY` (required to enable), `GDELT_ENRICH_ENABLED` (set `false` to switch off even when keyed → `disabled`), `GDELT_CLOUD_API_BASE` (optional endpoint override). Additive precision layer over flashpoint incidents (sub-national geo, confirmed fatalities, named actors); never inserts/removes rows. Unset → `not_configured`, base flashpoint feed unaffected.
+- **ReliefWeb (UN OCHA)** — `RELIEFWEB_APPNAME` (an APPROVED appname; the v2 API rejects unapproved names with 403 — request one at https://apidoc.reliefweb.int/parameters#appname). Cross-checks scraped incidents and attaches official corroboration links (Incidents/Topic screens, NOT PDFs). Unset → `not_configured` (the pass short-circuits; it is no longer mislabelled as a failing source).
+- **Liveuamap (live-map overlay)** — `LIVEUAMAP_API_KEY` (PAID). Server-side proxy only; the key never reaches the browser and upstream calls are TTL-cached. Unset → `not_configured`; the incident map works fully without it. Note: liveuamap.com 403s our egress IP (their Cloudflare block) → `failing_upstream` is expected even when keyed.
+- **OpenAI (AI narratives & translation)** — `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` (provisioned together by the AI integration). Powers AI country-report narratives and English translation of foreign-language incident headlines. Unset → `not_configured`: country reports fall back to the deterministic template (with an "AI narrative unavailable — template" label) and foreign headlines stay raw (flagged with an on-screen "untranslated" hint, never in PDFs).
+
+Other operational env (not integrations): `DATABASE_URL` (required), `SESSION_SECRET`, `INGEST_ADMIN_TOKEN` (gates `POST /api/admin/ingest` + sources mutations), `INGEST_INTERVAL_HOURS` / `INGEST_SCHEDULE_ENABLED` (ingest scheduler), `RELEVANCE_RULE_VERSION` / `INGEST_FORCE_VERSION` (backfill triggers).
+
 ## Where things live
 
 - Data-status model (live/manual/static + "Data as of" line): `artifacts/workbench/src/lib/reportDataStatus.ts` (`computeDataAsOf`, `formatDataAsOfLine`, `latestRecordDate`).

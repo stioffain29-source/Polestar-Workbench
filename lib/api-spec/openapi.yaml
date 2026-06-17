@@ -17,6 +17,7 @@ tags:
   - name: dashboard
   - name: cards
   - name: liveuamap
+  - name: integrations
 
 paths:
   /healthz:
@@ -394,6 +395,22 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SourceHealth" }
+
+  /integrations/status:
+    get:
+      operationId: getIntegrationStatus
+      tags: [integrations]
+      summary: Configuration and health status of external integrations
+      description: >
+        Unified status for each external integration (GDELT, ReliefWeb,
+        Liveuamap, OpenAI). Reports configuration state and graceful-degradation
+        evidence only — never the secret values themselves. Public endpoint.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IntegrationStatusResponse" }
 
   /reports:
     get:
@@ -2065,3 +2082,48 @@ components:
         events:
           type: array
           items: { $ref: "#/components/schemas/LiveuamapEvent" }
+
+    IntegrationStatusState:
+      type: string
+      enum:
+        - working
+        - not_configured
+        - failing_upstream
+        - no_data
+        - disabled
+        - unknown
+
+    IntegrationStatusMetric:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value: { type: string }
+
+    IntegrationStatusItem:
+      type: object
+      required: [key, label, status, summary, configured, optional, envVars, metrics]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        status: { $ref: "#/components/schemas/IntegrationStatusState" }
+        summary: { type: string }
+        detail: { type: ["string", "null"] }
+        configured: { type: boolean }
+        optional: { type: boolean }
+        envVars:
+          type: array
+          items: { type: string }
+        metrics:
+          type: array
+          items: { $ref: "#/components/schemas/IntegrationStatusMetric" }
+        docsUrl: { type: ["string", "null"] }
+
+    IntegrationStatusResponse:
+      type: object
+      required: [generatedAt, integrations]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        integrations:
+          type: array
+          items: { $ref: "#/components/schemas/IntegrationStatusItem" }

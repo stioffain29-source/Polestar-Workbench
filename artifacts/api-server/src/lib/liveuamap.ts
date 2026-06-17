@@ -198,6 +198,59 @@ function withCount(
   return { ...data, count, cached, events: data.events.slice(0, count) };
 }
 
+export type LiveuamapStatusState =
+  | "working"
+  | "not_configured"
+  | "failing_upstream"
+  | "no_data"
+  | "unknown";
+
+export interface LiveuamapStatus {
+  configured: boolean;
+  state: LiveuamapStatusState;
+  fetchedAt: string | null;
+  events: number;
+  freerequests: number | null;
+}
+
+/**
+ * Cheap status probe for the Integrations panel. Reuses the SAME cost-bounded,
+ * region-keyed cache as the public map endpoint (count never widens the key), so
+ * it never adds upstream cost beyond what the map already incurs. It warms the
+ * default region then reads the FULL cached page for an accurate event count
+ * (getLiveuamapEvents caches the whole page and only slices on return).
+ */
+export async function getLiveuamapStatus(): Promise<LiveuamapStatus> {
+  if (!isConfigured()) {
+    return { configured: false, state: "not_configured", fetchedAt: null, events: 0, freerequests: null };
+  }
+  // Warm/refresh through the shared cache (count=1 keeps the response tiny; the
+  // cache still stores the full page).
+  await getLiveuamapEvents(DEFAULT_REGION, 1);
+  const entry = cache.get(DEFAULT_REGION);
+  if (!entry) {
+    return { configured: true, state: "unknown", fetchedAt: null, events: 0, freerequests: null };
+  }
+  const events = entry.data.events.length;
+  // A hard failure with no stale page to fall back on stores fetchedAt: null.
+  if (!entry.ok && entry.data.fetchedAt === null) {
+    return {
+      configured: true,
+      state: "failing_upstream",
+      fetchedAt: null,
+      events,
+      freerequests: entry.data.freerequests ?? null,
+    };
+  }
+  return {
+    configured: true,
+    state: events > 0 ? "working" : "no_data",
+    fetchedAt: entry.data.fetchedAt,
+    events,
+    freerequests: entry.data.freerequests ?? null,
+  };
+}
+
 export async function getLiveuamapEvents(
   regionInput: string | undefined,
   countInput: number | undefined,

@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SEVERITY_LEVELS, CONFIDENCE_LEVELS, severityBadgeStyle } from "@/lib/topics";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
+import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { GdeltCoding, hasGdeltCoding } from "@/components/GdeltCoding";
 import { cn } from "@/lib/utils";
 
@@ -126,7 +128,8 @@ export default function Incidents() {
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic] ?? i.topic}</span></div>
                 <div className="p-3 font-medium min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate">{i.title}</span>
+                    <span className="truncate">{displayIncidentTitle(i.title, i.displayTitle)}</span>
+                    <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="shrink-0" />
                     {i.corroborations?.length ? (
                       <BadgeCheck
                         className="w-3.5 h-3.5 shrink-0 text-accent"

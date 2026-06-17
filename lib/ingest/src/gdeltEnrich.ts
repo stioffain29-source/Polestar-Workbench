@@ -60,8 +60,21 @@ const MIN_TITLE_SIM = 0.5;
 
 const DEMONSTRATIONS = "Demonstrations";
 
-function enabled(): boolean {
+/**
+ * True unless the pass is explicitly switched off with GDELT_ENRICH_ENABLED=false.
+ * (Default-on; the absence of an API key still makes the pass no-op cleanly.)
+ */
+export function isGdeltEnrichEnabled(): boolean {
   return process.env["GDELT_ENRICH_ENABLED"] !== "false";
+}
+
+/** True when a GDELT Cloud API key is present (required to make any call). */
+export function isGdeltConfigured(): boolean {
+  return !!process.env["GDELT_CLOUD_API_KEY"]?.trim();
+}
+
+function enabled(): boolean {
+  return isGdeltEnrichEnabled();
 }
 
 // --- APAC / Pacific scope (mirrors gdelt-eval.ts) ---------------------------

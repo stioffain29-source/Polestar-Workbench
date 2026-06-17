@@ -1,5 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, countryReportsTable, countryReportProseTable } from "@workspace/db";
+import {
+  db,
+  countryReportsTable,
+  countryReportProseTable,
+  type CountryProseSections,
+} from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { GenerateCountryProseBody, EditCountryProseBody } from "@workspace/api-zod";
 import {
@@ -14,6 +19,34 @@ const router: IRouter = Router();
 
 function slugOf(raw: string | string[] | undefined): string {
   return Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
+}
+
+// Empty narrative used when the AI prose engine is unavailable. The client treats
+// `available: false` exactly like a generation failure (renders its deterministic
+// template + a visible "AI narrative unavailable" label), so an unconfigured /
+// failing LLM degrades gracefully instead of hard-failing the country brief.
+const EMPTY_PROSE_SECTIONS: CountryProseSections = {
+  executiveSummary: "",
+  situation: "",
+  whatHappened: "",
+  whatMatters: "",
+  implications: [],
+  watchNext: [],
+  polestarView: "",
+};
+
+// A 200 "unavailable" payload — same shape as a success, but available:false and
+// empty sections. NOTHING is persisted: a transient/never-configured LLM must not
+// poison the prose cache with blank rows.
+function unavailableProse(fingerprint: string) {
+  return {
+    available: false as const,
+    fingerprint,
+    sections: EMPTY_PROSE_SECTIONS,
+    edited: null,
+    model: "unavailable",
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 // POST /countries/:slug/prose — return cached AI prose for the current incident
@@ -70,7 +103,9 @@ router.post("/countries/:slug/prose", async (req, res): Promise<void> => {
   }
 
   if (!isLlmAvailable()) {
-    res.status(503).json({ error: "llm-unavailable" });
+    // Graceful degradation: never hard-503 the country brief. Return a 200
+    // "unavailable" payload so the client falls back to its template narrative.
+    res.json(unavailableProse(fingerprint));
     return;
   }
 
@@ -86,7 +121,9 @@ router.post("/countries/:slug/prose", async (req, res): Promise<void> => {
 
   if (!outcome.ok) {
     req.log.warn({ slug, error: outcome.error }, "country prose generation failed");
-    res.status(503).json({ error: outcome.error });
+    // Upstream LLM call failed — degrade to the template narrative rather than
+    // hard-failing. Do not persist the empty result.
+    res.json(unavailableProse(fingerprint));
     return;
   }
 

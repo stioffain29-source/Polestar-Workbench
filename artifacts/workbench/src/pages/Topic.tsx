@@ -17,6 +17,8 @@ import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRa
 import { MarketPricesSection, IncidentDerivedPanel, type DerivedIncidentRow } from "@/components/MarketPrices";
 import { ExternalLink, BadgeCheck } from "lucide-react";
 import { GdeltCoding } from "@/components/GdeltCoding";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
+import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -499,7 +501,10 @@ export default function Topic() {
                     >
                       <LeafletTooltip>
                         <div className="text-xs">
-                          <div className="font-bold">{i.title}</div>
+                          <div className="font-bold">
+                            {displayIncidentTitle(i.title, i.displayTitle)}
+                            <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
+                          </div>
                           <div>{i.country ?? "Location not identified"}</div>
                         </div>
                       </LeafletTooltip>
@@ -561,7 +566,8 @@ export default function Topic() {
                       </td>
                       <td className="p-2 text-xs">{i.country ?? "—"}</td>
                       <td className="p-2 font-medium">
-                        {i.title}
+                        {displayIncidentTitle(i.title, i.displayTitle)}
+                        <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
                         {i.corroborations?.length ? (
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span className="inline-flex items-center gap-1 text-[10px] font-sans font-semibold uppercase tracking-wider text-accent">

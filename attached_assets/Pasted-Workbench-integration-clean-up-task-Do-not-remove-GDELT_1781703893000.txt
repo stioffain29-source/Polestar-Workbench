@@ -1,0 +1,136 @@
+Workbench integration clean-up task
+
+Do not remove GDELT, ReliefWeb, Liveuamap or OpenAI.
+
+The latest integration check confirms these are not dead integrations. They are mostly present but not fully configured, or not properly surfaced in the UI.
+
+Carry out a clean-up pass focused only on configuration, visibility and graceful failure states.
+
+1. GDELT
+
+Current status:
+
+Present but not configured.
+Code exists and is wired into ingest.
+No GDELT_CLOUD_API_KEY is currently present.
+GDELT is not shown in Source Health.
+
+Tasks:
+
+Ensure GDELT remains wired into ingest.
+Add clear documentation for the required Replit Secret: GDELT_CLOUD_API_KEY.
+Add GDELT to Source Health or an equivalent integration status view.
+If the key is missing, show: Not configured.
+Do not show it as failed when the key is missing.
+After the key is added, provide a way to confirm whether gdelt_enriched_at rows increase after ingest.
+
+2. ReliefWeb
+
+Current status:
+
+Present but not configured.
+Code exists and is wired into ingest.
+RELIEFWEB_APPNAME is missing or using a placeholder.
+The placeholder causes a 403 response.
+Source Health currently shows ReliefWeb as operational, which is misleading.
+
+Tasks:
+
+Keep ReliefWeb integration in place.
+Document required config: RELIEFWEB_APPNAME.
+If RELIEFWEB_APPNAME is missing or placeholder, show ReliefWeb as Not configured.
+Do not mark it operational until it has successfully returned usable data.
+After configuration, confirm incident_corroborations increases after ingest.
+Make Source Health reflect the true state.
+
+3. Liveuamap
+
+Current status:
+
+Configured and wired.
+LIVEUAMAP_API_KEY is present.
+The app route works.
+The upstream feed returns no usable events from the current server environment.
+This appears to be an upstream access or egress IP issue, not a local code issue.
+
+Tasks:
+
+Do not remove Liveuamap.
+Keep graceful failure.
+Make the map state clear when the overlay is unavailable.
+Show: Liveuamap overlay unavailable, rather than leaving an empty map layer unexplained.
+Document that the owner needs to confirm plan access, server to server access, or IP allowlisting with Liveuamap.
+Do not spend time rewriting the Liveuamap parser unless the upstream access issue is resolved first.
+
+4. OpenAI translation and prose
+
+Current status:
+
+Present but not configured.
+Translation and country prose code exists.
+OpenAI env names are correct.
+The Replit OpenAI integration has not been added.
+Translation has worked before because display_title exists on 74 incidents.
+Country prose currently returns 503 when OpenAI is unavailable.
+
+Tasks:
+
+Do not remove OpenAI code.
+Document that the Replit OpenAI integration must be added.
+Do not manually hardcode API keys.
+Required env vars are:
+
+AI_INTEGRATIONS_OPENAI_API_KEY
+AI_INTEGRATIONS_OPENAI_BASE_URL
+
+Improve failure behaviour:
+
+If OpenAI is not configured, country prose should fall back to a deterministic template.
+Do not return a hard 503 for normal country reporting.
+For untranslated headlines, clearly label them as untranslated rather than silently presenting raw foreign-language titles.
+
+5. Source Health and status display
+
+Create a cleaner status model for integrations:
+
+Working
+Not configured
+Configured but failing upstream
+Configured but no data returned
+Disabled intentionally
+Unknown
+
+Apply this to:
+
+GDELT
+ReliefWeb
+Liveuamap
+OpenAI
+
+Do not treat missing secrets as source failures.
+Do not treat a blocked upstream as a broken local integration.
+Do not show dormant sources as operational.
+
+6. Testing required
+
+After changes, test:
+
+GDELT missing key shows Not configured.
+ReliefWeb missing or placeholder appname shows Not configured.
+Liveuamap key present but upstream failure shows overlay unavailable.
+OpenAI missing integration causes country prose to use a template fallback, not fail.
+Source Health no longer falsely shows ReliefWeb as operational.
+No existing ingest, map, topic, incident or country report pages are broken.
+
+Run:
+
+pnpm run typecheck
+
+Provide a short change note showing:
+
+Files changed
+Status behaviour added
+Secrets required
+What still needs to be done by the owner
+What was tested
+What was not tested

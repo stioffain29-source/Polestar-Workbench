@@ -54,7 +54,20 @@ export interface FeedHealth {
 export async function recordSourceHealth(
   topic: string,
   feeds: FeedHealth[],
-  opts: { sourceType?: string; reliability?: number; notes?: string } = {},
+  opts: {
+    sourceType?: string;
+    reliability?: number;
+    notes?: string;
+    /**
+     * When true the feed is an OPTIONAL integration that is not configured
+     * (e.g. ReliefWeb without an approved appname). It is recorded as
+     * "not_configured" — a distinct, non-alarming state — rather than
+     * "operational" (misleading: it is doing nothing) or "failing" (misleading:
+     * nothing is broken, it is simply switched off). Timestamps and the failure
+     * streak are cleared so it never reads as a recovered or escalating feed.
+     */
+    notConfigured?: boolean;
+  } = {},
 ): Promise<void> {
   const now = new Date();
   const sourceType = opts.sourceType ?? "rss";
@@ -81,11 +94,24 @@ export async function recordSourceHealth(
         status: string;
         errorMessage: string | null;
         consecutiveFailures: number;
-        lastSuccessAt?: Date;
-        lastFailureAt?: Date;
+        lastSuccessAt?: Date | null;
+        lastFailureAt?: Date | null;
       };
 
-      if (f.ok) {
+      if (opts.notConfigured) {
+        // Optional integration switched off / not provisioned. Clear the
+        // success+failure timestamps so the UI shows neither "recovered" nor an
+        // escalating outage — just "not configured".
+        healthFields = {
+          url: f.url,
+          sourceType,
+          status: "not_configured",
+          errorMessage: (f.error ?? "Integration not configured").slice(0, 500),
+          consecutiveFailures: 0,
+          lastSuccessAt: null,
+          lastFailureAt: null,
+        };
+      } else if (f.ok) {
         // A successful fetch clears the error and the failure streak. Do NOT
         // touch last_failure_at — leaving it lets the UI see "recovered" (latest
         // success newer than latest failure).

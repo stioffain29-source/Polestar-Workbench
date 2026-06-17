@@ -1131,6 +1131,43 @@ export interface LiveuamapEventsResponse {
   events: LiveuamapEvent[];
 }
 
+export type IntegrationStatusState = typeof IntegrationStatusState[keyof typeof IntegrationStatusState];
+
+
+export const IntegrationStatusState = {
+  working: 'working',
+  not_configured: 'not_configured',
+  failing_upstream: 'failing_upstream',
+  no_data: 'no_data',
+  disabled: 'disabled',
+  unknown: 'unknown',
+} as const;
+
+export interface IntegrationStatusMetric {
+  label: string;
+  value: string;
+}
+
+export interface IntegrationStatusItem {
+  key: string;
+  label: string;
+  status: IntegrationStatusState;
+  summary: string;
+  /** @nullable */
+  detail?: string | null;
+  configured: boolean;
+  optional: boolean;
+  envVars: string[];
+  metrics: IntegrationStatusMetric[];
+  /** @nullable */
+  docsUrl?: string | null;
+}
+
+export interface IntegrationStatusResponse {
+  generatedAt: string;
+  integrations: IntegrationStatusItem[];
+}
+
 export type ListMarketPricesParams = {
 /**
  * Limit to one monitor group (fuel | energy | fertiliser)

@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import {
-  useListSources, useGetSourceHealth,
+  useListSources, useGetSourceHealth, useGetIntegrationStatus,
   useCreateSource, useUpdateSource, useDeleteSource,
   getListSourcesQueryKey, getGetSourceHealthQueryKey, getGetDashboardOverviewQueryKey,
   type Source,
+  type IntegrationStatusItem,
+  type IntegrationStatusState,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -53,6 +55,104 @@ const ACTION_PLAYBOOK: Record<string, ActionPlaybook> = {
 };
 function playbookFor(status: string): ActionPlaybook | null {
   return ACTION_PLAYBOOK[status] ?? null;
+}
+
+// Badge styling for the six unified integration states. Deliberately reserves
+// the subdued-red brand colour (#A33232) for the EXTREME severity tier ONLY —
+// none of these states uses it. Neutral states (not configured / disabled /
+// unknown) read muted, not alarming, because every integration here is OPTIONAL
+// and degrades gracefully when absent.
+const INTEGRATION_BADGE: Record<IntegrationStatusState, string> = {
+  working: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  failing_upstream: "bg-orange-100 text-orange-800 border border-orange-200",
+  no_data: "bg-amber-100 text-amber-800 border border-amber-200",
+  not_configured: "bg-muted text-muted-foreground border border-border",
+  disabled: "bg-muted text-muted-foreground border border-border",
+  unknown: "bg-muted text-muted-foreground border border-border",
+};
+const INTEGRATION_LABEL: Record<IntegrationStatusState, string> = {
+  working: "Working",
+  failing_upstream: "Upstream failing",
+  no_data: "No data yet",
+  not_configured: "Not configured",
+  disabled: "Disabled",
+  unknown: "Unknown",
+};
+
+function IntegrationRow({ item }: { item: IntegrationStatusItem }) {
+  return (
+    <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-[1.2fr_1.6fr_1.1fr] gap-3 text-sm">
+      <div>
+        <div className="font-serif font-bold text-primary">{item.label}</div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", INTEGRATION_BADGE[item.status])}>
+            {INTEGRATION_LABEL[item.status]}
+          </span>
+          {item.optional && (
+            <span className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Optional</span>
+          )}
+        </div>
+        <div className="text-[10px] font-mono text-muted-foreground mt-1.5 break-all">
+          {item.envVars.join(" · ")}
+        </div>
+      </div>
+      <div>
+        <div className="text-foreground">{item.summary}</div>
+        {item.detail && <div className="text-xs text-muted-foreground mt-1">{item.detail}</div>}
+        {item.docsUrl && (
+          <a
+            href={item.docsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-accent underline mt-1 inline-block"
+          >
+            Documentation
+          </a>
+        )}
+      </div>
+      <div>
+        <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Evidence</div>
+        {item.metrics.length === 0 ? (
+          <div className="text-xs text-muted-foreground">—</div>
+        ) : (
+          <div className="space-y-0.5">
+            {item.metrics.map((m, i) => (
+              <div key={i} className="flex justify-between gap-3 text-xs">
+                <span className="text-muted-foreground">{m.label}</span>
+                <span className="font-mono text-foreground">{m.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IntegrationsPanel() {
+  const { data, isLoading } = useGetIntegrationStatus();
+  const integrations = data?.integrations ?? [];
+  return (
+    <div className="bg-card border border-border rounded-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+        <div className="text-sm font-serif font-bold uppercase tracking-wide text-primary">External Integrations</div>
+        <div className="text-xs text-muted-foreground ml-1">
+          Optional enrichment &amp; overlay services — each degrades gracefully when absent
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">Checking integrations…</div>
+      ) : integrations.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">No integration status available.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {integrations.map((it) => (
+            <IntegrationRow key={it.key} item={it} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Sources() {
@@ -188,6 +288,8 @@ export default function Sources() {
           </div>
         </div>
       )}
+
+      <IntegrationsPanel />
 
       <div className="bg-card border border-border rounded-sm p-3 flex gap-2">
         <Select value={topic || "all"} onValueChange={(v) => setTopic(v === "all" ? "" : v)}>

@@ -422,7 +422,17 @@ export default function CountryReport() {
         },
       })
       .then((res) => {
-        if (!cancelled) setProseResult(res);
+        if (cancelled) return;
+        // The server returns 200 {available:false} (not a 503) when the AI prose
+        // engine is unconfigured or the upstream call failed. Treat it exactly
+        // like a thrown error: fall back to the deterministic template and show
+        // the unavailable hint.
+        if (!res.available) {
+          setProseResult(null);
+          setProseUnavailable(true);
+          return;
+        }
+        setProseResult(res);
       })
       .catch(() => {
         if (!cancelled) {
@@ -452,6 +462,12 @@ export default function CountryReport() {
           force: true,
         },
       });
+      // 200 {available:false} -> degrade to the template just like a thrown error.
+      if (!res.available) {
+        setProseResult(null);
+        setProseUnavailable(true);
+        return;
+      }
       setProseResult(res);
       setProseDraft(res.edited ?? res.sections);
       proseRequestKey.current = proseContentKey;
@@ -755,7 +771,7 @@ export default function CountryReport() {
       {proseUnavailable && (
         <div
           className="no-print"
-          style={{ fontFamily: ROBOTO, fontSize: 12, color: "#A33232", marginTop: 8, fontStyle: "italic" }}
+          style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 8, fontStyle: "italic" }}
         >
           AI narrative is unavailable right now — showing the template draft. Try Redraft shortly.
         </div>

@@ -11,6 +11,7 @@ import proseRouter from "./prose";
 import dashboardRouter from "./dashboard";
 import marketPricesRouter from "./marketPrices";
 import liveuamapRouter from "./liveuamap";
+import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
 import cardsRouter from "./cards";
@@ -31,6 +32,7 @@ router.use(countriesRouter);
 router.use(dashboardRouter);
 router.use(marketPricesRouter);
 router.use(liveuamapRouter);
+router.use(integrationsRouter);
 router.use(cardsRouter);
 
 export default router;

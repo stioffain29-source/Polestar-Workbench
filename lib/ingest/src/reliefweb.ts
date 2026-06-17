@@ -24,7 +24,24 @@ import { recordSourceHealth } from "./sourceHealth";
 const RELIEFWEB_ENDPOINT = "https://api.reliefweb.int/v2/reports";
 // Default placeholder; ReliefWeb rejects unapproved appnames with 403. Override
 // with an approved value via RELIEFWEB_APPNAME.
-const APPNAME = process.env.RELIEFWEB_APPNAME?.trim() || "polestar-advisory-workbench";
+const APPNAME_PLACEHOLDER = "polestar-advisory-workbench";
+const APPNAME = process.env.RELIEFWEB_APPNAME?.trim() || APPNAME_PLACEHOLDER;
+
+// Human-readable explanation surfaced on Source Health / the Integrations panel
+// when the appname is missing or still the placeholder.
+export const RELIEFWEB_NOT_CONFIGURED_MESSAGE =
+  "RELIEFWEB_APPNAME not set to an approved value — corroboration disabled. " +
+  "ReliefWeb's v2 API returns 403 without a pre-approved appname (request one at " +
+  "https://apidoc.reliefweb.int/parameters#appname).";
+
+/**
+ * True only when an approved ReliefWeb appname is configured. The default
+ * placeholder is rejected by the upstream (403), so it counts as unconfigured.
+ */
+export function isReliefWebConfigured(): boolean {
+  const v = process.env.RELIEFWEB_APPNAME?.trim();
+  return !!v && v !== APPNAME_PLACEHOLDER;
+}
 
 // A realistic desktop-browser User-Agent (mirrors feedFetch). Public APIs
 // sometimes throttle library-default agents.
@@ -337,6 +354,16 @@ export async function runReliefWebCorroboration(
   const log = (s: string) => logLines.push(s);
   log(`ReliefWeb corroboration — mode=${commit ? "COMMIT" : "DRY-RUN"}`);
 
+  // Short-circuit: without an approved appname the v2 API only returns 403, so
+  // there is no point fetching. Register the integration as not_configured (a
+  // distinct, non-alarming Source Health state) and return cleanly. Never let an
+  // unconfigured optional integration read as "operational".
+  if (!isReliefWebConfigured()) {
+    log(RELIEFWEB_NOT_CONFIGURED_MESSAGE);
+    if (commit) await registerHealth({ configured: false, feedOk: false, usableData: false });
+    return summary(commit, 0, 0, 0, 0, 0, true, errors, logLines);
+  }
+
   const now = new Date();
   const recentCutoff = new Date(now.getTime() - RECENT_RECHECK_DAYS * 86400000);
   const recheckCutoff = new Date(now.getTime() - RECHECK_INTERVAL_HOURS * 3600000);
@@ -374,7 +401,11 @@ export async function runReliefWebCorroboration(
 
   log(`  selected ${rows.length} incident(s) to examine (cap ${MAX_INCIDENTS_PER_RUN})`);
   if (rows.length === 0) {
-    if (commit) await registerHealth(true);
+    // Nothing due for a re-check this run. The feed is reachable but produced no
+    // new matches now, so do not (re)assert "operational" here — leave the row
+    // as-is. usableData=false means registerHealth leaves an established row
+    // untouched rather than fabricating health from an empty run.
+    if (commit) await registerHealth({ configured: true, feedOk: true, usableData: false });
     return summary(commit, 0, 0, 0, 0, 0, true, errors, logLines);
   }
 
@@ -494,7 +525,11 @@ export async function runReliefWebCorroboration(
           rows.map((r) => r.id),
         ),
       );
-    await registerHealth(feedOk);
+    await registerHealth({
+      configured: true,
+      feedOk,
+      usableData: corroboratedIncidents.size > 0,
+    });
     log(`  committed: ${linksInserted} new link(s); stamped ${rows.length} incident(s) as checked`);
   } else {
     log(`  DRY-RUN — no rows written.`);
@@ -513,26 +548,60 @@ export async function runReliefWebCorroboration(
   );
 }
 
-/** Register ReliefWeb on Source Health under each humanitarian topic it backs. */
-async function registerHealth(ok: boolean): Promise<void> {
+/**
+ * Register ReliefWeb on Source Health under each humanitarian topic it backs.
+ *
+ * Four-way mapping onto the source row:
+ *  - !configured           → not_configured (cleared timestamps, never alarming).
+ *  - configured & !feedOk   → failing path (escalates after the streak threshold).
+ *  - configured & usableData → operational (it genuinely returned corroborations).
+ *  - configured & feedOk but no matches yet → leave the row untouched: we do NOT
+ *    fabricate "operational" for a reachable-but-empty integration. The richer
+ *    "no_data" nuance is carried by the Integrations panel instead.
+ */
+async function registerHealth(opts: {
+  configured: boolean;
+  feedOk: boolean;
+  usableData: boolean;
+}): Promise<void> {
+  const notes =
+    "UN OCHA ReliefWeb — official corroboration of scraped incidents (country + timeframe + event match). Auto-monitored each ingest run.";
   for (const topic of HUMANITARIAN_TOPICS) {
-    await recordSourceHealth(
-      topic,
-      [
-        {
-          name: "ReliefWeb (UN OCHA)",
-          url: "https://reliefweb.int",
-          ok,
-          error: ok ? null : "ReliefWeb corroboration query failed",
-        },
-      ],
-      {
-        sourceType: "api",
-        reliability: 5,
-        notes:
-          "UN OCHA ReliefWeb — official corroboration of scraped incidents (country + timeframe + event match). Auto-monitored each ingest run.",
-      },
-    );
+    if (!opts.configured) {
+      await recordSourceHealth(
+        topic,
+        [
+          {
+            name: "ReliefWeb (UN OCHA)",
+            url: "https://reliefweb.int",
+            ok: false,
+            error: RELIEFWEB_NOT_CONFIGURED_MESSAGE,
+          },
+        ],
+        { sourceType: "api", reliability: 5, notes, notConfigured: true },
+      );
+    } else if (!opts.feedOk) {
+      await recordSourceHealth(
+        topic,
+        [
+          {
+            name: "ReliefWeb (UN OCHA)",
+            url: "https://reliefweb.int",
+            ok: false,
+            error: "ReliefWeb corroboration query failed",
+          },
+        ],
+        { sourceType: "api", reliability: 5, notes },
+      );
+    } else if (opts.usableData) {
+      await recordSourceHealth(
+        topic,
+        [{ name: "ReliefWeb (UN OCHA)", url: "https://reliefweb.int", ok: true, error: null }],
+        { sourceType: "api", reliability: 5, notes },
+      );
+    }
+    // else: configured + reachable + no matches this run → intentionally leave
+    // the existing row untouched.
   }
 }
 

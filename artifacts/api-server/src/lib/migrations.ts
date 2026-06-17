@@ -9,6 +9,8 @@ import {
   severityFromFatalities,
   maxSeverity,
   SEVERITY_RANK,
+  isReliefWebConfigured,
+  RELIEFWEB_NOT_CONFIGURED_MESSAGE,
   type Severity,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -209,6 +211,36 @@ export async function runDataMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS incident_corroborations_incident_idx
         ON incident_corroborations (incident_id)
     `);
+
+    // Relabel: when ReliefWeb has no APPROVED appname, its Source Health rows must
+    // not read as "operational". Earlier builds registered the corroboration pass
+    // as operational regardless of configuration, so existing prod rows can carry
+    // a misleading green status even though the v2 API only ever returns 403 for
+    // an unapproved appname. Correct them to "not_configured" (a distinct,
+    // non-alarming state) and clear the success/failure timestamps + streak so the
+    // UI shows neither "recovered" nor an escalating outage.
+    //
+    // NOT marker-gated: the condition depends on the CURRENT env, so it re-checks
+    // every boot. Idempotent — the WHERE clause only touches rows that disagree.
+    // If an approved appname is later configured, the next ingest run flips the
+    // row back to operational and this block stops matching.
+    if (!isReliefWebConfigured()) {
+      const relabel = await db.execute(sql`
+        UPDATE sources
+        SET status = 'not_configured',
+            error_message = ${RELIEFWEB_NOT_CONFIGURED_MESSAGE},
+            consecutive_failures = 0,
+            last_success_at = NULL,
+            last_failure_at = NULL
+        WHERE name = 'ReliefWeb (UN OCHA)' AND status <> 'not_configured'
+      `);
+      if ((relabel.rowCount ?? 0) > 0) {
+        logger.info(
+          { rows: relabel.rowCount ?? 0 },
+          "runDataMigrations: relabelled unconfigured ReliefWeb source rows to not_configured",
+        );
+      }
+    }
 
     // Schema: GDELT precision-enrichment layer (additive). Same rationale as the
     // corroboration columns above — drizzle push only reaches dev, so the prod
