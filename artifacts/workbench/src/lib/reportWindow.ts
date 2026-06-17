@@ -9,11 +9,10 @@ export type Cadence = "weekly" | "monthly";
 
 // Topics published on a monthly cadence (30-day window). Everything else is
 // weekly. Fertiliser joins Cargo Watch here so its report window matches the
-// Fertiliser dashboard's 30-day scope instead of a 7-day slice. Conflict joins
-// them too: armed theatres burn slowly and unevenly, so a 7-day slice made the
-// report claim "no other theatres" while active fronts (West Papua, Myanmar)
-// sat just outside the window.
-const MONTHLY_TOPICS = new Set<string>(["cargo_watch", "fertiliser", "conflict"]);
+// Fertiliser dashboard's 30-day scope instead of a 7-day slice. Conflict is a
+// WEEKLY product (per user): a 30-day window pulled in incidents from outside
+// the intended reporting week, so it stays out of this set.
+const MONTHLY_TOPICS = new Set<string>(["cargo_watch", "fertiliser"]);
 
 export function reportCadence(topic: string): Cadence {
   return MONTHLY_TOPICS.has(topic) ? "monthly" : "weekly";

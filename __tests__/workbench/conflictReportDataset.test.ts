@@ -311,9 +311,56 @@ describe("isGenericConflictProse", () => {
 });
 
 describe("conflict cadence", () => {
-  it("is monthly so slower-burn theatres fall inside the report window", () => {
-    expect(reportCadence("conflict")).toBe("monthly");
-    expect(reportWindowDefaultDays("conflict")).toBe(30);
+  it("is weekly so the report window matches its weekly reporting cadence", () => {
+    expect(reportCadence("conflict")).toBe("weekly");
+    expect(reportWindowDefaultDays("conflict")).toBe(7);
+  });
+});
+
+describe("buildConflictReportDataset — co-leading theatres", () => {
+  // Two theatres with effectively equal incident volume must SHARE the lead.
+  // Ranking one as the main concern and demoting the co-equal one to "quieter" /
+  // "at a lower level" contradicts the per-theatre counts the reader can see —
+  // the exact contradiction flagged on the live Conflict Watch report, where
+  // Pakistan and India were tied yet India was called "quieter".
+  const clash = (country: string) =>
+    `Armed clashes between troops and militants reported in ${country}`;
+  const many = (country: string, n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      inc({
+        id: `${country}-${i}`,
+        country,
+        severity: "high",
+        title: clash(country),
+      }),
+    );
+  const ds = buildConflictReportDataset(
+    [...many("Pakistan", 6), ...many("India", 6), ...many("Indonesia", 1)],
+    "conflict",
+    ISSUE_DATE,
+  );
+
+  it("names both tied theatres as the main concerns", () => {
+    expect(ds.autoSituation).toContain("Pakistan");
+    expect(ds.autoSituation).toContain("India");
+    expect(ds.autoSituation).toMatch(/Pakistan and India|India and Pakistan/);
+  });
+
+  it("never demotes the tied runner-up to 'quieter' or 'lower level'", () => {
+    // The "lower level"/"quieter" framing attaches only to the genuinely smaller
+    // theatre (Indonesia), never to the co-equal one.
+    expect(ds.autoSituation).not.toMatch(/India[^.]*lower level/i);
+    expect(ds.autoSituation).not.toMatch(/Pakistan[^.]*lower level/i);
+    expect(ds.autoPolestarView).not.toMatch(/India[^.]*quieter/i);
+    expect(ds.autoPolestarView).not.toMatch(/Pakistan[^.]*quieter/i);
+  });
+
+  it("does not claim one theatre holds most of the period's activity", () => {
+    // Pakistan is well under half the window here — the Polestar view must not
+    // assert the whole period's activity is concentrated in a single place.
+    expect(ds.autoPolestarView).not.toMatch(
+      /most of the armed activity is concentrated/i,
+    );
   });
 });
 

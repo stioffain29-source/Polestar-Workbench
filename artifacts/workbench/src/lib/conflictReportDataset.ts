@@ -450,6 +450,29 @@ function primaryHotspot(f: { labels: string[]; hasFocus: boolean }): string {
   return f.hasFocus && f.labels.length ? f.labels[0] : "";
 }
 
+// Theatres running at a similar volume to the top theatre SHARE the lead. Calling
+// a co-equal theatre "quieter" or "at a lower level" contradicts the per-theatre
+// counts the reader can see in the report body — the exact contradiction flagged
+// on the live report, where Pakistan and India were tied yet India was demoted to
+// "quieter". A theatre co-leads when its incident count is within ~25% of the top
+// theatre's; the minimum-top guard keeps thin, noisy windows on single-lead
+// phrasing rather than calling 1-vs-1 samples "co-leaders".
+const CO_LEAD_RATIO = 0.75;
+const CO_LEAD_MIN_TOP = 4;
+function leadTheatres(
+  areas: ConflictActivityArea[],
+): ConflictActivityArea[] {
+  if (areas.length === 0) return [];
+  const top = areas[0].incidentCount;
+  const leaders = [areas[0]];
+  if (top < CO_LEAD_MIN_TOP) return leaders;
+  for (let i = 1; i < areas.length; i++) {
+    if (areas[i].incidentCount >= top * CO_LEAD_RATIO) leaders.push(areas[i]);
+    else break;
+  }
+  return leaders.slice(0, 3);
+}
+
 // ---------------------------------------------------------------------------
 // Per-theatre paragraph (what / where / who / why-operationally / exposure).
 // No parenthetical record counts — counts live only on the Fast Facts cards.
@@ -694,14 +717,30 @@ function buildSituation(
   const lead = areas[0];
   const f = focusOf(lead);
   const where = joinList(f.labels);
-  const others = areas.slice(1, 3).map((a) => a.theatre);
-  const placeSentence = f.hasFocus
-    ? `${lead.theatre} is the main concern, with the worst activity around ${where}.`
-    : `${lead.theatre} is the main concern this period.`;
-  const leadEvent = topEvents(lead.incidents, 1)[0];
+  const leaders = leadTheatres(areas);
+  let placeSentence: string;
+  let othersStart: number;
+  if (leaders.length > 1) {
+    // Co-leading theatres get equal billing — a tied theatre is never demoted.
+    placeSentence = `${joinList(
+      leaders.map((a) => a.theatre),
+    )} are the main concerns this period, running at similar levels.`;
+    othersStart = leaders.length;
+  } else {
+    placeSentence = f.hasFocus
+      ? `${lead.theatre} is the main concern, with the worst activity around ${where}.`
+      : `${lead.theatre} is the main concern this period.`;
+    othersStart = 1;
+  }
+  // The standout incident is drawn from across the co-leaders, not just areas[0].
+  const leadEvent = topEvents(
+    leaders.flatMap((a) => a.incidents),
+    1,
+  )[0];
   const evSentence = leadEvent
     ? ` The most serious incident was ${eventClause(leadEvent)}.`
     : "";
+  const others = areas.slice(othersStart, othersStart + 2).map((a) => a.theatre);
   const othersSentence = others.length
     ? ` ${joinList(others)} also saw activity, at a lower level.`
     : "";
@@ -779,19 +818,32 @@ function buildPolestarView(
   // Name a single primary hotspot (honesty: still points at the flashpoint)
   // without re-listing the full multi-region phrase used earlier.
   const primary = primaryHotspot(fLead);
-  const leadWhere = primary ? `${primary} in ${lead.theatre}` : lead.theatre;
-  const others = areas.slice(1, 3).map((a) => a.theatre);
-  const tail = others.length
-    ? `, with ${joinList(others)} quieter but still worth watching`
-    : "";
-  // Describe where the activity actually sits rather than judging whether one
-  // country is "country-wide" — that framing reads as a contradiction when the
-  // report spans several countries. The "wider picture is calmer" sense is only
-  // honest when the lead is genuinely localised (>=50% in named hotspots).
-  const opening =
-    fLead.hasFocus && fLead.localised
-      ? `Most of the armed activity is concentrated around ${leadWhere}${tail}.`
-      : `${leadWhere} carries the most armed activity this period${tail}.`;
+  const leaders = leadTheatres(areas);
+  let opening: string;
+  if (leaders.length > 1) {
+    // Co-leading theatres are named jointly; only the genuinely smaller theatres
+    // below them are "lower-level" — never a co-equal one.
+    const rest = areas
+      .slice(leaders.length, leaders.length + 2)
+      .map((a) => a.theatre);
+    const tail = rest.length
+      ? `, with ${joinList(rest)} lower-level but still worth watching`
+      : "";
+    opening = `Armed activity is running at similar levels across ${joinList(
+      leaders.map((a) => a.theatre),
+    )} this period${tail}.`;
+  } else {
+    const others = areas.slice(1, 3).map((a) => a.theatre);
+    const tail = others.length
+      ? `, with ${joinList(others)} quieter but still worth watching`
+      : "";
+    // The concentration claim is scoped to WITHIN the lead theatre — it is not a
+    // claim that the lead holds most of the whole period's activity, which is
+    // false when several theatres are active.
+    opening = primary
+      ? `${lead.theatre} carries the most armed activity this period, concentrated around ${primary}${tail}.`
+      : `${lead.theatre} carries the most armed activity this period${tail}.`;
+  }
   const action = ` The response is straightforward: keep people clear of the worst-hit areas, tighten journey and route planning, protect the sites that matter most, and agree evacuation triggers well in advance.`;
   return `${opening}${action}`;
 }
