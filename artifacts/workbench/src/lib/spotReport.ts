@@ -202,8 +202,8 @@ export function checkSpotReportQuality(
       (i) => typeof i.latitude === "number" && typeof i.longitude === "number",
     );
     if (!hasReportCoords && !hasIncidentCoords) {
-      warnings.push(
-        "The incident map is enabled but no coordinates are available to plot.",
+      errors.push(
+        "The incident map is enabled but no coordinates are available to plot. Add coordinates or turn the map off before exporting.",
       );
     }
   }

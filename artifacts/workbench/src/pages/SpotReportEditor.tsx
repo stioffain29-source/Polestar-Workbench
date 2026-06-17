@@ -237,6 +237,12 @@ export default function SpotReportEditor() {
       category: f.category || (TOPIC_LABELS[primary.topic] ?? ""),
       incidentDate: f.incidentDate || toLocalInput(primary.occurredAt),
       bluf: f.bluf || primary.summary || "",
+      internalSourceNotes:
+        f.internalSourceNotes ||
+        linked
+          .map((i) => [i.source, i.sourceUrl].filter(Boolean).join(" — "))
+          .filter(Boolean)
+          .join("\n"),
       mapEnabled: true,
     }));
     prefilled.current = true;
