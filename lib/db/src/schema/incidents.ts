@@ -19,6 +19,14 @@ export const incidentsTable = pgTable("incidents", {
   confidence: text("confidence").notNull(),
   source: text("source"),
   sourceUrl: text("source_url"),
+  // Real publisher URL resolved from a Google News RSS redirect link (see
+  // @workspace/ingest googleNewsUrl.ts). Most flashpoint feeds are Google News
+  // aggregators, so `source_url` is an opaque news.google.com/rss/articles/...
+  // redirect; this additive, nullable column holds the underlying article URL
+  // so the GDELT enrichment URL-match can fire. Nullable: not-yet-resolved /
+  // already-direct rows leave it null and every consumer falls back to
+  // `source_url`. The original `source_url` is never mutated.
+  resolvedUrl: text("resolved_url"),
   analystNotes: text("analyst_notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   // Persisted relevance verdict (see @workspace/relevance). Nullable so

@@ -223,6 +223,15 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_confidence double precision`);
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_enriched_at timestamptz`);
 
+    // Schema: resolved publisher URL for Google News RSS redirect links
+    // (additive — see @workspace/ingest googleNewsUrl.ts). Most flashpoint feeds
+    // are Google News aggregators, so source_url is an opaque
+    // news.google.com/rss/articles/... redirect that can never equal GDELT's
+    // resolved source_urls[]; this nullable column holds the underlying article
+    // URL so the GDELT enrichment URL-match can fire. Same drizzle-push-only-
+    // reaches-dev rationale as the columns above — add it on boot, idempotent.
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolved_url text`);
+
     // 0) Country report narrative is now fully data-driven: the Situation,
     //    What Happened and Implications sections are generated from the live
     //    7-day window at render time and the stored overview / trend_summary

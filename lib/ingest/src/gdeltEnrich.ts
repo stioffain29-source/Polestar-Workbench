@@ -389,6 +389,7 @@ type Candidate = {
   country: string;
   title: string;
   sourceUrl: string | null;
+  resolvedUrl: string | null;
   occurredAt: Date;
   latitude: number | null;
   longitude: number | null;
@@ -443,6 +444,7 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
       country: incidentsTable.country,
       title: incidentsTable.title,
       sourceUrl: incidentsTable.sourceUrl,
+      resolvedUrl: incidentsTable.resolvedUrl,
       occurredAt: incidentsTable.occurredAt,
       latitude: incidentsTable.latitude,
       longitude: incidentsTable.longitude,
@@ -515,6 +517,7 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
     matched: boolean;
     geoUpgraded: boolean;
     severityRaised: boolean;
+    matchedByUrl: boolean;
   }> = [];
 
   let countriesQueried = 0;
@@ -545,15 +548,17 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
     for (const c of byCountry.get(canonical) ?? []) {
       examinedIds.add(c.id);
       const cTokens = titleTokens(c.title);
-      const cUrl = normalizeUrl(c.sourceUrl);
+      // Prefer the resolved publisher URL over the raw Google News redirect:
+      // GDELT clusters on the publisher URL, so a redirect can never match.
+      const cUrl = normalizeUrl(c.resolvedUrl ?? c.sourceUrl);
       const cDate = new Date(c.occurredAt);
-      let best: { e: GdeltEvent; sim: number } | null = null;
+      let best: { e: GdeltEvent; sim: number; byUrl?: boolean } | null = null;
       for (const { e, tokenSets, urls } of eventTokens) {
         if (!e.date) continue;
         if (daysBetween(cDate, new Date(e.date)) > DATE_TOLERANCE_DAYS) continue;
         // A shared source URL is a definitive link — accept immediately (sim=1).
         if (cUrl && urls.has(cUrl)) {
-          best = { e, sim: 1 };
+          best = { e, sim: 1, byUrl: true };
           break;
         }
         // Otherwise take the best Jaccard across all of the event's headline
@@ -600,11 +605,12 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
         }
       }
 
-      updates.push({ id: c.id, fields, matched: true, geoUpgraded, severityRaised });
+      updates.push({ id: c.id, fields, matched: true, geoUpgraded, severityRaised, matchedByUrl: best.byUrl ?? false });
     }
   }
 
   const matched = updates.filter((u) => u.matched).length;
+  const matchedByUrl = updates.filter((u) => u.matchedByUrl).length;
   const geoUpgraded = updates.filter((u) => u.geoUpgraded).length;
   const severityRaised = updates.filter((u) => u.severityRaised).length;
   const fieldsEnriched = updates.reduce((acc, u) => acc + Object.keys(u.fields).length, 0);
@@ -612,6 +618,7 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
   log(`  Countries queried  : ${countriesQueried}`);
   log(`  Incidents examined : ${examinedIds.size}`);
   log(`  Incidents matched  : ${matched}`);
+  log(`     via source URL  : ${matchedByUrl}`);
   log(`  Geo upgraded       : ${geoUpgraded}`);
   log(`  Severity raised    : ${severityRaised}`);
   log(`  QU spent           : ${client.qu}`);

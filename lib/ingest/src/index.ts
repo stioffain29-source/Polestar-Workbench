@@ -14,6 +14,8 @@ export { runStrikesBackfill } from "./backfillStrikes";
 export type { StrikesBackfillSummary } from "./backfillStrikes";
 export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
+export { runResolveGoogleNewsUrls, resolveGoogleNewsUrl, isGoogleNewsRedirect } from "./googleNewsUrl";
+export type { ResolveUrlSummary } from "./googleNewsUrl";
 export { runReliefWebCorroboration } from "./reliefweb";
 export type { ReliefWebCorroborationSummary } from "./reliefweb";
 export { runGdeltEnrich } from "./gdeltEnrich";

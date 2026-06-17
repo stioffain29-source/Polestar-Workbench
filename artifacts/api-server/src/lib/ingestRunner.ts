@@ -11,6 +11,7 @@ import {
   runMarketSnapshotIngest,
   runStrikesIngest,
   runTitleTranslation,
+  runResolveGoogleNewsUrls,
   runReliefWebCorroboration,
   runGdeltEnrich,
   type IngestSummary,
@@ -330,6 +331,22 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       );
     } catch (err) {
       logger.error({ err }, "title translation pass failed");
+    }
+    // Resolve Google News RSS redirect links (incidents.source_url) to their
+    // real publisher URLs, stored additively on incidents.resolved_url. This
+    // lets the GDELT enrichment URL-match (which runs LAST, below) compare a
+    // real article URL against GDELT's resolved source_urls[] instead of an
+    // opaque news.google.com redirect that can never match. Bounded + converging
+    // like the title-translation pass, and isolated in its own try so a network
+    // failure can never fail the incident ingest.
+    try {
+      const urls = await runResolveGoogleNewsUrls({ commit: true });
+      logger.info(
+        { resolved: urls.resolved, candidates: urls.candidates, failed: urls.failed },
+        "google news url resolution pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "google news url resolution pass failed");
     }
     // Live fuel-market prices (FRED). Isolated in its own try so a FRED outage
     // can never fail the incident ingest — it just reports the error.
