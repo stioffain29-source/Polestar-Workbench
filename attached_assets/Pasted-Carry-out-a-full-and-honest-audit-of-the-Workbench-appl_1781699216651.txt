@@ -1,0 +1,172 @@
+Carry out a full and honest audit of the Workbench application.
+
+Do not make fixes yet unless the issue is tiny, low risk, and clearly safe. The main task is to inspect the current state of the app and produce a clear audit report.
+
+Focus especially on any new APIs, data sources, integrations, or services that have recently been added.
+
+Audit the following areas:
+
+1. API and integration inventory
+
+Identify every API, external service, data source, scrape, feed, database connection, map layer, and third party integration currently connected to the Workbench.
+
+For each one, state:
+
+Name of the API or service
+What it is used for
+Where it is called in the codebase
+Whether it is live, partially live, mocked, unused, broken, or duplicated
+What secrets or environment variables it needs
+Whether those secrets appear to be present in Replit Secrets
+Whether the app handles API failure properly
+Whether the data is being stored, cached, transformed, or displayed correctly
+Any obvious cost, rate limit, privacy, or reliability risks
+
+2. Recent API additions
+
+Specifically check whether any recently added APIs or scrapers have been properly integrated.
+
+Confirm:
+
+The API call works
+The response is parsed correctly
+The output reaches the correct Workbench module
+Errors are handled properly
+The user interface shows the data correctly
+The API is not duplicated elsewhere
+Old or unused code has not been left behind
+The data source is suitable for operational reporting
+
+3. Overall Workbench condition
+
+Review the general health of the application.
+
+Check:
+
+App structure
+Routing
+Frontend components
+Backend routes
+Database schema
+Data flow
+Authentication, if present
+Report builder logic
+Map and visual layer logic
+Card or infographic generation logic
+Export functions
+Environment variables
+Package dependencies
+Build status
+Runtime errors
+Console errors
+Dead code
+Duplicated code
+Naming consistency
+Broken imports
+Unfinished features
+Mock data still being used
+Features that look complete but are not actually working
+
+4. Security and resilience
+
+Check for:
+
+Exposed secrets
+Hardcoded keys
+Unsafe API calls
+Poor error handling
+Lack of input validation
+Fragile scraper logic
+APIs that can break the app if they fail
+Unclear user permissions
+Unnecessary data retention
+Over reliance on one source
+No fallback if a feed fails
+
+5. Product usefulness
+
+Assess whether the Workbench is actually fit for its intended purpose.
+
+The Workbench should help a single analyst produce polished security, conflict, maritime, energy, cargo, protest, and operational risk reporting.
+
+Be honest about:
+
+What works well
+What is half built
+What is confusing
+What is over complicated
+What is missing
+What would slow an analyst down
+What could cause bad reporting
+What needs simplifying
+What should be removed
+
+6. Output required
+
+Produce a clear audit report in this format:
+
+A. Executive summary
+
+Plain English summary of the current condition of the Workbench.
+
+B. Overall rating
+
+Use one of these:
+
+Green: broadly healthy
+Amber: usable but needs clean up
+Red: unstable or not reliable enough
+
+Explain why.
+
+C. API and data source table
+
+Include:
+
+API or source
+Purpose
+Code location
+Status
+Issues found
+Recommended action
+
+D. Major issues
+
+List the most important problems first.
+
+For each issue include:
+
+Issue
+Why it matters
+Affected files or modules
+Severity: Critical, High, Medium, Low
+Recommended fix
+
+E. Quick wins
+
+List simple fixes that would improve stability or usability quickly.
+
+F. Larger fixes
+
+List deeper structural fixes that need more care.
+
+G. Dead code and unused features
+
+Identify anything that appears unused, duplicated, abandoned, or misleading.
+
+H. Final recommendation
+
+State clearly whether the Workbench is ready for continued build out, needs stabilisation first, or needs parts rebuilt.
+
+Important instructions:
+
+Be honest.
+Do not flatter the existing build.
+Do not mark something as working unless it has been checked.
+Do not assume an API is working just because code exists.
+Do not hide unfinished or mocked features.
+Do not rewrite the app during the audit.
+Do not add new features during the audit.
+Use plain English.
+Be specific about files, folders, functions, and modules.
+Where possible, include exact file paths.
