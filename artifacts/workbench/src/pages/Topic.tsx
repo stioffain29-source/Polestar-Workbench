@@ -16,6 +16,7 @@ import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { MarketPricesSection, IncidentDerivedPanel, type DerivedIncidentRow } from "@/components/MarketPrices";
 import { ExternalLink, BadgeCheck } from "lucide-react";
+import { GdeltCoding } from "@/components/GdeltCoding";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -581,6 +582,7 @@ export default function Topic() {
                             ))}
                           </div>
                         ) : null}
+                        <GdeltCoding incident={i} variant="inline" />
                       </td>
                       <td className="p-2">
                         <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>

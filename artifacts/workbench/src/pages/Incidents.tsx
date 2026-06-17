@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SEVERITY_LEVELS, CONFIDENCE_LEVELS, severityBadgeStyle } from "@/lib/topics";
+import { GdeltCoding, hasGdeltCoding } from "@/components/GdeltCoding";
 import { cn } from "@/lib/utils";
 
 const WINDOWS = [7, 14, 30, 60, 90, 120];
@@ -123,14 +124,17 @@ export default function Incidents() {
               >
                 <div className="p-3 font-mono text-xs">{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic] ?? i.topic}</span></div>
-                <div className="p-3 font-medium truncate flex items-center gap-1.5">
-                  <span className="truncate">{i.title}</span>
-                  {i.corroborations?.length ? (
-                    <BadgeCheck
-                      className="w-3.5 h-3.5 shrink-0 text-accent"
-                      aria-label="Corroborated by UN OCHA (ReliefWeb)"
-                    />
-                  ) : null}
+                <div className="p-3 font-medium min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate">{i.title}</span>
+                    {i.corroborations?.length ? (
+                      <BadgeCheck
+                        className="w-3.5 h-3.5 shrink-0 text-accent"
+                        aria-label="Corroborated by UN OCHA (ReliefWeb)"
+                      />
+                    ) : null}
+                  </div>
+                  {hasGdeltCoding(i) ? <GdeltCoding incident={i} variant="inline" /> : null}
                 </div>
                 <div className="p-3 text-xs">{i.country}</div>
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
@@ -238,6 +242,7 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
           </ul>
         </div>
       ) : null}
+      <GdeltCoding incident={incident} variant="block" />
       <div>
         <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Severity</label>
         <Select value={severity} onValueChange={setSeverity}>
