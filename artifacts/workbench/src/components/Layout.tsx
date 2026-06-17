@@ -4,7 +4,7 @@ import {
   Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import polestarLogo from "@assets/Reverse_white_logo_vert_1779500138062.png";
+import polestarLogo from "@assets/Reverse_colour_logo_vert.png";
 
 interface LayoutProps {
   children: ReactNode;
