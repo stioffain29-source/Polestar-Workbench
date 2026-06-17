@@ -422,6 +422,14 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // word "spillover" so genuine reports of militant violence around talks
   // ("militant violence falls after China-mediated talks") are NOT dropped.
   /\b(diploma(cy|tic|t)|prevent(s|ed|ing)?|avert(s|ed|ing)?|forestall|contain(s|ed|ing)?|stave off|avoid(s|ed|ing)?)\b[^.]{0,50}\bspillover\b/,
+  // PEACE / "cleared" declarations: an area declared free of insurgency or
+  // militancy, or a theatre officially normalised. These are the OPPOSITE of a
+  // live armed event ("Calabarzon declared insurgency-free on Independence
+  // Day") yet name an actor word, so they slip past the conflict REQUIRED gate.
+  // The violence override below still re-admits any genuine kinetic event (e.g.
+  // "declared insurgency-free after troops kill five rebels").
+  /\b(insurgenc(y|ies)|militanc(y|ies)|naxal(ism|ite)?|terror(ism|ist)?|rebel(lion)?)[ -]free\b/,
+  /\bfree (of|from) (insurgenc(y|ies)|militanc(y|ies)|naxal(ism)?|terror(ism)?|rebel(lion)?|armed (group|conflict))/,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are

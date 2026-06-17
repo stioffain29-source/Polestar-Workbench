@@ -15,14 +15,20 @@ civil-war topics, so quiet-week theatres (Myanmar, West Papua) fell outside it; 
 so genuine kinetic civil-war headlines (junta shelling, air/drone strikes, resistance
 forces — PDF/Karenni/KIA/TNLA) were tagged irrelevant and silently dropped.
 
-**Rule:** a multi-theatre conflict topic needs BOTH a monthly window (it lives in
-`MONTHLY_TOPICS`, cadence Monthly) AND kinetic/casualty-bound relevance vocab.
-**Why:** breadth depends on the slow theatres surviving the window AND the gate.
+**Rule (UPDATED):** Conflict is a WEEKLY product (7-day window, NOT in `MONTHLY_TOPICS`)
+— the user explicitly chose weekly; a 30-day window pulled in stale, out-of-week
+incidents. Coverage breadth now comes from (a) kinetic/casualty-bound relevance vocab
+AND (b) the Option-B out-of-window pull-in (see section 3), NOT from a wider window.
+**Why:** the brief must read as "this week", but a recent high-impact theatre whose last
+attack fell just before the week must not vanish at the window edge.
 **How to apply:** new civil-war vocabulary must be kinetic- or casualty-bound (weapon,
 offensive action, or `actor.{0,40}casualty`), NEVER a bare actor/place name, so
 diplomacy/trade/state-visit/humanitarian background pieces still fail. Excludes run
 BEFORE required, so adding excludes is always safe. Any gate change needs a
-`RELEVANCE_RULE_VERSION` bump or the persisted rows never re-tag on boot.
+`RELEVANCE_RULE_VERSION` bump or the persisted rows never re-tag on boot. Peace /
+"insurgency-free" / "free of insurgency" declarations name an actor word but are the
+OPPOSITE of an armed event — exclude them, guarded by `CONFLICT_VIOLENCE_OVERRIDE` so a
+genuine kinetic event in the same headline still keeps.
 
 **Precision watch:** `fighting between` and bare group terms (karenni/tnla/mndaa/
 brotherhood alliance) are broader than strictly kinetic — replay against live rows to
@@ -45,3 +51,35 @@ phrase appears ≤2× across the narrative and never in What Matters/Watch Next/
 Reserve the localised "rest of the country is far quieter" reassurance for theatres
 with ≥50% of incidents inside named hotspots; a scattered theatre must not be called
 concentrated/contained.
+
+## 3. Ranking is by IMPACT, not incident count (+ Option-B pull-in)
+
+**Rule:** theatre selection and ordering rank by IMPACT, not how many incidents a theatre
+logged. `compareAreas` is a tuple: worstSeverity → highImpactCount → casualty → site
+movement → operational signal → latestDate → incidentCount → name. Count is the LAST
+tiebreak only, so a single Extreme attack outranks a pile of Low chatter. Co-lead parity
+(`leadTheatres`) is by driver weight (`max(highImpact, casualty)`) gated on worst-rank ≥4
+OR ≥2 drivers — NOT by comparable counts.
+**Why:** the user's complaint was that count-ranking buried high-impact theatres under
+noisy low-severity ones.
+
+**Option-B out-of-window pull-in:** the builder also scans a pre-window strip
+`[win.end − (reportWindowMaxDays−1), win.start)` with `isTopicRelevant`. A theatre with
+NO in-window activity is pulled in ONLY if it carries a High/Extreme OR casualty-bearing
+driver. Pulled-in areas are flagged `pulledInFromLookback`, get a dedicated paragraph
+("stays on the watch list after high-impact attacks … just before this reporting period"
++ dated events + "Nothing new was reported inside the week"), and are EXCLUDED from Fast
+Facts, windowIncidents, and relatedIncidents (those stay strict-weekly enriched).
+
+**The contradiction trap (the bug an architect caught):** do NOT mix in-window and
+pulled-in theatres in one combined sort. A pre-window High would then sit at the TOP of
+the Top Activity Areas list while the Situation headline says a lower-severity in-window
+theatre is "the most serious theatre this period" — the list and the prose disagree.
+**Fix:** sort each group separately and concat IN-WINDOW FIRST. A theatre with no in-week
+activity can never be "most serious this period", so pulled-in theatres are a
+standing-watch tier BELOW the live week, never ranked over a live theatre. The Situation /
+Polestar headline leads on the top in-window theatre (or, in an empty week, the top
+pulled-in one); the pulled-in theatres are a dated secondary clause.
+**How to apply:** a test asserts the in-window theatre precedes the pulled-in one in
+`topActivityAreas` and that `topActivityAreas[0].pulledInFromLookback === false` whenever
+any in-window theatre exists.

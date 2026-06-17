@@ -231,6 +231,34 @@ describe("explainRelevance", () => {
       expect(result.reason).toContain("relief/peace");
     });
 
+    it("drops a peace 'insurgency-free' declaration", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Calabarzon declared insurgency-free on Independence Day",
+          summary:
+            "The military said the region is now free of insurgency after years of operations.",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("keeps a kinetic event despite insurgency-free framing (violence override)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Province declared insurgency-free, but militants ambush an army patrol",
+          summary:
+            "Gunmen opened fire on soldiers in a firefight hours after the announcement.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
     it("does not treat a Maoist bounty (Rs 8 lakh) as an investment story", () => {
       // A bounty/reward in lakh/crore must NOT trip the economic-investment
       // exclude — that broad money wording is only off-topic when bound to an

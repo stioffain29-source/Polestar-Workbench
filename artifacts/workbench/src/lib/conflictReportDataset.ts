@@ -1,5 +1,5 @@
-import { format, parseISO, max as dateMax } from "date-fns";
-import { resolveReportWindow } from "./reportWindow";
+import { format, parseISO, subDays, max as dateMax } from "date-fns";
+import { resolveReportWindow, reportWindowMaxDays } from "./reportWindow";
 import {
   filterTopicReportIncidents,
   type TopicFastFactCard,
@@ -9,7 +9,7 @@ import {
   CATEGORY_CARD_LABEL,
   detectOperationalImpacts,
 } from "./conflictAnalysis";
-import { splitAttributedCountries } from "./topicRelevance";
+import { splitAttributedCountries, isTopicRelevant } from "./topicRelevance";
 import { selectRelatedIncidents } from "./relatedIncidents";
 
 // Single source of truth for the Conflict Watch report's analysed dataset.
@@ -55,6 +55,14 @@ export interface ConflictActivityArea {
   worstSeverityLabel: string;
   casualtySignalCount: number;
   incidentCount: number;
+  /** High/Extreme-severity incidents — the impact drivers behind the ranking. */
+  highImpactCount: number;
+  /** Incidents that fall strictly INSIDE the reporting window. 0 for a theatre
+   *  surfaced only by a high-impact attack just before the window. */
+  periodIncidentCount: number;
+  /** True when the theatre has NO in-window activity and is on the watch list
+   *  solely because of a high-impact attack just before the reporting window. */
+  pulledInFromLookback: boolean;
   operationalScore: number;
   siteMovementScore: number;
   topCategories: string[];
@@ -450,24 +458,35 @@ function primaryHotspot(f: { labels: string[]; hasFocus: boolean }): string {
   return f.hasFocus && f.labels.length ? f.labels[0] : "";
 }
 
-// Theatres running at a similar volume to the top theatre SHARE the lead. Calling
-// a co-equal theatre "quieter" or "at a lower level" contradicts the per-theatre
-// counts the reader can see in the report body — the exact contradiction flagged
-// on the live report, where Pakistan and India were tied yet India was demoted to
-// "quieter". A theatre co-leads when its incident count is within ~25% of the top
-// theatre's; the minimum-top guard keeps thin, noisy windows on single-lead
-// phrasing rather than calling 1-vs-1 samples "co-leaders".
+// Theatres of comparable IMPACT to the top theatre SHARE the lead. Calling a
+// co-equal theatre "quieter" or "at a lower level" contradicts what the reader
+// can see in the report body — the exact contradiction flagged on the live
+// report, where Pakistan and India were both Extreme yet India was demoted to
+// "quieter". Parity is by impact evidence (High/Extreme + casualty drivers),
+// NOT by raw incident count: a theatre co-leads when it matches the top
+// theatre's worst-severity tier AND its driver weight is within ~25%.
 const CO_LEAD_RATIO = 0.75;
-const CO_LEAD_MIN_TOP = 4;
+function driverWeight(a: ConflictActivityArea): number {
+  return Math.max(a.highImpactCount, a.casualtySignalCount);
+}
 function leadTheatres(
   areas: ConflictActivityArea[],
 ): ConflictActivityArea[] {
   if (areas.length === 0) return [];
-  const top = areas[0].incidentCount;
-  const leaders = [areas[0]];
-  if (top < CO_LEAD_MIN_TOP) return leaders;
+  const top = areas[0];
+  const topRank = SEV_RANK[top.worstSeverity] ?? 0;
+  const topDrivers = driverWeight(top);
+  const leaders = [top];
+  // Co-leaders form only when the lead is a serious, well-evidenced theatre: a
+  // High/Extreme worst severity, OR at least two impact drivers. This keeps
+  // thin, low-severity windows on single-lead phrasing (the old min-top guard)
+  // while letting two genuinely co-equal theatres share the lead by impact.
+  if (topRank < 4 && topDrivers < 2) return leaders;
   for (let i = 1; i < areas.length; i++) {
-    if (areas[i].incidentCount >= top * CO_LEAD_RATIO) leaders.push(areas[i]);
+    const a = areas[i];
+    const r = SEV_RANK[a.worstSeverity] ?? 0;
+    if (r !== topRank) break; // must match the worst-severity tier
+    if (driverWeight(a) >= topDrivers * CO_LEAD_RATIO) leaders.push(a);
     else break;
   }
   return leaders.slice(0, 3);
@@ -480,6 +499,30 @@ function leadTheatres(
 // uniformly dangerous.
 // ---------------------------------------------------------------------------
 function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
+  // Pulled-in theatre: no activity inside the reporting week, surfaced only
+  // because a high-impact attack landed just BEFORE the window. Be explicit
+  // that the events predate the period — never imply in-week activity — and
+  // cite the standout events by name and date. No counts.
+  if (area.pulledInFromLookback) {
+    const focus = focusOf(area);
+    const where = joinList(focus.labels);
+    const events = topEvents(area.incidents, 2);
+    let eventSentence = "";
+    if (events.length > 1) {
+      eventSentence = ` The standout events were ${eventClause(
+        events[0],
+      )} and ${eventClause(events[1])}, both just before this reporting period.`;
+    } else if (events.length === 1) {
+      eventSentence = ` The standout event was ${eventClause(
+        events[0],
+      )}, just before this reporting period.`;
+    }
+    const lead = where
+      ? `${area.theatre} stays on the watch list after high-impact attacks around ${where} just before this reporting period.`
+      : `${area.theatre} stays on the watch list after high-impact attacks just before this reporting period.`;
+    const tail = ` Nothing new was reported inside the week, but the severity keeps ${area.theatre} under close watch for renewed activity.`;
+    return `${lead}${eventSentence}${tail}`;
+  }
   const activity = activityList(area.topCategories);
   const impacts = impactList(area.topImpacts);
   const sev = area.worstSeverityLabel;
@@ -532,10 +575,12 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
 function buildArea(
   theatre: string,
   rows: ConflictEnrichedIncident[],
+  opts: { pulledIn?: boolean; periodIncidentCount?: number } = {},
 ): ConflictActivityArea {
   let worstKey = "";
   let worstRank = 0;
   let casualty = 0;
+  let highImpact = 0;
   let opScore = 0;
   let siteScore = 0;
   const impactCounts = new Map<string, number>();
@@ -547,6 +592,7 @@ function buildArea(
       worstRank = r;
       worstKey = k;
     }
+    if (r >= 4) highImpact += 1;
     const impacts = detectOperationalImpacts(textOf(i));
     if (impacts.includes("Casualties reported")) casualty += 1;
     opScore += impacts.length;
@@ -577,6 +623,9 @@ function buildArea(
     worstSeverityLabel: worstKey ? SEV_LABEL[worstKey] : "—",
     casualtySignalCount: casualty,
     incidentCount: rows.length,
+    highImpactCount: highImpact,
+    periodIncidentCount: opts.periodIncidentCount ?? rows.length,
+    pulledInFromLookback: opts.pulledIn ?? false,
     operationalScore: opScore,
     siteMovementScore: siteScore,
     topCategories,
@@ -591,20 +640,27 @@ function buildArea(
   return area;
 }
 
+// Theatres are ranked by IMPACT, never by raw incident volume. A theatre with
+// one Extreme casualty attack outranks one with a dozen Low scuffles. Order:
+// worst severity -> High/Extreme count -> casualty signal -> site/movement/
+// infrastructure signal -> breadth of operational tags -> most recent impact,
+// with incident count kept only as a final volume tie-break.
 function compareAreas(a: ConflictActivityArea, b: ConflictActivityArea): number {
   const ra = SEV_RANK[a.worstSeverity] ?? 0;
   const rb = SEV_RANK[b.worstSeverity] ?? 0;
   if (rb !== ra) return rb - ra;
+  if (b.highImpactCount !== a.highImpactCount)
+    return b.highImpactCount - a.highImpactCount;
   if (b.casualtySignalCount !== a.casualtySignalCount)
     return b.casualtySignalCount - a.casualtySignalCount;
-  if (b.incidentCount !== a.incidentCount)
-    return b.incidentCount - a.incidentCount;
-  if (b.operationalScore !== a.operationalScore)
-    return b.operationalScore - a.operationalScore;
   if (b.siteMovementScore !== a.siteMovementScore)
     return b.siteMovementScore - a.siteMovementScore;
+  if (b.operationalScore !== a.operationalScore)
+    return b.operationalScore - a.operationalScore;
   const td = b.latestDate.getTime() - a.latestDate.getTime();
   if (td !== 0) return td;
+  if (b.incidentCount !== a.incidentCount)
+    return b.incidentCount - a.incidentCount;
   return a.theatre.localeCompare(b.theatre);
 }
 
@@ -710,10 +766,25 @@ const ZERO_POLESTAR =
 
 function buildSituation(
   areas: ConflictActivityArea[],
+  pulledInAreas: ConflictActivityArea[],
   worstKey: string,
   worstLabel: string,
 ): string {
-  if (areas.length === 0) return ZERO_SITUATION;
+  if (areas.length === 0 && pulledInAreas.length === 0) return ZERO_SITUATION;
+  // Quiet week, but one or more high-impact theatres sit just outside it.
+  if (areas.length === 0) {
+    const names = pulledInAreas.slice(0, 2).map((a) => a.theatre);
+    const ev = topEvents(
+      pulledInAreas.flatMap((a) => a.incidents),
+      1,
+    )[0];
+    const evSentence = ev ? ` The standout was ${eventClause(ev)}.` : "";
+    return `No armed activity was reported inside the reporting week, but ${joinList(
+      names,
+    )} ${
+      names.length > 1 ? "stay" : "stays"
+    } on watch after high-impact attacks just before it.${evSentence} Treat the in-week quiet as a pause, not an all-clear, and keep the standing risks under review.`;
+  }
   const lead = areas[0];
   const f = focusOf(lead);
   const where = joinList(f.labels);
@@ -722,14 +793,15 @@ function buildSituation(
   let othersStart: number;
   if (leaders.length > 1) {
     // Co-leading theatres get equal billing — a tied theatre is never demoted.
+    // Lead by IMPACT ("most serious"), not by volume ("similar levels").
     placeSentence = `${joinList(
       leaders.map((a) => a.theatre),
-    )} are the main concerns this period, running at similar levels.`;
+    )} are the most serious theatres this period.`;
     othersStart = leaders.length;
   } else {
     placeSentence = f.hasFocus
-      ? `${lead.theatre} is the main concern, with the worst activity around ${where}.`
-      : `${lead.theatre} is the main concern this period.`;
+      ? `${lead.theatre} is the most serious theatre this period, with the worst activity around ${where}.`
+      : `${lead.theatre} is the most serious theatre this period.`;
     othersStart = 1;
   }
   // The standout incident is drawn from across the co-leaders, not just areas[0].
@@ -744,7 +816,14 @@ function buildSituation(
   const othersSentence = others.length
     ? ` ${joinList(others)} also saw activity, at a lower level.`
     : "";
-  return `${placeSentence}${evSentence}${othersSentence}`;
+  // A high-impact theatre just outside the week is flagged so it is never lost.
+  const pulledNames = pulledInAreas.slice(0, 2).map((a) => a.theatre);
+  const pulledSentence = pulledNames.length
+    ? ` ${joinList(pulledNames)} ${
+        pulledNames.length > 1 ? "are" : "is"
+      } on watch after high-impact attacks just before this reporting period.`
+    : "";
+  return `${placeSentence}${evSentence}${othersSentence}${pulledSentence}`;
 }
 
 function buildOtherWatched(areas: ConflictActivityArea[]): string {
@@ -810,9 +889,19 @@ function buildWatchNext(
 
 function buildPolestarView(
   areas: ConflictActivityArea[],
+  pulledInAreas: ConflictActivityArea[],
   worstKey: string,
 ): string {
-  if (areas.length === 0) return ZERO_POLESTAR;
+  if (areas.length === 0 && pulledInAreas.length === 0) return ZERO_POLESTAR;
+  // Quiet week, but a high-impact theatre sits just outside it.
+  if (areas.length === 0) {
+    const names = pulledInAreas.slice(0, 2).map((a) => a.theatre);
+    return `No armed activity landed inside the reporting week, but ${joinList(
+      names,
+    )} ${
+      names.length > 1 ? "warrant" : "warrants"
+    } close watch after high-impact attacks just before it. Keep travel limits, site security and a rehearsed evacuation plan in place, and treat the in-week quiet as a pause rather than an all-clear.`;
+  }
   const lead = areas[0];
   const fLead = focusOf(lead);
   // Name a single primary hotspot (honesty: still points at the flashpoint)
@@ -822,16 +911,16 @@ function buildPolestarView(
   let opening: string;
   if (leaders.length > 1) {
     // Co-leading theatres are named jointly; only the genuinely smaller theatres
-    // below them are "lower-level" — never a co-equal one.
+    // below them are "lower-level" — never a co-equal one. Lead by IMPACT.
     const rest = areas
       .slice(leaders.length, leaders.length + 2)
       .map((a) => a.theatre);
     const tail = rest.length
       ? `, with ${joinList(rest)} lower-level but still worth watching`
       : "";
-    opening = `Armed activity is running at similar levels across ${joinList(
+    opening = `${joinList(
       leaders.map((a) => a.theatre),
-    )} this period${tail}.`;
+    )} are the most serious theatres this period${tail}.`;
   } else {
     const others = areas.slice(1, 3).map((a) => a.theatre);
     const tail = others.length
@@ -841,11 +930,18 @@ function buildPolestarView(
     // claim that the lead holds most of the whole period's activity, which is
     // false when several theatres are active.
     opening = primary
-      ? `${lead.theatre} carries the most armed activity this period, concentrated around ${primary}${tail}.`
-      : `${lead.theatre} carries the most armed activity this period${tail}.`;
+      ? `${lead.theatre} is the most serious theatre this period, its activity concentrated around ${primary}${tail}.`
+      : `${lead.theatre} is the most serious theatre this period${tail}.`;
   }
+  // A high-impact theatre just outside the week is flagged so it is never lost.
+  const pulledNames = pulledInAreas.slice(0, 2).map((a) => a.theatre);
+  const pulledSentence = pulledNames.length
+    ? ` ${joinList(pulledNames)} also ${
+        pulledNames.length > 1 ? "warrant" : "warrants"
+      } watching after high-impact attacks just before this period.`
+    : "";
   const action = ` The response is straightforward: keep people clear of the worst-hit areas, tighten journey and route planning, protect the sites that matter most, and agree evacuation triggers well in advance.`;
-  return `${opening}${action}`;
+  return `${opening}${pulledSentence}${action}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -865,9 +961,9 @@ export function buildConflictReportDataset(
     issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
   }));
 
-  // Group enriched incidents by attributed country. Compound attributions
-  // ("India; Pakistan") add the incident to BOTH theatres, matching how the
-  // Fast Facts "Most Affected Country" card counts countries.
+  // Group enriched (in-window) incidents by attributed country. Compound
+  // attributions ("India; Pakistan") add the incident to BOTH theatres,
+  // matching how the Fast Facts "Most Affected Country" card counts countries.
   const byCountry = new Map<string, ConflictEnrichedIncident[]>();
   for (const i of enriched) {
     for (const c of splitAttributedCountries(i.country)) {
@@ -877,18 +973,94 @@ export function buildConflictReportDataset(
     }
   }
 
-  const areas: ConflictActivityArea[] = [];
-  for (const [theatre, rows] of byCountry) areas.push(buildArea(theatre, rows));
-  areas.sort(compareAreas);
-  // Paragraphs are written here, after ranking, so each theatre's opening and
-  // operational read vary by its position — the top three never read off the
-  // same template.
+  // Impact pull-in (Option B). A theatre can carry a recent HIGH-IMPACT attack
+  // that fell just OUTSIDE the reporting week. Ranking strictly by the in-window
+  // slice would drop it entirely and hide a live concern. So scan the topic's
+  // hard-cap window (10 days for the weekly product) with the SAME relevance
+  // gate, keep only the records that predate the week (date < window start),
+  // and surface a theatre ONLY when it (a) has no in-window activity at all and
+  // (b) carries at least one High/Extreme or casualty-bearing attack. These
+  // pulled-in theatres are flagged in their paragraph as pre-window and never
+  // touch the Fast Facts, related-incidents table or in-week counts.
+  const lookbackStart = subDays(win.end, reportWindowMaxDays(topic) - 1);
+  const preWindow: ConflictEnrichedIncident[] = incidents
+    .filter((i) => {
+      if (i.topic !== topic) return false;
+      const d = toDate(i.occurredAt);
+      const ms = d.getTime();
+      if (isNaN(ms) || ms <= 0) return false;
+      if (d < lookbackStart || d >= win.start) return false; // strictly before the week
+      return isTopicRelevant(topic, {
+        topic: i.topic,
+        title: i.title,
+        summary: i.summary ?? null,
+        source: i.source ?? null,
+        sourceUrl: i.sourceUrl ?? null,
+        location: i.location ?? null,
+      });
+    })
+    .map((i) => ({
+      ...i,
+      date: toDate(i.occurredAt),
+      issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
+    }));
+
+  const byCountryPre = new Map<string, ConflictEnrichedIncident[]>();
+  for (const i of preWindow) {
+    for (const c of splitAttributedCountries(i.country)) {
+      const arr = byCountryPre.get(c) ?? [];
+      arr.push(i);
+      byCountryPre.set(c, arr);
+    }
+  }
+
+  const inWindowAreas: ConflictActivityArea[] = [];
+  for (const [theatre, rows] of byCountry)
+    inWindowAreas.push(buildArea(theatre, rows));
+
+  const pulledInAreas: ConflictActivityArea[] = [];
+  for (const [theatre, rows] of byCountryPre) {
+    if (byCountry.has(theatre)) continue; // in-window theatres are never pulled in
+    const drivers = rows.filter(
+      (i) => (SEV_RANK[sevKey(i.severity)] ?? 0) >= 4 || isCasualtyEvent(i),
+    );
+    if (drivers.length === 0) continue; // only a high-impact attack pulls a theatre in
+    pulledInAreas.push(
+      buildArea(theatre, drivers, { pulledIn: true, periodIncidentCount: 0 }),
+    );
+  }
+
+  // Each group is impact-ranked on its own, then in-window theatres are placed
+  // ABOVE pulled-in ones. A theatre with no activity inside the reporting week
+  // can never be "the most serious theatre this period", so a pre-window
+  // high-impact theatre is surfaced as a standing-watch tier BELOW the live
+  // week — never ranked over a live theatre. This keeps the Top Activity Areas
+  // list and the Situation/Polestar headline in agreement (no "Philippines is
+  // most serious" while a pulled-in theatre sits first in the list). When the
+  // week is empty, the pulled-in tier stands alone. Paragraphs are written
+  // after ordering so each opening varies by position; a pulled-in theatre gets
+  // its dedicated pre-window paragraph regardless of rank.
+  inWindowAreas.sort(compareAreas);
+  pulledInAreas.sort(compareAreas);
+  const areas = [...inWindowAreas, ...pulledInAreas];
   areas.forEach((area, idx) => {
     area.paragraph = buildAreaParagraph(area, idx);
   });
 
   const topActivityAreas = areas.slice(0, 3);
   const otherWatchedTheatres = areas.slice(3);
+
+  // Section prose splits the two populations: in-window theatres drive the live
+  // read; pulled-in theatres are surfaced via the Situation/Polestar flag only.
+  const rankedInWindow = areas.filter((a) => !a.pulledInFromLookback);
+  const rankedPulledIn = areas.filter((a) => a.pulledInFromLookback);
+  const otherInWindow = rankedInWindow.filter(
+    (a) => !topActivityAreas.includes(a),
+  );
+  // What Matters / Watch Next speak to the live week — lead on an in-window
+  // theatre whenever one exists, falling back to the pulled-in set only when
+  // the week is otherwise empty.
+  const leadAreas = rankedInWindow.length ? rankedInWindow : areas;
 
   let worstKey = "";
   let worstRank = 0;
@@ -917,11 +1089,16 @@ export function buildConflictReportDataset(
     relatedIncidents,
     worstSeverity: worstKey,
     worstSeverityLabel: worstLabel,
-    autoSituation: buildSituation(topActivityAreas, worstKey, worstLabel),
-    autoOtherWatched: buildOtherWatched(otherWatchedTheatres),
-    autoWhatMatters: buildWhatMatters(topActivityAreas, allImpacts),
-    autoWatchNext: buildWatchNext(topActivityAreas, categoriesPresent),
-    autoPolestarView: buildPolestarView(topActivityAreas, worstKey),
+    autoSituation: buildSituation(
+      rankedInWindow,
+      rankedPulledIn,
+      worstKey,
+      worstLabel,
+    ),
+    autoOtherWatched: buildOtherWatched(otherInWindow),
+    autoWhatMatters: buildWhatMatters(leadAreas, allImpacts),
+    autoWatchNext: buildWatchNext(leadAreas, categoriesPresent),
+    autoPolestarView: buildPolestarView(rankedInWindow, rankedPulledIn, worstKey),
   };
 }
 

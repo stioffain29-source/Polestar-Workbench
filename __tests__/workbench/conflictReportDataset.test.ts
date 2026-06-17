@@ -410,3 +410,129 @@ describe("buildConflictReportDataset — hotspot phrasing hygiene", () => {
     expect(occurrences).toBeLessThanOrEqual(2);
   });
 });
+
+describe("buildConflictReportDataset — impact pull-in (Option B)", () => {
+  // Option B: a theatre whose last HIGH-impact attack fell just OUTSIDE the
+  // 7-day reporting week is still surfaced (clearly flagged as pre-window) so a
+  // live concern is never lost to an arbitrary window edge. LOW pre-window
+  // activity is NOT pulled in, and pulled-in records never touch the strict
+  // weekly Fast Facts or the related-incidents table.
+  const preInc = (
+    over: Partial<ConflictReportIncident> & {
+      id: number | string;
+      severity: string;
+      country: string;
+      title: string;
+    },
+  ): ConflictReportIncident =>
+    // 7 Jun sits in the pre-window strip (6-9 Jun): inside the 10-day weekly
+    // hard cap, but before the 9 Jun window start.
+    inc({ occurredAt: "2026-06-07T08:00:00+00:00", ...over });
+
+  describe("with an in-window theatre present", () => {
+    const ds = buildConflictReportDataset(
+      [
+        // In-window, lower severity — the live read still leads here.
+        inc({ id: 1, country: "Philippines", severity: "moderate", title: NO_CASUALTY }),
+        // Pre-window HIGH attack, no in-window activity → pulled in.
+        preInc({ id: 2, country: "Thailand", severity: "high", title: NO_CASUALTY }),
+        // Pre-window LOW attack, no in-window activity → NOT pulled in.
+        preInc({ id: 3, country: "Cambodia", severity: "low", title: NO_CASUALTY }),
+      ],
+      "conflict",
+      ISSUE_DATE,
+    );
+    const all = [...ds.topActivityAreas, ...ds.otherWatchedTheatres];
+    const thailand = all.find((a) => a.theatre === "Thailand");
+
+    it("pulls in a HIGH pre-window theatre with no in-window activity", () => {
+      expect(thailand).toBeDefined();
+      expect(thailand!.pulledInFromLookback).toBe(true);
+    });
+
+    it("ranks the in-window theatre ABOVE the pulled-in one (no list/prose contradiction)", () => {
+      // A theatre with no in-week activity can never be "the most serious this
+      // period", so the live in-window theatre leads the Top Activity Areas list
+      // even though the pulled-in theatre carries a higher raw severity. This
+      // keeps the visible list and the Situation headline in agreement.
+      expect(ds.topActivityAreas[0]!.theatre).toBe("Philippines");
+      expect(ds.topActivityAreas[0]!.pulledInFromLookback).toBe(false);
+      const order = theatres(ds.topActivityAreas);
+      expect(order.indexOf("Philippines")).toBeLessThan(order.indexOf("Thailand"));
+    });
+
+    it("does NOT pull in a LOW pre-window theatre", () => {
+      expect(theatres(all)).not.toContain("Cambodia");
+    });
+
+    it("flags the pulled-in theatre's paragraph as pre-window, never in-week", () => {
+      expect(thailand!.paragraph).toContain("just before this reporting period");
+      expect(thailand!.paragraph).toContain("Nothing new was reported inside the week");
+    });
+
+    it("leads the Situation on the in-window theatre and flags the pulled-in one", () => {
+      expect(ds.autoSituation).toContain("Philippines");
+      expect(ds.autoSituation).toMatch(
+        /Thailand[^.]*on watch after high-impact attacks/i,
+      );
+    });
+
+    it("keeps the weekly window incidents (Fast Facts source) to in-window only", () => {
+      expect(ds.windowIncidents).toHaveLength(1);
+      expect(ds.windowIncidents[0]!.country).toBe("Philippines");
+    });
+
+    it("keeps the related-incidents table to in-window records only", () => {
+      expect(ds.relatedIncidents.every((r) => r.country !== "Thailand")).toBe(true);
+      expect(ds.relatedIncidents.every((r) => r.country !== "Cambodia")).toBe(true);
+    });
+
+    it("carries NO '(N records)' annotations on the pulled-in paragraph", () => {
+      expect(thailand!.paragraph).not.toMatch(/\(\s*\d/);
+      expect(thailand!.paragraph).not.toMatch(/\d+\s+(incidents?|records?)\b/i);
+    });
+  });
+
+  describe("quiet week with only a pre-window high-impact theatre", () => {
+    const ds = buildConflictReportDataset(
+      [preInc({ id: 1, country: "Thailand", severity: "high", title: NO_CASUALTY })],
+      "conflict",
+      ISSUE_DATE,
+    );
+
+    it("surfaces the pulled-in theatre even with an empty reporting week", () => {
+      expect(theatres(ds.topActivityAreas)).toContain("Thailand");
+      expect(ds.windowIncidents).toHaveLength(0);
+    });
+
+    it("frames the Situation and Polestar view as a quiet week with a standing risk", () => {
+      expect(ds.autoSituation).toContain(
+        "No armed activity was reported inside the reporting week",
+      );
+      expect(ds.autoSituation).toContain("Thailand");
+      expect(ds.autoPolestarView).toContain(
+        "No armed activity landed inside the reporting week",
+      );
+      expect(ds.autoPolestarView).toContain("Thailand");
+    });
+  });
+
+  describe("casualty-bearing pre-window attack", () => {
+    const ds = buildConflictReportDataset(
+      [
+        inc({ id: 1, country: "Philippines", severity: "high", title: NO_CASUALTY }),
+        // Moderate severity but casualty-bearing → still a high-impact driver.
+        preInc({ id: 2, country: "Vietnam", severity: "moderate", title: WITH_CASUALTY }),
+      ],
+      "conflict",
+      ISSUE_DATE,
+    );
+    const all = [...ds.topActivityAreas, ...ds.otherWatchedTheatres];
+
+    it("pulls in a casualty-bearing pre-window theatre even below High severity", () => {
+      const vietnam = all.find((a) => a.theatre === "Vietnam");
+      expect(vietnam).toBeDefined();
+      expect(vietnam!.pulledInFromLookback).toBe(true);
+    });
+  });
+});
