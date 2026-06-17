@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { setRoboto, ensureRobotoLoaded } from "./pdfFonts";
 export { setRoboto, ensureRobotoLoaded } from "./pdfFonts";
 

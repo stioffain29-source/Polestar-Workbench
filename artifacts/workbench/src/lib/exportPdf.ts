@@ -1,6 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { ensureRobotoLoaded, setRoboto } from "./pdfFonts";
 
 const MIN_PAGE_FILL = 0.45;

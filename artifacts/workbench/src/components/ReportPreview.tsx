@@ -33,7 +33,7 @@ import {
   cargoUsdNote,
   cargoCommodityNote,
 } from "@/lib/cargoReportData";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";

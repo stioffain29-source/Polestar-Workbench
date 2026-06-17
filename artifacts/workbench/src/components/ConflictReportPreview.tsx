@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { useMemo } from "react";
-import polestarLogo from "@assets/Reverse_white_logo_hor_1779525768654.png";
+import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
