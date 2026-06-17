@@ -440,6 +440,16 @@ function focusOf(area: ConflictActivityArea): {
   return { labels, localised: coverage >= 0.5, hasFocus: true };
 }
 
+// The lead theatre's hotspots are named IN FULL once in the Situation overview
+// and once in the theatre's own Top-Activity block. Downstream sections (What
+// Matters / Watch Next / Polestar View) must NOT re-list the same multi-region
+// phrase — that is exactly the "Afghan border and Khyber Pakhtunkhwa six times"
+// repetition readers complained about. They refer back instead to a SINGLE
+// primary hotspot or a generic "worst-hit areas" phrase.
+function primaryHotspot(f: { labels: string[]; hasFocus: boolean }): string {
+  return f.hasFocus && f.labels.length ? f.labels[0] : "";
+}
+
 // ---------------------------------------------------------------------------
 // Per-theatre paragraph (what / where / who / why-operationally / exposure).
 // No parenthetical record counts — counts live only on the Fast Facts cards.
@@ -714,13 +724,15 @@ function buildWhatMatters(
   if (areas.length === 0) return ZERO_WHAT_MATTERS;
   const lead = areas[0];
   const f = focusOf(lead);
+  // Refer back to the worst-hit areas generically — they are named in full in
+  // the Situation overview and the lead theatre block above.
   const where = f.hasFocus
-    ? joinList(f.labels)
+    ? `the worst-hit parts of ${lead.theatre}`
     : `the affected areas in ${lead.theatre}`;
   const para1 = `The priority is people. Anyone travelling through or working near ${where} risks being caught in an attack, a security sweep, a checkpoint or a sudden road closure.`;
   const scope =
     f.hasFocus && f.localised
-      ? `tighter precautions around ${where}, rather than a blanket change across the rest of ${lead.theatre}`
+      ? `tighter precautions where the violence is concentrated, rather than a blanket change across the rest of ${lead.theatre}`
       : `tighter precautions wherever the activity is heaviest, reviewed as the picture shifts`;
   const para2 = `For business, that means ${scope}. Plan journeys and routes with care, confirm site access before staff set out, and give every depot, worksite and route a clear way to pause, reroute or pull people out at short notice. Set your evacuation triggers now, while there is still room to decide calmly.`;
   return `${para1}\n\n${para2}`;
@@ -733,11 +745,16 @@ function buildWatchNext(
   if (areas.length === 0) return ZERO_WATCH_NEXT;
   const lead = areas[0];
   const f = focusOf(lead);
-  const leadWhere = f.hasFocus ? joinList(f.labels) : lead.theatre;
+  // A single primary hotspot here, not the full list — the full hotspot phrase
+  // is already named in the Situation overview and the lead theatre block.
+  // "around <hotspot>" reads naturally for region and border/belt labels alike;
+  // fall back to "in <theatre>" when the theatre has no clear focus.
+  const primary = primaryHotspot(f);
+  const leadWhere = primary ? `around ${primary}` : `in ${lead.theatre}`;
   const activity = activityList(lead.topCategories);
   const lines: string[] = [];
   lines.push(
-    `Expect further ${activity} in ${leadWhere}. The signal to watch is repetition — the same districts or routes being hit more than once.`,
+    `Expect further ${activity} ${leadWhere}. The signal to watch is repetition — the same districts or routes being hit more than once.`,
   );
   lines.push(
     `The clearest sign of escalation is spread: violence reaching neighbouring areas, or fresh checkpoints, road closures and curfews. That would mean the fighting is widening rather than easing.`,
@@ -759,9 +776,10 @@ function buildPolestarView(
   if (areas.length === 0) return ZERO_POLESTAR;
   const lead = areas[0];
   const fLead = focusOf(lead);
-  const leadWhere = fLead.hasFocus
-    ? `${joinList(fLead.labels)} in ${lead.theatre}`
-    : lead.theatre;
+  // Name a single primary hotspot (honesty: still points at the flashpoint)
+  // without re-listing the full multi-region phrase used earlier.
+  const primary = primaryHotspot(fLead);
+  const leadWhere = primary ? `${primary} in ${lead.theatre}` : lead.theatre;
   const others = areas.slice(1, 3).map((a) => a.theatre);
   const tail = others.length
     ? `, with ${joinList(others)} quieter but still worth watching`
@@ -772,7 +790,7 @@ function buildPolestarView(
   // honest when the lead is genuinely localised (>=50% in named hotspots).
   const opening =
     fLead.hasFocus && fLead.localised
-      ? `Most of the armed activity sits in ${leadWhere}${tail}.`
+      ? `Most of the armed activity is concentrated around ${leadWhere}${tail}.`
       : `${leadWhere} carries the most armed activity this period${tail}.`;
   const action = ` The response is straightforward: keep people clear of the worst-hit areas, tighten journey and route planning, protect the sites that matter most, and agree evacuation triggers well in advance.`;
   return `${opening}${action}`;

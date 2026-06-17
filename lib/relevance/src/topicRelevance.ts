@@ -516,13 +516,29 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|opened fire|hail of (gunfire|bullets))\b/,
     /\b(insurgen(t|ts|cy)|militan(t|ts|cy)|rebel(s|lion)?|separatis(t|ts|m)|guerrilla|paramilitar(y|ies)|militia(s|men)?|warlord|junta (forces|troops|airstrike|soldiers))\b/,
     /\b(ambush(ed|es)?|incursion|firefights?|skirmish(es)?)\b/,
-    /\b(ied|improvised explosive|roadside bomb|land ?mine|car bomb|truck bomb|grenade attack|bomb blast|suicide bomb(er|ing)?|drone strike|air ?strike (kill|hit|target|hits|kills|on))\b/,
+    /\b(ied|improvised explosive|roadside bomb|land ?mines?|car bomb|truck bomb|grenade attack|bomb blast|suicide bomb(er|ing)?|drone strike|air ?strike (kill|hit|target|hits|kills|on))\b/,
     /\b(abduct(ed|ion|ions)?|kidnap(ped|ping|pings|pers)?|hostage(s)?|held hostage)\b/,
     /\b(gunm[ae]n|armed assailant|shot dead|gunned down|mass shooting|gun rampage|massacre)\b/,
     /\b(tpnpb|opm|free papua|west papua (rebel|fighter|insurgen|liberation|armed)|npa|new people'?s army|abu sayyaf|biff|bifm|bangsamoro|moro (rebel|fighter|front)|ttp|tehrik[- ]?i[- ]?taliban|baloch(istan)? (liberation|insurgen|army|militant)|naxal(ite)?|maoist (rebel|insurgent|attack|guerrilla)|arakan army|ethnic armed (group|organisation|organization))\b/,
     /\b(troops|soldiers|security forces|police|army|navy|marines) .{0,30}(killed|kill|ambush(ed)?|attack(ed)?|clash(ed)?|wounded|gunned down|firefight)\b/,
     /\b(killed|wounded|injured|dead|casualt) .{0,30}(clash|fighting|gun ?battle|firefight|ambush|insurgen|militan|rebel|raid|shoot[- ]?out|armed attack)\b/,
     /\b(armed robbery|armed heist|armed hold[- ]?up|at gunpoint|extortion racket|kidnap[- ]for[- ]ransom)\b/,
+    // Myanmar / regional civil-war vocabulary. The patterns above are India/
+    // Pakistan-centric (TTP, Naxal, Baloch) and were blind to the Myanmar
+    // theatre, dropping genuine fighting ("junta counteroffensive", "fighting
+    // rages", "land mines"). Each stays kinetic-bound so diplomacy / state-visit
+    // / trade noise (no kinetic word) still fails the gate.
+    /\b(shell(ing|ed)|aerial bombard(ment|ed|ing)?|air ?strikes?|airstrikes?|drone ?strikes?)\b(?!\s+out\b)/,
+    /\b(artillery|mortar)\b[^.]{0,15}\b(fire|shell|shelling|shelled|barrage|strike|attack|duel|bombard(ment)?|round|rounds|bomb)\b/,
+    /\b(junta|military|regime|tatmadaw|army|troops|rebel|resistance|insurgent|ethnic armed|karenni|kachin|tnla|mndaa|brotherhood alliance)\b[^.]{0,20}\b(counter[- ]?)?offensive\b/,
+    /\b(people'?s defen[cs]e force|pdf fighters?|resistance (forces?|fighters?|groups?|army)|karenni|kachin independence army|kia (forces?|fighters?|rebels?|troops|battalion)|tnla|mndaa|brotherhood alliance|chin(land)? defen[cs]e force)\b/,
+    /\b((heavy|fierce|intense|renewed|fresh|deadly|ongoing|sporadic) fighting|fighting (rage|rages|raged|raging|erupt|erupts|erupted|broke out|continues|intensif(y|ies|ied|ying)))\b/,
+    /\bfighting between\b/,
+    // An armed actor (or weapon) whose action KILLS/WOUNDS within a short span
+    // is unambiguous conflict, e.g. "junta attacks kill three civilians",
+    // "air and drone strikes kill four civilians". Casualty-bound, so a bare
+    // state-visit/trade headline (no kill/wound word near the actor) still fails.
+    /\b(junta|military|regime|tatmadaw|militants?|insurgents?|rebels?|separatists?|paramilitar(y|ies)|army|troops|soldiers|air ?force|warplanes?|fighter jets?|drones?|artillery|mortars?|shelling|airstrikes?|air ?strikes?)\b.{0,40}\b(kill(s|ed|ing)?|wound(s|ed|ing)?|massacre[ds]?|civilians? (killed|dead|wounded|hurt|slain))\b/,
   ],
   // Protests / Flashpoint use a two-tier match: an UNAMBIGUOUS phrase
   // alone is sufficient, but the ambiguous tokens "rally", "strike"

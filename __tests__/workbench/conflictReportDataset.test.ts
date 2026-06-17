@@ -3,6 +3,10 @@ import {
   isGenericConflictProse,
   type ConflictReportIncident,
 } from "../../artifacts/workbench/src/lib/conflictReportDataset";
+import {
+  reportCadence,
+  reportWindowDefaultDays,
+} from "../../artifacts/workbench/src/lib/reportWindow";
 
 // Guards the Conflict Watch report's data-driven, LOCATION-LED restructure.
 // The same dataset feeds ConflictReportPreview (screen) and
@@ -303,5 +307,59 @@ describe("isGenericConflictProse", () => {
 
   it("treats empty text as non-generic", () => {
     expect(isGenericConflictProse("")).toBe(false);
+  });
+});
+
+describe("conflict cadence", () => {
+  it("is monthly so slower-burn theatres fall inside the report window", () => {
+    expect(reportCadence("conflict")).toBe("monthly");
+    expect(reportWindowDefaultDays("conflict")).toBe(30);
+  });
+});
+
+describe("buildConflictReportDataset — hotspot phrasing hygiene", () => {
+  // The lead theatre's named hotspots belong in the Situation overview and the
+  // theatre's own Top-Activity block — NOT hammered into every downstream
+  // section. Guards the "Afghan border and Khyber Pakhtunkhwa repeated six
+  // times" complaint that triggered this work.
+  const KP = "Armed clashes between troops and militants in Khyber Pakhtunkhwa";
+  const AFG = "Militants ambush an army patrol near the Afghan border";
+  const ds = buildConflictReportDataset(
+    [
+      inc({ id: 1, country: "Pakistan", severity: "high", title: KP }),
+      inc({ id: 2, country: "Pakistan", severity: "high", title: AFG }),
+      inc({ id: 3, country: "India", severity: "moderate", title: NO_CASUALTY }),
+    ],
+    "conflict",
+    ISSUE_DATE,
+  );
+  const lead = ds.topActivityAreas[0]!;
+  const labels = lead.hotspots.slice(0, 2).map((h) => h.label);
+  const fullPhrase =
+    labels.length === 2 ? `${labels[0]} and ${labels[1]}` : (labels[0] ?? "");
+
+  it("detects both Pakistan hotspots on the lead theatre", () => {
+    expect(lead.theatre).toBe("Pakistan");
+    expect(labels.length).toBe(2);
+  });
+
+  it("does not repeat the full hotspot phrase in downstream sections", () => {
+    expect(ds.autoWhatMatters).not.toContain(fullPhrase);
+    expect(ds.autoWatchNext).not.toContain(fullPhrase);
+    expect(ds.autoPolestarView).not.toContain(fullPhrase);
+  });
+
+  it("names the full hotspot phrase at most twice across the narrative", () => {
+    const all = [
+      ds.autoSituation,
+      lead.paragraph,
+      ds.autoWhatMatters,
+      ds.autoWatchNext,
+      ds.autoPolestarView,
+      ds.autoOtherWatched,
+    ].join("\n");
+    const occurrences = all.split(fullPhrase).length - 1;
+    expect(occurrences).toBeGreaterThanOrEqual(1);
+    expect(occurrences).toBeLessThanOrEqual(2);
   });
 });

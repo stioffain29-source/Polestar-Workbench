@@ -269,5 +269,124 @@ describe("explainRelevance", () => {
       expect(result.relevant).toBe(true);
       expect(result.reason).toContain("required topic phrase");
     });
+
+    // Myanmar civil-war vocabulary the old India/Pakistan-centric gate missed.
+    it("keeps a junta counteroffensive (offensive bound to an armed actor)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Myanmar junta counteroffensive pushes Karenni resistance into a new phase of war",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps 'fighting rages' headlines", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Junta escalates forced conscription in Kalay as local fighting rages",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps land-mine casualty stories, including the plural", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "A Family Ravaged by Land Mines in Myanmar",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps junta air strikes (bare, plural)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Junta air strikes hit a village in Sagaing region",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+    });
+
+    it("keeps heavy-shelling reports", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Heavy shelling reported across northern Rakhine",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+    });
+
+    it("keeps an actor-attack that kills civilians", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Myanmar junta attacks kill three civilians and trigger mass displacement in Okpho Township",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+    });
+
+    it("keeps 'air and drone strikes kill' headlines", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Myanmar junta air and drone strikes kill four civilians and destroy homes in Khin-U Township",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+    });
+
+    it("does not treat a junta state-visit / trade story as armed conflict", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Myanmar junta chief begins state visit to China to boost trade ties",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    it("does not let the 'shelling out' idiom through", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Yangon firms shelling out millions for new office space",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    it("does not treat a bare 'PDF' document as a resistance force", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "PDF report shows Myanmar economy shrinking sharply",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
   });
 });
