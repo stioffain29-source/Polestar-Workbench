@@ -449,14 +449,22 @@ export default function MapPage() {
           {liveOn && (
             <div className="mt-4 pt-3 border-t border-border">
               <div className="font-serif font-bold uppercase text-primary text-sm tracking-wide mb-1">Liveuamap</div>
-              {live?.configured ? (
+              {!live ? (
+                <div className="text-[11px] font-sans text-muted-foreground">
+                  Checking live layer…
+                </div>
+              ) : !live.configured ? (
+                <div className="text-[11px] font-sans text-muted-foreground">
+                  Live layer not configured yet.
+                </div>
+              ) : live.fetchedAt ? (
                 <div className="text-[11px] font-sans text-muted-foreground">
                   {live.events.length} live events · {regionLabel(liveRegion)}
                   {live.cached ? " · cached" : ""}
                 </div>
               ) : (
                 <div className="text-[11px] font-sans text-muted-foreground">
-                  Live layer not configured yet.
+                  Live layer temporarily unavailable.
                 </div>
               )}
             </div>
