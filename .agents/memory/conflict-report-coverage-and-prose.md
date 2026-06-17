@@ -83,3 +83,35 @@ pulled-in one); the pulled-in theatres are a dated secondary clause.
 **How to apply:** a test asserts the in-window theatre precedes the pulled-in one in
 `topActivityAreas` and that `topActivityAreas[0].pulledInFromLookback === false` whenever
 any in-window theatre exists.
+
+## 4. Prose hygiene (full rewrite — readable, non-templated, non-contradicting)
+
+These are PROSE-ONLY rules; they touch no ranking/relevance logic, so do NOT bump
+`RELEVANCE_RULE_VERSION` when changing them.
+
+**Cited standout must be kinetic, not a reaction headline.** When choosing the period's
+"most serious incident", a real armed event must outrank a political/reaction headline of
+the same severity ("vigil held…", "families demand justice…"). `eventScore` = +2 kinetic
++2 casualty −3 reaction-lead; `topEvents` sorts severity FIRST, then this score, so it
+only re-orders WITHIN a severity tier — it never overrides the tier.
+**Why:** a reaction headline was being paraded as the week's worst incident.
+
+**Concentration claims are gated on localised focus.** "its activity concentrated around
+<hotspot>" may only be used when the lead theatre is localised (≥50% of incidents inside
+named hotspots, `focusOf().localised`). For a sub-50% theatre, name the flashpoint with
+softer wording ("with <hotspot> among the worst-hit areas") or omit it. This applies in
+EVERY section, including the Polestar View — an architect caught the Polestar View saying
+"concentrated around Manipur" while the theatre's own paragraph correctly read "the
+heaviest activity around Manipur": same dataset, two surfaces, self-contradiction.
+**How to apply:** a sub-national-honesty test asserts `autoPolestarView` never matches
+`/concentrated around <hotspot>/i` when coverage <50%.
+
+**Section wording must vary; Situation and Polestar must not read verbatim-identical.**
+Rank-vary the area-paragraph openings (`v = min(rank, 2)`) and give `secondaryClause` a
+`variant` param so the Polestar View ("remained serious too" / "stayed quieter") differs
+from the Situation ("was also serious this period" / "was quieter"). Headlines are run
+through sentence-case hygiene (lowercase mid-headline common nouns + a leading single "A",
+keep proper nouns/acronyms) so a cited event reads as prose, not a scraped feed row.
+**Verify:** `artifacts/workbench/scripts/dumpConflictProse.ts` (`ISSUE=YYYY-MM-DD npx tsx
+…`) renders every section for eyeballing; preview/PDF parity is automatic because both
+read the one `buildConflictReportDataset`.

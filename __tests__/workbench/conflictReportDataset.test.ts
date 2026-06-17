@@ -231,7 +231,7 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
   it("names the hotspot but does not call a sub-50% theatre concentrated", () => {
     expect(lead.theatre).toBe("India");
     expect(lead.paragraph).toContain("Manipur");
-    expect(lead.paragraph).toContain("The worst activity sits around");
+    expect(lead.paragraph).toContain("the heaviest activity around");
     // The "rest of the country is far quieter" reassurance is reserved for
     // genuinely localised theatres (≥50% coverage) — never a scattered one.
     expect(lead.paragraph).not.toContain("far quieter");
@@ -247,6 +247,9 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
     // A sub-50% theatre must not be called country-wide-contained either.
     expect(ds.autoPolestarView).not.toMatch(/countrywide|country-wide/i);
     expect(ds.autoWhatMatters).not.toContain("not a blanket change");
+    // ...nor "concentrated around" the flashpoint: that upgrade contradicts the
+    // softer non-localised wording the theatre's own paragraph uses.
+    expect(ds.autoPolestarView).not.toMatch(/concentrated around Manipur/i);
     // It still names the flashpoint — honesty cuts both ways.
     expect(ds.autoPolestarView).toContain("Manipur");
   });
@@ -408,6 +411,36 @@ describe("buildConflictReportDataset — hotspot phrasing hygiene", () => {
     const occurrences = all.split(fullPhrase).length - 1;
     expect(occurrences).toBeGreaterThanOrEqual(1);
     expect(occurrences).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("buildConflictReportDataset — standout event is kinetic, not reaction", () => {
+  // The cited standout incident must be a real armed event, never a political /
+  // reaction headline ("vigil held", "families demand justice") of the same
+  // severity. This guards the live defect where a reaction headline was paraded
+  // as the period's most serious incident.
+  const KINETIC = "Militants attack an army base, six soldiers killed";
+  const REACTION = "Vigil held after six soldiers killed in militant attack";
+  const ds = buildConflictReportDataset(
+    [
+      inc({ id: 1, country: "Philippines", severity: "high", title: REACTION }),
+      inc({ id: 2, country: "Philippines", severity: "high", title: KINETIC }),
+    ],
+    "conflict",
+    ISSUE_DATE,
+  );
+
+  it("cites the kinetic event as the Situation standout, not the reaction one", () => {
+    expect(ds.autoSituation).toMatch(/most serious incident was[^.]*base/i);
+    expect(ds.autoSituation).not.toMatch(/vigil/i);
+  });
+
+  it("orders the kinetic event ahead of the reaction event in the lead paragraph", () => {
+    const lead = ds.topActivityAreas[0]!;
+    const baseIdx = lead.paragraph.indexOf("army base");
+    const vigilIdx = lead.paragraph.indexOf("vigil");
+    expect(baseIdx).toBeGreaterThan(-1);
+    expect(vigilIdx === -1 || baseIdx < vigilIdx).toBe(true);
   });
 });
 

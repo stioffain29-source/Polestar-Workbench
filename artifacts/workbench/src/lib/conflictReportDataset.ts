@@ -234,14 +234,19 @@ function lcFirst(s: string): string {
   if (!s) return s;
   const first = s.split(/\s+/)[0] ?? "";
   if (/^[A-Z]{2,}$/.test(first)) return s;
-  if (/^[A-Z][a-z]+$/.test(first)) return s[0]!.toLowerCase() + s.slice(1);
+  if (PROPER_NOUN_KEEP.has(baseWord(first))) return s; // keep proper nouns
+  if (/^[A-Z][a-z]*$/.test(first)) return s[0]!.toLowerCase() + s.slice(1);
   return s;
 }
 
-// One concrete event clause: cleaned headline + date, e.g. "four suicide
-// bombers killed as security forces repelled an attack ... on 15 Jun".
+// One concrete event clause: cleaned, sentence-cased headline + date, e.g.
+// "four suicide bombers killed as security forces repelled an attack on 15 Jun".
 function eventClause(i: ConflictEnrichedIncident): string {
-  const head = lcFirst(cleanHeadline(i.displayTitle ?? i.title));
+  const head = lcFirst(
+    lowerCommonWords(
+      sentenceCaseHeadline(cleanHeadline(i.displayTitle ?? i.title)),
+    ),
+  );
   const when =
     !isNaN(i.date.getTime()) && i.date.getTime() > 0
       ? ` on ${format(i.date, "d MMM")}`
@@ -249,8 +254,11 @@ function eventClause(i: ConflictEnrichedIncident): string {
   return `${head}${when}`;
 }
 
-// The most significant incidents in a theatre: worst severity first, then
-// casualty signal, then most recent.
+// The most significant incidents in a theatre: worst severity first, then —
+// WITHIN a severity tier — a real kinetic attack ahead of a political-reaction
+// headline (eventScore), then casualty signal, then most recent. This stops a
+// "group demands ban / seeks justice" advocacy headline being cited as the
+// standout incident when an actual attack of the same severity exists.
 function topEvents(
   rows: ConflictEnrichedIncident[],
   max: number,
@@ -259,10 +267,14 @@ function topEvents(
     .map((i) => ({
       i,
       sev: SEV_RANK[sevKey(i.severity)] ?? 0,
+      score: eventScore(i),
       deadly: isCasualtyEvent(i) ? 1 : 0,
       t: i.date.getTime(),
     }))
-    .sort((a, b) => b.sev - a.sev || b.deadly - a.deadly || b.t - a.t)
+    .sort(
+      (a, b) =>
+        b.sev - a.sev || b.score - a.score || b.deadly - a.deadly || b.t - a.t,
+    )
     .slice(0, max)
     .map((x) => x.i);
 }
@@ -400,6 +412,157 @@ function mentions(text: string, term: string): boolean {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Headline hygiene for prose. Two jobs: (1) rank a real kinetic event ahead of
+// a political-reaction headline when deciding what to cite (eventScore), and
+// (2) turn a Title-Cased news headline into sentence case so it reads as prose
+// rather than a scraped feed row — while preserving proper nouns and acronyms.
+// ---------------------------------------------------------------------------
+
+// Words that signal an actual armed event (used only to order events within a
+// severity tier — severity itself always dominates).
+const KINETIC_RE =
+  /\b(kill|killed|killing|dead|death|attack|attacked|bomb|bombed|bombing|bomber|blast|explos|shot|shoot|gunmen|gunman|gunfire|gun ?battle|firefight|ambush|raid|airstrike|air strike|shell|shelled|shelling|clash|fighting|ied|landmine|land mine|abduct|kidnap|seiz|assault|wounded|injured|massacre|militant|insurgent|soldier|troops)/i;
+
+// Headlines led by a political/reaction verb (demands, condemns, protests,
+// seeks justice…) rather than the event itself. Cited only when nothing
+// kinetic of the same severity is available.
+const REACTION_LEAD_RE =
+  /^(?:[\w’'.\-]+[\s,;:]+){0,4}(demand|seek|seeking|condemn|protest|urge|refus|call|mourn|slam|hail|blame|appeal|rally|rallies|vigil|petition|summon|boycott|welcome|reject)/i;
+
+// Higher = more worth citing as a standout incident.
+function eventScore(i: ConflictEnrichedIncident): number {
+  const head = cleanHeadline(i.displayTitle ?? i.title);
+  const text = `${head} ${i.summary ?? ""}`;
+  let s = 0;
+  if (KINETIC_RE.test(text)) s += 2;
+  if (isCasualtyEvent(i)) s += 2;
+  if (REACTION_LEAD_RE.test(head)) s -= 3;
+  return s;
+}
+
+// Generic words that also appear inside region labels but must NOT be treated
+// as proper nouns (so they lower-case normally in a headline).
+const PROPER_NOUN_STOP = new Set([
+  "the", "of", "and", "new", "west", "north", "south", "east", "central",
+  "deep", "hill", "tracts", "border", "state", "region", "province", "valley",
+]);
+// Theatre countries, capitals, demonyms and armed-actor names that the
+// gazetteer does not already cover.
+const PROPER_NOUN_EXTRA = [
+  "india", "pakistan", "myanmar", "burma", "thailand", "bangladesh",
+  "indonesia", "philippines", "nepal", "afghanistan", "afghan", "china",
+  "delhi", "islamabad", "kabul", "dhaka", "manila", "bangkok", "yangon",
+  "naypyidaw", "jakarta", "kathmandu", "naga", "nagas", "kuki", "kukis",
+  "meitei", "meiteis", "hmar", "zomi", "rohingya", "baloch", "pashtun",
+  "pathan", "taliban", "tatmadaw", "arakan", "rakhine",
+  "indian", "pakistani", "burmese", "thai", "filipino", "bangladeshi",
+];
+// Proper nouns that keep their capital when a Title-Cased headline is lowered
+// to sentence case. Built from the sub-national gazetteer + the curated set.
+const PROPER_NOUN_KEEP: Set<string> = (() => {
+  const keep = new Set<string>(PROPER_NOUN_EXTRA);
+  const add = (w: string) => {
+    const lw = w.toLowerCase();
+    if (lw.length > 2 && !PROPER_NOUN_STOP.has(lw)) keep.add(lw);
+  };
+  for (const defs of Object.values(COUNTRY_HOTSPOTS))
+    for (const d of defs)
+      for (const term of d.terms)
+        for (const w of term.split(/[\s-]+/)) add(w);
+  for (const country of Object.keys(COUNTRY_HOTSPOTS))
+    for (const w of country.split(/\s+/)) add(w);
+  return keep;
+})();
+
+function isAcronymToken(w: string): boolean {
+  const letters = w.replace(/[^A-Za-z]/g, "");
+  return letters.length >= 2 && letters === letters.toUpperCase();
+}
+function baseWord(w: string): string {
+  return w
+    .toLowerCase()
+    .replace(/[’']s$/, "")
+    .replace(/[^a-z]/g, "");
+}
+// Convert a Title-Cased headline to sentence case (proper nouns / acronyms
+// preserved). An already-sentence-case headline is returned untouched.
+function sentenceCaseHeadline(t: string): string {
+  if (!t) return t;
+  const tokens = t.split(/(\s+)/);
+  const wordIdx: number[] = [];
+  tokens.forEach((tok, idx) => {
+    if (/[A-Za-z]/.test(tok)) wordIdx.push(idx);
+  });
+  if (wordIdx.length < 5) return t;
+  let titleish = 0;
+  for (const idx of wordIdx)
+    if (/^[("']?[A-Z][a-z]+[’']?[a-z]*[).,:;!?"']?$/.test(tokens[idx]!))
+      titleish++;
+  if (titleish / wordIdx.length < 0.6) return t; // not Title Case → leave alone
+  let first = true;
+  for (const idx of wordIdx) {
+    const w = tokens[idx]!;
+    if (isAcronymToken(w)) {
+      first = false;
+      continue;
+    }
+    if (first) {
+      first = false;
+      continue;
+    }
+    if (PROPER_NOUN_KEEP.has(baseWord(w))) continue;
+    if (/^[A-Z][a-z]/.test(w)) tokens[idx] = w[0]!.toLowerCase() + w.slice(1);
+  }
+  return tokens.join("");
+}
+
+// Common nouns/verbs that news feeds frequently mis-capitalise mid-headline
+// ("four Suicide Bombers killed", "blast at Power Plant"). Sentence-casing only
+// fires on FULLY title-cased headlines, so these slip through in otherwise
+// lower-case headlines. This is an allow-list: only words KNOWN to be common are
+// lowered, so genuine proper nouns are never touched.
+const COMMON_LOWER = new Set<string>([
+  "suicide", "bomber", "bombers", "bombing", "bombings", "attack", "attacks",
+  "attacker", "attackers", "blast", "blasts", "explosion", "explosions",
+  "militant", "militants", "insurgent", "insurgents", "terrorist", "terrorists",
+  "gunman", "gunmen", "soldier", "soldiers", "security", "forces", "force",
+  "police", "army", "troops", "commander", "commanders", "fighter", "fighters",
+  "rebel", "rebels", "killed", "dead", "death", "deaths", "injured", "wounded",
+  "casualties", "hostage", "hostages", "abducted", "kidnapped", "raid", "raids",
+  "ambush", "clash", "clashes", "gunfight", "firefight", "shooting", "shootout",
+  "hospital", "treatment", "highway", "road", "roads", "bridge", "power",
+  "plant", "station", "market", "mosque", "church", "temple", "school",
+  "convoy", "checkpoint", "curfew", "protest", "protests", "rally", "mob",
+  "group", "council", "committee", "men", "man", "woman", "women", "child",
+  "children", "youth", "youths", "family", "families", "people", "village",
+  "villagers", "town", "city", "district", "drone", "supplier", "weapons",
+  "arms", "cache", "grenade", "mine", "mines", "landmine", "shell", "shelling",
+  "airstrike", "airstrikes", "strike", "strikes", "operation", "operations",
+  "foiled", "arrested", "arrest", "seized", "seize", "justice", "ban",
+  "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+  "ten", "dozens",
+]);
+// Lower-case any mid-headline word whose base is a known common word. Never
+// touches the first word (lcFirst owns that), acronyms, or proper nouns.
+function lowerCommonWords(t: string): string {
+  if (!t) return t;
+  const tokens = t.split(/(\s+)/);
+  let first = true;
+  for (let idx = 0; idx < tokens.length; idx++) {
+    const w = tokens[idx]!;
+    if (!/[A-Za-z]/.test(w)) continue;
+    if (first) {
+      first = false;
+      continue;
+    }
+    if (isAcronymToken(w)) continue;
+    if (/^[A-Z][a-z]/.test(w) && COMMON_LOWER.has(baseWord(w)))
+      tokens[idx] = w[0]!.toLowerCase() + w.slice(1);
+  }
+  return tokens.join("");
+}
+
 // Tally which named sub-national hotspots a theatre's incidents reference, by
 // scanning each headline (+ summary). Returns hotspots ranked by how many
 // incidents mention them, plus how many incidents matched any hotspot at all
@@ -492,6 +655,46 @@ function leadTheatres(
   return leaders.slice(0, 3);
 }
 
+// Describe the theatres BELOW the lead(s). A High/Extreme or casualty-bearing
+// second theatre is "also serious" — it must NEVER be lumped into "lower level"
+// alongside a genuinely quiet one (the old wording flattened a deadly Extreme
+// second into the same clause as a single Low incident, contradicting its own
+// theatre block). Only Low/Moderate, casualty-free theatres read as "quieter".
+function secondaryClause(
+  areas: ConflictActivityArea[],
+  fromIdx: number,
+  variant = 0,
+): string {
+  const rest = areas.slice(fromIdx);
+  if (!rest.length) return "";
+  const serious = rest.filter(
+    (a) => (SEV_RANK[a.worstSeverity] ?? 0) >= 4 || a.casualtySignalCount > 0,
+  );
+  const minor = rest.filter((a) => !serious.includes(a));
+  const parts: string[] = [];
+  if (serious.length) {
+    const names = joinList(serious.slice(0, 2).map((a) => a.theatre));
+    const deadly = serious.some((a) => a.casualtySignalCount > 0);
+    let where = "";
+    if (serious.length === 1) {
+      const p = primaryHotspot(focusOf(serious[0]!));
+      if (p) where = ` in ${p}`;
+    }
+    const verb =
+      variant === 1
+        ? "remained serious too"
+        : `${serious.length > 1 ? "were" : "was"} also serious this period`;
+    parts.push(`${names} ${verb}${deadly ? `, with deadly attacks${where}` : ""}.`);
+  }
+  if (minor.length) {
+    const names = joinList(minor.slice(0, 2).map((a) => a.theatre));
+    const verb =
+      variant === 1 ? "stayed quieter" : `${minor.length > 1 ? "were" : "was"} quieter`;
+    parts.push(`${names} ${verb}.`);
+  }
+  return ` ${parts.join(" ")}`;
+}
+
 // ---------------------------------------------------------------------------
 // Per-theatre paragraph (what / where / who / why-operationally / exposure).
 // No parenthetical record counts — counts live only on the Fast Facts cards.
@@ -530,46 +733,56 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
   const deadly = area.casualtySignalCount > 0;
   const focus = focusOf(area);
   const where = joinList(focus.labels);
+  const v = Math.min(rank, 2); // variant index — keeps the top three distinct
 
-  // Position line — varies by rank so the top three never open the same way.
-  const positions = ["is the main concern", "comes next", "is also on the list"];
-  const position =
-    rank < positions.length ? positions[rank] : "is worth watching";
+  // Opening clause — position varies by rank so paragraphs never start alike.
+  const positions = ["is the main concern", "comes next", "also features"];
+  const position = rank < positions.length ? positions[rank] : "is worth watching";
 
-  // Where the activity sits and what it can hit, in one natural sentence. The
-  // "rest of the country is quieter" reassurance is added only when the activity
-  // is genuinely localised (≥50% of incidents in named hotspots) — never for a
-  // scattered theatre, which would falsely imply the rest is safe.
-  let placeSentence: string;
+  // "What / where / what it can hit", merged into the opening so it reads as
+  // prose, not a checklist. The reach verb and the "rest of the country is
+  // quieter" reassurance both vary by rank. The reassurance is added ONLY when
+  // the activity is genuinely localised — never for a scattered theatre, which
+  // would falsely imply the rest is safe.
+  const reach = [
+    `where ${activity} are threatening ${impacts}`,
+    `where ${activity} can reach ${impacts}`,
+    `where ${activity} have struck ${impacts}`,
+  ][v];
+  const calm = [
+    `The rest of ${area.theatre} has stayed largely clear.`,
+    `Elsewhere in ${area.theatre} it is far quieter.`,
+    `The rest of the country is comparatively calm.`,
+  ][v];
+  let opening: string;
   if (focus.hasFocus && focus.localised) {
-    placeSentence = `The worst activity sits around ${where}, where ${activity} can quickly affect ${impacts}. The rest of ${area.theatre} is far quieter.`;
+    opening = `${area.theatre} ${position}, with the worst of it around ${where}, ${reach}. ${calm}`;
   } else if (focus.hasFocus) {
-    placeSentence = `The worst activity sits around ${where}, where ${activity} can quickly affect ${impacts}.`;
+    opening = `${area.theatre} ${position}, the heaviest activity around ${where}, ${reach}.`;
   } else {
-    placeSentence = `Activity is spread across the country, with ${activity} the main pattern and ${impacts} most at risk.`;
+    opening = `${area.theatre} ${position}, with ${activity} reported across the country and ${impacts} most exposed.`;
   }
 
-  // Concrete events — the actual standout incidents, named with their dates.
+  // Concrete events — real attacks first (eventScore), named with their dates.
   const events = topEvents(area.incidents, 2);
   let eventSentence = "";
+  const leadIn = ["Recent cases include", "These included", "Notable incidents include"][v];
   if (events.length > 1) {
-    eventSentence = `Recent incidents include ${eventClause(events[0])} and ${eventClause(events[1])}.`;
+    eventSentence = `${leadIn} ${eventClause(events[0])} and ${eventClause(events[1])}.`;
   } else if (events.length === 1) {
-    eventSentence = `The most serious was ${eventClause(events[0])}.`;
+    eventSentence = `The standout was ${eventClause(events[0])}.`;
   }
 
   // Brief, honest severity / casualty note — "deadly" only when the casualty
   // signal is real, never on severity rank alone.
   let toll = "";
   if (deadly) {
-    toll = "Some of these attacks have been deadly.";
+    toll = ["Several of these attacks killed people.", "Some proved lethal.", "There were fatalities."][v];
   } else if (sevRank >= 4) {
-    toll = `Severity has reached ${sev}, though no deaths have been confirmed.`;
+    toll = `Severity reached ${sev}, though no deaths are confirmed.`;
   }
 
-  return [`${area.theatre} ${position}.`, placeSentence, eventSentence, toll]
-    .filter(Boolean)
-    .join(" ");
+  return [opening, eventSentence, toll].filter(Boolean).join(" ");
 }
 
 function buildArea(
@@ -812,10 +1025,7 @@ function buildSituation(
   const evSentence = leadEvent
     ? ` The most serious incident was ${eventClause(leadEvent)}.`
     : "";
-  const others = areas.slice(othersStart, othersStart + 2).map((a) => a.theatre);
-  const othersSentence = others.length
-    ? ` ${joinList(others)} also saw activity, at a lower level.`
-    : "";
+  const othersSentence = secondaryClause(areas, othersStart);
   // A high-impact theatre just outside the week is flagged so it is never lost.
   const pulledNames = pulledInAreas.slice(0, 2).map((a) => a.theatre);
   const pulledSentence = pulledNames.length
@@ -826,8 +1036,27 @@ function buildSituation(
   return `${placeSentence}${evSentence}${othersSentence}${pulledSentence}`;
 }
 
-function buildOtherWatched(areas: ConflictActivityArea[]): string {
-  if (areas.length === 0) return ZERO_OTHER;
+function buildOtherWatched(
+  areas: ConflictActivityArea[],
+  pulledIn: ConflictActivityArea[],
+): string {
+  if (areas.length === 0) {
+    // Reconcile with the Situation / Polestar pull-in note: when a theatre was
+    // pulled in from just outside the week, do not claim a blanket "nothing
+    // else anywhere" — that contradicts the watch flag. Name it instead.
+    if (pulledIn.length) {
+      const names = joinList(pulledIn.slice(0, 2).map((a) => a.theatre));
+      const ev = topEvents(
+        pulledIn.flatMap((a) => a.incidents),
+        1,
+      )[0];
+      const evClause = ev ? `, including ${eventClause(ev)}` : "";
+      return `Inside the week, no other theatres saw notable armed activity. ${names} ${
+        pulledIn.length > 1 ? "stay" : "stays"
+      } on the watch list after recent high-impact attacks just before the period${evClause}.`;
+    }
+    return ZERO_OTHER;
+  }
   const parts = areas.slice(0, 6).map((a) => {
     const f = focusOf(a);
     return f.hasFocus ? `${a.theatre} (${joinList(f.labels)})` : a.theatre;
@@ -910,28 +1139,34 @@ function buildPolestarView(
   const leaders = leadTheatres(areas);
   let opening: string;
   if (leaders.length > 1) {
-    // Co-leading theatres are named jointly; only the genuinely smaller theatres
-    // below them are "lower-level" — never a co-equal one. Lead by IMPACT.
-    const rest = areas
-      .slice(leaders.length, leaders.length + 2)
-      .map((a) => a.theatre);
-    const tail = rest.length
-      ? `, with ${joinList(rest)} lower-level but still worth watching`
-      : "";
+    // Co-leading theatres are named jointly; the theatres below them are handled
+    // by secondaryClause (a deadly second reads "also serious", never demoted
+    // alongside a quiet one). Lead by IMPACT.
     opening = `${joinList(
       leaders.map((a) => a.theatre),
-    )} are the most serious theatres this period${tail}.`;
+    )} are the most serious theatres this period.${secondaryClause(
+      areas,
+      leaders.length,
+      1,
+    )}`;
   } else {
-    const others = areas.slice(1, 3).map((a) => a.theatre);
-    const tail = others.length
-      ? `, with ${joinList(others)} quieter but still worth watching`
-      : "";
     // The concentration claim is scoped to WITHIN the lead theatre — it is not a
     // claim that the lead holds most of the whole period's activity, which is
-    // false when several theatres are active.
-    opening = primary
-      ? `${lead.theatre} is the most serious theatre this period, its activity concentrated around ${primary}${tail}.`
-      : `${lead.theatre} is the most serious theatre this period${tail}.`;
+    // false when several theatres are active. It is also gated on localised
+    // focus: a sub-50%-coverage theatre may NAME its flashpoint but must not be
+    // called "concentrated" there, which would contradict its softer Top-Activity
+    // paragraph and the sub-national honesty rule.
+    const focusClause =
+      primary && fLead.localised
+        ? `, its activity concentrated around ${primary}`
+        : primary
+          ? `, with ${primary} among the worst-hit areas`
+          : "";
+    opening = `${lead.theatre} is the most serious theatre this period${focusClause}.${secondaryClause(
+      areas,
+      1,
+      1,
+    )}`;
   }
   // A high-impact theatre just outside the week is flagged so it is never lost.
   const pulledNames = pulledInAreas.slice(0, 2).map((a) => a.theatre);
@@ -1095,7 +1330,7 @@ export function buildConflictReportDataset(
       worstKey,
       worstLabel,
     ),
-    autoOtherWatched: buildOtherWatched(otherInWindow),
+    autoOtherWatched: buildOtherWatched(otherInWindow, rankedPulledIn),
     autoWhatMatters: buildWhatMatters(leadAreas, allImpacts),
     autoWatchNext: buildWatchNext(leadAreas, categoriesPresent),
     autoPolestarView: buildPolestarView(rankedInWindow, rankedPulledIn, worstKey),
