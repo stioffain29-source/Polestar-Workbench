@@ -530,13 +530,19 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(piracy|pirate|pirates|robbery|robbed) .{0,40}(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage|strait|at sea|off (the )?coast)\b/,
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage) .{0,40}(piracy|pirate|pirates|sea robbery|armed robbery|robbed|robbery)\b/,
     /\b(missile|drone) (strike|attack) .{0,30}(ship|vessel|tanker|maritime|port|hormuz|red sea)/,
-    /\bport (closure|shutdown|strike|congestion|disruption|attack|berth|backlog)/,
+    // Port DISRUPTION as a security/operational event — NOT commercial "port
+    // congestion", which is freight-economics commentary, not a maritime
+    // security incident (admitting it leaked container-rate / shipping-cost
+    // stories into the security monitor).
+    /\bport (closure|shutdown|strike|disruption|attack|berth|backlog)/,
     /\bchokepoint\b/,
     /\b(strait of hormuz|bab[- ]el[- ]mandeb|suez|malacca|singapore strait)/,
     /\b(naval|maritime) (advisory|warning|alert|patrol|operation)/,
     /\b(war risk|p&i|insurance premium) .{0,30}(shipping|vessel|tanker|maritime)/,
     /\b(route|routing|reroute|diversion) .{0,30}(vessel|tanker|ship|maritime|red sea|hormuz|suez|cape)/,
-    /\bfreight rate/,
+    // NOTE: bare "freight rate" / "shipping rate" / "container rate" is
+    // commercial freight economics, not a security incident — deliberately NOT
+    // admitted here.
   ],
   cargo_watch: [
     /\b(cargo|truck|container|warehouse|depot) (theft|robbery|hijack|raid|pilferage|stolen|loss)/,

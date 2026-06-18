@@ -16,10 +16,14 @@
 //                  count DISTINCT events, not the number of outlets that re-ran
 //                  the same wire (the report's deeper window-bound kinetic/court
 //                  dedup is separate and stays in the report builder)
-//   everything   → topic relevance gate (fuel / energy / fertiliser)
+//   everything   → topic relevance gate (fuel / energy / fertiliser /
+//                  conflict, and the cargo dashboard card), then the same
+//                  conservative same-title syndication collapse so every
+//                  monitor counts DISTINCT events
 import { parseISO } from "date-fns";
 import { isTopicRelevant } from "./topicRelevance";
 import { dedupeByTitle } from "./flashpointReportDataset";
+import { dedupeMonitorRows } from "./monitorDedupe";
 import {
   classifyRegion as classifyShippingRegion,
   isLowCredibilityShippingRecord,
@@ -123,6 +127,33 @@ function resolveFlashpointTrue<T extends TrueIncidentLike>(incidents: T[]): T[] 
   return dedupeByTitle(enriched) as unknown as T[];
 }
 
+// All other topics (fuel / energy / fertiliser / conflict, and the cargo
+// dashboard card): relevance gate, THEN collapse syndicated re-runs of the
+// same wire with the conservative same-title dedup so the monitor and its
+// dashboard card count DISTINCT events. Deliberately stricter than the
+// flashpoint signature pass — only identical canonical titles merge, so
+// distinct stories that merely share keywords are never lost.
+function resolveGenericTrue<T extends TrueIncidentLike>(
+  topic: string,
+  incidents: T[],
+): T[] {
+  const relevant = incidents.filter((i) => isTrueIncident(topic, i));
+  const enriched = relevant.map((i) => {
+    const rec = i as TrueIncidentLike & {
+      occurredAt?: string | null;
+      severity?: string | null;
+    };
+    let date: Date;
+    try {
+      date = rec.occurredAt ? parseISO(rec.occurredAt) : new Date(NaN);
+    } catch {
+      date = new Date(NaN);
+    }
+    return { ...i, date, severity: rec.severity ?? "" };
+  });
+  return dedupeMonitorRows(enriched) as unknown as T[];
+}
+
 /** Filter a list down to the topic's true, in-scope events. */
 export function resolveTrueIncidents<T extends TrueIncidentLike>(
   topic: string,
@@ -130,5 +161,5 @@ export function resolveTrueIncidents<T extends TrueIncidentLike>(
 ): T[] {
   if (topic === "shipping") return resolveShippingTrue(incidents);
   if (topic === "flashpoint" || topic === "protests") return resolveFlashpointTrue(incidents);
-  return incidents.filter((i) => isTrueIncident(topic, i));
+  return resolveGenericTrue(topic, incidents);
 }

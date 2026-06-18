@@ -17,6 +17,7 @@ import {
   identifyCountry,
   type Region,
 } from "@/lib/cargoAnalysis";
+import { dedupeMonitorRows } from "@/lib/monitorDedupe";
 
 // A named commercial entity, detected conservatively: a proper noun followed
 // by a corporate suffix. Police forces, ministries and generic words like
@@ -115,9 +116,24 @@ export default function CargoWatch() {
   const outOfScopeCount = allEnriched.filter((i) => i.scope === "out_of_scope_geo").length;
   const excludedNonCargoCount = allEnriched.filter((i) => i.scope === "excluded_non_cargo").length;
 
+  // Collapse syndicated re-runs of the same wire (an identical headline carried
+  // by many outlets) BEFORE deriving the visible working sets, so the record
+  // counts, map, country tallies and confirmed-loss total reflect DISTINCT
+  // events — not the number of outlets. Prefer the in-scope copy, then higher
+  // severity, then the newest. The raw DB tallies above stay un-deduped, since
+  // they describe the source data, not the working set.
+  const deduped = useMemo(
+    () =>
+      dedupeMonitorRows(
+        allEnriched.map((i) => ({ ...i, date: new Date(i.occurredAt) })),
+        (i) => (i.scope === "in_scope" ? 2 : i.scope === "country_review" ? 1 : 0),
+      ),
+    [allEnriched],
+  );
+
   // All in-scope records (no time filter) — used by the long-range trend chart.
-  const inScope = useMemo(() => allEnriched.filter((i) => i.scope === "in_scope"), [allEnriched]);
-  const needsReview = useMemo(() => allEnriched.filter((i) => i.scope === "country_review"), [allEnriched]);
+  const inScope = useMemo(() => deduped.filter((i) => i.scope === "in_scope"), [deduped]);
+  const needsReview = useMemo(() => deduped.filter((i) => i.scope === "country_review"), [deduped]);
 
   // Time-window filter drives the map, recent list, country chart, KPIs, table.
   const cutoff = useMemo(() => (range === "all" ? null : subDays(new Date(), RANGE_DAYS[range])), [range]);

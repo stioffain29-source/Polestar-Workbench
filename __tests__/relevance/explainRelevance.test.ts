@@ -417,4 +417,109 @@ describe("explainRelevance", () => {
       expect(result.relevant).toBe(false);
     });
   });
+
+  describe("shipping", () => {
+    // Freight-economics commerce homonyms must NOT pass the maritime-SECURITY
+    // gate. These leaked in via the old "port congestion" / "freight rate"
+    // admissions, which have been removed.
+    it("drops global port congestion / shipping-rate commentary", () => {
+      const result = explainRelevance(
+        "shipping",
+        input({
+          topic: "shipping",
+          title: "Global port congestion, high shipping rates to last into 2023",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    it("drops container shipping-rate trend stories", () => {
+      const result = explainRelevance(
+        "shipping",
+        input({
+          topic: "shipping",
+          title: "World container shipping rates keep rising amid port congestion",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    it("drops shipping-cost surge stories", () => {
+      const result = explainRelevance(
+        "shipping",
+        input({
+          topic: "shipping",
+          title: "Shipping Costs for a Container from China Surge 250% to $7,500",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    it("drops congestion buried in the summary", () => {
+      const result = explainRelevance(
+        "shipping",
+        input({
+          topic: "shipping",
+          title: "Quarterly logistics update",
+          summary: "Port congestion worsens as container shipping rates climb",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    // Genuine maritime-security events must STILL pass.
+    it("keeps a vessel attack", () => {
+      expect(
+        explainRelevance(
+          "shipping",
+          input({ topic: "shipping", title: "Tanker attacked by drone in the Gulf of Oman" }),
+        ).relevant,
+      ).toBe(true);
+    });
+
+    it("keeps a port closure", () => {
+      expect(
+        explainRelevance(
+          "shipping",
+          input({ topic: "shipping", title: "Major port closure after explosion halts operations" }),
+        ).relevant,
+      ).toBe(true);
+    });
+
+    it("keeps armed robbery against a ship", () => {
+      expect(
+        explainRelevance(
+          "shipping",
+          input({ topic: "shipping", title: "Armed robbery against a ship in the Singapore Strait" }),
+        ).relevant,
+      ).toBe(true);
+    });
+
+    it("keeps a missile strike on a vessel", () => {
+      expect(
+        explainRelevance(
+          "shipping",
+          input({ topic: "shipping", title: "Houthi missile strike targets vessel in the Red Sea" }),
+        ).relevant,
+      ).toBe(true);
+    });
+
+    it("keeps route diversions", () => {
+      expect(
+        explainRelevance(
+          "shipping",
+          input({ topic: "shipping", title: "Ships reroute around Cape of Good Hope to avoid Red Sea" }),
+        ).relevant,
+      ).toBe(true);
+    });
+
+    it("keeps war-risk insurance for tankers", () => {
+      expect(
+        explainRelevance(
+          "shipping",
+          input({ topic: "shipping", title: "War risk premiums jump for tankers transiting Hormuz" }),
+        ).relevant,
+      ).toBe(true);
+    });
+  });
 });
