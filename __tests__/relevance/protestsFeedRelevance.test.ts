@@ -472,6 +472,100 @@ const FIXTURES: Fixture[] = [
     verdict: "KEEP",
   },
 
+  // ---- Industrial action at a named facility (in scope): KEEP ----------
+  // Worker stoppage disrupting output, even when the headline omits the
+  // union/worker words the public-order cue requires.
+  {
+    title: "Strike to disrupt output at Australian LNG export plant, Inpex says",
+    verdict: "KEEP",
+    reason: "industrial action",
+  },
+  {
+    title: "Inpex applies to halt Australia's Ichthys LNG strike in 2026",
+    verdict: "KEEP",
+    reason: "industrial action",
+  },
+  {
+    title: "Hundreds of BHP workers back strike action at key Australian iron ore export hub",
+    verdict: "KEEP",
+  },
+  // Military / sport / market "strike"/"rally" homonyms must STAY dropped —
+  // they carry no industrial anchor next to the token (or no stoppage token).
+  {
+    title: "China's strike capacity over Australia set to expand, think tank says",
+    verdict: "DROP",
+    reason: "without public-order cue",
+  },
+  {
+    title: "China direct strike threat to Australia 'growing': report",
+    verdict: "DROP",
+    reason: "without public-order cue",
+  },
+  {
+    title: "Connolly leads Australia recovery after Bangladesh strike early on day two",
+    verdict: "DROP",
+    reason: "without public-order cue",
+  },
+  {
+    title: "Iron ore exports rally to a record high on Chinese demand",
+    verdict: "DROP",
+    reason: "homonym",
+  },
+
+  // ---- APAC coverage-gap countries (SK / NZ / Malaysia / Papua): KEEP ---
+  // Real events the per-country civil-unrest feeds were added to capture.
+  {
+    title: "South Korean police break up 35-hour polling station protest",
+    verdict: "KEEP",
+  },
+  {
+    title:
+      "Protesters rally outside South Korea election commission demanding a re-vote",
+    verdict: "KEEP",
+  },
+  {
+    title: "Thousands protest in Auckland against the gender definition bill",
+    verdict: "KEEP",
+  },
+  {
+    title:
+      "Pro-Palestine protesters disrupt Foreign Minister Winston Peters at Wellington select committee",
+    verdict: "KEEP",
+  },
+  {
+    title:
+      "Over 1,000 Orang Asli rally in Putrajaya demanding recognition of ancestral land rights",
+    verdict: "KEEP",
+  },
+  {
+    title:
+      "Sorong residents protest palm oil company's harvesting on disputed land in Papua",
+    verdict: "KEEP",
+  },
+  // New Zealand anchor must NOT admit sports/concert noise.
+  {
+    title: "Iran rally twice to hold New Zealand 2-2 in heated World Cup clash",
+    verdict: "DROP",
+  },
+  {
+    title: "Evanescence announces massive 2027 New Zealand show",
+    verdict: "DROP",
+  },
+  {
+    title: "New Zealand celebrate milestones as they march into hockey semis",
+    verdict: "DROP",
+  },
+  {
+    title:
+      "'We're here to play football', Iran downplays protest ahead New Zealand opener",
+    verdict: "DROP",
+  },
+  // Interstate diplomatic "protest" — a state lodging a complaint, not unrest.
+  {
+    title: "North Korea Protests Seoul-EU Rebuke of Russia Ties",
+    verdict: "DROP",
+  },
+
   // ---- Press-freedom / coverage suppression (reporting subject): DROP --
   {
     title:

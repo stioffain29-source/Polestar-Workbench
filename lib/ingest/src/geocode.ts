@@ -77,6 +77,11 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   canberra: { lat: -35.28, lng: 149.13 },
   perth: { lat: -31.95, lng: 115.86 },
   adelaide: { lat: -34.93, lng: 138.6 },
+  // New Zealand
+  auckland: { lat: -36.85, lng: 174.76 },
+  wellington: { lat: -41.29, lng: 174.78 },
+  christchurch: { lat: -43.53, lng: 172.64 },
+  dunedin: { lat: -45.87, lng: 170.5 },
   // Bangladesh
   dhaka: { lat: 23.81, lng: 90.41 },
   chittagong: { lat: 22.36, lng: 91.78 },

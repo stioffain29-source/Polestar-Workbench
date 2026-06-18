@@ -380,6 +380,16 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // not the security-relevant civil unrest this APAC/Gulf monitor tracks.
   // Title-only + before the rescue so the bare word "protest" cannot keep it.
   /\b(world cup|fifa|uefa|olympics?|olympic games|copa am[eé]rica|champions league)\b/,
+  // Sports progression — a team "marches into the semis/final", "marched into
+  // the last 8". The ambiguous cue "march" would otherwise rescue these; a
+  // sporting run is never civil unrest. The optional middle word lets the sport
+  // name sit between ("march into hockey semis"). Genuine protest marches go
+  // "to parliament / the streets", never "into the semis", so this is safe.
+  /\bmarch(es|ed|ing)? (in)?to (the )?(\w+ )?(final|finals|semi|semis|semi-?finals?|quarter-?finals?|last \d+|knockout|play-?offs?|title|trophy|round of \d+)\b/,
+  // "play football / cricket / …" is unambiguous sports colour. "'We're here to
+  // play football', Iran downplays protest ahead New Zealand opener" is a World
+  // Cup fixture, not the security-relevant unrest this monitor tracks.
+  /\b(play|playing|plays|played) (football|soccer|cricket|rugby|hockey|netball|basketball|volleyball|handball|futsal)\b/,
   // Explainer / symbolism think-piece — "What does pink symbolize at the
   // Women's Alliance protest?" is a colour-symbolism explainer, not a report
   // of an event.
@@ -513,7 +523,7 @@ const FP_OVERSEAS_PROTEST_RE = /\b(protest|demonstrat|rally|clash|picket|vigil|g
 // added there should be added here too. "chinese" is deliberately OMITTED (an
 // actor, not a venue — "Chinese embassy" protests happen across the region).
 const FP_APAC_ANCHOR_RE =
-  /\b(?:australia|australian|australians|sydney|melbourne|brisbane|canberra|perth|adelaide|bangladesh|bangladeshi|bangladeshis|dhaka|chittagong|chattogram|comilla|cumilla|rangpur|sylhet|khulna|rajshahi|barisal|barishal|mymensingh|gazipur|narayanganj|china|beijing|shanghai|guangzhou|shenzhen|hong kong|wuhan|chengdu|xinjiang|india|indian|indians|delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|imphal|guwahati|lucknow|patna|manipur|indonesia|indonesian|indonesians|jakarta|java|sumatra|bali|sulawesi|surabaya|bandung|medan|makassar|yogyakarta|semarang|aceh|japan|japanese|tokyo|osaka|kyoto|yokohama|nagoya|fukuoka|malaysia|malaysian|malaysians|kuala lumpur|penang|johor|sabah|sarawak|putrajaya|myanmar|burma|burmese|yangon|mandalay|naypyidaw|nepal|nepali|nepalis|nepalese|kathmandu|pokhara|biratnagar|pakistan|pakistani|pakistanis|karachi|lahore|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|philippines|philippine|filipino|filipina|filipinos|filipinas|manila|cebu|davao|quezon|mindanao|iloilo|baguio|zamboanga|pnp|south korea|south korean|south koreans|seoul|busan|incheon|daegu|sri lanka|sri lankan|sri lankans|colombo|kandy|jaffna|galle|negombo|thailand|thai|thais|bangkok|chiang mai|phuket|vietnam|viet nam|vietnamese|hanoi|ho chi minh|haiphong|jamaat|shibir|awami|rohingya|naxal|maoist|hartal|tehreek|imran khan|papua|papuan|papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago|west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|intan jaya|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|maybrat|beoga|lanny jaya|tolikara|dogiyai|deiyai|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
+  /\b(?:australia|australian|australians|sydney|melbourne|brisbane|canberra|perth|adelaide|new zealand|new zealander|new zealanders|auckland|wellington|christchurch|dunedin|bangladesh|bangladeshi|bangladeshis|dhaka|chittagong|chattogram|comilla|cumilla|rangpur|sylhet|khulna|rajshahi|barisal|barishal|mymensingh|gazipur|narayanganj|china|beijing|shanghai|guangzhou|shenzhen|hong kong|wuhan|chengdu|xinjiang|india|indian|indians|delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|imphal|guwahati|lucknow|patna|manipur|indonesia|indonesian|indonesians|jakarta|java|sumatra|bali|sulawesi|surabaya|bandung|medan|makassar|yogyakarta|semarang|aceh|japan|japanese|tokyo|osaka|kyoto|yokohama|nagoya|fukuoka|malaysia|malaysian|malaysians|kuala lumpur|penang|johor|sabah|sarawak|putrajaya|myanmar|burma|burmese|yangon|mandalay|naypyidaw|nepal|nepali|nepalis|nepalese|kathmandu|pokhara|biratnagar|pakistan|pakistani|pakistanis|karachi|lahore|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|philippines|philippine|filipino|filipina|filipinos|filipinas|manila|cebu|davao|quezon|mindanao|iloilo|baguio|zamboanga|pnp|south korea|south korean|south koreans|seoul|busan|incheon|daegu|sri lanka|sri lankan|sri lankans|colombo|kandy|jaffna|galle|negombo|thailand|thai|thais|bangkok|chiang mai|phuket|vietnam|viet nam|vietnamese|hanoi|ho chi minh|haiphong|jamaat|shibir|awami|rohingya|naxal|maoist|hartal|tehreek|imran khan|papua|papuan|papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago|west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|intan jaya|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|maybrat|beoga|lanny jaya|tolikara|dogiyai|deiyai|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
 
 // Out-of-region theatre — countries / capitals / leaders OUTSIDE the 15-country
 // APAC scope (Latin America, the Middle East, Africa, non-APAC Europe/Eurasia,
@@ -943,7 +953,7 @@ const FP_NEG_GESTURE =
 const FP_NEG_DIPLOMATIC =
   /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b|\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b[^.]{0,25}\bprotest\b|\bprotest\b[^.]{0,25}\b(via|through|with)\b[^.]{0,15}\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b|\bbilateral (relations|ties|relationship)\b/i;
 const FP_NEG_INTERSTATE_NAT =
-  "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
+  "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|seoul|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
 const FP_NEG_INTERSTATE_TERR =
   "(lipulekh|kalapani|limpiyadhura|arunachal|aksai chin|doklam|kashmir|tawang|south china sea|west philippine sea|senkaku|spratly|scarborough|panatag|bajo de masinloc|masinloc|sabah|disputed (border|island|islets|temple|territory|waters|shoal)|border (dispute|area|encroach)|sanctions|missile launch|aircraft incursion|naval activit|maritime law|textbook|floating structure|territorial)";
 const FP_NEG_INTERSTATE = new RegExp(
@@ -1001,6 +1011,30 @@ function flashpointProtestCrackdownVerdict(text: string, negText: string): boole
 // public-order companion, so they are not flashpoint material.
 const FLASHPOINT_PUBLIC_ORDER_CUE_RE =
   /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage))\b/;
+
+// Industrial-action recogniser. This monitor's scope explicitly includes
+// industrial action, but real labour-strike headlines often omit the
+// union/worker words the public-order cue requires — e.g. "Strike to disrupt
+// output at Australian LNG export plant" or "Inpex applies to halt Ichthys
+// LNG strike". The signal is a worker STRIKE / WALKOUT / STOPPAGE token (never
+// the overloaded "rally") sitting within proximity of an industrial anchor:
+// an output/production word or a named facility (LNG plant, mine, port,
+// iron-ore export, refinery…) or a workforce/union word. Requiring the
+// stoppage token AND a nearby industrial anchor keeps this off the military
+// ("strike capacity/threat over Australia"), weather ("lightning strike") and
+// sport ("Bangladesh strike early") homonyms — those carry no industrial
+// anchor near the token, and the modifier-bound military / "strike a deal" /
+// tariff / market-rally homonyms are already killed in FLASHPOINT_EXCLUDE
+// (which runs first). It also never fires on a market "iron-ore rally" because
+// the trigger here is the stoppage token, not "rally".
+const FP_INDUSTRIAL_STOPPAGE =
+  "(?:strike|strikes|striking|walkout|walk[- ]?out|stoppage|stop[- ]?work|down(?:ed)? tools|industrial action|protected (?:industrial )?action|work[- ]to[- ]rule|go[- ]slow|picket(?:s|ing|ed| line)?)";
+const FP_INDUSTRIAL_ANCHOR =
+  "(?:output|production|operations?|exports?|shipments?|loadings?|throughput|supply|lng|gas (?:plant|field|export|hub)|refiner(?:y|ies)|smelter|mine|mines|mining|miners?|iron ore|coal|copper|nickel|alumina|bauxite|ore|port|terminal|wharf|dock|jetty|berth|rail(?:way)?|freight|plant|factor(?:y|ies)|mill|warehouse|depot|offshore|platform|rig|workers?|workforce|staff|employees?|unions?|enterprise agreement|pay (?:deal|dispute|offer|rise)|wages?|bargaining)";
+const FLASHPOINT_INDUSTRIAL_ACTION_RE = new RegExp(
+  `\\b${FP_INDUSTRIAL_STOPPAGE}\\b[^.!?]{0,70}\\b${FP_INDUSTRIAL_ANCHOR}\\b|\\b${FP_INDUSTRIAL_ANCHOR}\\b[^.!?]{0,70}\\b${FP_INDUSTRIAL_STOPPAGE}\\b`,
+  "i",
+);
 
 // Political-rally cue. A "rally" is the most overloaded flashpoint token:
 // it is a market move, a sports comeback, and a motorsport event as often
@@ -1370,6 +1404,12 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       }
       if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) {
         return { relevant: true, reason: "kept: ambiguous token (rally/strike) + public-order cue" };
+      }
+      // Genuine industrial action: a worker strike/walkout/stoppage disrupting
+      // output at a named industrial facility. In scope for this monitor even
+      // when the headline omits the union/worker words the cue above needs.
+      if (FLASHPOINT_INDUSTRIAL_ACTION_RE.test(text)) {
+        return { relevant: true, reason: "kept: industrial action (worker stoppage at industrial site)" };
       }
       // A "rally" with explicit POLITICAL-mobilisation context (against a
       // govt/policy, for rights/a demand, anti-war/regime, opposition/grand/

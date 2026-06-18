@@ -224,6 +224,7 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Malaysia",          aliases: ["malaysia", "malaysian", "malaysians", "kuala lumpur", "penang", "johor", "sabah", "sarawak", "putrajaya"] },
   { canonical: "Myanmar",           aliases: ["myanmar", "burma", "burmese", "yangon", "mandalay", "naypyidaw"] },
   { canonical: "Nepal",             aliases: ["nepal", "nepali", "nepalis", "nepalese", "kathmandu", "pokhara", "biratnagar"] },
+  { canonical: "New Zealand",       aliases: ["new zealand", "new zealander", "new zealanders", "auckland", "wellington", "christchurch", "dunedin"] },
   { canonical: "Pakistan",          aliases: ["pakistan", "pakistani", "pakistanis", "karachi", "lahore", "islamabad", "rawalpindi", "peshawar", "quetta", "multan", "faisalabad"] },
   // NOTE: Papua New Guinea and Indonesian West Papua are resolved by
   // resolvePapuaPng() (below), NOT by this alias table, because they share
