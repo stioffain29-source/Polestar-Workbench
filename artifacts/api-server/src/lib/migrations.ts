@@ -18,6 +18,7 @@ import {
 } from "@workspace/ingest";
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
+import { APAC_FLASHPOINT_BACKFILL } from "./seed/apacFlashpointBackfill";
 
 // Catalogued Flashpoint regional sources that the audit identified as
 // missing. Inserted idempotently on startup; existing rows are not
@@ -1462,6 +1463,97 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (cardErr) {
       logger.error({ err: cardErr }, "Card builder seed failed");
+    }
+
+    // ONE-TIME backfill of the newly-added APAC civil-unrest feeds.
+    //
+    //   Production only ever ran a single boot ingest, which captured just the
+    //   current ~14-day Google News window, and the New Zealand feed fetch
+    //   failed transiently in that one run (it landed zero rows). Google News
+    //   "when:14d" cannot re-fetch the older articles dev accumulated, so the
+    //   only reliable way to bring prod to parity for Australia / New Zealand /
+    //   South Korea / Malaysia / West Papua is to copy the exact verified
+    //   relevant rows across rather than re-pull the feeds and hope. Inserts
+    //   only rows not already present, deduped by source_url or
+    //   (topic+title+occurred_at) — identical to the admin backfill route — so
+    //   it is idempotent and safe to re-run. Marker-gated → runs once per env.
+    //   Seeded rows carry the current relevance version + verdict so the
+    //   relevance backfill below leaves them untouched.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "apac_flashpoint_backfill_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        let inserted = 0;
+        let skipped = 0;
+        for (const rec of APAC_FLASHPOINT_BACKFILL) {
+          const occurredAt = new Date(rec.occurredAt);
+          if (Number.isNaN(occurredAt.getTime())) {
+            skipped++;
+            continue;
+          }
+          // A record counts as already present if EITHER its source URL matches
+          // an existing row OR the (topic, title, occurred_at) natural key does
+          // — the same dual-key dedup the admin backfill route uses, so a row
+          // the live feed already landed in prod is never duplicated.
+          const naturalKey = and(
+            eq(incidentsTable.topic, rec.topic),
+            eq(incidentsTable.title, rec.title),
+            eq(incidentsTable.occurredAt, occurredAt),
+          );
+          const matchCondition = rec.sourceUrl
+            ? or(eq(incidentsTable.sourceUrl, rec.sourceUrl), naturalKey)
+            : naturalKey;
+          const existing = await db
+            .select({ id: incidentsTable.id })
+            .from(incidentsTable)
+            .where(matchCondition)
+            .limit(1);
+          if (existing.length > 0) {
+            skipped++;
+            continue;
+          }
+          await db.insert(incidentsTable).values({
+            topic: rec.topic,
+            title: rec.title,
+            displayTitle: rec.displayTitle,
+            summary: rec.summary,
+            country: rec.country,
+            location: rec.location,
+            latitude: rec.latitude,
+            longitude: rec.longitude,
+            occurredAt,
+            severity: rec.severity,
+            confidence: rec.confidence,
+            source: rec.source,
+            sourceUrl: rec.sourceUrl,
+            resolvedUrl: rec.resolvedUrl,
+            relevanceStatus: rec.relevanceStatus,
+            relevanceScore: rec.relevanceScore,
+            relevanceReason: rec.relevanceReason,
+            relevanceVersion: RELEVANCE_RULE_VERSION,
+            relevanceEvaluatedAt: new Date(),
+          });
+          inserted++;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { inserted, skipped, marker: markerKey },
+          "One-time backfill of APAC civil-unrest flashpoint rows (Australia / New Zealand / South Korea / Malaysia / West Papua)",
+        );
+      }
+    } catch (apacErr) {
+      logger.error({ err: apacErr }, "APAC flashpoint backfill failed");
     }
 
     try {

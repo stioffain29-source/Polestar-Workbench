@@ -45,3 +45,29 @@ the route skips with `bad_occurred_at`). Normalise to `+00:00` before sending
 
 **Why:** repeated "we lost incidents prod had / dev has" complaints stem from
 feed non-determinism; this route is the durable, deterministic recovery path.
+
+## No-token variant: marker-gated boot-migration seed
+
+When `INGEST_ADMIN_TOKEN` is UNSET in prod the admin backfill route 503s, and
+setting a token directly is discouraged (and `requestEnvVar` stalls on the
+user). The same deterministic copy can ship with NO secret as a one-time,
+marker-gated block in `runDataMigrations` (`migrations.ts`) that imports a
+generated seed module (export the dev rows with `json_agg`, write a typed
+`*.ts` array under `artifacts/api-server/src/lib/seed/` — a TS array bundles
+reliably; don't rely on JSON-loader behaviour). Same dual-key dedup
+(`source_url` OR `(topic,title,occurred_at)`); set `relevanceVersion =
+RELEVANCE_RULE_VERSION` + the dev verdict on inserts so the relevance backfill
+leaves them untouched and they pass the API filter immediately.
+
+**Why:** runs in the deployment runtime (writable prod DB) on the next boot
+after a plain republish — no token, no post-deploy curl. Marker-gated so it
+runs once per env and is idempotent.
+
+**Validate before publishing:** restart the api-server in DEV — dev already
+holds the rows, so the block must log `inserted:0 / skipped:<all>` (dedup
+proven, zero dev pollution). In prod the dedup skips the rows the live feed
+already landed and inserts only the genuinely-missing ones.
+
+**Caveat:** this seeds a one-time SNAPSHOT. Ongoing freshness for a feed that
+failed transiently still depends on the normal scheduler retrying it on its
+next ~12h cycle; the seed only closes the immediate gap.
