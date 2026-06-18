@@ -9,24 +9,34 @@ import type { IngestOptions, IngestSummary } from "./types";
 // Shared South/SE/East-Asia + Middle East country alias map. Order matters:
 // more specific actors precede broader regional names. Covers the APAC and
 // South Asia footprint of the energy/fertiliser/fuel monitors.
-const COUNTRY_ALIASES: CountryAlias[] = [
-  { canonical: "India", aliases: ["india", "indian", "delhi", "mumbai", "kolkata", "chennai", "bengaluru", "uttar pradesh", "maharashtra", "punjab", "bihar", "tamil nadu"] },
-  { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "karachi", "lahore", "islamabad", "punjab province", "sindh", "balochistan", "khyber"] },
-  { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram"] },
-  { canonical: "Sri Lanka", aliases: ["sri lanka", "sri lankan", "colombo", "ceylon"] },
-  { canonical: "Nepal", aliases: ["nepal", "nepali", "kathmandu"] },
+// Exported so the one-time news-topic country backfill (backfillNewsCountry.ts)
+// re-derives existing 'Unknown' rows through the SAME gazetteer the live ingest
+// uses — no second, drift-prone copy of the alias list.
+//
+// Beyond bare country/capital names, in-region grid news routinely names ONLY a
+// state, city, utility or regulator (e.g. "K-Electric", "NEPRA", "Gazipur",
+// "NEA", "Kerala") with no country word, so the region feeds dropped them to
+// 'Unknown'. The added aliases are deliberately UNAMBIGUOUS, single-country
+// identifiers validated against the live Unknown set; generic electrical terms
+// (e.g. "brownout") are intentionally excluded to stay precision-first.
+export const COUNTRY_ALIASES: CountryAlias[] = [
+  { canonical: "India", aliases: ["india", "indian", "delhi", "mumbai", "kolkata", "chennai", "bengaluru", "uttar pradesh", "maharashtra", "punjab", "bihar", "tamil nadu", "kerala", "gurugram", "gurgaon", "karnataka", "telangana", "gujarat", "rajasthan", "odisha", "kochi", "krishnankutty"] },
+  { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "karachi", "lahore", "islamabad", "punjab province", "sindh", "balochistan", "khyber", "k-electric", "k electric", "kelectric", "lesco", "hesco", "nepra", "peshawar", "quetta", "multan", "faisalabad", "rawalpindi", "gujranwala", "leghari", "shehbaz", "ufone"] },
+  { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram", "bkmea", "bpdb", "desco", "gazipur", "brahmanbaria", "sylhet", "khulna", "jessore", "narayanganj", "rajshahi", "barisal", "mymensingh", "ctg", "comilla", "cumilla", "bogura", "rmg", "nasrul"] },
+  { canonical: "Sri Lanka", aliases: ["sri lanka", "sri lankan", "colombo", "ceylon", "ceb", "sajith", "kandy", "jaffna"] },
+  { canonical: "Nepal", aliases: ["nepal", "nepali", "kathmandu", "nea", "ghising", "chitwan", "pokhara", "biratnagar"] },
   { canonical: "Myanmar", aliases: ["myanmar", "burma", "burmese", "yangon", "naypyidaw", "mandalay"] },
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "surabaya"] },
-  { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "luzon", "mindanao", "cebu"] },
+  { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "luzon", "mindanao", "cebu", "meralco", "napocor", "visayas", "davao", "iloilo"] },
   { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
-  { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok"] },
+  { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "koh larn", "phuket", "chiang mai", "pattaya"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur"] },
   { canonical: "China", aliases: ["china", "chinese", "beijing", "shanghai", "guangdong"] },
-  { canonical: "Japan", aliases: ["japan", "japanese", "tokyo", "osaka"] },
+  { canonical: "Japan", aliases: ["japan", "japanese", "tokyo", "osaka", "tepco", "fukushima"] },
   { canonical: "South Korea", aliases: ["south korea", "korean", "seoul", "busan"] },
   { canonical: "Iran", aliases: ["iran", "iranian", "tehran"] },
   { canonical: "Iraq", aliases: ["iraq", "iraqi", "baghdad", "basra"] },
-  { canonical: "Saudi Arabia", aliases: ["saudi arabia", "saudi", "riyadh", "jeddah"] },
+  { canonical: "Saudi Arabia", aliases: ["saudi arabia", "saudi", "riyadh", "jeddah", "yanbu", "dammam", "dhahran", "mecca", "medina"] },
   { canonical: "United Arab Emirates", aliases: ["united arab emirates", "uae", "dubai", "abu dhabi"] },
   { canonical: "Qatar", aliases: ["qatar", "qatari", "doha"] },
   { canonical: "Kuwait", aliases: ["kuwait", "kuwaiti"] },

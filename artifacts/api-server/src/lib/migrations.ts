@@ -4,6 +4,7 @@ import { sql, eq, or, ne, isNull, inArray, and, like } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import {
   runStrikesBackfill,
+  runNewsCountryBackfill,
   classifySeverity,
   isReactionLed,
   severityFromFatalities,
@@ -560,6 +561,51 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { rows: res.rowCount ?? 0, marker: markerKey },
           "One-time purge of out-of-region mis-stamped fuel/energy/fertiliser rows",
+        );
+      }
+    }
+
+    // 3d-1b) ONE-TIME backfill of 'Unknown'-country energy rows.
+    //
+    //        The region energy feeds (load-shedding / brownout / grid-attack)
+    //        search several countries at once and fall back to country='Unknown'
+    //        for any headline naming no in-region COUNTRY word — even when it
+    //        names a state, city, utility or regulator that unambiguously
+    //        identifies the country (Gazipur, K-Electric, NEPRA, NEA, Kerala…).
+    //        The gazetteer now recognises those, so the monitor's COUNTRY column
+    //        showed "—" for ~130 otherwise-placeable rows. This re-runs the SAME
+    //        detectCountry over the already-stored Unknown rows and fills the
+    //        country (+ country-centroid coordinates only when the row has none).
+    //        Unknown-ONLY: it never overwrites an attributed row, and rows that
+    //        still name no place stay 'Unknown' (rendered "—"), which is honest.
+    //        Runs AFTER the 3d out-of-region purge so deleted rows are not
+    //        re-placed. Marker-gated → runs once.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "energy_unknown_country_backfill_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await runNewsCountryBackfill({ commit: true, topics: ["energy"] });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            candidates: res.candidates,
+            resolved: res.resolved,
+            stillUnknown: res.stillUnknown,
+            perCountry: res.perCountry,
+            marker: markerKey,
+          },
+          "One-time backfill of Unknown-country energy rows",
         );
       }
     }

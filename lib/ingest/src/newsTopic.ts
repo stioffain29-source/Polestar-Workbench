@@ -69,7 +69,7 @@ type Feed = TopicFeed & { url: string };
 
 type Classified = { kept: boolean; reason: string; country: string | null };
 
-function detectCountry(hay: string, aliases: CountryAlias[]): string | null {
+export function detectCountry(hay: string, aliases: CountryAlias[]): string | null {
   const match = aliases.find((c) => c.aliases.some((a) => hasWord(hay, a)));
   return match ? match.canonical : null;
 }
