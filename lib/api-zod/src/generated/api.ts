@@ -56,6 +56,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "confidence": zod.enum(['low', 'medium', 'high']),
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "resolvedUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "corroborations": zod.array(zod.object({
@@ -319,6 +320,7 @@ export const ListIncidentsResponseItem = zod.object({
   "confidence": zod.enum(['low', 'medium', 'high']),
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "resolvedUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "corroborations": zod.array(zod.object({
@@ -379,6 +381,7 @@ export const GetIncidentResponse = zod.object({
   "confidence": zod.enum(['low', 'medium', 'high']),
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "resolvedUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "corroborations": zod.array(zod.object({
@@ -434,6 +437,7 @@ export const UpdateIncidentResponse = zod.object({
   "confidence": zod.enum(['low', 'medium', 'high']),
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "resolvedUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "corroborations": zod.array(zod.object({
@@ -485,6 +489,7 @@ export const GetRecentIncidentsResponseItem = zod.object({
   "confidence": zod.enum(['low', 'medium', 'high']),
   "source": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
+  "resolvedUrl": zod.string().nullish(),
   "analystNotes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "corroborations": zod.array(zod.object({

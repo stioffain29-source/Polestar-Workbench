@@ -17,6 +17,7 @@ import {
   OPERATIONAL_IMPACTS, type ProtestCategory,
 } from "@/lib/protestsAnalysis";
 import { ExternalLink } from "lucide-react";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -580,8 +581,8 @@ export default function Protests() {
                         </span>
                       </td>
                       <td className="p-2">
-                        {i.sourceUrl ? (
-                          <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                        {incidentSourceUrl(i) ? (
+                          <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (

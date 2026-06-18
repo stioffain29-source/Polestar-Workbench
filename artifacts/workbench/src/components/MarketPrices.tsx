@@ -6,6 +6,7 @@ import {
 import { useListMarketPrices } from "@workspace/api-client-react";
 import type { MarketPrice } from "@workspace/api-client-react";
 import { SEVERITY_LABELS, severityBadgeStyle } from "@/lib/topics";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { ExternalLink } from "lucide-react";
 
 const FILL_OPACITY = 0.78;
@@ -102,6 +103,7 @@ export type DerivedIncidentRow = {
   title: string;
   severity: string;
   sourceUrl?: string | null;
+  resolvedUrl?: string | null;
 };
 
 // Presentational panel for incidents derived from the loaded set by keyword
@@ -177,8 +179,8 @@ export function IncidentDerivedPanel({
                         </span>
                       </td>
                       <td className="p-2">
-                        {i.sourceUrl ? (
-                          <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                        {incidentSourceUrl(i) ? (
+                          <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (

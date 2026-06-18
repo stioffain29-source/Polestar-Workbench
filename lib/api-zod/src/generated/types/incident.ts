@@ -32,6 +32,8 @@ export interface Incident {
   /** @nullable */
   sourceUrl?: string | null;
   /** @nullable */
+  resolvedUrl?: string | null;
+  /** @nullable */
   analystNotes?: string | null;
   createdAt: Date;
   corroborations: Corroboration[];

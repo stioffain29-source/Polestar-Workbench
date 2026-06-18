@@ -24,6 +24,7 @@ import { dedupeShippingMonitorRows } from "@/lib/shippingReportDataset";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
 
@@ -731,7 +732,7 @@ export default function Shipping() {
                     severity={v.severity}
                     type={v.vesselType}
                     summary={v.summary ?? null}
-                    sourceUrl={v.sourceUrl ?? null}
+                    sourceUrl={incidentSourceUrl(v)}
                   />
                 </div>
               ))}
@@ -780,8 +781,8 @@ export default function Shipping() {
                       </span>
                     </td>
                     <td className="p-2">
-                      {i.sourceUrl ? (
-                        <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
+                      {incidentSourceUrl(i) ? (
+                        <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       ) : <span className="text-muted-foreground text-xs">—</span>}
@@ -1021,8 +1022,8 @@ export default function Shipping() {
                             </span>
                           </td>
                           <td className="p-2">
-                            {i.sourceUrl ? (
-                              <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                            {incidentSourceUrl(i) ? (
+                              <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
                                 <ExternalLink className="w-3 h-3" />
                               </a>
                             ) : (

@@ -22,6 +22,7 @@ import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { GdeltCoding, hasGdeltCoding } from "@/components/GdeltCoding";
 import { cn } from "@/lib/utils";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 
 const WINDOWS = [7, 14, 30, 60, 90, 120];
 
@@ -211,9 +212,9 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
         <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Summary</label>
         <p className="text-sm mt-1">{incident.summary}</p>
       </div>
-      {incident.sourceUrl && (
+      {incidentSourceUrl(incident) && (
         <div className="text-xs">
-          <a className="text-accent hover:underline" href={incident.sourceUrl} target="_blank" rel="noreferrer">{incident.sourceUrl}</a>
+          <a className="text-accent hover:underline" href={incidentSourceUrl(incident)!} target="_blank" rel="noreferrer">{incidentSourceUrl(incident)}</a>
         </div>
       )}
       {incident.corroborations?.length ? (

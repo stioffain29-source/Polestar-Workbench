@@ -7,6 +7,7 @@ import { format, formatDistanceToNow, subDays } from "date-fns";
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend } from "recharts";
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import {
   classifyRegion,
   classifyCategory,
@@ -375,8 +376,8 @@ export default function CargoWatch() {
                     </span>
                   </div>
                   <div className="text-sm font-medium leading-snug">
-                    {i.sourceUrl ? (
-                      <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:text-accent hover:underline">{i.title}</a>
+                    {incidentSourceUrl(i) ? (
+                      <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="hover:text-accent hover:underline">{i.title}</a>
                     ) : i.title}
                   </div>
                   <div className="text-[11px] text-muted-foreground font-sans mt-1 flex items-center justify-between gap-2">
@@ -502,8 +503,8 @@ export default function CargoWatch() {
                     <td className="p-2 text-xs">{i.company ?? <span className="text-muted-foreground">None named</span>}</td>
                     <td className="p-2 text-xs capitalize">{i.confidence}</td>
                     <td className="p-2">
-                      {i.sourceUrl ? (
-                        <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
+                      {incidentSourceUrl(i) ? (
+                        <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       ) : (

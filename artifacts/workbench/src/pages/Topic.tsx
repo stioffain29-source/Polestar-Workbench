@@ -16,6 +16,7 @@ import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { MarketPricesSection, IncidentDerivedPanel, type DerivedIncidentRow } from "@/components/MarketPrices";
 import { ExternalLink, BadgeCheck } from "lucide-react";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { GdeltCoding } from "@/components/GdeltCoding";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
@@ -272,6 +273,7 @@ export default function Topic() {
       title: i.title,
       severity: i.severity,
       sourceUrl: (i as { sourceUrl?: string | null }).sourceUrl,
+      resolvedUrl: (i as { resolvedUrl?: string | null }).resolvedUrl,
     }));
     return { rows, countryRows };
   }, [topic, sortedForTable]);
@@ -596,8 +598,8 @@ export default function Topic() {
                         </span>
                       </td>
                       <td className="p-2">
-                        {i.sourceUrl ? (
-                          <a href={i.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                        {incidentSourceUrl(i) ? (
+                          <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (

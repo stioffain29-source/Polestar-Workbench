@@ -1036,6 +1036,10 @@ components:
         confidence: { $ref: "#/components/schemas/Confidence" }
         source: { type: ["string", "null"] }
         sourceUrl: { type: ["string", "null"] }
+        # Real publisher URL resolved from a Google News RSS redirect, when
+        # available. Clients should prefer this over sourceUrl for the analyst
+        # "source" link, falling back to sourceUrl when null.
+        resolvedUrl: { type: ["string", "null"] }
         analystNotes: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         corroborations:
