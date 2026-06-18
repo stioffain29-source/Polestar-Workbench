@@ -170,10 +170,24 @@ bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
   DFA/foreign-ministry/state-department alternatives to `FP_NEG_DIPLOMATIC`, so the
   existing protest-verdict step 0b drops it (DFA = Dept of Foreign Affairs, PH).
 
-**Keep-guard \b trap (cost me a test cycle):** event keep-guards MUST use
+- **Court / judicial process** ("South Korea court sentences ex-President Yoon to
+  30-year jail term") — a legal OUTCOME, not a civil-unrest event, yet it was kept
+  (and rated Extreme) and so CROWNED South Korea highest-severity country on the
+  monitor. `FP_COURT_PROCESS_RE` (court/tribunal/judge + sentence/jail/convict/
+  verdict/…, plus bare "jail/prison term", "N-year jail") placed AFTER school-
+  admission, BEFORE the title-rescue, gated OUT by `FP_COURT_UNREST_KEEP_RE` so a
+  verdict that actually SPARKS protests/clashes keeps. The monitor's highest-
+  severity-country Fast Fact reads the relevance-filtered set, so dropping the row
+  from relevance fixes the headline number directly — no UI change needed.
+
+**Keep-guard \b trap (cost me a test cycle, TWICE):** event keep-guards MUST use
 leading-\b STEMS (`protest`, `clash`, `kill`), never a trailing-\b literal —
 `/\bprotest\b/` misses "protests"/"protesters", so an inflected real-event headline
 leaks past the guard. Same lesson as the strike-target leading-\b-only rule.
+**Specifically: `FP_REAL_UNREST_COMPANION_RE` (line ~438) IS itself the trap** —
+it is `\b(protest|…|clash|…)\b` with trailing \b, so it misses "protests"/"clashes".
+Do NOT reuse it as a keep-guard for a new drop; write a fresh leading-\b-stem regex
+(that is why `FP_COURT_UNREST_KEEP_RE` exists separately).
 
 **Prove it three ways:** jest fixtures (DROP targets + KEEP controls) in
 `__tests__/relevance/protestsFeedRelevance.test.ts` (run `pnpm exec jest`), the live

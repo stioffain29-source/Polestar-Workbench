@@ -504,6 +504,20 @@ const FIXTURES: Fixture[] = [
     verdict: "DROP",
     reason: "non-civil-unrest sense",
   },
+
+  // ---- Court / judicial process (legal outcome, not an event): DROP ----
+  {
+    title: "South Korea court sentences ex-President Yoon to 30-year jail term over drone incursion",
+    summary:
+      "The ruling adds to a series of judgments against the ousted conservative leader whose martial law order plunged the country into political turmoil.",
+    verdict: "DROP",
+    reason: "court/judicial process",
+  },
+  // A verdict that actually SPARKS unrest must still be KEPT.
+  {
+    title: "Court jails opposition leader, sparking mass protests and clashes nationwide",
+    verdict: "KEEP",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {

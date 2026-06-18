@@ -550,6 +550,21 @@ const FP_PRESS_REAL_VIOLENCE_RE =
 const FP_SCHOOL_ADMISSION_RE =
   /\b(spmb|ppdb|zonasi|school admission\w*|student admission\w*|school enrol\w*|admission (system|process|quota|policy|selection)|not accepted (to|into|at|—|,)|tidak diterima|school placement|school registration|new (pupil|student) (intake|admission|enrol\w*))\b/i;
 
+// Court / judicial PROCESS story — a sentencing, verdict, conviction, jail term
+// or trial is a legal outcome, not a civil-unrest EVENT ("Court sentences
+// ex-President Yoon to 30-year jail term"). It must NOT count toward a country's
+// severity on the protest monitor. Kept only when real unrest accompanies it
+// (verdict that sparks protests / clashes / a rally), via the companion guard.
+const FP_COURT_PROCESS_RE =
+  /\b(court|tribunal|judge|judiciary|prosecutor\w*|prosecution|the bench)\b[^.]{0,45}\b(sentenc\w*|jail\w*|imprison\w*|convict\w*|acquit\w*|verdict|ruling|rules?|ruled|indict\w*|on trial|found guilty|guilty)\b|\bsentenc\w*\b[^.]{0,30}\b(to|jail|prison|year|years|life)\b|\b(jail|prison) term\b|\bjailed (for|over)\b|\b\d+[- ]year (jail|prison)\b/i;
+// Keep-guard for the court drop: a real unrest reaction to a verdict. Uses
+// LEADING-\b STEMS ONLY (never a trailing \b) so plurals/inflections —
+// "protests", "clashes", "demonstrations", "rioted" — all match. (The older
+// FP_REAL_UNREST_COMPANION_RE has the trailing-\b plural trap, so it is NOT
+// reused here.) "march" is omitted to avoid colliding with the month.
+const FP_COURT_UNREST_KEEP_RE =
+  /\b(protest|demonstrat|rall(y|ies|ied)|riot|clash|unrest|uprising|tear ?gas|water cannon|barricad|stormed|storming|looting|arson|curfew|hartal|bandh|gherao|picket|sit-?in|walkout)/i;
+
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
@@ -1195,6 +1210,13 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       if (/\bprotest/i.test(th) && FP_SCHOOL_ADMISSION_RE.test(th) && !FP_INDUSTRY_STREET_RE.test(text)) {
         return { relevant: false, reason: "excluded: school-admission grievance (administrative, not civil unrest)" };
       }
+    }
+    // Court / judicial process (sentencing, verdict, conviction, jail term,
+    // trial) — a legal outcome, not a civil-unrest event, so it must not inflate
+    // a country's severity on the monitor. Kept when a verdict actually sparks
+    // unrest (companion guard: protest / clash / riot / rally in the text).
+    if (FP_COURT_PROCESS_RE.test(titleHaystack(i)) && !FP_COURT_UNREST_KEEP_RE.test(text)) {
+      return { relevant: false, reason: "excluded: court/judicial process (legal outcome, not a civil-unrest event)" };
     }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The
