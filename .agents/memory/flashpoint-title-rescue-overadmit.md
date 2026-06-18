@@ -51,6 +51,33 @@ api-server boot `backfillRelevance` re-evaluates and re-cleans the DB. Dev clean
 on the next workspace restart; **prod only re-cleans after a republish** (prod DB
 is read-only from the workspace; the boot runs in the deployment runtime).
 
+**`protest`/`crackdown` are TWO-SENSE homonyms — sense-gate, don't keyword-match.**
+Keeping a row because the headline/body merely *contains* `protest` or `crackdown`
+admits four big non-civil-unrest classes: diplomatic complaints ("Manila lodges
+protest with China"), interstate/territorial complaints ("Cambodia protests Thai
+heritage listing"), symbolic individual gestures ("artist returns medal in
+protest"), and enforcement-of-crime crackdowns ("crackdown on electricity theft").
+Fix = make these tokens NON-rescuing and NON-required, then decide by SENSE:
+- Removed bare `protest`/`crackdown` from the title-rescue set
+  (`FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE`) and from `REQUIRED.protests`/`.flashpoint`.
+- A verdict fn `flashpointProtestCrackdownVerdict(text, negText)→boolean|null`,
+  wired as step 0b (headline) and step 3b (body, after REQUIRED firstMatch):
+  `protest` → KEEP if a civil-unrest/violence cue is in PROXIMITY (`.{0,40}` gap,
+  `FP_POS_DEMO`/`FP_POS_VIOLENCE`); else DROP if a NEG cue
+  (`FP_NEG_GESTURE`/`_DIPLOMATIC`/`_INTERSTATE`); else keep-default (null,
+  fail-open). `crackdown` → DROP if `FP_NEG_CRACKDOWN` (crime-enforcement sense)
+  AND no `FP_UNREST_COMPANION` word; else keep.
+**Critical split: POS uses the full haystack `text`; NEG uses `flashpointNegText`
+(title+summary ONLY)** — scanning the source name/URL for NEG words gave false
+diplomatic hits (outlet "The Diplomat", "/world/" URL paths). **Why keep-default
+is fail-open:** an unrecognised non-civil `protest` use can still slip through, but
+that preserves recall — the alternative (drop-unless-positive) silently kills
+genuine demonstrations whose headline lacks a violence cue.
+**Verified:** real compiled module over the 2994-row flashpoint+protests audit set
+→ 72 drops, 0 adds (purely subtractive for these rows). Note: the new keep reasons
+score 0.5 in `evaluateIncidentRelevance` (don't match its score-1 regex), but
+`relevance_score` is written-only/never read, so it has no functional effect.
+
 **Monitor/dashboard syndication dedup:** `resolveTrueIncidents("flashpoint"|"protests", …)`
 routes to `resolveFlashpointTrue` (`artifacts/workbench/src/lib/trueIncidents.ts`):
 relevance-gate, then collapse syndicated rewrites with the report builder's

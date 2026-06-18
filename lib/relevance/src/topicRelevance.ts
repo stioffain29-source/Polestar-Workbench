@@ -590,7 +590,12 @@ const REQUIRED: Record<string, RegExp[]> = {
   // tier; the ambiguous tier is enforced separately in
   // `isTopicRelevant` for `protests` and `flashpoint`.
   protests: [
-    /\b(protest|demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    // NOTE: the polysemous words "protest" and "crackdown" are deliberately
+    // OMITTED here — they are routed through the negative-sense gate
+    // (flashpointProtestCrackdownVerdict) so a record is no longer kept merely
+    // because its text contains "protest"/"crackdown" in a diplomatic, gesture,
+    // interstate or law-enforcement sense. The unambiguous tokens stay.
+    /\b(demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
     // "march" alone is a calendar month ("flat from 50.4 in March"). Only the
     // inflected protest forms (marches/marchers/marching/marched) or an
     // explicit protest-march phrase count; bare "march" needs a companion
@@ -605,7 +610,12 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(curfew|state of emergency|martial law|lockdown imposed|section\s*144|assembly ban)\b/,
   ],
   flashpoint: [
-    /\b(protest|demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|crackdown|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    // NOTE: the polysemous words "protest" and "crackdown" are deliberately
+    // OMITTED here — they are routed through the negative-sense gate
+    // (flashpointProtestCrackdownVerdict) so a record is no longer kept merely
+    // because its text contains "protest"/"crackdown" in a diplomatic, gesture,
+    // interstate or law-enforcement sense. The unambiguous tokens stay.
+    /\b(demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
     // "march" alone is a calendar month ("flat from 50.4 in March"). Only the
     // inflected protest forms (marches/marchers/marching/marched) or an
     // explicit protest-march phrase count; bare "march" needs a companion
@@ -627,14 +637,74 @@ const REQUIRED: Record<string, RegExp[]> = {
 const FLASHPOINT_AMBIGUOUS_RE =
   /\b(rally|rallies|rallied|strike|strikes|striking|struck|students?)\b/;
 
-// Title-rescue set: phrases so unmistakably about public order that their
-// presence in the HEADLINE overrides the body-scanning context excludes
-// (military-strike homonym, student-crime). Deliberately EXCLUDES the
-// ambiguous sports/finance homonyms ("rally", "march", bare "strike") so a
-// motorsport rally or stock-market strike headline can never be rescued —
-// those still fall through to the homonym/ambiguous gates.
-const FLASHPOINT_TITLE_RESCUE_RE =
-  /\b(protest(s|ers?|ing|ed)?|demonstration(s)?|demonstrators?|sit[- ]?in|picket(s|ing|ed)?|walkout|stoppage|hartal|bandh|gherao|chakka jam|wheel[- ]?jam|shutter[- ]?down|industrial action|strike notice|civil unrest|public disorder|crackdown|gen[- ]?z protest)\b/i;
+// Title-rescue set: UNAMBIGUOUS public-order phrases whose presence in the
+// HEADLINE overrides the body-scanning context excludes (military-strike
+// homonym, student-crime). Deliberately EXCLUDES the ambiguous sports/finance
+// homonyms ("rally", "march", bare "strike") AND the two POLYSEMOUS words
+// "protest" / "crackdown" — those are routed through the negative-sense gate
+// below, so a headline is no longer kept merely because it contains the word
+// "protest" (diplomatic "lodged a formal protest", symbolic "resigned in
+// protest", interstate "Bangladesh protests India") or "crackdown" ("drug
+// crackdown").
+const FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE =
+  /\b(demonstration(s)?|demonstrators?|sit[- ]?in|picket(s|ing|ed)?|walkout|stoppage|hartal|bandh|gherao|chakka jam|wheel[- ]?jam|shutter[- ]?down|industrial action|strike notice|civil unrest|public disorder|gen[- ]?z protest)\b/i;
+
+// ---- Negative-sense gate for the polysemous words "protest" / "crackdown" ----
+// "protest" is kept by default (high recall) UNLESS it is used in a non-civil-
+// unrest sense AND no positive demonstration/casualty signal is present:
+//   • symbolic individual gesture — "returned the medal in protest"
+//   • diplomatic complaint        — "lodged a formal protest", "protest note"
+//   • interstate complaint        — "Bangladesh protests India", "protest to China"
+// A positive signal (protesters / took to the streets / tear gas / a death or
+// arrest AT a protest / "protest turns violent") overrides the gate and keeps.
+// "crackdown" is kept UNLESS it is plainly a law-enforcement / financial
+// crackdown (drug / graft / tax / investment / Tiananmen …) with no civil-
+// unrest companion.
+const FP_POS_DEMO =
+  /\b(protesters?|demonstrators?|took to the streets?|take to the streets?|staged? (a )?(protest|demonstration|sit[- ]?in|walkout|march|rally)|h(o|e)ld (a )?(protest|demonstration|rally|march)|mass protest|street protest|anti[- ]government protest|pro[- ]democracy|thousands|hundreds|crowd|rall(y|ied|ies)|march(es|ers|ing|ed)|gather(ed|ing)?|tear ?gas|water cannon|baton|rubber bullet|riot police|burn\w* (tyres|tires|effigy)|blockad(e|ed|ing)|roadblock|stormed?|sit[- ]?in|hunger strike)\b/i;
+const FP_POS_VIOLENCE =
+  /\b(deadly|violent|bloody|fatal)\s+(protest|demonstration|rally|unrest|riot)|\bprotest(s|ers)?\b.{0,40}\b(turn\w* (violent|ugly|deadly)|clash\w*|looting|arson|stormed?|set (on )?fire|torched?)\b|\b(killed?|kill\w*|dead|death\w*|fatal\w*|casualt\w*|injured|wounded|shot|hurt|die[ds]?|missing|arrested|detained)\b.{0,24}\b(in|during|at|amid|after)\s+(the\s+)?(?:\w+\s+){0,2}(protest|demonstration|rally|unrest|riot)|\bprotest (death|deaths|toll|killing|killings|violence)\b|\b(clash\w*|riot\w*)\b.{0,18}\bprotest/i;
+const FP_NEG_GESTURE =
+  /\b(resign\w*|quit|return\w*|withdraw\w*|step(ped)? down|boycott\w*|refus\w*|declin\w*|skip\w*|hand\w* back|wore? black|donat\w*|exit\w*) .{0,35}\bin protest\b|\bin protest\b.{0,30}(resign\w*|return\w*|withdraw\w*|boycott\w*|quit|step(ped)? down)\b|\b(act|sign|mark|token|gesture|instant act) of protest\b|\bas a (?:silent |symbolic )?protest\b/i;
+const FP_NEG_DIPLOMATIC =
+  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b/i;
+const FP_NEG_INTERSTATE_NAT =
+  "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
+const FP_NEG_INTERSTATE_TERR =
+  "(lipulekh|kalapani|limpiyadhura|arunachal|aksai chin|doklam|kashmir|tawang|south china sea|west philippine sea|senkaku|spratly|scarborough|panatag|bajo de masinloc|masinloc|sabah|disputed (border|island|islets|temple|territory|waters|shoal)|border (dispute|area|encroach)|sanctions|missile launch|aircraft incursion|naval activit|maritime law|textbook|floating structure|territorial)";
+const FP_NEG_INTERSTATE = new RegExp(
+  `\\b${FP_NEG_INTERSTATE_NAT}\\b(?:\\s+\\w+){0,2}\\s+protest(s|ed|ing)?\\b\\s*(to|over|against|with|at)?\\s*(the\\s+)?(${FP_NEG_INTERSTATE_NAT}|${FP_NEG_INTERSTATE_TERR})|\\bprotest(s|ed|ing)?\\s+(to|with)\\s+(the\\s+)?${FP_NEG_INTERSTATE_NAT}\\b|\\b(files?|lodge[sd]?|registers?) (a |another |formal |strong |diplomatic )*protest\\b`,
+  "i",
+);
+const FP_NEG_CRACKDOWN =
+  /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+) crackdown\b|\btiananmen\b/i;
+const FP_UNREST_COMPANION =
+  /\b(protest|demonstrat|dissent|rally|march|sit[- ]?in|civil unrest|unrest|riot|activist|opposition|gen[- ]?z|student|tear ?gas|curfew|uprising)\b/i;
+
+// Title+summary only (NOT source/url) for the negative-sense scan, so a
+// source name ("The Diplomat") can never trip the diplomatic gate.
+function flashpointNegText(i: RelevanceInput): string {
+  return [i.title ?? "", i.summary ?? ""].join(" ").toLowerCase();
+}
+
+// Verdict for a record whose flashpoint hook is the polysemous word "protest"
+// or "crackdown". true = keep, false = drop, null = neither word present
+// (defer to the other rules). `text` is the full haystack (positive scan);
+// `negText` is title+summary only (negative-sense scan).
+function flashpointProtestCrackdownVerdict(text: string, negText: string): boolean | null {
+  if (/\bprotest(s|ers?|ing|ed)?\b/.test(text)) {
+    if (FP_POS_DEMO.test(text) || FP_POS_VIOLENCE.test(text)) return true;
+    if (FP_NEG_GESTURE.test(negText) || FP_NEG_DIPLOMATIC.test(negText) || FP_NEG_INTERSTATE.test(negText)) {
+      return false;
+    }
+    return true;
+  }
+  if (/\bcrackdown\b|\bcracks? down\b/.test(text)) {
+    if (FP_NEG_CRACKDOWN.test(text) && !FP_UNREST_COMPANION.test(text)) return false;
+    return true;
+  }
+  return null;
+}
 
 // Public-order companion. If a record's only flashpoint signal is an
 // ambiguous token (rally/strike/student), one of these cues must also
@@ -789,13 +859,30 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     ) {
       return { relevant: false, reason: "excluded: animal welfare / wildlife enforcement (not civil unrest)" };
     }
-    if (FLASHPOINT_TITLE_RESCUE_RE.test(titleHaystack(i))) {
+    if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The
       // absolute general-news exclude already ran above, so keep it here —
       // this both rescues genuine protests from the body-scanning context
-      // excludes below AND covers plural/inflected forms ("protests",
-      // "demonstrations") that the \b-anchored REQUIRED patterns miss.
+      // excludes below AND covers plural/inflected forms ("demonstrations")
+      // that the \b-anchored REQUIRED patterns miss.
       return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
+    }
+    // 0b. Polysemous "protest" / "crackdown" IN THE HEADLINE: keep only when it
+    //     reads as genuine civil unrest. A diplomatic complaint ("lodged a
+    //     formal protest"), a symbolic gesture ("resigned in protest") or an
+    //     interstate complaint ("Bangladesh protests India") is dropped; a real
+    //     demonstration — or one with casualties / "turns violent" — is kept.
+    //     This is the fix for "kept merely because the headline says protest".
+    //     A title containing protest/crackdown always returns here (the verdict
+    //     is never null), so step 3b only ever sees body-only matches.
+    if (/\b(protest(s|ers?|ing|ed)?|crackdown|cracks? down)\b/i.test(titleHaystack(i))) {
+      const verdict = flashpointProtestCrackdownVerdict(text, flashpointNegText(i));
+      if (verdict === false) {
+        return { relevant: false, reason: "excluded: 'protest'/'crackdown' in non-civil-unrest sense (diplomatic/gesture/interstate/enforcement)" };
+      }
+      if (verdict === true) {
+        return { relevant: true, reason: "kept: civil-unrest 'protest'/'crackdown' in headline" };
+      }
     }
     // 1. Hard exclusions first — sports/finance/weather/military/
     //    entertainment/betting homonyms of "rally" / "strike" / "student".
@@ -808,10 +895,22 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       return { relevant: false, reason: "excluded: student non-mobilisation (attack/crime/policy, not protest)" };
     }
     // 3. Unambiguous-tier match: any REQUIRED.flashpoint phrase
-    //    qualifies on its own.
+    //    qualifies on its own. (REQUIRED no longer carries the bare words
+    //    "protest"/"crackdown" — those go through the negative-sense gate in 3b.)
     const unambiguous = REQUIRED[topic] ?? [];
     const u = firstMatch(text, unambiguous);
     if (u) return { relevant: true, reason: `kept: unambiguous public-order phrase (/${u.source}/)` };
+    // 3b. Polysemous "protest" / "crackdown" in the BODY (the headline carried
+    //     no rescue token). Same negative-sense gate as step 0b, but it runs
+    //     AFTER the homonym and student-non-mobilisation excludes so the
+    //     sports/military/finance noise is already stripped.
+    const bodyVerdict = flashpointProtestCrackdownVerdict(text, flashpointNegText(i));
+    if (bodyVerdict === false) {
+      return { relevant: false, reason: "excluded: 'protest'/'crackdown' in non-civil-unrest sense (diplomatic/gesture/interstate/enforcement)" };
+    }
+    if (bodyVerdict === true) {
+      return { relevant: true, reason: "kept: civil-unrest 'protest'/'crackdown' phrase" };
+    }
     // 4. Ambiguous-tier match: bare "rally" / "strike" needs a
     //    public-order companion; bare "student(s)" needs a student-
     //    mobilisation phrase.
