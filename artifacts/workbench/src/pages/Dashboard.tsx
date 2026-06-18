@@ -1,5 +1,5 @@
 import { useGetDashboardOverview, useListIncidents, type DashboardTopicCard, type Incident } from "@workspace/api-client-react";
-import { AlertTriangle, Activity, CheckCircle2, XCircle, FileText, ArrowRight, BadgeCheck } from "lucide-react";
+import { AlertTriangle, Activity, CheckCircle2, XCircle, FileText, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { severityBadgeStyle } from "@/lib/topics";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
+import { CorroborationBadge } from "@/components/CorroborationBadge";
 
 // The "Protests & Civil Unrest" card is backed by the flashpoint data topic.
 function dataTopicFor(topic: string): string {
@@ -159,12 +160,7 @@ export default function Dashboard() {
                         </div>
                         <h4 className="font-sans font-medium text-foreground group-hover:text-accent transition-colors flex items-center gap-1.5">
                           <span>{incident.title}</span>
-                          {incident.corroborations?.length ? (
-                            <BadgeCheck
-                              className="w-3.5 h-3.5 shrink-0 text-accent"
-                              aria-label="Corroborated by UN OCHA (ReliefWeb)"
-                            />
-                          ) : null}
+                          <CorroborationBadge corroborations={incident.corroborations} />
                         </h4>
                       </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent flex-shrink-0 mt-1" />

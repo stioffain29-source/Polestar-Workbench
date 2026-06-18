@@ -23,6 +23,7 @@ import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { GdeltCoding, hasGdeltCoding } from "@/components/GdeltCoding";
 import { cn } from "@/lib/utils";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { CorroborationBadge } from "@/components/CorroborationBadge";
 
 const WINDOWS = [7, 14, 30, 60, 90, 120];
 
@@ -131,12 +132,7 @@ export default function Incidents() {
                   <div className="flex items-center gap-1.5">
                     <span className="truncate">{displayIncidentTitle(i.title, i.displayTitle)}</span>
                     <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="shrink-0" />
-                    {i.corroborations?.length ? (
-                      <BadgeCheck
-                        className="w-3.5 h-3.5 shrink-0 text-accent"
-                        aria-label="Corroborated by UN OCHA (ReliefWeb)"
-                      />
-                    ) : null}
+                    <CorroborationBadge corroborations={i.corroborations} />
                   </div>
                   {hasGdeltCoding(i) ? <GdeltCoding incident={i} variant="inline" /> : null}
                 </div>
