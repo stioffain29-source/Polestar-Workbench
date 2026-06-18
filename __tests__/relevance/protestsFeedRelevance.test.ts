@@ -396,6 +396,55 @@ const FIXTURES: Fixture[] = [
     verdict: "DROP",
     reason: "sports-governance",
   },
+
+  // ---- Appeal for calm / restraint (preventive statement): DROP --------
+  {
+    title: "PNP calls for calm as Congress convenes special session",
+    summary:
+      "The Philippine National Police urged the public not to escalate political tensions amid the Senate leadership squabble as Congress convenes a special session.",
+    verdict: "DROP",
+    reason: "appeal for calm",
+  },
+  {
+    title: "Election body urges restraint as political tensions rise",
+    summary: "Officials appealed for calm; no incidents were reported.",
+    verdict: "DROP",
+    reason: "appeal for calm",
+  },
+  // A genuine event that ALSO mentions an appeal for calm must be KEPT.
+  {
+    title: "After deadly protests, Nepal's new prime minister urges calm",
+    verdict: "KEEP",
+  },
+  {
+    title: "Protesters clash with police as officials call for calm",
+    verdict: "KEEP",
+  },
+
+  // ---- Overseas / diaspora venue (not APAC civil unrest): DROP ---------
+  {
+    title:
+      "Bangladesh July Revolution leaders speak at Oxford Union as protesters clash outside",
+    verdict: "DROP",
+    reason: "overseas/diaspora venue",
+  },
+  {
+    title: "British Tamils protest at Downing Street to condemn Sri Lanka's arrests",
+    verdict: "DROP",
+    reason: "overseas/diaspora venue",
+  },
+
+  // ---- Recruitment-industry complaint over a requirement: DROP --------
+  {
+    title: "Recruiters protest Saudi skills test requirement for Nepali workers",
+    verdict: "DROP",
+    reason: "recruitment-industry complaint",
+  },
+  // A real recruitment-agency STREET action must still be KEPT.
+  {
+    title: "Manpower agencies stage sit-in protest outside ministry over new rule",
+    verdict: "KEEP",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {

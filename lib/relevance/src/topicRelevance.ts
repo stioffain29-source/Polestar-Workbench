@@ -1093,6 +1093,28 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     if (FP_SPORTS_GOV_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: sports-governance protest (not security-relevant civil unrest)" };
     }
+    // Appeal for calm / restraint by authorities (preventive statement, not an
+    // event). Title-bound, with a live-unrest override so a real "calm after
+    // deadly clashes" report still survives.
+    {
+      const th = titleHaystack(i);
+      if (FP_CALM_APPEAL_RE.test(th) && !FP_CALM_TITLE_EVENT_RE.test(th) && !FP_CALM_LIVE_RE.test(text)) {
+        return { relevant: false, reason: "excluded: appeal for calm/restraint (preventive statement, not a civil-unrest event)" };
+      }
+    }
+    // Overseas / diaspora demonstration at a non-APAC Western venue.
+    if (FP_OVERSEAS_VENUE_RE.test(titleHaystack(i)) && FP_OVERSEAS_PROTEST_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: overseas/diaspora venue (not APAC civil unrest)" };
+    }
+    // Recruitment / manpower industry objecting to a regulatory requirement.
+    if (
+      FP_INDUSTRY_ACTOR_RE.test(text) &&
+      /\bprotest/i.test(titleHaystack(i)) &&
+      FP_INDUSTRY_OBJECT_RE.test(text) &&
+      !FP_INDUSTRY_STREET_RE.test(text)
+    ) {
+      return { relevant: false, reason: "excluded: recruitment-industry complaint over a requirement (not civil unrest)" };
+    }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The
       // absolute general-news exclude already ran above, so keep it here —

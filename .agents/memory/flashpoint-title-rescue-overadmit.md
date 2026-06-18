@@ -133,8 +133,30 @@ bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
   wrapper img { width:100%; object-fit:cover; max-height:calc(…) }") is junk for ANY
   topic, so it goes in the general `EXCLUDE_PHRASES` (runs first, all topics):
   `/\{[^}]{0,40}(object-fit|max-height:\s*calc|width:\s*100%)/` + `viewport-wrapper`.
+**Three MORE classes the protest verdict (not the rescue) kept (fixed pre-rescue):**
+- **Appeal-for-calm preventive statement** ("PNP calls for calm as Congress
+  convenes") — an authorities' statement, no event. Drop when the TITLE is the
+  appeal AND the title has no event word AND the full text has no LIVE-unrest. Two
+  keep-guards (`FP_CALM_TITLE_EVENT_RE`, `FP_CALM_LIVE_RE`) so "After deadly
+  protests, PM urges calm" / "Police call for calm after deadly clashes" survive.
+- **Overseas/diaspora venue** — a London/Washington solidarity demo the geocoder
+  mis-tags to an APAC country (Oxford Union, Downing Street, White House, …).
+  `FP_OVERSEAS_VENUE_RE` + a protest word → drop. Both the Oxford and a "British
+  Tamils protest at Downing Street" row are this class.
+- **Recruitment-industry complaint over a foreign REQUIREMENT** ("Recruiters
+  protest Saudi skills test requirement") — a commercial-lobby grievance, not
+  street unrest. actor(recruit/manpower/…) + protest + object(test/rule/quota/…),
+  gated OUT by any public-order signal (`FP_INDUSTRY_STREET_RE`: rally/sit-in/
+  arrests/outside-ministry) so a real agency street action keeps.
+**Keep-guard \b trap (cost me a test cycle):** event keep-guards MUST use
+leading-\b STEMS (`protest`, `clash`, `kill`), never a trailing-\b literal —
+`/\bprotest\b/` misses "protests"/"protesters", so an inflected real-event headline
+leaks past the guard. Same lesson as the strike-target leading-\b-only rule.
+
 **Prove it three ways:** jest fixtures (DROP targets + KEEP controls) in
 `__tests__/relevance/protestsFeedRelevance.test.ts` (run `pnpm exec jest`), the live
 `/api/incidents?topic=flashpoint` feed must lack the junk but show it again under
 `?includeIrrelevant=true` (filtered, not deleted), and a re-screenshot of
-`/topics/protests`.
+`/topics/protests`. Caveat: a feed grep can match a junk phrase inside a DIFFERENT
+row's SUMMARY (the flagged headline may be prod-only via feed non-determinism) —
+confirm by TITLE, not a substring of the JSON blob, before claiming a leak.
