@@ -341,8 +341,19 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // round-robin (no high-volume topic starves the smaller ones). Bounded +
     // converging like the title-translation pass, and isolated in its own try so
     // a network failure can never fail the incident ingest.
+    //
+    // The per-run budget is set well above the count of rows a single scrape
+    // adds so each run resolves THIS run's new redirects AND chips away at the
+    // historical backlog of older unresolved rows (~7k at one point). The WHERE
+    // only ever returns rows that still need resolving (redirect source_url +
+    // NULL resolved_url), so a settled row is never re-scanned and the work
+    // strictly converges across runs. Kept modest enough that the pass stays a
+    // small fraction of the ingest chain (and avoids tripping Google's
+    // egress-IP rate limit). A faster one-time historical drain is the CLI
+    // `scrape:resolve-urls --commit --limit=<large> --concurrency=<n>` (see
+    // replit.md) — for prod it must run inside the deployment runtime.
     try {
-      const urls = await runResolveGoogleNewsUrls({ commit: true });
+      const urls = await runResolveGoogleNewsUrls({ commit: true, limit: 300 });
       logger.info(
         {
           resolved: urls.resolved,

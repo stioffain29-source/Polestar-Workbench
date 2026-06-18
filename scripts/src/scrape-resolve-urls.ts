@@ -9,7 +9,9 @@ import { pool } from "@workspace/db";
 // fair round-robin so no high-volume topic starves the smaller ones in a
 // bounded run. Use --commit to write; default is a dry-run. Optional
 // --limit=<n> bounds how many unresolved redirect rows are scanned per run;
-// optional --topics=a,b,c restricts to a specific topic set.
+// optional --topics=a,b,c restricts to a specific topic set; optional
+// --concurrency=<n> sets how many redirects are resolved in parallel (raise it
+// for a one-time bulk historical backfill; the default suits the in-ingest pass).
 
 async function main(): Promise<void> {
   const commit = process.argv.includes("--commit");
@@ -23,10 +25,20 @@ async function main(): Promise<void> {
         .map((t) => t.trim())
         .filter(Boolean)
     : undefined;
+  const concurrencyArg = process.argv.find((a) =>
+    a.startsWith("--concurrency="),
+  );
+  const concurrency = concurrencyArg
+    ? Number(concurrencyArg.split("=")[1])
+    : undefined;
   const summary = await runResolveGoogleNewsUrls({
     commit,
     limit: Number.isFinite(limit) && limit > 0 ? limit : 2000,
     topics,
+    concurrency:
+      concurrency && Number.isFinite(concurrency) && concurrency > 0
+        ? concurrency
+        : undefined,
   });
   console.log(summary.logLines.join("\n"));
   await pool.end();
