@@ -479,6 +479,38 @@ const FP_DIPLOMATIC_PROTEST_RE =
 const FP_SPORTS_GOV_RE =
   /\b(cricket board|cricket head\s?quarters?|sports mafia|french open|wimbledon|grand slam|prize money|olympic committee|football federation|formula 1|premier league|la liga|test match|odi series)\b/i;
 
+// Appeal for calm / restraint by authorities — a preventive statement, not a
+// civil-unrest event ("PNP calls for calm as Congress convenes"). Dropped only
+// when the headline is purely the appeal (no event word in the title) AND the
+// full text carries no LIVE unrest, so "Police call for calm after deadly
+// clashes" and "After deadly protests, PM urges calm" are still kept. The
+// keep-guards use leading-\b stems so inflections (protests / killed) match.
+const FP_CALM_APPEAL_RE =
+  /\b(calls?|appeals?|urges?|appeal|plea|pleads?|urge|urged|urging|calling|appealing)\s+(?:on\s+\w+\s+|the\s+public\s+|to\s+\w+\s+)?(?:for\s+)?(calm|restraint|sobriety|public calm|maximum restraint)\b|\bnot to escalate\b|\b(remain|stay|keep)\s+calm\b/i;
+const FP_CALM_TITLE_EVENT_RE =
+  /\b(clash|riot|protest|rall(y|ies)|demonstrat|march|unrest|strike|blockade|sit[- ]?in|kill|injur|dead|deadly|wound|tear ?gas|water cannon|arrest|detain|storm|torch|burn|arson|loot|violen|ston(e|ing)|baton|rubber bullet|stampede|curfew|crackdown|shot|fire)/i;
+const FP_CALM_LIVE_RE =
+  /\b(clash|riot|kill|injur|dead|deadly|wound|tear ?gas|water cannon|arrest|detain|storm|torch|burn|arson|loot|violen|stampede|curfew|shot|opened fire)/i;
+
+// Overseas / diaspora demonstration at an unmistakably non-APAC Western venue
+// (a London / Washington solidarity protest the geocoder mis-tagged to a
+// South-Asian country). Not an in-region civil-unrest incident.
+const FP_OVERSEAS_VENUE_RE =
+  /\b(oxford union|cambridge union|the white house|capitol hill|downing street|westminster hall|trafalgar square)\b/i;
+const FP_OVERSEAS_PROTEST_RE = /\b(protest|demonstrat|rally|clash|picket|vigil|gather)/i;
+
+// Recruitment / manpower industry objecting to an administrative REQUIREMENT
+// (a foreign skills test, certification rule, quota) — a commercial-lobby
+// grievance, not street civil unrest. Dropped only when NO public-order signal
+// (a held rally / sit-in / blockade / arrests / "outside the ministry") is
+// present anywhere in the text, so a real agency street action survives.
+const FP_INDUSTRY_ACTOR_RE =
+  /\b(recruit(er|ers|ment|ing)|manpower|placement agenc\w*|overseas employ\w*|staffing agenc\w*|labou?r recruit\w*)\b/i;
+const FP_INDUSTRY_OBJECT_RE =
+  /\b(test|requirement|rule|regulation|criteria|circular|directive|notification|quota|accreditation|certif\w*|exam|policy|levy|fee|guideline|norm)\b/i;
+const FP_INDUSTRY_STREET_RE =
+  /\b(rally|rallies|march|clash|riot|strike|blockade|road|highway|sit[- ]?in|picket|bandh|shutdown|gherao|hartal|stage[ds]?|staged|hold|held|gather|crowd|thousands|hundreds|burn|torch|effigy|arrest|detain|tear ?gas|injured|killed|outside)\b/i;
+
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
