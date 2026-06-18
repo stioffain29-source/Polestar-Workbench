@@ -139,7 +139,15 @@ export interface ResolveUrlSummary {
   candidates: number;
   resolved: number;
   failed: number;
+  /** Per-topic resolved/failed/candidate breakdown for visibility. */
+  byTopic: Record<string, { candidates: number; resolved: number; failed: number }>;
   logLines: string[];
+}
+
+interface Candidate {
+  id: number;
+  sourceUrl: string | null;
+  topic: string;
 }
 
 /**
@@ -150,6 +158,17 @@ export interface ResolveUrlSummary {
  * runs: every successfully resolved row leaves the candidate set. Already
  * resolved rows and non-redirect rows never match and so are never re-scanned.
  *
+ * Covers ALL news topics, not just flashpoint. The GDELT enrichment was the
+ * first consumer (flashpoint only), but the workbench UI and future enrichment
+ * want clean publisher URLs for every topic (shipping/energy/conflict/fuel/…).
+ * To stop a high-volume topic (shipping/flashpoint) from starving the smaller
+ * ones out of a bounded run, the global `limit` is split across topics with a
+ * fair ROUND-ROBIN: each topic contributes its newest candidate in turn until
+ * the budget is spent. A topic with fewer candidates than its share simply
+ * drops out and its slots go to topics that still have work, so no budget is
+ * wasted and no topic starves. Pass `topics` to restrict the set; otherwise the
+ * pass discovers every topic that currently has redirect candidates.
+ *
  * Failures leave resolved_url NULL and are retried on a later pass (so a
  * transient Google rate-limit never permanently poisons a row). Safe to run
  * repeatedly.
@@ -158,7 +177,12 @@ export interface ResolveUrlSummary {
  * wrappers call pool.end() themselves (mirrors the other ingest passes).
  */
 export async function runResolveGoogleNewsUrls(
-  opts: { commit?: boolean; limit?: number; concurrency?: number } = {},
+  opts: {
+    commit?: boolean;
+    limit?: number;
+    concurrency?: number;
+    topics?: string[];
+  } = {},
 ): Promise<ResolveUrlSummary> {
   const commit = opts.commit ?? false;
   const limit = Math.max(1, opts.limit ?? 80);
@@ -169,26 +193,63 @@ export async function runResolveGoogleNewsUrls(
   // Redirect detection lives in the WHERE so only real candidates return. The
   // pattern is a bound parameter (no SQL-text interpolation); `~` is a
   // case-sensitive Postgres regex match — the host + path are lowercase.
-  //
-  // Scoped to topic='flashpoint': the GDELT enrichment (the ONLY consumer of
-  // resolved_url) cross-matches flashpoint incidents only, so resolving any
-  // other topic's redirects spends HTTP budget on rows nothing reads — and,
-  // worse, lets the higher-volume news topics (shipping/energy/conflict) starve
-  // the flashpoint rows out of each bounded run. Keep the candidate set to the
-  // rows that actually move the match rate.
-  const candidates = await db
-    .select({
-      id: incidentsTable.id,
-      sourceUrl: incidentsTable.sourceUrl,
-    })
-    .from(incidentsTable)
-    .where(
-      sql`${incidentsTable.topic} = 'flashpoint' AND ${incidentsTable.resolvedUrl} IS NULL AND ${incidentsTable.sourceUrl} ~ ${GOOGLE_NEWS_REDIRECT_SOURCE}`,
-    )
-    .orderBy(sql`${incidentsTable.createdAt} DESC`)
-    .limit(limit);
+  const redirectMatch = sql`${incidentsTable.resolvedUrl} IS NULL AND ${incidentsTable.sourceUrl} ~ ${GOOGLE_NEWS_REDIRECT_SOURCE}`;
 
-  log(`resolve-urls: ${candidates.length} Google News redirect candidate(s)`);
+  // Resolve the topic set: explicit override, else discover every topic that
+  // currently has redirect candidates so "all news topics" stays correct as
+  // topics are added/removed without editing a hardcoded list.
+  let topics: string[];
+  if (opts.topics && opts.topics.length > 0) {
+    topics = opts.topics;
+  } else {
+    const rows = await db
+      .selectDistinct({ topic: incidentsTable.topic })
+      .from(incidentsTable)
+      .where(redirectMatch);
+    topics = rows.map((r) => r.topic).sort();
+  }
+
+  // Fetch each topic's newest candidates independently (capped at the global
+  // `limit`, so a single non-empty topic can still consume the whole budget),
+  // then round-robin them into the bounded candidate list. This gives every
+  // topic a fair turn while redistributing the slack from topics that have
+  // fewer candidates than their even share.
+  const perTopic: Candidate[][] = await Promise.all(
+    topics.map((topic) =>
+      db
+        .select({
+          id: incidentsTable.id,
+          sourceUrl: incidentsTable.sourceUrl,
+          topic: incidentsTable.topic,
+        })
+        .from(incidentsTable)
+        .where(sql`${incidentsTable.topic} = ${topic} AND ${redirectMatch}`)
+        .orderBy(sql`${incidentsTable.createdAt} DESC`)
+        .limit(limit),
+    ),
+  );
+
+  const candidates: Candidate[] = [];
+  for (let i = 0; candidates.length < limit; i++) {
+    let added = false;
+    for (const list of perTopic) {
+      if (i < list.length) {
+        candidates.push(list[i]);
+        added = true;
+        if (candidates.length >= limit) break;
+      }
+    }
+    if (!added) break;
+  }
+
+  const byTopic: ResolveUrlSummary["byTopic"] = {};
+  for (const c of candidates) {
+    (byTopic[c.topic] ??= { candidates: 0, resolved: 0, failed: 0 }).candidates++;
+  }
+
+  log(
+    `resolve-urls: ${candidates.length} Google News redirect candidate(s) across ${topics.length} topic(s): ${topics.join(", ")}`,
+  );
 
   let resolved = 0;
   let failed = 0;
@@ -196,17 +257,21 @@ export async function runResolveGoogleNewsUrls(
   async function worker(): Promise<void> {
     while (next < candidates.length) {
       const r = candidates[next++];
+      const bucket = byTopic[r.topic];
       if (!r.sourceUrl) {
         failed++;
+        bucket.failed++;
         continue;
       }
       const publisher = await resolveGoogleNewsUrl(r.sourceUrl);
       if (!publisher) {
         failed++;
-        log(`  id=${r.id} FAILED`);
+        bucket.failed++;
+        log(`  id=${r.id} (${r.topic}) FAILED`);
         continue;
       }
       resolved++;
+      bucket.resolved++;
       if (commit) {
         await db
           .update(incidentsTable)
@@ -221,8 +286,12 @@ export async function runResolveGoogleNewsUrls(
     Array.from({ length: Math.min(concurrency, candidates.length) }, worker),
   );
 
+  for (const topic of topics) {
+    const b = byTopic[topic];
+    if (b) log(`  ${topic}: resolved ${b.resolved}/${b.candidates}, failed ${b.failed}`);
+  }
   log(
     `resolve-urls: ${commit ? "committed" : "dry-run"} — resolved ${resolved}, failed ${failed}`,
   );
-  return { candidates: candidates.length, resolved, failed, logLines };
+  return { candidates: candidates.length, resolved, failed, byTopic, logLines };
 }

@@ -336,13 +336,20 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // real publisher URLs, stored additively on incidents.resolved_url. This
     // lets the GDELT enrichment URL-match (which runs LAST, below) compare a
     // real article URL against GDELT's resolved source_urls[] instead of an
-    // opaque news.google.com redirect that can never match. Bounded + converging
-    // like the title-translation pass, and isolated in its own try so a network
-    // failure can never fail the incident ingest.
+    // opaque news.google.com redirect that can never match, and gives the
+    // workbench UI clean publisher links. Covers ALL news topics with a fair
+    // round-robin (no high-volume topic starves the smaller ones). Bounded +
+    // converging like the title-translation pass, and isolated in its own try so
+    // a network failure can never fail the incident ingest.
     try {
       const urls = await runResolveGoogleNewsUrls({ commit: true });
       logger.info(
-        { resolved: urls.resolved, candidates: urls.candidates, failed: urls.failed },
+        {
+          resolved: urls.resolved,
+          candidates: urls.candidates,
+          failed: urls.failed,
+          byTopic: urls.byTopic,
+        },
         "google news url resolution pass complete",
       );
     } catch (err) {
