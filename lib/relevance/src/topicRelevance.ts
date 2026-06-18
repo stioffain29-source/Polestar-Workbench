@@ -438,6 +438,47 @@ const FP_CANCELLED_KEEP_RE =
 const FP_REAL_UNREST_COMPANION_RE =
   /\b(protest|demonstrat|rally|rallies|rallied|march(es|ers?|ing|ed)|picket|walkout|strike|riot|clash|tear ?gas|water cannon|barricad|sit-?in|curfew|hartal|bandh|gherao|crowd|mob|looting|arson|stormed?|unrest|blockad)\b/i;
 
+// Travel/safety ADVISORY telling nationals/tourists to AVOID protest or
+// demonstration AREAS — operational safety guidance, not a civil-unrest event.
+// Gated on all three signals (an "avoid" instruction + an advisory issuer + a
+// protest/area target) so a genuine demonstration headline that merely shares
+// one of these tokens is never dropped.
+const FP_ADVISORY_AVOID_RE = /\bavoid\b/i;
+const FP_ADVISORY_ISSUER_RE =
+  /\b(advis|warn|caution|alert|travel|national|tourist|embass|consulat|foreign ministr|urged|expats?)/i;
+const FP_ADVISORY_TARGET_RE =
+  /\b(protest|demonstration|rally|unrest|area|district|downtown|gathering|zone)/i;
+
+// Editorial LABEL leading the headline (opinion / analysis / commentary /
+// explainer). A think-piece about unrest, not a report of a discrete event.
+const FP_EDITORIAL_LABEL_RE =
+  /^\s*\[?\s*(analysis|commentary|opinion|editorial|perspective|viewpoint|column|explainer|backgrounder|factbox|q&a)\s*[:\]\-–—|]/i;
+
+// Editorial FORMATS — listicles ("5 things to know"), digests ("Today's Top 3
+// News"), photo galleries ("in pictures"), yearenders, "explained" /
+// "what's next for" think-pieces, "lessons from" / "why X matters". A bundle
+// or retrospective, not a single civil-unrest event.
+const FP_EDITORIAL_FORMAT_RE =
+  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|\bphoto\s+(gallery|essay)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(from|of|for)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b/i;
+
+// Protest AFTERMATH / clean-up (street cleaning after a demo, a "protests
+// aftermath" retrospective) — a non-event, unless an ongoing-unrest signal
+// shows the situation is still live.
+const FP_AFTERMATH_RE =
+  /\b(clean\s?up|cleaning\s?up|clean-up|street cleaning|sweep(ing)? the streets|mop\s?up|clearing (the )?(debris|rubble))\b[^.!?]{0,30}\b(after|following|post)\b[^.!?]{0,24}\b(protest|demonstration|rally|riot|unrest)\b|\b(protests?|demonstration|rally|riot|unrest)\s+aftermath\b/i;
+const FP_AFTERMATH_LIVE_RE =
+  /\b(clash|resume|continu|escalat|erupt|storm|riot|tear ?gas|water cannon|killed|injured|dead|death toll|wounded|arrest|detain|set (on )?fire|arson|loot)\b/i;
+
+// Diplomatic / interstate "protest" = a formal complaint note between states,
+// not a street demonstration ("Thailand lodges official protest against …").
+const FP_DIPLOMATIC_PROTEST_RE =
+  /\b(diplomatic|formal|official|written|strong|stern)\s+protests?\b(?!\w)|\blodge[sd]?\s+(an?\s+)?(official|formal|diplomatic|strong|stern|written)\s+\w*\s*protests?\b|\bprotests?\s+(note|d[eé]marche)\b/i;
+
+// Sports-governance protest (cricket board, tennis prize money, fans outside a
+// stadium) — a sporting grievance, not security-relevant civil unrest.
+const FP_SPORTS_GOV_RE =
+  /\b(cricket board|cricket head\s?quarters?|sports mafia|french open|wimbledon|grand slam|prize money|olympic committee|football federation|formula 1|premier league|la liga|test match|odi series)\b/i;
+
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
@@ -990,6 +1031,35 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Cancelled / suspended industrial action (non-event) — title-bound.
     if (FP_CANCELLED_ACTION_RE.test(titleHaystack(i)) && !FP_CANCELLED_KEEP_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: cancelled/suspended industrial action (non-event)" };
+    }
+    // Travel/safety advisory telling people to AVOID protest areas — guidance,
+    // not an event. All three signals required so a real demo never trips it.
+    {
+      const th = titleHaystack(i);
+      if (FP_ADVISORY_AVOID_RE.test(th) && FP_ADVISORY_ISSUER_RE.test(th) && FP_ADVISORY_TARGET_RE.test(th)) {
+        return { relevant: false, reason: "excluded: travel/safety advisory to avoid protest areas (not a civil-unrest event)" };
+      }
+    }
+    // Editorial LABEL leading the headline (opinion/analysis/explainer) — runs on
+    // the raw title so the ^ anchor holds.
+    if (FP_EDITORIAL_LABEL_RE.test(i.title ?? "")) {
+      return { relevant: false, reason: "excluded: editorial label (opinion/analysis/explainer), not a civil-unrest event" };
+    }
+    // Editorial FORMAT (listicle/digest/gallery/yearender/think-piece).
+    if (FP_EDITORIAL_FORMAT_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: editorial format (listicle/digest/gallery/think-piece), not a single event" };
+    }
+    // Protest aftermath / clean-up — a non-event unless still live.
+    if (FP_AFTERMATH_RE.test(titleHaystack(i)) && !FP_AFTERMATH_LIVE_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: protest aftermath / clean-up (non-event)" };
+    }
+    // Diplomatic / interstate formal protest (a complaint note, not a demo).
+    if (FP_DIPLOMATIC_PROTEST_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: diplomatic/interstate formal protest (not civil unrest)" };
+    }
+    // Sports-governance protest (cricket board / prize money / stadium fans).
+    if (FP_SPORTS_GOV_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: sports-governance protest (not security-relevant civil unrest)" };
     }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The

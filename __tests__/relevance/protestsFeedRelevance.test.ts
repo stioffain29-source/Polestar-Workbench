@@ -307,6 +307,95 @@ const FIXTURES: Fixture[] = [
     verdict: "DROP",
     reason: "general-news noise",
   },
+
+  // ---- Travel/safety advisory to AVOID protest areas (non-event): DROP --
+  {
+    title: "Malaysians advised to avoid central Jakarta demonstration areas",
+    verdict: "DROP",
+    reason: "travel/safety advisory",
+  },
+  {
+    title: "US, France to nationals in Metro Manila: Avoid Sept. 21 protest areas",
+    verdict: "DROP",
+    reason: "travel/safety advisory",
+  },
+  // A live demonstration that merely mentions a central/downtown AREA, with no
+  // "avoid" instruction, must SURVIVE the advisory exclude: KEEP.
+  {
+    title: "Protesters clash with police in central Jakarta as thousands gather downtown",
+    verdict: "KEEP",
+  },
+
+  // ---- Editorial LABEL leading the headline (commentary): DROP ---------
+  {
+    title: "Analysis: Nepal's protests are being closely watched in Vietnam",
+    verdict: "DROP",
+    reason: "editorial label",
+  },
+  {
+    title: "[Opinion] Revisiting the first data center protest in Malaysia",
+    verdict: "DROP",
+    reason: "editorial label",
+  },
+  // A real protest whose headline happens to start with a place, not a label,
+  // must SURVIVE: KEEP. ("Analysis" only fires as a leading label.)
+  {
+    title: "Forensic analysis confirms three protesters killed by live rounds in Dhaka",
+    verdict: "KEEP",
+  },
+
+  // ---- Editorial FORMAT (listicle / gallery / explainer / think-piece) --
+  {
+    title: "Five things to know about Indonesia's deadly unrest",
+    verdict: "DROP",
+    reason: "editorial format",
+  },
+  {
+    title: "Indonesia's anti-government protests – in pictures",
+    verdict: "DROP",
+    reason: "editorial format",
+  },
+  {
+    title: "Bangladesh's protests explained: what led to PM's ouster and the challenges ahead",
+    verdict: "DROP",
+    reason: "editorial format",
+  },
+  {
+    title: "What's next for Nepal after deadly protests force PM out?",
+    verdict: "DROP",
+    reason: "editorial format",
+  },
+
+  // ---- Protest aftermath / clean-up (non-event): DROP ------------------
+  {
+    title: "Military, police join cleaning workers to clean up streets after mass protest",
+    verdict: "DROP",
+    reason: "aftermath",
+  },
+  // Clean-up that is still LIVE (clashes continue) must SURVIVE: KEEP.
+  {
+    title: "Clashes continue as crews clear debris after another night of protest unrest",
+    verdict: "KEEP",
+  },
+
+  // ---- Diplomatic / interstate formal "protest" (a note): DROP ---------
+  {
+    title: "Thailand lodges official landmine protest against Cambodia",
+    verdict: "DROP",
+    reason: "diplomatic/interstate",
+  },
+
+  // ---- Sports-governance protest (not civil unrest): DROP --------------
+  {
+    title: "Protest demands resignation of Sri Lanka Cricket Board",
+    verdict: "DROP",
+    reason: "sports-governance",
+  },
+  {
+    title: "French Open players plan media protest over prize money share",
+    verdict: "DROP",
+    reason: "sports-governance",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {
