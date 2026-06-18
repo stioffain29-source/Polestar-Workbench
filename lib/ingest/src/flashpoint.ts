@@ -265,6 +265,40 @@ function resolvePapuaPng(hay: string): string | null {
   return null;
 }
 
+/**
+ * Build the haystack used for COUNTRY RESOLUTION with the Google-News source
+ * masthead removed. Google News appends the publisher name to BOTH the title
+ * (after a trailing " - " / " | ") AND, verbatim, to the summary. A publisher
+ * city ("The Manila Times" -> Manila, "Bangkok Post" -> Bangkok) would
+ * otherwise become the only country signal of an out-of-region story that names
+ * no real location — e.g. an overseas "G7 protest turns from carnival to
+ * violent stand-off - The Manila Times". Stripping it for GEO ONLY (the DENY,
+ * FOREIGN_LOCATION and relevance-cue checks still see the full text) means a
+ * masthead-only country resolves to null, so the row is dropped at ingest as
+ * "no-apac-country" instead of being mis-stamped to the publisher's country.
+ */
+function geoHaystack(title: string, summary: string): string {
+  const dash = Math.max(title.lastIndexOf(" - "), title.lastIndexOf(" | "));
+  const source = dash > 0 ? title.slice(dash + 3).trim() : "";
+  const cleanTitle = dash > 0 ? title.slice(0, dash).trim() : title;
+  const cleanSummary = source ? summary.split(source).join(" ") : summary;
+  return `${cleanTitle}\n${cleanSummary}`;
+}
+
+/**
+ * Resolve the APAC country of a flashpoint item from its title + summary with
+ * the source masthead stripped (see geoHaystack). Exported so the api-server's
+ * one-time cleanup migration re-derives country with the IDENTICAL logic the
+ * ingest now uses.
+ */
+export function resolveFlashpointCountry(title: string, summary: string): string | null {
+  const geoHay = geoHaystack(title, summary);
+  const pacific = resolvePapuaPng(geoHay);
+  if (pacific) return pacific;
+  const m = COUNTRY_ALIASES.find((c) => c.aliases.some((a) => hasWord(geoHay, a)));
+  return m ? m.canonical : null;
+}
+
 function classify(title: string, summary: string): {
   kept: boolean;
   reason: string;
@@ -296,11 +330,7 @@ function classify(title: string, summary: string): {
   // "Students hold protest against fee hike" with the country only in
   // the summary's dateline). Papua / PNG are resolved first by
   // resolvePapuaPng so Indonesian West Papua is not mis-routed to PNG.
-  let country = resolvePapuaPng(hay);
-  if (!country) {
-    const m = COUNTRY_ALIASES.find((c) => c.aliases.some((a) => hasWord(hay, a)));
-    country = m ? m.canonical : null;
-  }
+  const country = resolveFlashpointCountry(title, summary);
 
   const isPacific =
     country === "Papua New Guinea" ||
@@ -422,6 +452,7 @@ function titleSimilarity(a: string, b: string): number {
 export const flashpointTestHooks = {
   classify,
   resolvePapuaPng,
+  resolveFlashpointCountry,
   titleSimilarity,
   eventSignatureTrigrams,
 };

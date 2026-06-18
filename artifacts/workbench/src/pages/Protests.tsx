@@ -157,7 +157,9 @@ export default function Protests() {
   const countrySeverity = useMemo(() => {
     const m = new Map<string, { severe: number; maxRank: number; total: number }>();
     inWindow.forEach((i) => {
-      if (!i.country) return;
+      // An unlocated incident must never be crowned the highest-severity
+      // "country" — exclude Unknown / placeholder rows from the ranking.
+      if (!i.country || i.country === "Unknown" || i.country === "—") return;
       const rank = SEV_RANK[i.severity] ?? 0;
       const cur = m.get(i.country) ?? { severe: 0, maxRank: 0, total: 0 };
       cur.total += 1;

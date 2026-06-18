@@ -1,4 +1,6 @@
-export { runFlashpointIngest } from "./flashpoint";
+export { runFlashpointIngest, resolveFlashpointCountry } from "./flashpoint";
+export { runFlashpointMastheadRelocate } from "./flashpointMastheadRelocate";
+export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
 export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest } from "./topicConfigs";

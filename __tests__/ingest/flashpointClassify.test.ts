@@ -68,6 +68,30 @@ describe("classify", () => {
     expect(result.reason).toBe("out-of-region:uk-ireland");
   });
 
+  it("drops an out-of-region story whose ONLY APAC signal is the source masthead", () => {
+    // An overseas G7-summit protest: the headline names no place, and "Manila"
+    // appears solely in the publisher name, which Google News appends to BOTH
+    // the title and the summary. No foreign token exists for FOREIGN_LOCATION to
+    // catch, so the masthead must be stripped before country resolution.
+    const result = classify(
+      "G7 protest turns from carnival to violent stand-off - The Manila Times",
+      "G7 protest turns from carnival to violent stand-off The Manila Times",
+    );
+    expect(result.kept).toBe(false);
+    expect(result.country).toBeNull();
+    expect(result.reason).toBe("no-apac-country");
+  });
+
+  it("keeps an in-region protest whose city is in the content, not just the masthead", () => {
+    const result = classify(
+      "Thousands rally in Cebu over fuel prices - The Manila Times",
+      "Thousands rally in Cebu over fuel prices The Manila Times",
+    );
+    expect(result.kept).toBe(true);
+    expect(result.country).toBe("Philippines");
+    expect(result.reason).toMatch(/^allow:/);
+  });
+
   it("rejects a diaspora protest held abroad even when it names an APAC country", () => {
     const result = classify(
       "Sri Lankan Tamil groups protest in London - Daily Mirror",

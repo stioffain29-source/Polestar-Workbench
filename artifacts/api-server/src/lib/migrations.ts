@@ -5,6 +5,7 @@ import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/re
 import {
   runStrikesBackfill,
   runNewsCountryBackfill,
+  runFlashpointMastheadRelocate,
   classifySeverity,
   isReactionLed,
   severityFromFatalities,
@@ -714,6 +715,51 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { rows: res.rowCount ?? 0, marker: markerKey },
           "One-time purge of out-of-region (US/EU) mis-stamped flashpoint rows",
+        );
+      }
+    }
+
+    // 3d-4) ONE-TIME relocation of masthead-leaked flashpoint rows.
+    //
+    //       A third cross-syndication defect: when a flashpoint headline names
+    //       NO location at all (an overseas "G7 protest turns from carnival to
+    //       violent stand-off"), the Google-News source masthead — appended to
+    //       both the title and the summary — was the only country signal, so the
+    //       publisher's CITY ("The Manila Times" -> Manila) mis-stamped the row
+    //       to the publisher's APAC country, which could then be crowned the
+    //       highest-severity country. Unlike 3d-2 / 3d-3 there is NO foreign
+    //       token to key off, so this re-runs the ingest's now masthead-stripped
+    //       country resolution (resolveFlashpointCountry) over every stored
+    //       flashpoint row and RELOCATES to country='Unknown' (coords nulled)
+    //       any row that now resolves to null — i.e. the masthead was the sole
+    //       signal. Relocate (not delete): the protest is real, only its
+    //       location is unknowable from the data. Durable across relevance
+    //       backfills (they never touch country). Marker-gated → runs once.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "flashpoint_masthead_country_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await runFlashpointMastheadRelocate({ commit: true });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            candidates: res.candidates,
+            relocated: res.relocated,
+            fromCountry: res.fromCountry,
+            marker: markerKey,
+          },
+          "One-time relocation of masthead-leaked flashpoint rows",
         );
       }
     }
