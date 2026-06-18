@@ -344,6 +344,20 @@ export default function MapPage() {
                           {p.summary.length > 220 ? `${p.summary.slice(0, 217)}…` : p.summary}
                         </div>
                       )}
+                      {p.corroborations.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            color: "#4655FF",
+                          }}
+                        >
+                          Corroborated by UN OCHA (ReliefWeb)
+                        </div>
+                      )}
                     </div>
                   </LeafletTooltip>
                   {p.id.startsWith("i-") && (
