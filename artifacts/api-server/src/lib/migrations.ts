@@ -9,6 +9,10 @@ import {
   runFlashpointUnknownReattribute,
   classifySeverity,
   isReactionLed,
+  isPresentTenseFatalOrPluralStrike,
+  isNaturalCauseDeath,
+  isFatalKineticAttack,
+  isJudicialDeath,
   severityFromFatalities,
   maxSeverity,
   SEVERITY_RANK,
@@ -1108,6 +1112,108 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { scanned: candidates.length, changed, marker: markerKey },
           "One-time downgrade of reaction-led mis-rated incident severities",
+        );
+      }
+    }
+
+    // 3g-2) One-time UPGRADE of incidents the classifier historically
+    //       UNDER-rated because the EXTREME tier matched only past-tense
+    //       casualty verbs ("killed") while news writes fatal attacks in the
+    //       present tense ("airstrike kills seven civilians"), and the conflict
+    //       HIGH tier matched only singular "airstrike" — so "Junta airstrikes
+    //       kill 8 civilians" fell all the way to low while a security op that
+    //       "killed" one militant read Extreme. classifySeverity now covers the
+    //       present-tense fatal verb + plural strike forms, so NEW rows rate
+    //       correctly, but stored auto-scraped rows keep their old chip.
+    //
+    //       This pass re-rates ONLY auto-scraped / legacy flashpoint / conflict
+    //       / strikes rows (the legacy incidents.topic='strikes' rows share the
+    //       generic Incidents list with conflict, so a fatal Myanmar airstrike
+    //       must not read moderate there while extreme on the conflict monitor;
+    //       the Missile Strike Tracker reads a SEPARATE strikesTable and is
+    //       untouched). Two tightly-scoped corrections, both gated on a narrow
+    //       predicate so the pass can never sweep up rows that differ from the
+    //       classifier for unrelated historical reasons:
+    //         (a) UPGRADE — rows escalated specifically by THIS change
+    //             (isPresentTenseFatalOrPluralStrike: "airstrikes kill 8
+    //             civilians", "airstrike … killing father and son"), set to the
+    //             current classifySeverity result ONLY when strictly higher.
+    //         (b) DOWNGRADE — natural / accidental deaths (isNaturalCauseDeath:
+    //             "Lightning Strike Kills 14", "earthquake … 32 dead") that are
+    //             NOT security events, set to the classifier result ONLY when
+    //             strictly lower, so they vacate the reserved Extreme tier.
+    //       Both directions skip analyst-curated rows (machine provenance only)
+    //       and never touch other topics. Marker-gated → runs once per env.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_present_tense_fatal_upgrade_v9";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, ["flashpoint", "conflict", "strikes"]),
+              // Machine-provenance rows only — auto-scraped feed rows AND legacy
+              // bulk imports (legacy:db:%). Both are classifier-assigned, never
+              // analyst-curated, so a re-rate cannot clobber a human severity.
+              or(
+                like(incidentsTable.analystNotes, "auto-scraped:%"),
+                like(incidentsTable.analystNotes, "legacy:db:%"),
+              ),
+            ),
+          );
+        let upgraded = 0;
+        let downgraded = 0;
+        for (const r of candidates) {
+          const isUpgradeCandidate =
+            isPresentTenseFatalOrPluralStrike(r.title, r.summary ?? "") ||
+            isFatalKineticAttack(r.title, r.summary ?? "");
+          const isDowngradeCandidate =
+            isNaturalCauseDeath(r.title, r.summary ?? "") ||
+            isJudicialDeath(r.title, r.summary ?? "");
+          if (!isUpgradeCandidate && !isDowngradeCandidate) continue;
+          const topic = r.topic === "conflict" || r.topic === "strikes" ? "conflict" : "flashpoint";
+          const fromText = classifySeverity(r.title, r.summary ?? "", topic);
+          const floor = severityFromFatalities(r.fatalities);
+          const next = floor ? maxSeverity(fromText, floor) : fromText;
+          const stored = r.severity as Severity;
+          if (isUpgradeCandidate && !isDowngradeCandidate && SEVERITY_RANK[next] > SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            upgraded++;
+          } else if (isDowngradeCandidate && SEVERITY_RANK[next] < SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            downgraded++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: candidates.length, upgraded, downgraded, marker: markerKey },
+          "One-time severity heal: present-tense fatal upgrade + natural-cause downgrade",
         );
       }
     }

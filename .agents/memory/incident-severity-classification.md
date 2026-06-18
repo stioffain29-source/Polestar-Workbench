@@ -46,3 +46,31 @@ historical classifier drift to ~every row — a dry-run flipped 217 rows and *in
 fatality floor (`next = floor ? maxSeverity(text, floor) : text`) so a confirmed-fatality row is
 never downgraded. Fix the migration BODY (don't bump the marker key) when prod hasn't run it yet —
 prod runs each marker once, and an uncorrected earlier body would execute first there.
+
+## Fatal-WORD vs fatal-EVENT — the bare-"death" collision (and the bidirectional heal)
+
+The reserved Extreme tier keys off a bare `\bdeath\b`/`\bkilled\b`, which fires on text where a fatal
+WORD is present but no fatal EVENT happened. Three guards in `severity.ts` strip these out of the
+Extreme gate (each: detect the non-event phrasing, then re-test EXTREME on the stripped text so a
+headline that ALSO carries a real killing — "10 killed; mastermind sentenced to death" — still rates
+Extreme):
+- `isNaturalCauseDeath` — lightning/flood/earthquake/drowning deaths with NO security/crowd signal.
+- `isJudicialDeath` — "sentenced to death" / death sentence / death penalty / death row / death
+  anniversary. **Why this guard can't reuse the security keep-list:** "sentenced to death for role in
+  protest crackdown" contains "protest", so a security-signal gate would wrongly keep it — the
+  judicial guard must be the strip-and-retest, independent of the crowd/security keep-list.
+- The INVERSE problem (fatal EVENT under-rated): present-tense kills and past-tense "killed" + a
+  kinetic noun (`isFatalKineticAttack`) were stored High/Low by legacy/stale rows the present-tense
+  predicate alone missed. Also widen the fatal vocabulary as real misses surface — e.g. "burn(ed|t)
+  alive" was absent (only "burn to death" existed) so an airstrike that "leaves prisoners burned
+  alive" read Low.
+
+**Why the heal is now bidirectional:** the original reported bug was two-sided (fatal airstrikes
+under-rated AND non-killing "death" headlines over-rated), so the boot migration scans
+machine-provenance (`auto-scraped:%` / `legacy:db`) flashpoint/conflict/strikes rows and does BOTH:
+UPGRADE on `isFatalKineticAttack || isPresentTenseFatalOrPluralStrike` (strictly higher) and
+DOWNGRADE on `isNaturalCauseDeath || isJudicialDeath` (strictly lower). Marker bumped per classifier
+change. **Scope discipline that held:** do NOT blanket re-rate `legacy:db` rows whose stored Extreme
+the classifier wouldn't reproduce (e.g. a military-PR "anniversary" headline) — that is the
+flagged-unsafe ~414-row territory; the heal only touches rows a specific predicate matches. The
+Missile Strike Tracker (`strikes` TABLE, separate from the `strikes` topic) is left untouched.
