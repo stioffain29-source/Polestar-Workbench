@@ -148,6 +148,28 @@ bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
   street unrest. actor(recruit/manpower/…) + protest + object(test/rule/quota/…),
   gated OUT by any public-order signal (`FP_INDUSTRY_STREET_RE`: rally/sit-in/
   arrests/outside-ministry) so a real agency street action keeps.
+**Four MORE non-civil-unrest classes the protest gate kept (fixed pre-rescue):**
+- **Security-deployment preparation** ("Police deploy 4,131 personnel to secure
+  Jakarta protests") — a logistics/posture statement, not an event. Drop on
+  deploy-verb + force + secure-purpose + a protest word, gated OUT by
+  `FP_CALM_LIVE_RE` so a real POST-clash deployment keeps.
+- **Labour/industrial-tribunal ruling** ("Fair Work rejects gas giant's claim
+  strikes…") — a legal-PROCESS story about whether industrial action is lawful,
+  not a stoppage. tribunal-body + strike/industrial-action + process-verb, gated
+  OUT by `FP_TRIBUNAL_ACTIVE_STRIKE_RE` so a strike actually under way/cleared keeps.
+- **Press-freedom / coverage-suppression** ("silencing PoJK unrest coverage as
+  journalist faces detention") — the unrest is the censored REPORTING SUBJECT.
+  suppress-of-coverage + press-actor, gated OUT by `FP_PRESS_REAL_VIOLENCE_RE` so a
+  journalist hurt in actual violence keeps. (FP_CALM_LIVE_RE is UNUSABLE as the
+  guard here — it matches bare "detain".)
+- **School-admission / enrolment grievance** ("Kuja residents protest SPMB,
+  children not accepted") — an administrative complaint over a student-intake
+  system (SPMB/PPDB/zonasi/"not accepted"/"tidak diterima"), not unrest. protest +
+  admission-system, gated OUT by `FP_INDUSTRY_STREET_RE` (real street escalation).
+- **Diplomatic protest via the foreign ministry** ("urges DFA protest") — added
+  DFA/foreign-ministry/state-department alternatives to `FP_NEG_DIPLOMATIC`, so the
+  existing protest-verdict step 0b drops it (DFA = Dept of Foreign Affairs, PH).
+
 **Keep-guard \b trap (cost me a test cycle):** event keep-guards MUST use
 leading-\b STEMS (`protest`, `clash`, `kill`), never a trailing-\b literal —
 `/\bprotest\b/` misses "protests"/"protesters", so an inflected real-event headline

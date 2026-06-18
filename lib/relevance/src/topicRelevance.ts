@@ -511,6 +511,45 @@ const FP_INDUSTRY_OBJECT_RE =
 const FP_INDUSTRY_STREET_RE =
   /\b(rally|rallies|march|clash|riot|strike|blockade|road|highway|sit[- ]?in|picket|bandh|shutdown|gherao|hartal|stage[ds]?|staged|hold|held|gather|crowd|thousands|hundreds|burn|torch|effigy|arrest|detain|tear ?gas|injured|killed|outside)\b/i;
 
+// Security forces pre-positioned to SECURE / police an upcoming protest — a
+// deployment & logistics statement, not an unrest event ("Police deploy 4,131
+// personnel to secure Jakarta protests"). A genuine post-clash deployment is
+// kept via the live-violence override (FP_CALM_LIVE_RE).
+const FP_SECURITY_DEPLOY_VERB_RE =
+  /\b(deploys?|deployed|deploying|deployment|mobilis\w*|mobiliz\w*|station(s|ed|ing)?|beef(s|ed)? up|step(s|ped)? up|ramp(s|ed)? up|tighten(s|ed|ing)?|reinforc\w*|put on standby|on (high )?alert|placed on alert)\b/i;
+const FP_SECURITY_FORCE_RE =
+  /\b(police|personnel|security (forces|personnel)|officers|troops|cops|constab\w*|paramilitar\w*|riot police|law enforcement|security)\b/i;
+const FP_SECURITY_PURPOSE_RE =
+  /\b(secure|securing|to secure|guard|safeguard|monitor|maintain (order|peace)|keep the peace|ahead of|in anticipation of|police the|oversee)\b/i;
+
+// Labour / industrial tribunal ADJUDICATING whether industrial action is
+// lawful — a legal-process story ("Fair Work rejects gas giant's claim strikes
+// would harm the economy"), not a stoppage. Kept when a real strike is
+// actually under way or has been cleared to proceed.
+const FP_LABOUR_TRIBUNAL_RE =
+  /\b(fair work commission|fair work|industrial relations commission|industrial tribunal|labou?r court|labor relations commission|national labor relations commission|nlrc|arbitration (commission|tribunal|panel)|industrial court)\b/i;
+const FP_TRIBUNAL_PROCESS_RE =
+  /\b(reject\w*|uphold\w*|dismiss\w*|rul\w*|order\w*|grant\w*|approv\w*|deni\w*|hear\w*|bid|claim\w*|application|appeal\w*|lawful|unlawful|protected action|ballot|injunction|verdict|ruling)\b/i;
+const FP_TRIBUNAL_ACTIVE_STRIKE_RE =
+  /\b(strike|walkout|stoppage)s?\b[^.]{0,24}\b(begin|begins|began|start|starts|started|proceed\w*|go ahead|commenc\w*|under ?way|loom\w*|planned|set (for|to)|to (begin|start|hit|go ahead)|enters?|continue\w*|escalat\w*)\b|\b(walk(ed|s)? off|downed tools|on strike|staged? (a )?(strike|walkout)|picket(ing|ed|s|ers)?|took to the picket)\b/i;
+
+// Press-freedom / coverage-suppression story — the unrest is the REPORTING
+// SUBJECT being censored, not an event ("Pakistan accused of silencing PoJK
+// unrest coverage as journalist faces detention"). A journalist actually
+// killed / shot / hurt in violence is kept.
+const FP_PRESS_SUPPRESS_RE =
+  /\b(silenc\w*|censor\w*|gag\w*|muzzl\w*|suppress\w*|black\s?out|throttl\w*|clamp\w* down on|stifl\w*)\b[^.]{0,40}\b(coverage|report\w*|press|media|journalis\w*|news|footage|broadcast)\b|\b(unrest|protest|conflict)\s+coverage\b|\b(coverage|reporting) of (the )?(unrest|protest)\b|\b(press freedom|media freedom|freedom of the press)\b/i;
+const FP_PRESS_ACTOR_RE =
+  /\b(journalis\w*|reporter\w*|correspondent|news ?paper|press|media outlet|broadcaster|editor|photojournalis\w*|blogger|news channel)\b/i;
+const FP_PRESS_REAL_VIOLENCE_RE =
+  /\b(kill\w*|shot|gunned|injur\w*|wounded|beaten|assault\w*|stab\w*|fired? (on|at)|tear ?gas\w*|clash\w*|riot\w*|storm\w*)\b/i;
+
+// School-admission / enrolment grievance — an administrative complaint over a
+// student-intake system (SPMB / PPDB / zonasi / "not accepted"), not security-
+// relevant civil unrest. A real escalated street action keeps.
+const FP_SCHOOL_ADMISSION_RE =
+  /\b(spmb|ppdb|zonasi|school admission\w*|student admission\w*|school enrol\w*|admission (system|process|quota|policy|selection)|not accepted (to|into|at|—|,)|tidak diterima|school placement|school registration|new (pupil|student) (intake|admission|enrol\w*))\b/i;
+
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
@@ -835,7 +874,7 @@ const FP_POS_VIOLENCE =
 const FP_NEG_GESTURE =
   /\b(resign\w*|quit|return\w*|withdraw\w*|step(ped)? down|boycott\w*|refus\w*|declin\w*|skip\w*|hand\w* back|wore? black|donat\w*|exit\w*) .{0,35}\bin protest\b|\bin protest\b.{0,30}(resign\w*|return\w*|withdraw\w*|boycott\w*|quit|step(ped)? down)\b|\b(act|sign|mark|token|gesture|instant act|form|means|way|expression) of protest\b|\bas a (?:silent |symbolic )?protest\b/i;
 const FP_NEG_DIPLOMATIC =
-  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b|\bbilateral (relations|ties|relationship)\b/i;
+  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b|\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b[^.]{0,25}\bprotest\b|\bprotest\b[^.]{0,25}\b(via|through|with)\b[^.]{0,15}\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b|\bbilateral (relations|ties|relationship)\b/i;
 const FP_NEG_INTERSTATE_NAT =
   "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
 const FP_NEG_INTERSTATE_TERR =
@@ -1114,6 +1153,48 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       !FP_INDUSTRY_STREET_RE.test(text)
     ) {
       return { relevant: false, reason: "excluded: recruitment-industry complaint over a requirement (not civil unrest)" };
+    }
+    // Security forces pre-positioned to SECURE an upcoming protest (a
+    // deployment/logistics statement, not an unrest event). A real post-clash
+    // deployment keeps via the live-violence override.
+    {
+      const th = titleHaystack(i);
+      if (
+        FP_SECURITY_DEPLOY_VERB_RE.test(th) &&
+        FP_SECURITY_FORCE_RE.test(th) &&
+        FP_SECURITY_PURPOSE_RE.test(th) &&
+        FP_OVERSEAS_PROTEST_RE.test(th) &&
+        !FP_CALM_LIVE_RE.test(text)
+      ) {
+        return { relevant: false, reason: "excluded: security-deployment preparation (not a civil-unrest event)" };
+      }
+    }
+    // Labour / industrial tribunal ruling on whether industrial action is
+    // lawful (legal process, not a stoppage). A real impending/active strike
+    // is kept by the active-strike override.
+    if (
+      FP_LABOUR_TRIBUNAL_RE.test(text) &&
+      /\b(strike|strikes|industrial action|walkout|stoppage|lockout)\b/i.test(text) &&
+      FP_TRIBUNAL_PROCESS_RE.test(text) &&
+      !FP_TRIBUNAL_ACTIVE_STRIKE_RE.test(text)
+    ) {
+      return { relevant: false, reason: "excluded: labour-tribunal ruling on industrial action (legal process, not unrest)" };
+    }
+    // Press-freedom / coverage-suppression story (the unrest is the censored
+    // reporting subject, not an event). A journalist hurt in violence keeps.
+    {
+      const th = titleHaystack(i);
+      if (FP_PRESS_SUPPRESS_RE.test(th) && FP_PRESS_ACTOR_RE.test(th) && !FP_PRESS_REAL_VIOLENCE_RE.test(th)) {
+        return { relevant: false, reason: "excluded: press-freedom/coverage-suppression (reporting subject, not a civil-unrest event)" };
+      }
+    }
+    // School-admission / enrolment grievance (administrative complaint over a
+    // student-intake system, not civil unrest). A real escalation keeps.
+    {
+      const th = titleHaystack(i);
+      if (/\bprotest/i.test(th) && FP_SCHOOL_ADMISSION_RE.test(th) && !FP_INDUSTRY_STREET_RE.test(text)) {
+        return { relevant: false, reason: "excluded: school-admission grievance (administrative, not civil unrest)" };
+      }
     }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The

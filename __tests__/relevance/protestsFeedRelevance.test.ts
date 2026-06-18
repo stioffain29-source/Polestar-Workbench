@@ -445,6 +445,65 @@ const FIXTURES: Fixture[] = [
     title: "Manpower agencies stage sit-in protest outside ministry over new rule",
     verdict: "KEEP",
   },
+
+  // ---- Security-deployment preparation (not an event): DROP ------------
+  {
+    title: "Metro Jaya Police Deploys 4,131 Personnel to Secure Jakarta Public Protests",
+    verdict: "DROP",
+    reason: "security-deployment preparation",
+  },
+  // A real post-clash deployment must still be KEPT.
+  {
+    title: "Police deploy tear gas as protesters clash in central Jakarta",
+    verdict: "KEEP",
+  },
+
+  // ---- Labour-tribunal ruling on industrial action (legal process): DROP
+  {
+    title: "Fair Work rejects gas giant's claim strikes would harm the economy",
+    summary:
+      "One of Australia's biggest gas producers has lost a bid to stop industrial action at its Darwin facilities after claiming strikes would force shutdowns.",
+    verdict: "DROP",
+    reason: "labour-tribunal ruling",
+  },
+  // A real impending strike cleared by the tribunal must still be KEPT.
+  {
+    title: "Fair Work rejects bid to halt nurses' walkout as strike begins across NSW hospitals",
+    verdict: "KEEP",
+  },
+
+  // ---- Press-freedom / coverage suppression (reporting subject): DROP --
+  {
+    title:
+      "Pakistan accused of silencing PoJK unrest coverage as journalist faces detention",
+    verdict: "DROP",
+    reason: "press-freedom/coverage-suppression",
+  },
+  // A journalist hurt in real violence must still be KEPT.
+  {
+    title: "Journalist shot covering protest as police clash with demonstrators",
+    verdict: "KEEP",
+  },
+
+  // ---- School-admission grievance (administrative): DROP ---------------
+  {
+    title:
+      "Kuja Residents Protest DKI Jakarta SPMB, Children Living Near Schools Are Not Accepted",
+    verdict: "DROP",
+    reason: "school-admission grievance",
+  },
+  // A real escalated street protest over admissions must still be KEPT.
+  {
+    title: "Parents protest school admission rules, clash with police outside the office",
+    verdict: "KEEP",
+  },
+
+  // ---- Diplomatic protest urged via the foreign ministry (DFA): DROP ---
+  {
+    title: "Pangilinan condemns China sanctions vs. Teodoro, urges DFA protest",
+    verdict: "DROP",
+    reason: "non-civil-unrest sense",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {
