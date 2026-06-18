@@ -531,8 +531,40 @@ function extractFutureSignals(rows: EnrichedIncident[]): EnrichedIncident[] {
 }
 
 // --- Dedupe helpers --------------------------------------------------------
+// Google-News / wire titles append the publisher after a final ASCII " - " and
+// some outlets inject " | Section | site.com" noise ("Indonesia Protest | Pro
+// Sports | bdtonline.com - Bluefield Daily Telegraph"). That suffix is per-
+// OUTLET, so the SAME wire syndicated across three outlets yields three
+// different dedup keys and survives as duplicate cards. Strip it before the
+// dedup signature so syndicated copies collapse. Used by the dedup helpers
+// only; em-dashes (—) are left intact (they separate real clauses).
+function stripMasthead(title: string): string {
+  let t = (title ?? "").trim();
+  // Peel trailing " - <publisher>" / " | <publisher>" segments. Split on the
+  // LAST space-padded ASCII " - " / " | " and treat the tail as a masthead when
+  // it is short (<= 6 words); the tail may itself contain hyphens/dots
+  // ("Journal-News.com", "bdtonline.com"). Keep a >= 2-word head so a real
+  // clause is never consumed. em-dashes (—) are not delimiters here.
+  for (let i = 0; i < 5; i++) {
+    const m = t.match(/^(.*\S)\s+[-|]\s+(.+)$/);
+    if (!m) break;
+    const head = m[1].trim();
+    if (m[2].trim().split(/\s+/).length > 6) break;
+    if (head.split(/\s+/).length < 2) break;
+    t = head;
+  }
+  // Collapse any residual " | Section" noise an outlet injects mid-title down
+  // to the lead headline segment.
+  const pipe = t.indexOf(" | ");
+  if (pipe > 0) {
+    const lead = t.slice(0, pipe).trim();
+    if (lead.split(/\s+/).length >= 2) t = lead;
+  }
+  return t;
+}
+
 function normaliseTitle(s: string): string {
-  return (s ?? "")
+  return stripMasthead(s ?? "")
     .toLowerCase()
     .replace(/[\u2018\u2019\u201C\u201D"'`]/g, "")
     .replace(/[^a-z0-9\s]+/g, " ")

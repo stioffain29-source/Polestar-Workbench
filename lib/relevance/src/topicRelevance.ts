@@ -270,6 +270,18 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
 
   // Business "strike a deal" — commercial agreement, not industrial action.
   /\bstrik(e|es|ing) (a |the |an |new |fresh |landmark |historic )?(deal|agreement|accord|pact|partnership|bargain|alliance|truce)\b/,
+  // Trade / tariff economics metaphor — "Trump's forced-labor tariffs strike
+  // Sri Lanka's fragile export recovery". "strike/hit/batter" here is the
+  // metaphor "tariffs hit the economy", not industrial action. Requires the
+  // tariff/trade noun + an impact verb + an economic-outcome object, so a
+  // genuine labour strike sparked by tariffs ("tariffs spark workers' strike")
+  // is untouched and a real anti-tariff protest title-rescues above this list.
+  // The leading lookahead bails out if an explicit industrial-action phrase
+  // ("workers strike", "union walkout") is present, so a real labour stoppage
+  // phrased "tariffs hit factories as workers strike" is never swallowed by the
+  // metaphor. ("forced-labor" never trips it — the guard needs the worker noun
+  // immediately followed by the stoppage verb.)
+  /^(?!.*\b(?:workers?|trade ?unions?|unions?|staff|employees?|drivers?|pilots?|nurses?|teachers?|miners?|dockers?|seafarers?) (?:strike|strikes|striking|walkout|walk out|stoppage|down tools|downed tools|industrial action)\b).*\b(tariffs?|trade war|customs dut(?:y|ies)|import dut(?:y|ies))\b[^.!?]{0,30}\b(strike|strikes|struck|hit|hits|hammer|hammers|batter|batters|threaten|threatens|dent|dents|derail|derails|cripple|cripples|squeeze|squeezes|slam|slams)\b[^.!?]{0,45}\b(econom|export|import|recover|growth|gdp|trade|industr|sector|revenue|earnings|market|business|manufactur|factor(?:y|ies)|exporters?|importers?|supply chain)\b/,
   // Sports betting / gambling commercial stories. "ArenaPlus, NBA strike
   // sports betting deal in Philippines" leaked because the "strike … deal"
   // pattern above needs "deal" to follow "strike" immediately. A gambling
@@ -323,6 +335,18 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // Metaphorical "instant protest" headline — runs BEFORE the title-rescue so
   // the bare word "protest" can no longer rescue the quoted figure of speech.
   /\binstant protest\b/,
+  // Retrospective administrative / compensation aftermath — "September protest
+  // damage claims settled after nine months", "riot compensation claims paid
+  // out". These are insurance / payout / settlement FOLLOW-UPS, not a protest
+  // EVENT, yet the bare word "protest" in the headline would otherwise
+  // title-rescue them. Drops before the rescue. Gated on a damage/compensation
+  // claims NOUN *and* an administrative-RESOLUTION verb in proximity, so a live
+  // grievance rally ("protesters demand compensation claims", "rally over
+  // unpaid injury claims") is untouched — only a settled/paid-out aftermath is
+  // dropped. "protest claims lives/responsibility" is never matched (no claims
+  // noun). Ambiguous grievance verbs (unpaid/rejected/pending) are deliberately
+  // excluded so an active claims protest is never swallowed.
+  /\b(damage|compensation|insurance|property|injury|loss|payout) claims?\b[^.!?]{0,40}\b(settled|paid out|processed|approved|disbursed|reimburs)\w*\b/,
 ];
 
 const SHIPPING_EXCLUDE: RegExp[] = [
