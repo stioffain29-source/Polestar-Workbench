@@ -43,7 +43,7 @@ export function isGoogleNewsRedirect(url: string | null | undefined): boolean {
   return GOOGLE_NEWS_REDIRECT_RE.test(url);
 }
 
-function extractArticleId(url: string): string | null {
+export function extractArticleId(url: string): string | null {
   const m = url.match(/\/(?:rss\/)?articles\/([^?/]+)/);
   return m ? m[1] : null;
 }
@@ -51,7 +51,7 @@ function extractArticleId(url: string): string | null {
 // OLD-format decode: the base64 segment may embed the publisher URL directly.
 // Returns the URL if found, else null (new-format ids decode to an opaque blob
 // containing no http(s) URL, so this cleanly falls through).
-function decodeOldFormat(id: string): string | null {
+export function decodeOldFormat(id: string): string | null {
   try {
     let b = id.replace(/-/g, "+").replace(/_/g, "/");
     while (b.length % 4) b += "=";
