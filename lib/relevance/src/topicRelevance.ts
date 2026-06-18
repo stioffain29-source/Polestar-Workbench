@@ -183,7 +183,7 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   // Finance / markets: stock, share, equity, bond, currency, FX,
   // commodity rallies. "Ringgit rally", "Rupee rally", "Stocks extend
   // rally", "Brent rally", "Gold rally", "Bitcoin rally".
-  /\b(stock|stocks|share|shares|equity|equities|market|markets|index|nifty|sensex|nikkei|kospi|hang seng|shanghai composite|kse[- ]?100|psx|jci|ftse|s&p|nasdaq|dow|asx|set index|pse(i)?|vn[- ]index|wall street|wall[- ]?st|main street) .{0,60}rally\b/,
+  /\b(stock|stocks|share|shares|equity|equities|market|markets|index|nifty|sensex|nikkei|kospi|hang seng|shanghai composite|kse[- ]?100|psx|bursa|jci|ftse|s&p|nasdaq|dow|asx|set index|pse(i)?|vn[- ]index|wall street|wall[- ]?st|main street) .{0,60}rally\b/,
   /\brally\b .{0,30}(stocks?|shares?|equit(y|ies)|markets?|bonds?|treasur(y|ies)|currenc(y|ies)|commodities?|wall street|nikkei|kospi|sensex|nifty|hang seng|ftse|s&p|nasdaq|dow|psei|jci)/,
   // "PSEi rebounds above 5,900 on Wall Street rally" — index name +
   // points/level + "on … rally" is unambiguously a markets headline.
@@ -202,6 +202,17 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\b(lightning|thunder|storm|rain|hail|snow|blizzard|cyclone|typhoon|hurricane|tornado|tsunami|earthquake|quake|flood|monsoon|heatwave|cold wave) (strike|strikes|struck|striking)/,
   /\b(strike|strikes|struck|striking) .{0,30}(provinces?|districts?|villages?|towns?|cities|coast|region) .{0,40}(rain|thunder|lightning|storm|cyclone|typhoon|hurricane|monsoon|flood)/,
   /\brain and thunder\b/,
+
+  // Natural-disaster headlines. An earthquake / tsunami / volcanic
+  // eruption / landslide / flood story is a hazard report, not civil
+  // unrest, even when it shares the ambiguous "strike(s)" token
+  // ("Magnitude 6.6 quake strikes Mindanao", "7.8 earthquake feared
+  // dead"). Genuine POST-disaster protests keep a protest/demonstration
+  // word in the headline and are rescued by FLASHPOINT_TITLE_RESCUE_RE,
+  // which runs BEFORE this list, so they are unaffected.
+  /\b(magnitude|m\d(\.\d)?|richter)\b.{0,25}\b(earthquake|quake|tremor|aftershock)/,
+  /\b(earthquake|quake|tremor|aftershock)s?\b.{0,40}\b(magnitude|richter|epicent|feared dead|death toll|destruction|jolt(s|ed)?|trapped|rescue|collapsed?|tsunami|injured|killed|damage)\b/,
+  /\b(tsunami warning|tsunami waves?|volcanic eruption|volcano (erupts?|erupted|spew)|landslide(s)? (kill|killed|buries|buried|swept|hit)|flash flood(s|ing)?|floodwaters?|mudslide)\b/,
 
   // Ceremonial / military parades. "Soldiers march in annual Independence
   // parade", "troops parade", "Republic Day parade". A ceremonial march is
@@ -243,6 +254,18 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\brally\b .{0,40}(rout|valuation|profit|profits|earnings|fivefold|investors?|record (high|low)|shares?)/,
   /\b(tin|copper|aluminium|aluminum|nickel|zinc|steel|smelting|smelter|palm oil|crude|brent|wti) (\w+ ){0,2}rally\b/,
   /\brally lifts? (profit|profits|earnings|shares?|sales|stock)/,
+  // Finance / markets, third pass. The instrument-adjacent patterns above
+  // miss a few real shapes: a bare "currency/assets/bond rally", a
+  // "rally for the peso/ringgit/…" (instrument AFTER "for"), a possessive
+  // crypto move ("Bitcoin's Iran rally"), and the named market-mood
+  // rallies ("broad market rally", "relief rally", "post-Eid rally").
+  // These would otherwise fall through to the generic ambiguous-token
+  // drop and — worse — could be re-admitted by the political-rally cue
+  // below ("rally for the peso") if not killed here first.
+  /\b(currency|currencies|\bfx\b|assets?|bonds?|treasur(y|ies)|commodit(y|ies)) rally\b/,
+  /\brally (for|to) (the )?(peso|ringgit|rupee|rupiah|baht|yuan|renminbi|dong|kyat|taka|kip|won|yen|dollar|euro|pound|sterling|riyal|dirham|lira|stocks?|shares?|equit)/,
+  /\b(bitcoin|ethereum|crypto|xrp|btc|eth|dogecoin|solana|altcoin)('s|s')?\b.{0,25}rally\b/,
+  /\b(broad|relief|santa[- ]?claus|year[- ]end|post[- ]?eid) (market )?rally\b/,
 
   // Sports, second pass. Match-report vocabulary that the named-league
   // list above misses: a goal "strike" reported at half/full time, players
@@ -721,6 +744,27 @@ function flashpointProtestCrackdownVerdict(text: string, negText: string): boole
 const FLASHPOINT_PUBLIC_ORDER_CUE_RE =
   /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage))\b/;
 
+// Political-rally cue. A "rally" is the most overloaded flashpoint token:
+// it is a market move, a sports comeback, and a motorsport event as often
+// as it is a political demonstration. The finance/sports/motorsport senses
+// are killed in FLASHPOINT_EXCLUDE (which runs BEFORE this check), so any
+// "rally" that survives to here is a candidate. This set KEEPS the ones
+// with explicit POLITICAL-mobilisation context — a rally against a govt /
+// policy, a rally for rights / a demand, an anti-(war|regime|…) rally, an
+// opposition / grand / mass / election / labour rally, or a rally behind a
+// party / leader — so a genuine "Thousands rally against the government" or
+// "11-Party Alliance grand rally" is distinguished from a "currency rally".
+// Deliberately NARROW: it requires a political object, never a bare
+// "rally", so awareness drives ("anti-dengue rally") and civic notices
+// ("rally to join search") stay dropped.
+const FLASHPOINT_POLITICAL_RALLY_RE: RegExp[] = [
+  /\brall(y|ies|ied)\b.{0,30}\b(against|over)\b.{0,50}\b(govt|government|policy|policies|law|laws|bill|amendment|regime|junta|coup|president|prime minister|\bpm\b|minister|chief minister|election|poll|polls|price|prices|inflation|cost of living|living cost|corruption|tax|taxes|fuel|reform|reforms|cuts?|austerity|crackdown|war|occupation|verdict|ruling|arrest|arrests|detention|killing|killings|violence|discrimination|atrocit|abuse|dictatorship|authoritarian|takaichi|sovereignty)\b/,
+  /\brall(y|ies|ied)\b.{0,15}\b(for|demands?|demanding|to demand|calling for|seeking)\b.{0,45}\b(rights|justice|democracy|freedom|reform|reforms|release|resignation|independence|sovereignty|minorit|wages?|pay rise|accountability|return of|abductee|land rights|self[- ]determination|autonomy|equality|policy change)\b/,
+  /\banti[- ](war|government|govt|regime|coup|junta|china|chinese|india|indian|\bus\b|american|israel|israeli|muslim|hindu|christian|immigrant|migrant|dictatorship|corruption|fascis|colonial|nuclear)\b.{0,15}rall(y|ies)\b/,
+  /\b(\d+[- ]party|multi[- ]party|opposition|ruling[- ]party|grand|mass|massive|election|campaign|political|protest|solidarity|may day|labour|labor|workers'?|farmers'?|hunger|sit[- ]?in) rall(y|ies)\b/,
+  /\brall(y|ies|ied)\b behind\b.{0,25}\b(party|government|govt|opposition|coalition|alliance|leader|leaders|\bpm\b|president|prime minister|minister|premier|candidate|\bmp\b|chief)\b/,
+];
+
 // Student-specific extra guard. A record whose only flashpoint hook
 // is the word "student(s)" must also describe mobilisation or public-
 // order action against students — not crime stories about a student,
@@ -928,6 +972,15 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       }
       if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) {
         return { relevant: true, reason: "kept: ambiguous token (rally/strike) + public-order cue" };
+      }
+      // A "rally" with explicit POLITICAL-mobilisation context (against a
+      // govt/policy, for rights/a demand, anti-war/regime, opposition/grand/
+      // mass rally, rally behind a party/leader) is a genuine demonstration,
+      // distinct from the market/crypto/sports "rally" homonyms already
+      // dropped in FLASHPOINT_EXCLUDE above.
+      const pol = firstMatch(text, FLASHPOINT_POLITICAL_RALLY_RE);
+      if (pol) {
+        return { relevant: true, reason: `kept: ambiguous token (political rally) + political context (/${pol.source}/)` };
       }
       return { relevant: false, reason: "dropped: ambiguous token (rally/strike) without public-order cue" };
     }
