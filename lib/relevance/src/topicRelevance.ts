@@ -388,6 +388,22 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   /\b(punish\w*|disciplin\w*|sack\w*|suspend\w*|sentenc\w*|convict\w*|jail\w*|verdict|tribunal|probe|inquiry|commission|anniversary|aftermath)\b[^.!?]{0,45}\b(19|20)\d{2}\b[^.!?]{0,25}\b(protest|crackdown|riot|unrest|uprising|movement)\b/,
 ];
 
+// Editorial suppression — specific genuine-protest headlines an operator has
+// manually removed from the Protests & Civil Unrest feed. These ARE real
+// public-order events (so they are NOT homonyms/noise and the categorical
+// excludes above correctly leave them in); they are dropped only because an
+// operator made a per-item editorial call. Each pattern is bound tightly to
+// its one headline so it can never swallow a different live protest. Matched
+// against the normalised title (source suffix stripped, lower-cased).
+const FLASHPOINT_EDITORIAL_SUPPRESS: RegExp[] = [
+  // "3 Demands Raised by Indonesian Women's Alliance in Jakarta Protest"
+  /\bdemands raised by\b[^.!?]{0,40}\bwomen'?s alliance\b/,
+  // "Bandung Students Protest for Third Time; Here Are the Demands"
+  /\bbandung students? protest\b[^.!?]{0,40}\bhere are the demands\b/,
+  // "Bangladesh halts construction of largest Lord Ram statue after ... protest"
+  /\blord ram statue\b/,
+];
+
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
@@ -891,6 +907,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   }
 
   if (topic === "flashpoint" || topic === "protests") {
+    // Editorial suppression FIRST — these are genuine protests the operator
+    // manually removed, so they would otherwise be KEPT by the title-rescue /
+    // protest-verdict below. Must win over every keep path, hence top of block.
+    const suppressed = firstMatch(titleHaystack(i), FLASHPOINT_EDITORIAL_SUPPRESS);
+    if (suppressed) return { relevant: false, reason: `excluded: editorially suppressed (operator-removed protest) (/${suppressed.source}/)` };
     // 0. Title-rescue: an UNMISTAKABLE public-order phrase in the headline
     //    itself (protest / demonstration / picket / walkout / strike notice
     //    / hartal / crackdown ...) is decisive. The two context excludes

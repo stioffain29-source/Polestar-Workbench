@@ -213,9 +213,31 @@ const FIXTURES: Fixture[] = [
     reason: "homonym in headline",
   },
 
+  // ---- Editorially suppressed genuine protests (operator-removed): DROP -
+  {
+    title: "3 Demands Raised by Indonesian Women's Alliance in Jakarta Protest",
+    verdict: "DROP",
+    reason: "editorially suppressed",
+  },
+  {
+    title: "Bandung Students Protest for Third Time; Here Are the Demands",
+    verdict: "DROP",
+    reason: "editorially suppressed",
+  },
+  {
+    title: "Bangladesh halts construction of largest Lord Ram statue after radical groups protest",
+    verdict: "DROP",
+    reason: "editorially suppressed",
+  },
+
   // ---- Genuine local protests must SURVIVE the new excludes: KEEP ------
   {
     title: "Thousands of students protest in Jakarta against new education fees",
+    verdict: "KEEP",
+    reason: "civil-unrest",
+  },
+  {
+    title: "Jakarta students protest against costly programs, rising fuel prices",
     verdict: "KEEP",
     reason: "civil-unrest",
   },

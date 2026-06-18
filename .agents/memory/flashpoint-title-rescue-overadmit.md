@@ -95,3 +95,14 @@ keep a ≥2-word head — do NOT forbid `-`/`.` in the tail: publisher names con
 them ("Journal-News.com", "bdtonline.com"), and a `[^-|]` tail silently leaks
 hyphenated outlets as separate cards. em-dashes (—) are left intact (real
 clause separators).
+
+**Editorial suppression of GENUINE protests (operator per-item removals):** when
+the operator wants a specific REAL protest gone (not in any noise category, so the
+categorical excludes correctly keep it), do NOT loosen rules — they'd nuke legit
+controls. Use `FLASHPOINT_EDITORIAL_SUPPRESS` (an array of tightly title-bound
+regexes), checked at the VERY TOP of the flashpoint branch (before title-rescue /
+the protest verdict, which would otherwise KEEP them), returning reason
+`editorially suppressed (operator-removed protest)`. Bind each pattern to its one
+headline (`\bdemands raised by\b…\bwomen's alliance\b`, not bare `demands`). Durable
+across backfills (it's in the engine, not a manual DB flip which a later version-
+bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
