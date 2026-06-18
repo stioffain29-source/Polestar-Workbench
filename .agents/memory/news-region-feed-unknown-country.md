@@ -42,3 +42,9 @@ honest, not a defect. Prod DB is read-only from the workspace, so the marker-
 gated block in `runDataMigrations` runs the backfill inside the deployment on
 republish (same pattern as the other one-time purges/relocations). Place it
 AFTER the out-of-region purge so deleted rows are not re-placed.
+
+## Inverse re-attribution: when the gazetteer GAINS demonyms, re-sweep stranded Unknown rows
+- Expanding `COUNTRY_ALIASES`/`resolveFlashpointCountry` with plural demonyms ("Malaysians", "Nepalis", "Indonesians"…) only helps FUTURE ingests. Rows whose ONLY country signal was such a demonym pre-date it and sit stranded at `country='Unknown'`/NULL.
+- The repair is the INVERSE of the masthead RELOCATE (which moved bad rows TO Unknown): a marker-gated boot migration (`flashpoint_unknown_reattribute_v1`, lib fn `runFlashpointUnknownReattribute`) that re-runs the IDENTICAL masthead-stripped `resolveFlashpointCountry` over every `country IS NULL OR ='Unknown'` flashpoint row and MOVES it to the country where it now resolves. Coords stay NULL (the resolver yields a country, not a point — fabricating a centroid is dishonest geo).
+- **Conservative by construction:** the WHERE selects Unknown/NULL ONLY, and re-asserts that in the UPDATE WHERE, so an already-attributed row is NEVER clobbered. Durable across relevance backfills (they never touch `country`). On a real run this re-attributed ~54 of ~480 Unknown flashpoint rows to APAC; 0 attributed rows touched.
+- **Why** both halves ship together: the gazetteer expansion is also what makes `FP_OFFSHORE_THEATRE_RE`'s demonym list complete, so the negative foreign-theatre gate (see geocode-masthead-pollution.md) and the re-attribution share one demonym vocabulary — add a demonym in BOTH the resolver aliases AND the offshore/anchor regexes or the two surfaces drift.

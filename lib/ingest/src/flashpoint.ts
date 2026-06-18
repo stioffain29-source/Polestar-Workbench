@@ -203,25 +203,36 @@ const PACIFIC_CRIME: RegExp =
 // (genuine flashpoint signal source) and Vietnam (occasional). UAE and
 // other ME entries are deliberately excluded — they belong to Strike,
 // not Flashpoint.
+// Each country carries its name, DEMONYM(S) and major + distinctive subnational
+// city names. The demonyms matter: a headline often names only the nationality
+// of the protesters ("South Korean riot police", "Indonesian students rally",
+// "Japanese citizens protest", "Australian iron ore hub") — and hasWord() uses
+// \b boundaries, so the bare country alias ("south korea") never matches the
+// demonym ("South Korean"). Without the demonyms these genuine APAC events
+// resolve to null and are DROPPED at ingest as "no-apac-country" (data loss) or
+// sit at country='Unknown'. "chinese" is deliberately OMITTED — it is too often
+// an ACTOR reference ("Chinese embassy protest in Manila") rather than the
+// venue; China still resolves from its city names. Subnational cities are kept
+// DISTINCTIVE (no out-of-region namesake) to avoid mis-attribution.
 const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
-  { canonical: "Australia",         aliases: ["australia", "sydney", "melbourne", "brisbane", "canberra", "perth", "adelaide"] },
-  { canonical: "Bangladesh",        aliases: ["bangladesh", "dhaka", "chittagong"] },
-  { canonical: "China",             aliases: ["china", "beijing", "shanghai", "guangzhou", "shenzhen", "hong kong"] },
-  { canonical: "India",             aliases: ["india", "delhi", "mumbai", "chennai", "bengaluru", "kolkata", "hyderabad"] },
-  { canonical: "Indonesia",         aliases: ["indonesia", "jakarta", "java", "sumatra", "bali", "sulawesi", "surabaya", "bandung"] },
-  { canonical: "Japan",             aliases: ["japan", "tokyo", "osaka", "kyoto", "yokohama", "nagoya", "fukuoka"] },
-  { canonical: "Malaysia",          aliases: ["malaysia", "kuala lumpur", "penang", "johor", "sabah", "sarawak"] },
-  { canonical: "Myanmar",           aliases: ["myanmar", "burma", "yangon", "mandalay", "naypyidaw"] },
-  { canonical: "Nepal",             aliases: ["nepal", "kathmandu", "pokhara"] },
-  { canonical: "Pakistan",          aliases: ["pakistan", "karachi", "lahore", "islamabad", "rawalpindi", "peshawar"] },
+  { canonical: "Australia",         aliases: ["australia", "australian", "australians", "sydney", "melbourne", "brisbane", "canberra", "perth", "adelaide"] },
+  { canonical: "Bangladesh",        aliases: ["bangladesh", "bangladeshi", "bangladeshis", "dhaka", "chittagong", "chattogram", "comilla", "cumilla", "rangpur", "sylhet", "khulna", "rajshahi", "barisal", "barishal", "mymensingh", "gazipur", "narayanganj"] },
+  { canonical: "China",             aliases: ["china", "beijing", "shanghai", "guangzhou", "shenzhen", "hong kong", "wuhan", "chengdu"] },
+  { canonical: "India",             aliases: ["india", "indian", "indians", "delhi", "mumbai", "chennai", "bengaluru", "kolkata", "hyderabad", "imphal", "guwahati", "lucknow", "patna", "manipur"] },
+  { canonical: "Indonesia",         aliases: ["indonesia", "indonesian", "indonesians", "jakarta", "java", "sumatra", "bali", "sulawesi", "surabaya", "bandung", "medan", "makassar", "yogyakarta", "semarang", "aceh"] },
+  { canonical: "Japan",             aliases: ["japan", "japanese", "tokyo", "osaka", "kyoto", "yokohama", "nagoya", "fukuoka"] },
+  { canonical: "Malaysia",          aliases: ["malaysia", "malaysian", "malaysians", "kuala lumpur", "penang", "johor", "sabah", "sarawak", "putrajaya"] },
+  { canonical: "Myanmar",           aliases: ["myanmar", "burma", "burmese", "yangon", "mandalay", "naypyidaw"] },
+  { canonical: "Nepal",             aliases: ["nepal", "nepali", "nepalis", "nepalese", "kathmandu", "pokhara", "biratnagar"] },
+  { canonical: "Pakistan",          aliases: ["pakistan", "pakistani", "pakistanis", "karachi", "lahore", "islamabad", "rawalpindi", "peshawar", "quetta", "multan", "faisalabad"] },
   // NOTE: Papua New Guinea and Indonesian West Papua are resolved by
   // resolvePapuaPng() (below), NOT by this alias table, because they share
   // the ambiguous word "papua". Do not re-add a "papua"/"png" alias here.
-  { canonical: "Philippines",       aliases: ["philippines", "manila", "cebu", "davao", "quezon city"] },
-  { canonical: "South Korea",       aliases: ["south korea", "seoul", "busan", "incheon", "daegu"] },
-  { canonical: "Sri Lanka",         aliases: ["sri lanka", "colombo", "kandy", "jaffna"] },
-  { canonical: "Thailand",          aliases: ["thailand", "bangkok", "chiang mai", "phuket"] },
-  { canonical: "Vietnam",           aliases: ["vietnam", "viet nam", "hanoi", "ho chi minh", "haiphong"] },
+  { canonical: "Philippines",       aliases: ["philippines", "philippine", "filipino", "filipina", "filipinos", "filipinas", "manila", "cebu", "davao", "quezon city", "mindanao", "iloilo", "baguio", "zamboanga", "pnp"] },
+  { canonical: "South Korea",       aliases: ["south korea", "south korean", "south koreans", "seoul", "busan", "incheon", "daegu"] },
+  { canonical: "Sri Lanka",         aliases: ["sri lanka", "sri lankan", "sri lankans", "colombo", "kandy", "jaffna", "galle", "negombo"] },
+  { canonical: "Thailand",          aliases: ["thailand", "thai", "thais", "bangkok", "chiang mai", "phuket"] },
+  { canonical: "Vietnam",           aliases: ["vietnam", "viet nam", "vietnamese", "hanoi", "ho chi minh", "haiphong"] },
 ];
 
 // Papua / PNG disambiguation. The Indonesian province of Papua / West Papua

@@ -499,6 +499,58 @@ const FP_OVERSEAS_VENUE_RE =
   /\b(oxford union|cambridge union|the white house|capitol hill|downing street|westminster hall|trafalgar square)\b/i;
 const FP_OVERSEAS_PROTEST_RE = /\b(protest|demonstrat|rally|clash|picket|vigil|gather)/i;
 
+// APAC regional-scope anchor — the union of every country / demonym / city /
+// Pacific marker the ingest country resolver can attribute (COUNTRY_ALIASES +
+// PNG_MARKERS + WEST_PAPUA_MARKERS in @workspace/ingest), plus a few unambiguous
+// APAC political markers (org names) for recall. It does NOT gate on its own:
+// a genuine APAC protest often names only a LOCAL entity the gazetteer does not
+// know (Manibela, Mendiola, Camp Crame, the MACC chief, Nepal's Oli/Lekhak Gen-Z
+// crackdown) with the country only in the stripped masthead, so REQUIRING an
+// anchor would wrongly bury real events. Instead it is the PROTECTIVE override
+// for the out-of-region gate below: a record that names BOTH a foreign theatre
+// AND an in-region place ("Thai protesters target Malaysian, US embassies",
+// "anti-Israel rally in Jakarta") is kept. Mirror COUNTRY_ALIASES: any token
+// added there should be added here too. "chinese" is deliberately OMITTED (an
+// actor, not a venue — "Chinese embassy" protests happen across the region).
+const FP_APAC_ANCHOR_RE =
+  /\b(?:australia|australian|australians|sydney|melbourne|brisbane|canberra|perth|adelaide|bangladesh|bangladeshi|bangladeshis|dhaka|chittagong|chattogram|comilla|cumilla|rangpur|sylhet|khulna|rajshahi|barisal|barishal|mymensingh|gazipur|narayanganj|china|beijing|shanghai|guangzhou|shenzhen|hong kong|wuhan|chengdu|xinjiang|india|indian|indians|delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|imphal|guwahati|lucknow|patna|manipur|indonesia|indonesian|indonesians|jakarta|java|sumatra|bali|sulawesi|surabaya|bandung|medan|makassar|yogyakarta|semarang|aceh|japan|japanese|tokyo|osaka|kyoto|yokohama|nagoya|fukuoka|malaysia|malaysian|malaysians|kuala lumpur|penang|johor|sabah|sarawak|putrajaya|myanmar|burma|burmese|yangon|mandalay|naypyidaw|nepal|nepali|nepalis|nepalese|kathmandu|pokhara|biratnagar|pakistan|pakistani|pakistanis|karachi|lahore|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|philippines|philippine|filipino|filipina|filipinos|filipinas|manila|cebu|davao|quezon|mindanao|iloilo|baguio|zamboanga|pnp|south korea|south korean|south koreans|seoul|busan|incheon|daegu|sri lanka|sri lankan|sri lankans|colombo|kandy|jaffna|galle|negombo|thailand|thai|thais|bangkok|chiang mai|phuket|vietnam|viet nam|vietnamese|hanoi|ho chi minh|haiphong|jamaat|shibir|awami|rohingya|naxal|maoist|hartal|tehreek|imran khan|papua|papuan|papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago|west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|intan jaya|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|maybrat|beoga|lanny jaya|tolikara|dogiyai|deiyai|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
+
+// Out-of-region theatre — countries / capitals / leaders OUTSIDE the 15-country
+// APAC scope (Latin America, the Middle East, Africa, non-APAC Europe/Eurasia,
+// the Americas, G7/G20 summits). A flashpoint/protests record that names one of
+// these in its MASTHEAD-STRIPPED body and carries NO APAC anchor is foreign
+// syndication an APAC publisher merely re-ran — "G7 protest turns from carnival
+// to violent stand-off", "Bolivia protest sees looting in La Paz", "post-Maduro
+// Venezuela", "Iran foreign-ministry protest". At ingest these resolve to no
+// APAC country and are already dropped as "no-apac-country"; this hides the rows
+// already stored. Deliberately keyed off a POSITIVE foreign place (not a missing
+// APAC anchor) so a real APAC event whose only geo cue is a local entity is
+// untouched. Tokens are chosen to avoid in-region / namesake collisions (no bare
+// "us"/"america"; no "guinea" -> Papua New Guinea; no "georgia" -> US state).
+// Country names AND demonyms (singular + plural): a Google-News headline names
+// the people as often as the place ("Nigerian teachers protest", "Peruvians
+// protest", "Hundreds of Israelis protest"), and a bare \bnigeria\b never matches
+// "Nigerian", so the demonym forms must be listed explicitly.
+const FP_OFFSHORE_THEATRE_RE =
+  /\b(?:bolivia|bolivian|bolivians|la paz|venezuela|venezuelan|venezuelans|caracas|maduro|peru|peruvian|peruvians|lima|brazil|brasil|brazilian|brazilians|brasilia|argentina|argentine|argentinian|argentinians|buenos aires|mexico|mexican|mexicans|chile|chilean|chileans|santiago|colombia|colombian|colombians|bogota|ecuador|ecuadorian|ecuadorians|quito|nicaragua|nicaraguan|nicaraguans|honduras|honduran|hondurans|guatemala|guatemalan|guatemalans|panama|panamanian|panamanians|uruguay|paraguay|haiti|haitian|haitians|iran|iranian|iranians|tehran|iraq|iraqi|iraqis|baghdad|israel|israeli|israelis|gaza|palestine|palestinian|palestinians|lebanon|lebanese|beirut|syria|syrian|syrians|damascus|yemen|yemeni|yemenis|houthi|houthis|saudi|saudis|riyadh|jordan|jordanian|jordanians|amman|qatar|qatari|doha|bahrain|bahraini|kuwait|kuwaiti|oman|omani|dubai|abu dhabi|egypt|egyptian|egyptians|cairo|kenya|kenyan|kenyans|nairobi|nigeria|nigerian|nigerians|niger|lagos|abuja|ethiopia|ethiopian|ethiopians|addis ababa|sudan|sudanese|khartoum|somalia|somali|somalis|mogadishu|south africa|south african|johannesburg|pretoria|congo|congolese|kinshasa|ghana|ghanaian|ghanaians|accra|uganda|ugandan|ugandans|kampala|zimbabwe|zimbabwean|zimbabweans|harare|tanzania|tanzanian|tanzanians|morocco|moroccan|moroccans|algeria|algerian|algerians|tunisia|tunisian|tunisians|libya|libyan|libyans|tripoli|senegal|senegalese|cameroon|cameroonian|cameroonians|zambia|zambian|zambians|malawi|malawian|malawians|mozambique|mozambican|mozambicans|rwanda|rwandan|rwandans|ivory coast|turkey|turkish|ankara|istanbul|albania|albanian|albanians|tirana|greece|greek|athens|serbia|serbian|serbians|belgrade|ukraine|ukrainian|ukrainians|kyiv|kiev|russia|russian|russians|moscow|belarus|belarusian|belarusians|minsk|poland|warsaw|hungary|hungarian|hungarians|budapest|romania|romanian|romanians|bucharest|bulgaria|bulgarian|bulgarians|czech|slovakia|slovak|croatia|croatian|croatians|bosnia|bosnian|bosnians|kosovo|kosovar|moldova|moldovan|moldovans|armenia|armenian|armenians|yerevan|azerbaijan|azerbaijani|azerbaijanis|baku|trump|maga|washington|g7|g-7|g20|g-20|davos)\b/i;
+
+// Masthead-stripped GEO text — mirrors geoHaystack() in @workspace/ingest so the
+// APAC-anchor gate sees exactly the text the country resolver saw. Google News
+// appends the publisher to BOTH the title (after a trailing " - " / " | ") and,
+// verbatim, the summary; a publisher CITY ("The Manila Times" -> Manila) would
+// otherwise fake an APAC anchor for an out-of-region story that names no real
+// place. Strip the title's trailing source and remove that same string from the
+// summary, then lower-case for the anchor regex.
+function flashpointGeoText(i: RelevanceInput): string {
+  const title = i.title ?? "";
+  const summary = i.summary ?? "";
+  const dash = Math.max(title.lastIndexOf(" - "), title.lastIndexOf(" | "));
+  const source = dash > 0 ? title.slice(dash + 3).trim() : "";
+  const cleanTitle = dash > 0 ? title.slice(0, dash).trim() : title;
+  const cleanSummary = source ? summary.split(source).join(" ") : summary;
+  return `${cleanTitle}\n${cleanSummary}`.toLowerCase();
+}
+
 // Recruitment / manpower industry objecting to an administrative REQUIREMENT
 // (a foreign skills test, certification rule, quota) — a commercial-lobby
 // grievance, not street civil unrest. Dropped only when NO public-order signal
@@ -1159,6 +1211,30 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Overseas / diaspora demonstration at a non-APAC Western venue.
     if (FP_OVERSEAS_VENUE_RE.test(titleHaystack(i)) && FP_OVERSEAS_PROTEST_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: overseas/diaspora venue (not APAC civil unrest)" };
+    }
+    // Out-of-region gate: drop a record that POSITIVELY names a foreign theatre
+    // (Bolivia, Venezuela, Iran, Kenya, a G7 summit, ...) in its masthead-stripped
+    // body and carries NO in-region APAC anchor — foreign syndication an APAC
+    // publisher merely re-ran ("G7 protest turns from carnival to violent stand-
+    // off - The Manila Times"). Ingest already drops these as "no-apac-country";
+    // this hides the historical rows. Keyed off a POSITIVE foreign place, never a
+    // missing anchor, so a genuine APAC protest whose only geo cue is a local
+    // entity (Manibela, Mendiola, Camp Crame, Oli/Lekhak) is left untouched.
+    //     Skip rows the homonym exclude (step 1, below) would catch anyway: a
+    //     finance/sports/weather "rally"/"strike" homonym that merely names a
+    //     foreign place ("Ethereum's Iran rally fizzles") is NOT protest
+    //     syndication — it is noise, and should drop with the precise "homonym"
+    //     reason, not be mislabelled "out-of-region theatre". The row drops
+    //     either way; this only preserves the more accurate reason.
+    {
+      const geo = flashpointGeoText(i);
+      if (
+        FP_OFFSHORE_THEATRE_RE.test(geo) &&
+        !FP_APAC_ANCHOR_RE.test(geo) &&
+        !firstMatch(text, FLASHPOINT_EXCLUDE)
+      ) {
+        return { relevant: false, reason: "excluded: out-of-region theatre (foreign syndication, no APAC anchor)" };
+      }
     }
     // Recruitment / manpower industry objecting to a regulatory requirement.
     if (

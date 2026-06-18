@@ -6,6 +6,7 @@ import {
   runStrikesBackfill,
   runNewsCountryBackfill,
   runFlashpointMastheadRelocate,
+  runFlashpointUnknownReattribute,
   classifySeverity,
   isReactionLed,
   severityFromFatalities,
@@ -760,6 +761,47 @@ export async function runDataMigrations(): Promise<void> {
             marker: markerKey,
           },
           "One-time relocation of masthead-leaked flashpoint rows",
+        );
+      }
+    }
+
+    // 3d-5) ONE-TIME re-attribution of Unknown flashpoint rows (inverse of
+    //        3d-4). The country resolver's gazetteer gained plural demonyms
+    //        ("Malaysians", "Nepalis", "Indonesians", ...). Rows whose ONLY
+    //        country signal was such a demonym pre-date that and were stranded at
+    //        country='Unknown' (or NULL). This re-runs the IDENTICAL masthead-
+    //        stripped resolution over every Unknown/NULL flashpoint row and, where
+    //        it now resolves, moves the row to that country (coords stay NULL — the
+    //        resolver yields a country, not a point). Only touches Unknown/NULL
+    //        rows, so an already-attributed row is never clobbered; durable across
+    //        relevance backfills (they never touch country). Marker-gated → once.
+    //        Bump the key if the gazetteer gains more demonyms and stranded rows
+    //        should be re-swept.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "flashpoint_unknown_reattribute_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await runFlashpointUnknownReattribute({ commit: true });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            candidates: res.candidates,
+            reattributed: res.reattributed,
+            toCountry: res.toCountry,
+            marker: markerKey,
+          },
+          "One-time re-attribution of Unknown flashpoint rows (expanded demonym gazetteer)",
         );
       }
     }

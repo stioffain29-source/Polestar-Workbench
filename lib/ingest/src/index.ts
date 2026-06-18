@@ -1,5 +1,6 @@
 export { runFlashpointIngest, resolveFlashpointCountry } from "./flashpoint";
 export { runFlashpointMastheadRelocate } from "./flashpointMastheadRelocate";
+export { runFlashpointUnknownReattribute } from "./flashpointUnknownReattribute";
 export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
