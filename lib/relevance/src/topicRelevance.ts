@@ -952,6 +952,14 @@ const FP_NEG_INTERSTATE = new RegExp(
 );
 const FP_NEG_CRACKDOWN =
   /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+) crackdown\b|\btiananmen\b/i;
+// Financial / markets / regulatory context. A "crackdown" or "clampdown" set in
+// this vocabulary (banks, insurers, investment, capital flows, money flows,
+// securities, the bourse) is a MARKETS story, not civil unrest — "Beijing's
+// investment clampdown clouds outlook for Hong Kong banks and insurers". Used to
+// drop such a record UNLESS an FP_UNREST_COMPANION word is also present, so a
+// genuine "police crackdown on protesters outside the stock exchange" survives.
+const FP_NEG_FINANCIAL =
+  /\b(banks?|banking|insurers?|insurance|investors?|investment|bourses?|securities|equit(y|ies)|stock market|stocks|shares?|ipo|listings?|hedge funds?|private equity|bond market|forex|foreign exchange|capital (flight|flow|flows|market|markets|control|controls|outflow|outflows)|money (flow|flows|outflow|outflows)|fund (flow|flows|outflow|outflows)|financial (sector|institution|institutions|firm|firms|regulator|regulators|executives?)|markets? regulator|central bank)\b/i;
 const FP_UNREST_COMPANION =
   /\b(protest|demonstrat|dissent|rally|march|sit[- ]?in|civil unrest|unrest|riot|activist|opposition|gen[- ]?z|student|tear ?gas|curfew|uprising)\b/i;
 
@@ -973,8 +981,13 @@ function flashpointProtestCrackdownVerdict(text: string, negText: string): boole
     }
     return true;
   }
-  if (/\bcrackdown\b|\bcracks? down\b/.test(text)) {
-    if (FP_NEG_CRACKDOWN.test(text) && !FP_UNREST_COMPANION.test(text)) return false;
+  if (/\bcrackdown\b|\bcracks? down\b|\bclampdown\b|\bclamps? down\b/.test(text)) {
+    if (
+      (FP_NEG_CRACKDOWN.test(text) || FP_NEG_FINANCIAL.test(text)) &&
+      !FP_UNREST_COMPANION.test(text)
+    ) {
+      return false;
+    }
     return true;
   }
   return null;
