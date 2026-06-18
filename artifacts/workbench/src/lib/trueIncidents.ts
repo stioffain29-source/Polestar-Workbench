@@ -10,11 +10,16 @@
 //                  page's exact pipeline; this is a list-level transform, not
 //                  a per-record predicate)
 //   cargo_watch  → cargo scope classifier (APAC/ME cargo crime only)
-//   flashpoint   → topic relevance gate (the report's deeper kinetic/court
-//                  dedup is window-bound and stays in the report builder)
+//   flashpoint   → topic relevance gate, then collapse syndicated rewrites of
+//                  the same event with the report builder's exact title+
+//                  signature dedup, so the monitor and the dashboard card both
+//                  count DISTINCT events, not the number of outlets that re-ran
+//                  the same wire (the report's deeper window-bound kinetic/court
+//                  dedup is separate and stays in the report builder)
 //   everything   → topic relevance gate (fuel / energy / fertiliser)
 import { parseISO } from "date-fns";
 import { isTopicRelevant } from "./topicRelevance";
+import { dedupeByTitle } from "./flashpointReportDataset";
 import {
   classifyRegion as classifyShippingRegion,
   isLowCredibilityShippingRecord,
@@ -95,11 +100,35 @@ function resolveShippingTrue<T extends TrueIncidentLike>(incidents: T[]): T[] {
   return dedupeShippingMonitorRows(scoped) as unknown as T[];
 }
 
+// Flashpoint/protests: relevance gate THEN collapse syndicated rewrites of the
+// same event using the report builder's exact two-pass title+signature dedup,
+// so the monitor and the dashboard card both count DISTINCT events, not the
+// number of outlets that re-ran the same wire. The dedup keeps the best row
+// (highest severity, then newest), mirroring the Shipping list-level transform.
+function resolveFlashpointTrue<T extends TrueIncidentLike>(incidents: T[]): T[] {
+  const relevant = incidents.filter((i) => isTrueIncident("flashpoint", i));
+  const enriched = relevant.map((i) => {
+    const rec = i as TrueIncidentLike & {
+      occurredAt?: string | null;
+      severity?: string | null;
+    };
+    let date: Date;
+    try {
+      date = rec.occurredAt ? parseISO(rec.occurredAt) : new Date(NaN);
+    } catch {
+      date = new Date(NaN);
+    }
+    return { ...i, date, severity: rec.severity ?? "" };
+  });
+  return dedupeByTitle(enriched) as unknown as T[];
+}
+
 /** Filter a list down to the topic's true, in-scope events. */
 export function resolveTrueIncidents<T extends TrueIncidentLike>(
   topic: string,
   incidents: T[],
 ): T[] {
   if (topic === "shipping") return resolveShippingTrue(incidents);
+  if (topic === "flashpoint" || topic === "protests") return resolveFlashpointTrue(incidents);
   return incidents.filter((i) => isTrueIncident(topic, i));
 }

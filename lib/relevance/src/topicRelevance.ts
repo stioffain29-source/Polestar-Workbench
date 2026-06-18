@@ -281,6 +281,13 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
   /\b(fact[- ]check|misleading|false(ly)? (claim|shared)|debunk(ed|s)?|no evidence|misrepresent|old (video|clip|footage)|unrelated (video|clip|footage|event))\b/,
 
+  // Metaphorical "instant protest" — a politician describing his own conduct
+  // ("returning from Delhi was an 'instant protest'") is a quoted figure of
+  // speech, not a public-order event. It was syndicated ~10× as near-duplicate
+  // wires and flooded the feed. The phrase is distinctive and never names a
+  // real demonstration, so the exclude is safe (verified against live rows).
+  /\binstant protest\b/,
+
   // Opinion-poll / approval-rating stories — a survey result, not an event.
   /\b(net satisfaction|satisfaction rating|approval rating|disapproval rating|net trust|opinion poll|pollster|\bsws\b|pulse asia|survey (shows|finds|reveals|said|found))\b/,
 
@@ -313,6 +320,9 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   /\b(in|look)\s+photos:\s/,
   /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
   /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
+  // Metaphorical "instant protest" headline — runs BEFORE the title-rescue so
+  // the bare word "protest" can no longer rescue the quoted figure of speech.
+  /\binstant protest\b/,
 ];
 
 const SHIPPING_EXCLUDE: RegExp[] = [
@@ -625,6 +635,22 @@ const STUDENT_MOBILISATION_RE =
 const STUDENT_NON_MOBILISATION_RE =
   /\b((attack|attacked|attacks|bomb|bombed|bombing|shooting|stabbing|shot dead|killed|raped|abducted|kidnapped|missing) .{0,40}(student|students|pupil|pupils|schoolchildren|schoolgirl|schoolboy|college|university|campus)|(student|pupil|schoolchildren|schoolgirl|schoolboy) .{0,30}(raped|killed|abducted|kidnapped|stabbed|shot dead|missing|murdered)|education (policy|reform|budget|act|bill|board exam|board examination|results)|(strike|airstrike|missile|drone) (on|hits|kills|killed|destroyed) .{0,30}(college|school|university|campus|hostel)|exam (scandal|leak|cheating|fraud|controversy|results)|admission (deadline|policy|quota))\b/;
 
+// Animal-welfare / wildlife-enforcement stories are not civil unrest. A
+// rescue, seizure, smuggling bust or "<animal> meat" trade crackdown is a
+// law-enforcement / welfare story, yet it slips through the gate on a
+// public-order word like "crackdown" ("Vietnam rescues 400 cats in major meat
+// trade crackdown"). Drop it ONLY when no public-gathering signal is present,
+// so a genuine animal-rights RALLY or protest ("Animal lovers rally outside
+// parliament", "Animal rights groups protest in Dhaka") is still kept — the
+// override below carries bare "rally"/"gather"/"demand". Mirrors the conflict
+// violence-override pattern. Verified against live rows: drops only the cats
+// wire, never a real demonstration.
+const ANIMAL_ENFORCEMENT_RE =
+  /\b(rescue[sd]?|seiz(e|es|ed|ure)|confiscat\w*|smuggl\w*|traffick\w*|poach\w*|slaughter\w*|butcher\w*|crackdown|cracks? down|bust(s|ed)?)\b[^.]{0,30}\b(cats?|dogs?|pangolins?|turtles?|elephants?|tigers?|wildlife|livestock|poultry|animals?)\b/;
+const ANIMAL_MEAT_TRADE_RE = /\b(cat|dog) meat\b/;
+const PUBLIC_GATHERING_OVERRIDE_RE =
+  /\b(protest(s|ers?|ing|ed)?|demonstrat\w+|picket\w*|sit[- ]?in|rall(y|ies|ied)|march(es|ers?|ing|ed)|gather(s|ed|ing)?|activists?|campaigners?|advocates?|demand(s|ed|ing)?|calling for|hunger strike)\b/;
+
 function haystack(i: RelevanceInput): string {
   // Strip the Google News feed-category label from the source. Feed names
   // are "Google News — <Country> (Civil Unrest)" / "(Protests)" / "(Fuel)"
@@ -729,6 +755,16 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     //     FLASHPOINT_EXCLUDE which runs only AFTER the rescue.
     const titleHom = firstMatch(titleHaystack(i), FLASHPOINT_TITLE_HARD_EXCLUDE);
     if (titleHom) return { relevant: false, reason: `excluded: flashpoint homonym in headline (/${titleHom.source}/)` };
+    // Animal-welfare / wildlife-enforcement (rescue, seizure, "<animal> meat"
+    // trade crackdown) is a law-enforcement story, not civil unrest — unless a
+    // public-gathering signal shows it is a genuine animal-rights protest. Runs
+    // before the title-rescue so "crackdown" can no longer rescue it.
+    if (
+      (ANIMAL_ENFORCEMENT_RE.test(text) || ANIMAL_MEAT_TRADE_RE.test(text)) &&
+      !PUBLIC_GATHERING_OVERRIDE_RE.test(text)
+    ) {
+      return { relevant: false, reason: "excluded: animal welfare / wildlife enforcement (not civil unrest)" };
+    }
     if (FLASHPOINT_TITLE_RESCUE_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The
       // absolute general-news exclude already ran above, so keep it here —

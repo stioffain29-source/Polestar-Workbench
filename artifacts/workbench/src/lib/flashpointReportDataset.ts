@@ -572,7 +572,7 @@ function topicSignature(title: string, date: Date): string {
   return `${bucket}|${top.join(" ")}`;
 }
 
-function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
+export function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
   const better = (a: T, b: T) => {
     const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
     const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
