@@ -370,6 +370,22 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // noun). Ambiguous grievance verbs (unpaid/rejected/pending) are deliberately
   // excluded so an active claims protest is never swallowed.
   /\b(damage|compensation|insurance|property|injury|loss|payout) claims?\b[^.!?]{0,40}\b(settled|paid out|processed|approved|disbursed|reimburs)\w*\b/,
+  // Sports mega-event fan colour — "Hundreds protest Iran's 'regime team'
+  // ahead of World Cup opener", "Some wave protest flags as Iran plays World
+  // Cup opener". A fan demonstration at a football fixture is sports colour,
+  // not the security-relevant civil unrest this APAC/Gulf monitor tracks.
+  // Title-only + before the rescue so the bare word "protest" cannot keep it.
+  /\b(world cup|fifa|uefa|olympics?|olympic games|copa am[eé]rica|champions league)\b/,
+  // Explainer / symbolism think-piece — "What does pink symbolize at the
+  // Women's Alliance protest?" is a colour-symbolism explainer, not a report
+  // of an event.
+  /\bwhat (do|does)\b[^.!?]{0,40}\bsymboli[sz](e|es|ed|ing|m)\b/,
+  // Retrospective disciplinary / inquiry aftermath of a PAST (dated) protest —
+  // "university punishes staff over 2024 protest crackdown" is a delayed
+  // sanction, not a live demonstration. Gated on a disciplinary/inquiry verb
+  // + an explicit year + protest/crackdown, so a current live protest
+  // ("2026 protest erupts in Dhaka") is untouched.
+  /\b(punish\w*|disciplin\w*|sack\w*|suspend\w*|sentenc\w*|convict\w*|jail\w*|verdict|tribunal|probe|inquiry|commission|anniversary|aftermath)\b[^.!?]{0,45}\b(19|20)\d{2}\b[^.!?]{0,25}\b(protest|crackdown|riot|unrest|uprising|movement)\b/,
 ];
 
 const SHIPPING_EXCLUDE: RegExp[] = [
@@ -694,9 +710,9 @@ const FP_POS_DEMO =
 const FP_POS_VIOLENCE =
   /\b(deadly|violent|bloody|fatal)\s+(protest|demonstration|rally|unrest|riot)|\bprotest(s|ers)?\b.{0,40}\b(turn\w* (violent|ugly|deadly)|clash\w*|looting|arson|stormed?|set (on )?fire|torched?)\b|\b(killed?|kill\w*|dead|death\w*|fatal\w*|casualt\w*|injured|wounded|shot|hurt|die[ds]?|missing|arrested|detained)\b.{0,24}\b(in|during|at|amid|after)\s+(the\s+)?(?:\w+\s+){0,2}(protest|demonstration|rally|unrest|riot)|\bprotest (death|deaths|toll|killing|killings|violence)\b|\b(clash\w*|riot\w*)\b.{0,18}\bprotest/i;
 const FP_NEG_GESTURE =
-  /\b(resign\w*|quit|return\w*|withdraw\w*|step(ped)? down|boycott\w*|refus\w*|declin\w*|skip\w*|hand\w* back|wore? black|donat\w*|exit\w*) .{0,35}\bin protest\b|\bin protest\b.{0,30}(resign\w*|return\w*|withdraw\w*|boycott\w*|quit|step(ped)? down)\b|\b(act|sign|mark|token|gesture|instant act) of protest\b|\bas a (?:silent |symbolic )?protest\b/i;
+  /\b(resign\w*|quit|return\w*|withdraw\w*|step(ped)? down|boycott\w*|refus\w*|declin\w*|skip\w*|hand\w* back|wore? black|donat\w*|exit\w*) .{0,35}\bin protest\b|\bin protest\b.{0,30}(resign\w*|return\w*|withdraw\w*|boycott\w*|quit|step(ped)? down)\b|\b(act|sign|mark|token|gesture|instant act|form|means|way|expression) of protest\b|\bas a (?:silent |symbolic )?protest\b/i;
 const FP_NEG_DIPLOMATIC =
-  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b/i;
+  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b|\bbilateral (relations|ties|relationship)\b/i;
 const FP_NEG_INTERSTATE_NAT =
   "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
 const FP_NEG_INTERSTATE_TERR =

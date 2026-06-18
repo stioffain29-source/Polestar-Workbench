@@ -167,6 +167,63 @@ const FIXTURES: Fixture[] = [
     verdict: "DROP",
     reason: "without public-order cue",
   },
+
+  // ---- Sports mega-event fan colour: DROP ------------------------------
+  {
+    title: "Hundreds protest Iran's 'regime team' ahead of World Cup opener",
+    verdict: "DROP",
+    reason: "homonym in headline",
+  },
+  {
+    title: "Some wave protest flags, others cheer as Iran plays World Cup opener",
+    verdict: "DROP",
+    reason: "homonym in headline",
+  },
+
+  // ---- Metaphor / expressive "form of protest": DROP -------------------
+  {
+    title: "Returning to Bangladesh was form of protest: Zahed Ur Rahman",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  {
+    title: "Drag show performed in Manila street as form of protest",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+
+  // ---- Retrospective disciplinary aftermath of a dated protest: DROP ---
+  {
+    title: "Bangladesh university punishes staff over 2024 protest crackdown",
+    verdict: "DROP",
+    reason: "homonym in headline",
+  },
+
+  // ---- Diplomatic / bilateral-relations "protest": DROP ----------------
+  {
+    title: "Bilateral relations: envoy harassed in Delhi, strains and protest",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+
+  // ---- Symbolism / explainer think-piece: DROP -------------------------
+  {
+    title: "What does pink symbolize at the Women's Alliance protest in Jakarta?",
+    verdict: "DROP",
+    reason: "homonym in headline",
+  },
+
+  // ---- Genuine local protests must SURVIVE the new excludes: KEEP ------
+  {
+    title: "Thousands of students protest in Jakarta against new education fees",
+    verdict: "KEEP",
+    reason: "civil-unrest",
+  },
+  {
+    title: "Workers stage a protest outside the labour ministry over unpaid wages",
+    verdict: "KEEP",
+    reason: "civil-unrest",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {
