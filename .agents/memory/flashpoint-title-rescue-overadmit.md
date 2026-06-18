@@ -106,3 +106,35 @@ the protest verdict, which would otherwise KEEP them), returning reason
 headline (`\bdemands raised by\b…\bwomen's alliance\b`, not bare `demands`). Durable
 across backfills (it's in the engine, not a manual DB flip which a later version-
 bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
+
+**Four more visible-junk classes the protest gate keeps (fixed pre-rescue/early):**
+- **Figurative "roadblock"** — bare `roadblock` is a REQUIRED protest tactic, so an
+  OBSTACLE-METAPHOR headline ("programme has faced roadblocks", "funding roadblocks
+  to the deal") leaks in. Drop only when an obstacle collocation matches AND there
+  is NO real-unrest companion (`FP_REAL_UNREST_COMPANION_RE`: protest/march/strike/
+  clash/…). The collocation gate (faced/major/political/funding/… + roadblock) is
+  what spares a GENUINE "Murray Barracks Roadblock" soldiers' standoff and "roadblock
+  robbery" — those have no metaphor collocation so the regex never matches them.
+- **Cancelled / suspended industrial action** (non-event) — title-bound: a cancel
+  verb (call off/suspend/postpone/defer/scrap/cancel/avert) within `[^.]{0,18}` of
+  strike/walkout/stoppage/industrial-action, gated OUT when the title also says it
+  CONTINUES or turned to unrest (`continu*/resum*/protest/clash/charge/defy/escalat/
+  riot/violen*/killed/injured`). DELIBERATELY excludes the verbs `withdraw` and
+  `drop` — "withdraw strike suspension, continue protest" RESUMES action and "drop
+  charges against protest leader" is advocacy, both must KEEP. Verb breadth here is
+  the trap; the keep-gate is title-only (matches the validated executeSql sweep).
+- **Multi-topic news digest** ("CJP's first protest, India-Nepal ties, and Vizag
+  steel plant accident") — protest is one bundled list-item, no safe GENERAL rule
+  exists, so bind a tight title regex in `FLASHPOINT_OFFTOPIC_DIGEST` to a unique
+  co-occurring phrase (`first protest`…`vizag steel plant accident`). Avoid the
+  apostrophe in the binding token — DB titles use a CURLY ’ (U+2019), straight `'?`
+  won't match.
+- **Scraped CMS/CSS dumped into the body** — a malformed scrape (".full-viewport-
+  wrapper img { width:100%; object-fit:cover; max-height:calc(…) }") is junk for ANY
+  topic, so it goes in the general `EXCLUDE_PHRASES` (runs first, all topics):
+  `/\{[^}]{0,40}(object-fit|max-height:\s*calc|width:\s*100%)/` + `viewport-wrapper`.
+**Prove it three ways:** jest fixtures (DROP targets + KEEP controls) in
+`__tests__/relevance/protestsFeedRelevance.test.ts` (run `pnpm exec jest`), the live
+`/api/incidents?topic=flashpoint` feed must lack the junk but show it again under
+`?includeIrrelevant=true` (filtered, not deleted), and a re-screenshot of
+`/topics/protests`.

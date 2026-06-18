@@ -246,6 +246,67 @@ const FIXTURES: Fixture[] = [
     verdict: "KEEP",
     reason: "civil-unrest",
   },
+
+  // ---- Figurative "roadblock" (obstacle metaphor): DROP ----------------
+  // Bare "roadblock" is a REQUIRED protest tactic, so an obstacle-metaphor
+  // headline leaks in unless caught. Dropped only when no real-unrest
+  // companion is present.
+  {
+    title: "Starmer to meet Japan's Takaichi as fighter jet funding sputters",
+    summary:
+      "The Global Combat Air Programme has faced roadblocks including delays to Britain's financial contribution to the project.",
+    verdict: "DROP",
+    reason: "figurative 'roadblock'",
+  },
+  // A REAL road-block as a protest tactic, sitting next to a genuine-unrest
+  // companion, must SURVIVE the figurative exclude: KEEP.
+  {
+    title: "Demonstrators set up roadblocks across the city in anti-government unrest",
+    verdict: "KEEP",
+  },
+  // PNG soldiers' barracks roadblock (a genuine standoff) must SURVIVE: KEEP.
+  {
+    title: "PNG Defence Force Soldiers Maintain Demands After Murray Barracks Roadblock",
+    verdict: "KEEP",
+  },
+
+  // ---- Cancelled / suspended industrial action (non-event): DROP -------
+  {
+    title: "Colombo Port workers call off strike",
+    verdict: "DROP",
+    reason: "cancelled/suspended industrial action",
+  },
+  {
+    title: "Samsung workers' union suspends planned strike",
+    verdict: "DROP",
+    reason: "cancelled/suspended industrial action",
+  },
+  // A strike that CONTINUES / turns to protest must SURVIVE: KEEP.
+  {
+    title: "Bangladesh's primary teachers withdraw strike suspension, continue protest",
+    verdict: "KEEP",
+  },
+  // A genuine long protest that has concluded is still real unrest: KEEP.
+  {
+    title: "105-day protest to save Sri Lanka's Mannar Island called off",
+    verdict: "KEEP",
+  },
+
+  // ---- Off-topic news digest (protest is one bundled item): DROP -------
+  {
+    title: "CJP's first protest, India-Nepal ties, and Vizag steel plant accident",
+    verdict: "DROP",
+    reason: "news digest",
+  },
+
+  // ---- Scraped CMS/CSS markup dumped into the body: DROP ---------------
+  {
+    title: "India's top-heavy boom and the lesson for Bangladesh",
+    summary:
+      "Byline Tue, 05/05/2026 - 11:54 .full-viewport-wrapper img { width: 100%; object-fit: cover; max-height: calc(100vh - 71px); } Meanwhile protests erupted in Dhaka over the economy.",
+    verdict: "DROP",
+    reason: "general-news noise",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {

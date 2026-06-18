@@ -36,6 +36,10 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\bcelebrity\b/,
   /\bentertainment news\b/,
   /\brecipe\b/,
+  // Scraped page markup leaked into the record body (CMS template CSS / inline
+  // style blocks) — a malformed scrape dump, never a clean news incident.
+  /\{[^}]{0,40}(object-fit|max-height:\s*calc|width:\s*100%)/,
+  /\bviewport-wrapper\b/,
 ];
 
 // Cargo-specific exclusions. Cargo Watch covers operational cargo and
@@ -403,6 +407,36 @@ const FLASHPOINT_EDITORIAL_SUPPRESS: RegExp[] = [
   // "Bangladesh halts construction of largest Lord Ram statue after ... protest"
   /\blord ram statue\b/,
 ];
+
+// Off-topic news DIGESTS — a single article bundling several unrelated stories
+// ("X's first protest, Y ties, and Z accident"). The protest is just one list
+// item, not the article's subject, so the protest-verdict wrongly keeps it.
+// Bound tightly to the one digest headline so it can never swallow a live event.
+const FLASHPOINT_OFFTOPIC_DIGEST: RegExp[] = [
+  // "CJP's first protest, India-Nepal ties, and Vizag steel plant accident"
+  /\bfirst protest\b[^.]{0,60}\bvizag steel plant accident\b/,
+];
+
+// Figurative "roadblock" = an OBSTACLE METAPHOR ("the program faced
+// roadblocks", "funding roadblocks to the deal"), NOT a protest road-block.
+// REQUIRED treats bare "roadblock" as an unambiguous protest tactic, so these
+// leak in. Drop only when no genuine-unrest companion is present, so a real
+// "protesters set up roadblocks" or a "Barracks Roadblock" mutiny still keeps.
+const FP_FIGURATIVE_ROADBLOCK_RE =
+  /\b(faces?|faced|facing|hit|hits|hitting|met|meets?|meeting|encounter(s|ed|ing)?|overcome|overcame|major|biggest|key|main|serious|significant|another|further|political|legal|legislative|regulatory|bureaucratic|financial|funding|budget|procedural|economic|diplomatic|technical|administrative|logistical|practical)\s+(\w+\s+){0,2}road ?blocks?\b|\broad ?blocks?\s+(to|for|ahead|remain|persist|that|include|including|over|on the (path|road|way))\b/i;
+
+// Cancelled / suspended industrial action = a NON-EVENT (the strike was called
+// off or never happened). Title-bound; spared when the headline shows the
+// action actually continues or turned to unrest.
+const FP_CANCELLED_ACTION_RE =
+  /\b(call(s|ed)?\s+off|called[- ]off|suspend(s|ed|ing)?|postpon(e|es|ed|ing)|defer(s|red|ring)?|scrap(s|ped|ping)?|cancel(s|led|ling)?|avert(s|ed|ing)?)\b[^.]{0,18}\b(strike|strikes|walkout|walkouts|stoppage|industrial action)\b/i;
+const FP_CANCELLED_KEEP_RE =
+  /\b(continu\w*|resum\w*|protest|clash\w*|charge[sd]?|defy|defian\w*|escalat\w*|riot\w*|violen\w*|killed?|injured)\b/i;
+
+// Shared "is there genuine unrest here?" companion — spares a figurative match
+// that sits alongside a real public-order signal.
+const FP_REAL_UNREST_COMPANION_RE =
+  /\b(protest|demonstrat|rally|rallies|rallied|march(es|ers?|ing|ed)|picket|walkout|strike|riot|clash|tear ?gas|water cannon|barricad|sit-?in|curfew|hartal|bandh|gherao|crowd|mob|looting|arson|stormed?|unrest|blockad)\b/i;
 
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
@@ -945,6 +979,17 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       !PUBLIC_GATHERING_OVERRIDE_RE.test(text)
     ) {
       return { relevant: false, reason: "excluded: animal welfare / wildlife enforcement (not civil unrest)" };
+    }
+    // Off-topic news digest — the protest is one of several bundled stories.
+    const digest = firstMatch(titleHaystack(i), FLASHPOINT_OFFTOPIC_DIGEST);
+    if (digest) return { relevant: false, reason: `excluded: multi-topic news digest (not a single civil-unrest event) (/${digest.source}/)` };
+    // Figurative "roadblock" (obstacle metaphor) with no genuine-unrest companion.
+    if (FP_FIGURATIVE_ROADBLOCK_RE.test(text) && !FP_REAL_UNREST_COMPANION_RE.test(text)) {
+      return { relevant: false, reason: "excluded: figurative 'roadblock' (obstacle metaphor, not a protest road-block)" };
+    }
+    // Cancelled / suspended industrial action (non-event) — title-bound.
+    if (FP_CANCELLED_ACTION_RE.test(titleHaystack(i)) && !FP_CANCELLED_KEEP_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: cancelled/suspended industrial action (non-event)" };
     }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       // The headline itself is an unmistakable public-order event. The
