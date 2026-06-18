@@ -673,6 +673,51 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-3) ONE-TIME purge of out-of-region (US / continental-Europe)
+    //        flashpoint rows.
+    //
+    //       Same defect class as 3d-2 (UK/Ireland) for the OTHER big
+    //       cross-syndication source: a US "mass rally" (Trump / MAGA) or an
+    //       EU domestic protest is topically a political rally — the relevance
+    //       lib keeps it on purpose (geography is not its job) — but a leaked
+    //       masthead or a passing actor reference ("...against China tariffs")
+    //       stamped the row onto an APAC country even though it is physically
+    //       in Washington / Berlin / Paris. The ingest classifier now rejects
+    //       these (FOREIGN_LOCATION_WEST); this clears rows already stored.
+    //       Delete (not relocate) — they belong to no APAC country report.
+    //       Mirrors lib/ingest FOREIGN_LOCATION_WEST exactly: BARE distinctive
+    //       city tokens, plus a venue-preposition-gated tier (NO "to" — so an
+    //       APAC protest that merely appeals to a Western state is untouched).
+    //       Marker-gated. Backslashes DOUBLED (\\y) — JS template literal first.
+    {
+      const FOREIGN_BARE_WEST =
+        "los angeles|san francisco|philadelphia|chicago|houston|seattle|minneapolis|frankfurt|hamburg|stuttgart|dusseldorf|rotterdam|marseille";
+      const FOREIGN_VENUE_WEST =
+        "washington|new york|brooklyn|boston|atlanta|dallas|denver|phoenix|miami|detroit|las vegas|portland|sacramento|california|texas|florida|arizona|georgia|michigan|ohio|pennsylvania|wisconsin|minnesota|nevada|oregon|colorado|united states|america|usa|paris|berlin|madrid|barcelona|rome|milan|naples|munich|cologne|brussels|amsterdam|hague|vienna|warsaw|athens|lisbon|stockholm|copenhagen|oslo|helsinki|budapest|prague|zurich|geneva|france|germany|spain|italy|netherlands|belgium|portugal|greece|poland|austria|sweden|denmark|norway|finland|switzerland";
+      const markerKey = "flashpoint_out_of_region_us_eu_purge_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM incidents
+          WHERE topic = 'flashpoint'
+            AND (
+              (COALESCE(title,'') || ' ' || COALESCE(summary,'')) ~* ('\\y(' || ${FOREIGN_BARE_WEST} || ')\\y')
+              OR (COALESCE(title,'') || ' ' || COALESCE(summary,'')) ~* ('\\y(in|at|outside|near|across)[[:space:]]+(the[[:space:]]+|central[[:space:]]+|greater[[:space:]]+|downtown[[:space:]]+)?(' || ${FOREIGN_VENUE_WEST} || ')\\y')
+            )
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time purge of out-of-region (US/EU) mis-stamped flashpoint rows",
+        );
+      }
+    }
+
     // 3e) ONE-TIME reclassification of stored strike columns.
     //
     //     The Missile Strike Tracker dashboard derives Target / Weapon /

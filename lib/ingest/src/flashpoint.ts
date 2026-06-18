@@ -153,6 +153,33 @@ const FLASHPOINT_DENY: RegExp[] = [
 const FOREIGN_LOCATION: RegExp =
   /\b(?:belfast|glasgow|edinburgh|cardiff|dublin|londonderry|derry)\b|\b(?:in|at|outside|near|across|to)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:london|manchester|birmingham|liverpool|leeds|sheffield|bristol|nottingham|newcastle|united kingdom|northern ireland|great britain)\b/i;
 
+// Out-of-region US / continental-Europe location guard. Same rationale and
+// two-tier structure as FOREIGN_LOCATION above, applied to the OTHER big
+// cross-syndication source. A US "mass rally" (Trump / MAGA) or a domestic
+// EU protest is TOPICALLY a political rally, so the relevance lib keeps it on
+// purpose — geography is deliberately not its job (see
+// FLASHPOINT_POLITICAL_RALLY_RE in @workspace/relevance). But the Protests &
+// Civil Unrest monitor is an APAC / South-Asia / Gulf product, so a Washington
+// or Berlin rally must be dropped here before storage even when a leaked
+// source masthead or a passing actor reference ("...against China tariffs")
+// stamps the row onto an APAC country. Two tiers keep precision high:
+//   - BARE tokens are distinctive US/EU CITY names with no APAC namesake and
+//     no treaty / actor / common-word homonym (a bare "Paris"/"Rome"/"Geneva"/
+//     "Vienna" is deliberately OMITTED — they double as treaty/convention
+//     references — and sits in the venue-gated tier instead).
+//   - VENUE-gated names require a physical-location preposition ("in
+//     Washington", "in America", "in Germany"). This holds (a) US states and
+//     the country/region nouns that are often a mere ACTOR reference ("US
+//     condemns", "Germany backs", "appeal to France") rather than the event
+//     location, and (b) city names that collide with sports clubs or treaties.
+//     Country NOUNS only (france/germany), never the adjective (french/german),
+//     so "French embassy in Manila" — a Manila event — is never mis-dropped;
+//     and "to" is excluded from the preposition set so an APAC protest that
+//     merely APPEALS to a Western state ("Myanmar activists appeal to Germany")
+//     keeps its in-region tag.
+const FOREIGN_LOCATION_WEST: RegExp =
+  /\b(?:los angeles|san francisco|philadelphia|chicago|houston|seattle|minneapolis|frankfurt|hamburg|stuttgart|dusseldorf|rotterdam|marseille)\b|\b(?:in|at|outside|near|across)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:washington|new york|brooklyn|boston|atlanta|dallas|denver|phoenix|miami|detroit|las vegas|portland|sacramento|california|texas|florida|arizona|georgia|michigan|ohio|pennsylvania|wisconsin|minnesota|nevada|oregon|colorado|united states|america|usa|paris|berlin|madrid|barcelona|rome|milan|naples|munich|cologne|brussels|amsterdam|hague|vienna|warsaw|athens|lisbon|stockholm|copenhagen|oslo|helsinki|budapest|prague|zurich|geneva|france|germany|spain|italy|netherlands|belgium|portugal|greece|poland|austria|sweden|denmark|norway|finland|switzerland)\b/i;
+
 // Pacific (PNG / West Papua) civilian crime & communal-violence cues.
 // PNG's security signal is overwhelmingly violent CRIME (armed robbery,
 // carjacking, raskol gangs, tribal fighting), which carries none of the
@@ -254,6 +281,14 @@ function classify(title: string, summary: string): {
   // BEFORE country resolution so the masthead-leaked country never matters.
   if (FOREIGN_LOCATION.test(hay)) {
     return { kept: false, reason: "out-of-region:uk-ireland", country: null };
+  }
+
+  // Reject US / continental-Europe-located events (Trump/MAGA rallies, EU
+  // domestic protests) that a leaked masthead or a passing actor reference
+  // mis-stamped onto an APAC country. Geography belongs to the scraper; the
+  // relevance lib keeps these by TOPIC on purpose.
+  if (FOREIGN_LOCATION_WEST.test(hay)) {
+    return { kept: false, reason: "out-of-region:us-eu", country: null };
   }
 
   // Country must appear in TITLE or SUMMARY (broader than cargo-watch

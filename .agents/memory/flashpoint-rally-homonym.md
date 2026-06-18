@@ -34,6 +34,16 @@ api-server workflow and confirm the persisted `relevance_version` /
 `relevance_status` in the dev DB.
 
 **Accepted tradeoff:** the relevance lib is TOPIC relevance, not geography.
-A US "mass rally" (Trump/MAGA) is topically a political rally and will be
-kept; geo-scoping is the scraper's job (`lib/ingest/src/flashpoint.ts`
-FOREIGN_LOCATION), which is out of scope for this lib.
+A US "mass rally" (Trump/MAGA) is topically a political rally and the lib
+KEEPS it on purpose; geo-scoping is the scraper's job, NOT this lib's. The
+scraper drops out-of-region rows in `classify()` via two two-tier guards in
+`lib/ingest/src/flashpoint.ts`: `FOREIGN_LOCATION` (UK/Ireland) and
+`FOREIGN_LOCATION_WEST` (US + continental-EU). Both run BEFORE country
+resolution so a leaked masthead / passing actor-country reference can't save
+the row. Precision rules: BARE tier = distinctive cities with no APAC
+namesake / treaty homonym; VENUE tier = preposition-gated (NO "to", so
+"appeal to Germany" survives) using country NOUNS not adjectives (so "French
+embassy in Manila" survives). Any token change here must be mirrored in the
+marker-gated boot purge in `artifacts/api-server/src/lib/migrations.ts`
+(`flashpoint_out_of_region_*_purge_v1`) to clean prod rows — drizzle push
+only hits dev.
