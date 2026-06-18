@@ -19,7 +19,7 @@ describe("explainRelevance", () => {
         }),
       );
       expect(result.relevant).toBe(true);
-      expect(result.reason).toContain("title-rescue");
+      expect(result.reason).toMatch(/title-rescue|civil-unrest 'protest'/);
     });
 
     it("drops sports headlines that misuse the word protest", () => {

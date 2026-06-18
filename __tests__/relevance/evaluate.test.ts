@@ -14,7 +14,7 @@ describe("evaluateIncidentRelevance", () => {
   it("scores title-rescued records as one", () => {
     const verdict = evaluateIncidentRelevance("flashpoint", {
       topic: "flashpoint",
-      title: "Teachers protest abduction of colleague",
+      title: "Workers stage a demonstration outside parliament",
     });
     expect(verdict.relevant).toBe(true);
     expect(verdict.score).toBe(1);
