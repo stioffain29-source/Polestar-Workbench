@@ -274,6 +274,73 @@ const INDONESIA_CONTEXT = /\b(indonesia|indonesian|tni|polri|jakarta)\b/i;
 const WP_INSURGENCY =
   /\b(rebels?|separatists?|insurgen(?:t|ts|cy)|opm|tpnpb|west papua national liberation|indonesian (?:military|soldiers?|troops?|forces?))\b/i;
 
+// Authoritative single-country PNG / West Papua OUTLETS.
+//
+// resolveFlashpointCountry strips the Google-News masthead before geo matching
+// (see geoHaystack) so a publisher city can never become the only country
+// signal of a foreign wire story. That is correct for MIXED outlets that
+// republish foreign agency copy (e.g. The National runs AFP/Reuters world
+// news), but it silently discards genuine LOCAL incidents whose headline names
+// no in-gazetteer place ("Police urge banks to report suspicious transactions"
+// - PNG Haus Bung). For outlets that publish ONLY their own country's news the
+// masthead IS an authoritative country signal, so these maps re-supply that
+// country as a FALLBACK — used only when in-text resolution returns null and
+// AFTER the foreign-location / kinetic denies have run, so the security gate
+// still decides what is kept. The National is deliberately ABSENT (it
+// syndicates foreign wire, so its masthead is not country-authoritative).
+interface OutletCountry {
+  re: RegExp;
+  country: string;
+}
+
+// Matched against the masthead text extracted from the TITLE (publisher name
+// after the trailing " - " / " | "). Rescues Google-News site: feeds AND any
+// multi-publisher feed item that still carries one of these publishers'
+// mastheads (e.g. a Post-Courier story surfaced via a broad PNG query).
+const AUTHORITATIVE_MASTHEADS: OutletCountry[] = [
+  { re: /\b(png haus bung|emtv|loop png|one ?png|post[ -]?courier|png ?facts)\b/i, country: "Papua New Guinea" },
+  { re: /\b(jubi|suara papua)\b/i, country: "West Papua" },
+];
+
+// Matched against the FEED url (the site:domain inside a Google-News query, or
+// the host of a direct RSS feed). Rescues DIRECT outlet feeds whose item titles
+// are bare (no " - Publisher" suffix), e.g. postcourier.com.pg, jubi.id.
+const AUTHORITATIVE_FEEDS: OutletCountry[] = [
+  { re: /\b(emtv\.com\.pg|looppng\.com|onepng\.com|pnghausbung\.com|postcourier\.com\.pg|pngfacts\.com)\b/i, country: "Papua New Guinea" },
+  { re: /\b(jubi\.id|suarapapua\.com)\b/i, country: "West Papua" },
+];
+
+/**
+ * Resolve an authoritative country from the publisher masthead of a single-
+ * country local outlet. Returns null for mixed wire outlets (The National),
+ * whose extracted masthead never matches the map.
+ */
+function mastheadCountry(title: string): string | null {
+  const dash = Math.max(title.lastIndexOf(" - "), title.lastIndexOf(" | "));
+  if (dash <= 0) return null;
+  const source = title.slice(dash + 3).trim();
+  if (!source) return null;
+  for (const o of AUTHORITATIVE_MASTHEADS) if (o.re.test(source)) return o.country;
+  return null;
+}
+
+/**
+ * Resolve an authoritative country from the FEED url of a single-country local
+ * outlet (direct RSS feeds carry bare titles, so the masthead path cannot
+ * help). Exported so the ingest loop can supply it as a per-feed fallback.
+ */
+export function authoritativeFeedCountry(feedUrl: string | null | undefined): string | null {
+  if (!feedUrl) return null;
+  let hay = feedUrl;
+  try {
+    hay = decodeURIComponent(feedUrl);
+  } catch {
+    // Malformed escape — fall back to the raw URL.
+  }
+  for (const o of AUTHORITATIVE_FEEDS) if (o.re.test(hay)) return o.country;
+  return null;
+}
+
 /**
  * Resolve a Papua-region country tag, or null when the text is not about
  * either Papua. Cross-border records (both PNG and West Papua markers) are
@@ -325,10 +392,14 @@ export function resolveFlashpointCountry(title: string, summary: string): string
   const pacific = resolvePapuaPng(geoHay);
   if (pacific) return pacific;
   const m = COUNTRY_ALIASES.find((c) => c.aliases.some((a) => hasWord(geoHay, a)));
-  return m ? m.canonical : null;
+  if (m) return m.canonical;
+  // Fallback: an authoritative single-country outlet masthead (local PNG /
+  // West Papua press) when no in-text place resolved. Mixed wire outlets are
+  // absent from the map, so this never mis-stamps foreign syndication.
+  return mastheadCountry(title);
 }
 
-function classify(title: string, summary: string): {
+function classify(title: string, summary: string, feedCountry?: string | null): {
   kept: boolean;
   reason: string;
   country: string | null;
@@ -359,7 +430,7 @@ function classify(title: string, summary: string): {
   // "Students hold protest against fee hike" with the country only in
   // the summary's dateline). Papua / PNG are resolved first by
   // resolvePapuaPng so Indonesian West Papua is not mis-routed to PNG.
-  const country = resolveFlashpointCountry(title, summary);
+  const country = resolveFlashpointCountry(title, summary) ?? feedCountry ?? null;
 
   const isPacific =
     country === "Papua New Guinea" ||
@@ -491,6 +562,8 @@ export const flashpointTestHooks = {
   classify,
   resolvePapuaPng,
   resolveFlashpointCountry,
+  mastheadCountry,
+  authoritativeFeedCountry,
   titleSimilarity,
   eventSignatureTrigrams,
 };
@@ -560,6 +633,10 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const CONCURRENCY = 4;
   const processFeed = async (s: (typeof fetchable)[number]) => {
     perFeed[s.name] = { name: s.name, found: 0, accepted: 0, rejected: 0 };
+    // Authoritative country for a single-country local outlet feed (used as a
+    // fallback when an item's title carries no in-gazetteer place and no
+    // recognisable masthead, e.g. a direct outlet RSS feed with bare titles).
+    const feedCountry = authoritativeFeedCountry(s.url);
     try {
       const parsed = await fetchFeed(parser, s.url!, { stagger: true });
       const items = parsed.items ?? [];
@@ -574,11 +651,16 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
           perFeed[s.name].rejected++;
           continue;
         }
-        const c = classify(title, summary);
-        const resolvedCountry = resolveFlashpointCountry(title, summary);
+        const c = classify(title, summary, feedCountry);
+        // Diagnostics-only country: classify() returns country:null on rejection
+        // paths, so deriving itemIsPng from c.country alone undercounts rejected
+        // PNG rows. Re-resolve independently (same precedence classify uses) so
+        // the PNG diagnostics count rejected items too.
+        const diagCountry =
+          c.country ?? resolveFlashpointCountry(title, summary) ?? feedCountry;
         const itemIsPng =
-          resolvedCountry === "Papua New Guinea" ||
-          resolvedCountry === "West Papua; Papua New Guinea";
+          diagCountry === "Papua New Guinea" ||
+          diagCountry === "West Papua; Papua New Guinea";
         if (itemIsPng) {
           pngMatched++;
           pngArticlesBySource[s.name] = (pngArticlesBySource[s.name] ?? 0) + 1;

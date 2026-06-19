@@ -1,6 +1,6 @@
 ---
 name: PNG flashpoint feeds & Pacific crime acceptance
-description: Why opening PNG feeds needs a classifier change + when:Nd, and why the recent PNG window is structurally sparse
+description: Why opening PNG feeds needs a classifier change + when:Nd; and why pure-local PNG/WP outlets were silently dropped at country resolution (masthead-stripping) until an authoritative-outlet fallback
 ---
 
 The PNG (and West Papua) country report kept rendering "too thin" — the rolling
@@ -54,8 +54,14 @@ the countryMatch module header warns about.
 **Why:** verified empirically — without when: the crime feed pulled 48 genuine
 PNG security incidents (armed robbery Port Moresby, soldier stabbed in Lae,
 2Fast Motors robbery) but the newest was ~Dec 2025; with when:14d the public
-English feeds carry essentially NO fresh PNG security incident. The thin report
-reflects sparse reality, not a bug — be honest about this with the user.
+English feeds carry essentially NO fresh PNG security incident.
+
+**SUPERSEDED — "thin = sparse reality, not a bug" was only HALF true.** The
+public Google-News feeds are genuinely sparse, but the DEDICATED local outlet
+feeds (PNG Haus Bung, EMTV, Post Courier, One PNG, Jubi, Suara Papua) were
+publishing fresh genuine incidents that were being SILENTLY DROPPED at country
+resolution — see the masthead-stripping section below. Do NOT tell the user a
+PNG/WP week is sparse until the local-outlet feeds have been re-checked.
 
 **Junk guard:** the civil-unrest "strike" keyword pulls sports/video "strike"
 noise (e.g. a hockey "The Leafs Are Ready To Strike... PNG (vFetqxZnwf) -
@@ -233,6 +239,47 @@ does NOT restore HISTORICAL prod rows that aged out of the feeds — those need 
 token-gated /api/admin/incidents/backfill route, and the workspace currently has
 no INGEST_ADMIN_TOKEN to call it (PROD_DATABASE_URL value isn't sandbox-readable
 either), so historical dev→prod depth parity is out of reach from the workspace.
+
+**Masthead-stripping silently dropped pure-local PNG/WP outlet items at country
+resolution ("PNG and Papua look lite", Jun-2026).** `geoHaystack` strips the
+publisher masthead BEFORE geo-matching (so "Taipei Times" can't leak Taipei).
+But dedicated single-country local outlets (PNG Haus Bung, EMTV, Post Courier,
+One PNG, Jubi, Suara Papua) routinely run headlines that name NO in-gazetteer
+place ("Armed suspect shot during Manu Cash and Carry robbery", "Aircraft
+Hijacked by Armed Men") — the outlet name was the ONLY country signal, and
+stripping it left the item resolving to null → dropped as `no-apac-country`
+BEFORE the security gate ever saw it. So genuine fresh incidents on the BEST
+feeds were lost while the report read "thin/sparse".
+Fix (`lib/ingest/src/flashpoint.ts`): an authoritative-OUTLET country FALLBACK,
+applied ONLY when in-text resolution returns null. Two maps —
+`AUTHORITATIVE_MASTHEADS` (matches the trailing "- <outlet>" in the title:
+png haus bung|emtv|loop png|one png|post courier|png facts → PNG; jubi|suara
+papua → West Papua) via `mastheadCountry(title)`, and `AUTHORITATIVE_FEEDS`
+(matches the feed URL: domain or `site:` query → same countries) via exported
+`authoritativeFeedCountry(feedUrl)`. `resolveFlashpointCountry` falls back to
+`mastheadCountry`; `classify(title,summary,feedCountry?)` falls back to the
+passed feedCountry; `processFeed` computes `feedCountry =
+authoritativeFeedCountry(s.url)` per source. Both helpers exported on
+`flashpointTestHooks`.
+**The National (PNG) is DELIBERATELY EXCLUDED** from both maps — it republishes
+mixed foreign wire ("Kyiv monastery on fire after air attack - The National"),
+so trusting its masthead would mis-tag foreign kinetic as PNG. Only single-
+country LOCAL outlets may be trusted; verify a candidate outlet's feed is not a
+wire aggregator before adding it.
+**Why:** for a fixed-geography local outlet the masthead/domain IS reliable
+country ground-truth; using it as a null-only fallback can't override genuine
+in-text geo (Manila still → Philippines) and can't admit non-incidents (the
+security gate still runs after — validated: PNG Haus Bung 1→6 accepted, and all
+94 rejects are legit noise: film reviews, COVID case-counts, polling-schedule
+PR; ZERO genuine incidents wrongly dropped).
+**Residual (separate root cause, NOT country resolution):** Jubi/Suara Papua run
+genuine Bahasa-Indonesia security incidents ("Dua warga Intan Jaya ... ledakan
+... bom" = bomb blast in a known conflict regency) that the ENGLISH-ONLY
+security cue set misses → `no-flashpoint-cue`. English Google WP feeds still
+carry the major WP insurgency, so WP isn't dark, but native-Bahasa direct feeds
+need Bahasa violence cues (ledakan/bom/penembakan/baku tembak/tewas ditembak)
+at the INGEST gate to be captured (translation runs AFTER ingest, too late). A
+known follow-up, not done here.
 
 **How to apply:** new PNG/Pacific feeds go in FLASHPOINT_REGIONAL_SOURCES in
 `artifacts/api-server/src/lib/migrations.ts` (seeded on boot, reaches prod on
