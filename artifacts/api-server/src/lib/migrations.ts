@@ -317,6 +317,94 @@ export async function runDataMigrations(): Promise<void> {
         ON reliefweb_reports (published_at)
     `);
 
+    // Schema: AI-generated country-report narratives + sibling tables that the
+    // country/PNG report builder relies on. These were previously created only by
+    // the dev-only drizzle `push`, so a fresh production database never had them.
+    // Without country_report_prose the prose route degrades to the deterministic
+    // template and analyst edits / AI narratives never persist in the published
+    // app. Create them idempotently here so the deployment runtime (the only place
+    // with a writable prod primary) self-provisions them on boot. All IF NOT
+    // EXISTS — safe to re-run. Mirrors lib/db/src/schema/{countryReportProse,
+    // countryReports,countryBaselines,cards}.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_reports (
+        id serial PRIMARY KEY,
+        slug text NOT NULL UNIQUE,
+        name text NOT NULL,
+        region text NOT NULL,
+        overview text,
+        trend_summary text,
+        implications text,
+        key_numbers jsonb,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_report_prose (
+        id serial PRIMARY KEY,
+        slug text NOT NULL UNIQUE,
+        fingerprint text NOT NULL,
+        sections jsonb NOT NULL,
+        edited jsonb,
+        model text NOT NULL,
+        generated_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_baselines (
+        id serial PRIMARY KEY,
+        slug text NOT NULL UNIQUE,
+        operating_environment text NOT NULL DEFAULT '',
+        security_context text NOT NULL DEFAULT '',
+        known_risk_areas jsonb NOT NULL DEFAULT '[]'::jsonb,
+        key_cities_provinces jsonb NOT NULL DEFAULT '[]'::jsonb,
+        movement_constraints text NOT NULL DEFAULT '',
+        infrastructure_limits text NOT NULL DEFAULT '',
+        medical_evac text NOT NULL DEFAULT '',
+        resource_sector_exposure text NOT NULL DEFAULT '',
+        location_watchlist jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS card_templates (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        template_key text NOT NULL DEFAULT 'country_risk',
+        is_built_in boolean NOT NULL DEFAULT false,
+        content jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        last_edited_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS card_drafts (
+        id serial PRIMARY KEY,
+        title text NOT NULL,
+        template_key text NOT NULL DEFAULT 'country_risk',
+        content jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        last_edited_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS brand_settings (
+        id integer PRIMARY KEY DEFAULT 1,
+        color_midnight text NOT NULL DEFAULT '#0B0B3D',
+        color_electric text NOT NULL DEFAULT '#4655FF',
+        color_dusk text NOT NULL DEFAULT '#303030',
+        color_polar text NOT NULL DEFAULT '#E2E2E2',
+        color_extreme text NOT NULL DEFAULT '#A33232',
+        logo_image text,
+        font_heading text NOT NULL DEFAULT 'Roboto Condensed',
+        font_body text NOT NULL DEFAULT 'Roboto',
+        footer_text text NOT NULL DEFAULT 'Polestar Advisory',
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
     // Relabel: when ReliefWeb has no APPROVED appname, its Source Health rows must
     // not read as "operational". Earlier builds registered the corroboration pass
     // as operational regardless of configuration, so existing prod rows can carry
