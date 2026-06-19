@@ -1491,10 +1491,36 @@ const COUNTRY_SECURITY_SIGNAL_RE =
 // stripped only general-news noise (e.g. a "fuel subsidy" policy story or a
 // football scoreline appeared as the country's lead security incident).
 const COUNTRY_ECONOMIC_NOISE_RE =
-  /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?|completes? (the )?migration|migrat(ion|es|ed|ing) (of|to) (its )?[a-z]+ (system|platform)|system (migration|upgrade)|prepaid metering|go[- ]live|new (it|billing|payment|digital) platform)\b/i;
+  /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?|completes? (the )?migration|migrat(ion|es|ed|ing) (of|to) (its )?[a-z]+ (system|platform)|system (migration|upgrade)|prepaid metering|go[- ]live|new (it|billing|payment|digital) platform|boost|grants?|funding|funded|donations?|donat(?:es|ed)|sponsor(?:s|ed|ship)?)\b/i;
 
 const COUNTRY_SPORTS_NOISE_RE =
-  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|rugby|netball|cricket|grand final|test match|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?)\b/i;
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|athletics|rugby|netball|cricket|grand final|test match|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?)\b/i;
+
+// Unambiguous sports-SPECTACLE phrases. A country security report never leads on
+// the World Cup or the Olympics, and these mega-events routinely carry
+// incidental violence vocabulary in the body (e.g. a NEGATED "this isn't a
+// crackdown on fans"), so the broad HARD_SECURITY rescue must NOT apply here.
+// They are dropped UNLESS the record carries a real SECURITY signal — kinetic
+// (bomb / gunfire / stampede / counted fatalities) OR public-order (riot /
+// arrest / curfew / tear gas / evacuation / armed robbery / hostage / kidnap).
+// This preserves a genuine venue incident ("bomb at the Olympics", "fans riot
+// at the World Cup, police arrest 40") while still rejecting a match report
+// whose body only carries an incidental or NEGATED term ("this isn't a
+// crackdown on fans", "criminal records"). The sports-idiom word "clash"
+// ("Round 1 clash") is intentionally NOT a rescue here.
+const COUNTRY_SPORTS_SPECTACLE_RE =
+  /\b(world cup|olympics?|olympic games|paralympics?|commonwealth games|(?:pacific|university|national|school|png) games|\bfifa\b|\buefa\b)\b/i;
+
+const SPECTACLE_SECURITY_RESCUE_RE =
+  /\b(bomb|bombing|ied|grenade|explosion|blast|gunm[ae]n|gunfire|opened fire|shot dead|stabbed|stampede|suicide (?:attack|bomb)|terror attack|\d+ (?:killed|dead|wounded)|killed \d|riot|arrest|curfew|tear gas|evacuat(?:e|ed|ion)|armed robbery|hostage|kidnap|abduct)\b/i;
+
+// Ceremonial / public-relations EVENTS — a breakfast, summit, signing ceremony
+// or MoU is a diary item, not a security incident. Dropped UNLESS the record
+// carries a security signal of its own (so "gunmen attack the summit" survives
+// via the soft lexicon). Deliberately omits event words that double as outlet
+// names in a masthead/URL (e.g. "forum") since the haystack includes the source.
+const COUNTRY_PR_EVENT_RE =
+  /\b(breakfast|gala|fundraiser|summit|conference|workshop|seminar|symposium|trade fair|graduation|signing ceremony|ribbon[- ]?cutting|\bmou\b|memorandum of understanding)\b/i;
 
 // Non-event editorial classes: explainers, op-eds, "what you need to know"
 // guides and fact-checks. A country SECURITY aggregate lists concrete
@@ -1578,11 +1604,24 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   if (COUNTRY_EXPLAINER_NOISE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
     return false;
   }
+  // Drop unambiguous sports-SPECTACLE coverage (World Cup, Olympics) unless a
+  // real SECURITY signal is present. The broad HARD_SECURITY lexicon (which
+  // includes "crackdown") is intentionally NOT the guard here, because a sports
+  // story commonly carries those words incidentally or negated; the dedicated
+  // spectacle-rescue set keeps genuine kinetic/public-order venue incidents.
+  if (COUNTRY_SPORTS_SPECTACLE_RE.test(text) && !SPECTACLE_SECURITY_RESCUE_RE.test(text)) {
+    return false;
+  }
   // Drop SPORTS noise unless the record carries a HARD security signal. A match
   // report routinely calls itself a "Round 1 clash"; "clash" (and "raid",
   // "fighting", "victory") must NOT rescue a football story — only an
   // unambiguous violence/crime word does.
   if (COUNTRY_SPORTS_NOISE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
+  }
+  // Drop ceremonial / PR diary EVENTS (a breakfast, summit, signing ceremony)
+  // unless the record carries any security signal — these are not incidents.
+  if (COUNTRY_PR_EVENT_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
     return false;
   }
   return true;

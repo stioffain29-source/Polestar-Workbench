@@ -287,3 +287,37 @@ deploy; repairFlashpointSeedUrls updates existing rows' URLs). Any new Google
 News feed that must fill a rolling window needs `when:Nd`. CountryReport.tsx
 applies isCountryRelevant + isForeignDominantContext + isIndonesianWestPapuaContext
 on top of the country token match, so raw-DB rows ≠ rendered rows.
+
+**Local-outlet attribution surfaces NON-security NOISE that the country gate must
+drop ("report looks bleak / off-topic", Jun-2026).** Once the masthead/feed
+fallback correctly tags a PNG newspaper's whole output as PNG, the country report
+inherits that outlet's NON-incident diary too: a foreign sports spectacle re-run
+locally ("Argentina to block 13k from World Cup over unpaid child support" — rated
+HIGH, hit TOP 3), local soccer fixtures, a training-grant PR puff ("Aviation
+Training Receives K500,000 Boost"), and ceremonial PR ("ICAC to Host Regional
+Breakfast"). All belong in `isCountryRelevant` (the country report's OWN frontend
+display gate) — NOT ingest deny / persisted relevance, which the country report
+bypasses via `includeIrrelevant`. Noise classes + guards added:
+- economic/boosterism (boost|grant|funding|donation|sponsor) gated `!SECURITY_SIGNAL`
+- broadened sports lexicon (soccer|tournament|championship|…) gated `!HARD_SECURITY`
+- sports SPECTACLE (world cup|olympics|fifa|…games) — dropped UNLESS a dedicated
+  spectacle-rescue set fires
+- ceremonial/PR diary (breakfast|summit|signing ceremony|mou|…) gated `!SECURITY_SIGNAL`
+**Spectacle needs its OWN rescue, not the broad HARD_SECURITY lexicon.** The
+Argentina story was being RESCUED from the sports drop because HARD_SECURITY
+includes "crackdown"/"curfew" and its body had a NEGATED "this isn't a crackdown
+on fans". So spectacle uses a narrow SPECTACLE_SECURITY_RESCUE_RE = kinetic
+(bomb|gunfire|shot dead|stampede|N killed) PLUS public-order (riot|arrest|curfew|
+tear gas|evacuat|armed robbery|hostage|kidnap) — enough to keep a genuine venue
+incident ("fans riot at the World Cup, police arrest 40") while dropping match
+reports. The sports-idiom "clash" ("Round 1 clash") is DELIBERATELY NOT a rescue.
+**Why:** the broad-lexicon rescue is the exact trap — a spectacle body almost
+always carries incidental/negated security words, so its guard must be tighter
+than every other noise class.
+**Gotcha:** `haystack()` for the country gate includes title + summary + cleaned
+source + sourceUrl, so a PR term that doubles as an OUTLET name ("forum",
+"convention") false-drops via the masthead — keep only diary words that never
+appear in a publisher name. This gate is FRONTEND-DISPLAY only → NO
+RELEVANCE_RULE_VERSION bump (it never touches ingest/persistence). Verify by
+running the live PNG/WP rows through `isCountryRelevant` directly (throwaway probe
+over a psql JSON dump), not by eyeballing the rendered page.
