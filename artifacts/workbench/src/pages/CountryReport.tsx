@@ -399,6 +399,21 @@ export default function CountryReport() {
   const [proseUnavailable, setProseUnavailable] = useState(false);
   const [proseDraft, setProseDraft] = useState<CountryProseSections | null>(null);
   const proseRequestKey = useRef<string | null>(null);
+  // Busy state is derived from a LOCAL in-flight counter, not the shared React
+  // Query mutation's `isPending`. StrictMode double-invokes the prose effect in
+  // dev, which can strand the shared mutation in a zombie pending state and
+  // leave the button stuck on "Drafting...". The counter only reflects requests
+  // this component actually started and finished, so it always settles.
+  const proseInFlight = useRef(0);
+  const [proseBusy, setProseBusy] = useState(false);
+  const beginProseRequest = () => {
+    proseInFlight.current += 1;
+    setProseBusy(true);
+  };
+  const endProseRequest = () => {
+    proseInFlight.current = Math.max(0, proseInFlight.current - 1);
+    setProseBusy(proseInFlight.current > 0);
+  };
 
   // PNG grounds the AI prose on the SAME deduped, province/category-attributed
   // window items the brief renders (richer than the raw incident rows); every
@@ -470,6 +485,7 @@ export default function CountryReport() {
     proseRequestKey.current = proseContentKey;
     let cancelled = false;
     setProseUnavailable(false);
+    beginProseRequest();
     generateProse
       .mutateAsync({
         slug,
@@ -502,6 +518,9 @@ export default function CountryReport() {
           setProseResult(null);
           setProseUnavailable(true);
         }
+      })
+      .finally(() => {
+        endProseRequest();
       });
     return () => {
       cancelled = true;
@@ -512,6 +531,7 @@ export default function CountryReport() {
   const redraft = async () => {
     if (!country) return;
     setProseUnavailable(false);
+    beginProseRequest();
     try {
       const res = await generateProse.mutateAsync({
         slug,
@@ -537,6 +557,8 @@ export default function CountryReport() {
       proseRequestKey.current = proseContentKey;
     } catch {
       setProseUnavailable(true);
+    } finally {
+      endProseRequest();
     }
   };
 
@@ -819,17 +841,17 @@ export default function CountryReport() {
             <>
               <button
                 onClick={redraft}
-                disabled={generateProse.isPending}
+                disabled={proseBusy}
                 className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm disabled:opacity-60"
                 style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, color: DUSK, background: "#fff" }}
                 title="Regenerate the narrative from the current incidents"
               >
-                {generateProse.isPending ? (
+                {proseBusy ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="w-3.5 h-3.5" />
                 )}
-                {generateProse.isPending ? "Drafting..." : "Redraft"}
+                {proseBusy ? "Drafting..." : "Redraft"}
               </button>
               <button
                 onClick={() => setEditing(true)}
