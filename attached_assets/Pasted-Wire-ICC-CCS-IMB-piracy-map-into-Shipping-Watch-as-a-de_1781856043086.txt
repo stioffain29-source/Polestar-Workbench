@@ -1,0 +1,119 @@
+Wire ICC CCS / IMB piracy map into Shipping Watch as a dedicated maritime security source.
+
+Source:
+ICC Commercial Crime Services / International Maritime Bureau piracy and armed robbery map:
+https://icc-ccs.org/map/
+
+Primary destination:
+Shipping Watch.
+
+This source must support the Shipping Watch product first. It should provide live maritime security incident coverage for piracy, armed robbery, suspicious approaches, boardings, attempted boardings, fired upon incidents and hijackings.
+
+Do not treat ICC CCS / IMB as a general incident source.
+
+Required behaviour:
+
+1. Create a standalone connector:
+   icc_imb_piracy
+
+2. Ingest ICC CCS / IMB piracy map incidents into a maritime security table or maritime specific event model.
+
+3. Each record should include:
+   - source_name: ICC CCS / IMB Piracy Reporting Centre
+   - source_url
+   - incident_number
+   - incident_date
+   - incident_type
+   - vessel_type if available
+   - location_name
+   - country or nearest country
+   - sea_area or waterway
+   - latitude
+   - longitude
+   - raw_position_text
+   - narrative_summary
+   - fetched_at
+   - confidence / coordinate_quality
+
+4. Classify only as maritime security:
+   category = Maritime Security
+   subcategory = Piracy / Armed Robbery
+
+   Allowed incident types:
+   - Boarded
+   - Attempted Boarding
+   - Armed Robbery
+   - Fired Upon
+   - Hijacking
+   - Suspicious Vessel
+   - Unknown Maritime Security Incident
+
+5. Feed directly into Shipping Watch:
+   ICC CCS / IMB incidents must appear in the Shipping Watch dashboard, map, weekly report and PDF output.
+
+6. Shipping Watch display:
+   Add a dedicated section:
+   "Piracy and Armed Robbery"
+
+   Show:
+   - incident date
+   - location / waters
+   - nearest country
+   - incident type
+   - short summary
+   - business relevance
+
+7. Shipping Watch map:
+   Plot ICC CCS / IMB events on the maritime map using parsed coordinates where available.
+   If coordinates are missing or poor quality, group by waterway or nearest country and mark as approximate.
+
+8. Shipping Watch narrative:
+   Generate a short operational paragraph when incidents exist.
+
+   Example:
+   "ICC CCS / IMB reporting recorded maritime security activity in the Singapore Strait and Indonesian waters during the reporting period. Incidents involved boardings and suspicious vessel activity, with relevance to vessel routing, anchorage security, crew safety and marine cargo assurance."
+
+9. Country reports:
+   These incidents may also appear in a country report, but only under a clearly labelled Maritime Security section.
+   They must not be counted as normal crime, protest, civil unrest, terrorism or conflict incidents.
+
+10. Conflict Watch:
+   Do not send ICC CCS / IMB incidents to Conflict Watch unless there is a separate armed conflict source confirming the event has conflict relevance.
+
+11. Deduplication:
+   Use:
+   source_name + incident_number
+
+   If incident_number is missing:
+   source_name + incident_date + location + hash(narrative_summary)
+
+12. Source Health:
+   Add ICC CCS / IMB to Source Health.
+
+   Show:
+   - last fetch time
+   - newest incident date
+   - number of records ingested
+   - last error
+   - status: healthy / degraded / failed
+
+13. Failure handling:
+   If ICC CCS blocks scraping or the page structure changes, the connector must fail cleanly.
+   Do not break the ingest cycle.
+   Keep previous records.
+   Mark Source Health as degraded.
+
+14. Important guardrail:
+   ICC CCS / IMB is a Shipping Watch source.
+   It must not inflate general country incident counts.
+   It must not create land based crime incidents.
+   It must not appear in Protest Watch or Conflict Watch by default.
+
+Acceptance criteria:
+- ICC CCS / IMB appears as a Shipping Watch source.
+- Incidents appear in the Shipping Watch map and report.
+- Incidents are classified as Maritime Security only.
+- Source Health tracks the connector.
+- Duplicate incidents are not created.
+- Country reports can reference incidents only under Maritime Security.
+- General incident counts are not affected.

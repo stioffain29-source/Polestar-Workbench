@@ -1,0 +1,121 @@
+Add ICC CCS / IMB Piracy Map as a standalone maritime security source in Polestar Workbench.
+
+Source:
+ICC Commercial Crime Services / International Maritime Bureau piracy and armed robbery map.
+
+Purpose:
+Ingest reported piracy, armed robbery, attempted boarding, hijacking, fired upon and suspicious vessel incidents into Polestar as maritime security events only.
+
+Do not classify these as protest, civil unrest, conflict, crime, theft, terrorism or general incidents unless another source independently supports that classification. They must not inflate existing land based incident counts.
+
+Required behaviour:
+
+1. Create a new source connector called icc_imb_piracy.
+
+2. Fetch the current year ICC CCS live piracy map page and parse the incident table.
+   Fields to extract:
+   - incident_number
+   - date_of_incident
+   - raw_narrative
+   - raw_position_text
+   - latitude
+   - longitude
+   - location_name
+   - country
+   - incident_type
+   - vessel_status if available or inferable
+   - source_url
+   - source_name = "ICC CCS / IMB Piracy Reporting Centre"
+   - fetched_at
+   - raw_html_snapshot or raw_source_text for audit
+
+3. Parse coordinates from IMB position format.
+   Example formats may include:
+   - 13:45.72N – 120:59.59E
+   - 01:04.2N – 103:40.7E
+   Convert degrees and minutes into decimal degrees.
+   Preserve the original position text as raw_position_text.
+   Add coordinate_quality:
+   - exact_reported
+   - estimated
+   - missing
+
+4. Classification:
+   Use the map category where available:
+   - Attempted Attack
+   - Boarded
+   - Fired upon
+   - Hijacked
+   - Suspicious vessel
+
+   If the category is not directly available from the parsed table, infer conservatively from the narrative:
+   - "boarded" = Boarded
+   - "attempted to board" / "aborted" = Attempted Attack
+   - "fired upon" = Fired upon
+   - "hijacked" = Hijacked
+   - "suspicious" / "suspicious movements" = Suspicious vessel
+   If uncertain, set incident_type = "Unknown maritime security incident" and do not over classify.
+
+5. Deduplication:
+   Primary dedupe key:
+   source_name + incident_number
+
+   Fallback dedupe key if incident number is missing:
+   source_name + date_of_incident + normalised_location + hash(raw_narrative)
+
+   Never create duplicates on repeated ingest runs.
+
+6. Storage:
+   Prefer a dedicated table:
+   maritime_security_events
+
+   If the app already uses a central incidents table, add:
+   category = "Maritime Security"
+   subcategory = "Piracy / Armed Robbery"
+   source = "ICC CCS / IMB"
+   include_in_country_counts = false by default
+   include_in_shipping_watch = true
+   include_in_conflict_watch = false
+   include_in_protest_watch = false
+   include_in_crime_watch = false unless explicitly selected
+
+7. Bench display:
+   Add ICC CCS / IMB to Source Health.
+   Show:
+   - last successful fetch
+   - number of events ingested
+   - newest incident date
+   - last error if failed
+   - status: healthy / degraded / failed
+
+8. Report use:
+   Surface these events in:
+   - Shipping Watch
+   - Maritime Security section of country reports
+   - Country reports where the country is directly affected, for example Indonesia, Philippines, Singapore, Malaysia, Bangladesh, PNG, Ghana, Somalia, Nigeria etc.
+
+   Do not place them under general incident totals unless the report section is explicitly maritime.
+
+9. Output text:
+   For country reports, produce a short maritime paragraph only when relevant:
+   "IMB reported [x] maritime security incident(s) affecting [location/waters] during the period. The reporting involved [type: boarding / attempted boarding / suspicious vessel / hijacking]. Business relevance is mainly to port calls, anchorage security, crew safety, routing and marine cargo assurance."
+
+10. Compliance and source handling:
+   The ICC CCS terms state that website content is for general information, may change without notice, carries no warranty for accuracy or completeness, and reproduction of owned/licensed material is restricted. Treat this as a source summary and attribution feed, not a wholesale republication feed. Store attribution and source URL with every record. Do not copy large chunks of ICC narrative into public facing reports unless clearly attributed and kept brief.
+
+11. Fallback:
+   If the map page blocks automated fetches or the table structure changes, fail gracefully.
+   Do not crash ingest.
+   Mark Source Health as degraded.
+   Keep the previous successful records.
+   Add a clear error message.
+
+Acceptance criteria:
+- ICC CCS / IMB appears as a standalone source in Source Health.
+- Current year maritime incidents ingest without duplication.
+- Events show in Shipping Watch.
+- Events can appear in country reports under Maritime Security.
+- Events do not inflate protest, conflict, crime, or civil unrest counts.
+- Coordinates are parsed where available and preserved in raw form.
+- Source attribution is visible.
+- Failed fetches degrade cleanly without breaking the bench.
