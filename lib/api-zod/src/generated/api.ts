@@ -293,6 +293,37 @@ export const ListLiveuamapEventsResponse = zod.object({
 })
 
 
+/**
+ * @summary UN OCHA ReliefWeb situational reports stored as supporting CONTEXT (never as incidents, so they never inflate any count) for the monitored APAC countries.
+ */
+export const listReliefWebReportsQueryLimitMax = 100;
+
+
+
+export const ListReliefWebReportsQueryParams = zod.object({
+  "country": zod.coerce.string().optional().describe('Limit to one primary country (exact match on the ReliefWeb country name)'),
+  "limit": zod.coerce.number().min(1).max(listReliefWebReportsQueryLimitMax).optional().describe('Max number of most-recent reports to return (1-100)')
+})
+
+export const ListReliefWebReportsResponseItem = zod.object({
+  "id": zod.number(),
+  "externalId": zod.string().optional(),
+  "title": zod.string(),
+  "summary": zod.string().nullish(),
+  "url": zod.string(),
+  "sourceOrg": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "countries": zod.array(zod.string()).optional(),
+  "publishedAt": zod.coerce.date().nullish(),
+  "originalDate": zod.coerce.date().nullish(),
+  "categoryRaw": zod.string().nullish(),
+  "classification": zod.string(),
+  "confidence": zod.string().optional(),
+  "tags": zod.array(zod.string()).optional()
+}).describe('A UN OCHA ReliefWeb situational \/ humanitarian report stored as supporting CONTEXT for a monitored APAC country. NOT an incident: these rows live in their own table and never feed any incident count.')
+export const ListReliefWebReportsResponse = zod.array(ListReliefWebReportsResponseItem)
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 

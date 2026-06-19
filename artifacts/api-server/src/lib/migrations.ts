@@ -230,6 +230,51 @@ export async function runDataMigrations(): Promise<void> {
         ON incident_corroborations (incident_id)
     `);
 
+    // Schema: ReliefWeb (UN OCHA) situational/context reports. A SEPARATE table
+    // from incident_corroborations — it stores ReliefWeb reports as standalone
+    // supporting context (never as incidents), so it can NEVER inflate incident
+    // counts. drizzle push only reaches dev, so the prod primary gains the table
+    // here on boot. All idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reliefweb_reports (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL DEFAULT 'reliefweb',
+        external_id text NOT NULL,
+        title text NOT NULL,
+        summary text,
+        body text,
+        url text NOT NULL,
+        source_org text,
+        country text,
+        countries jsonb NOT NULL DEFAULT '[]'::jsonb,
+        published_at timestamptz,
+        original_date timestamptz,
+        category_raw text,
+        source_type text NOT NULL DEFAULT 'humanitarian_report',
+        classification text NOT NULL DEFAULT 'context',
+        confidence text NOT NULL DEFAULT 'medium',
+        tags jsonb NOT NULL DEFAULT '[]'::jsonb,
+        fetched_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS reliefweb_reports_source_external_unique
+        ON reliefweb_reports (source_name, external_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS reliefweb_reports_url_idx
+        ON reliefweb_reports (source_name, url)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS reliefweb_reports_country_idx
+        ON reliefweb_reports (country)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS reliefweb_reports_published_idx
+        ON reliefweb_reports (published_at)
+    `);
+
     // Relabel: when ReliefWeb has no APPROVED appname, its Source Health rows must
     // not read as "operational". Earlier builds registered the corroboration pass
     // as operational regardless of configuration, so existing prod rows can carry

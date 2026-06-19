@@ -4,6 +4,7 @@ import {
   useGetReport,
   useUpdateReport,
   useListIncidents,
+  useListReliefWebReports,
   getGetReportQueryKey,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
@@ -120,6 +121,10 @@ export default function ReportEditor() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [exporting, setExporting] = useState(false);
   const { data: incidents } = useListIncidents({});
+  // Supporting UN OCHA ReliefWeb context for the Conflict Watch report. Fetched
+  // unconditionally but only surfaced for the conflict topic; degrades to an
+  // empty list (and a hidden section) when the feed is unconfigured/unapproved.
+  const { data: situationalReports } = useListReliefWebReports({ limit: 40 });
   const seededForId = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   // Staleness check shared by the seeding effect and the live warning banner.
@@ -242,7 +247,12 @@ export default function ReportEditor() {
       } else if (form.topic === "shipping") {
         await exportShippingReportPdf(pdfPayload, incidentsForExport, filename);
       } else if (form.topic === "conflict") {
-        await exportConflictReportPdf(pdfPayload, incidentsForExport, filename);
+        await exportConflictReportPdf(
+          pdfPayload,
+          incidentsForExport,
+          filename,
+          situationalReports,
+        );
       } else {
         await exportTopicReportPdf(
           {
@@ -1343,6 +1353,7 @@ export default function ReportEditor() {
             <ConflictReportPreview
               report={form}
               incidents={incidentsForExport}
+              situationalReports={situationalReports}
             />
           ) : (
             <ReportPreview

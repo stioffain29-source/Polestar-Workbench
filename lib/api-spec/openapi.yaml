@@ -86,6 +86,32 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/LiveuamapEventsResponse" }
 
+  /reliefweb-reports:
+    get:
+      operationId: listReliefWebReports
+      tags: [reliefweb-reports]
+      summary: >-
+        UN OCHA ReliefWeb situational reports stored as supporting CONTEXT (never
+        as incidents, so they never inflate any count) for the monitored APAC
+        countries.
+      parameters:
+        - name: country
+          in: query
+          description: Limit to one primary country (exact match on the ReliefWeb country name)
+          schema: { type: string }
+        - name: limit
+          in: query
+          description: Max number of most-recent reports to return (1-100)
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReliefWebReport" }
+
   /incidents:
     get:
       operationId: listIncidents
@@ -2030,6 +2056,33 @@ components:
           type: ["array", "null"]
           items: { $ref: "#/components/schemas/MarketPriceTrajectoryPoint" }
         updatedAt: { type: string, format: date-time }
+
+    ReliefWebReport:
+      type: object
+      description: >-
+        A UN OCHA ReliefWeb situational / humanitarian report stored as
+        supporting CONTEXT for a monitored APAC country. NOT an incident: these
+        rows live in their own table and never feed any incident count.
+      required: [id, title, url, classification]
+      properties:
+        id: { type: integer }
+        externalId: { type: string }
+        title: { type: string }
+        summary: { type: ["string", "null"] }
+        url: { type: string }
+        sourceOrg: { type: ["string", "null"] }
+        country: { type: ["string", "null"] }
+        countries:
+          type: array
+          items: { type: string }
+        publishedAt: { type: ["string", "null"], format: date-time }
+        originalDate: { type: ["string", "null"], format: date-time }
+        categoryRaw: { type: ["string", "null"] }
+        classification: { type: string }
+        confidence: { type: string }
+        tags:
+          type: array
+          items: { type: string }
 
     LiveuamapRegion:
       type: string

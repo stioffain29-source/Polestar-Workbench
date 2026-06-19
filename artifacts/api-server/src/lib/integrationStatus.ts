@@ -3,6 +3,7 @@ import {
   incidentsTable,
   incidentCorroborationsTable,
   countryReportProseTable,
+  reliefwebReportsTable,
 } from "@workspace/db";
 import { eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
@@ -84,6 +85,10 @@ const GDELT_DETAIL =
   "Additive precision layer over flashpoint incidents (sub-national geo, confirmed fatalities, named actors). Never inserts or removes incident rows — only enriches existing ones.";
 const RELIEFWEB_DETAIL =
   "Cross-checks scraped incidents against official UN OCHA ReliefWeb reports and attaches corroborating links (shown on Incidents/Topic screens, not in PDFs).";
+const RELIEFWEB_REPORTS_DETAIL =
+  "Pulls UN OCHA ReliefWeb situational/humanitarian reports for the monitored APAC countries as supporting CONTEXT under Conflict Watch and country reports. Stored in their own table — never as incidents, so they never inflate any count.";
+const RELIEFWEB_REPORTS_NOT_CONFIGURED_MESSAGE =
+  "RELIEFWEB_APPNAME not set to an approved value — situational context disabled. ReliefWeb's v2 API returns 403 without a pre-approved appname (request one at https://apidoc.reliefweb.int/parameters#appname).";
 const LIVEUAMAP_DETAIL =
   "Server-side proxy for the PAID Liveuamap live-map overlay (the key never reaches the browser; upstream calls are TTL-cached). The incident map works fully without it.";
 const OPENAI_DETAIL =
@@ -201,6 +206,69 @@ async function reliefwebStatus(): Promise<IntegrationStatusItem> {
     optional: true,
     envVars,
     metrics: [metric("Corroborations", links), metric("Last match", fmtDate(latest))],
+    docsUrl: "https://apidoc.reliefweb.int/parameters#appname",
+  };
+}
+
+async function reliefwebReportsStatus(): Promise<IntegrationStatusItem> {
+  const envVars = ["RELIEFWEB_APPNAME"];
+  const configured = isReliefWebConfigured();
+
+  let reports = 0;
+  let latest: Date | null = null;
+  let countries = 0;
+  try {
+    const [row] = await db
+      .select({
+        n: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${reliefwebReportsTable.publishedAt})`,
+        countries: sql<number>`count(distinct ${reliefwebReportsTable.country})::int`,
+      })
+      .from(reliefwebReportsTable)
+      .where(eq(reliefwebReportsTable.sourceName, "reliefweb"));
+    reports = row?.n ?? 0;
+    latest = row?.latest ?? null;
+    countries = row?.countries ?? 0;
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "reliefweb reports integration status query failed");
+    return unknownItem({
+      key: "reliefweb_reports",
+      label: "ReliefWeb Situational Reports (UN OCHA)",
+      configured,
+      envVars,
+      summary: "Status query failed.",
+      detail: RELIEFWEB_REPORTS_DETAIL,
+      docsUrl: "https://apidoc.reliefweb.int/parameters#appname",
+    });
+  }
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (!configured) {
+    status = "not_configured";
+    summary = RELIEFWEB_REPORTS_NOT_CONFIGURED_MESSAGE;
+  } else if (reports > 0) {
+    status = "working";
+    summary = `Holding ${reports} UN OCHA situational report(s) as supporting context — never counted as incidents.`;
+  } else {
+    status = "no_data";
+    summary = "Configured, but no situational reports have been stored yet.";
+  }
+
+  return {
+    key: "reliefweb_reports",
+    label: "ReliefWeb Situational Reports (UN OCHA)",
+    status,
+    summary,
+    detail: RELIEFWEB_REPORTS_DETAIL,
+    configured,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("Reports stored", reports),
+      metric("Latest report", fmtDate(latest)),
+      metric("Countries covered", countries),
+    ],
     docsUrl: "https://apidoc.reliefweb.int/parameters#appname",
   };
 }
@@ -324,6 +392,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
   const integrations = await Promise.all([
     gdeltStatus(),
     reliefwebStatus(),
+    reliefwebReportsStatus(),
     liveuamapStatus(),
     openaiStatus(),
   ]);

@@ -4,6 +4,7 @@ import {
   useGetCountryReport,
   useListIncidents,
   useListSources,
+  useListReliefWebReports,
   useUpdateCountryReport,
   useGetCountryBaseline,
   useUpsertCountryBaseline,
@@ -34,6 +35,7 @@ import {
   isForeignDominantContext,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
+import SituationalContextSection from "@/components/SituationalContextSection";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
@@ -171,6 +173,12 @@ export default function CountryReport() {
   // (no source health available) we still surface the conservative coverage
   // warning rather than silently hiding it.
   const { data: sourcesData, isLoading: sourcesLoading } = useListSources();
+  // Supporting UN OCHA ReliefWeb context scoped to this country. Degrades to an
+  // empty list (and a hidden section) when the feed is unconfigured/unapproved.
+  const { data: situationalReports } = useListReliefWebReports(
+    country ? { country: country.name ?? undefined, limit: 40 } : {},
+    { query: { enabled: !!country } } as never,
+  );
   const incidents = useMemo(() => {
     if (!country) return [];
     const name = country.name ?? "";
@@ -1101,6 +1109,13 @@ export default function CountryReport() {
       <Section title="Polestar View">
         <Prose text={displayProse.polestarView} />
       </Section>
+
+      {/* Situational Context (UN OCHA ReliefWeb supporting layer — not counted) */}
+      <SituationalContextSection
+        reports={situationalReports}
+        country={effective.name}
+        max={6}
+      />
 
       {/* 10. Related Incidents */}
       <Section title="Related Incidents">

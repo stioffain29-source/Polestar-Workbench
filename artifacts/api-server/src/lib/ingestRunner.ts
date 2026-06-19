@@ -13,12 +13,14 @@ import {
   runTitleTranslation,
   runResolveGoogleNewsUrls,
   runReliefWebCorroboration,
+  runReliefWebReportsIngest,
   runGdeltEnrich,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
   type StrikesIngestSummary,
   type ReliefWebCorroborationSummary,
+  type ReliefWebReportsSummary,
   type GdeltEnrichSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -56,7 +58,18 @@ export type IngestRunResult =
       marketSnapshot: MarketSnapshotSummary;
       strikes: StrikesIngestSummary;
       corroboration: ReliefWebCorroborationSummary;
+      reliefwebReports: ReliefWebReportsSummary;
       gdeltEnrich: GdeltEnrichSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type ReliefWebReportsRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      reliefwebReports: ReliefWebReportsSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -168,6 +181,27 @@ function emptyCorroboration(err: unknown): ReliefWebCorroborationSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`ReliefWeb corroboration failed: ${msg}`],
+  };
+}
+
+function emptyReliefWebReports(err: unknown): ReliefWebReportsSummary {
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    source: "reliefweb_reports",
+    mode: "commit",
+    configured: false,
+    windowFrom: null,
+    reportsFetched: 0,
+    rejected: 0,
+    duplicateInDb: 0,
+    newToInsert: 0,
+    inserted: 0,
+    totalAfter: 0,
+    latestReportDate: null,
+    countriesCovered: [],
+    fetchOk: false,
+    errors: [msg],
+    logLines: [`ReliefWeb situational reports failed: ${msg}`],
   };
 }
 
@@ -407,6 +441,28 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ReliefWeb corroboration pass failed");
       corroboration = emptyCorroboration(err);
     }
+    // ReliefWeb (UN OCHA) situational reports — a SEPARATE context pass from the
+    // corroboration above. Pulls UN OCHA reports for the monitored APAC
+    // countries into the standalone reliefweb_reports table as supporting
+    // CONTEXT (never as incidents, so it can never inflate any count). Isolated
+    // in its own try so a ReliefWeb outage can never fail the wider ingest.
+    let reliefwebReports: ReliefWebReportsSummary;
+    try {
+      reliefwebReports = await runReliefWebReportsIngest({ commit: true });
+      logger.info(
+        {
+          configured: reliefwebReports.configured,
+          reportsFetched: reliefwebReports.reportsFetched,
+          inserted: reliefwebReports.inserted,
+          totalAfter: reliefwebReports.totalAfter,
+          fetchOk: reliefwebReports.fetchOk,
+        },
+        "ReliefWeb situational reports pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "ReliefWeb situational reports pass failed");
+      reliefwebReports = emptyReliefWebReports(err);
+    }
     // GDELT precision enrichment. ADDITIVE — attaches structured ACLED-style
     // fields (precise sub-national geo, fatality counts, named actors, event
     // coding, AI confidence) onto EXISTING flashpoint rows; never replaces the
@@ -446,7 +502,36 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       marketSnapshot,
       strikes,
       corroboration,
+      reliefwebReports,
       gdeltEnrich,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the ReliefWeb situational-reports context ingest, committing to the
+ * database. Used by the manual admin trigger so an operator can refresh UN OCHA
+ * context without re-running the full multi-minute incident chain. Shares the
+ * same advisory lock so it can never collide with a full run.
+ */
+export async function runReliefWebReportsOnce(): Promise<ReliefWebReportsRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let reliefwebReports: ReliefWebReportsSummary;
+    try {
+      reliefwebReports = await runReliefWebReportsIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "ReliefWeb situational reports ingest failed");
+      reliefwebReports = emptyReliefWebReports(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      reliefwebReports,
     };
   });
   if (!res.ran) return res;

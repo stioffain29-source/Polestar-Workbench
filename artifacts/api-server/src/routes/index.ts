@@ -11,6 +11,7 @@ import proseRouter from "./prose";
 import dashboardRouter from "./dashboard";
 import marketPricesRouter from "./marketPrices";
 import liveuamapRouter from "./liveuamap";
+import reliefwebReportsRouter from "./reliefwebReports";
 import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
@@ -32,6 +33,7 @@ router.use(countriesRouter);
 router.use(dashboardRouter);
 router.use(marketPricesRouter);
 router.use(liveuamapRouter);
+router.use(reliefwebReportsRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
 

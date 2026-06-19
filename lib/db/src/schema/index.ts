@@ -1,5 +1,6 @@
 export * from "./incidents";
 export * from "./corroborations";
+export * from "./reliefwebReports";
 export * from "./strikes";
 export * from "./sources";
 export * from "./reports";

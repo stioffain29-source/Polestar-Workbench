@@ -1,0 +1,276 @@
+TASK: Add ReliefWeb API as a Polestar source adapter
+
+Purpose
+
+Add ReliefWeb as a new API based source for Polestar.
+
+This should not be treated as a live incident feed. ReliefWeb is a curated humanitarian reporting source. It should be used to enrich Conflict Watch, country reporting and crisis context, especially where events have humanitarian, displacement, disaster, conflict or civil unrest consequences.
+
+Do not scrape the ReliefWeb website.
+
+Use the official ReliefWeb API V2.
+
+Endpoint
+
+Use the reports endpoint:
+
+POST https://api.reliefweb.int/v2/reports?appname=${RELIEFWEB_APPNAME}
+
+ReliefWeb requires an approved appname. Add this as an environment variable:
+
+RELIEFWEB_APPNAME=polestar-advisory-monitoring
+
+The integration must fail clearly if RELIEFWEB_APPNAME is missing.
+
+Initial monitored countries
+
+Pull ReliefWeb reports for:
+
+Indonesia
+Philippines
+Thailand
+Malaysia
+Myanmar
+Cambodia
+Bangladesh
+Papua New Guinea
+Australia
+
+Do not add New Zealand unless reporting exists or it is later added to the monitored country list.
+
+Use case inside Polestar
+
+ReliefWeb should support:
+
+Conflict Watch
+Country reports
+Crisis context
+Humanitarian impact
+Displacement
+Natural disaster overlays
+Civil unrest with humanitarian consequence
+War and armed conflict impact
+Insurgency impact
+Operational disruption context
+
+It should not be used to inflate protest counts or incident totals.
+
+API request
+
+Use POST with a JSON body.
+
+Start with a 7 day lookback on first run. After that, use date.created from the last successful run.
+
+Example request body:
+
+{
+  "limit": 100,
+  "preset": "latest",
+  "profile": "list",
+  "filter": {
+    "operator": "AND",
+    "conditions": [
+      {
+        "field": "date.created",
+        "value": {
+          "from": "2026-06-12T00:00:00+00:00"
+        }
+      },
+      {
+        "field": "country",
+        "value": [
+          "Indonesia",
+          "Philippines",
+          "Thailand",
+          "Malaysia",
+          "Myanmar",
+          "Cambodia",
+          "Bangladesh",
+          "Papua New Guinea",
+          "Australia"
+        ],
+        "operator": "OR"
+      }
+    ]
+  },
+  "fields": {
+    "include": [
+      "id",
+      "title",
+      "url",
+      "date.created",
+      "date.original",
+      "source.name",
+      "source.shortname",
+      "primary_country.name",
+      "country.name",
+      "format.name",
+      "theme.name",
+      "disaster_type.name",
+      "headline.title",
+      "headline.summary",
+      "body"
+    ]
+  },
+  "sort": [
+    "date.created:desc"
+  ]
+}
+
+Data mapping
+
+Map each ReliefWeb result into the existing Polestar source/incidents pipeline as follows:
+
+source_name = ReliefWeb
+external_id = ReliefWeb report id
+title = title
+summary = headline.summary, fallback to first 500 characters of body
+body = body
+url = url
+published_at = date.created, fallback to date.original
+country = primary_country.name, fallback to country.name
+source_org = source.name
+category_raw = theme.name / disaster_type.name / format.name
+source_type = humanitarian_report
+confidence = medium
+
+Deduplication
+
+Primary deduplication:
+
+source_name + external_id
+
+Fallback deduplication:
+
+source_name + url
+
+Do not create duplicate entries where the same ReliefWeb report mentions several countries. Store the full country list if the schema allows it, but assign the primary display country using primary_country.name.
+
+Classification
+
+Classify ReliefWeb reports as context/enrichment unless they clearly describe a specific operationally relevant event.
+
+Suggested internal tags:
+
+humanitarian_context
+conflict_impact
+civil_unrest_impact
+displacement
+natural_disaster
+food_security
+health_crisis
+access_constraints
+infrastructure_disruption
+security_context
+
+Reporting behaviour
+
+In Conflict Watch, ReliefWeb content should appear as supporting context beneath the relevant country section.
+
+Example use:
+
+“ReliefWeb reporting indicates continued displacement and access constraints in affected provinces, adding humanitarian pressure to the wider security picture.”
+
+Do not write:
+
+“ReliefWeb reported 14 incidents.”
+
+Unless the report itself clearly contains incident data and the system has extracted it properly.
+
+Scheduling
+
+Run ReliefWeb ingest every 6 hours.
+
+Also allow a manual run from the admin/source health panel.
+
+Suggested command:
+
+pnpm ingest:reliefweb
+
+Logging
+
+Log the following on every run:
+
+source_name
+run_started_at
+run_finished_at
+countries_requested
+number_fetched
+number_inserted
+number_skipped_duplicate
+number_failed
+latest_date_created
+API status code
+API error message if any
+RELIEFWEB_APPNAME present yes/no
+
+Source health card
+
+Add ReliefWeb to the source health panel.
+
+Show:
+
+Last successful run
+Last error
+Reports fetched in last run
+Reports inserted in last run
+Latest report date
+Countries covered
+Status: Healthy / Warning / Failed
+
+Failure handling
+
+If the API fails, do not break the wider ingest pipeline.
+
+Log the error and mark ReliefWeb as Warning or Failed.
+
+If the API returns no reports, treat this as a successful run with zero results, not as an error.
+
+Acceptance criteria
+
+1. ReliefWeb is visible as a source in the source health panel.
+
+2. The app uses the ReliefWeb API, not website scraping.
+
+3. RELIEFWEB_APPNAME is stored as an environment variable.
+
+4. The ingest pulls reports for Indonesia, Philippines, Thailand, Malaysia, Myanmar, Cambodia, Bangladesh, Papua New Guinea and Australia.
+
+5. The system stores the ReliefWeb report id, title, URL, source organisation, country, published date, summary and body.
+
+6. Deduplication works using source_name + external_id.
+
+7. ReliefWeb reports do not inflate incident counts by default.
+
+8. ReliefWeb content can be used in Conflict Watch and country reports as context.
+
+9. Logs show fetched, inserted, duplicate and failed counts.
+
+10. A failed ReliefWeb run does not break the rest of the Polestar ingest process.
+
+Important product note
+
+ReliefWeb is worth adding, but only as a context source.
+
+Good for:
+
+Conflict Watch
+Country reports
+Humanitarian impact
+Displacement
+Disaster overlays
+Crisis context
+Operational context after conflict, insurgency, civil unrest or natural disaster
+
+Weak for:
+
+Live protest tracking
+Urban transport disruption
+Cargo theft
+Industrial action
+Routine crime
+Near real time security incident counting
+
+Product rule:
+
+ReliefWeb enriches the assessment. It does not drive the count.

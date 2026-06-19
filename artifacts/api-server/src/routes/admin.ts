@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { type IngestSummary } from "@workspace/ingest";
 import { summarizeIngestFailures } from "../lib/ingestFailureSummary";
-import { runIngestOnce } from "../lib/ingestRunner";
+import { runIngestOnce, runReliefWebReportsOnce } from "../lib/ingestRunner";
 
 const router: IRouter = Router();
 
@@ -154,6 +154,80 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin ingest failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Protected manual trigger for ONLY the ReliefWeb situational-context pass.
+//
+// Same token gate + concurrency guarantees as /admin/ingest (shares the cross-
+// instance advisory lock via runReliefWebReportsOnce), but refreshes UN OCHA
+// context WITHOUT re-running the full multi-minute incident chain. A no-op when
+// RELIEFWEB_APPNAME is not set to an approved value — it returns the summary
+// with configured=false so the caller can see why nothing was fetched.
+router.post("/admin/reliefweb-reports", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin reliefweb-reports called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  try {
+    req.log.info("admin reliefweb-reports started");
+    const result = await runReliefWebReportsOnce();
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const r = result.reliefwebReports;
+    req.log.info(
+      {
+        configured: r.configured,
+        reportsFetched: r.reportsFetched,
+        inserted: r.inserted,
+        totalAfter: r.totalAfter,
+        fetchOk: r.fetchOk,
+        durationMs: result.durationMs,
+      },
+      "admin reliefweb-reports finished",
+    );
+    res.json({
+      ok: true,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      reliefwebReports: {
+        configured: r.configured,
+        windowFrom: r.windowFrom,
+        reportsFetched: r.reportsFetched,
+        rejected: r.rejected,
+        duplicateInDb: r.duplicateInDb,
+        newToInsert: r.newToInsert,
+        inserted: r.inserted,
+        totalAfter: r.totalAfter,
+        latestReportDate: r.latestReportDate,
+        countriesCovered: r.countriesCovered,
+        fetchOk: r.fetchOk,
+        errors: r.errors,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin reliefweb-reports failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

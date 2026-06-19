@@ -48,12 +48,14 @@ import type {
   ListIncidentsParams,
   ListLiveuamapEventsParams,
   ListMarketPricesParams,
+  ListReliefWebReportsParams,
   ListReportsParams,
   ListSourcesParams,
   ListSpotReportsParams,
   ListStrikesParams,
   LiveuamapEventsResponse,
   MarketPrice,
+  ReliefWebReport,
   Report,
   ReportInput,
   ReportUpdate,
@@ -394,6 +396,90 @@ export function useListLiveuamapEvents<TData = Awaited<ReturnType<typeof listLiv
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListLiveuamapEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListReliefWebReportsUrl = (params?: ListReliefWebReportsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/reliefweb-reports?${stringifiedParams}` : `/api/reliefweb-reports`
+}
+
+/**
+ * @summary UN OCHA ReliefWeb situational reports stored as supporting CONTEXT (never as incidents, so they never inflate any count) for the monitored APAC countries.
+ */
+export const listReliefWebReports = async (params?: ListReliefWebReportsParams, options?: RequestInit): Promise<ReliefWebReport[]> => {
+
+  return customFetch<ReliefWebReport[]>(getListReliefWebReportsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListReliefWebReportsQueryKey = (params?: ListReliefWebReportsParams,) => {
+    return [
+    `/api/reliefweb-reports`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListReliefWebReportsQueryOptions = <TData = Awaited<ReturnType<typeof listReliefWebReports>>, TError = ErrorType<unknown>>(params?: ListReliefWebReportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReliefWebReports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListReliefWebReportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listReliefWebReports>>> = ({ signal }) => listReliefWebReports(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listReliefWebReports>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListReliefWebReportsQueryResult = NonNullable<Awaited<ReturnType<typeof listReliefWebReports>>>
+export type ListReliefWebReportsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary UN OCHA ReliefWeb situational reports stored as supporting CONTEXT (never as incidents, so they never inflate any count) for the monitored APAC countries.
+ */
+
+export function useListReliefWebReports<TData = Awaited<ReturnType<typeof listReliefWebReports>>, TError = ErrorType<unknown>>(
+ params?: ListReliefWebReportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReliefWebReports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListReliefWebReportsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

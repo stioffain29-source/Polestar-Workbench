@@ -48,6 +48,9 @@ import {
   type WatchlistRow,
   type CountryCoverageStatus,
 } from "./countryReportLayers";
+import { buildSituationalContext } from "./situationalContext";
+import { drawSituationalContextPdf } from "./situationalContextPdf";
+import type { ReliefWebReport } from "@workspace/api-client-react";
 
 export interface PdfIncident {
   id: number | string;
@@ -84,6 +87,9 @@ export interface CountryPdfExtras {
   watchNext?: string;
   /** Optional "Polestar View" prose; rendered only if provided and non-empty. */
   polestarView?: string;
+  /** Supporting UN OCHA ReliefWeb situational reports. Rendered as a context
+   *  layer (never counted as incidents); the section is skipped when empty. */
+  situationalReports?: ReliefWebReport[] | null;
   /** PNG data-URL of the rendered preview map. Optional. */
   mapImage?: string;
   /** Curated country baseline (operating environment, security context,
@@ -729,6 +735,15 @@ export async function exportCountryReportPdf(
   // Incidents to mirror the preview's section order exactly.
   drawNarrative(ctx, "Watch Next", extras.watchNext);
   drawNarrative(ctx, "Polestar View", extras.polestarView);
+
+  // 9c. Situational Context (UN OCHA ReliefWeb) — supporting layer, not counted.
+  drawSituationalContextPdf(
+    ctx,
+    buildSituationalContext(extras.situationalReports ?? [], {
+      country: country.name,
+      max: 6,
+    }),
+  );
 
   // 10. Related Incidents
   drawIncidentTable(ctx, windowIncidents);

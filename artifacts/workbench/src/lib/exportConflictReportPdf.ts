@@ -41,6 +41,9 @@ import {
   type ConflictEnrichedIncident,
   type ConflictActivityArea,
 } from "./conflictReportDataset";
+import { buildSituationalContext } from "./situationalContext";
+import { drawSituationalContextPdf } from "./situationalContextPdf";
+import type { ReliefWebReport } from "@workspace/api-client-react";
 
 // Conflict Watch PDF. Section order (LOCATION-LED, no Executive Summary):
 //   Cover -> Situation -> Fast Facts -> Top Activity Areas ->
@@ -225,6 +228,7 @@ export async function exportConflictReportPdf(
   data: ConflictReportData,
   incidents: ConflictReportIncident[],
   filename: string,
+  situationalReports?: ReliefWebReport[] | null,
 ): Promise<void> {
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const canon = canonicalTopic(data.topic);
@@ -305,6 +309,8 @@ export async function exportConflictReportPdf(
     "Polestar View",
     pickProse(data.polestarView, ds.autoPolestarView),
   );
+
+  drawSituationalContextPdf(ctx, buildSituationalContext(situationalReports, { max: 6 }));
 
   drawRelatedIncidents(ctx, ds.relatedIncidents);
 

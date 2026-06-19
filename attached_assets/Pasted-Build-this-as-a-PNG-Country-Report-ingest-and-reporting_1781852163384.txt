@@ -1,0 +1,66 @@
+Build this as a PNG Country Report ingest and reporting module, not as separate city feeds.
+
+The PNG Country Report should monitor the last 7 days of open-source reporting for protest, civil unrest, crime, theft, robbery, tribal violence, policing operations and operational disruption.
+
+Core monitored areas:
+- Port Moresby / NCD
+- Lae / Morobe
+- Mt Hagen / Western Highlands
+- National catch-all for major incidents elsewhere in PNG that affect security, travel, aviation, ports, roads, fuel, power, telecoms or government stability.
+
+Sources:
+- RPNGC
+- Post Courier
+- The National PNG
+- PNG Haus Bung
+- Loop PNG
+- EMTV
+- One PNG
+- ReliefWeb
+- GDELT
+- official government, airport and port statements where available
+
+Do not rely on police reporting alone. Treat RPNGC as high-confidence confirmation, not the only discovery source.
+
+For each article or item, extract:
+- source
+- title
+- URL
+- published date
+- incident date if mentioned
+- location
+- province
+- city or area
+- incident category
+- short factual summary
+- business impact
+- confidence score
+- whether the incident occurred this reporting week
+- whether it was only reported this week but occurred earlier
+- reason included or rejected
+
+The report should produce:
+1. Executive summary
+2. Top 3 incidents this week
+3. Port Moresby / NCD section
+4. Lae / Morobe section
+5. Mt Hagen / Western Highlands section
+6. Other national security-relevant incidents
+7. Business impact
+8. Outlook for next week
+9. Source confidence and reporting gaps
+
+If no reportable item is found for a location, write:
+“No fresh publicly reported protest, theft, robbery or major crime incident identified in open sources for this location during the reporting period.”
+
+Add ingest diagnostics showing:
+- articles pulled by source
+- articles matching PNG
+- articles matching monitored locations
+- articles matching incident terms
+- rejected duplicates
+- rejected old incidents
+- rejected non-security items
+- promoted report candidates
+
+The aim is a usable PNG country security report, not a raw news feed.

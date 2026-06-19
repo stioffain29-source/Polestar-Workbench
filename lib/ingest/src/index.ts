@@ -26,6 +26,11 @@ export {
 } from "./reliefweb";
 export type { ReliefWebCorroborationSummary } from "./reliefweb";
 export {
+  runReliefWebReportsIngest,
+  emptyReliefWebReportsSummary,
+} from "./reliefwebReports";
+export type { ReliefWebReportsSummary } from "./reliefwebReports";
+export {
   runGdeltEnrich,
   isGdeltConfigured,
   isGdeltEnrichEnabled,

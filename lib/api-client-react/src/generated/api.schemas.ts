@@ -1075,6 +1075,32 @@ export interface MarketPrice {
   updatedAt?: string;
 }
 
+/**
+ * A UN OCHA ReliefWeb situational / humanitarian report stored as supporting CONTEXT for a monitored APAC country. NOT an incident: these rows live in their own table and never feed any incident count.
+ */
+export interface ReliefWebReport {
+  id: number;
+  externalId?: string;
+  title: string;
+  /** @nullable */
+  summary?: string | null;
+  url: string;
+  /** @nullable */
+  sourceOrg?: string | null;
+  /** @nullable */
+  country?: string | null;
+  countries?: string[];
+  /** @nullable */
+  publishedAt?: string | null;
+  /** @nullable */
+  originalDate?: string | null;
+  /** @nullable */
+  categoryRaw?: string | null;
+  classification: string;
+  confidence?: string;
+  tags?: string[];
+}
+
 export type LiveuamapRegion = typeof LiveuamapRegion[keyof typeof LiveuamapRegion];
 
 
@@ -1188,6 +1214,19 @@ region?: LiveuamapRegion;
  * @maximum 100
  */
 count?: number;
+};
+
+export type ListReliefWebReportsParams = {
+/**
+ * Limit to one primary country (exact match on the ReliefWeb country name)
+ */
+country?: string;
+/**
+ * Max number of most-recent reports to return (1-100)
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListIncidentsParams = {

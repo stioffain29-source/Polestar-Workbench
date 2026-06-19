@@ -10,6 +10,8 @@ import {
   type ConflictEnrichedIncident,
 } from "@/lib/conflictReportDataset";
 import { SEV_COLOR } from "@/lib/pdfChrome";
+import SituationalContextSection from "@/components/SituationalContextSection";
+import type { ReliefWebReport } from "@workspace/api-client-react";
 
 // Conflict Watch on-screen preview. Renders the same sections, in the same
 // order, from the same dataset (buildConflictReportDataset) as
@@ -360,9 +362,11 @@ function RelatedIncidentsTable({ rows }: { rows: ConflictEnrichedIncident[] }) {
 export default function ConflictReportPreview({
   report,
   incidents,
+  situationalReports,
 }: {
   report: ConflictPreviewReport;
   incidents: ConflictReportIncident[];
+  situationalReports?: ReliefWebReport[] | null;
 }) {
   const topic = report.topic ?? "conflict";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -525,6 +529,8 @@ export default function ConflictReportPreview({
         <Section title="Polestar View">
           <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
         </Section>
+
+        <SituationalContextSection reports={situationalReports} max={6} />
 
         <Section title="Related Incidents">
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
