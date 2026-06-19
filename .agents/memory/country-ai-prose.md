@@ -15,6 +15,14 @@ The narrative sections of a country brief (executiveSummary, situation, whatHapp
 
 **How to apply:** any new field added to the prompt body MUST also enter `incidentIdentity`, or stale cache hits return. Bump `PROSE_PROMPT_VERSION` whenever the prompt/section contract changes so existing rows regenerate. Reordering incidents must NOT change the fingerprint (canonical sort guarantees this — verified).
 
+## PNG variant leaves 4 sections empty BY DESIGN — "Not populated" = stale-bundle skew, not a bug
+
+The PNG country brief uses prose variant `"png"` (vs `"country"`). The `png` variant DELIBERATELY returns only `executiveSummary` + `outlook`; `situation`/`whatHappened`/`whatMatters`/`implications` are length-0. Those four come from the deterministic `PngCountryReportBody` dataset (Top 3 / per-location / national activity), NOT the AI prose. The generic country layout renders those four FROM prose; the PNG layout renders them from the dataset. `isPng` (`acceptedCountryTokens(country.name).includes("papua new guinea")` in `CountryReport.tsx`) routes BOTH the layout choice AND the variant sent to the prose route (client-decided `proseVariant`).
+
+**Symptom seen once:** the PUBLISHED PNG report showed "Not populated" for those four sections while Exec Summary + Fast Facts were correct. Root cause was NOT code — it was a stale cached BROWSER bundle predating `PngCountryReportBody`: the old bundle rendered the generic layout (`isPng` effectively false there) against the NEW server's `png`-variant prose → empty sections. Deployed code was correct (served prod bundle contained the PNG-body literals; prod had `png`-variant prose, which only an `isPng=true` client can produce; dev rendered the PNG body from identical data). **Why it can only be skew:** `isPng` couples the layout and the variant, so in any SINGLE consistent bundle the generic layout never meets `png` prose. Resolution = hard refresh / fresh bundle; no repo change fixes an already-cached client.
+
+**How to apply:** if someone reports the published PNG country report showing "Not populated", first verify the served prod bundle (`getDeploymentInfo().primaryUrl`, curl `--compressed` the hashed `/assets/*.js`, grep `TOP 3 INCIDENTS THIS WEEK`) and whether prod prose is `png`-variant before touching code — the likely fix is the user reloading, not an edit.
+
 ## Constraints the prompt enforces (brand rules)
 
 No fabrication (window facts only from supplied incidents; quiet window = limited reporting, never "calm"); NO numeric incident/record counts in prose; five-tier vocab only (Insignificant/Low/Moderate/High/Extreme); no mention of internal tooling/pipelines/geocoding/dedup; each section a distinct job (no cross-section repetition); British English. Preview==PDF is free here because the country PDF rasterises the on-screen DOM (`exportElementToPdf`), so wiring prose into the React preview covers both.
