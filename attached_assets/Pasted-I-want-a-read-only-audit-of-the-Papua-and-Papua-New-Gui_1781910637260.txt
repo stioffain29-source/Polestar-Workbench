@@ -1,0 +1,126 @@
+I want a read only audit of the Papua and Papua New Guinea country report setup.
+
+Do not change code.
+Do not refactor.
+Do not rebuild the reports.
+Do not make assumptions.
+This is diagnosis only.
+
+Audit the following areas and report back clearly.
+
+1. Feed health
+
+For both Papua and Papua New Guinea, list every source currently feeding the country report.
+
+For each source, show:
+
+Source name
+Feed type
+Country or theatre it maps to
+Last successful pull
+Items collected in the last 7 days
+Items collected in the last 30 days
+Items collected in the last 90 days
+Current status: live, weak, stale, dead or misconfigured
+Whether the source should be kept, fixed, replaced or removed
+
+I need to know which feeds are actually working and which ones are just sitting in the config doing nothing.
+
+2. Data quality
+
+For both reports, inspect recent items and assess whether they are useful reportable incidents or just general news.
+
+Check:
+
+How many items are genuine security incidents
+How many are duplicates or syndicated repeats
+How many are background political stories rather than incidents
+How many have usable location data
+How many have usable category data
+How many have usable severity data
+How many have operational impact or business relevance
+How many Indonesian language items are untranslated
+How many items would survive basic analyst review
+
+Do not rely on raw incident counts alone. I need to know whether the data is actually useful.
+
+3. Papua specific issues
+
+Check whether the Papua report is too dependent on one or two sources.
+
+Check whether Indonesian language sources are being ingested properly.
+
+Check whether OpenAI translation is configured and working for Papua content.
+
+Check whether place names such as Jayapura, Timika, Nduga, Intan Jaya, Puncak, Yahukimo, Mimika and Pegunungan Bintang are being captured into usable location fields.
+
+Check whether Papua incidents are being classified under the right risk categories, especially armed conflict, civil unrest, activism, crime and terrorism where relevant.
+
+4. Papua New Guinea specific issues
+
+Check whether the PNG report is over weighted towards Port Moresby.
+
+Check whether incidents from Lae, Mt Hagen, Highlands provinces and other areas are being captured properly.
+
+Check whether crime, unrest, tribal violence, election related incidents, fuel disruption, transport disruption and police activity are being classified consistently.
+
+Check whether PNG local sources are duplicating the same stories and inflating counts.
+
+5. Layout audit
+
+Explain why the Papua and Papua New Guinea reports no longer look alike.
+
+Identify the exact files, components or conditions causing the split.
+
+Check whether PNG is using a bespoke template and Papua is using a generic country report template.
+
+Check whether the two reports have different rules for:
+
+Summary structure
+Maps
+Charts
+Location buckets
+Top incidents
+Business impact
+Outlook
+Source confidence
+Incident tables
+Deduplication
+Category filtering
+
+I need this explained in plain English.
+
+6. Consistency audit
+
+Compare the two reports side by side.
+
+Show what appears in PNG but not Papua.
+
+Show what appears in Papua but not PNG.
+
+Show where the same country report rules are being applied differently.
+
+Show whether the differences are intentional, accidental or caused by older code branches.
+
+7. Required output
+
+Return the audit in this structure:
+
+Executive summary
+Feed health table
+Data quality findings
+Papua findings
+Papua New Guinea findings
+Layout divergence findings
+Root causes
+Recommended fixes
+Priority order
+Do not change anything yet
+
+For the recommended fixes, separate them into:
+
+Must fix
+Should fix
+Could fix later
+
+Be direct. If feeds are dead, say they are dead. If the layout split is messy, say it is messy. If the data is thin because the source base is weak, say that. I need an honest audit, not a reassurance note.
