@@ -5,6 +5,7 @@ import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/re
 import {
   runStrikesBackfill,
   runNewsCountryBackfill,
+  runPngExtractBackfill,
   runFlashpointMastheadRelocate,
   runFlashpointUnknownReattribute,
   classifySeverity,
@@ -1746,6 +1747,53 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (apacErr) {
       logger.error({ err: apacErr }, "APAC flashpoint backfill failed");
+    }
+
+    // ONE-TIME backfill of the PNG per-incident structured extraction.
+    //
+    //   The four PNG columns (province / category / business_impact /
+    //   incident_date) are populated at INGEST (lib/ingest flashpoint via
+    //   extractPngItem + derivePngIncidentDate), so only PNG rows ingested AFTER
+    //   those columns shipped carry them. Every earlier PNG row — in dev and
+    //   prod — reads null and forces the PNG country brief onto its client-side
+    //   mirror rulebook. This pass re-applies the IDENTICAL extraction to the
+    //   historical flashpoint rows attributed to Papua New Guinea (or the
+    //   cross-border "West Papua; Papua New Guinea" tag), so the report reads
+    //   these fields straight from the API. The extraction is a pure,
+    //   deterministic function of each row's existing title/summary/location/
+    //   occurredAt, so it is idempotent and can never invent data. Marker-gated
+    //   → runs once per environment. Reaches the writable prod DB only after a
+    //   republish (the deployment runtime is the only writable-prod context).
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "png_extract_backfill_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const summary = await runPngExtractBackfill({ commit: true });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            candidates: summary.candidates,
+            updated: summary.updated,
+            provinceFilled: summary.provinceFilled,
+            incidentDateFilled: summary.incidentDateFilled,
+            marker: markerKey,
+          },
+          "One-time backfill of PNG per-incident structured extraction (province / category / business_impact / incident_date)",
+        );
+      }
+    } catch (pngErr) {
+      logger.error({ err: pngErr }, "PNG extraction backfill failed");
     }
 
     try {

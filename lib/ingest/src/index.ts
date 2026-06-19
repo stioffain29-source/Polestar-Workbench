@@ -45,6 +45,8 @@ export type { SeverityBackfillSummary } from "./backfillSeverity";
 export { runCargoCountryBackfill } from "./backfillCargoCountry";
 export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { runNewsCountryBackfill } from "./backfillNewsCountry";
+export { runPngExtractBackfill } from "./backfillPngExtract";
+export type { PngExtractBackfillSummary } from "./backfillPngExtract";
 export type { NewsCountryBackfillSummary } from "./backfillNewsCountry";
 export { geocode } from "./geocode";
 export type { GeoResult } from "./geocode";
