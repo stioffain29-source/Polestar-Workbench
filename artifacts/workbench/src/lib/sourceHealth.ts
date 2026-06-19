@@ -10,6 +10,7 @@ import { sourceStatusClass } from "./topics";
 // Human-readable badge label for a source status enum value
 // (e.g. "not_configured" -> "not configured").
 export function sourceStatusLabel(status: string): string {
+  if (status === "pending") return "pending approval";
   return status.replace(/_/g, " ");
 }
 
@@ -48,7 +49,11 @@ export function isSourceActionRequired(s: {
   lastSuccessAt?: string | Date | null;
   lastFailureAt?: string | Date | null;
 }): boolean {
-  return effectiveSourceStatus(s) !== "operational";
+  const eff = effectiveSourceStatus(s);
+  // "pending" is a configured-but-not-yet-validated optional integration
+  // (awaiting approval / network validation), not an outage — it must stay out
+  // of the Action Required panel, like "operational".
+  return eff !== "operational" && eff !== "pending";
 }
 
 // Number of CONSECUTIVE failed ingest runs at which the ingest pipeline

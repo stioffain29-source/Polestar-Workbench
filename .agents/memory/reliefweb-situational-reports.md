@@ -28,11 +28,23 @@ approved appname to ever work. Two traps that each block it independently:
 
 **Egress-IP block is expected (same class as Liveuamap).** Even with the appname UA +
 valid date, ReliefWeb still 406s Replit’s datacenter egress IP under load. Brief 403
-windows appear then the protection locks onto the IP range. Treat residual 406 as
-`failing_upstream` (recorded in Source Health with a clear message), exactly like the
-documented liveuamap Cloudflare egress block — not a code bug. An approved appname +
-a reachable network (e.g. production egress, or HDX relaxing protection for the approved
-appname) is what makes it actually return rows.
+windows appear then the protection locks onto the IP range. This is environmental, not a
+code bug — exactly like the documented liveuamap Cloudflare egress block. An approved
+appname + a reachable network (e.g. production egress, or HDX relaxing protection for the
+approved appname) is what makes it actually return rows.
+
+**Represented as `pending` while unvalidated, NOT `failing_upstream`.** This source is
+BUILT + MERGED but has never returned live rows (403/406, unapproved appname). Surfacing
+it as a broken/failing source misrepresents an integration that is simply awaiting
+external approval + a prod-network check. The `sourceHealth.ts` recorder takes a
+`pending` opt: when `pending && no prior lastSuccessAt`, it records status `pending`
+(amber, "Pending approval") instead of escalating the failure streak; the integration
+panel (`integrationStatus.ts`) reports Built=yes / Merged=yes / Live data=pending + a
+reason. Once a real fetch succeeds, the normal working/failing logic takes over.
+**Why:** an optional, fully-built source blocked only on appname approval is "pending",
+not "broken" — keep it out of Action Required and the dashboard failing count. The moment
+the appname is approved AND prod egress is verified reachable, the first successful ingest
+flips it to `working` automatically; no code change needed.
 
 **How to apply:** when "ReliefWeb situational reports empty / failing" — first confirm
 it’s 406 (bot/IP) not 400 (request bug). 400 = your body/date is malformed (fix it);

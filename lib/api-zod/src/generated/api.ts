@@ -81,7 +81,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().nullish(),
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']),
   "lastSuccessAt": zod.coerce.date().nullish(),
   "lastFailureAt": zod.coerce.date().nullish(),
   "errorMessage": zod.string().nullish(),
@@ -718,7 +718,7 @@ export const GetStrikeSummaryResponse = zod.object({
 
 export const ListSourcesQueryParams = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']).optional()
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']).optional()
 })
 
 export const listSourcesResponseConsecutiveFailuresMin = 0;
@@ -734,7 +734,7 @@ export const ListSourcesResponseItem = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().nullish(),
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']),
   "lastSuccessAt": zod.coerce.date().nullish(),
   "lastFailureAt": zod.coerce.date().nullish(),
   "errorMessage": zod.string().nullish(),
@@ -757,7 +757,7 @@ export const CreateSourceBody = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().optional(),
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']),
   "lastSuccessAt": zod.coerce.date().optional(),
   "lastFailureAt": zod.coerce.date().optional(),
   "errorMessage": zod.string().optional(),
@@ -781,7 +781,7 @@ export const UpdateSourceBody = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']).optional(),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']).optional(),
   "url": zod.string().optional(),
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']).optional(),
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']).optional(),
   "lastSuccessAt": zod.coerce.date().optional(),
   "lastFailureAt": zod.coerce.date().optional(),
   "errorMessage": zod.string().optional(),
@@ -803,7 +803,7 @@ export const UpdateSourceResponse = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict']),
   "sourceType": zod.enum(['rss', 'api', 'scraper', 'manual', 'social', 'government', 'news']),
   "url": zod.string().nullish(),
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']),
   "lastSuccessAt": zod.coerce.date().nullish(),
   "lastFailureAt": zod.coerce.date().nullish(),
   "errorMessage": zod.string().nullish(),
@@ -827,7 +827,7 @@ export const GetSourceHealthResponse = zod.object({
   "total": zod.number(),
   "manualReviewCount": zod.number(),
   "byStatus": zod.array(zod.object({
-  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured']),
+  "status": zod.enum(['operational', 'delayed', 'stale', 'failing', 'blocked', 'not_configured', 'pending']),
   "count": zod.number()
 }))
 })
@@ -843,7 +843,7 @@ export const GetIntegrationStatusResponse = zod.object({
   "integrations": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string(),
-  "status": zod.enum(['working', 'not_configured', 'failing_upstream', 'no_data', 'disabled', 'unknown']),
+  "status": zod.enum(['working', 'not_configured', 'failing_upstream', 'no_data', 'disabled', 'unknown', 'pending']),
   "summary": zod.string(),
   "detail": zod.string().nullish(),
   "configured": zod.boolean(),

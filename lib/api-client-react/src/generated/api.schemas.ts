@@ -117,6 +117,7 @@ export const SourceStatus = {
   failing: 'failing',
   blocked: 'blocked',
   not_configured: 'not_configured',
+  pending: 'pending',
 } as const;
 
 export type ReportStatus = typeof ReportStatus[keyof typeof ReportStatus];
@@ -1169,6 +1170,7 @@ export const IntegrationStatusState = {
   no_data: 'no_data',
   disabled: 'disabled',
   unknown: 'unknown',
+  pending: 'pending',
 } as const;
 
 export interface IntegrationStatusMetric {

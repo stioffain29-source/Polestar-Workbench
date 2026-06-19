@@ -251,8 +251,13 @@ async function reliefwebReportsStatus(): Promise<IntegrationStatusItem> {
     status = "working";
     summary = `Holding ${reports} UN OCHA situational report(s) as supporting context — never counted as incidents.`;
   } else {
-    status = "no_data";
-    summary = "Configured, but no situational reports have been stored yet.";
+    // Built and merged, but no live data yet. The appname is not approved (403)
+    // and ReliefWeb blocks this server's egress IP (same class as Liveuamap),
+    // so this is "pending" — awaiting approval + production network validation —
+    // NOT a broken integration.
+    status = "pending";
+    summary =
+      "Built and merged; live data pending — awaiting appname approval and production network validation. ReliefWeb returns 403 until the appname is approved and currently blocks this server's network, so recheck from the published deployment once approved.";
   }
 
   return {
@@ -265,6 +270,9 @@ async function reliefwebReportsStatus(): Promise<IntegrationStatusItem> {
     optional: true,
     envVars,
     metrics: [
+      metric("Built", "yes"),
+      metric("Merged", "yes"),
+      metric("Live data", reports > 0 ? "yes" : "pending"),
       metric("Reports stored", reports),
       metric("Latest report", fmtDate(latest)),
       metric("Countries covered", countries),

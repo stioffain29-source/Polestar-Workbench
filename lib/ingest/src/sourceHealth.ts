@@ -67,6 +67,16 @@ export async function recordSourceHealth(
      * streak are cleared so it never reads as a recovered or escalating feed.
      */
     notConfigured?: boolean;
+    /**
+     * When true the feed is an OPTIONAL integration that is configured but has
+     * never successfully returned data yet (e.g. ReliefWeb with an as-yet
+     * unapproved appname, or an upstream that blocks this server's egress IP).
+     * A failure in that state is "pending validation" — NOT a broken feed — so
+     * it is recorded as the non-alarming "pending" status and kept out of the
+     * red Action Required panel and the dashboard failing-sources count. Once
+     * the feed has succeeded at least once, a later failure escalates normally.
+     */
+    pending?: boolean;
   } = {},
 ): Promise<void> {
   const now = new Date();
@@ -78,6 +88,7 @@ export async function recordSourceHealth(
         .select({
           id: sourcesTable.id,
           consecutiveFailures: sourcesTable.consecutiveFailures,
+          lastSuccessAt: sourcesTable.lastSuccessAt,
         })
         .from(sourcesTable)
         .where(and(eq(sourcesTable.name, f.name), eq(sourcesTable.topic, topic)));
@@ -122,6 +133,20 @@ export async function recordSourceHealth(
           errorMessage: null,
           consecutiveFailures: 0,
           lastSuccessAt: now,
+        };
+      } else if (opts.pending && !existing?.lastSuccessAt) {
+        // Configured but never validated end-to-end yet, and this run failed.
+        // Record it as the non-alarming "pending" state (awaiting approval /
+        // network validation) rather than escalating to "failing": it stays out
+        // of the red Action Required panel and the dashboard failing count, and
+        // the streak is reset so it never reads as "retrying".
+        healthFields = {
+          url: f.url,
+          sourceType,
+          status: "pending",
+          errorMessage: (f.error ?? "Awaiting validation").slice(0, 500),
+          consecutiveFailures: 0,
+          lastFailureAt: now,
         };
       } else {
         const next = (existing?.consecutiveFailures ?? 0) + 1;

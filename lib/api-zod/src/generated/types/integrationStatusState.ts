@@ -16,4 +16,5 @@ export const IntegrationStatusState = {
   no_data: 'no_data',
   disabled: 'disabled',
   unknown: 'unknown',
+  pending: 'pending',
 } as const;

@@ -1018,7 +1018,7 @@ components:
 
     SourceStatus:
       type: string
-      enum: [operational, delayed, stale, failing, blocked, not_configured]
+      enum: [operational, delayed, stale, failing, blocked, not_configured, pending]
 
     ReportStatus:
       type: string
@@ -2149,6 +2149,7 @@ components:
         - no_data
         - disabled
         - unknown
+        - pending
 
     IntegrationStatusMetric:
       type: object

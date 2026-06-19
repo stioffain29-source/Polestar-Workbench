@@ -16,4 +16,5 @@ export const SourceStatus = {
   failing: 'failing',
   blocked: 'blocked',
   not_configured: 'not_configured',
+  pending: 'pending',
 } as const;

@@ -77,7 +77,7 @@ export const INFRASTRUCTURE = [
 ] as const;
 
 export const SOURCE_TYPES = ["rss","api","scraper","manual","social","government","news"] as const;
-export const SOURCE_STATUSES = ["operational","delayed","stale","failing","blocked","not_configured"] as const;
+export const SOURCE_STATUSES = ["operational","delayed","stale","failing","blocked","not_configured","pending"] as const;
 export const REPORT_STATUSES = ["draft","review","published"] as const;
 
 export function severityClass(s: string): string {
@@ -110,6 +110,7 @@ export function sourceStatusClass(s: string): string {
     case "failing": return "bg-destructive text-destructive-foreground";
     case "blocked": return "bg-destructive text-destructive-foreground";
     case "not_configured": return "bg-muted text-muted-foreground";
+    case "pending": return "bg-amber-100 text-amber-800 border border-amber-200";
     default: return "bg-muted text-muted-foreground";
   }
 }

@@ -535,7 +535,10 @@ export async function runReliefWebReportsIngest(
           .returning({ id: reliefwebReportsTable.id });
         base.inserted = inserted.length;
       }
-      // Health: failing only when configured but every fetch failed.
+      // Health: configured but not yet validated end-to-end. A failed fetch is
+      // "pending" (awaiting appname approval + production network validation),
+      // NOT a broken feed — recordSourceHealth keeps it out of the failing
+      // count until the source returns data at least once.
       const feedOk = fetchOk || fetched.length > 0;
       await recordSourceHealth(
         HEALTH_TOPIC,
@@ -544,10 +547,12 @@ export async function runReliefWebReportsIngest(
             name: HEALTH_SOURCE_NAME,
             url: "https://reliefweb.int",
             ok: feedOk,
-            error: feedOk ? null : errors[0] ?? "ReliefWeb reports query failed",
+            error: feedOk
+              ? null
+              : `Awaiting appname approval and production network validation — ${errors[0] ?? "ReliefWeb reports query unreachable from this network"}`,
           },
         ],
-        { sourceType: "api", reliability: 5, notes: HEALTH_NOTES },
+        { sourceType: "api", reliability: 5, notes: HEALTH_NOTES, pending: true },
       );
       log(`  committed: ${base.inserted} new report(s) stored`);
     } else {
