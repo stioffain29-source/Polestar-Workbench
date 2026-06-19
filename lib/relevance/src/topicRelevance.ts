@@ -549,16 +549,30 @@ const FP_OFFSHORE_THEATRE_RE =
 // appends the publisher to BOTH the title (after a trailing " - " / " | ") and,
 // verbatim, the summary; a publisher CITY ("The Manila Times" -> Manila) would
 // otherwise fake an APAC anchor for an out-of-region story that names no real
-// place. Strip the title's trailing source and remove that same string from the
-// summary, then lower-case for the anchor regex.
-function flashpointGeoText(i: RelevanceInput): string {
+// place. Strip the title's trailing source AND the persisted source name from
+// both fields, then lower-case for the anchor regex.
+function reEscape(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function mastheadStrippedGeoText(i: RelevanceInput): string {
   const title = i.title ?? "";
   const summary = i.summary ?? "";
   const dash = Math.max(title.lastIndexOf(" - "), title.lastIndexOf(" | "));
-  const source = dash > 0 ? title.slice(dash + 3).trim() : "";
-  const cleanTitle = dash > 0 ? title.slice(0, dash).trim() : title;
-  const cleanSummary = source ? summary.split(source).join(" ") : summary;
-  return `${cleanTitle}\n${cleanSummary}`.toLowerCase();
+  const dashSource = dash > 0 ? title.slice(dash + 3).trim() : "";
+  const cleanTitle = dash > 0 ? title.slice(0, dash) : title;
+  let geo = `${cleanTitle}\n${summary}`.toLowerCase();
+  // Strip the wire masthead. Google News appends the source after " - "/" | "
+  // in the title, but SOME feeds append it to the SUMMARY ONLY with no dash, so
+  // a source like "India Today" leaks "india" as a false APAC anchor. Remove
+  // both the title-suffix source AND the persisted source name (i.source),
+  // matched as whole phrases — never bare substrings, so a short source like
+  // "ANI"/"AP" cannot gut "animal"/"capture".
+  const feedSource = (i.source ?? "").replace(/\([^)]*\)/g, " ").trim();
+  for (const s of [dashSource, feedSource]) {
+    const t = s.toLowerCase().trim();
+    if (t) geo = geo.replace(new RegExp(`\\b${reEscape(t)}\\b`, "g"), " ");
+  }
+  return geo;
 }
 
 // Recruitment / manpower industry objecting to an administrative REQUIREMENT
@@ -1161,9 +1175,25 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     const m = firstMatch(text, ENERGY_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: energy off-topic (/${m.source}/)` };
   }
-  if (topic === "conflict" && !CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
-    const m = firstMatch(text, CONFLICT_EXCLUDE);
-    if (m) return { relevant: false, reason: `excluded: conflict off-topic relief/peace (/${m.source}/)` };
+  if (topic === "conflict") {
+    if (!CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
+      const m = firstMatch(text, CONFLICT_EXCLUDE);
+      if (m) return { relevant: false, reason: `excluded: conflict off-topic relief/peace (/${m.source}/)` };
+    }
+    // Out-of-region theatre gate — mirrors the flashpoint gate further below. A
+    // conflict record that POSITIVELY names a non-APAC theatre ("Niamey airport
+    // attack foiled as Niger forces kill 22 gunmen - India Today") in its
+    // masthead-stripped body and carries NO in-region APAC anchor is foreign
+    // syndication an APAC publisher merely re-ran — and got the feed's default
+    // India country/centroid. The armed-violence override deliberately does NOT
+    // rescue it: a real West-African clash is still out of scope. Keyed off a
+    // POSITIVE foreign place (never a missing anchor), so an in-region clash whose
+    // only geo cue is a local entity is left untouched, and a cross-border story
+    // that also names an APAC country ("Pakistan-Iran border clash") is kept.
+    const geo = mastheadStrippedGeoText(i);
+    if (FP_OFFSHORE_THEATRE_RE.test(geo) && !FP_APAC_ANCHOR_RE.test(geo)) {
+      return { relevant: false, reason: "excluded: out-of-region theatre (foreign syndication, no APAC anchor)" };
+    }
   }
 
   if (topic === "flashpoint" || topic === "protests") {
@@ -1274,7 +1304,7 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     //     reason, not be mislabelled "out-of-region theatre". The row drops
     //     either way; this only preserves the more accurate reason.
     {
-      const geo = flashpointGeoText(i);
+      const geo = mastheadStrippedGeoText(i);
       if (
         FP_OFFSHORE_THEATRE_RE.test(geo) &&
         !FP_APAC_ANCHOR_RE.test(geo) &&
