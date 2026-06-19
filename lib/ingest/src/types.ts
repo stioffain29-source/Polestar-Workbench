@@ -15,6 +15,28 @@ export type FeedStat = {
   error?: string;
 };
 
+// PNG-specific ingest diagnostics for one flashpoint run. Surfaced in the
+// admin/ingest response, the run log lines, and (DB-derived) in the PNG report's
+// "Source confidence & reporting gaps" section. All counts are PNG-only.
+export type PngIngestDiagnostics = {
+  /** PNG articles pulled, per source feed. */
+  articlesBySource: Array<[string, number]>;
+  /** Items resolving to Papua New Guinea (accepted or rejected). */
+  matchedPng: number;
+  /** Accepted PNG items that resolved a monitored PNG province/locality. */
+  matchedLocations: number;
+  /** PNG items accepted on a crime/operational incident term. */
+  matchedIncidentTerms: number;
+  /** PNG items dropped as duplicates (in-batch or already in DB). */
+  rejectedDuplicates: number;
+  /** PNG items whose occurrence date falls outside the recent reporting horizon. */
+  rejectedOld: number;
+  /** PNG-country items rejected for carrying no security-relevant cue. */
+  rejectedNonSecurity: number;
+  /** New PNG report candidates promoted for insert this run. */
+  promotedCandidates: number;
+};
+
 export type IngestSummary = {
   topic: IngestTopic;
   mode: "commit" | "dry-run";
@@ -34,6 +56,8 @@ export type IngestSummary = {
   lastUpdated: string | null;
   perFeed: FeedStat[];
   countryCoverage: Array<[string, number]>;
+  /** PNG-only ingest diagnostics (flashpoint runs only). */
+  pngDiagnostics?: PngIngestDiagnostics;
   /** Human-readable report lines, for CLI rendering. */
   logLines: string[];
 };

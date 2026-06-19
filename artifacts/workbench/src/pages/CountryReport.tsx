@@ -27,6 +27,8 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
+import PngCountryReportBody from "@/components/PngCountryReportBody";
+import { buildPngReportDataset, type PngSourceIncident } from "@/lib/pngReportDataset";
 import {
   incidentMatchesCountry,
   acceptedCountryTokens,
@@ -270,6 +272,14 @@ export default function CountryReport() {
     };
   }, [baselineData]);
   const baseline: CountryBaseline | null = editing ? baselineDraft : persistedBaseline;
+
+  // PNG (Papua New Guinea) renders a dedicated nine-section structured brief
+  // instead of the generic country narrative. PNG-only: gated on the country
+  // token so no other country report or monitor is affected.
+  const isPng = useMemo(
+    () => acceptedCountryTokens(country?.name ?? "").includes("papua new guinea"),
+    [country],
+  );
   const layers: CountryLayerBuckets = useMemo(
     () => buildCountryLayers(incidents as CountryFastFactsIncident[], issueDate),
     [incidents, issueDate],
@@ -412,6 +422,9 @@ export default function CountryReport() {
   useEffect(() => {
     if (!country) return;
     if (editing) return;
+    // PNG uses deterministic event-led prose built client-side; skip the AI
+    // prose fetch entirely (no wallet cost, guaranteed dev/prod parity).
+    if (isPng) return;
     if (proseRequestKey.current === proseContentKey) return;
     proseRequestKey.current = proseContentKey;
     let cancelled = false;
@@ -586,6 +599,17 @@ export default function CountryReport() {
 
   const coverUrl = effective ? countryCoverUrl(effective.name) : undefined;
   const periodLabel = active.periodLabel;
+
+  const pngDataset = useMemo(() => {
+    if (!isPng) return null;
+    return buildPngReportDataset({
+      windowIncidents: active.incidents as PngSourceIncident[],
+      thirtyDay: layers.thirtyDay as PngSourceIncident[],
+      ninetyDay: layers.ninetyDay as PngSourceIncident[],
+      baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
+      periodLabel: active.basisLabel,
+    });
+  }, [isPng, active, layers, baseline]);
 
   const downloadPdf = async () => {
     if (!effective || !draftedProse) return;
@@ -988,6 +1012,10 @@ export default function CountryReport() {
         </Section>
       )}
 
+      {isPng && pngDataset && <PngCountryReportBody dataset={pngDataset} />}
+
+      {!isPng && (
+      <>
       <Section title="Executive Summary">
         <Prose text={displayProse.executiveSummary} />
       </Section>
@@ -1156,6 +1184,8 @@ export default function CountryReport() {
           </div>
         )}
       </Section>
+      </>
+      )}
 
       {/* Internal Source Coverage — screen-only, never in the PDF.
           Surfaces the layer counts and any thin-data signal for the

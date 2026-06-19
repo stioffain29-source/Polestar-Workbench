@@ -6,7 +6,8 @@ import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { fetchFeed } from "./feedFetch";
-import type { FeedStat, IngestOptions, IngestSummary } from "./types";
+import { extractPngItem, derivePngProvince, derivePngIncidentDate } from "./pngExtract";
+import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
 
 // Feed fetching is centralised in feedFetch.ts: a real browser User-Agent,
 // AbortController timeout, gzip/br auto-decompression (some feeds — e.g.
@@ -35,6 +36,7 @@ type Accepted = {
   sourceUrl: string;
   feedLabel: string;
   reason: string;
+  isPng: boolean;
 };
 
 type Rejected = {
@@ -197,6 +199,21 @@ const FOREIGN_LOCATION_WEST: RegExp =
 // Papua incidents the global protest-only allowlist misses.
 const PACIFIC_CRIME: RegExp =
   /\b(armed robbery|robbery|robbed|hold[- ]?up|carjack(?:ing|ed)?|home invasion|stabb(?:ed|ing)|machete attack|bush[- ]?knife|raskol|tribal (?:fight|clash|war|warfare|violence|conflict)|gang[- ]?(?:rape|violence|attack|war|fight|members?|shooting)|police raid|raid(?:ed|s)?|wanted (?:criminal|man|men|suspect|fugitive|offender)|shot dead|shooting|gunned down|opened fire|gun(?:point|fire|fight)|gun battle|firefight|kidnap(?:p?ed|ping)?|abduct(?:ion|ed)?|looting|murder(?:ed|s)?|manslaughter|kill(?:ed|ings?|s)?|fatalit(?:y|ies)|massacre|found dead|beaten to death|mob (?:attack|violence|justice|turns|sets|storms|burn|beat)|payback (?:killing|attack)|sorcery|riot(?:ing|s)?|arson|rebels?|separatists?|insurgen(?:t|ts|cy)|deadly clash|armed clash|violent clash|ambush(?:ed|es|ing)?|landmine|land mine|detained by (?:security|police|the military|military|marines?|tni|soldiers?|joint|task ?force)|opm|tpnpb|armed criminal group|criminal armed group|recover(?:ed|s)? (?:the )?bodies|bodies of (?:\d|the ))\b/i;
+
+// PNG-ONLY broadened operational scope. A Papua New Guinea country brief tracks
+// more than crime/unrest: policing operations, community-policing launches,
+// intelligence/police training, and operational disruption to aviation, ports,
+// roads, fuel, power, telecoms or government stability are all security-relevant
+// for PNG even when they carry no protest cue and are not crimes (e.g. a
+// community-policing launch, an intelligence-training course, airport runway
+// works). These cues are accepted ONLY when the resolved country is PNG (see the
+// isPng gate in classify), so the broadened scope NEVER leaks into West Papua or
+// any other country. Because such items carry no FLASHPOINT_REQUIRED protest
+// cue, the relevance gate still marks them irrelevant, so the generic flashpoint
+// MONITOR stays clean while the PNG country brief (which reads includeIrrelevant)
+// still surfaces them.
+const PNG_OPERATIONAL: RegExp =
+  /\b(community polic\w*|neighbou?rhood watch|crime[- ]?prevention|police (?:operation|patrol|training|recruit\w*|deployment|presence|post|barracks|station|swoop)|joint (?:operation|patrol|task ?force)|intelligence (?:training|unit|sharing|gathering|course|workshop|capabilit\w*)|police training|capacity[- ]?building|correctional (?:service|institution|facility|officers?)|warders?|prison (?:break|escape|riot|unrest|officers?|inmates?)|jail ?break|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|manhunt|crackdown|curfew|state of emergency|lockdown|airport|airstrip|airfield|runway|aviation|air ?services|flights?|aircraft|wharf|jetty|port (?:closure|shut|disrupt\w*|congestion|operations?|security)|harbou?r|highway (?:closed|cut|block\w*|landslip|landslide|washed|sealed|reopen\w*|works?|upgrade)|road (?:closed|cut|block\w*|landslip|landslide|washed|sealed|works?|upgrade)|bridge (?:collapse|washed|down|out|works?)|fuel (?:shortage|crisis|outage|supply|ran out|rationing)|power (?:outage|blackout|cut|failure|shortage|rationing|crisis)|electricity (?:outage|blackout|cut|crisis)|grid (?:failure|down)|telecom\w*|telecommunication\w*|network (?:outage|down|disrupt\w*)|internet (?:outage|down|disrupt\w*|cut)|mobile (?:network|service) (?:down|outage|disrupt\w*)|digicel|vote of no confidence|government (?:shutdown|instability|stability|crisis|standoff)|political (?:crisis|instability|standoff)|public servants? strike|parliament\w* (?:standoff|deadlock|impasse))\b/i;
 
 // Country aliases for in-text matching. Restricted to the 14 APAC
 // targets the Flashpoint Data Coverage Audit calls out, plus Myanmar
@@ -369,6 +386,15 @@ function classify(title: string, summary: string): {
     return { kept: true, reason: "allow:pacific-crime", country };
   }
 
+  // PNG-only broadened operational scope (policing ops, community policing,
+  // intelligence training, aviation/port/road/fuel/power/telecoms/government
+  // disruption). Gated on isPng (not West Papua) so it never leaks.
+  const isPng =
+    country === "Papua New Guinea" || country === "West Papua; Papua New Guinea";
+  if (isPng && PNG_OPERATIONAL.test(hay)) {
+    return { kept: true, reason: "allow:png-operational", country };
+  }
+
   return { kept: false, reason: country ? "no-flashpoint-cue" : "no-apac-country", country: null };
 }
 
@@ -521,6 +547,13 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const rejected: Rejected[] = [];
   const perFeed: Record<string, FeedStat> = {};
 
+  // PNG-only ingest diagnostics, accumulated through the run.
+  const pngArticlesBySource: Record<string, number> = {};
+  let pngMatched = 0;
+  let pngMatchedLocations = 0;
+  let pngMatchedTerms = 0;
+  let pngRejectedNonSecurity = 0;
+
   // Feeds are fetched with bounded concurrency. Sequential fetching of
   // ~39 feeds at a 20s-per-feed timeout can exceed two minutes.
   // Processing is otherwise identical and order-independent.
@@ -542,10 +575,23 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
           continue;
         }
         const c = classify(title, summary);
+        const resolvedCountry = resolveFlashpointCountry(title, summary);
+        const itemIsPng =
+          resolvedCountry === "Papua New Guinea" ||
+          resolvedCountry === "West Papua; Papua New Guinea";
+        if (itemIsPng) {
+          pngMatched++;
+          pngArticlesBySource[s.name] = (pngArticlesBySource[s.name] ?? 0) + 1;
+        }
         if (!c.kept || !c.country) {
+          if (itemIsPng && c.reason === "no-flashpoint-cue") pngRejectedNonSecurity++;
           rejected.push({ title, reason: c.reason, feedLabel: s.name });
           perFeed[s.name].rejected++;
           continue;
+        }
+        if (itemIsPng) {
+          pngMatchedTerms++;
+          if (derivePngProvince(null, `${title} ${summary}`)) pngMatchedLocations++;
         }
         accepted.push({
           title: title.slice(0, 500),
@@ -556,6 +602,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
           sourceUrl: link,
           feedLabel: s.name,
           reason: c.reason,
+          isPng: itemIsPng,
         });
         perFeed[s.name].accepted++;
       }
@@ -584,9 +631,13 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const seenKeys = new Set<string>();
   const seenUrls = new Set<string>();
   const uniqueAccepted: Accepted[] = [];
+  let pngRejectedDuplicates = 0;
   for (const a of accepted) {
     const k = dedupeKey(a.title, a.occurredAt, a.country);
-    if (seenKeys.has(k) || seenUrls.has(a.sourceUrl)) continue;
+    if (seenKeys.has(k) || seenUrls.has(a.sourceUrl)) {
+      if (a.isPng) pngRejectedDuplicates++;
+      continue;
+    }
     seenKeys.add(k);
     seenUrls.add(a.sourceUrl);
     uniqueAccepted.push(a);
@@ -659,14 +710,33 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   for (const a of uniqueAccepted) {
     if (existingUrls.has(a.sourceUrl) || existingKeys.has(dedupeKey(a.title, a.occurredAt, a.country))) {
       dupeInDb++;
+      if (a.isPng) pngRejectedDuplicates++;
       continue;
     }
     if (isSyndicatedRehash(a)) {
       rehashSkipped++;
+      if (a.isPng) pngRejectedDuplicates++;
       continue;
     }
     toInsert.push(a);
   }
+
+  // PNG ingest diagnostics for this run. rejectedOld = promoted PNG candidates
+  // whose occurrence date is older than 30 days (still inserted; flagged as
+  // outside the recent reporting horizon for the report's gaps section).
+  const PNG_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const pngPromoted = toInsert.filter((a) => a.isPng);
+  const pngDiagnostics: PngIngestDiagnostics = {
+    articlesBySource: Object.entries(pngArticlesBySource).sort((a, b) => b[1] - a[1]),
+    matchedPng: pngMatched,
+    matchedLocations: pngMatchedLocations,
+    matchedIncidentTerms: pngMatchedTerms,
+    rejectedDuplicates: pngRejectedDuplicates,
+    rejectedOld: pngPromoted.filter((a) => nowMs - a.occurredAt.getTime() > PNG_HORIZON_MS).length,
+    rejectedNonSecurity: pngRejectedNonSecurity,
+    promotedCandidates: pngPromoted.length,
+  };
 
   // Report
   log("\n=== Per-feed ===");
@@ -725,7 +795,18 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     rejected: rejected.length,
     perFeed: fetchable.map((s) => perFeed[s.name]),
     countryCoverage: [...countryCoverage.entries()].sort((a, b) => b[1] - a[1]),
+    pngDiagnostics,
   };
+
+  log("\n=== PNG diagnostics ===");
+  log(`  Matched PNG          : ${pngDiagnostics.matchedPng}`);
+  log(`  Matched locations    : ${pngDiagnostics.matchedLocations}`);
+  log(`  Matched incident terms: ${pngDiagnostics.matchedIncidentTerms}`);
+  log(`  Rejected non-security: ${pngDiagnostics.rejectedNonSecurity}`);
+  log(`  Rejected duplicates  : ${pngDiagnostics.rejectedDuplicates}`);
+  log(`  Rejected old         : ${pngDiagnostics.rejectedOld}`);
+  log(`  Promoted candidates  : ${pngDiagnostics.promotedCandidates}`);
+  for (const [src, n] of pngDiagnostics.articlesBySource) log(`    ${src.padEnd(40)} ${n}`);
 
   if (!commit) {
     log("\nDRY-RUN — no rows written. Re-run with --commit to insert.");
@@ -752,6 +833,11 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       sourceUrl: a.sourceUrl,
       location: geo?.location ?? null,
     });
+    // PNG-only structured extraction. Other countries leave these columns null.
+    const png = a.isPng ? extractPngItem(a.title, a.summary, geo?.location ?? null) : null;
+    const incidentDate = a.isPng
+      ? derivePngIncidentDate(`${a.title} ${a.summary}`, a.occurredAt)
+      : null;
     return {
       topic: "flashpoint",
       title: a.title,
@@ -761,6 +847,10 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       latitude: geo?.latitude ?? null,
       longitude: geo?.longitude ?? null,
       occurredAt: a.occurredAt,
+      incidentDate,
+      province: png?.province ?? null,
+      category: png?.category ?? null,
+      businessImpact: png?.businessImpact ?? null,
       severity: classifySeverity(a.title, a.summary, "flashpoint"),
       confidence: "low",
       source: a.source,

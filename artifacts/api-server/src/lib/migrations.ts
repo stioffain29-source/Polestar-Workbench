@@ -98,6 +98,25 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "Benar News",              url: "https://www.benarnews.org/english/rss2.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: Asia desk. SE Asia regional desk — Philippines, Indonesia, Bangladesh." },
   { name: "Jubi.id (West Papua)",    url: "https://jubi.id/feed/",                                                          sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Jayapura / Indonesian Papua — community protest and security operations. Manual translation review required." },
   { name: "Post-Courier (PNG)",      url: "https://www.postcourier.com.pg/feed/",                                           sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Port Moresby — political demonstrations, sectoral strike action." },
+  // Named PNG mastheads for the Papua New Guinea country brief. The direct
+  // publisher RSS feeds (thenational.com.pg, emtv.com.pg, looppng.com,
+  // onepng.com, pnghausbung.com) 403/redirect/refuse from the Replit egress IP,
+  // so each is collected via a Google-News site-scoped feed instead, narrowed
+  // to security/crime/operational cues and when:14d for recency (cue lists kept
+  // small so Google News honours the recency filter). These broaden PNG source
+  // coverage beyond Post-Courier; the classify PNG gate still scopes relevance.
+  { name: "The National (PNG)",      url: "https://news.google.com/rss/search?q=site:thenational.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. The National — PNG's largest-circulation daily (Port Moresby). Collected via Google-News site-scope (direct feed 403s our egress IP). Security/crime/operational cues, last 14 days." },
+  { name: "Loop PNG",                url: "https://news.google.com/rss/search?q=site:looppng.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. Loop PNG — high-volume PNG news portal. Collected via Google-News site-scope (no reachable direct feed). Security/crime/operational cues, last 14 days." },
+  { name: "EMTV (PNG)",              url: "https://news.google.com/rss/search?q=site:emtv.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. EMTV — national broadcaster (Port Moresby). Collected via Google-News site-scope (direct feed redirects/blocks our egress IP). Security/crime/operational cues, last 14 days." },
+  { name: "PNG Haus Bung",          url: "https://news.google.com/rss/search?q=site:pnghausbung.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. PNG Haus Bung — popular PNG news blog (tabloid register; corroborate before use). Collected via Google-News site-scope. Security/crime cues, last 14 days." },
+  { name: "One PNG",                url: "https://news.google.com/rss/search?q=site:onepng.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. One PNG — community news aggregator. Collected via Google-News site-scope. Security/crime cues, last 14 days." },
+  // RPNGC (Royal Papua New Guinea Constabulary) — official police statements.
+  // CONFIRMATION source, not a discovery feed: used to corroborate incidents
+  // surfaced by the mastheads above (named operations, arrests, casualty
+  // confirmations), not as a sole basis for inclusion. High reliability when it
+  // speaks; sparse cadence. Collected via Google-News scoped to RPNGC/police
+  // commissioner statements.
+  { name: "RPNGC (PNG Police, confirmation)", url: "https://news.google.com/rss/search?q=(%22Royal+Papua+New+Guinea+Constabulary%22+OR+RPNGC+OR+%22Police+Commissioner%22+OR+%22Acting+Commissioner%22)+(Papua+OR+PNG+OR+Moresby+OR+Lae+OR+Hagen)+when:21d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 4, notes: "Owner: Pacific desk. Royal PNG Constabulary official statements — CONFIRMATION-ONLY (corroborates masthead incidents; not a sole discovery basis). Sparse cadence, last 21 days." },
   { name: "RNZ Pacific",             url: "https://www.rnz.co.nz/rss/pacific.xml",                                          sourceType: "rss",  reliability: 4, notes: "Owner: Pacific desk. Regional coverage for PNG, Solomons, Fiji and Indonesian Papua." },
   // Direct publisher RSS — regional national dailies and broadcasters.
   { name: "Daily Mirror Sri Lanka",  url: "http://www.dailymirror.lk/RSS_Feeds/news",                                       sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Sri Lanka — Colombo national daily." },
@@ -206,6 +225,28 @@ export async function runDataMigrations(): Promise<void> {
     //     (a separate signal — never overwrites confidence).
     await db.execute(
       sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS corroboration_checked_at timestamptz`,
+    );
+
+    // Schema: PNG country-report enrichment columns (additive, nullable). The
+    // structured per-item extraction the flashpoint scraper derives for Papua
+    // New Guinea records so the PNG brief can break the picture down by province
+    // and category and carry a per-item business-impact line, plus the
+    // occurred-vs-reported date distinction (incident_date = when the event
+    // actually happened when the article states a date distinct from the RSS
+    // pubDate). Null for non-PNG / not-yet-extracted rows; every consumer falls
+    // back to location/topic/occurred_at. drizzle push only reaches dev, so the
+    // prod primary gains these here on boot. All idempotent (IF NOT EXISTS).
+    await db.execute(
+      sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_date timestamptz`,
+    );
+    await db.execute(
+      sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS province text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS category text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS business_impact text`,
     );
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS incident_corroborations (

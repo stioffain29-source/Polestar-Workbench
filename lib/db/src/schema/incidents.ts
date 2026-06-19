@@ -15,6 +15,21 @@ export const incidentsTable = pgTable("incidents", {
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  // The date the underlying event actually OCCURRED, when the article states a
+  // distinct incident date that differs from the publication date (occurredAt
+  // is the RSS pubDate, i.e. when it was REPORTED). Nullable: most rows leave
+  // it null and consumers fall back to occurredAt. Drives the "occurred this
+  // reporting week" vs "reported this week but occurred earlier" distinction
+  // (e.g. the West Taraka raid reported 9 Jun for a 26 May operation).
+  incidentDate: timestamp("incident_date", { withTimezone: true }),
+  // PNG country-report enrichment (additive, nullable). The structured
+  // extraction the keyword scraper derives for Papua New Guinea items so the
+  // PNG brief can break the picture down by province and category and state a
+  // business-impact line per item. Null for non-PNG / not-yet-extracted rows;
+  // every consumer falls back to location/topic when absent.
+  province: text("province"),
+  category: text("category"),
+  businessImpact: text("business_impact"),
   severity: text("severity").notNull(),
   confidence: text("confidence").notNull(),
   source: text("source"),
