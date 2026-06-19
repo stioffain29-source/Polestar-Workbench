@@ -31,6 +31,15 @@ export interface PngSourceIncident {
   sourceUrl?: string | null;
   resolvedUrl?: string | null;
   confidence?: string | null;
+  // Server-extracted PNG enrichment (see lib/ingest/src/pngExtract.ts), surfaced
+  // through the incidents API. When present these are authoritative and the
+  // client derivation below is skipped; when null (non-PNG / not-yet-backfilled
+  // rows, e.g. prod before a republish+ingest) the client falls back to the
+  // mirrored rulebook so the report renders identically either way.
+  province?: string | null;
+  category?: string | null;
+  businessImpact?: string | null;
+  incidentDate?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -354,11 +363,28 @@ interface BuildArgs {
 
 function toItem(i: PngSourceIncident): PngReportItem {
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
-  const province = derivePngProvince(i.location, text);
-  const { category, impact } = extractCategory(text);
+  // Prefer the server-extracted enrichment from the incidents API; fall back to
+  // the mirrored client rulebook only when the API value is absent (non-PNG or
+  // not-yet-backfilled rows). province / category / businessImpact / incidentDate
+  // are all additive and nullable, so this is a clean prefer-server-else-derive.
+  const province = i.province ?? derivePngProvince(i.location, text);
+  let category: PngCategory;
+  let impact: string;
+  if (i.category && i.businessImpact) {
+    // category + businessImpact are written together by the ingest rulebook, so
+    // they are present or absent as a pair; trust them as a unit when present.
+    category = i.category as PngCategory;
+    impact = i.businessImpact;
+  } else {
+    const derived = extractCategory(text);
+    category = derived.category;
+    impact = derived.impact;
+  }
   const sev = (i.severity ?? "").toLowerCase();
   const reportedDate = new Date(i.occurredAt);
-  const incidentDate = derivePngIncidentDate(text, reportedDate);
+  const incidentDate = i.incidentDate
+    ? new Date(i.incidentDate)
+    : derivePngIncidentDate(text, reportedDate);
   const title =
     i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source);
   return {

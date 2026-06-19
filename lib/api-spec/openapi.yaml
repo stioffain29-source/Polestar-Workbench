@@ -1071,6 +1071,15 @@ components:
         corroborations:
           type: array
           items: { $ref: "#/components/schemas/Corroboration" }
+        # PNG country-report enrichment (additive, nullable). The structured
+        # extraction the ingest derives for Papua New Guinea items (province /
+        # category / business-impact / occurred-vs-reported date). Null for
+        # non-PNG / not-yet-extracted rows; consumers fall back to
+        # location/topic/occurredAt when absent.
+        incidentDate: { type: ["string", "null"], format: date-time }
+        province: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        businessImpact: { type: ["string", "null"] }
         # GDELT precision-enrichment fields (additive). Null unless the GDELT
         # pass matched this incident to a structured ACLED-style event; every
         # surface falls back to the base fields when absent.

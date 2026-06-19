@@ -38,6 +38,14 @@ export interface Incident {
   createdAt: Date;
   corroborations: Corroboration[];
   /** @nullable */
+  incidentDate?: Date | null;
+  /** @nullable */
+  province?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  businessImpact?: string | null;
+  /** @nullable */
   fatalities?: number | null;
   /** @nullable */
   actors?: string | null;
