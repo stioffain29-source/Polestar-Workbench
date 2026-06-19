@@ -78,11 +78,13 @@ router.post("/countries/:slug/prose", async (req, res): Promise<void> => {
     });
     return;
   }
+  const variant = body.variant ?? "country";
   const fingerprint = computeProseFingerprint({
     slug,
     countryName: country.name,
     basisDays: body.basisDays,
     incidents,
+    variant,
   });
 
   const [existing] = await db
@@ -117,6 +119,7 @@ router.post("/countries/:slug/prose", async (req, res): Promise<void> => {
     issueDate: body.issueDate,
     incidents,
     baseline: body.baseline ?? null,
+    variant,
   });
 
   if (!outcome.ok) {

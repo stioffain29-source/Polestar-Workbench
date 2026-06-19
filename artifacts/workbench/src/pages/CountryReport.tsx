@@ -373,6 +373,20 @@ export default function CountryReport() {
     });
   }, [country, active, issueDate]);
 
+  // Deterministic PNG dataset (the labelled fallback). Built here so the AI
+  // prose path below can ground its Executive Summary + Outlook on the SAME
+  // deduped window items the brief renders.
+  const pngDataset = useMemo(() => {
+    if (!isPng) return null;
+    return buildPngReportDataset({
+      windowIncidents: active.incidents as PngSourceIncident[],
+      thirtyDay: layers.thirtyDay as PngSourceIncident[],
+      ninetyDay: layers.ninetyDay as PngSourceIncident[],
+      baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
+      periodLabel: active.basisLabel,
+    });
+  }, [isPng, active, layers, baseline]);
+
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
   // window incidents the page renders, and cached by a fingerprint of that
@@ -386,15 +400,29 @@ export default function CountryReport() {
   const [proseDraft, setProseDraft] = useState<CountryProseSections | null>(null);
   const proseRequestKey = useRef<string | null>(null);
 
-  const proseIncidents: ProseIncidentInput[] = useMemo(
-    () =>
-      active.incidents.map((i) => ({
-        topic: i.topic, title: i.title, summary: i.summary,
-        location: i.location, country: i.country,
-        severity: i.severity, occurredAt: i.occurredAt, source: i.source,
-      })),
-    [active],
-  );
+  // PNG grounds the AI prose on the SAME deduped, province/category-attributed
+  // window items the brief renders (richer than the raw incident rows); every
+  // other country uses the raw window incidents.
+  const proseVariant: "country" | "png" = isPng ? "png" : "country";
+  const proseIncidents: ProseIncidentInput[] = useMemo(() => {
+    if (isPng && pngDataset) {
+      return pngDataset.windowItems.map((it) => ({
+        topic: it.category,
+        title: it.title,
+        summary: null,
+        location: it.province ?? null,
+        country: "Papua New Guinea",
+        severity: it.severity,
+        occurredAt: (it.incidentDate ?? it.reportedDate).toISOString(),
+        source: it.source ?? null,
+      }));
+    }
+    return active.incidents.map((i) => ({
+      topic: i.topic, title: i.title, summary: i.summary,
+      location: i.location, country: i.country,
+      severity: i.severity, occurredAt: i.occurredAt, source: i.source,
+    }));
+  }, [isPng, pngDataset, active]);
 
   const periodWord = useMemo(
     () =>
@@ -415,8 +443,8 @@ export default function CountryReport() {
         ].join("~"),
       )
       .sort();
-    return `${slug}|${active.basisDays}|${ids.join("§")}`;
-  }, [proseIncidents, slug, active.basisDays]);
+    return `${proseVariant}|${slug}|${active.basisDays}|${ids.join("§")}`;
+  }, [proseIncidents, slug, active.basisDays, proseVariant]);
 
   const baselineContext: ProseBaselineContext | null = useMemo(() => {
     if (!persistedBaseline) return null;
@@ -435,9 +463,9 @@ export default function CountryReport() {
   useEffect(() => {
     if (!country) return;
     if (editing) return;
-    // PNG uses deterministic event-led prose built client-side; skip the AI
-    // prose fetch entirely (no wallet cost, guaranteed dev/prod parity).
-    if (isPng) return;
+    // PNG waits until its dataset has built so the fingerprint hashes the same
+    // window items the brief renders (the request derives from pngDataset).
+    if (isPng && !pngDataset) return;
     if (proseRequestKey.current === proseContentKey) return;
     proseRequestKey.current = proseContentKey;
     let cancelled = false;
@@ -452,6 +480,7 @@ export default function CountryReport() {
           issueDate,
           incidents: proseIncidents,
           baseline: baselineContext,
+          variant: proseVariant,
           force: false,
         },
       })
@@ -493,6 +522,7 @@ export default function CountryReport() {
           issueDate,
           incidents: proseIncidents,
           baseline: baselineContext,
+          variant: proseVariant,
           force: true,
         },
       });
@@ -550,6 +580,28 @@ export default function CountryReport() {
       polestarView: draftedProse?.polestarView ?? "",
     };
   }, [editing, proseDraft, proseResult, draftedProse]);
+
+  // PNG: overlay the AI Executive Summary + Outlook onto the deterministic
+  // dataset (which supplies the other seven sections). While editing, the live
+  // draft drives the preview; otherwise prefer the server prose. When no AI
+  // prose exists, the deterministic template text shows unchanged.
+  const pngEffectiveDataset = useMemo(() => {
+    if (!pngDataset) return null;
+    const src =
+      editing && proseDraft
+        ? proseDraft
+        : proseResult
+          ? (proseResult.edited ?? proseResult.sections)
+          : null;
+    if (src && src.executiveSummary && src.executiveSummary.trim()) {
+      return {
+        ...pngDataset,
+        executiveSummary: src.executiveSummary,
+        outlook: src.outlook && src.outlook.trim() ? src.outlook : pngDataset.outlook,
+      };
+    }
+    return pngDataset;
+  }, [pngDataset, editing, proseDraft, proseResult]);
 
   const setProseField = (k: keyof CountryProseSections, v: string | string[]) =>
     setProseDraft((d) => (d ? { ...d, [k]: v } : d));
@@ -612,17 +664,6 @@ export default function CountryReport() {
 
   const coverUrl = effective ? countryCoverUrl(effective.name) : undefined;
   const periodLabel = active.periodLabel;
-
-  const pngDataset = useMemo(() => {
-    if (!isPng) return null;
-    return buildPngReportDataset({
-      windowIncidents: active.incidents as PngSourceIncident[],
-      thirtyDay: layers.thirtyDay as PngSourceIncident[],
-      ninetyDay: layers.ninetyDay as PngSourceIncident[],
-      baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
-      periodLabel: active.basisLabel,
-    });
-  }, [isPng, active, layers, baseline]);
 
   const downloadPdf = async () => {
     if (!effective || !draftedProse) return;
@@ -1009,7 +1050,18 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {editing && proseDraft && (
+      {editing && proseDraft && isPng && (
+        <Section title="Narrative (editable)">
+          <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
+            AI-generated from this window's incidents. Edits are saved against the current data; if the
+            data later changes, use Redraft to regenerate.
+          </div>
+          <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
+          <BaselineTextField label="Outlook — Next Week" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
+        </Section>
+      )}
+
+      {editing && proseDraft && !isPng && (
         <Section title="Narrative (editable)">
           <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
             AI-generated from this window's incidents. Edits are saved against the current data; if the
@@ -1025,7 +1077,7 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {isPng && pngDataset && <PngCountryReportBody dataset={pngDataset} />}
+      {isPng && pngEffectiveDataset && <PngCountryReportBody dataset={pngEffectiveDataset} />}
 
       {!isPng && (
       <>

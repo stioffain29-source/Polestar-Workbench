@@ -1012,7 +1012,16 @@ export interface CountryProseSections {
   implications: string[];
   watchNext: string[];
   polestarView: string;
+  outlook?: string;
 }
+
+export type GenerateCountryProseInputVariant = typeof GenerateCountryProseInputVariant[keyof typeof GenerateCountryProseInputVariant];
+
+
+export const GenerateCountryProseInputVariant = {
+  country: 'country',
+  png: 'png',
+} as const;
 
 export interface GenerateCountryProseInput {
   region: string;
@@ -1020,6 +1029,7 @@ export interface GenerateCountryProseInput {
   periodWord: string;
   issueDate: string;
   force?: boolean;
+  variant?: GenerateCountryProseInputVariant;
   incidents: ProseIncidentInput[];
   baseline?: ProseBaselineContext | null;
 }

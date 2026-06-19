@@ -61,6 +61,12 @@ export interface ProseBaselineContext {
   resourceSectorExposure?: string | null;
 }
 
+// "country" = the generic seven-section country brief. "png" = the bespoke Papua
+// New Guinea brief, which is rendered by its own deterministic builder and only
+// wants two AI paragraphs (Executive Summary + Outlook); the other sections come
+// from the structured PNG dataset, not the model.
+export type ProseVariant = "country" | "png";
+
 export interface GenerateProseInput {
   countryName: string;
   region: string;
@@ -69,6 +75,7 @@ export interface GenerateProseInput {
   issueDate: string;
   incidents: ProseIncidentInput[];
   baseline?: ProseBaselineContext | null;
+  variant?: ProseVariant;
 }
 
 export type GenerateProseOutcome =
@@ -129,10 +136,12 @@ export function computeProseFingerprint(input: {
   countryName: string;
   basisDays: number;
   incidents: ProseIncidentInput[];
+  variant?: ProseVariant;
 }): string {
   const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
   const payload = JSON.stringify({
     v: PROSE_PROMPT_VERSION,
+    variant: input.variant ?? "country",
     slug: input.slug,
     name: input.countryName,
     basisDays: input.basisDays,
@@ -167,6 +176,32 @@ Return STRICT JSON with EXACTLY these keys and no others:
   "implications": string[],    // 4-7 distinct concrete actions the client should take. Each a short imperative sentence. No numbering, no leading dash.
   "watchNext": string[],       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
   "polestarView": string       // The bottom-line analyst judgement and the recommended operating posture.
+}
+Return ONLY the JSON object.`;
+
+// PNG brief variant: the deterministic builder already produces the per-province
+// and per-category breakdown, watchlist and Polestar assessment. The model only
+// writes the two free-prose paragraphs at the top and tail of the brief.
+const PNG_SYSTEM_PROMPT = `You are a senior security-intelligence analyst writing the Papua New Guinea country brief for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded for Papua New Guinea over a reporting window, plus verified standing background, and you produce TWO narrative paragraphs for the brief.
+
+GROUNDING — non-negotiable:
+- Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
+- You MAY use the supplied STANDING BACKGROUND (verified, analyst-curated) and well-established, uncontroversial facts about Papua New Guinea's operating environment for framing — but never present background as if it happened during this window.
+- If the window has few or no incidents, say so plainly and lean on the standing background. A quiet window reflects limited reporting, not safety: never imply the country has become calm, and never fabricate activity to fill space.
+
+WRITING RULES:
+- The Executive Summary and the Outlook do DISTINCT jobs. The Executive Summary characterises what this window shows and what it means for operations now; the Outlook looks forward to the coming period. Do not repeat the same fact or sentence across the two.
+- Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the brief.
+- Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
+- Write concrete, information-dense sentences. Name the actual provinces, actors and event types from the incidents. No filler, no hedging boilerplate, no generic risk-management truisms.
+- Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
+- Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
+- British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
+
+Return STRICT JSON with EXACTLY these keys and no others:
+{
+  "executiveSummary": string,  // 3-4 sentences: the headline judgement for this window — the dominant provinces and event types — and what it means for operations now.
+  "outlook": string            // 2-3 sentences: the forward view for the coming period, grounded in this window's pattern and the standing background; what to expect and where pressure is likely.
 }
 Return ONLY the JSON object.`;
 
@@ -235,7 +270,7 @@ function coerceList(v: unknown): string[] {
     .filter(Boolean);
 }
 
-function parseSections(content: string): CountryProseSections | null {
+function parseSections(content: string, variant: ProseVariant): CountryProseSections | null {
   let raw: unknown;
   try {
     raw = JSON.parse(content);
@@ -251,6 +286,25 @@ function parseSections(content: string): CountryProseSections | null {
   }
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
+
+  if (variant === "png") {
+    // The PNG brief only consumes Executive Summary + Outlook; the structured
+    // builder owns every other section. The remaining keys are written empty so
+    // the stored shape stays a valid CountryProseSections.
+    const sections: CountryProseSections = {
+      executiveSummary: coerceStr(o.executiveSummary),
+      outlook: coerceStr(o.outlook),
+      situation: "",
+      whatHappened: "",
+      whatMatters: "",
+      implications: [],
+      watchNext: [],
+      polestarView: "",
+    };
+    if (!sections.executiveSummary || !sections.outlook) return null;
+    return sections;
+  }
+
   const sections: CountryProseSections = {
     executiveSummary: coerceStr(o.executiveSummary),
     situation: coerceStr(o.situation),
@@ -272,6 +326,9 @@ async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome
   const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   if (!base || !key) return { ok: false, error: "llm-unavailable" };
 
+  const variant: ProseVariant = input.variant ?? "country";
+  const systemPrompt = variant === "png" ? PNG_SYSTEM_PROMPT : SYSTEM_PROMPT;
+
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -283,7 +340,7 @@ async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome
         max_completion_tokens: MAX_COMPLETION_TOKENS,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: buildUserPrompt(input) },
         ],
       }),
@@ -312,7 +369,7 @@ async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome
     const content = choice?.message?.content;
     if (!content) return { ok: false, error: `empty-content(${choice?.finish_reason ?? "?"})` };
 
-    const sections = parseSections(content);
+    const sections = parseSections(content, variant);
     if (!sections) return { ok: false, error: "bad-json" };
     return { ok: true, sections, model: MODEL };
   } catch (err) {

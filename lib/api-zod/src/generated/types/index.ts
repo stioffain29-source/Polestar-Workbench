@@ -36,6 +36,7 @@ export * from './fuelDataCard';
 export * from './fuelFastFacts';
 export * from './fuelHardNumbers';
 export * from './generateCountryProseInput';
+export * from './generateCountryProseInputVariant';
 export * from './getIncidentCountsByTopicParams';
 export * from './getRecentIncidentsParams';
 export * from './getStrikeSummaryDays';

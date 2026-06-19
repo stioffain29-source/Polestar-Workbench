@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { GenerateCountryProseInputVariant } from './generateCountryProseInputVariant';
 import type { ProseBaselineContext } from './proseBaselineContext';
 import type { ProseIncidentInput } from './proseIncidentInput';
 
@@ -14,6 +15,7 @@ export interface GenerateCountryProseInput {
   periodWord: string;
   issueDate: string;
   force?: boolean;
+  variant?: GenerateCountryProseInputVariant;
   incidents: ProseIncidentInput[];
   baseline?: ProseBaselineContext | null;
 }

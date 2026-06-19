@@ -11,6 +11,9 @@ export interface CountryProseSections {
   implications: string[];
   watchNext: string[];
   polestarView: string;
+  // Forward-looking outlook paragraph. Only the PNG country brief (variant
+  // "png") populates this; the generic country report leaves it undefined.
+  outlook?: string;
 }
 
 // Cache of AI-generated country-report prose, keyed one-row-per-country.

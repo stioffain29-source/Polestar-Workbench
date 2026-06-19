@@ -14,4 +14,5 @@ export interface CountryProseSections {
   implications: string[];
   watchNext: string[];
   polestarView: string;
+  outlook?: string;
 }

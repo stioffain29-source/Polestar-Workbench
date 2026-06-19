@@ -1959,6 +1959,9 @@ components:
           type: array
           items: { type: string }
         polestarView: { type: string }
+        # Forward-looking paragraph. Only the PNG brief (variant "png") populates
+        # this; the generic country report omits it.
+        outlook: { type: string }
 
     GenerateCountryProseInput:
       type: object
@@ -1969,6 +1972,10 @@ components:
         periodWord: { type: string }
         issueDate: { type: string }
         force: { type: boolean }
+        # "country" (default) = the generic seven-section brief; "png" = the
+        # bespoke Papua New Guinea brief that only wants Executive Summary +
+        # Outlook from the model.
+        variant: { type: string, enum: [country, png] }
         incidents:
           type: array
           items: { $ref: "#/components/schemas/ProseIncidentInput" }

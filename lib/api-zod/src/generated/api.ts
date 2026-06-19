@@ -2576,6 +2576,7 @@ export const GenerateCountryProseBody = zod.object({
   "periodWord": zod.string(),
   "issueDate": zod.string(),
   "force": zod.boolean().optional(),
+  "variant": zod.enum(['country', 'png']).optional(),
   "incidents": zod.array(zod.object({
   "topic": zod.string().nullish(),
   "title": zod.string().nullish(),
@@ -2608,7 +2609,8 @@ export const GenerateCountryProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "outlook": zod.string().optional()
 }),
   "edited": zod.union([zod.object({
   "executiveSummary": zod.string(),
@@ -2617,7 +2619,8 @@ export const GenerateCountryProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "outlook": zod.string().optional()
 }),zod.null()]).optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
@@ -2637,7 +2640,8 @@ export const EditCountryProseBody = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "outlook": zod.string().optional()
 })
 })
 
@@ -2651,7 +2655,8 @@ export const EditCountryProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "outlook": zod.string().optional()
 }),
   "edited": zod.union([zod.object({
   "executiveSummary": zod.string(),
@@ -2660,7 +2665,8 @@ export const EditCountryProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "outlook": zod.string().optional()
 }),zod.null()]).optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
