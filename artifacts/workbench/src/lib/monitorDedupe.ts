@@ -113,3 +113,40 @@ export function dedupeMonitorRows<T extends MonitorDedupeRow>(
   }
   return Array.from(byKey.values());
 }
+
+export interface WindowDedupeIncident {
+  title: string;
+  severity?: string | null;
+  occurredAt: string;
+}
+
+/**
+ * Collapse syndicated duplicates in a country report's window incidents the same
+ * way the monitors do: key on the canonical (masthead-stripped) title and keep
+ * the single best copy — higher severity, then newer `occurredAt`. Rows with an
+ * empty canonical key (unkeyable) are always kept and first-occurrence order is
+ * preserved. Unlike `dedupeMonitorRows` this reads the incidents' string
+ * `occurredAt`, so callers need not adapt to the `{ date: Date }` row shape.
+ */
+export function dedupeCountryWindowIncidents<T extends WindowDedupeIncident>(
+  rows: T[],
+): T[] {
+  const better = (a: T, b: T): boolean => {
+    const sa = SEV_RANK[(a.severity ?? "").toLowerCase()] ?? 0;
+    const sb = SEV_RANK[(b.severity ?? "").toLowerCase()] ?? 0;
+    if (sa !== sb) return sa > sb;
+    const ta = Date.parse(a.occurredAt);
+    const tb = Date.parse(b.occurredAt);
+    const na = Number.isNaN(ta) ? -Infinity : ta;
+    const nb = Number.isNaN(tb) ? -Infinity : tb;
+    return na >= nb;
+  };
+  const byKey = new Map<string, T>();
+  let unkeyable = 0;
+  for (const r of rows) {
+    const k = canonicalTitleKey(r.title ?? "") || `__nokey_${unkeyable++}`;
+    const prev = byKey.get(k);
+    if (!prev || better(r, prev)) byKey.set(k, r);
+  }
+  return Array.from(byKey.values());
+}

@@ -27,6 +27,7 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
+import { dedupeCountryWindowIncidents } from "@/lib/monitorDedupe";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
 import { buildPngReportDataset, type PngSourceIncident } from "@/lib/pngReportDataset";
 import {
@@ -109,10 +110,14 @@ function cleanIncidentTitle(title?: string | null, source?: string | null): stri
   const m = t.match(/^(.*\S)\s[-–—|]\s([^-–—|]{2,40})$/);
   if (m) {
     const tail = m[2].trim();
+    const head = m[1].trim();
     const wordCount = tail.split(/\s+/).length;
+    // A bare domain ("voi.id", "beritaimn.com") is a publisher handle, never a
+    // headline subtitle, so strip it regardless of the keyword list below.
+    const isBareDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(tail);
     const looksLikeMasthead = /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media)\b/i.test(tail);
-    if (wordCount <= 6 && !/\d/.test(tail) && looksLikeMasthead) {
-      return m[1].trim();
+    if (head.split(/\s+/).length >= 2 && (isBareDomain || (wordCount <= 6 && !/\d/.test(tail) && looksLikeMasthead))) {
+      return head;
     }
   }
   return t;
@@ -343,22 +348,31 @@ export default function CountryReport() {
     [sourcesData, issueDate, country?.name],
   );
 
+  // Collapse syndicated duplicates (the same wire re-run under an identical
+  // headline) BEFORE Fast Facts, the map, the charts and the related-incidents
+  // table read the active window, so one event never shows or counts twice.
+  // Mirrors the monitor dedupe; the PNG dataset path dedupes separately.
+  const dedupedWindowIncidents = useMemo(
+    () => dedupeCountryWindowIncidents(active.incidents),
+    [active],
+  );
+
   // Compute Fast Facts against the active window once per render.
   const facts = useMemo(
     () => computeCountryFastFacts({
       issueDate,
       incidents: incidents as CountryFastFactsIncident[],
-      windowIncidents: active.incidents,
+      windowIncidents: dedupedWindowIncidents,
       standingIncidents: layers.ninetyDay,
       periodLabel: active.periodShortLabel,
     }),
-    [incidents, issueDate, active, layers],
+    [incidents, issueDate, dedupedWindowIncidents, active, layers],
   );
 
   // Auto-derived prose (executiveSummary, whatMatters, watchNext, polestarView).
   const draftedProse = useMemo(() => {
     if (!country) return null;
-    const inputs: DraftableIncident[] = active.incidents.map((i) => ({
+    const inputs: DraftableIncident[] = dedupedWindowIncidents.map((i) => ({
       topic: i.topic, title: i.title, summary: i.summary,
       source: i.source, sourceUrl: i.sourceUrl, location: i.location,
       severity: i.severity, occurredAt: i.occurredAt, country: i.country,
@@ -371,7 +385,7 @@ export default function CountryReport() {
       windowIncidents: inputs,
       basisDays: active.basisDays,
     });
-  }, [country, active, issueDate]);
+  }, [country, active, dedupedWindowIncidents, issueDate]);
 
   // Deterministic PNG dataset (the labelled fallback). Built here so the AI
   // prose path below can ground its Executive Summary + Outlook on the SAME
