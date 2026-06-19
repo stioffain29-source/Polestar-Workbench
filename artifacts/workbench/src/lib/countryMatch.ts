@@ -117,6 +117,23 @@ export function isIndonesianWestPapuaContext(
   return WEST_PAPUA_CONTEXT_RE.test(t) && !PNG_CONTEXT_RE.test(t);
 }
 
+/**
+ * Symmetric counterpart to {@link isIndonesianWestPapuaContext}: true when a
+ * record's narrative is clearly about the independent state of Papua New Guinea
+ * (Port Moresby, Lae, Morobe, Enga, MOMASE, PNG institutions) rather than
+ * Indonesian Papua / West Papua. Used to keep genuinely-PNG items that carry a
+ * stray "Papua" / "West Papua" country tag out of the Indonesian Papua country
+ * report — the mirror of the West Papua strip the PNG report already applies,
+ * so the Papua brief can never be framed as Papua New Guinea. Cross-border
+ * records (handled by {@link isCrossBorderPapuaPng}) are exempted by the caller.
+ */
+export function isPapuaNewGuineaDominantContext(
+  text: string | null | undefined,
+): boolean {
+  const t = text ?? "";
+  return PNG_CONTEXT_RE.test(t) && !WEST_PAPUA_CONTEXT_RE.test(t);
+}
+
 // Distant foreign countries / nationalities / conflict theatres. When one of
 // these dominates a record's TITLE the article is about that country, not the
 // report's. Indonesia / West Papua are deliberately ABSENT — they are handled

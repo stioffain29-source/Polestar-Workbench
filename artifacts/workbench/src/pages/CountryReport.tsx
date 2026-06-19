@@ -33,6 +33,7 @@ import {
   incidentMatchesCountry,
   acceptedCountryTokens,
   isIndonesianWestPapuaContext,
+  isPapuaNewGuineaDominantContext,
   isCrossBorderPapuaPng,
   isForeignDominantContext,
 } from "@/lib/countryMatch";
@@ -184,7 +185,10 @@ export default function CountryReport() {
   const incidents = useMemo(() => {
     if (!country) return [];
     const name = country.name ?? "";
-    const isPng = acceptedCountryTokens(name).includes("papua new guinea");
+    const tokens = acceptedCountryTokens(name);
+    const isPng = tokens.includes("papua new guinea");
+    // The Indonesian Papua report (own token "papua", never the PNG group).
+    const isPapua = !isPng && tokens.includes("papua");
     return (incidentsData ?? []).filter((i) => {
       if (!incidentMatchesCountry(i.country, name)) return false;
       // Standing rule: Indonesian Papua / West Papua records must not
@@ -195,6 +199,15 @@ export default function CountryReport() {
       if (isPng && !isCrossBorderPapuaPng(i.country)) {
         const text = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
         if (isIndonesianWestPapuaContext(text)) return false;
+      }
+      // Symmetric rule for the Indonesian Papua report: a genuinely Papua New
+      // Guinea record (Port Moresby, Lae, Morobe, MOMASE, PNG institutions) that
+      // carries a stray "Papua" / "West Papua" country tag must not populate this
+      // brief, or the Indonesian Papua report reads as Papua New Guinea. Genuine
+      // cross-border records are exempt and stay in both reports.
+      if (isPapua && !isCrossBorderPapuaPng(i.country)) {
+        const text = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
+        if (isPapuaNewGuineaDominantContext(text)) return false;
       }
       // Drop geocoder mis-tags: a record whose TITLE is about a distant
       // foreign country (e.g. "Myanmar clashes ... near Thai border") with no
