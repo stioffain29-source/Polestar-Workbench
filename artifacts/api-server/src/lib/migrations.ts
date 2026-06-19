@@ -1752,18 +1752,23 @@ export async function runDataMigrations(): Promise<void> {
     // ONE-TIME backfill of the PNG per-incident structured extraction.
     //
     //   The four PNG columns (province / category / business_impact /
-    //   incident_date) are populated at INGEST (lib/ingest flashpoint via
-    //   extractPngItem + derivePngIncidentDate), so only PNG rows ingested AFTER
-    //   those columns shipped carry them. Every earlier PNG row — in dev and
-    //   prod — reads null and forces the PNG country brief onto its client-side
-    //   mirror rulebook. This pass re-applies the IDENTICAL extraction to the
-    //   historical flashpoint rows attributed to Papua New Guinea (or the
-    //   cross-border "West Papua; Papua New Guinea" tag), so the report reads
-    //   these fields straight from the API. The extraction is a pure,
-    //   deterministic function of each row's existing title/summary/location/
-    //   occurredAt, so it is idempotent and can never invent data. Marker-gated
-    //   → runs once per environment. Reaches the writable prod DB only after a
-    //   republish (the deployment runtime is the only writable-prod context).
+    //   incident_date) are populated at INGEST only for FLASHPOINT rows
+    //   (lib/ingest flashpoint via extractPngItem + derivePngIncidentDate), but
+    //   the PNG country brief aggregates EVERY topic tagged to Papua New Guinea
+    //   (protests, conflict, cargo_watch, fuel, …). So non-flashpoint PNG rows —
+    //   and every flashpoint PNG row ingested before those columns shipped — read
+    //   null. This pass re-applies the IDENTICAL extraction to ALL rows whose
+    //   country tag includes Papua New Guinea (any topic), so the report reads
+    //   these fields straight from the API instead of recomputing them client-
+    //   side. The extraction is a pure, deterministic function of each row's
+    //   existing title/summary/location/occurredAt, so it is idempotent and can
+    //   never invent data, and it is PNG-SCOPED so it never leaks onto any
+    //   non-PNG country. Marker-gated → runs once per environment; the v2 key
+    //   re-runs the now-broadened scope once over the rows the earlier
+    //   flashpoint-only v1 left untouched. Reaches the writable prod DB only
+    //   after a republish (the deployment runtime is the only writable-prod
+    //   context); new PNG rows thereafter are kept filled by the live-ingest
+    //   onlyNull enrichment pass in runIngestOnce.
     try {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS app_migration_markers (
@@ -1771,7 +1776,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "png_extract_backfill_v1";
+      const markerKey = "png_extract_backfill_v2";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);

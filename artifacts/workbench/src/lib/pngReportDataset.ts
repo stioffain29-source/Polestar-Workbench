@@ -6,20 +6,21 @@
 // into any other country report or the topic monitors.
 //
 // Per-item extraction (province / category / business impact / occurred-vs-
-// reported date) is IMPORTED from the canonical server-side rulebook in
-// `lib/ingest/src/pngExtract.ts` via its pure `@workspace/ingest/pngExtract`
-// subpath (no server deps), so the rulebook lives in ONE place and the client
-// can no longer drift from ingest. Server-extracted columns from the incidents
-// API are authoritative; when they are null (non-PNG or not-yet-backfilled
-// rows, e.g. prod before a republish + ingest) the report falls back to the
-// SAME shared rulebook, so it renders identical output regardless of whether
-// the nullable DB columns have been backfilled yet.
+// reported date) is read STRAIGHT FROM THE INCIDENTS API. The columns are
+// populated server-side by the canonical rulebook in `lib/ingest/src/pngExtract.ts`
+// — at ingest for new rows and via the marker-gated PNG backfill + the live-
+// ingest onlyNull enrichment pass for every PNG-tagged row across topics — so
+// the client no longer recomputes them and can never drift from ingest. The
+// columns are nullable, so a residual unextracted row falls back to the
+// rulebook's own "Other security" default (NOT a re-run of the rulebook); after
+// the backfill + ingest passes no PNG-report row should reach the report
+// unextracted.
+//
+// `derivePngProvince` is still imported below — but only to map curated
+// watchlist LABELS to provinces for the coverage-gap check, which is not
+// per-incident recomputation.
 
-import {
-  extractPngItem,
-  derivePngProvince,
-  derivePngIncidentDate,
-} from "@workspace/ingest/pngExtract";
+import { derivePngProvince } from "@workspace/ingest/pngExtract";
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
@@ -150,31 +151,29 @@ interface BuildArgs {
   periodLabel: string;
 }
 
+// Rulebook "Other security" default — used ONLY for a residual row that somehow
+// reaches the report without server-extracted columns (after the backfill + the
+// live-ingest enrichment pass this should not occur for any PNG-report row).
+// Kept in sync with OTHER_SECURITY_IMPACT / the default category in
+// lib/ingest/src/pngExtract.ts. This is a benign fallback, NOT a re-run of the
+// rulebook — the client no longer recomputes per-incident attributes.
+const DEFAULT_CATEGORY: PngCategory = "Other security";
+const DEFAULT_BUSINESS_IMPACT =
+  "Security-relevant development; monitor for operational follow-on in the affected area.";
+
 function toItem(i: PngSourceIncident): PngReportItem {
-  const text = `${i.title ?? ""} ${i.summary ?? ""}`;
-  // Prefer the server-extracted enrichment from the incidents API; fall back to
-  // the SAME shared @workspace/ingest/pngExtract rulebook only when the API value
-  // is absent (non-PNG or not-yet-backfilled rows). province / category /
-  // businessImpact / incidentDate are all additive and nullable, so this is a
-  // clean prefer-server-else-derive against one canonical rulebook.
-  const derived = extractPngItem(i.title ?? "", i.summary ?? "", i.location ?? null);
-  const province = i.province ?? derived.province;
-  let category: PngCategory;
-  let impact: string;
-  if (i.category && i.businessImpact) {
-    // category + businessImpact are written together by the ingest rulebook, so
-    // they are present or absent as a pair; trust them as a unit when present.
-    category = i.category as PngCategory;
-    impact = i.businessImpact;
-  } else {
-    category = derived.category;
-    impact = derived.businessImpact;
-  }
+  // Read the PNG per-incident enrichment STRAIGHT from the incidents API. The
+  // columns are populated server-side (ingest + backfill + onlyNull enrichment
+  // pass) for every PNG-tagged row, so the client no longer recomputes them.
+  // category + businessImpact are written together by the ingest rulebook, so
+  // they are present or absent as a pair.
+  const province = i.province ?? null;
+  const category: PngCategory =
+    i.category && i.businessImpact ? (i.category as PngCategory) : DEFAULT_CATEGORY;
+  const impact = i.category && i.businessImpact ? i.businessImpact : DEFAULT_BUSINESS_IMPACT;
   const sev = (i.severity ?? "").toLowerCase();
   const reportedDate = new Date(i.occurredAt);
-  const incidentDate = i.incidentDate
-    ? new Date(i.incidentDate)
-    : derivePngIncidentDate(text, reportedDate);
+  const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
   const title =
     i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source);
   return {

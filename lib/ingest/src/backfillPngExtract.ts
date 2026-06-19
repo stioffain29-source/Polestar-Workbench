@@ -1,32 +1,34 @@
 import { db, incidentsTable } from "@workspace/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { extractPngItem, derivePngIncidentDate } from "./pngExtract";
 
-// One-time backfill: re-run the canonical PNG per-incident extraction over the
-// flashpoint rows attributed to Papua New Guinea so the PNG country brief reads
-// province / category / business_impact / incident_date straight from the API
-// instead of re-deriving them client-side.
+// PNG per-incident extraction over the incident rows attributed to Papua New
+// Guinea, so the PNG country brief reads province / category / business_impact /
+// incident_date STRAIGHT FROM THE API instead of re-deriving them client-side.
 //
-// Why this is needed: the four PNG columns are populated at INGEST
-// (lib/ingest/src/flashpoint.ts via extractPngItem + derivePngIncidentDate), so
-// only rows ingested AFTER those columns shipped carry them. Every PNG row
-// ingested earlier — in both dev and prod — reads null and forces the report
-// onto its client-side mirror rulebook. This pass re-applies the IDENTICAL
-// extraction the ingest now uses to those historical rows.
+// Why this is needed: the PNG country brief aggregates EVERY topic tagged to
+// Papua New Guinea (flashpoint, protests, conflict, cargo_watch, fuel, …), but
+// only the flashpoint ingest populates the four PNG columns inline
+// (lib/ingest/src/flashpoint.ts via extractPngItem + derivePngIncidentDate).
+// Every other PNG-tagged row — and every flashpoint PNG row ingested before
+// those columns shipped — reads null and used to force the report onto an
+// in-browser mirror rulebook. This pass re-applies the IDENTICAL extraction the
+// ingest uses to ALL PNG-tagged rows so the report no longer recomputes.
 //
-// Scope: ONLY flashpoint rows whose stored country is one of the PNG country
-// tags ("Papua New Guinea" or the cross-border "West Papua; Papua New Guinea"),
-// mirroring the ingest's isPng gate so the broadened PNG scope never leaks into
-// other countries. The extraction is a pure, deterministic function of the
-// row's existing title / summary / location / occurredAt, so the pass is
-// idempotent — re-running it produces the same values and never invents data.
-// There is no analyst-editing surface for these derived columns, so the pass
-// rewrites them unconditionally (it does not protect a prior value the way the
-// blank-only backfills do for analyst-owned fields).
+// Scope: any row whose stored country tag INCLUDES "Papua New Guinea" — the
+// SAME superset the PNG brief consumes (it token-matches "papua new guinea", so
+// compound tags like "West Papua; Papua New Guinea" or "Pakistan; Papua New
+// Guinea" are in scope). A row must carry the PNG country tag, so the extraction
+// is PNG-SCOPED and never leaks onto any non-PNG country. The extraction is a
+// pure, deterministic function of the row's existing title / summary / location
+// / occurredAt, so the pass is idempotent — re-running it produces the same
+// values and never invents data. There is no analyst-editing surface for these
+// derived columns, so the full pass rewrites them unconditionally (the
+// `onlyNull` mode used by the live ingest fills just the unpopulated rows).
 
-// The PNG country tags the flashpoint ingest assigns (see resolvePapuaPng in
-// flashpoint.ts). Keep in sync with the isPng gate there.
-const PNG_COUNTRY_TAGS = ["Papua New Guinea", "West Papua; Papua New Guinea"];
+// Match any incident whose country tag includes Papua New Guinea (case-
+// insensitive), mirroring the PNG brief's token match so the scope stays PNG.
+const PNG_COUNTRY_MATCH: SQL = sql`${incidentsTable.country} ILIKE '%papua new guinea%'`;
 
 export type PngExtractBackfillSummary = {
   mode: "dry-run" | "commit";
@@ -46,18 +48,28 @@ export type PngExtractBackfillSummary = {
 };
 
 export async function runPngExtractBackfill(
-  opts: { commit?: boolean; limit?: number } = {},
+  opts: { commit?: boolean; limit?: number; onlyNull?: boolean } = {},
 ): Promise<PngExtractBackfillSummary> {
   const commit = opts.commit ?? false;
   const limit = opts.limit ?? 10000;
+  // onlyNull restricts the pass to rows that have not been extracted yet
+  // (category null — category + business_impact are written as a pair). The
+  // live-ingest enrichment uses this so it touches only newly-inserted PNG rows
+  // and converges; the one-time boot backfill leaves it off to refresh every
+  // PNG row against the current rulebook.
+  const onlyNull = opts.onlyNull ?? false;
   const logLines: string[] = [];
   const log = (s: string) => logLines.push(s);
   const perCategory = new Map<string, number>();
   const samples: PngExtractBackfillSummary["samples"] = [];
 
   log(
-    `PNG extraction backfill — mode=${commit ? "COMMIT" : "DRY-RUN"}, limit=${limit}`,
+    `PNG extraction backfill — mode=${commit ? "COMMIT" : "DRY-RUN"}, limit=${limit}, onlyNull=${onlyNull}`,
   );
+
+  const selectWhere = onlyNull
+    ? and(PNG_COUNTRY_MATCH, isNull(incidentsTable.category))
+    : PNG_COUNTRY_MATCH;
 
   const rows = await db
     .select({
@@ -68,16 +80,11 @@ export async function runPngExtractBackfill(
       occurredAt: incidentsTable.occurredAt,
     })
     .from(incidentsTable)
-    .where(
-      and(
-        eq(incidentsTable.topic, "flashpoint"),
-        inArray(incidentsTable.country, PNG_COUNTRY_TAGS),
-      ),
-    )
+    .where(selectWhere)
     .orderBy(incidentsTable.id)
     .limit(limit);
 
-  log(`Candidates (flashpoint PNG rows): ${rows.length}`);
+  log(`Candidates (PNG-tagged rows${onlyNull ? ", unextracted" : ""}): ${rows.length}`);
 
   let updated = 0;
   let provinceFilled = 0;
@@ -108,19 +115,20 @@ export async function runPngExtractBackfill(
     }
 
     if (commit) {
-      // Re-assert the PNG country scope in the WHERE so a row whose country
-      // changed between SELECT and UPDATE is left untouched (the extraction is
-      // only valid for PNG rows).
+      // Re-assert the PNG country scope (and the onlyNull guard) in the WHERE so
+      // a row whose country changed between SELECT and UPDATE is left untouched
+      // (the extraction is only valid for PNG rows).
+      const updateWhere = onlyNull
+        ? and(
+            eq(incidentsTable.id, r.id),
+            PNG_COUNTRY_MATCH,
+            isNull(incidentsTable.category),
+          )
+        : and(eq(incidentsTable.id, r.id), PNG_COUNTRY_MATCH);
       await db
         .update(incidentsTable)
         .set({ province, category, businessImpact, incidentDate })
-        .where(
-          and(
-            eq(incidentsTable.id, r.id),
-            eq(incidentsTable.topic, "flashpoint"),
-            inArray(incidentsTable.country, PNG_COUNTRY_TAGS),
-          ),
-        );
+        .where(updateWhere);
     }
     updated++;
   }

@@ -15,6 +15,7 @@ import {
   runReliefWebCorroboration,
   runReliefWebReportsIngest,
   runGdeltEnrich,
+  runPngExtractBackfill,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
@@ -346,6 +347,29 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const conflict = await runIncidentIngest("conflict", () =>
       runConflictIngest({ commit: true }),
     );
+    // PNG per-incident structured extraction. The PNG country brief reads
+    // province / category / business_impact / incident_date STRAIGHT from the
+    // incidents API (the client no longer recomputes them), but only the
+    // flashpoint ingest fills those columns inline — the brief also aggregates
+    // protests / conflict / cargo_watch / fuel rows tagged to Papua New Guinea.
+    // This onlyNull pass fills any PNG-tagged row this run inserted that still
+    // has no extraction, applying the IDENTICAL shared rulebook. PNG-SCOPED
+    // (rows must carry the PNG country tag) so it never leaks onto other
+    // countries; idempotent + converging (a filled row is never re-touched).
+    // Isolated in its own try so an error can never fail the incident ingest.
+    try {
+      const png = await runPngExtractBackfill({ commit: true, onlyNull: true });
+      logger.info(
+        {
+          candidates: png.candidates,
+          updated: png.updated,
+          provinceFilled: png.provinceFilled,
+        },
+        "PNG per-incident extraction pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "PNG per-incident extraction pass failed");
+    }
     // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
     // West Papua feeds) into clean English advisory titles AFTER the scrapers
     // have written this run's rows. Isolated in its own try so an LLM/network
