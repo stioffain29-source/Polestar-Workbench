@@ -552,6 +552,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/ingest':
+        specifier: workspace:*
+        version: link:../../lib/ingest
       '@workspace/relevance':
         specifier: workspace:*
         version: link:../../lib/relevance

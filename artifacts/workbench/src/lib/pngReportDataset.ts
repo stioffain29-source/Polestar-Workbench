@@ -6,12 +6,23 @@
 // into any other country report or the topic monitors.
 //
 // Per-item extraction (province / category / business impact / occurred-vs-
-// reported date) MIRRORS the canonical server-side rulebook in
-// `lib/ingest/src/pngExtract.ts`. The report derives client-side so it renders
-// identical output in dev and prod regardless of whether the nullable DB
-// columns have been backfilled yet (prod is read-only from the workspace and
-// only populates those columns after a republish + ingest). Keep the two copies
-// in lockstep: any change to province keys or category rules belongs in BOTH.
+// reported date) is IMPORTED from the canonical server-side rulebook in
+// `lib/ingest/src/pngExtract.ts` via its pure `@workspace/ingest/pngExtract`
+// subpath (no server deps), so the rulebook lives in ONE place and the client
+// can no longer drift from ingest. Server-extracted columns from the incidents
+// API are authoritative; when they are null (non-PNG or not-yet-backfilled
+// rows, e.g. prod before a republish + ingest) the report falls back to the
+// SAME shared rulebook, so it renders identical output regardless of whether
+// the nullable DB columns have been backfilled yet.
+
+import {
+  extractPngItem,
+  derivePngProvince,
+  derivePngIncidentDate,
+} from "@workspace/ingest/pngExtract";
+
+export type { PngCategory } from "@workspace/ingest/pngExtract";
+import type { PngCategory } from "@workspace/ingest/pngExtract";
 
 // ---------------------------------------------------------------------------
 // Input shape (permissive — the page passes CountryFastFactsIncident objects,
@@ -42,235 +53,13 @@ export interface PngSourceIncident {
   incidentDate?: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Province resolution (mirror of pngExtract.PNG_PROVINCE_BY_CITY)
-// ---------------------------------------------------------------------------
-const PNG_PROVINCE_BY_CITY: Record<string, string> = {
-  "port moresby": "National Capital District",
-  "nine mile": "National Capital District",
-  bomana: "National Capital District",
-  gerehu: "National Capital District",
-  boroko: "National Capital District",
-  waigani: "National Capital District",
-  gordons: "National Capital District",
-  gordon: "National Capital District",
-  "six mile": "National Capital District",
-  hohola: "National Capital District",
-  badili: "National Capital District",
-  koki: "National Capital District",
-  hanuabada: "National Capital District",
-  ncd: "National Capital District",
-  "west taraka": "Morobe",
-  taraka: "Morobe",
-  lae: "Morobe",
-  nadzab: "Morobe",
-  bumbu: "Morobe",
-  eriku: "Morobe",
-  bulolo: "Morobe",
-  wau: "Morobe",
-  morobe: "Morobe",
-  kagamuga: "Western Highlands",
-  "mount hagen": "Western Highlands",
-  "mt hagen": "Western Highlands",
-  banz: "Jiwaka",
-  minj: "Jiwaka",
-  madang: "Madang",
-  goroka: "Eastern Highlands",
-  kainantu: "Eastern Highlands",
-  wewak: "East Sepik",
-  maprik: "East Sepik",
-  enga: "Enga",
-  wabag: "Enga",
-  porgera: "Enga",
-  wapenamanda: "Enga",
-  tari: "Hela",
-  hela: "Hela",
-  komo: "Hela",
-  mendi: "Southern Highlands",
-  ialibu: "Southern Highlands",
-  kokopo: "East New Britain",
-  rabaul: "East New Britain",
-  kimbe: "West New Britain",
-  bougainville: "Bougainville",
-  buka: "Bougainville",
-  arawa: "Bougainville",
-  panguna: "Bougainville",
-  vanimo: "West Sepik",
-  kerema: "Gulf",
-  popondetta: "Oro",
-  alotau: "Milne Bay",
-  daru: "Western",
-  kavieng: "New Ireland",
-  lorengau: "Manus",
-};
-
-const PROVINCE_KEYS = Object.keys(PNG_PROVINCE_BY_CITY).sort((a, b) => b.length - a.length);
-
+// Generic word-boundary helper — used only by the watchlist-gap check further
+// down. Province / category / occurred-date derivation all come from the shared
+// @workspace/ingest/pngExtract rulebook imported above (no duplicated copy).
 function hasWord(haystack: string, needle: string): boolean {
   if (!needle) return false;
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, "i").test(haystack);
-}
-
-function derivePngProvince(location: string | null | undefined, text: string): string | null {
-  const loc = (location ?? "").trim().toLowerCase();
-  if (loc && PNG_PROVINCE_BY_CITY[loc]) return PNG_PROVINCE_BY_CITY[loc];
-  const hay = `${location ?? ""} ${text}`;
-  for (const key of PROVINCE_KEYS) {
-    if (hasWord(hay, key)) return PNG_PROVINCE_BY_CITY[key];
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Category + business impact (mirror of pngExtract.CATEGORY_RULES)
-// ---------------------------------------------------------------------------
-export type PngCategory =
-  | "Armed robbery / hold-up"
-  | "Tribal / communal violence"
-  | "Homicide / violent crime"
-  | "Theft / break-in"
-  | "Civil unrest / protest"
-  | "Policing operation"
-  | "Community policing"
-  | "Intelligence / training"
-  | "Corrections / detention"
-  | "Aviation / airport"
-  | "Maritime / port"
-  | "Road / highway"
-  | "Power / utilities"
-  | "Telecoms / connectivity"
-  | "Government stability"
-  | "Other security";
-
-const CATEGORY_RULES: Array<{ re: RegExp; category: PngCategory; impact: string }> = [
-  {
-    re: /\b(armed robbery|hold[- ]?up|carjack(?:ing|ed)?|stick[- ]?up|heist)\b/i,
-    category: "Armed robbery / hold-up",
-    impact: "Direct threat to staff, cash-in-transit and premises in the affected area; review movement and security cover.",
-  },
-  {
-    re: /\b(tribal (?:fight|clash|war|warfare|violence|conflict)|payback (?:killing|attack)|inter[- ]?clan|clan (?:fight|war|clash)|communal (?:violence|clash))\b/i,
-    category: "Tribal / communal violence",
-    impact: "Road closures, supply-chain disruption and personnel-movement risk across the affected district.",
-  },
-  {
-    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed)\b/i,
-    category: "Homicide / violent crime",
-    impact: "Heightened personal-security risk locally; review after-hours exposure and movement protocols.",
-  },
-  {
-    re: /\b(community polic\w*|neighbou?rhood watch|police (?:partnership|community)|safe (?:city|community)|crime[- ]?prevention (?:launch|program|programme|initiative))\b/i,
-    category: "Community policing",
-    impact: "Net positive for the local security posture; limited direct operational impact.",
-  },
-  {
-    re: /\b(intelligence (?:training|unit|sharing|gathering|course|workshop|capabilit\w*)|police training|capacity[- ]?building|train(?:ing|ed) (?:of |for )?(?:officers|police|recruits|personnel))\b/i,
-    category: "Intelligence / training",
-    impact: "Security capacity-building; no direct operational disruption expected.",
-  },
-  {
-    re: /\b(correctional (?:service|institution|facility|officers?)|warders?|prison (?:break|escape|riot|unrest|officers?|inmates?)|jail ?break|inmates? escape|cell block)\b/i,
-    category: "Corrections / detention",
-    impact: "Localised security-force activity; limited direct commercial impact unless escapees are at large.",
-  },
-  {
-    re: /\b(airport|airstrip|airfield|runway|aviation|air ?services|flights?|aircraft)\b/i,
-    category: "Aviation / airport",
-    impact: "Possible flight-schedule and airport-access disruption affecting travel and air freight.",
-  },
-  {
-    re: /\b(wharf|jetty|port (?:closure|shut|disrupt\w*|congestion|operations?|security)|harbou?r|shipping|maritime|vessel|ferry)\b/i,
-    category: "Maritime / port",
-    impact: "Possible cargo-handling and port-access disruption affecting sea freight.",
-  },
-  {
-    re: /\b(highway|road (?:closed|cut|block\w*|landslip|landslide|washed|sealed)|bridge (?:collapse|washed|down|out)|landslip|landslide blocks?)\b/i,
-    category: "Road / highway",
-    impact: "Overland freight and personnel-movement disruption on the affected corridor.",
-  },
-  {
-    re: /\b(power (?:outage|blackout|cut|failure|shortage|rationing|crisis)|electricity (?:outage|blackout|cut|crisis)|grid (?:failure|down)|png power|fuel (?:shortage|crisis|outage|ran out|rationing|supply))\b/i,
-    category: "Power / utilities",
-    impact: "Operational disruption from power/fuel interruption; check site continuity and backup supply.",
-  },
-  {
-    re: /\b(telecom\w*|telecommunication\w*|internet (?:outage|down|disrupt\w*|cut)|network (?:outage|down|disrupt\w*)|mobile (?:network|service) (?:down|outage|disrupt\w*)|digicel|connectivity)\b/i,
-    category: "Telecoms / connectivity",
-    impact: "Connectivity disruption; verify communications redundancy at affected sites.",
-  },
-  {
-    re: /\b(vote of no confidence|government (?:shutdown|instability|stability|crisis|standoff)|political (?:crisis|instability|standoff)|public servants? strike|cabinet (?:reshuffle|crisis)|parliament\w* (?:standoff|deadlock|impasse))\b/i,
-    category: "Government stability",
-    impact: "Political-risk signal; monitor for downstream policy and security effects.",
-  },
-  {
-    re: /\b(protest|demonstration|rally|march|riot|unrest|looting|roadblock|road block|strike|walkout|stoppage|picket|public disorder)\b/i,
-    category: "Civil unrest / protest",
-    impact: "Potential road blockages, business closures and movement restrictions in the affected area.",
-  },
-  {
-    re: /\b(theft|stolen|burglary|break[- ]?in|looting|robbery|robbed)\b/i,
-    category: "Theft / break-in",
-    impact: "Property and asset-security risk; review premises security in the affected area.",
-  },
-  {
-    re: /\b(police (?:operation|raid|swoop|patrol|deployment|crackdown)|joint (?:operation|patrol|task ?force)|raid(?:ed|s)?|swoop|manhunt|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|wanted (?:man|men|criminal|suspect|fugitive))\b/i,
-    category: "Policing operation",
-    impact: "Localised disruption and checkpoints; short-term access constraints possible.",
-  },
-];
-
-const OTHER_SECURITY_IMPACT =
-  "Security-relevant development; monitor for operational follow-on in the affected area.";
-
-function extractCategory(text: string): { category: PngCategory; impact: string } {
-  for (const rule of CATEGORY_RULES) {
-    if (rule.re.test(text)) return { category: rule.category, impact: rule.impact };
-  }
-  return { category: "Other security", impact: OTHER_SECURITY_IMPACT };
-}
-
-// ---------------------------------------------------------------------------
-// Occurred-vs-reported date (mirror of pngExtract.derivePngIncidentDate)
-// ---------------------------------------------------------------------------
-const MONTHS: Record<string, number> = {
-  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
-  may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8,
-  september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
-};
-const MONTH_ALT =
-  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
-const DMY_RE = new RegExp(
-  String.raw`\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(${MONTH_ALT})\b(?:[,\s]+(\d{4}))?`,
-  "gi",
-);
-const MDY_RE = new RegExp(
-  String.raw`\b(${MONTH_ALT})\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:[,\s]+(\d{4}))?`,
-  "gi",
-);
-
-function derivePngIncidentDate(text: string, pubDate: Date): Date | null {
-  const pubMs = pubDate.getTime();
-  if (Number.isNaN(pubMs)) return null;
-  const minMs = pubMs - 200 * 24 * 60 * 60 * 1000;
-  const distinctMs = pubMs - 2 * 24 * 60 * 60 * 1000;
-  const pubYear = pubDate.getUTCFullYear();
-  const candidates: number[] = [];
-  const collect = (day: number, month: number | undefined, yearStr: string | undefined) => {
-    if (month === undefined || !day || day < 1 || day > 31) return;
-    const year = yearStr ? Number(yearStr) : pubYear;
-    let d = Date.UTC(year, month, day);
-    if (!yearStr && d > pubMs) d = Date.UTC(year - 1, month, day);
-    if (d >= minMs && d <= distinctMs) candidates.push(d);
-  };
-  let m: RegExpExecArray | null;
-  DMY_RE.lastIndex = 0;
-  while ((m = DMY_RE.exec(text)) !== null) collect(Number(m[1]), MONTHS[m[2].toLowerCase()], m[3]);
-  MDY_RE.lastIndex = 0;
-  while ((m = MDY_RE.exec(text)) !== null) collect(Number(m[2]), MONTHS[m[1].toLowerCase()], m[3]);
-  if (candidates.length === 0) return null;
-  return new Date(Math.min(...candidates));
 }
 
 // ---------------------------------------------------------------------------
@@ -364,10 +153,12 @@ interface BuildArgs {
 function toItem(i: PngSourceIncident): PngReportItem {
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
   // Prefer the server-extracted enrichment from the incidents API; fall back to
-  // the mirrored client rulebook only when the API value is absent (non-PNG or
-  // not-yet-backfilled rows). province / category / businessImpact / incidentDate
-  // are all additive and nullable, so this is a clean prefer-server-else-derive.
-  const province = i.province ?? derivePngProvince(i.location, text);
+  // the SAME shared @workspace/ingest/pngExtract rulebook only when the API value
+  // is absent (non-PNG or not-yet-backfilled rows). province / category /
+  // businessImpact / incidentDate are all additive and nullable, so this is a
+  // clean prefer-server-else-derive against one canonical rulebook.
+  const derived = extractPngItem(i.title ?? "", i.summary ?? "", i.location ?? null);
+  const province = i.province ?? derived.province;
   let category: PngCategory;
   let impact: string;
   if (i.category && i.businessImpact) {
@@ -376,9 +167,8 @@ function toItem(i: PngSourceIncident): PngReportItem {
     category = i.category as PngCategory;
     impact = i.businessImpact;
   } else {
-    const derived = extractCategory(text);
     category = derived.category;
-    impact = derived.impact;
+    impact = derived.businessImpact;
   }
   const sev = (i.severity ?? "").toLowerCase();
   const reportedDate = new Date(i.occurredAt);
