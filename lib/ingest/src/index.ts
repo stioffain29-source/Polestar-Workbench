@@ -11,6 +11,15 @@ export { runMarketPricesIngest } from "./marketPrices";
 export type { MarketPriceSummary } from "./marketPrices";
 export { runMarketSnapshotIngest } from "./marketSnapshot";
 export type { MarketSnapshotSummary } from "./marketSnapshot";
+export {
+  runMaritimeMovementIngest,
+  isAisConfigured,
+  AIS_THEATRES,
+} from "./maritimeMovement";
+export type {
+  MaritimeMovementSummary,
+  MaritimeMovementOptions,
+} from "./maritimeMovement";
 export { runStrikesIngest, classifyStrikeFields } from "./strikes";
 export type { StrikesIngestSummary, StrikeTheatre } from "./strikes";
 export { runStrikesBackfill } from "./backfillStrikes";

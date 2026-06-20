@@ -4,10 +4,11 @@ import { pgTable, serial, text, integer, jsonb, timestamp } from "drizzle-orm/pg
 // CONTEXT only — it is NEVER an incident and can never create one. AIS "dark" /
 // gap activity is an INDICATOR, never evidence of hostile intent on its own.
 //
-// There is no AIS API configured, so rows arrive via an admin-token-gated
-// MANUAL upload (POST /api/admin/maritime-movement) from a licensed provider.
-// When the table is empty every surface degrades cleanly to "movement data
-// unavailable" — it never fabricates traffic.
+// Rows arrive from the live AIS ingest (lib/ingest/src/maritimeMovement.ts,
+// source_name contains "ais") when AIS_API_KEY is configured, AND/OR from an
+// admin-token-gated MANUAL upload (POST /api/admin/maritime-movement) from a
+// licensed provider. When the table is empty every surface degrades cleanly to
+// "movement data unavailable" — it never fabricates traffic.
 //
 // One row per snapshot (theatre + data_as_of); history is kept (we never
 // overwrite), and the read endpoints surface the latest snapshot per theatre.

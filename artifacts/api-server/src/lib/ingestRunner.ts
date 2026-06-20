@@ -9,6 +9,7 @@ import {
   runConflictIngest,
   runMarketPricesIngest,
   runMarketSnapshotIngest,
+  runMaritimeMovementIngest,
   runStrikesIngest,
   runTitleTranslation,
   runResolveGoogleNewsUrls,
@@ -20,6 +21,7 @@ import {
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
+  type MaritimeMovementSummary,
   type StrikesIngestSummary,
   type ReliefWebCorroborationSummary,
   type ReliefWebReportsSummary,
@@ -58,6 +60,7 @@ export type IngestRunResult =
       conflict: IngestSummary;
       marketPrices: MarketPriceSummary;
       marketSnapshot: MarketSnapshotSummary;
+      maritimeMovement: MaritimeMovementSummary;
       strikes: StrikesIngestSummary;
       corroboration: ReliefWebCorroborationSummary;
       reliefwebReports: ReliefWebReportsSummary;
@@ -225,6 +228,27 @@ function emptyGdeltEnrich(err: unknown): GdeltEnrichSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`GDELT enrichment failed: ${msg}`],
+  };
+}
+
+function emptyMaritimeMovement(err: unknown): MaritimeMovementSummary {
+  const m = err instanceof Error ? err.message : String(err);
+  return {
+    provider: (process.env.AIS_PROVIDER?.trim() || "aisstream").toLowerCase(),
+    mode: "commit",
+    configured: !!process.env.AIS_API_KEY?.trim(),
+    enabled: true,
+    ran: false,
+    reason: "fetch_failed",
+    collectSeconds: 0,
+    messagesReceived: 0,
+    vesselsSeen: 0,
+    theatresWritten: 0,
+    rowsInserted: 0,
+    perTheatre: [],
+    fetchOk: false,
+    errors: [m],
+    logLines: [`maritime movement ingest failed: ${m}`],
   };
 }
 
@@ -462,6 +486,29 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "market snapshot ingest failed");
       marketSnapshot = emptyMarketSnapshot(err);
     }
+    // Live vessel-MOVEMENT (AIS) context. Writes ONLY the isolated
+    // maritime_movement store — CONTEXT ONLY, it never touches the incidents
+    // table and can never inflate a confirmed-incident count. No-ops cleanly
+    // when AIS_API_KEY is unset (the board degrades to "movement data
+    // unavailable"). Isolated in its own try so a provider/WebSocket failure can
+    // never fail the incident ingest.
+    let maritimeMovement: MaritimeMovementSummary;
+    try {
+      maritimeMovement = await runMaritimeMovementIngest({ commit: true });
+      logger.info(
+        {
+          ran: maritimeMovement.ran,
+          reason: maritimeMovement.reason,
+          vesselsSeen: maritimeMovement.vesselsSeen,
+          theatresWritten: maritimeMovement.theatresWritten,
+          rowsInserted: maritimeMovement.rowsInserted,
+        },
+        "maritime movement (AIS) pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "maritime movement (AIS) pass failed");
+      maritimeMovement = emptyMaritimeMovement(err);
+    }
     // ReliefWeb (UN OCHA) corroboration. Cross-checks the incidents just
     // scraped (and a bounded back-fill of older rows) against UN OCHA's
     // ReliefWeb reports and attaches official corroborating references — a
@@ -543,6 +590,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       conflict,
       marketPrices,
       marketSnapshot,
+      maritimeMovement,
       strikes,
       corroboration,
       reliefwebReports,

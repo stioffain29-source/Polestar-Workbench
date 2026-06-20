@@ -1322,12 +1322,14 @@ function MaritimeBoardCard({
   );
 }
 
-// Movement (AIS) context is NEVER scraped — there is no AIS API. Rows arrive via
-// this admin-token-gated manual upload from a licensed provider. A successful
-// upload invalidates the latest-movement query so the board AND the Shipping
-// Watch report immediately render the new movement context. The token is sent
-// per-request as an Authorization: Bearer header; it is never persisted and the
-// workbench never holds a global auth token.
+// Movement (AIS) context is populated automatically by the live AIS ingest when
+// AIS_API_KEY is configured; this admin-token-gated form is a COMPLEMENTARY
+// manual path for a licensed provider's snapshot. Either way the rows are
+// CONTEXT only, never incidents. A successful upload invalidates the
+// latest-movement query so the board AND the Shipping Watch report immediately
+// render the new movement context. The token is sent per-request as an
+// Authorization: Bearer header; it is never persisted and the workbench never
+// holds a global auth token.
 const MOVEMENT_COUNT_FIELDS: { key: keyof MaritimeMovementInput; label: string }[] = [
   { key: "totalVessels", label: "Total vessels" },
   { key: "inboundCount", label: "Inbound" },
@@ -1433,8 +1435,9 @@ function MaritimeMovementUploadForm({ hasMovement }: { hasMovement: boolean }) {
     <Section title="Movement Data Upload — Admin">
       <div className="flex items-center justify-between gap-4 flex-wrap -mt-1">
         <p className="text-xs text-muted-foreground font-sans max-w-3xl">
-          Movement (AIS) figures are CONTEXT, never incidents. There is no AIS feed — a licensed
-          provider's snapshot is uploaded here. Admin token required.{" "}
+          Movement (AIS) figures are CONTEXT, never incidents. A live AIS feed populates these
+          automatically when configured; this form adds a licensed provider's snapshot manually.
+          Admin token required.{" "}
           {hasMovement
             ? "A snapshot is on file; uploading adds a newer one."
             : "No snapshot on file — both surfaces read movement data unavailable until one is added."}

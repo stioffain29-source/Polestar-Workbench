@@ -75,11 +75,43 @@ async function latestMovement(pattern?: string): Promise<Date | null> {
       .select({ latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})` })
       .from(maritimeMovementTable)
       .where(pattern ? ilike(maritimeMovementTable.sourceName, pattern) : undefined);
-    return row?.latest ?? null;
+    return toDate(row?.latest);
   } catch (err) {
     logger.warn({ err: msg(err) }, "maritime movement freshness query failed");
     return null;
   }
+}
+
+/**
+ * Newest GENUINELY-MANUAL movement upload — excludes provider-fed rows (AIS /
+ * Windward) so the "Manual context upload" row reflects only operator uploads,
+ * not the live AIS feed (whose source_name contains "ais").
+ */
+async function latestManualMovement(): Promise<Date | null> {
+  try {
+    const [row] = await db
+      .select({ latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})` })
+      .from(maritimeMovementTable)
+      .where(
+        sql`${maritimeMovementTable.sourceName} NOT ILIKE '%ais%' AND ${maritimeMovementTable.sourceName} NOT ILIKE '%windward%'`,
+      );
+    return toDate(row?.latest);
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "manual maritime movement freshness query failed");
+    return null;
+  }
+}
+
+/**
+ * Coerce a raw `max(timestamp)` result to a real Date. A raw `sql` aggregate
+ * bypasses Drizzle's column type parser, so the pg driver hands back the
+ * timestamp as a STRING; without this, freshnessOf/fmt would call .getTime()
+ * on a string and throw once any movement row exists.
+ */
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function msg(err: unknown): string {
@@ -169,7 +201,7 @@ async function providerStatus(opts: {
 
 async function manualUploadStatus(): Promise<MaritimeSourceHealthItem> {
   const label = "Manual context upload";
-  const latest = await latestMovement();
+  const latest = await latestManualMovement();
   const fresh = freshnessOf(latest);
   if (fresh === "live") {
     return item("manual_upload", label, "live", "Recent manual movement-context upload present.", fmt(latest));
