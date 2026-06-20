@@ -19,6 +19,10 @@ module.exports = {
     "^@assets/.*$": "<rootDir>/__tests__/mocks/asset.ts",
     "\\.(ttf|woff2?|png|jpe?g|svg|gif|webp)(\\?url)?$":
       "<rootDir>/__tests__/mocks/asset.ts",
+    // The api-server source uses NodeNext `.js`-suffixed relative imports (e.g.
+    // `../lib/adminAuth.js`). ts-jest does not rewrite those, so strip the
+    // extension off relative specifiers and let jest resolve the `.ts` source.
+    "^(\\.{1,2}/.*)\\.js$": "$1",
     // Heavy chart/map children (recharts, leaflet) that block rendering in jest.
     // The page-break marker test only asserts the parent preview's markers, so
     // stub these to an inert placeholder. Must come BEFORE the generic `@/` rule.
@@ -35,6 +39,10 @@ module.exports = {
     "^react$": "<rootDir>/artifacts/workbench/node_modules/react",
     "^react-dom/server$":
       "<rootDir>/artifacts/workbench/node_modules/react-dom/server.node.js",
+    "^react-dom/client$":
+      "<rootDir>/artifacts/workbench/node_modules/react-dom/client.js",
+    "^react-dom/test-utils$":
+      "<rootDir>/artifacts/workbench/node_modules/react-dom/test-utils.js",
     "^react-dom$": "<rootDir>/artifacts/workbench/node_modules/react-dom",
     "^react/jsx-runtime$":
       "<rootDir>/artifacts/workbench/node_modules/react/jsx-runtime",
