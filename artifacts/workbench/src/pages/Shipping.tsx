@@ -34,6 +34,7 @@ import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import {
   buildMaritimeIntelligence,
+  formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeRiskLevel,
   type MaritimeIntelligence,
@@ -1638,10 +1639,7 @@ function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
       <div className="text-[11px] font-sans leading-snug">
         <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Movement</span>
         {movement ? (
-          <span className="text-foreground/85">
-            {movement.totalVessels != null ? `${movement.totalVessels} vessels tracked` : "Tracked"}
-            {movement.changeVs7DayBaseline ? ` · ${movement.changeVs7DayBaseline} vs 7-day baseline` : ""}
-          </span>
+          <span className="text-foreground/85">{formatMovementSummary(movement)}</span>
         ) : (
           <span className="italic text-muted-foreground">Movement data unavailable</span>
         )}
@@ -1823,12 +1821,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
               {movementSnapshot.theatres.map((t) => (
                 <li key={t.theatre} className="text-[12px] font-sans leading-snug">
                   <span className="font-serif font-bold text-primary">{t.theatre}</span>
-                  {t.totalVessels != null && (
-                    <span className="text-foreground/80"> — {t.totalVessels} vessels tracked</span>
-                  )}
-                  {t.changeVs7DayBaseline && (
-                    <span className="text-muted-foreground"> · {t.changeVs7DayBaseline} vs 7-day baseline</span>
-                  )}
+                  <span className="text-foreground/80"> — {formatMovementSummary(t)}</span>
                 </li>
               ))}
             </ul>

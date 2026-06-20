@@ -18,6 +18,7 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import type { MaritimeMovement } from "@workspace/api-client-react";
 import {
   buildMaritimeIntelligence,
+  formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
   type ChokepointCard,
@@ -496,9 +497,7 @@ function ChokepointReportCard({ card }: { card: ChokepointCard }) {
       </p>
       <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
         <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Movement</span>
-        {movement
-          ? `${movement.totalVessels != null ? `${movement.totalVessels} vessels tracked` : "Tracked"}${movement.changeVs7DayBaseline ? ` · ${movement.changeVs7DayBaseline} vs 7-day baseline` : ""}`
-          : "Movement data unavailable"}
+        {movement ? formatMovementSummary(movement) : "Movement data unavailable"}
       </p>
       <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
         <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Business impact</span>
@@ -590,8 +589,7 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
             {movementSnapshot.theatres.map((t) => (
               <li key={t.theatre} className="text-[13px] leading-[1.6]">
                 <span style={{ color: NAVY, fontWeight: 700 }}>{t.theatre}</span>
-                {t.totalVessels != null && <span> &mdash; {t.totalVessels} vessels tracked</span>}
-                {t.changeVs7DayBaseline && <span> &middot; {t.changeVs7DayBaseline} vs 7-day baseline</span>}
+                <span> &mdash; {formatMovementSummary(t)}</span>
               </li>
             ))}
           </ul>

@@ -49,6 +49,7 @@ import {
 import type { MaritimeMovement } from "@workspace/api-client-react";
 import {
   buildMaritimeIntelligence,
+  formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
 } from "./maritimeIntelligence";
@@ -677,16 +678,7 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
       lines.push("Last incident: None in window");
     }
     if (card.movement) {
-      const mv: string[] = [];
-      if (card.movement.totalVessels != null) {
-        mv.push(`${card.movement.totalVessels} vessels tracked`);
-      } else {
-        mv.push("Tracked");
-      }
-      if (card.movement.changeVs7DayBaseline) {
-        mv.push(`${card.movement.changeVs7DayBaseline} vs 7-day baseline`);
-      }
-      lines.push(`Movement: ${mv.join(" \u00b7 ")}`);
+      lines.push(`Movement: ${formatMovementSummary(card.movement)}`);
     } else {
       lines.push("Movement: Movement data unavailable");
     }
@@ -723,14 +715,9 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   // Maritime context — vessel movement (AIS). CONTEXT only.
   drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[2]);
   if (movementSnapshot) {
-    const items = movementSnapshot.theatres.map((t) => {
-      const parts = [t.theatre];
-      if (t.totalVessels != null) parts.push(`${t.totalVessels} vessels tracked`);
-      if (t.changeVs7DayBaseline) {
-        parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
-      }
-      return parts.join(" \u2014 ");
-    });
+    const items = movementSnapshot.theatres.map(
+      (t) => `${t.theatre} \u2014 ${formatMovementSummary(t)}`,
+    );
     drawMiniBullets(ctx, items);
     renderProse(
       ctx,

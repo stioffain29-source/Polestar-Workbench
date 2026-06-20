@@ -426,6 +426,29 @@ export function buildMovementSnapshot(
   return { theatres, asOf, sourceName, confidence };
 }
 
+/**
+ * One compact movement line for a theatre, shared by the board card, the
+ * report preview AND the PDF so the three surfaces can never disagree. Each
+ * fragment is omitted when the provider did not report it (null) — a missing
+ * count never becomes a fabricated zero, and movement is CONTEXT only (it never
+ * asserts an incident).
+ */
+export function formatMovementSummary(t: MovementTheatre): string {
+  const parts: string[] = [];
+  parts.push(t.totalVessels != null ? `${t.totalVessels} vessels tracked` : "Tracked");
+  if (t.inboundCount != null && t.outboundCount != null) {
+    parts.push(`${t.inboundCount} in / ${t.outboundCount} out`);
+  }
+  if (t.tankersCount != null) parts.push(`${t.tankersCount} tankers`);
+  if (t.bulkCarriersCount != null) parts.push(`${t.bulkCarriersCount} bulk`);
+  if (t.containerCount != null) parts.push(`${t.containerCount} container`);
+  if (t.lngLpgCount != null) parts.push(`${t.lngLpgCount} LNG/LPG`);
+  if (t.anchoredOrWaitingCount != null) parts.push(`${t.anchoredOrWaitingCount} anchored`);
+  if (t.aisDarkOrGapCount != null) parts.push(`${t.aisDarkOrGapCount} AIS-dark`);
+  if (t.changeVs7DayBaseline) parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
+  return parts.join(" \u00b7 ");
+}
+
 // ---------------------------------------------------------------------------
 // Incident snapshot
 // ---------------------------------------------------------------------------

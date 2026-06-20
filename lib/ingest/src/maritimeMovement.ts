@@ -43,22 +43,77 @@ const MAX_COLLECT_SECONDS = 180;
 // a ship in the narrow Bab el-Mandeb strait is counted there, not swept up by
 // the broad Red Sea box that overlaps it. The theatre names match
 // BOARD_CHOKEPOINTS exactly so the workbench can map each snapshot to its card.
+//
+// `inboundBearing` is the compass course (0-360°) that represents the
+// conventional "inbound" flow for the theatre — into the basin a transiting
+// vessel is bound for (e.g. NW into the Persian Gulf at Hormuz). A vessel whose
+// course-over-ground is within ±90° of this bearing is counted INBOUND, else
+// OUTBOUND. A chokepoint is a through-route, so this is a directional-FLOW split
+// (laden out / ballast in), not a port arrival/departure count; it is honest
+// context, never an incident.
 interface TheatreBox {
   theatre: string;
   minLat: number;
   maxLat: number;
   minLon: number;
   maxLon: number;
+  inboundBearing: number;
 }
 
 export const AIS_THEATRES: TheatreBox[] = [
-  { theatre: "Strait of Hormuz", minLat: 24.0, maxLat: 27.5, minLon: 54.0, maxLon: 58.5 },
-  { theatre: "Bab el-Mandeb", minLat: 12.0, maxLat: 14.0, minLon: 42.5, maxLon: 44.5 },
-  { theatre: "Gulf of Aden", minLat: 10.5, maxLat: 15.0, minLon: 44.5, maxLon: 51.5 },
-  { theatre: "Singapore Strait", minLat: 1.0, maxLat: 1.5, minLon: 103.4, maxLon: 104.2 },
-  { theatre: "Malacca Strait", minLat: 1.0, maxLat: 6.5, minLon: 98.0, maxLon: 103.4 },
-  { theatre: "Red Sea", minLat: 14.0, maxLat: 28.0, minLon: 32.0, maxLon: 43.5 },
+  { theatre: "Strait of Hormuz", minLat: 24.0, maxLat: 27.5, minLon: 54.0, maxLon: 58.5, inboundBearing: 315 },
+  { theatre: "Bab el-Mandeb", minLat: 12.0, maxLat: 14.0, minLon: 42.5, maxLon: 44.5, inboundBearing: 0 },
+  { theatre: "Gulf of Aden", minLat: 10.5, maxLat: 15.0, minLon: 44.5, maxLon: 51.5, inboundBearing: 270 },
+  { theatre: "Singapore Strait", minLat: 1.0, maxLat: 1.5, minLon: 103.4, maxLon: 104.2, inboundBearing: 90 },
+  { theatre: "Malacca Strait", minLat: 1.0, maxLat: 6.5, minLon: 98.0, maxLon: 103.4, inboundBearing: 135 },
+  { theatre: "Red Sea", minLat: 14.0, maxLat: 28.0, minLon: 32.0, maxLon: 43.5, inboundBearing: 0 },
 ];
+
+// Speed-over-ground thresholds (knots). At/under ANCHOR a vessel reads as
+// stationary (anchored/waiting); at/over MOVING it is genuinely transiting and
+// its course can be trusted for a direction split. The gap between the two is a
+// drifting/manoeuvring band that is counted as neither (no fabricated bin).
+const ANCHOR_SOG_KNOTS = 0.5;
+const MOVING_SOG_KNOTS = 1.0;
+
+// AIS NavigationalStatus codes that mean the vessel is not transiting.
+const NAV_AT_ANCHOR = 1;
+const NAV_MOORED = 5;
+
+/** AIS course-over-ground is reported 0-359.9°; 360 is the "not available" sentinel. */
+function validCog(c: number | null): number | null {
+  return c !== null && c >= 0 && c < 360 ? c : null;
+}
+
+/** AIS speed-over-ground is in knots; 102.3 is the "not available" sentinel. */
+function validSog(s: number | null): number | null {
+  return s !== null && s >= 0 && s < 102 ? s : null;
+}
+
+/**
+ * Classify a moving vessel's course as inbound/outbound relative to a theatre's
+ * reference bearing. Returns null when the vessel is anchored/waiting or has no
+ * usable course+speed (so it is counted in neither direction).
+ */
+function classifyDirection(
+  inboundBearing: number,
+  cog: number | null,
+  sog: number | null,
+  navStatus: number | null,
+): "inbound" | "outbound" | null {
+  if (navStatus === NAV_AT_ANCHOR || navStatus === NAV_MOORED) return null;
+  if (sog === null || sog < MOVING_SOG_KNOTS) return null;
+  if (cog === null) return null;
+  // Smallest absolute angular gap between the course and the inbound bearing.
+  const diff = Math.abs(((cog - inboundBearing + 540) % 360) - 180);
+  return diff <= 90 ? "inbound" : "outbound";
+}
+
+/** A vessel reads as anchored/waiting from an explicit nav status or ~zero speed. */
+function isAnchored(sog: number | null, navStatus: number | null): boolean {
+  if (navStatus === NAV_AT_ANCHOR || navStatus === NAV_MOORED) return true;
+  return sog !== null && sog < ANCHOR_SOG_KNOTS;
+}
 
 export type MaritimeMovementSummary = {
   provider: string;
@@ -84,6 +139,9 @@ export type MaritimeMovementSummary = {
     theatre: string;
     totalVessels: number;
     tankers: number;
+    inbound: number | null;
+    outbound: number | null;
+    anchored: number | null;
     change: string | null;
   }>;
   fetchOk: boolean;
@@ -166,9 +224,20 @@ async function messageToText(data: unknown): Promise<string | null> {
   return null;
 }
 
+// What we accumulate per unique vessel (MMSI). `type` comes from ShipStaticData;
+// `cog`/`sog`/`navStatus` come from PositionReport. All start null and are only
+// overwritten with VALID values, so a missing field stays "not reported".
+interface VesselObs {
+  theatre: string | null;
+  type: number | null;
+  cog: number | null;
+  sog: number | null;
+  navStatus: number | null;
+}
+
 interface CollectResult {
   messages: number;
-  byMmsi: Map<number, { theatre: string | null; type: number | null }>;
+  byMmsi: Map<number, VesselObs>;
   error: string | null;
 }
 
@@ -182,7 +251,7 @@ interface CollectResult {
 function collectAisStream(apiKey: string, collectMs: number): Promise<CollectResult> {
   return new Promise<CollectResult>((resolve) => {
     const WS = (globalThis as { WebSocket?: WsCtor }).WebSocket;
-    const byMmsi = new Map<number, { theatre: string | null; type: number | null }>();
+    const byMmsi = new Map<number, VesselObs>();
     let messages = 0;
     let settled = false;
     let ws: WsLike | null = null;
@@ -259,20 +328,42 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
         const theatre = lat !== null && lon !== null ? assignTheatre(lat, lon) : null;
 
         let type: number | null = null;
+        let cog: number | null = null;
+        let sog: number | null = null;
+        let navStatus: number | null = null;
         if (obj.MessageType === "ShipStaticData") {
           const msg = obj.Message as
             | { ShipStaticData?: { Type?: number } }
             | undefined;
           const t = msg?.ShipStaticData?.Type;
           if (typeof t === "number") type = t;
+        } else if (obj.MessageType === "PositionReport") {
+          const msg = obj.Message as
+            | {
+                PositionReport?: {
+                  Cog?: number;
+                  Sog?: number;
+                  NavigationalStatus?: number;
+                };
+              }
+            | undefined;
+          const pr = msg?.PositionReport;
+          if (typeof pr?.Cog === "number") cog = validCog(pr.Cog);
+          if (typeof pr?.Sog === "number") sog = validSog(pr.Sog);
+          if (typeof pr?.NavigationalStatus === "number")
+            navStatus = pr.NavigationalStatus;
         }
 
         const existing = byMmsi.get(mmsi);
         if (existing) {
           if (theatre) existing.theatre = theatre;
           if (type !== null) existing.type = type;
+          // Keep the latest VALID movement fields seen for this vessel.
+          if (cog !== null) existing.cog = cog;
+          if (sog !== null) existing.sog = sog;
+          if (navStatus !== null) existing.navStatus = navStatus;
         } else {
-          byMmsi.set(mmsi, { theatre, type });
+          byMmsi.set(mmsi, { theatre, type, cog, sog, navStatus });
         }
       })();
     });
@@ -386,13 +477,59 @@ export async function runMaritimeMovementIngest(
     collectSeconds * 1000,
   );
 
+  // Per-theatre reference bearing for the inbound/outbound flow split.
+  const bearingByTheatre = new Map<string, number>(
+    AIS_THEATRES.map((t) => [t.theatre, t.inboundBearing]),
+  );
+
   // Aggregate UNIQUE vessels per theatre.
-  const agg = new Map<string, { total: number; tankers: number }>();
-  for (const { theatre, type } of byMmsi.values()) {
+  //   inbound/outbound — direction split from course-over-ground (moving only)
+  //   anchored         — at-anchor / moored / ~zero speed
+  //   directionObserved/motionObserved — how many vessels we could classify, so
+  //     a 0 only ever reads as a real measurement (not "no data" — that stays NULL)
+  interface TheatreAgg {
+    total: number;
+    tankers: number;
+    inbound: number;
+    outbound: number;
+    anchored: number;
+    directionObserved: number;
+    motionObserved: number;
+  }
+  const agg = new Map<string, TheatreAgg>();
+  for (const { theatre, type, cog, sog, navStatus } of byMmsi.values()) {
     if (!theatre) continue;
-    const a = agg.get(theatre) ?? { total: 0, tankers: 0 };
+    const a =
+      agg.get(theatre) ??
+      ({
+        total: 0,
+        tankers: 0,
+        inbound: 0,
+        outbound: 0,
+        anchored: 0,
+        directionObserved: 0,
+        motionObserved: 0,
+      } satisfies TheatreAgg);
     a.total += 1;
     if (isTankerType(type)) a.tankers += 1;
+    if (sog !== null || navStatus !== null) a.motionObserved += 1;
+    if (isAnchored(sog, navStatus)) {
+      a.anchored += 1;
+    } else {
+      const dir = classifyDirection(
+        bearingByTheatre.get(theatre) ?? 0,
+        cog,
+        sog,
+        navStatus,
+      );
+      if (dir === "inbound") {
+        a.inbound += 1;
+        a.directionObserved += 1;
+      } else if (dir === "outbound") {
+        a.outbound += 1;
+        a.directionObserved += 1;
+      }
+    }
     agg.set(theatre, a);
   }
 
@@ -433,17 +570,36 @@ export async function runMaritimeMovementIngest(
     if (!a || a.total === 0) continue; // absence, never a fabricated zero
     const baseline = await baselineTotal(t.theatre, cutoff);
     const change = formatChange(a.total, baseline);
+    // A count is only written when we actually OBSERVED the signal it needs:
+    //   direction needs ≥1 course-classifiable vessel; anchored needs ≥1 vessel
+    //   reporting speed/nav-status. Otherwise the column stays NULL ("not
+    //   reported"), never a fabricated zero.
+    const inbound = a.directionObserved > 0 ? a.inbound : null;
+    const outbound = a.directionObserved > 0 ? a.outbound : null;
+    const anchored = a.motionObserved > 0 ? a.anchored : null;
     perTheatre.push({
       theatre: t.theatre,
       totalVessels: a.total,
       tankers: a.tankers,
+      inbound,
+      outbound,
+      anchored,
       change,
     });
     rows.push({
       theatre: t.theatre,
       dataAsOf: observedAt,
       totalVessels: a.total,
+      inboundCount: inbound,
+      outboundCount: outbound,
       tankersCount: a.tankers > 0 ? a.tankers : null,
+      // Bulk vs container vs LNG/LPG cannot be separated from the AIS ship-type
+      // code alone (70-79 is "cargo" with no sub-class; gas carriers are not a
+      // distinct code) — that split needs an external ship registry — so these
+      // stay NULL rather than a fabricated guess. Likewise AIS-dark/gap is not
+      // derivable from a live receive stream (it only shows vessels that ARE
+      // transmitting), so it stays NULL too.
+      anchoredOrWaitingCount: anchored,
       aisVisibleCount: a.total,
       changeVs7DayBaseline: change,
       confidence: confidenceFor(a.total),
@@ -457,6 +613,9 @@ export async function runMaritimeMovementIngest(
         messagesReceived: messages,
         observedAt: observedAt.toISOString(),
         boundingBox: [t.minLat, t.maxLat, t.minLon, t.maxLon],
+        inboundBearing: t.inboundBearing,
+        directionObserved: a.directionObserved,
+        motionObserved: a.motionObserved,
       },
     });
   }
