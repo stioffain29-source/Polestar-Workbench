@@ -111,6 +111,16 @@ export type IccPiracyRunResult =
     }
   | { ran: false; reason: "locked" };
 
+export type MovementRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      maritimeMovement: MaritimeMovementSummary;
+    }
+  | { ran: false; reason: "locked" };
+
 function emptyIncidentIngest(
   topic: IngestSummary["topic"],
   err: unknown,
