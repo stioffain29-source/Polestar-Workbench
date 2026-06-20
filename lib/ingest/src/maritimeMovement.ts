@@ -12,6 +12,15 @@ import {
   type VesselClass,
   type VesselLookup,
 } from "./vesselRegistry";
+import { recordSourceHealth } from "./sourceHealth";
+
+// Source Health telemetry key for the OPTIONAL vessel-registry precision layer.
+// Kept on its OWN topic so it never pollutes the shipping incident-feed health
+// count (getMaritimeSourceHealth keys the "Reuters / news-verification feed" row
+// off topic='shipping'). A sustained datalastic outage escalates this row to
+// "failing", which the integration-status endpoint surfaces as failing_upstream.
+export const REGISTRY_HEALTH_TOPIC = "maritime_registry";
+export const REGISTRY_HEALTH_NAME = "Vessel registry (cargo-type breakdown)";
 
 // ===========================================================================
 // Live vessel-MOVEMENT (AIS) context ingest.
@@ -655,6 +664,34 @@ export async function runMaritimeMovementIngest(
     config: registryConfig,
   });
   const classByMmsi = registry.classByMmsi;
+
+  // Record the registry's live health (STATE + EVIDENCE only, never the key) so
+  // the integration-status endpoint can surface working / failing_upstream.
+  // Only configured+enabled runs write a row — not_configured and disabled are
+  // derived from env at read time, so no telemetry is needed for them. A
+  // reachable upstream (any resolution, or a clean run with no errors) is "ok";
+  // a run that contacted the registry but resolved nothing AND hit errors is a
+  // failure that escalates to "failing" (→ failing_upstream) after a sustained
+  // streak, so a single transient blip never alarms.
+  if (opts.commit && registry.configured && registry.enabled) {
+    const registryOk = registry.errors.length === 0 || registry.resolved > 0;
+    await recordSourceHealth(
+      REGISTRY_HEALTH_TOPIC,
+      [
+        {
+          name: REGISTRY_HEALTH_NAME,
+          url: registryConfig.base,
+          ok: registryOk,
+          error: registryOk ? null : (registry.errors[0] ?? "vessel registry upstream unreachable"),
+        },
+      ],
+      {
+        sourceType: "api",
+        reliability: 4,
+        notes: `Optional cargo-type precision layer (${registryConfig.provider}); resolves bulk/container/LNG-LPG per chokepoint.`,
+      },
+    );
+  }
 
   // Aggregate UNIQUE vessels per theatre.
   //   inbound/outbound — direction split from course-over-ground (moving only)

@@ -18,6 +18,8 @@ export {
   computeDarkByTheatre,
   isLoitering,
   isWithinDarkWindow,
+  REGISTRY_HEALTH_TOPIC,
+  REGISTRY_HEALTH_NAME,
 } from "./maritimeMovement";
 export type {
   MaritimeMovementSummary,

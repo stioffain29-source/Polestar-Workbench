@@ -4,13 +4,19 @@ import {
   incidentCorroborationsTable,
   countryReportProseTable,
   reliefwebReportsTable,
+  maritimeMovementTable,
+  sourcesTable,
 } from "@workspace/db";
-import { eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
   isGdeltConfigured,
   isGdeltEnrichEnabled,
   isReliefWebConfigured,
+  isVesselRegistryConfigured,
+  readVesselRegistryConfig,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
+  REGISTRY_HEALTH_TOPIC,
+  REGISTRY_HEALTH_NAME,
 } from "@workspace/ingest";
 import type {
   IntegrationStatusItem,
@@ -94,6 +100,8 @@ const LIVEUAMAP_DETAIL =
   "Server-side proxy for the PAID Liveuamap live-map overlay (the key never reaches the browser; upstream calls are TTL-cached). The incident map works fully without it.";
 const OPENAI_DETAIL =
   "Powers AI country-report narratives and English translation of foreign-language incident headlines. Both degrade to deterministic non-AI fallbacks when absent.";
+const VESSEL_REGISTRY_DETAIL =
+  "Additive precision layer over the AIS movement sample: looks up each cargo/tanker vessel by IMO/MMSI to split the chokepoint count into bulk / container / LNG-LPG. Never touches incidents; when absent those three columns simply stay NULL ('not reported').";
 
 async function gdeltStatus(): Promise<IntegrationStatusItem> {
   const envVars = ["GDELT_CLOUD_API_KEY", "GDELT_ENRICH_ENABLED", "GDELT_CLOUD_API_BASE"];
@@ -392,6 +400,101 @@ async function openaiStatus(): Promise<IntegrationStatusItem> {
   };
 }
 
+async function vesselRegistryStatus(): Promise<IntegrationStatusItem> {
+  const envVars = [
+    "VESSEL_REGISTRY_API_KEY",
+    "VESSEL_REGISTRY_ENABLED",
+    "VESSEL_REGISTRY_PROVIDER",
+    "VESSEL_REGISTRY_API_BASE",
+    "VESSEL_REGISTRY_MAX_LOOKUPS",
+  ];
+  const cfg = readVesselRegistryConfig();
+  const configured = isVesselRegistryConfigured();
+  const docsUrl = "https://datalastic.com";
+
+  // EVIDENCE: how many movement snapshots carry a resolved cargo-type split
+  // (any of the three breakdown columns populated), and the most recent one,
+  // plus the registry's own live health row (a sustained datalastic outage
+  // escalates it to "failing").
+  let breakdownRows = 0;
+  let latest: Date | null = null;
+  let feedStatus: string | null = null;
+  try {
+    const [row] = await db
+      .select({
+        n: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})`,
+      })
+      .from(maritimeMovementTable)
+      .where(
+        sql`${maritimeMovementTable.bulkCarriersCount} IS NOT NULL OR ${maritimeMovementTable.containerCount} IS NOT NULL OR ${maritimeMovementTable.lngLpgCount} IS NOT NULL`,
+      );
+    breakdownRows = row?.n ?? 0;
+    latest = row?.latest ?? null;
+    const [health] = await db
+      .select({ status: sourcesTable.status })
+      .from(sourcesTable)
+      .where(
+        and(
+          eq(sourcesTable.name, REGISTRY_HEALTH_NAME),
+          eq(sourcesTable.topic, REGISTRY_HEALTH_TOPIC),
+        ),
+      );
+    feedStatus = health?.status ?? null;
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "vessel registry integration status query failed");
+    return unknownItem({
+      key: "vessel_registry",
+      label: "Vessel registry (cargo-type breakdown)",
+      configured,
+      envVars,
+      summary: "Status query failed.",
+      detail: VESSEL_REGISTRY_DETAIL,
+      docsUrl,
+    });
+  }
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (!cfg.enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (VESSEL_REGISTRY_ENABLED=false) — the bulk/container/LNG-LPG breakdown stays unreported (NULL). The AIS movement sample is unaffected.";
+  } else if (!configured) {
+    status = "not_configured";
+    summary =
+      "No VESSEL_REGISTRY_API_KEY — the cargo-type split is skipped, so bulk/container/LNG-LPG stay NULL ('not reported'). The AIS movement counts are unaffected.";
+  } else if (feedStatus === "failing") {
+    status = "failing_upstream";
+    summary =
+      "Configured, but the vessel-registry upstream is returning errors on consecutive runs — no cargo-type classes are being resolved.";
+  } else if (breakdownRows > 0) {
+    status = "working";
+    summary = `Resolved cargo-type classes for ${breakdownRows} chokepoint snapshot(s) (bulk / container / LNG-LPG).`;
+  } else {
+    status = "no_data";
+    summary =
+      "Configured, but no cargo-type classes resolved yet — awaiting an AIS movement sample with registry-matched vessels.";
+  }
+
+  return {
+    key: "vessel_registry",
+    label: "Vessel registry (cargo-type breakdown)",
+    status,
+    summary,
+    detail: VESSEL_REGISTRY_DETAIL,
+    configured,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("Provider", cfg.provider),
+      metric("Snapshots with split", breakdownRows),
+      metric("Last resolved", fmtDate(latest)),
+    ],
+    docsUrl,
+  };
+}
+
 /**
  * Assemble the public integration status snapshot. Each probe catches its own
  * failures and degrades to "unknown" so the endpoint never hard-fails, and the
@@ -404,6 +507,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       reliefwebStatus(),
       reliefwebReportsStatus(),
       liveuamapStatus(),
+      vesselRegistryStatus(),
       openaiStatus(),
     ]),
     getMaritimeSourceHealth(),
