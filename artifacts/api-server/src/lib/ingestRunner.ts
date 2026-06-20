@@ -792,3 +792,38 @@ export async function runIccPiracyOnce(): Promise<IccPiracyRunResult> {
   if (!res.ran) return res;
   return { ran: true, ...res.value };
 }
+
+/**
+ * Run ONLY the live AIS maritime-movement ingest, committing to the database.
+ *
+ * Movement (the "Live Fleet Intelligence" board) sits at the very END of the
+ * full incident chain, which is a multi-minute, unowned background task. On an
+ * autoscale deployment the instance is routinely torn down before the chain
+ * reaches the movement step, so the live vessel sample never lands in prod and
+ * the board stays stuck on the last manual snapshot. Mirroring the proven
+ * strikes pattern, this gives movement its OWN fast, early boot run that
+ * completes inside the cold-start warm window — the Datalastic path is a
+ * handful of HTTP GETs, so it finishes in seconds. Shares the same advisory
+ * lock so it can never collide with a full run.
+ */
+export async function runMovementOnce(): Promise<MovementRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let maritimeMovement: MaritimeMovementSummary;
+    try {
+      maritimeMovement = await runMaritimeMovementIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "maritime movement ingest failed");
+      maritimeMovement = emptyMaritimeMovement(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      maritimeMovement,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}

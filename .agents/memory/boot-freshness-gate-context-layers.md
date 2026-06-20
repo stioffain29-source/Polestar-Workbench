@@ -45,3 +45,25 @@ autoscale never cold-starts. The honest split: code can make warm/always-on and
 trafficked-autoscale reliable AND make staleness observable; only a deployment
 topology (VM/scheduled) can guarantee cadence at zero traffic, and that is a
 user action.
+
+## Adding the layer to the full-ingest gate is NOT enough — give it its OWN early boot run
+
+The full-ingest movement gate only refreshes movement when a full ingest
+actually runs. But the boot path SKIPS the full ingest whenever incidents are
+fresh (it only does the cheap fuel-price top-up). So an empty/stale movement
+board on a fresh-incident cold start never got refreshed by the gate alone —
+the symptom was "Live Fleet Intelligence empty in prod for Hormuz + every
+chokepoint" even though the Datalastic collection path existed.
+
+Fix (mirrors strikes): movement now has its OWN early boot sub-run inside the
+short post-listen timer (`runMovementOnce` in `ingestRunner.ts`, called from
+`startIngestScheduler`). Structure: strikes runs via if/else (NO early return)
+THEN a sequential movement sub-run executes — sequential so the two never
+contend on the shared advisory lock. The movement sub-run is gated on
+`movementFeedActive()` && (movement age null/>=interval OR
+`movementProviderMismatch()`), so a fresh, correctly-sourced board skips it.
+
+**How to apply:** any context layer that (a) refreshes ONLY inside
+`runIngestOnce` and (b) must stay fresh even when incidents are fresh needs its
+OWN early boot sub-run, not just membership in the full-ingest freshness OR.
+Sequence it AFTER strikes (no early return) to avoid advisory-lock contention.

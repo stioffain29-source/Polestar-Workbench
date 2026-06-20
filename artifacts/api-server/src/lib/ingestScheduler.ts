@@ -8,6 +8,7 @@ import {
 import {
   runIngestOnce,
   runMarketPricesOnce,
+  runMovementOnce,
   runStrikesOnce,
 } from "./ingestRunner";
 import { logger } from "./logger";
@@ -435,6 +436,8 @@ export function startIngestScheduler(): void {
   const strikesTimer = setTimeout(
     () =>
       void (async () => {
+        // Strikes sub-run (if/else, never an early return, so the movement
+        // sub-run below always follows regardless of strikes freshness).
         try {
           const strikeAge = await hoursSinceNewestStrike();
           if (strikeAge !== null && strikeAge < hours) {
@@ -442,42 +445,111 @@ export function startIngestScheduler(): void {
               { strikeAgeHours: Math.round(strikeAge) },
               "boot strikes: tracker fresh, skipping early strikes run",
             );
-            return;
-          }
-          logger.info(
-            {
-              strikeAgeHours: strikeAge === null ? null : Math.round(strikeAge),
-            },
-            "boot strikes: tracker stale, running early strikes-only ingest",
-          );
-          const result = await runStrikesOnce();
-          if (!result.ran) {
-            logger.info("boot strikes: skipped (full ingest already running)");
-            return;
-          }
-          const failures = summarizeStrikesFailures(result.strikes);
-          const payload = {
-            strikesInserted: result.strikes.inserted,
-            strikesLatest: result.strikes.latestRecord,
-            byTheatre: result.strikes.byTheatre,
-            durationMs: result.durationMs,
-            ingestFailures: failures,
-          };
-          if (failures.hadFailures) {
-            logger.warn(
-              payload,
-              "boot strikes: early strikes-only ingest finished with failures",
-            );
           } else {
             logger.info(
-              payload,
-              "boot strikes: early strikes-only ingest finished",
+              {
+                strikeAgeHours:
+                  strikeAge === null ? null : Math.round(strikeAge),
+              },
+              "boot strikes: tracker stale, running early strikes-only ingest",
             );
+            const result = await runStrikesOnce();
+            if (!result.ran) {
+              logger.info(
+                "boot strikes: skipped (full ingest already running)",
+              );
+            } else {
+              const failures = summarizeStrikesFailures(result.strikes);
+              const payload = {
+                strikesInserted: result.strikes.inserted,
+                strikesLatest: result.strikes.latestRecord,
+                byTheatre: result.strikes.byTheatre,
+                durationMs: result.durationMs,
+                ingestFailures: failures,
+              };
+              if (failures.hadFailures) {
+                logger.warn(
+                  payload,
+                  "boot strikes: early strikes-only ingest finished with failures",
+                );
+              } else {
+                logger.info(
+                  payload,
+                  "boot strikes: early strikes-only ingest finished",
+                );
+              }
+            }
           }
         } catch (err) {
           logger.error(
             { err },
             "boot strikes: early strikes-only ingest failed",
+          );
+        }
+
+        // EARLY movement-only run, SEQUENCED after strikes so the two never
+        // contend for the shared advisory lock. Live AIS movement (the "Live
+        // Fleet Intelligence" board) otherwise refreshes ONLY at the very END
+        // of the multi-minute full chain, which an autoscale instance routinely
+        // tears down first — so in prod the board stayed frozen on the last
+        // manual snapshot (terrestrial aisstream saw Singapore only; every
+        // Middle-East strait, incl. Hormuz, read empty). This fast
+        // Datalastic-satellite run repopulates every chokepoint inside the
+        // cold-start warm window. Gated on movement staleness OR a provider
+        // switch (time-fresh aisstream rows are coverage-wrong once the
+        // deployment moves to the satellite feed), and skipped entirely when no
+        // movement feed is configured.
+        try {
+          if (!movementFeedActive()) {
+            logger.info(
+              "boot movement: no live AIS feed configured, skipping early movement run",
+            );
+          } else {
+            const movementAge = await hoursSinceNewestMovement();
+            const providerSwitched = await movementProviderMismatch();
+            const movementStale =
+              movementAge === null ||
+              movementAge >= hours ||
+              providerSwitched;
+            if (!movementStale) {
+              logger.info(
+                { movementAgeHours: Math.round(movementAge!) },
+                "boot movement: board fresh, skipping early movement run",
+              );
+            } else {
+              logger.info(
+                {
+                  movementAgeHours:
+                    movementAge === null ? null : Math.round(movementAge),
+                  providerSwitched,
+                },
+                "boot movement: board stale/provider-switched, running early movement-only ingest",
+              );
+              const result = await runMovementOnce();
+              if (!result.ran) {
+                logger.info(
+                  "boot movement: skipped (full ingest already running)",
+                );
+              } else {
+                const mm = result.maritimeMovement;
+                logger.info(
+                  {
+                    provider: mm.provider,
+                    theatresWritten: mm.theatresWritten,
+                    vesselsSeen: mm.vesselsSeen,
+                    rowsInserted: mm.rowsInserted,
+                    perTheatre: mm.perTheatre,
+                    durationMs: result.durationMs,
+                  },
+                  "boot movement: early movement-only ingest finished",
+                );
+              }
+            }
+          }
+        } catch (err) {
+          logger.error(
+            { err },
+            "boot movement: early movement-only ingest failed",
           );
         }
       })(),

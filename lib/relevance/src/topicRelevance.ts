@@ -664,6 +664,39 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   /\b(ageing|aging|veteran|elderly|second[- ]hand|secondhand) (suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|pair|trio|duo|tonnage)\b/,
   /\b\$\d+\s*m?\s*(gain|profit) from\b/,
   /\bgain from .{0,20}(disposal|sale|vessel|tanker)\b/,
+  // The Baltic Dry Index / Baltic Exchange is a commercial freight-rate
+  // benchmark, not a maritime-security or disruption incident. Its daily
+  // "index rises/falls" wires flooded the Confirmed Maritime Incidents board.
+  /\bbaltic (dry|exchange|capesize|panamax|supramax) index\b/,
+  /\bbaltic dry\b/,
+];
+
+// Tracked chokepoint theatres — the board follows the Gulf + Asia straits
+// (BOARD_CHOKEPOINTS). When a story names any of these it is in-scope even if it
+// also references an off-theatre sea (e.g. a comparative "from the Baltic to
+// Hormuz" piece), so the off-region gate below is SUPPRESSED whenever this hits.
+const SHIPPING_THEATRE_RE =
+  /\b(strait of hormuz|hormuz|bab[- ]?el[- ]?mandeb|bab al[- ]?mandab|red sea|gulf of aden|gulf of oman|persian gulf|arabian (sea|gulf)|suez|malacca|singapore strait|south china sea|taiwan strait|lombok|sunda)\b/;
+
+// Off-theatre maritime geography — European / Atlantic / Black-Baltic waters
+// that are NOT tracked by the board. A vessel incident anchored to one of these
+// (a Black Sea tanker drone strike, a UK/Baltic "shadow fleet" interdiction, an
+// English Channel or Scottish-waters seizure) is dropped UNLESS the same story
+// also names a tracked theatre above. Gated this way (off-region present AND no
+// tracked theatre) so precision stays high and a Gulf/Asia story is never lost.
+const SHIPPING_OFF_REGION: RegExp[] = [
+  /\bblack sea\b/,
+  /\bbaltic sea\b/,
+  /\bgulf of (finland|bothnia|riga)\b/,
+  /\benglish channel\b/,
+  /\bnorth sea\b/,
+  /\bscottish (waters|coast|isles|islands)\b/,
+  /\bscotland\b/,
+  // Russian "shadow fleet" interdiction by the UK / Baltic states — a European
+  // sanctions-enforcement story, not a Gulf/Asia chokepoint incident. Bound to
+  // the European actor so a shadow-fleet tanker transiting Hormuz still keeps.
+  /\b(uk|u\.k\.|britain|british|royal navy|starmer|estonia|estonian|finland|finnish|denmark|danish|sweden|swedish)\b.{0,40}\bshadow (fleet|tanker|tankers|ship|ships)\b/,
+  /\bshadow (fleet|tanker|tankers|ship|ships)\b.{0,40}\b(uk|u\.k\.|britain|british|royal navy|starmer|estonia|estonian|finland|finnish|denmark|danish|sweden|swedish|tate modern)\b/,
 ];
 
 // Energy is a Middle East / South+East Asia / Oceania grid-stress monitor.
@@ -1160,6 +1193,17 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   if (general) return { relevant: false, reason: `excluded: general-news noise (/${general.source}/)` };
 
   if (topic === "shipping") {
+    // Off-theatre geography gate: drop European / Black-Baltic / UK-Channel
+    // maritime stories that have nothing to do with the tracked Gulf + Asia
+    // chokepoints — UNLESS the same story also names a tracked theatre (then it
+    // is in-scope and kept). Runs before the topic exclude/required gates.
+    const offRegion = firstMatch(text, SHIPPING_OFF_REGION);
+    if (offRegion && !SHIPPING_THEATRE_RE.test(text)) {
+      return {
+        relevant: false,
+        reason: `excluded: shipping off-region (/${offRegion.source}/)`,
+      };
+    }
     const m = firstMatch(text, SHIPPING_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: shipping off-topic (/${m.source}/)` };
   }
