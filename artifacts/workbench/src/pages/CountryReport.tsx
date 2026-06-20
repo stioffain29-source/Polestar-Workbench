@@ -80,6 +80,30 @@ const SEV_LABEL: Record<string, string> = {
 };
 const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
 
+// Deterministic per-incident summary — the labelled fallback shown when an AI
+// summary for an incident is unavailable (mirrors the structured PNG brief,
+// where each card shows `summaries[id] || businessImpact`). Grounded ONLY on the
+// incident's own fields (type, location, date, severity); no fabricated facts,
+// British English, five-tier severity vocab, no parenthetical counts. The
+// page-level "AI narrative unavailable" banner labels the wholesale-fallback case.
+function deterministicIncidentSummary(i: {
+  topic: string;
+  title: string;
+  summary?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
+  location?: string | null;
+  severity?: string | null;
+  occurredAt: string;
+}): string {
+  const type = classifyIncidentType(i);
+  const sevLabel = SEV_LABEL[(i.severity ?? "").toLowerCase()];
+  const loc = (i.location ?? "").trim();
+  const where = loc ? ` in ${loc}` : "";
+  const sev = sevLabel ? `, assessed at ${sevLabel} severity` : "";
+  return `${type}${where}, reported ${format(new Date(i.occurredAt), "dd MMM yyyy")}${sev}.`;
+}
+
 // Render a bullet list (implications / watch-next) as newline-joined lines the
 // <Prose> component can lay out as paragraphs.
 function bulletJoin(xs: string[]): string {
@@ -178,7 +202,11 @@ export default function CountryReport() {
   // page's own `isCountryRelevant` gate (applied in buildCountryLayers) be the
   // single source of truth, so the report is self-consistent and identical in
   // dev and prod regardless of how each DB persisted relevance.
-  const { data: incidentsData } = useListIncidents(
+  const {
+    data: incidentsData,
+    isSuccess: incidentsSuccess,
+    isError: incidentsError,
+  } = useListIncidents(
     country ? ({ days: 90, includeIrrelevant: true } as never) : {},
     {
       query: { enabled: !!country },
@@ -479,7 +507,16 @@ export default function CountryReport() {
         source: it.source ?? null,
       }));
     }
+    // Generic country report: ground the prose on the FULL active window set.
+    // We pass `id` so the model's number-keyed per-incident summaries map back to
+    // each incident. We deliberately ground on active.incidents (not the deduped
+    // table subset): the full set's id list is order-stable under the server's
+    // canonical sort, so the cache fingerprint is stable, whereas the dedup keeps
+    // a non-deterministic representative per cluster and would flip the
+    // fingerprint every load (regeneration loop). Every deduped table row's id is
+    // a subset of this set, so each shown row still resolves a summary.
     return active.incidents.map((i) => ({
+      id: i.id != null ? String(i.id) : undefined,
       topic: i.topic, title: i.title, summary: i.summary,
       location: i.location, country: i.country,
       severity: i.severity, occurredAt: i.occurredAt, source: i.source,
@@ -526,6 +563,14 @@ export default function CountryReport() {
   useEffect(() => {
     if (!country) return;
     if (editing) return;
+    // Wait until the incidents query has SETTLED (success or error) before
+    // grounding the prose. While it is still loading, `proseIncidents` is empty,
+    // so the effect would fire once on the empty set and again on the full set —
+    // two different fingerprints racing to write the cache (a regeneration loop)
+    // and, worse, prose grounded on zero incidents. A genuinely empty week still
+    // proceeds: the query settles with an empty array, so quiet windows are
+    // unaffected.
+    if (!incidentsSuccess && !incidentsError) return;
     // The structured brief waits until its dataset has built so the fingerprint
     // hashes the same window items the brief renders (the request derives from
     // pngDataset).
@@ -575,7 +620,7 @@ export default function CountryReport() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [country, slug, editing, proseContentKey, periodWord, issueDate, baselineContext]);
+  }, [country, slug, editing, proseContentKey, periodWord, issueDate, baselineContext, incidentsSuccess, incidentsError]);
 
   const redraft = async () => {
     if (!country) return;
@@ -674,11 +719,13 @@ export default function CountryReport() {
     return pngDataset;
   }, [pngDataset, editing, proseDraft, proseResult]);
 
-  // PNG: the per-incident AI analyst summaries (keyed by incident id) from the
-  // same effective source as the prose above — live draft while editing,
-  // otherwise the saved/edited server prose. Empty when no AI prose exists, in
-  // which case each card falls back to its deterministic category line.
-  const pngIncidentSummaries = useMemo<Record<string, string>>(() => {
+  // Per-incident AI analyst summaries (keyed by incident id) from the same
+  // effective source as the prose above — live draft while editing, otherwise the
+  // saved/edited server prose. Used by BOTH the structured brief (on each card)
+  // and the generic country report (in the Related Incidents table). Empty when no
+  // AI prose exists, in which case each surface falls back gracefully (the card to
+  // its deterministic category line; the table to no summary).
+  const incidentSummaries = useMemo<Record<string, string>>(() => {
     const src =
       editing && proseDraft
         ? proseDraft
@@ -1192,11 +1239,32 @@ export default function CountryReport() {
           <BaselineListField label="Implications for Business" items={proseDraft.implications} onChange={(v) => setProseField("implications", v)} placeholder="One implication per line" />
           <BaselineListField label="Watch Next" items={proseDraft.watchNext} onChange={(v) => setProseField("watchNext", v)} placeholder="One indicator per line" />
           <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
+          {dedupedWindowIncidents.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 6 }}>
+                Incident Summaries
+              </div>
+              <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
+                One analyst summary per incident, grounded on its own reporting. Shown in the Related Incidents table.
+              </div>
+              {dedupedWindowIncidents.map((it) => {
+                const iid = String(it.id);
+                return (
+                  <BaselineTextField
+                    key={iid}
+                    label={cleanIncidentTitle(it.title, it.source)}
+                    value={proseDraft.incidentSummaries?.[iid] ?? ""}
+                    onChange={(v) => setIncidentSummary(iid, v)}
+                  />
+                );
+              })}
+            </div>
+          )}
         </Section>
       )}
 
       {isStructured && pngEffectiveDataset && (
-        <PngCountryReportBody dataset={pngEffectiveDataset} incidentSummaries={pngIncidentSummaries} />
+        <PngCountryReportBody dataset={pngEffectiveDataset} incidentSummaries={incidentSummaries} />
       )}
 
       {!isStructured && (
@@ -1399,11 +1467,17 @@ export default function CountryReport() {
             {[...windowIncidents].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).map((i) => {
               const sk = (i.severity ?? "").toLowerCase();
               const sevColor = SEV_COLOR[sk] ?? "#999";
+              const summaryText = incidentSummaries[String(i.id)]?.trim() || deterministicIncidentSummary(i);
               return (
-                <div key={i.id} className="grid items-center" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
+                <div key={i.id} className="grid items-start" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
                   <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
                   <div className="p-2.5">{classifyIncidentType(i)}</div>
-                  <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{(i.displayTitle && i.displayTitle.trim()) ? i.displayTitle.trim() : cleanIncidentTitle(i.title, i.source)}</div>
+                  <div className="p-2.5">
+                    <div style={{ fontWeight: 500, color: NAVY }}>{(i.displayTitle && i.displayTitle.trim()) ? i.displayTitle.trim() : cleanIncidentTitle(i.title, i.source)}</div>
+                    {summaryText && (
+                      <div style={{ fontWeight: 400, color: DUSK, fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>{summaryText}</div>
+                    )}
+                  </div>
                   <div className="p-2.5">
                     <span
                       style={{

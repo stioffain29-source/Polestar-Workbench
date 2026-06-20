@@ -26,7 +26,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated.
-export const PROSE_PROMPT_VERSION = "v3";
+export const PROSE_PROMPT_VERSION = "v4";
 
 // The model only ever sees this many incidents, and the cache fingerprint hashes
 // exactly the same capped set — so the cache key and the prompt input can never
@@ -125,7 +125,15 @@ function canonicalIncidents(incidents: ProseIncidentInput[]): ProseIncidentInput
       const da = (a.occurredAt ?? "").slice(0, 10);
       const db = (b.occurredAt ?? "").slice(0, 10);
       if (da !== db) return da < db ? 1 : -1; // most recent first
-      return (a.title ?? "").localeCompare(b.title ?? "");
+      const t = (a.title ?? "").localeCompare(b.title ?? "");
+      if (t !== 0) return t;
+      // Final deterministic tiebreaker on id. Syndicated duplicates can share an
+      // identical title AND date; without this their relative order follows the
+      // (non-deterministic) incoming order, which — now that id is part of each
+      // incident's identity — flips the ordered id list the fingerprint hashes and
+      // regenerates the prose on every load. Sorting tied rows by id pins the
+      // order, so the fingerprint (and the prompt's incident numbering) is stable.
+      return String(a.id ?? "").localeCompare(String(b.id ?? ""));
     })
     .slice(0, MAX_PROSE_INCIDENTS);
 }
@@ -174,6 +182,13 @@ WRITING RULES:
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
 
+PER-INCIDENT SUMMARIES ("incidentSummaries"):
+- For EVERY numbered incident in the INCIDENTS list, write one concise factual analyst summary of THAT specific incident.
+- Ground each summary ONLY on that incident's own title and summary line — never on any other incident, the standing background, or outside knowledge. Do not invent, infer or add facts, casualty figures, place names, group names or attributions that are not in that incident's own text.
+- State plainly what happened, where, who or what was affected, and the operational implication for staff movement, site access or continuity ONLY where that incident's own text supports it.
+- One sentence is usually enough; use two only when the incident's text genuinely carries that much. When the source text is thin, keep it short rather than padding.
+- Do NOT state numeric counts of incidents or records, and do NOT repeat the incident's title verbatim.
+
 Return STRICT JSON with EXACTLY these keys and no others:
 {
   "executiveSummary": string,  // 2-3 sentences: the headline judgement for this window and what it means for operations.
@@ -182,7 +197,8 @@ Return STRICT JSON with EXACTLY these keys and no others:
   "whatMatters": string,       // Why it matters for staff movement, site access and continuity, and where to focus attention.
   "implications": string[],    // 4-7 distinct concrete actions the client should take. Each a short imperative sentence. No numbering, no leading dash.
   "watchNext": string[],       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
-  "polestarView": string       // The bottom-line analyst judgement and the recommended operating posture.
+  "polestarView": string,      // The bottom-line analyst judgement and the recommended operating posture.
+  "incidentSummaries": object  // Keys are the incident NUMBERS from the INCIDENTS list as strings ("1", "2", ...); each value is that incident's factual summary as described above. Include an entry for every numbered incident.
 }
 Return ONLY the JSON object.`;
 
@@ -290,6 +306,29 @@ function coerceList(v: unknown): string[] {
     .filter(Boolean);
 }
 
+// Map the model's number-keyed per-incident summaries ("1", "2", ...) back to an
+// id-keyed map the client renders. The prompt numbers the canonical capped set,
+// so each number maps to that incident's id. Used by BOTH the structured ("png")
+// brief and the generic ("country") report so per-incident summaries reach every
+// country brief.
+function mapIncidentSummaries(
+  raw: unknown,
+  incidents: ProseIncidentInput[],
+): Record<string, string> {
+  const canon = canonicalIncidents(incidents);
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      const idx = Number(k) - 1;
+      const inc = Number.isInteger(idx) ? canon[idx] : undefined;
+      const text = coerceStr(v);
+      const id = inc?.id != null ? String(inc.id).trim() : "";
+      if (id && text) out[id] = text;
+    }
+  }
+  return out;
+}
+
 function parseSections(
   content: string,
   variant: ProseVariant,
@@ -320,18 +359,7 @@ function parseSections(
     // incidentSummaries are returned keyed by the 1-based incident NUMBER from
     // the prompt. The prompt numbers the canonical capped set, so map each number
     // back to that incident's id to produce the id-keyed map the client renders.
-    const canon = canonicalIncidents(incidents);
-    const incidentSummaries: Record<string, string> = {};
-    const rawSummaries = o.incidentSummaries;
-    if (rawSummaries && typeof rawSummaries === "object" && !Array.isArray(rawSummaries)) {
-      for (const [k, v] of Object.entries(rawSummaries as Record<string, unknown>)) {
-        const idx = Number(k) - 1;
-        const inc = Number.isInteger(idx) ? canon[idx] : undefined;
-        const text = coerceStr(v);
-        const id = inc?.id != null ? String(inc.id).trim() : "";
-        if (id && text) incidentSummaries[id] = text;
-      }
-    }
+    const incidentSummaries = mapIncidentSummaries(o.incidentSummaries, incidents);
     const sections: CountryProseSections = {
       executiveSummary: coerceStr(o.executiveSummary),
       outlook: coerceStr(o.outlook),
@@ -355,8 +383,12 @@ function parseSections(
     implications: coerceList(o.implications),
     watchNext: coerceList(o.watchNext),
     polestarView: coerceStr(o.polestarView),
+    // Per-incident analyst summaries (best-effort) keyed by incident id, shown in
+    // the Related Incidents table. Absent entries fall back to no summary.
+    incidentSummaries: mapIncidentSummaries(o.incidentSummaries, incidents),
   };
-  // Require the core paragraphs; bullet lists may legitimately be short.
+  // Require the core paragraphs; bullet lists may legitimately be short and the
+  // per-incident summaries are best-effort.
   if (!sections.executiveSummary || !sections.situation || !sections.whatHappened) {
     return null;
   }
