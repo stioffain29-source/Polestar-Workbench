@@ -22,6 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
+import { createInFlightBusy } from "@/lib/inFlightBusy";
 import { ArrowLeft, Download, Loader2, Pencil, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
@@ -437,15 +438,14 @@ export default function CountryReport() {
   // dev, which can strand the shared mutation in a zombie pending state and
   // leave the button stuck on "Drafting...". The counter only reflects requests
   // this component actually started and finished, so it always settles.
-  const proseInFlight = useRef(0);
+  // (See `createInFlightBusy` + `inFlightBusy.test.ts` for the guarded logic.)
+  const proseTracker = useRef(createInFlightBusy());
   const [proseBusy, setProseBusy] = useState(false);
   const beginProseRequest = () => {
-    proseInFlight.current += 1;
-    setProseBusy(true);
+    setProseBusy(proseTracker.current.begin());
   };
   const endProseRequest = () => {
-    proseInFlight.current = Math.max(0, proseInFlight.current - 1);
-    setProseBusy(proseInFlight.current > 0);
+    setProseBusy(proseTracker.current.end());
   };
 
   // PNG grounds the AI prose on the SAME deduped, province/category-attributed
