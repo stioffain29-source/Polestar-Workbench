@@ -1,5 +1,5 @@
 import { format, parseISO, subDays } from "date-fns";
-import { latestRecordDate } from "./reportDataStatus";
+import { latestRecordDate, utcYmd } from "./reportDataStatus";
 
 // Central window rules for every report builder (topic reports + country reports).
 // Dashboard pages, archive views, map views and the full database are NOT subject
@@ -84,7 +84,10 @@ export function clampIssueDateToLatestRecord<
   const issueStr = issueDate.slice(0, 10);
   const latest = latestRecordDate(incidents, scopeTopic);
   if (!latest) return issueStr;
-  const latestStr = format(latest, "yyyy-MM-dd");
+  // Project the latest record's day in UTC (see utcYmd) so the clamp aligns
+  // with the UTC issue date / "today" instead of drifting a day in non-UTC
+  // viewer zones.
+  const latestStr = utcYmd(latest);
   return latestStr < issueStr ? latestStr : issueStr;
 }
 

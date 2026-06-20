@@ -48,7 +48,7 @@ import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
-import { latestRecordDate } from "@/lib/reportDataStatus";
+import { latestRecordDate, utcYmd } from "@/lib/reportDataStatus";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 import { format, parseISO } from "date-fns";
 import {
@@ -167,11 +167,15 @@ export default function ReportEditor() {
     const dataTopic = topic === "protests" ? "flashpoint" : topic;
     const latest = latestRecordDate(incidents ?? [], dataTopic);
     if (!latest) return null;
-    const latestYmd = format(latest, "yyyy-MM-dd");
+    // occurredAt is a UTC instant; project its calendar day in UTC (NOT the
+    // browser's local zone) so an evening-UTC record does not roll into the
+    // next day for eastern viewers and fire a FALSE staleness against the bare
+    // (UTC-style) issue date. Matches the UTC "today" used at seed time.
+    const latestYmd = utcYmd(latest);
     const issueYmd = issueDate.slice(0, 10);
     if (latestYmd <= issueYmd) return null;
     return {
-      latest: format(latest, "d MMM yyyy"),
+      latest: format(parseISO(latestYmd), "d MMM yyyy"),
       issueDate: format(parseISO(issueYmd), "d MMM yyyy"),
     };
   };
@@ -887,7 +891,9 @@ export default function ReportEditor() {
     }
     const dataTopic = form.topic === "protests" ? "flashpoint" : form.topic;
     const latest = latestRecordDate(incidents ?? [], dataTopic);
-    return latest ? format(latest, "yyyy-MM-dd") : "";
+    // UTC day (see utcYmd) so the issue-date cap matches the UTC clamp/"today"
+    // and does not let an eastern viewer pick a day past the real data.
+    return latest ? utcYmd(latest) : "";
   })();
 
   return (

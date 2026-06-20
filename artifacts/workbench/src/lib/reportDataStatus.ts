@@ -94,6 +94,20 @@ export function latestRecordDate(
 }
 
 /**
+ * Calendar day (YYYY-MM-DD) of an instant projected in UTC — viewer-timezone
+ * independent. `occurredAt`/`createdAt` are UTC instants and report issue dates
+ * are bare (UTC-style) dates, so any calendar-day comparison between them must
+ * project to UTC, NOT the browser's local zone. A local projection rolls an
+ * evening-UTC record (e.g. 20 Jun 19:44Z) into the next calendar day for
+ * eastern viewers, which fires a FALSE stale-prose warning and mis-clamps the
+ * issue date. Mirrors the UTC `today` (`new Date().toISOString().slice(0,10)`)
+ * already used at seed time, keeping the whole dating path on one clock.
+ */
+export function utcYmd(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
  * Compute the "Data as of" descriptor for a topic directly from the
  * incident list the preview already holds. `latestRecord` is the newest
  * event; `lastUpdated` is the newest row-insertion time (the real
