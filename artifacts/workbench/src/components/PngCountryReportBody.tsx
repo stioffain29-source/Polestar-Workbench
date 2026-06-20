@@ -58,7 +58,11 @@ function Prose({ text }: { text: string }) {
   return (
     <div>
       {text.split(/\n+/).map((p, i) => (
-        <p key={i} style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "0 0 10px 0" }}>
+        <p
+          key={i}
+          data-pdf-flow="true"
+          style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "0 0 10px 0" }}
+        >
           {p}
         </p>
       ))}
@@ -118,6 +122,7 @@ function ItemCard({ item }: { item: PngReportItem }) {
   const bodyText = summaries[item.id]?.trim() || item.businessImpact;
   return (
     <div
+      data-pdf-row="true"
       style={{
         border: `1px solid ${POLAR}`,
         borderLeft: `4px solid ${color}`,
@@ -354,7 +359,10 @@ export default function PngCountryReportBody({
         {d.businessImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
         ) : (
-          <ul style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}>
+          <ul
+            data-pdf-flow="true"
+            style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}
+          >
             {d.businessImpact.map((line, i) => (
               <li key={i} style={{ marginBottom: 6 }}>
                 {line}
