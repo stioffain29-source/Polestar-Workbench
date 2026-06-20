@@ -246,6 +246,12 @@ function emptyMaritimeMovement(err: unknown): MaritimeMovementSummary {
     theatresWritten: 0,
     rowsInserted: 0,
     perTheatre: [],
+    registry: {
+      configured: !!process.env.VESSEL_REGISTRY_API_KEY?.trim(),
+      enabled: (process.env.VESSEL_REGISTRY_ENABLED?.trim() || "true") !== "false",
+      lookups: 0,
+      resolved: 0,
+    },
     fetchOk: false,
     errors: [m],
     logLines: [`maritime movement ingest failed: ${m}`],

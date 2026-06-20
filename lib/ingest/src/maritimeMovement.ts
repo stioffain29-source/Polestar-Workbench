@@ -1,5 +1,11 @@
 import { db, maritimeMovementTable, type InsertMaritimeMovement } from "@workspace/db";
 import { and, desc, ilike, lte, eq, sql } from "drizzle-orm";
+import {
+  resolveVesselClasses,
+  readVesselRegistryConfig,
+  type VesselClass,
+  type VesselLookup,
+} from "./vesselRegistry";
 
 // ===========================================================================
 // Live vessel-MOVEMENT (AIS) context ingest.
@@ -21,9 +27,13 @@ import { and, desc, ilike, lte, eq, sql } from "drizzle-orm";
 // Honesty rules baked in:
 //   * Only counts we can actually derive from AIS are filled. Total vessels and
 //     AIS-visible count come from unique MMSIs seen; tankers come from the AIS
-//     ship-type code. Inbound/outbound, bulk vs container vs LNG, anchored and
-//     "AIS dark" are NOT derivable from a short open-stream sample, so they stay
-//     NULL ("not reported"), never a fabricated zero.
+//     ship-type code. Bulk vs container vs LNG/LPG are NOT derivable from the
+//     AIS type code, so they are filled ONLY when the optional external vessel
+//     registry (lib/ingest/src/vesselRegistry.ts, keyed on IMO/MMSI) resolves a
+//     definitive class; absent that registry, or for any vessel it cannot
+//     resolve, they stay NULL ("not reported"), never a fabricated zero.
+//     Inbound/outbound, anchored and "AIS dark" are likewise NULL when the
+//     short open-stream sample cannot derive them.
 //   * A theatre that observed no vessels gets NO row (absence, not "0 traffic").
 //   * source_name contains "ais" so the AIS row on Source Health flips to live.
 //
@@ -142,8 +152,18 @@ export type MaritimeMovementSummary = {
     inbound: number | null;
     outbound: number | null;
     anchored: number | null;
+    bulk: number | null;
+    container: number | null;
+    lngLpg: number | null;
     change: string | null;
   }>;
+  /** External vessel-registry precision layer (bulk/container/LNG-LPG split). */
+  registry: {
+    configured: boolean;
+    enabled: boolean;
+    lookups: number;
+    resolved: number;
+  };
   fetchOk: boolean;
   errors: string[];
   logLines: string[];
@@ -176,6 +196,7 @@ function emptySummary(
     theatresWritten: 0,
     rowsInserted: 0,
     perTheatre: [],
+    registry: { configured, enabled, lookups: 0, resolved: 0 },
     fetchOk: false,
     errors: [],
     logLines: [logLine],
@@ -195,6 +216,14 @@ function assignTheatre(lat: number, lon: number): string | null {
 // bulk vs container vs LNG from the type code alone, so those stay NULL.)
 function isTankerType(type: number | null): boolean {
   return type !== null && type >= 80 && type <= 89;
+}
+
+// Trade-class vessels worth a registry lookup: 70-79 = cargo (bulk/container
+// live here), 80-89 = tanker (gas carriers live here). Other classes
+// (passenger, fishing, tug, etc.) carry no bulk/container/LNG split, so we do
+// not spend a lookup on them.
+function isCargoOrTanker(type: number | null): boolean {
+  return type !== null && type >= 70 && type <= 89;
 }
 
 // Minimal structural type for the Node global WebSocket so this compiles without
@@ -230,6 +259,8 @@ async function messageToText(data: unknown): Promise<string | null> {
 interface VesselObs {
   theatre: string | null;
   type: number | null;
+  /** IMO hull number from ShipStaticData; key for the external registry lookup. */
+  imo: number | null;
   cog: number | null;
   sog: number | null;
   navStatus: number | null;
@@ -328,15 +359,18 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
         const theatre = lat !== null && lon !== null ? assignTheatre(lat, lon) : null;
 
         let type: number | null = null;
+        let imo: number | null = null;
         let cog: number | null = null;
         let sog: number | null = null;
         let navStatus: number | null = null;
         if (obj.MessageType === "ShipStaticData") {
           const msg = obj.Message as
-            | { ShipStaticData?: { Type?: number } }
+            | { ShipStaticData?: { Type?: number; ImoNumber?: number } }
             | undefined;
           const t = msg?.ShipStaticData?.Type;
           if (typeof t === "number") type = t;
+          const imoNum = msg?.ShipStaticData?.ImoNumber;
+          if (typeof imoNum === "number" && imoNum > 0) imo = imoNum;
         } else if (obj.MessageType === "PositionReport") {
           const msg = obj.Message as
             | {
@@ -358,12 +392,13 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
         if (existing) {
           if (theatre) existing.theatre = theatre;
           if (type !== null) existing.type = type;
+          if (imo !== null) existing.imo = imo;
           // Keep the latest VALID movement fields seen for this vessel.
           if (cog !== null) existing.cog = cog;
           if (sog !== null) existing.sog = sog;
           if (navStatus !== null) existing.navStatus = navStatus;
         } else {
-          byMmsi.set(mmsi, { theatre, type, cog, sog, navStatus });
+          byMmsi.set(mmsi, { theatre, type, imo, cog, sog, navStatus });
         }
       })();
     });
@@ -482,22 +517,48 @@ export async function runMaritimeMovementIngest(
     AIS_THEATRES.map((t) => [t.theatre, t.inboundBearing]),
   );
 
+  // OPTIONAL precision layer: resolve the precise commercial class (bulk /
+  // container / LNG-LPG) for each cargo/tanker vessel via the external vessel
+  // registry, keyed on its IMO (preferred) or MMSI. No-ops cleanly when the
+  // registry is unconfigured — the breakdown columns then stay NULL. Only
+  // trade-class vessels (AIS type 70-89) are looked up; that is where the
+  // bulk/container/gas split lives, and it bounds the lookup budget to the
+  // vessels that matter.
+  const registryConfig = readVesselRegistryConfig();
+  const registryCandidates: VesselLookup[] = [];
+  for (const [mmsi, v] of byMmsi.entries()) {
+    if (v.theatre && isCargoOrTanker(v.type)) {
+      registryCandidates.push({ mmsi, imo: v.imo });
+    }
+  }
+  const registry = await resolveVesselClasses(registryCandidates, {
+    config: registryConfig,
+  });
+  const classByMmsi = registry.classByMmsi;
+
   // Aggregate UNIQUE vessels per theatre.
   //   inbound/outbound — direction split from course-over-ground (moving only)
   //   anchored         — at-anchor / moored / ~zero speed
-  //   directionObserved/motionObserved — how many vessels we could classify, so
-  //     a 0 only ever reads as a real measurement (not "no data" — that stays NULL)
+  //   bulk/container/lngLpg — from the external registry (registry-resolved only)
+  //   directionObserved/motionObserved/registryResolved — how many vessels we
+  //     could classify, so a 0 only ever reads as a real measurement (not "no
+  //     data" — that stays NULL)
   interface TheatreAgg {
     total: number;
     tankers: number;
     inbound: number;
     outbound: number;
     anchored: number;
+    bulk: number;
+    container: number;
+    lngLpg: number;
     directionObserved: number;
     motionObserved: number;
+    registryResolved: number;
   }
   const agg = new Map<string, TheatreAgg>();
-  for (const { theatre, type, cog, sog, navStatus } of byMmsi.values()) {
+  for (const [mmsi, v] of byMmsi.entries()) {
+    const { theatre, type, cog, sog, navStatus } = v;
     if (!theatre) continue;
     const a =
       agg.get(theatre) ??
@@ -507,11 +568,22 @@ export async function runMaritimeMovementIngest(
         inbound: 0,
         outbound: 0,
         anchored: 0,
+        bulk: 0,
+        container: 0,
+        lngLpg: 0,
         directionObserved: 0,
         motionObserved: 0,
+        registryResolved: 0,
       } satisfies TheatreAgg);
     a.total += 1;
     if (isTankerType(type)) a.tankers += 1;
+    const klass = classByMmsi.get(mmsi);
+    if (klass !== undefined) {
+      a.registryResolved += 1;
+      if (klass === "bulk") a.bulk += 1;
+      else if (klass === "container") a.container += 1;
+      else if (klass === "lng-lpg") a.lngLpg += 1;
+    }
     if (sog !== null || navStatus !== null) a.motionObserved += 1;
     if (isAnchored(sog, navStatus)) {
       a.anchored += 1;
@@ -554,6 +626,12 @@ export async function runMaritimeMovementIngest(
       theatresWritten: 0,
       rowsInserted: 0,
       perTheatre: [],
+      registry: {
+        configured: registry.configured,
+        enabled: registry.enabled,
+        lookups: registry.lookups,
+        resolved: registry.resolved,
+      },
       fetchOk: false,
       errors,
       logLines,
@@ -577,6 +655,15 @@ export async function runMaritimeMovementIngest(
     const inbound = a.directionObserved > 0 ? a.inbound : null;
     const outbound = a.directionObserved > 0 ? a.outbound : null;
     const anchored = a.motionObserved > 0 ? a.anchored : null;
+    // The bulk/container/LNG-LPG split is filled ONLY when the external registry
+    // resolved ≥1 vessel in this theatre. A theatre with zero successful
+    // lookups (registry off, or no match) keeps all three NULL ("not
+    // reported"); a 0 only appears when we DID resolve vessels and none were of
+    // that class — a real measurement, never a fabricated zero.
+    const registryResolved = a.registryResolved > 0;
+    const bulk = registryResolved ? a.bulk : null;
+    const container = registryResolved ? a.container : null;
+    const lngLpg = registryResolved ? a.lngLpg : null;
     perTheatre.push({
       theatre: t.theatre,
       totalVessels: a.total,
@@ -584,6 +671,9 @@ export async function runMaritimeMovementIngest(
       inbound,
       outbound,
       anchored,
+      bulk,
+      container,
+      lngLpg,
       change,
     });
     rows.push({
@@ -595,10 +685,14 @@ export async function runMaritimeMovementIngest(
       tankersCount: a.tankers > 0 ? a.tankers : null,
       // Bulk vs container vs LNG/LPG cannot be separated from the AIS ship-type
       // code alone (70-79 is "cargo" with no sub-class; gas carriers are not a
-      // distinct code) — that split needs an external ship registry — so these
-      // stay NULL rather than a fabricated guess. Likewise AIS-dark/gap is not
-      // derivable from a live receive stream (it only shows vessels that ARE
-      // transmitting), so it stays NULL too.
+      // distinct code) — that split needs the external vessel registry (keyed on
+      // IMO/MMSI). When the registry is configured these are registry-resolved
+      // counts; otherwise they stay NULL rather than a fabricated guess.
+      // Likewise AIS-dark/gap is not derivable from a live receive stream (it
+      // only shows vessels that ARE transmitting), so it stays NULL too.
+      bulkCarriersCount: bulk,
+      containerCount: container,
+      lngLpgCount: lngLpg,
       anchoredOrWaitingCount: anchored,
       aisVisibleCount: a.total,
       changeVs7DayBaseline: change,
@@ -616,6 +710,8 @@ export async function runMaritimeMovementIngest(
         inboundBearing: t.inboundBearing,
         directionObserved: a.directionObserved,
         motionObserved: a.motionObserved,
+        registryResolved: a.registryResolved,
+        registryProvider: registry.configured ? registryConfig.provider : null,
       },
     });
   }
@@ -642,6 +738,12 @@ export async function runMaritimeMovementIngest(
         theatresWritten: 0,
         rowsInserted: 0,
         perTheatre,
+        registry: {
+          configured: registry.configured,
+          enabled: registry.enabled,
+          lookups: registry.lookups,
+          resolved: registry.resolved,
+        },
         fetchOk: true,
         errors,
         logLines,
@@ -652,6 +754,18 @@ export async function runMaritimeMovementIngest(
   logLines.push(
     `AIS movement ingest (${mode}): ${messages} messages, ${vesselsSeen} unique vessels across ${rows.length} theatre(s); ${opts.commit ? `${inserted} row(s) written` : "dry-run, nothing written"}.`,
   );
+  if (registry.configured && registry.enabled) {
+    logLines.push(
+      `Vessel registry (${registryConfig.provider}): ${registry.lookups} lookup(s), ${registry.resolved} resolved to a commercial class.`,
+    );
+  } else if (registryCandidates.length > 0) {
+    logLines.push(
+      "Vessel registry not configured — bulk/container/LNG-LPG breakdown left unreported (NULL).",
+    );
+  }
+  if (registry.errors.length > 0) {
+    errors.push(...registry.errors.map((e) => `vessel registry: ${e}`));
+  }
 
   return {
     provider,
@@ -666,6 +780,12 @@ export async function runMaritimeMovementIngest(
     theatresWritten: rows.length,
     rowsInserted: inserted,
     perTheatre,
+    registry: {
+      configured: registry.configured,
+      enabled: registry.enabled,
+      lookups: registry.lookups,
+      resolved: registry.resolved,
+    },
     fetchOk: true,
     errors,
     logLines,

@@ -20,6 +20,18 @@ export type {
   MaritimeMovementSummary,
   MaritimeMovementOptions,
 } from "./maritimeMovement";
+export {
+  resolveVesselClasses,
+  classifyVesselClass,
+  readVesselRegistryConfig,
+  isVesselRegistryConfigured,
+} from "./vesselRegistry";
+export type {
+  VesselClass,
+  VesselLookup,
+  VesselRegistryConfig,
+  VesselRegistryResult,
+} from "./vesselRegistry";
 export { runStrikesIngest, classifyStrikeFields } from "./strikes";
 export type { StrikesIngestSummary, StrikeTheatre } from "./strikes";
 export { runStrikesBackfill } from "./backfillStrikes";
