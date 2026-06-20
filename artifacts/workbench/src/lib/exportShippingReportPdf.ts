@@ -52,6 +52,11 @@ import {
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
 } from "./maritimeIntelligence";
+import {
+  MARITIME_CONF_LABEL,
+  MARITIME_SUBSECTION_ORDER,
+  maritimeExecCards,
+} from "./maritimeReportView";
 
 void _LOCATION_NOT_IDENTIFIED;
 
@@ -554,11 +559,6 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
 // Mirrors MaritimeIntelligenceReportSection in ShippingReportPreview.tsx —
 // same sections, same order, same dataset, so preview == PDF.
 
-const MARITIME_CONF_LABEL: Record<string, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
 
 // Bullets without a section heading — mirrors drawBulletSection's body so the
 // indent, circle marker and line spacing match the rest of the report.
@@ -631,9 +631,7 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
     bluf,
     risk,
     movementSnapshot,
-    incidentSnapshot,
     chokepointCards,
-    chokepointsAffected,
     confirmedIncidents,
     keyRiskIndicators,
     businessImpact,
@@ -643,17 +641,9 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   drawSectionHeading(ctx, "Maritime Intelligence");
 
   // Executive summary — four KPI cards (Risk Level, Confirmed Incidents 7d,
-  // Chokepoints Affected, Business Impact). Same four the board shows.
-  const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
-  const execCards: KpiCardData[] = [
-    { label: "Maritime Risk Level", value: `L${risk.level} \u00b7 ${risk.label}` },
-    { label: "Confirmed Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
-    { label: "Chokepoints Affected", value: `${chokepointsAffected} / ${chokepointCards.length}` },
-    {
-      label: "Business Impact",
-      value: namedImpacts.length > 0 ? String(namedImpacts.length) : "\u2014",
-    },
-  ];
+  // Chokepoints Affected, Business Impact). Built from the SHARED view contract
+  // (maritimeReportView) so they are byte-identical to the on-screen board.
+  const execCards: KpiCardData[] = maritimeExecCards(board);
   drawFastFactsKpiCards(ctx, execCards);
 
   drawBlufBox(ctx, bluf);
@@ -661,7 +651,7 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   // Six chokepoint cards — rendered as compact stacked blocks (one per
   // chokepoint) so the PDF carries the SAME six chokepoints, in the same order,
   // as the on-screen board.
-  drawSubtitle(ctx, "Chokepoint Cards");
+  drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[0]);
   for (const card of chokepointCards) {
     ensureSpace(ctx, 20);
     setRoboto(pdf, "bold");
@@ -709,7 +699,7 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
 
   // Confirmed maritime incidents — allowed categories only; movement/AIS never
   // appears here.
-  drawSubtitle(ctx, "Confirmed Maritime Incidents");
+  drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[1]);
   if (confirmedIncidents.length > 0) {
     const rows = confirmedIncidents.map((r) => {
       let when = r.occurredAt;
@@ -731,7 +721,7 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   }
 
   // Maritime context — vessel movement (AIS). CONTEXT only.
-  drawSubtitle(ctx, "Maritime Context \u2014 Vessel Movement (AIS)");
+  drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[2]);
   if (movementSnapshot) {
     const items = movementSnapshot.theatres.map((t) => {
       const parts = [t.theatre];

@@ -23,6 +23,12 @@ import {
   type ChokepointCard,
   type LatestIncident,
 } from "@/lib/maritimeIntelligence";
+import {
+  MARITIME_CONF_LABEL,
+  MARITIME_POLESTAR_SUBSECTIONS,
+  MARITIME_SUBSECTION_ORDER,
+  maritimeExecCards,
+} from "@/lib/maritimeReportView";
 
 // Polestar disclaimer text used at the foot of every report. Kept inline
 // here (rather than imported from the PDF chrome) so the on-screen
@@ -452,12 +458,6 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
   );
 }
 
-const MARITIME_CONF_LABEL: Record<string, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
-
 function MaritimeSubLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -550,21 +550,13 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
     bluf,
     risk,
     movementSnapshot,
-    incidentSnapshot,
     chokepointCards,
-    chokepointsAffected,
     confirmedIncidents,
     keyRiskIndicators,
     businessImpact,
     watchNext,
   } = board;
-  const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
-  const execCards: KpiCard[] = [
-    { label: "Maritime Risk Level", value: `L${risk.level} · ${risk.label}` },
-    { label: "Confirmed Incidents · 7d", value: String(incidentSnapshot.total) },
-    { label: "Chokepoints Affected", value: `${chokepointsAffected} / ${chokepointCards.length}` },
-    { label: "Business Impact", value: namedImpacts.length > 0 ? String(namedImpacts.length) : "—" },
-  ];
+  const execCards: KpiCard[] = maritimeExecCards(board);
   return (
     <Section title="Maritime Intelligence">
       <KpiGrid cards={execCards} />
@@ -581,17 +573,17 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
         </p>
       </div>
 
-      <MaritimeSubLabel>Chokepoint Cards</MaritimeSubLabel>
+      <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[0]}</MaritimeSubLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
         {chokepointCards.map((card) => (
           <ChokepointReportCard key={card.key} card={card} />
         ))}
       </div>
 
-      <MaritimeSubLabel>Confirmed Maritime Incidents</MaritimeSubLabel>
+      <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[1]}</MaritimeSubLabel>
       <ConfirmedIncidentsReportTable rows={confirmedIncidents} />
 
-      <MaritimeSubLabel>Maritime Context &mdash; Vessel Movement (AIS)</MaritimeSubLabel>
+      <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[2]}</MaritimeSubLabel>
       {movementSnapshot ? (
         <>
           <ul className="space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
@@ -617,18 +609,18 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
         <div className="uppercase" style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.18em", marginBottom: 8 }}>
           Polestar View
         </div>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Assessment</div>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[0]}</div>
         <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 13, lineHeight: 1.6, fontWeight: 300, margin: "0 0 6px 0" }}>{risk.rationale}</p>
         <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px 0" }}>
           {keyRiskIndicators.map((k, i) => (
             <li key={i} style={{ color: "#dfe1f0", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6 }}>&middot; {k}</li>
           ))}
         </ul>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Business Impact</div>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[1]}</div>
         <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6, margin: "0 0 8px 0" }}>{businessImpact.join(", ")}</p>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Confidence</div>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[2]}</div>
         <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6, margin: "0 0 8px 0" }}>{MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}</p>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Watch Next</div>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[3]}</div>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {watchNext.map((w, i) => (
             <li key={i} style={{ color: "#dfe1f0", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6 }}>&middot; {w}</li>
