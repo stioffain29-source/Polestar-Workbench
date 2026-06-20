@@ -1,29 +1,65 @@
 ---
 name: maritime-movement scrape operations
-description: Why the AIS movement commit run looks hung, and how the panel populates per-theatre.
+description: AIS collection providers (aisstream vs Datalastic satellite), why the commit run looks hung, provider-switch boot gate, and the NULL-not-zero cargo-split honesty rule.
 ---
 
-# Running the AIS maritime-movement ingest
+# AIS maritime-movement ingest
 
-`pnpm --filter @workspace/scripts run scrape:maritime-movement -- --commit` opens the
-aisstream WebSocket, samples for `AIS_COLLECT_SECONDS` (default 60), THEN does the
-optional Datalastic vessel-registry lookups INLINE before writing.
+`runMaritimeMovementIngest` collects live vessel positions per chokepoint and writes
+UNIQUE-vessel snapshots into `maritime_movement` (+ `maritime_vessel_sighting`, SINGULAR).
+It NEVER touches the incidents table. CLI: `pnpm --filter @workspace/scripts run
+scrape:maritime-movement -- --commit`.
 
-**The "it's hung" trap:** the registry pass resolves up to `VESSEL_REGISTRY_MAX_LOOKUPS`
-(default 150) vessels at concurrency 5 with an 8s per-lookup timeout — worst case a few
-MINUTES after the sample ends. Under nohup the pnpm/tsx stdout is buffered (non-TTY) so the
-log shows only the banner until the very end. It is slow, not broken.
-**How to apply:** for a fast movement-only run, set `VESSEL_REGISTRY_ENABLED=false` inline —
-that skips the Datalastic pass; the bulk/container/LNG-LPG columns stay NULL (honesty
-contract) but the row lands in seconds. Give a full commit run a generous timeout (≥5 min).
+## Two collection providers — pick the satellite one for the Middle East
 
-**Per-theatre population is honest, not all-or-nothing:** the panel lives on the Shipping
-monitor (`/topics/shipping`) and the Shipping Watch report. A theatre only gets a row when
-the live sample observed traffic there. In practice short samples from the workspace egress
-consistently only capture **Singapore Strait** — the other five chokepoints (Hormuz,
-Bab el-Mandeb, Red Sea, Gulf of Aden, Malacca) keep reading "Movement data unavailable"
-until a sample sees their vessels. That is the no-fabricated-row rule, not a bug.
+- **aisstream.io** (free, terrestrial WebSocket sample): near-ZERO Middle-East coverage.
+  Short samples from the workspace egress consistently only capture **Singapore Strait**;
+  Hormuz / Bab el-Mandeb / Red Sea / Gulf of Aden read empty. This is the coverage gap, NOT
+  a no-traffic situation — do not mistake it for the honest no-row rule.
+- **Datalastic satellite** (`collectViaDatalastic`): the coverage-complete path. Used when the
+  PAID `VESSEL_REGISTRY_API_KEY` (datalastic) is configured+enabled — that key DOUBLES as the
+  collection source. One `vessel_inradius` GET per theatre centre+radius; classes resolved
+  INLINE from each vessel's `type_specific` (no slow per-vessel registry lookups). Verified:
+  all 6 chokepoints populate incl. **Strait of Hormuz** (~157 vessels). source_name =
+  `"AIS (Datalastic satellite)"` (contains "ais" for the boot-gate ILIKE, and "datalastic"
+  for the provider check).
+- **Why:** the user demanded real Hormuz vessel data; free aisstream cannot deliver it.
+- **How to apply:** if Hormuz/ME straits are empty in prod, confirm the Datalastic key is set
+  and the deployment shipped the satellite path — then a refresh repopulates every theatre.
 
-**Don't chase your own shell:** `pgrep -f maritime-movement` / `pkill -f maritime-movement`
-self-match the checking command (the pattern is in its own argv), giving a false "still
-running". Use the bracket trick — `ps -eo pid,args | grep '[s]crape-maritime-movement'`.
+## Provider-switch boot gate (prod self-heal)
+
+The scheduler's boot freshness gate only checked the newest AIS row's TIME age. A switch from
+aisstream → Datalastic leaves the old rows TIME-fresh but COVERAGE-wrong, so the gate would
+skip the catch-up and Hormuz stays empty after republish. Fix: `movementProviderMismatch()`
+forces a boot catch-up when the newest row's provider ≠ the now-active provider. Also
+`movementFeedActive() = aisMovementActive() (AIS_API_KEY) || activeMovementProviderIsDatalastic()`
+— gate logic must use the OR or a Datalastic-only deployment skips movement refresh.
+- **Why:** time-based freshness alone masks a coverage regression on provider change.
+- **How to apply:** any new movement provider must (a) write a distinguishable source_name and
+  (b) be recognised by both helpers, or the switch won't trigger a refresh.
+
+## NULL-not-zero cargo-split honesty (NO-FABRICATION)
+
+`datalasticCargoClass(typeSpecific)` resolves bulk/container/lng-lpg ONLY from a SPECIFIC
+`type_specific` ("Bulk Carrier", "LNG Tanker", "General Cargo"…). A bare generic "Cargo"/
+"Tanker" (or absent) stays UNRESOLVED (null) — it must NOT be bucketed as "other", because
+"other" marks the vessel `registryResolved`, which flips the split columns from honest NULL to
+a fabricated `0 bulk / 0 container / 0 LNG`. A specific-but-untracked type ("Crude Oil Tanker")
+legitimately resolves to "other" (a confirmed non-split).
+- **Why:** a displayed "0 bulk" must mean "checked, none", never "couldn't tell".
+- **How to apply:** keep split counts gated on a definitive match; total still counts the hull.
+
+## Operational traps
+
+- **The "it's hung" trap (aisstream path):** the inline Datalastic registry pass resolves up to
+  `VESSEL_REGISTRY_MAX_LOOKUPS` (default 150) at concurrency 5 with an 8s per-lookup timeout —
+  minutes after the sample ends; non-TTY stdout buffers so the log shows only the banner. Slow,
+  not broken. For a fast movement-only run set `VESSEL_REGISTRY_ENABLED=false` (splits stay NULL).
+  NOTE: with the Datalastic COLLECTION path, splits come free from `type_specific` (no slow pass).
+- **Don't chase your own shell:** `pgrep/pkill -f maritime-movement` self-match the checker. Use
+  the bracket trick — `ps -eo pid,args | grep '[s]crape-maritime-movement'`.
+- **tsx invocation:** run from `scripts/` (`cd scripts && npx tsx src/...`); bare `tsx` not on PATH.
+  Node/tsx scripts see `process.env`; the code_execution sandbox does NOT.
+- Prod DB is read-only from the workspace; movement refresh runs INSIDE the deployment runtime
+  (boot freshness gate after republish, or token-gated `POST /api/admin/ingest`).

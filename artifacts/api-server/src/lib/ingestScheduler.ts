@@ -207,6 +207,62 @@ async function hoursSinceNewestMovement(): Promise<number | null> {
 }
 
 /**
+ * The AIS collection provider now active. Mirrors the useDatalastic decision in
+ * lib/ingest/src/maritimeMovement.ts: the PAID Datalastic key (registry layer)
+ * doubles as the satellite collection source — when it is present and not
+ * switched off it drives collection (real Middle-East coverage), otherwise the
+ * free terrestrial aisstream feed does.
+ */
+function activeMovementProviderIsDatalastic(): boolean {
+  const key = process.env.VESSEL_REGISTRY_API_KEY?.trim() ?? "";
+  const enabled = (process.env.VESSEL_REGISTRY_ENABLED?.trim() || "true").toLowerCase();
+  const provider = (
+    process.env.VESSEL_REGISTRY_PROVIDER?.trim() || "datalastic"
+  ).toLowerCase();
+  const off = enabled === "false" || enabled === "0" || enabled === "off" || enabled === "no";
+  return key.length > 0 && !off && provider === "datalastic";
+}
+
+/**
+ * True when SOME live vessel-movement feed is active — either the terrestrial
+ * aisstream feed (AIS_API_KEY) or the Datalastic satellite feed (the registry
+ * key, which doubles as the collection source). The movement collector in
+ * lib/ingest/src/maritimeMovement.ts runs whenever EITHER is configured, so the
+ * scheduler's freshness/SLA logic must use the same OR — keying only on
+ * AIS_API_KEY would skip movement refresh on a Datalastic-only deployment (or
+ * one with AIS_ENABLED=false) even though the collector would still populate it.
+ */
+function movementFeedActive(): boolean {
+  return aisMovementActive() || activeMovementProviderIsDatalastic();
+}
+
+/**
+ * True when the newest AIS movement snapshot was written by a DIFFERENT provider
+ * than the one now active (e.g. prod still holds terrestrial aisstream rows but
+ * the deployment has since switched to the Datalastic satellite feed). Such rows
+ * can be TIME-fresh yet coverage-wrong — aisstream cannot see the Middle-East
+ * straits, so Hormuz/Bab el-Mandeb/Gulf of Aden/Red Sea read empty — and the
+ * time-based freshness gate alone would wrongly treat them as fresh and skip the
+ * catch-up. Forcing a refresh on a provider switch repopulates every chokepoint
+ * from the active feed. Returns false when there are no rows yet (the normal
+ * staleness path already forces the initial population).
+ */
+async function movementProviderMismatch(): Promise<boolean> {
+  if (!movementFeedActive()) return false;
+  const res = await db.execute(sql`
+    SELECT source_name
+    FROM maritime_movement
+    WHERE source_name ILIKE '%ais%'
+    ORDER BY data_as_of DESC
+    LIMIT 1
+  `);
+  const row = res.rows[0] as { source_name: string | null } | undefined;
+  if (!row?.source_name) return false;
+  const newestIsDatalastic = row.source_name.toLowerCase().includes("datalastic");
+  return newestIsDatalastic !== activeMovementProviderIsDatalastic();
+}
+
+/**
  * Hours since the newest stored ICC maritime-security event (or null when the
  * table is empty). Like strikes and the scraped land topics, ICC piracy events
  * refresh ONLY inside a full ingest (runIngestOnce → runIccPiracyIngest), so a
@@ -240,7 +296,7 @@ async function hoursSinceNewestMaritimeSecurity(): Promise<number | null> {
  * being noticed only when an analyst opens Source Health.
  */
 async function monitorMovementFreshness(reason: string): Promise<void> {
-  if (!aisMovementActive()) return;
+  if (!movementFeedActive()) return;
   let ageHours: number | null;
   try {
     ageHours = await hoursSinceNewestMovement();
@@ -485,14 +541,23 @@ export function startIngestScheduler(): void {
           // ingest. Treat a stale movement table as a reason to run so the
           // Shipping Watch board stays within its 14-day freshness window even
           // when incidents are fresh (which alone skips the full ingest). Only
-          // considered when AIS is keyed+enabled — otherwise the table is empty
-          // by design and would force a needless scrape on every cold start.
-          const aisActive = aisMovementActive();
+          // considered when SOME movement feed (aisstream or Datalastic) is
+          // active — otherwise the table is empty by design and gating on it
+          // would force a needless scrape on every cold start.
+          const aisActive = movementFeedActive();
           const movementAge = aisActive
             ? await hoursSinceNewestMovement()
             : null;
+          // A provider switch (e.g. terrestrial aisstream → Datalastic satellite)
+          // leaves the existing rows TIME-fresh but coverage-wrong, so force a
+          // catch-up to repopulate every chokepoint from the now-active feed even
+          // when the time-based gate below would treat them as fresh.
+          const movementProviderSwitched = await movementProviderMismatch();
           const movementStale =
-            aisActive && (movementAge === null || movementAge >= hours);
+            aisActive &&
+            (movementAge === null ||
+              movementAge >= hours ||
+              movementProviderSwitched);
           // ICC maritime-security events also refresh ONLY inside a full ingest.
           // Force a catch-up when the table is POPULATED but stale; an empty
           // table is deliberately NOT a trigger (the ICC map routinely blocks
@@ -542,6 +607,7 @@ export function startIngestScheduler(): void {
                 movementAgeHours:
                   movementAge === null ? null : Math.round(movementAge),
                 movementStale,
+                movementProviderSwitched,
                 maritimeSecurityAgeHours:
                   maritimeSecurityAge === null
                     ? null

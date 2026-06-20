@@ -9,8 +9,11 @@ import { and, desc, ilike, lte, gte, lt, eq, sql } from "drizzle-orm";
 import {
   resolveVesselClasses,
   readVesselRegistryConfig,
+  classifyVesselClass,
   type VesselClass,
   type VesselLookup,
+  type VesselRegistryConfig,
+  type VesselRegistryResult,
 } from "./vesselRegistry";
 import { recordSourceHealth } from "./sourceHealth";
 
@@ -65,6 +68,21 @@ export const REGISTRY_HEALTH_NAME = "Vessel registry (cargo-type breakdown)";
 const AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream";
 const SOURCE_NAME = "AIS (aisstream.io)";
 const SOURCE_URL = "https://aisstream.io";
+
+// Datalastic satellite-AIS collection path. The free aisstream.io terrestrial
+// feed has NO coverage of the Middle-East chokepoints (Hormuz / Bab el-Mandeb /
+// Gulf of Aden / Red Sea), so when the PAID vessel-registry key (Datalastic) is
+// present we collect live positions from its satellite `vessel_inradius`
+// endpoint instead — one area query per chokepoint centre+radius. The
+// source_name MUST contain "ais" so the Source-Health row and the boot
+// freshness gate (source_name ILIKE '%ais%') still recognise it as the live AIS
+// movement feed.
+const DATALASTIC_SOURCE_NAME = "AIS (Datalastic satellite)";
+const DATALASTIC_SOURCE_URL = "https://datalastic.com";
+const DATALASTIC_REQUEST_TIMEOUT_MS = 15_000;
+// A realistic browser UA; the registry endpoint can throttle library defaults.
+const DATALASTIC_UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 const DEFAULT_COLLECT_SECONDS = 60;
 const MIN_COLLECT_SECONDS = 10;
@@ -564,6 +582,194 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
   });
 }
 
+/** Parse a numeric id that the registry may report as a string or number. */
+function parseIntId(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return Math.floor(raw);
+  }
+  if (typeof raw === "string") {
+    const n = Number.parseInt(raw.trim(), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Drop non-vessel AIS objects (aids-to-navigation, base stations, aircraft)
+ * that an area query can return so they never count as "vessels". Keeps the
+ * total-vessel count honest — only real ships are tallied.
+ */
+function isNonVesselType(type: string | null, typeSpecific: string | null): boolean {
+  const s = `${type ?? ""} ${typeSpecific ?? ""}`.toLowerCase();
+  return (
+    s.includes("aircraft") ||
+    s.includes("helicopter") ||
+    s.includes("aid to navigation") ||
+    s.includes("navigation aid") ||
+    s.includes("aton") ||
+    s.includes("beacon") ||
+    s.includes("racon") ||
+    s.includes("base station") ||
+    s.includes("reference point") ||
+    s.includes("sea farm")
+  );
+}
+
+/**
+ * Map a Datalastic free-text vessel type to the coarse AIS ship-type band the
+ * downstream aggregation expects: 80-89 (tanker, incl. gas carriers) or 70-79
+ * (cargo: bulk/container/general). Everything else returns null — the vessel
+ * still counts toward the theatre total, it simply is not a tracked trade class.
+ * (Order matters: gas/tanker is checked before cargo so an "Oil or Chemical
+ * Tanker" lands in the tanker band, not the cargo band.)
+ */
+function aisCodeFromDatalasticType(
+  type: string | null,
+  typeSpecific: string | null,
+): number | null {
+  const s = `${type ?? ""} ${typeSpecific ?? ""}`.toLowerCase();
+  if (
+    /\b(lng|lpg)\b/.test(s) ||
+    s.includes("gas carrier") ||
+    s.includes("liquefied gas") ||
+    s.includes("tanker")
+  ) {
+    return 80;
+  }
+  if (s.includes("container") || s.includes("bulk") || s.includes("cargo")) {
+    return 70;
+  }
+  return null;
+}
+
+/**
+ * Resolve a cargo/tanker hull's commercial sub-class (bulk / container / lng-lpg
+ * / other) from Datalastic's type strings, but ONLY when the text is SPECIFIC
+ * enough to be definitive. Datalastic's `type_specific` names the sub-class
+ * ("Bulk Carrier", "Container Ship", "LNG Tanker", "General Cargo", "Crude Oil
+ * Tanker", …); the bare `type` ("Cargo"/"Tanker") names none. When no specific
+ * text is present we return null (UNRESOLVED) rather than bucketing the hull as
+ * "other" — otherwise a theatre of unclassifiable hulls would render a
+ * fabricated "0 bulk / 0 container / 0 LNG" instead of an honest "not reported".
+ * Mirrors the NO-FABRICATION rule of the registry path: a split count is filled
+ * only from a definitive match. A specific-but-untracked type ("General Cargo",
+ * "Crude Oil Tanker") legitimately resolves to "other" — a confirmed non-split.
+ */
+function datalasticCargoClass(typeSpecific: string | null): VesselClass | null {
+  const specific = typeSpecific?.trim() ?? "";
+  if (specific.length === 0) return null;
+  const lower = specific.toLowerCase();
+  // A type_specific that merely echoes the generic class is not a sub-class.
+  if (lower === "cargo" || lower === "tanker") return null;
+  return classifyVesselClass(specific);
+}
+
+/**
+ * Collect live vessel positions from Datalastic's satellite `vessel_inradius`
+ * endpoint — one area query per tracked chokepoint (centre + radius). This is
+ * the coverage-complete alternative to the terrestrial aisstream feed, which
+ * cannot see the Middle-East straits.
+ *
+ * The shape mirrors `collectAisStream` (returns `CollectResult`) plus an inline
+ * `classByMmsi`: because the area query already carries each vessel's precise
+ * `type_specific`, the bulk/container/LNG-LPG split is resolved here for FREE,
+ * with no per-vessel registry lookups (which is what made the old path look
+ * hung). Honesty rules are preserved: non-vessels are dropped; nav status is
+ * unavailable from this endpoint so it stays null; an untracked type leaves the
+ * class unset; a theatre that returns nothing simply contributes no vessels.
+ */
+async function collectViaDatalastic(
+  theatres: readonly TheatreBox[],
+  cfg: VesselRegistryConfig,
+): Promise<CollectResult & { classByMmsi: Map<number, VesselClass> }> {
+  const byMmsi = new Map<number, VesselObs>();
+  const classByMmsi = new Map<number, VesselClass>();
+  let messages = 0;
+  const errors: string[] = [];
+
+  // Sequential, one query per theatre. Theatres are visited in board order so
+  // that on the rare chance two radii overlap, the FIRST (more specific) theatre
+  // keeps the vessel — mirroring the specific→broad rule of the bounding boxes.
+  for (const t of theatres) {
+    const params = new URLSearchParams({
+      "api-key": cfg.apiKey,
+      lat: String(t.centerLat),
+      lon: String(t.centerLon),
+      radius: String(t.radiusNm),
+    });
+    const url = `${cfg.base}/vessel_inradius?${params.toString()}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), DATALASTIC_REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": DATALASTIC_UA, Accept: "application/json" },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        errors.push(`${t.theatre}: status ${res.status}`);
+        continue;
+      }
+      const json = (await res.json()) as { data?: { vessels?: unknown[] } };
+      const vessels = Array.isArray(json?.data?.vessels) ? json.data!.vessels! : [];
+      for (const raw of vessels) {
+        if (!raw || typeof raw !== "object") continue;
+        const v = raw as Record<string, unknown>;
+        const mmsi = parseIntId(v.mmsi);
+        if (mmsi === null) continue;
+        // First theatre in board order wins (guards against overlapping radii).
+        if (byMmsi.has(mmsi)) continue;
+        const type = typeof v.type === "string" ? v.type : null;
+        const typeSpecific =
+          typeof v.type_specific === "string" ? v.type_specific : null;
+        if (isNonVesselType(type, typeSpecific)) continue;
+        messages += 1;
+        const lat = typeof v.lat === "number" ? v.lat : null;
+        const lon = typeof v.lon === "number" ? v.lon : null;
+        const imo = parseIntId(v.imo);
+        const cog = typeof v.course === "number" ? validCog(v.course) : null;
+        const sog = typeof v.speed === "number" ? validSog(v.speed) : null;
+        const name =
+          typeof v.name === "string" && v.name.trim().length > 0
+            ? v.name.trim()
+            : null;
+        const aisType = aisCodeFromDatalasticType(type, typeSpecific);
+        byMmsi.set(mmsi, {
+          theatre: t.theatre,
+          type: aisType,
+          imo,
+          cog,
+          sog,
+          // Datalastic vessel_inradius does not report navigational status.
+          navStatus: null,
+          lat,
+          lon,
+          name,
+        });
+        // The cargo-class split is free here when type_specific names it; a hull
+        // with only a generic "Cargo"/"Tanker" stays UNRESOLVED (left out of the
+        // split) so the breakdown never fabricates a 0 — see datalasticCargoClass.
+        if (isCargoOrTanker(aisType)) {
+          const klass = datalasticCargoClass(typeSpecific);
+          if (klass !== null) classByMmsi.set(mmsi, klass);
+        }
+      }
+    } catch (err) {
+      const msg = ctrl.signal.aborted
+        ? `${t.theatre}: timed out after ${DATALASTIC_REQUEST_TIMEOUT_MS}ms`
+        : `${t.theatre}: ${err instanceof Error ? err.message : String(err)}`;
+      errors.push(msg);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Surface a global error ONLY when every theatre failed (no data at all). A
+  // partial failure (some theatres returned vessels) is conveyed by per-theatre
+  // absence, never by discarding the good data with a hard error.
+  const error = byMmsi.size === 0 && errors.length > 0 ? errors.join("; ") : null;
+  return { messages, byMmsi, error, classByMmsi };
+}
+
 async function baselineTotal(theatre: string, cutoff: Date): Promise<number | null> {
   try {
     const [row] = await db
@@ -615,10 +821,22 @@ export async function runMaritimeMovementIngest(
   opts: MaritimeMovementOptions = {},
 ): Promise<MaritimeMovementSummary> {
   const mode: "commit" | "dry-run" = opts.commit ? "commit" : "dry-run";
-  const provider = (process.env.AIS_PROVIDER?.trim() || "aisstream").toLowerCase();
+  const aisProvider = (process.env.AIS_PROVIDER?.trim() || "aisstream").toLowerCase();
   const apiKey = process.env.AIS_API_KEY?.trim() ?? "";
-  const configured = apiKey.length > 0;
   const enabled = !isFalsey(process.env.AIS_ENABLED);
+
+  // PRIMARY collection-source selection. The free aisstream terrestrial feed
+  // cannot see the Middle-East chokepoints, so when the PAID Datalastic key is
+  // present (and not switched off) we collect from its satellite area endpoint
+  // instead. The Datalastic kill-switch is VESSEL_REGISTRY_ENABLED; aisstream's
+  // is AIS_ENABLED. When Datalastic is the source the aisstream gates are
+  // bypassed (a missing/disabled AIS_API_KEY must not suppress the live feed).
+  const registryConfig = readVesselRegistryConfig();
+  const useDatalastic =
+    registryConfig.configured &&
+    registryConfig.enabled &&
+    registryConfig.provider === "datalastic";
+  const configured = apiKey.length > 0 || useDatalastic;
 
   const envSeconds = Number(process.env.AIS_COLLECT_SECONDS);
   const collectSeconds = Math.min(
@@ -632,67 +850,105 @@ export async function runMaritimeMovementIngest(
     ),
   );
 
-  if (!enabled) {
-    return emptySummary(
-      mode,
-      provider,
-      configured,
-      false,
-      "disabled",
-      collectSeconds,
-      "AIS movement ingest disabled (AIS_ENABLED=false); skipping.",
-    );
-  }
-  if (!configured) {
-    return emptySummary(
-      mode,
-      provider,
-      false,
-      true,
-      "not_configured",
-      collectSeconds,
-      "AIS movement ingest not configured (AIS_API_KEY unset); skipping cleanly.",
-    );
-  }
-  if (provider !== "aisstream") {
-    return emptySummary(
-      mode,
-      provider,
-      true,
-      true,
-      "unsupported_provider",
-      collectSeconds,
-      `AIS provider "${provider}" is not supported (only "aisstream"); skipping.`,
-    );
+  // The aisstream-specific gates only apply when Datalastic is NOT the source.
+  if (!useDatalastic) {
+    if (!enabled) {
+      return emptySummary(
+        mode,
+        aisProvider,
+        configured,
+        false,
+        "disabled",
+        collectSeconds,
+        "AIS movement ingest disabled (AIS_ENABLED=false); skipping.",
+      );
+    }
+    if (!configured) {
+      return emptySummary(
+        mode,
+        aisProvider,
+        false,
+        true,
+        "not_configured",
+        collectSeconds,
+        "AIS movement ingest not configured (AIS_API_KEY unset); skipping cleanly.",
+      );
+    }
+    if (aisProvider !== "aisstream") {
+      return emptySummary(
+        mode,
+        aisProvider,
+        true,
+        true,
+        "unsupported_provider",
+        collectSeconds,
+        `AIS provider "${aisProvider}" is not supported (only "aisstream"); skipping.`,
+      );
+    }
   }
 
-  const { messages, byMmsi, error } = await collectAisStream(
-    apiKey,
-    collectSeconds * 1000,
-  );
+  // ----- Collection: Datalastic satellite area queries OR aisstream stream ----
+  let messages: number;
+  let byMmsi: Map<number, VesselObs>;
+  let error: string | null;
+  let datalasticClasses: Map<number, VesselClass> | null = null;
+  let activeProvider: string;
+  let activeSourceName: string;
+  let activeSourceUrl: string;
+  if (useDatalastic) {
+    const collected = await collectViaDatalastic(AIS_THEATRES, registryConfig);
+    messages = collected.messages;
+    byMmsi = collected.byMmsi;
+    error = collected.error;
+    datalasticClasses = collected.classByMmsi;
+    activeProvider = "datalastic";
+    activeSourceName = DATALASTIC_SOURCE_NAME;
+    activeSourceUrl = DATALASTIC_SOURCE_URL;
+  } else {
+    const collected = await collectAisStream(apiKey, collectSeconds * 1000);
+    messages = collected.messages;
+    byMmsi = collected.byMmsi;
+    error = collected.error;
+    activeProvider = "aisstream";
+    activeSourceName = SOURCE_NAME;
+    activeSourceUrl = SOURCE_URL;
+  }
 
   // Per-theatre reference bearing for the inbound/outbound flow split.
   const bearingByTheatre = new Map<string, number>(
     AIS_THEATRES.map((t) => [t.theatre, t.inboundBearing]),
   );
 
-  // OPTIONAL precision layer: resolve the precise commercial class (bulk /
-  // container / LNG-LPG) for each cargo/tanker vessel via the external vessel
-  // registry, keyed on its IMO (preferred) or MMSI. No-ops cleanly when the
-  // registry is unconfigured — the breakdown columns then stay NULL. Only
-  // trade-class vessels (AIS type 70-89) are looked up; that is where the
-  // bulk/container/gas split lives, and it bounds the lookup budget to the
-  // vessels that matter.
-  const registryConfig = readVesselRegistryConfig();
+  // OPTIONAL precision layer: the precise commercial class (bulk / container /
+  // LNG-LPG) for each cargo/tanker vessel. On the Datalastic path it is already
+  // resolved INLINE from the area query's `type_specific` (no per-vessel lookups
+  // needed — that is what made the old path look hung); on the aisstream path we
+  // look each trade vessel up by IMO (preferred) or MMSI. Either way an
+  // unresolved vessel is left unclassified and a theatre with no resolutions
+  // keeps the bulk/container/LNG-LPG columns NULL.
   const registryCandidates: VesselLookup[] = [];
-  for (const [mmsi, v] of byMmsi.entries()) {
-    if (v.theatre && isCargoOrTanker(v.type)) {
-      registryCandidates.push({ mmsi, imo: v.imo });
+  let registry: VesselRegistryResult;
+  if (useDatalastic && datalasticClasses) {
+    registry = {
+      classByMmsi: datalasticClasses,
+      configured: registryConfig.configured,
+      enabled: registryConfig.enabled,
+      lookups: datalasticClasses.size,
+      resolved: datalasticClasses.size,
+      // A global collection error (every theatre failed) doubles as the registry
+      // error here; a partial/clean run carries none.
+      errors: error ? [error] : [],
+    };
+  } else {
+    for (const [mmsi, v] of byMmsi.entries()) {
+      if (v.theatre && isCargoOrTanker(v.type)) {
+        registryCandidates.push({ mmsi, imo: v.imo });
+      }
     }
+    registry = await resolveVesselClasses(registryCandidates, {
+      config: registryConfig,
+    });
   }
-  const registry = await resolveVesselClasses(registryCandidates, {
-    config: registryConfig,
-  });
   const classByMmsi = registry.classByMmsi;
 
   // Record the registry's live health (STATE + EVIDENCE only, never the key) so
@@ -801,7 +1057,7 @@ export async function runMaritimeMovementIngest(
   if (error && vesselsSeen === 0) {
     logLines.push(`AIS movement ingest: collection failed — ${error}.`);
     return {
-      provider,
+      provider: activeProvider,
       mode,
       configured: true,
       enabled: true,
@@ -960,17 +1216,19 @@ export async function runMaritimeMovementIngest(
       aisDarkOrGapCount: aisDarkOrGap,
       changeVs7DayBaseline: change,
       confidence: hasTraffic ? confidenceFor(a!.total) : "low",
-      sourceName: SOURCE_NAME,
-      sourceUrl: SOURCE_URL,
+      sourceName: activeSourceName,
+      sourceUrl: activeSourceUrl,
       notes: hasTraffic
         ? "Live AIS sample of vessels currently transiting the theatre. Movement is context, never an incident."
         : "No live AIS traffic observed; prior loitering vessels have gone silent (AIS-dark/gap). Indicator only, never an incident.",
       rawPayload: {
-        provider: "aisstream",
+        provider: activeProvider,
         collectSeconds,
         messagesReceived: messages,
         observedAt: observedAt.toISOString(),
         boundingBox: [t.minLat, t.maxLat, t.minLon, t.maxLon],
+        queryCenter: useDatalastic ? [t.centerLat, t.centerLon] : null,
+        queryRadiusNm: useDatalastic ? t.radiusNm : null,
         inboundBearing: t.inboundBearing,
         directionObserved: a?.directionObserved ?? 0,
         motionObserved: a?.motionObserved ?? 0,
@@ -991,7 +1249,7 @@ export async function runMaritimeMovementIngest(
       errors.push(m);
       logLines.push(`AIS movement ingest: DB insert failed — ${m}.`);
       return {
-        provider,
+        provider: activeProvider,
         mode,
         configured: true,
         enabled: true,
@@ -1097,7 +1355,7 @@ export async function runMaritimeMovementIngest(
   }
 
   return {
-    provider,
+    provider: activeProvider,
     mode,
     configured: true,
     enabled: true,
