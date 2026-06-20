@@ -38,11 +38,15 @@ import FleetIntelligence from "@/components/FleetIntelligence";
 import {
   buildMaritimeIntelligence,
   formatMovementSummary,
+  formatMovementTotals,
+  formatMovementDirection,
+  formatMovementCargo,
   MARITIME_RISK_COLOR,
   type MaritimeRiskLevel,
   type MaritimeIntelligence,
   type ChokepointCard,
   type LatestIncident,
+  type MovementTheatre,
 } from "@/lib/maritimeIntelligence";
 import {
   buildMaritimeSecuritySummary,
@@ -1710,6 +1714,40 @@ function MaritimeMiniRiskChip({ level, label }: { level: MaritimeRiskLevel; labe
   );
 }
 
+// Movement (AIS) context for one chokepoint, broken into labelled Movement /
+// Direction / Cargo mix rows so inbound/outbound and cargo type are explicit
+// rather than buried in one run-on line. Each helper returns null when the
+// provider did not report that dimension, so a missing figure is simply omitted
+// (never a fabricated zero). Movement is CONTEXT only — it never raises risk.
+function MovementBlock({ movement }: { movement: MovementTheatre | null }) {
+  const direction = movement ? formatMovementDirection(movement) : null;
+  const cargo = movement ? formatMovementCargo(movement) : null;
+  return (
+    <div className="text-[11px] font-sans leading-snug">
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Movement</div>
+      {movement ? (
+        <div className="mt-0.5 flex flex-col gap-0.5">
+          <div className="text-foreground/85">{formatMovementTotals(movement)}</div>
+          {direction && (
+            <div>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Direction</span>
+              <span className="text-foreground/85">{direction}</span>
+            </div>
+          )}
+          {cargo && (
+            <div>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Cargo mix</span>
+              <span className="text-foreground/85">{cargo}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <span className="italic text-muted-foreground">Movement data unavailable</span>
+      )}
+    </div>
+  );
+}
+
 // One of the six spec chokepoint cards.
 function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
   const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
@@ -1738,14 +1776,7 @@ function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
         )}
       </div>
 
-      <div className="text-[11px] font-sans leading-snug">
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Movement</span>
-        {movement ? (
-          <span className="text-foreground/85">{formatMovementSummary(movement)}</span>
-        ) : (
-          <span className="italic text-muted-foreground">Movement data unavailable</span>
-        )}
-      </div>
+      <MovementBlock movement={movement} />
 
       <div className="text-[11px] font-sans leading-snug">
         <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Business impact</span>

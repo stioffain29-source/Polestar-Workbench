@@ -63,3 +63,28 @@ legitimately resolves to "other" (a confirmed non-split).
   Node/tsx scripts see `process.env`; the code_execution sandbox does NOT.
 - Prod DB is read-only from the workspace; movement refresh runs INSIDE the deployment runtime
   (boot freshness gate after republish, or token-gated `POST /api/admin/ingest`).
+
+## "No inbound/outbound or cargo" complaints are usually a STALE view, not a missing feature
+
+The Datalastic COLLECTION path DOES populate `inbound_count`/`outbound_count` AND the
+cargo split (`tankers/bulk/container/lng_lpg`) — replit.md's older "inbound/outbound stay NULL"
+wording predates that path and is now stale for a Datalastic-keyed deployment. These columns
+only (re)fill when the live AIS+registry ingest runs on a deployment cold start, so a board
+viewed BEFORE the latest republish's boot ingest shows them blank — same stale-view class as
+every other boot-ingest-fed surface. Confirm the prod row actually has the values before
+treating "the board has no inbound/outbound/cargo" as a code bug.
+- **Why:** the data, mapping, and rendering were all already correct; the user's screenshot
+  pre-dated the boot ingest that filled the columns.
+- **How to apply:** query `maritime_movement` in prod first; if populated, it's a refresh/cache
+  issue (republish + hard refresh), not a missing feature.
+
+## Board card vs report/PDF movement rendering split
+
+The Shipping monitor chokepoint card surfaces movement as labelled MOVEMENT / DIRECTION /
+CARGO MIX rows via the dedicated `formatMovementTotals` / `formatMovementDirection` /
+`formatMovementCargo` helpers (in `maritimeIntelligence.ts`). The Shipping Watch report
+preview AND its PDF still use the compact one-line `formatMovementSummary` (their parity is
+preserved). All four read the SAME `MovementTheatre` data; only presentation differs. Every
+helper returns null / omits a fragment when the provider didn't report it (no fabricated zeros).
+- **How to apply:** add a new movement dimension to the helper(s) for the card, and to
+  `formatMovementSummary` for the report/PDF, or the surfaces drift.

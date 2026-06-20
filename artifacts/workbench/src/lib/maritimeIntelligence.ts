@@ -427,11 +427,13 @@ export function buildMovementSnapshot(
 }
 
 /**
- * One compact movement line for a theatre, shared by the board card, the
- * report preview AND the PDF so the three surfaces can never disagree. Each
- * fragment is omitted when the provider did not report it (null) — a missing
- * count never becomes a fabricated zero, and movement is CONTEXT only (it never
- * asserts an incident).
+ * One compact movement line for a theatre, shared by the Shipping Watch report
+ * preview AND the PDF so those two surfaces can never disagree. (The board card
+ * uses the dedicated formatMovementTotals / formatMovementDirection /
+ * formatMovementCargo helpers below for a labelled, multi-row layout over the
+ * SAME MovementTheatre data.) Each fragment is omitted when the provider did not
+ * report it (null) — a missing count never becomes a fabricated zero, and
+ * movement is CONTEXT only (it never asserts an incident).
  */
 export function formatMovementSummary(t: MovementTheatre): string {
   const parts: string[] = [];
@@ -443,6 +445,45 @@ export function formatMovementSummary(t: MovementTheatre): string {
   if (t.bulkCarriersCount != null) parts.push(`${t.bulkCarriersCount} bulk`);
   if (t.containerCount != null) parts.push(`${t.containerCount} container`);
   if (t.lngLpgCount != null) parts.push(`${t.lngLpgCount} LNG/LPG`);
+  if (t.anchoredOrWaitingCount != null) parts.push(`${t.anchoredOrWaitingCount} anchored`);
+  if (t.aisDarkOrGapCount != null) parts.push(`${t.aisDarkOrGapCount} AIS-dark`);
+  if (t.changeVs7DayBaseline) parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
+  return parts.join(" \u00b7 ");
+}
+
+/**
+ * Inbound / outbound transit split for a theatre, or null when the provider did
+ * not report direction (a missing count is never shown as a fabricated zero).
+ * Used by the board card to surface direction on its own labelled line.
+ */
+export function formatMovementDirection(t: MovementTheatre): string | null {
+  if (t.inboundCount == null || t.outboundCount == null) return null;
+  return `${t.inboundCount} inbound / ${t.outboundCount} outbound`;
+}
+
+/**
+ * Cargo-type mix for a theatre (tankers / bulk / container / LNG-LPG), or null
+ * when none of the classes were resolved. Each fragment is omitted when its
+ * count is null — the registry layer only fills a class from a definitive match.
+ */
+export function formatMovementCargo(t: MovementTheatre): string | null {
+  const parts: string[] = [];
+  if (t.tankersCount != null) parts.push(`${t.tankersCount} tankers`);
+  if (t.bulkCarriersCount != null) parts.push(`${t.bulkCarriersCount} bulk`);
+  if (t.containerCount != null) parts.push(`${t.containerCount} container`);
+  if (t.lngLpgCount != null) parts.push(`${t.lngLpgCount} LNG/LPG`);
+  return parts.length ? parts.join(" \u00b7 ") : null;
+}
+
+/**
+ * Totals / visibility line for a theatre (tracked, AIS-visible, anchored,
+ * AIS-dark, baseline change) — everything that is not direction or cargo mix.
+ * Shown above the Direction and Cargo mix rows on the board card.
+ */
+export function formatMovementTotals(t: MovementTheatre): string {
+  const parts: string[] = [];
+  parts.push(t.totalVessels != null ? `${t.totalVessels} vessels tracked` : "Tracked");
+  if (t.aisVisibleCount != null) parts.push(`${t.aisVisibleCount} AIS-visible`);
   if (t.anchoredOrWaitingCount != null) parts.push(`${t.anchoredOrWaitingCount} anchored`);
   if (t.aisDarkOrGapCount != null) parts.push(`${t.aisDarkOrGapCount} AIS-dark`);
   if (t.changeVs7DayBaseline) parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
