@@ -455,6 +455,34 @@ export interface IncidentSnapshot {
 }
 
 // ---------------------------------------------------------------------------
+// Chokepoint cards
+// ---------------------------------------------------------------------------
+
+// The SIX chokepoints surfaced as cards on the board and in the report, in
+// display order. Gulf of Oman and Arabian / Persian Gulf stay in the detection
+// vocabulary (they enrich Hormuz context) but are not their own cards.
+export const BOARD_CHOKEPOINTS: ChokepointKey[] = [
+  "Strait of Hormuz",
+  "Bab el-Mandeb",
+  "Red Sea",
+  "Gulf of Aden",
+  "Singapore Strait",
+  "Malacca Strait",
+];
+
+export interface ChokepointCard {
+  key: ChokepointKey;
+  risk: MaritimeRisk;
+  /** Confirmed incidents tagged to this chokepoint in the window. */
+  incidentCount: number;
+  lastConfirmed: LatestIncident | null;
+  /** Matched movement-context theatre, or null when no AIS data. */
+  movement: MovementTheatre | null;
+  businessImpact: BusinessImpact[];
+  confidence: Confidence;
+}
+
+// ---------------------------------------------------------------------------
 // Source health
 // ---------------------------------------------------------------------------
 
@@ -478,6 +506,12 @@ export interface MaritimeIntelligence {
   risk: MaritimeRisk;
   movementSnapshot: MovementSnapshot | null;
   incidentSnapshot: IncidentSnapshot;
+  /** The six spec chokepoints, each with its own risk / count / movement. */
+  chokepointCards: ChokepointCard[];
+  /** Number of board chokepoints with ≥1 confirmed incident in the window. */
+  chokepointsAffected: number;
+  /** Every confirmed incident in the window (drives the confirmed table). */
+  confirmedIncidents: LatestIncident[];
   keyRiskIndicators: string[];
   businessImpact: BusinessImpact[];
   watchNext: string[];
@@ -507,6 +541,20 @@ function safeDate(iso: string): Date {
 function stripTrailingPublisher(title: string): string {
   // "Tanker struck in Gulf of Oman - Reuters" -> "Tanker struck in Gulf of Oman"
   return title.replace(/\s+[-–|]\s+[A-Z][^-–|]{1,40}$/u, "").trim() || title.trim();
+}
+
+function toLatestIncident(r: ClassifiedIncident): LatestIncident {
+  return {
+    id: r.id,
+    title: stripTrailingPublisher(r.title),
+    category: r.category,
+    severity: r.severity,
+    occurredAt: r.occurredAt,
+    chokepoint: r.chokepoints[0] ?? null,
+    country: r.incidentCountry,
+    source: r.source ?? null,
+    sourceUrl: r.sourceUrl ?? null,
+  };
 }
 
 function impactSentence(impacts: BusinessImpact[]): string {
@@ -600,19 +648,7 @@ export function buildMaritimeIntelligence(
   ).map((c) => tallyMap.get(c)!);
 
   const latestRow = confirmed[0] ?? null;
-  const latest: LatestIncident | null = latestRow
-    ? {
-        id: latestRow.id,
-        title: stripTrailingPublisher(latestRow.title),
-        category: latestRow.category,
-        severity: latestRow.severity,
-        occurredAt: latestRow.occurredAt,
-        chokepoint: latestRow.chokepoints[0] ?? null,
-        country: latestRow.incidentCountry,
-        source: latestRow.source ?? null,
-        sourceUrl: latestRow.sourceUrl ?? null,
-      }
-    : null;
+  const latest: LatestIncident | null = latestRow ? toLatestIncident(latestRow) : null;
 
   const incidentSnapshot: IncidentSnapshot = {
     total: confirmed.length,
@@ -620,12 +656,49 @@ export function buildMaritimeIntelligence(
     latest,
   };
 
+  // The full confirmed list (already date-sorted, newest first) drives the
+  // confirmed-incidents table on the board and report.
+  const confirmedIncidents: LatestIncident[] = confirmed.map(toLatestIncident);
+
   // 5. Risk + business impact (incident-driven only).
   const risk = computeMaritimeRisk(confirmed);
   const businessImpact = deriveBusinessImpact(confirmed);
 
   // 6. Movement snapshot (context).
   const movementSnapshot = buildMovementSnapshot(movement);
+
+  // 6a. Per-chokepoint cards (the six spec chokepoints). Each card scores risk
+  //     from its OWN confirmed subset and matches a movement theatre by name —
+  //     movement is context only and never adds to the incident count.
+  const matchChokepointMovement = (key: ChokepointKey): MovementTheatre | null => {
+    if (!movementSnapshot) return null;
+    const k = key.toLowerCase();
+    return (
+      movementSnapshot.theatres.find((t) => {
+        const theatre = (t.theatre ?? "").toLowerCase();
+        const cp = (t.chokepoint ?? "").toLowerCase();
+        return (
+          theatre.includes(k) ||
+          k.includes(theatre) ||
+          (cp && (cp.includes(k) || k.includes(cp)))
+        );
+      }) ?? null
+    );
+  };
+  const chokepointCards: ChokepointCard[] = BOARD_CHOKEPOINTS.map((key) => {
+    const subset = confirmed.filter((r) => r.chokepoints.includes(key));
+    const cpRisk = computeMaritimeRisk(subset);
+    return {
+      key,
+      risk: cpRisk,
+      incidentCount: subset.length,
+      lastConfirmed: subset[0] ? toLatestIncident(subset[0]) : null,
+      movement: matchChokepointMovement(key),
+      businessImpact: deriveBusinessImpact(subset),
+      confidence: cpRisk.confidence,
+    };
+  });
+  const chokepointsAffected = chokepointCards.filter((c) => c.incidentCount > 0).length;
 
   // 7. Key risk indicators — terse, no parenthetical counts. Incident-driven
   //    indicators first, then movement CONTEXT indicators (clearly framed as
@@ -738,6 +811,9 @@ export function buildMaritimeIntelligence(
     risk,
     movementSnapshot,
     incidentSnapshot,
+    chokepointCards,
+    chokepointsAffected,
+    confirmedIncidents,
     keyRiskIndicators,
     businessImpact,
     watchNext,

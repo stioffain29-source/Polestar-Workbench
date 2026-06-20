@@ -1333,9 +1333,29 @@ export interface IntegrationStatusItem {
   docsUrl?: string | null;
 }
 
+export type MaritimeSourceState = typeof MaritimeSourceState[keyof typeof MaritimeSourceState];
+
+
+export const MaritimeSourceState = {
+  live: 'live',
+  stale: 'stale',
+  disabled: 'disabled',
+  unavailable: 'unavailable',
+} as const;
+
+export interface MaritimeSourceHealthItem {
+  key: string;
+  label: string;
+  status: MaritimeSourceState;
+  detail: string;
+  /** @nullable */
+  asOf?: string | null;
+}
+
 export interface IntegrationStatusResponse {
   generatedAt: string;
   integrations: IntegrationStatusItem[];
+  maritimeSources: MaritimeSourceHealthItem[];
 }
 
 export type ListMarketPricesParams = {

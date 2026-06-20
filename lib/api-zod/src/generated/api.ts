@@ -993,6 +993,13 @@ export const GetIntegrationStatusResponse = zod.object({
   "value": zod.string()
 })),
   "docsUrl": zod.string().nullish()
+})),
+  "maritimeSources": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['live', 'stale', 'disabled', 'unavailable']),
+  "detail": zod.string(),
+  "asOf": zod.string().nullish()
 }))
 })
 

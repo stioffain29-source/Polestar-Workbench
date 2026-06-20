@@ -2313,11 +2313,32 @@ components:
           items: { $ref: "#/components/schemas/IntegrationStatusMetric" }
         docsUrl: { type: ["string", "null"] }
 
+    MaritimeSourceState:
+      type: string
+      enum:
+        - live
+        - stale
+        - disabled
+        - unavailable
+
+    MaritimeSourceHealthItem:
+      type: object
+      required: [key, label, status, detail]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        status: { $ref: "#/components/schemas/MaritimeSourceState" }
+        detail: { type: string }
+        asOf: { type: ["string", "null"] }
+
     IntegrationStatusResponse:
       type: object
-      required: [generatedAt, integrations]
+      required: [generatedAt, integrations, maritimeSources]
       properties:
         generatedAt: { type: string, format: date-time }
         integrations:
           type: array
           items: { $ref: "#/components/schemas/IntegrationStatusItem" }
+        maritimeSources:
+          type: array
+          items: { $ref: "#/components/schemas/MaritimeSourceHealthItem" }

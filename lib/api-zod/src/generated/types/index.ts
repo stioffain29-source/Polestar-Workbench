@@ -69,6 +69,8 @@ export * from './liveuamapRegion';
 export * from './maritimeMovement';
 export * from './maritimeMovementInput';
 export * from './maritimeMovementInputConfidence';
+export * from './maritimeSourceHealthItem';
+export * from './maritimeSourceState';
 export * from './marketPrice';
 export * from './marketPriceTrajectoryPoint';
 export * from './munition';

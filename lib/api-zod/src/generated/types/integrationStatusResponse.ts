@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { IntegrationStatusItem } from './integrationStatusItem';
+import type { MaritimeSourceHealthItem } from './maritimeSourceHealthItem';
 
 export interface IntegrationStatusResponse {
   generatedAt: Date;
   integrations: IntegrationStatusItem[];
+  maritimeSources: MaritimeSourceHealthItem[];
 }

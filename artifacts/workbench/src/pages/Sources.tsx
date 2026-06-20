@@ -6,6 +6,8 @@ import {
   type Source,
   type IntegrationStatusItem,
   type IntegrationStatusState,
+  type MaritimeSourceHealthItem,
+  type MaritimeSourceState,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -157,6 +159,70 @@ function IntegrationsPanel() {
   );
 }
 
+// Maritime Source Health uses its OWN four-state vocabulary (live / stale /
+// disabled / unavailable) per the Shipping Watch spec. Neutral, non-alarming
+// styling for the off/absent states — every maritime source here is optional
+// and an unconfigured provider is "unavailable", not a failure. The subdued-red
+// brand colour (#A33232) stays reserved for the Extreme risk tier only.
+const MARITIME_BADGE: Record<MaritimeSourceState, string> = {
+  live: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  stale: "bg-amber-100 text-amber-800 border border-amber-200",
+  disabled: "bg-muted text-muted-foreground border border-border",
+  unavailable: "bg-muted text-muted-foreground border border-border",
+};
+const MARITIME_LABEL: Record<MaritimeSourceState, string> = {
+  live: "Live",
+  stale: "Stale",
+  disabled: "Disabled",
+  unavailable: "Unavailable",
+};
+
+function MaritimeSourceRow({ item }: { item: MaritimeSourceHealthItem }) {
+  return (
+    <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-[1.2fr_1.8fr_0.8fr] gap-3 text-sm">
+      <div>
+        <div className="font-serif font-bold text-primary">{item.label}</div>
+        <div className="mt-1">
+          <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", MARITIME_BADGE[item.status])}>
+            {MARITIME_LABEL[item.status]}
+          </span>
+        </div>
+      </div>
+      <div className="text-foreground">{item.detail}</div>
+      <div>
+        <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">As of</div>
+        <div className="font-mono text-xs text-foreground">{item.asOf ?? "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function MaritimeSourceHealthPanel() {
+  const { data, isLoading } = useGetIntegrationStatus();
+  const sources = data?.maritimeSources ?? [];
+  return (
+    <div className="bg-card border border-border rounded-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+        <div className="text-sm font-serif font-bold uppercase tracking-wide text-primary">Maritime Source Health</div>
+        <div className="text-xs text-muted-foreground ml-1">
+          Live / Stale / Disabled / Unavailable per maritime source — AIS &amp; Windward are optional and degrade gracefully
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">Checking maritime sources…</div>
+      ) : sources.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">No maritime source health available.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {sources.map((it) => (
+            <MaritimeSourceRow key={it.key} item={it} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sources() {
   const qc = useQueryClient();
   const [topic, setTopic] = useState("");
@@ -292,6 +358,8 @@ export default function Sources() {
       )}
 
       <IntegrationsPanel />
+
+      <MaritimeSourceHealthPanel />
 
       <div className="bg-card border border-border rounded-sm p-3 flex gap-2">
         <Select value={topic || "all"} onValueChange={(v) => setTopic(v === "all" ? "" : v)}>

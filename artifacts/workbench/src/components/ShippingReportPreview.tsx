@@ -20,6 +20,8 @@ import {
   buildMaritimeIntelligence,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
+  type ChokepointCard,
+  type LatestIncident,
 } from "@/lib/maritimeIntelligence";
 
 // Polestar disclaimer text used at the foot of every report. Kept inline
@@ -471,17 +473,103 @@ function MaritimeSubLabel({ children }: { children: React.ReactNode }) {
 // report in the SAME order as the live Shipping monitor and the SAME order
 // exportShippingReportPdf draws it. Movement (AIS) is CONTEXT only and
 // degrades to "movement data unavailable". #A33232 is reserved for level 5.
+function ChokepointReportCard({ card }: { card: ChokepointCard }) {
+  const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
+  return (
+    <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, padding: 10, breakInside: "avoid" }}>
+      <div className="flex items-start justify-between gap-2" style={{ marginBottom: 4 }}>
+        <span style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 13, lineHeight: 1.15 }}>{key}</span>
+        <span
+          className="uppercase"
+          style={{ background: MARITIME_RISK_COLOR[risk.level], color: "#fff", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", padding: "2px 6px", borderRadius: 2, whiteSpace: "nowrap" }}
+        >
+          L{risk.level} &middot; {risk.label}
+        </span>
+      </div>
+      <div style={{ marginBottom: 4 }}>
+        <span style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 16 }}>{incidentCount}</span>
+        <span className="uppercase" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 9, letterSpacing: "0.1em", marginLeft: 6 }}>confirmed &middot; 7 days</span>
+      </div>
+      <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
+        <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Last incident</span>
+        {lastConfirmed ? `${format(parseISO(lastConfirmed.occurredAt), "d MMM")} — ${lastConfirmed.title}` : "None in window"}
+      </p>
+      <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
+        <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Movement</span>
+        {movement
+          ? `${movement.totalVessels != null ? `${movement.totalVessels} vessels tracked` : "Tracked"}${movement.changeVs7DayBaseline ? ` · ${movement.changeVs7DayBaseline} vs 7-day baseline` : ""}`
+          : "Movement data unavailable"}
+      </p>
+      <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
+        <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Business impact</span>
+        {businessImpact.join(", ")}
+      </p>
+      <p className="text-[10px] uppercase" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", letterSpacing: "0.08em", margin: 0 }}>
+        Confidence: {MARITIME_CONF_LABEL[confidence] ?? confidence}
+      </p>
+    </div>
+  );
+}
+
+function ConfirmedIncidentsReportTable({ rows }: { rows: LatestIncident[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-[13px]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+        No confirmed maritime security incidents in the window.
+      </p>
+    );
+  }
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Roboto, sans-serif" }}>
+      <thead>
+        <tr style={{ background: "#f4f4f8" }}>
+          <th className="uppercase" style={{ textAlign: "left", padding: "6px 8px", fontSize: 9, letterSpacing: "0.08em", color: DUSK, fontWeight: 700, width: 70 }}>Date</th>
+          <th className="uppercase" style={{ textAlign: "left", padding: "6px 8px", fontSize: 9, letterSpacing: "0.08em", color: DUSK, fontWeight: 700, width: 150 }}>Category</th>
+          <th className="uppercase" style={{ textAlign: "left", padding: "6px 8px", fontSize: 9, letterSpacing: "0.08em", color: DUSK, fontWeight: 700, width: 80 }}>Severity</th>
+          <th className="uppercase" style={{ textAlign: "left", padding: "6px 8px", fontSize: 9, letterSpacing: "0.08em", color: DUSK, fontWeight: 700, width: 120 }}>Chokepoint</th>
+          <th className="uppercase" style={{ textAlign: "left", padding: "6px 8px", fontSize: 9, letterSpacing: "0.08em", color: DUSK, fontWeight: 700 }}>Event</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id} style={{ borderTop: `1px solid ${POLAR}`, breakInside: "avoid" }}>
+            <td style={{ padding: "6px 8px", fontSize: 11, color: DUSK, whiteSpace: "nowrap" }}>{format(parseISO(r.occurredAt), "d MMM")}</td>
+            <td style={{ padding: "6px 8px", fontSize: 11, color: NAVY }}>{r.category}</td>
+            <td style={{ padding: "6px 8px", fontSize: 11, color: DUSK }}>{SHIPPING_SEV_LABEL[shippingSevKey(r.severity ?? "")] ?? r.severity}</td>
+            <td style={{ padding: "6px 8px", fontSize: 11, color: DUSK }}>{r.chokepoint ?? "—"}</td>
+            <td style={{ padding: "6px 8px", fontSize: 11, color: NAVY }}>{r.title}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntelligence }) {
-  const { bluf, risk, movementSnapshot, incidentSnapshot, keyRiskIndicators, businessImpact, sourceHealth } = board;
-  const categoryCards: KpiCard[] = incidentSnapshot.byCategory.map((c) => ({
-    label: c.category,
-    value: String(c.count),
-    severity: c.highestSeverityKey,
-  }));
-  const latest = incidentSnapshot.latest;
+  const {
+    bluf,
+    risk,
+    movementSnapshot,
+    incidentSnapshot,
+    chokepointCards,
+    chokepointsAffected,
+    confirmedIncidents,
+    keyRiskIndicators,
+    businessImpact,
+    watchNext,
+  } = board;
+  const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
+  const execCards: KpiCard[] = [
+    { label: "Maritime Risk Level", value: `L${risk.level} · ${risk.label}` },
+    { label: "Confirmed Incidents · 7d", value: String(incidentSnapshot.total) },
+    { label: "Chokepoints Affected", value: `${chokepointsAffected} / ${chokepointCards.length}` },
+    { label: "Business Impact", value: namedImpacts.length > 0 ? String(namedImpacts.length) : "—" },
+  ];
   return (
     <Section title="Maritime Intelligence">
-      <div className="rounded-sm p-4" style={{ background: NAVY }}>
+      <KpiGrid cards={execCards} />
+
+      <div className="rounded-sm p-4" style={{ background: NAVY, marginTop: 12 }}>
         <div
           className="uppercase"
           style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.18em", marginBottom: 6 }}
@@ -493,80 +581,60 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
         </p>
       </div>
 
-      <MaritimeSubLabel>Current Maritime Risk Level</MaritimeSubLabel>
-      <div className="flex items-center gap-3 mb-3">
-        <span
-          className="inline-flex items-center justify-center"
-          style={{ width: 38, height: 38, background: MARITIME_RISK_COLOR[risk.level], color: "#fff", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 18 }}
-        >
-          {risk.level}
-        </span>
-        <div>
-          <div style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>{risk.label}</div>
-          <div className="uppercase" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 10, letterSpacing: "0.1em" }}>
-            Confidence: {MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}
-          </div>
-        </div>
+      <MaritimeSubLabel>Chokepoint Cards</MaritimeSubLabel>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+        {chokepointCards.map((card) => (
+          <ChokepointReportCard key={card.key} card={card} />
+        ))}
       </div>
-      <Paragraphs text={risk.rationale} />
 
-      <MaritimeSubLabel>Movement Snapshot &mdash; Context</MaritimeSubLabel>
+      <MaritimeSubLabel>Confirmed Maritime Incidents</MaritimeSubLabel>
+      <ConfirmedIncidentsReportTable rows={confirmedIncidents} />
+
+      <MaritimeSubLabel>Maritime Context &mdash; Vessel Movement (AIS)</MaritimeSubLabel>
       {movementSnapshot ? (
-        <ul className="space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-          {movementSnapshot.theatres.map((t) => (
-            <li key={t.theatre} className="text-[13px] leading-[1.6]">
-              <span style={{ color: NAVY, fontWeight: 700 }}>{t.theatre}</span>
-              {t.totalVessels != null && <span> &mdash; {t.totalVessels} vessels tracked</span>}
-              {t.changeVs7DayBaseline && <span> &middot; {t.changeVs7DayBaseline} vs 7-day baseline</span>}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+            {movementSnapshot.theatres.map((t) => (
+              <li key={t.theatre} className="text-[13px] leading-[1.6]">
+                <span style={{ color: NAVY, fontWeight: 700 }}>{t.theatre}</span>
+                {t.totalVessels != null && <span> &mdash; {t.totalVessels} vessels tracked</span>}
+                {t.changeVs7DayBaseline && <span> &middot; {t.changeVs7DayBaseline} vs 7-day baseline</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[12px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontStyle: "italic", marginTop: 6 }}>
+            Vessel movement is context only &mdash; it never counts as an incident and never raises the risk level on its own.
+          </p>
+        </>
       ) : (
         <p className="text-[13px] leading-[1.6]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
           Movement data unavailable. Risk is assessed from confirmed incidents alone.
         </p>
       )}
 
-      <MaritimeSubLabel>Incident Snapshot &mdash; Confirmed Incidents by Category</MaritimeSubLabel>
-      <p className="text-[13px] mb-3" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-        Confirmed maritime incidents in window:{" "}
-        <span style={{ color: NAVY, fontWeight: 700 }}>{incidentSnapshot.total}</span>
-      </p>
-      {categoryCards.length > 0 ? (
-        <KpiGrid cards={categoryCards} />
-      ) : (
-        <p className="text-[13px]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-          No confirmed maritime security incidents in the window.
-        </p>
-      )}
-      {latest && (
-        <p className="text-[13px] mt-3" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-          <span className="uppercase" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.1em", marginRight: 6 }}>
-            Latest
-          </span>
-          {format(parseISO(latest.occurredAt), "d MMM yyyy")} &mdash; {latest.title}. {latest.category}
-          {latest.chokepoint ? `, ${latest.chokepoint}` : ""}.
-        </p>
-      )}
-
-      <MaritimeSubLabel>Key Risk Indicators</MaritimeSubLabel>
-      <Bullets text={keyRiskIndicators.map((k) => `- ${k}`).join("\n")} max={8} />
-
-      <MaritimeSubLabel>Business Impact</MaritimeSubLabel>
-      <div className="flex flex-wrap gap-1.5">
-        {businessImpact.map((b) => (
-          <span
-            key={b}
-            className="text-[12px]"
-            style={{ border: `1px solid ${POLAR}`, color: DUSK, fontFamily: "Roboto, sans-serif", padding: "3px 8px", borderRadius: 2 }}
-          >
-            {b}
-          </span>
-        ))}
+      <div className="rounded-sm" style={{ background: NAVY, padding: 16, marginTop: 12 }}>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.18em", marginBottom: 8 }}>
+          Polestar View
+        </div>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Assessment</div>
+        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 13, lineHeight: 1.6, fontWeight: 300, margin: "0 0 6px 0" }}>{risk.rationale}</p>
+        <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px 0" }}>
+          {keyRiskIndicators.map((k, i) => (
+            <li key={i} style={{ color: "#dfe1f0", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6 }}>&middot; {k}</li>
+          ))}
+        </ul>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Business Impact</div>
+        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6, margin: "0 0 8px 0" }}>{businessImpact.join(", ")}</p>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Confidence</div>
+        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6, margin: "0 0 8px 0" }}>{MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}</p>
+        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>Watch Next</div>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {watchNext.map((w, i) => (
+            <li key={i} style={{ color: "#dfe1f0", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6 }}>&middot; {w}</li>
+          ))}
+        </ul>
       </div>
-
-      <MaritimeSubLabel>Source Health</MaritimeSubLabel>
-      <Paragraphs text={sourceHealth.note} />
     </Section>
   );
 }

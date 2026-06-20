@@ -37,6 +37,8 @@ import {
   MARITIME_RISK_COLOR,
   type MaritimeRiskLevel,
   type MaritimeIntelligence,
+  type ChokepointCard,
+  type LatestIncident,
 } from "@/lib/maritimeIntelligence";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
@@ -1590,23 +1592,192 @@ function MaritimeMovementUploadForm({ hasMovement }: { hasMovement: boolean }) {
   );
 }
 
+// Small severity-coloured chip for a chokepoint card's risk level.
+function MaritimeMiniRiskChip({ level, label }: { level: MaritimeRiskLevel; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider"
+      style={{ background: MARITIME_RISK_COLOR[level], color: "#FFFFFF" }}
+    >
+      L{level} · {label}
+    </span>
+  );
+}
+
+// One of the six spec chokepoint cards.
+function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
+  const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
+  return (
+    <div className="bg-white border border-border rounded-sm p-3 flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-serif font-bold text-primary text-sm leading-tight">{key}</span>
+        <MaritimeMiniRiskChip level={risk.level} label={risk.label} />
+      </div>
+
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-lg text-primary leading-none">{incidentCount}</span>
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
+          confirmed · last 7 days
+        </span>
+      </div>
+
+      <div className="text-[11px] font-sans leading-snug">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Last incident</span>
+        {lastConfirmed ? (
+          <span className="text-foreground/85">
+            {format(parseISO(lastConfirmed.occurredAt), "dd MMM")} — {lastConfirmed.title}
+          </span>
+        ) : (
+          <span className="italic text-muted-foreground">None in window</span>
+        )}
+      </div>
+
+      <div className="text-[11px] font-sans leading-snug">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Movement</span>
+        {movement ? (
+          <span className="text-foreground/85">
+            {movement.totalVessels != null ? `${movement.totalVessels} vessels tracked` : "Tracked"}
+            {movement.changeVs7DayBaseline ? ` · ${movement.changeVs7DayBaseline} vs 7-day baseline` : ""}
+          </span>
+        ) : (
+          <span className="italic text-muted-foreground">Movement data unavailable</span>
+        )}
+      </div>
+
+      <div className="text-[11px] font-sans leading-snug">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Business impact</span>
+        <span className="text-foreground/85">{businessImpact.join(", ")}</span>
+      </div>
+
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mt-auto pt-1">
+        Confidence: {MARITIME_CONFIDENCE_LABEL[confidence] ?? confidence}
+      </div>
+    </div>
+  );
+}
+
+// One executive-summary stat card.
+function ExecSummaryCard({
+  label,
+  value,
+  sub,
+  valueColor,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  valueColor?: string;
+}) {
+  return (
+    <div className="bg-white border border-border rounded-sm p-4 flex flex-col gap-1">
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">{label}</div>
+      <div
+        className="font-serif font-bold leading-none text-2xl"
+        style={{ color: valueColor ?? "#0B0B3D" }}
+      >
+        {value}
+      </div>
+      {sub && <div className="text-[11px] font-sans leading-snug text-foreground/75">{sub}</div>}
+    </div>
+  );
+}
+
+// The confirmed-incidents table — confirmed maritime security events only.
+// Movement / AIS context never appears here.
+function ConfirmedIncidentsTable({ rows }: { rows: LatestIncident[] }) {
+  return (
+    <MaritimeBoardCard label="Confirmed Maritime Incidents">
+      {rows.length === 0 ? (
+        <div className="text-[12px] font-sans italic text-muted-foreground">
+          No confirmed maritime security incidents in the window.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-2 font-sans font-medium w-[90px]">Date</th>
+                <th className="text-left p-2 font-sans font-medium w-[170px]">Category</th>
+                <th className="text-left p-2 font-sans font-medium w-[90px]">Severity</th>
+                <th className="text-left p-2 font-sans font-medium w-[150px]">Chokepoint</th>
+                <th className="text-left p-2 font-sans font-medium">Event</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((r) => (
+                <tr key={r.id} className="align-top hover:bg-muted/30">
+                  <td className="p-2 font-mono text-xs whitespace-nowrap">
+                    {format(parseISO(r.occurredAt), "dd MMM")}
+                  </td>
+                  <td className="p-2 text-xs text-foreground/90">{r.category}</td>
+                  <td className="p-2">
+                    <span
+                      className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm"
+                      style={severityBadgeStyle((r.severity ?? "").toLowerCase())}
+                    >
+                      {SEVERITY_LABELS[(r.severity ?? "").toLowerCase()] ?? r.severity}
+                    </span>
+                  </td>
+                  <td className="p-2 text-xs text-muted-foreground">
+                    {r.chokepoint ?? "—"}
+                  </td>
+                  <td className="p-2 text-xs text-foreground/90">{r.title}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </MaritimeBoardCard>
+  );
+}
+
 function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
   const {
     bluf,
     risk,
     movementSnapshot,
     incidentSnapshot,
+    chokepointCards,
+    chokepointsAffected,
+    confirmedIncidents,
     keyRiskIndicators,
     businessImpact,
     watchNext,
-    sourceHealth,
   } = board;
+
+  const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
 
   return (
     <Section title="Maritime Intelligence">
       <p className="text-xs text-muted-foreground font-sans -mt-1">
         Weekly assessment · last 7 days. One shared dataset, identical to the Shipping Watch report.
       </p>
+
+      {/* Executive summary row — 4 cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <ExecSummaryCard
+          label="Maritime Risk Level"
+          value={`L${risk.level} · ${risk.label}`}
+          valueColor={MARITIME_RISK_COLOR[risk.level]}
+          sub={`Confidence: ${MARITIME_CONFIDENCE_LABEL[risk.confidence] ?? risk.confidence}`}
+        />
+        <ExecSummaryCard
+          label="Confirmed Incidents · 7d"
+          value={incidentSnapshot.total}
+          sub="Confirmed maritime security events"
+        />
+        <ExecSummaryCard
+          label="Chokepoints Affected"
+          value={`${chokepointsAffected} / ${chokepointCards.length}`}
+          sub="With ≥1 confirmed incident"
+        />
+        <ExecSummaryCard
+          label="Business Impact"
+          value={namedImpacts.length > 0 ? namedImpacts.length : "—"}
+          sub={namedImpacts.length > 0 ? namedImpacts.slice(0, 2).join(", ") : "No material impact"}
+        />
+      </div>
 
       {/* BLUF */}
       <div className="rounded-sm p-4" style={{ background: "#0B0B3D" }}>
@@ -1621,173 +1792,110 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
         </p>
       </div>
 
-      {/* Risk · Movement · Source health */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <MaritimeBoardCard label="Current Maritime Risk Level">
-          <div className="flex items-center gap-3">
-            <div
-              className="font-serif font-bold leading-none text-3xl"
-              style={{ color: MARITIME_RISK_COLOR[risk.level] }}
-            >
-              {risk.level}
-            </div>
-            <div>
-              <div className="font-serif font-bold text-primary text-lg leading-tight">
-                {risk.label}
-              </div>
-              <div className="text-[10px] uppercase tracking-widest font-sans text-muted-foreground">
-                Confidence: {MARITIME_CONFIDENCE_LABEL[risk.confidence] ?? risk.confidence}
-              </div>
-            </div>
-          </div>
-          <p className="text-[12px] text-foreground/80 font-sans leading-snug mt-2">
-            {risk.rationale}
-          </p>
-        </MaritimeBoardCard>
-
-        <MaritimeBoardCard label="Movement Snapshot (Context)">
-          {movementSnapshot ? (
-            <div className="space-y-2">
-              <div className="text-[11px] text-muted-foreground font-sans">
-                As of {format(parseISO(movementSnapshot.asOf ?? new Date().toISOString()), "dd MMM yyyy")} ·{" "}
-                {movementSnapshot.sourceName ?? "Licensed provider"} · Confidence{" "}
-                {MARITIME_CONFIDENCE_LABEL[movementSnapshot.confidence ?? "low"] ?? movementSnapshot.confidence}
-              </div>
-              <ul className="space-y-1.5">
-                {movementSnapshot.theatres.map((t) => (
-                  <li key={t.theatre} className="text-[12px] font-sans leading-snug">
-                    <span className="font-serif font-bold text-primary">{t.theatre}</span>
-                    {t.totalVessels != null && (
-                      <span className="text-foreground/80"> — {t.totalVessels} vessels tracked</span>
-                    )}
-                    {t.changeVs7DayBaseline && (
-                      <span className="text-muted-foreground"> · {t.changeVs7DayBaseline} vs 7-day baseline</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div className="text-[12px] font-sans italic text-muted-foreground">
-              Movement data unavailable. Upload a licensed-provider snapshot to populate this card. Risk is assessed from incidents alone.
-            </div>
-          )}
-        </MaritimeBoardCard>
-
-        <MaritimeBoardCard label="Source Health">
-          <ul className="space-y-1.5 text-[12px] font-sans">
-            <li className="flex items-center gap-2">
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ background: sourceHealth.incidentsAvailable ? "#4655FF" : "#B8C2CC" }}
-              />
-              <span className="text-foreground/80">
-                Incident feed: {sourceHealth.incidentsAvailable ? "available" : "no records"}
-              </span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ background: sourceHealth.movementAvailable ? "#4655FF" : "#B8C2CC" }}
-              />
-              <span className="text-foreground/80">
-                Movement context: {sourceHealth.movementAvailable ? "available" : "unavailable"}
-              </span>
-            </li>
-          </ul>
-          <p className="text-[11px] text-muted-foreground font-sans leading-snug mt-2">
-            {sourceHealth.note}
-          </p>
-        </MaritimeBoardCard>
+      {/* Six chokepoint cards */}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
+          Chokepoint Cards
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {chokepointCards.map((card) => (
+            <ChokepointBoardCard key={card.key} card={card} />
+          ))}
+        </div>
       </div>
 
-      {/* Incident snapshot */}
-      <MaritimeBoardCard label="Incident Snapshot — Confirmed Incidents by Category">
-        <div className="flex items-baseline gap-2 mb-3">
-          <span className="font-serif font-bold text-primary text-2xl leading-none">
-            {incidentSnapshot.total}
-          </span>
-          <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-sans">
-            confirmed maritime incidents in window
-          </span>
-        </div>
-        {incidentSnapshot.byCategory.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {incidentSnapshot.byCategory.map((c) => (
-              <div
-                key={c.category}
-                className="flex items-center justify-between gap-2 border border-border rounded-sm px-2.5 py-1.5"
-              >
-                <span className="text-[12px] font-sans text-foreground/90 leading-snug">{c.category}</span>
-                <span className="flex items-center gap-2 shrink-0">
-                  <span
-                    className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm"
-                    style={severityBadgeStyle(c.highestSeverityKey)}
-                  >
-                    {SEVERITY_LABELS[c.highestSeverityKey] ?? c.highestSeverityKey}
-                  </span>
-                  <span className="font-mono text-sm text-primary">{c.count}</span>
-                </span>
-              </div>
-            ))}
+      {/* Confirmed incidents table */}
+      <ConfirmedIncidentsTable rows={confirmedIncidents} />
+
+      {/* Maritime context panel — movement / AIS only */}
+      <MaritimeBoardCard label="Maritime Context — Vessel Movement (AIS)">
+        {movementSnapshot ? (
+          <div className="space-y-2">
+            <div className="text-[11px] text-muted-foreground font-sans">
+              As of {format(parseISO(movementSnapshot.asOf ?? new Date().toISOString()), "dd MMM yyyy")} ·{" "}
+              {movementSnapshot.sourceName ?? "Licensed provider"} · Confidence{" "}
+              {MARITIME_CONFIDENCE_LABEL[movementSnapshot.confidence ?? "low"] ?? movementSnapshot.confidence}
+            </div>
+            <ul className="space-y-1.5">
+              {movementSnapshot.theatres.map((t) => (
+                <li key={t.theatre} className="text-[12px] font-sans leading-snug">
+                  <span className="font-serif font-bold text-primary">{t.theatre}</span>
+                  {t.totalVessels != null && (
+                    <span className="text-foreground/80"> — {t.totalVessels} vessels tracked</span>
+                  )}
+                  {t.changeVs7DayBaseline && (
+                    <span className="text-muted-foreground"> · {t.changeVs7DayBaseline} vs 7-day baseline</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-muted-foreground font-sans leading-snug">
+              Vessel movement is CONTEXT only — it never counts as an incident and never raises the risk level on its own.
+            </p>
           </div>
         ) : (
           <div className="text-[12px] font-sans italic text-muted-foreground">
-            No confirmed maritime security incidents in the window.
-          </div>
-        )}
-        {incidentSnapshot.latest && (
-          <div className="mt-3 pt-3 border-t border-border text-[12px] font-sans">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-2">Latest</span>
-            <span className="font-mono text-muted-foreground mr-2">
-              {format(parseISO(incidentSnapshot.latest.occurredAt), "dd MMM")}
-            </span>
-            <span className="text-foreground/90">{incidentSnapshot.latest.title}</span>
-            <span className="text-muted-foreground">
-              {" "}— {incidentSnapshot.latest.category}
-              {incidentSnapshot.latest.chokepoint ? ` · ${incidentSnapshot.latest.chokepoint}` : ""}
-            </span>
+            Movement data unavailable. Upload a licensed-provider snapshot to populate this panel. Risk is assessed from confirmed incidents alone.
           </div>
         )}
       </MaritimeBoardCard>
 
-      {/* Indicators · Business impact · Watch next */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <MaritimeBoardCard label="Key Risk Indicators">
-          <ul className="space-y-1.5">
-            {keyRiskIndicators.map((k, i) => (
-              <li key={i} className="text-[12px] font-sans leading-snug text-foreground/85 flex gap-2">
-                <span style={{ color: "#4655FF" }}>•</span>
-                <span>{k}</span>
-              </li>
-            ))}
-          </ul>
-        </MaritimeBoardCard>
-
-        <MaritimeBoardCard label="Business Impact">
-          <div className="flex flex-wrap gap-1.5">
-            {businessImpact.map((b) => (
-              <span
-                key={b}
-                className="px-2 py-0.5 text-[11px] font-sans rounded-sm border"
-                style={{ borderColor: "#E2E2E2", color: "#303030" }}
-              >
-                {b}
-              </span>
-            ))}
+      {/* Polestar View */}
+      <div className="rounded-sm border border-border" style={{ background: "#0B0B3D" }}>
+        <div className="px-4 pt-3 text-[10px] uppercase tracking-widest font-sans" style={{ color: "#9aa0c8" }}>
+          Polestar View
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px p-4 pt-2">
+          <div className="pr-4">
+            <div className="text-[10px] uppercase tracking-widest font-sans mb-1" style={{ color: "#9aa0c8" }}>
+              Assessment
+            </div>
+            <p className="text-[13px] font-sans leading-snug" style={{ color: "#FFFFFF" }}>
+              {risk.rationale}
+            </p>
+            <ul className="space-y-1 mt-2">
+              {keyRiskIndicators.map((k, i) => (
+                <li key={i} className="text-[12px] font-sans leading-snug flex gap-2" style={{ color: "#dfe1f0" }}>
+                  <span style={{ color: "#4655FF" }}>•</span>
+                  <span>{k}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </MaritimeBoardCard>
-
-        <MaritimeBoardCard label="Watch Next">
-          <ul className="space-y-1.5">
-            {watchNext.map((w, i) => (
-              <li key={i} className="text-[12px] font-sans leading-snug text-foreground/85 flex gap-2">
-                <span style={{ color: "#4655FF" }}>•</span>
-                <span>{w}</span>
-              </li>
-            ))}
-          </ul>
-        </MaritimeBoardCard>
+          <div className="md:pl-4 md:border-l" style={{ borderColor: "#2a2a5c" }}>
+            <div className="text-[10px] uppercase tracking-widest font-sans mb-1" style={{ color: "#9aa0c8" }}>
+              Business impact
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {businessImpact.map((b) => (
+                <span
+                  key={b}
+                  className="px-2 py-0.5 text-[11px] font-sans rounded-sm"
+                  style={{ background: "#16164a", color: "#dfe1f0" }}
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
+            <div className="text-[10px] uppercase tracking-widest font-sans mb-1" style={{ color: "#9aa0c8" }}>
+              Confidence
+            </div>
+            <p className="text-[12px] font-sans mb-3" style={{ color: "#FFFFFF" }}>
+              {MARITIME_CONFIDENCE_LABEL[risk.confidence] ?? risk.confidence}
+            </p>
+            <div className="text-[10px] uppercase tracking-widest font-sans mb-1" style={{ color: "#9aa0c8" }}>
+              Watch next
+            </div>
+            <ul className="space-y-1">
+              {watchNext.map((w, i) => (
+                <li key={i} className="text-[12px] font-sans leading-snug flex gap-2" style={{ color: "#dfe1f0" }}>
+                  <span style={{ color: "#4655FF" }}>•</span>
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </Section>
   );

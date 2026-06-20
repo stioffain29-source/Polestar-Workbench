@@ -20,6 +20,7 @@ import type {
 } from "@workspace/api-zod";
 import { isLlmAvailable } from "./countryProse";
 import { getLiveuamapStatus } from "./liveuamap";
+import { getMaritimeSourceHealth } from "./maritimeSources";
 import { logger } from "./logger";
 
 // ===========================================================================
@@ -397,12 +398,15 @@ async function openaiStatus(): Promise<IntegrationStatusItem> {
  * Liveuamap probe reuses its cost-bounded cache so this adds no upstream spend.
  */
 export async function getIntegrationStatuses(): Promise<IntegrationStatusResponse> {
-  const integrations = await Promise.all([
-    gdeltStatus(),
-    reliefwebStatus(),
-    reliefwebReportsStatus(),
-    liveuamapStatus(),
-    openaiStatus(),
+  const [integrations, maritimeSources] = await Promise.all([
+    Promise.all([
+      gdeltStatus(),
+      reliefwebStatus(),
+      reliefwebReportsStatus(),
+      liveuamapStatus(),
+      openaiStatus(),
+    ]),
+    getMaritimeSourceHealth(),
   ]);
-  return { generatedAt: new Date(), integrations };
+  return { generatedAt: new Date(), integrations, maritimeSources };
 }

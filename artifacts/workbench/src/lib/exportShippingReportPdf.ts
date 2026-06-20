@@ -632,35 +632,106 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
     risk,
     movementSnapshot,
     incidentSnapshot,
+    chokepointCards,
+    chokepointsAffected,
+    confirmedIncidents,
     keyRiskIndicators,
     businessImpact,
-    sourceHealth,
+    watchNext,
   } = board;
 
   drawSectionHeading(ctx, "Maritime Intelligence");
+
+  // Executive summary — four KPI cards (Risk Level, Confirmed Incidents 7d,
+  // Chokepoints Affected, Business Impact). Same four the board shows.
+  const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
+  const execCards: KpiCardData[] = [
+    { label: "Maritime Risk Level", value: `${risk.level} \u2014 ${risk.label}` },
+    { label: "Confirmed Incidents 7d", value: String(incidentSnapshot.total) },
+    { label: "Chokepoints Affected", value: `${chokepointsAffected} / ${chokepointCards.length}` },
+    {
+      label: "Business Impact",
+      value: namedImpacts.length > 0 ? String(namedImpacts.length) : "\u2014",
+    },
+  ];
+  drawFastFactsKpiCards(ctx, execCards);
+
   drawBlufBox(ctx, bluf);
 
-  // Current maritime risk level — number + label coloured by tier (#A33232
-  // reserved for level 5), with the confidence beneath it.
-  drawSubtitle(ctx, "Current Maritime Risk Level");
-  ensureSpace(ctx, 30);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(12);
-  setText(pdf, MARITIME_RISK_COLOR[risk.level]);
-  pdf.text(sanitize(`${risk.level} \u2014 ${risk.label}`), MX, ctx.y + 11);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(9);
-  setText(pdf, DUSK);
-  pdf.text(
-    sanitize(`Confidence: ${MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}`),
-    MX,
-    ctx.y + 25,
-  );
-  ctx.y += 32;
-  renderProse(ctx, risk.rationale);
+  // Six chokepoint cards — rendered as compact stacked blocks (one per
+  // chokepoint) so the PDF carries the SAME six chokepoints, in the same order,
+  // as the on-screen board.
+  drawSubtitle(ctx, "Chokepoint Cards");
+  for (const card of chokepointCards) {
+    ensureSpace(ctx, 20);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(10);
+    setText(pdf, MARITIME_RISK_COLOR[card.risk.level]);
+    pdf.text(
+      sanitize(`${card.key} \u2014 L${card.risk.level} ${card.risk.label}`),
+      MX,
+      ctx.y + 9,
+    );
+    ctx.y += 13;
+    const lines: string[] = [];
+    lines.push(`Confirmed (7d): ${card.incidentCount}`);
+    if (card.lastConfirmed) {
+      let when = card.lastConfirmed.occurredAt;
+      try {
+        when = format(parseISO(card.lastConfirmed.occurredAt), "d MMM");
+      } catch {
+        /* keep raw */
+      }
+      lines.push(`Last incident: ${when} \u2014 ${card.lastConfirmed.title}`);
+    } else {
+      lines.push("Last incident: None in window");
+    }
+    if (card.movement) {
+      const mv: string[] = [];
+      if (card.movement.totalVessels != null) {
+        mv.push(`${card.movement.totalVessels} vessels tracked`);
+      } else {
+        mv.push("Tracked");
+      }
+      if (card.movement.changeVs7DayBaseline) {
+        mv.push(`${card.movement.changeVs7DayBaseline} vs 7-day baseline`);
+      }
+      lines.push(`Movement: ${mv.join(" \u00b7 ")}`);
+    } else {
+      lines.push("Movement: Movement data unavailable");
+    }
+    lines.push(`Business impact: ${card.businessImpact.join(", ")}`);
+    lines.push(
+      `Confidence: ${MARITIME_CONF_LABEL[card.confidence] ?? card.confidence}`,
+    );
+    drawMiniBullets(ctx, lines, lines.length);
+  }
 
-  // Movement snapshot — CONTEXT only. Degrades to "movement data unavailable".
-  drawSubtitle(ctx, "Movement Snapshot \u2014 Context");
+  // Confirmed maritime incidents — allowed categories only; movement/AIS never
+  // appears here.
+  drawSubtitle(ctx, "Confirmed Maritime Incidents");
+  if (confirmedIncidents.length > 0) {
+    const rows = confirmedIncidents.map((r) => {
+      let when = r.occurredAt;
+      try {
+        when = format(parseISO(r.occurredAt), "d MMM");
+      } catch {
+        /* keep raw */
+      }
+      const sev = SEV_LABEL[sevKey(r.severity ?? "")] ?? r.severity ?? "";
+      const cp = r.chokepoint ? ` \u00b7 ${r.chokepoint}` : "";
+      return `${when} \u2014 ${r.category} \u00b7 ${sev}${cp}: ${r.title}`;
+    });
+    drawMiniBullets(ctx, rows, rows.length);
+  } else {
+    renderProse(
+      ctx,
+      "No confirmed maritime security incidents in the window.",
+    );
+  }
+
+  // Maritime context — vessel movement (AIS). CONTEXT only.
+  drawSubtitle(ctx, "Maritime Context \u2014 Vessel Movement (AIS)");
   if (movementSnapshot) {
     const items = movementSnapshot.theatres.map((t) => {
       const parts = [t.theatre];
@@ -671,6 +742,10 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
       return parts.join(" \u2014 ");
     });
     drawMiniBullets(ctx, items);
+    renderProse(
+      ctx,
+      "Vessel movement is context only \u2014 it never counts as an incident and never raises the risk level on its own.",
+    );
   } else {
     renderProse(
       ctx,
@@ -678,51 +753,17 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
     );
   }
 
-  // Incident snapshot — confirmed incidents by category.
-  drawSubtitle(ctx, "Incident Snapshot \u2014 Confirmed Incidents by Category");
+  // Polestar View — Assessment / Business impact / Confidence / Watch next.
+  drawSubtitle(ctx, "Polestar View");
+  renderProse(ctx, risk.rationale);
+  drawMiniBullets(ctx, keyRiskIndicators);
+  renderProse(ctx, `Business impact: ${businessImpact.join("; ")}.`);
   renderProse(
     ctx,
-    `Confirmed maritime incidents in window: ${incidentSnapshot.total}.`,
+    `Confidence: ${MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}.`,
   );
-  const cards: KpiCardData[] = incidentSnapshot.byCategory.map((c) => ({
-    label: c.category,
-    value: String(c.count),
-    severity: c.highestSeverityKey,
-  }));
-  if (cards.length > 0) {
-    drawFastFactsKpiCards(ctx, cards);
-  } else {
-    renderProse(
-      ctx,
-      "No confirmed maritime security incidents in the window.",
-    );
-  }
-  const latest = incidentSnapshot.latest;
-  if (latest) {
-    let when = latest.occurredAt;
-    try {
-      when = format(parseISO(latest.occurredAt), "d MMM yyyy");
-    } catch {
-      /* keep raw */
-    }
-    const tail = latest.chokepoint ? `, ${latest.chokepoint}` : "";
-    renderProse(
-      ctx,
-      `Latest: ${when} \u2014 ${latest.title}. ${latest.category}${tail}.`,
-    );
-  }
-
-  // Key risk indicators.
-  drawSubtitle(ctx, "Key Risk Indicators");
-  drawMiniBullets(ctx, keyRiskIndicators);
-
-  // Business impact.
-  drawSubtitle(ctx, "Business Impact");
-  renderProse(ctx, `${businessImpact.join("; ")}.`);
-
-  // Source health.
-  drawSubtitle(ctx, "Source Health");
-  renderProse(ctx, sourceHealth.note);
+  renderProse(ctx, "Watch next:");
+  drawMiniBullets(ctx, watchNext);
 }
 
 // Exporter ------------------------------------------------------------------
