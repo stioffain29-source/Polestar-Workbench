@@ -3,6 +3,9 @@ import {
   maritimeMovementTable,
   sourcesTable,
   incidentsTable,
+  countryReportProseTable,
+  incidentCorroborationsTable,
+  reliefwebReportsTable,
 } from "@workspace/db";
 
 // The integration-status probes derive a public STATE + EVIDENCE for each
@@ -35,6 +38,7 @@ jest.mock("../../artifacts/api-server/src/lib/countryProse", () => ({
 
 import { getIntegrationStatuses } from "../../artifacts/api-server/src/lib/integrationStatus";
 import { isLlmAvailable } from "../../artifacts/api-server/src/lib/countryProse";
+import { getLiveuamapStatus } from "../../artifacts/api-server/src/lib/liveuamap";
 import type {
   IntegrationStatusItem,
   IntegrationStatusResponse,
@@ -167,6 +171,152 @@ describe("gdelt integration status (shared shape lock)", () => {
         envVars: expect.arrayContaining(["GDELT_CLOUD_API_KEY"]),
         metrics: expect.any(Array),
       }),
+    );
+  });
+});
+
+describe("liveuamap integration status", () => {
+  function stubLiveuamap(state: string, extra: Record<string, unknown> = {}) {
+    (getLiveuamapStatus as jest.Mock).mockResolvedValue({
+      state,
+      configured: state !== "not_configured",
+      events: 0,
+      fetchedAt: null,
+      freerequests: null,
+      ...extra,
+    });
+  }
+
+  it("surfaces working when the upstream proxy returns cached events", async () => {
+    stubLiveuamap("working", {
+      events: 12,
+      fetchedAt: new Date("2026-06-15T00:00:00Z"),
+      freerequests: 88,
+    });
+    const item = find(await statuses(), "liveuamap");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(true);
+    expect(item.summary).toContain("12");
+    expect(item.metrics).toEqual(
+      expect.arrayContaining([{ label: "Cached events", value: "12" }]),
+    );
+  });
+
+  it("surfaces not_configured when the proxy reports no API key", async () => {
+    stubLiveuamap("not_configured");
+    const item = find(await statuses(), "liveuamap");
+    expect(item.status).toBe("not_configured");
+    expect(item.configured).toBe(false);
+    expect(item.summary).toContain("incident map is unaffected");
+  });
+
+  it("surfaces failing_upstream when the proxy reports the upstream unreachable", async () => {
+    stubLiveuamap("failing_upstream");
+    const item = find(await statuses(), "liveuamap");
+    expect(item.status).toBe("failing_upstream");
+    expect(item.summary).toContain("unreachable");
+  });
+
+  it("surfaces no_data when the proxy is reachable but returns nothing", async () => {
+    stubLiveuamap("no_data");
+    const item = find(await statuses(), "liveuamap");
+    expect(item.status).toBe("no_data");
+    expect(item.summary).toContain("no events");
+  });
+
+  it("degrades to unknown when the proxy probe throws", async () => {
+    (getLiveuamapStatus as jest.Mock).mockRejectedValue(new Error("boom"));
+    const item = find(await statuses(), "liveuamap");
+    expect(item.status).toBe("unknown");
+  });
+});
+
+describe("openai integration status", () => {
+  it("reports not_configured when the AI integration is unavailable", async () => {
+    (isLlmAvailable as jest.Mock).mockReturnValue(false);
+    const item = find(await statuses(), "openai");
+    expect(item.status).toBe("not_configured");
+    expect(item.configured).toBe(false);
+    expect(item.summary).toContain("deterministic template");
+  });
+
+  it("reports working with translated-headline and cached-narrative metrics", async () => {
+    (isLlmAvailable as jest.Mock).mockReturnValue(true);
+    const byTable = new Map<unknown, Rows>([
+      [incidentsTable, [{ n: 7 }]],
+      [countryReportProseTable, [{ n: 4 }]],
+    ]);
+    const item = find(await statuses(byTable), "openai");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(true);
+    expect(item.metrics).toEqual(
+      expect.arrayContaining([
+        { label: "Translated headlines", value: "7" },
+        { label: "AI narratives cached", value: "4" },
+      ]),
+    );
+  });
+});
+
+describe("reliefweb integration status (corroboration)", () => {
+  it("reports not_configured when the appname is unset", async () => {
+    delete process.env.RELIEFWEB_APPNAME;
+    const item = find(await statuses(), "reliefweb");
+    expect(item.status).toBe("not_configured");
+    expect(item.configured).toBe(false);
+  });
+
+  it("reports working when corroborations have matched", async () => {
+    process.env.RELIEFWEB_APPNAME = "approved-name";
+    const byTable = new Map<unknown, Rows>([
+      [incidentCorroborationsTable, [{ n: 6, latest: new Date("2026-06-12T00:00:00Z") }]],
+    ]);
+    const item = find(await statuses(byTable), "reliefweb");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(true);
+    expect(item.summary).toContain("6");
+  });
+
+  it("reports no_data when configured but nothing has matched yet", async () => {
+    process.env.RELIEFWEB_APPNAME = "approved-name";
+    const byTable = new Map<unknown, Rows>([
+      [incidentCorroborationsTable, [{ n: 0, latest: null }]],
+    ]);
+    const item = find(await statuses(byTable), "reliefweb");
+    expect(item.status).toBe("no_data");
+  });
+});
+
+describe("reliefweb_reports integration status (situational context)", () => {
+  it("reports not_configured when the appname is unset", async () => {
+    delete process.env.RELIEFWEB_APPNAME;
+    const item = find(await statuses(), "reliefweb_reports");
+    expect(item.status).toBe("not_configured");
+    expect(item.configured).toBe(false);
+  });
+
+  it("reports pending (non-alarming amber) when configured but no reports stored yet", async () => {
+    process.env.RELIEFWEB_APPNAME = "approved-name";
+    const byTable = new Map<unknown, Rows>([
+      [reliefwebReportsTable, [{ n: 0, latest: null, countries: 0 }]],
+    ]);
+    const item = find(await statuses(byTable), "reliefweb_reports");
+    expect(item.status).toBe("pending");
+    expect(item.metrics).toEqual(
+      expect.arrayContaining([{ label: "Live data", value: "pending" }]),
+    );
+  });
+
+  it("reports working when situational reports are stored", async () => {
+    process.env.RELIEFWEB_APPNAME = "approved-name";
+    const byTable = new Map<unknown, Rows>([
+      [reliefwebReportsTable, [{ n: 9, latest: new Date("2026-06-14T00:00:00Z"), countries: 3 }]],
+    ]);
+    const item = find(await statuses(byTable), "reliefweb_reports");
+    expect(item.status).toBe("working");
+    expect(item.summary).toContain("9");
+    expect(item.metrics).toEqual(
+      expect.arrayContaining([{ label: "Live data", value: "yes" }]),
     );
   });
 });
