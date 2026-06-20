@@ -265,6 +265,125 @@ export const ListMarketPricesResponse = zod.array(ListMarketPricesResponseItem)
 
 
 /**
+ * @summary Maritime vessel-MOVEMENT context snapshots (AIS-derived traffic). Context only — never incidents. An empty list means movement data is unavailable.
+ */
+export const listMaritimeMovementQueryLimitMax = 200;
+
+
+
+export const ListMaritimeMovementQueryParams = zod.object({
+  "theatre": zod.coerce.string().optional().describe('Limit to one theatre (exact match), e.g. \"Strait of Hormuz\"'),
+  "limit": zod.coerce.number().min(1).max(listMaritimeMovementQueryLimitMax).optional().describe('Max number of most-recent snapshots to return (1-200)')
+})
+
+export const ListMaritimeMovementResponseItem = zod.object({
+  "id": zod.number(),
+  "theatre": zod.string(),
+  "chokepoint": zod.string().nullish(),
+  "dataAsOf": zod.coerce.date(),
+  "totalVessels": zod.number().nullish(),
+  "inboundCount": zod.number().nullish(),
+  "outboundCount": zod.number().nullish(),
+  "tankersCount": zod.number().nullish(),
+  "bulkCarriersCount": zod.number().nullish(),
+  "containerCount": zod.number().nullish(),
+  "lngLpgCount": zod.number().nullish(),
+  "anchoredOrWaitingCount": zod.number().nullish(),
+  "aisVisibleCount": zod.number().nullish(),
+  "aisDarkOrGapCount": zod.number().nullish(),
+  "changeVs7DayBaseline": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "confidence": zod.string(),
+  "sourceName": zod.string(),
+  "sourceUrl": zod.string().nullish(),
+  "rawPayload": zod.unknown().optional(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('A maritime vessel-MOVEMENT context snapshot (AIS-derived traffic) for a theatre. CONTEXT only — it is never an incident and never inflates any incident count. AIS dark \/ gap activity is an indicator, not hostile intent. Count fields are null when \"not reported\" (never assumed zero).')
+export const ListMaritimeMovementResponse = zod.array(ListMaritimeMovementResponseItem)
+
+
+/**
+ * @summary Manual upload of one movement snapshot from a licensed provider (admin-token-gated; there is no AIS API). Movement is context, never an incident.
+ */
+
+export const createMaritimeMovementBodyTotalVesselsMin = 0;
+
+export const createMaritimeMovementBodyInboundCountMin = 0;
+
+export const createMaritimeMovementBodyOutboundCountMin = 0;
+
+export const createMaritimeMovementBodyTankersCountMin = 0;
+
+export const createMaritimeMovementBodyBulkCarriersCountMin = 0;
+
+export const createMaritimeMovementBodyContainerCountMin = 0;
+
+export const createMaritimeMovementBodyLngLpgCountMin = 0;
+
+export const createMaritimeMovementBodyAnchoredOrWaitingCountMin = 0;
+
+export const createMaritimeMovementBodyAisVisibleCountMin = 0;
+
+export const createMaritimeMovementBodyAisDarkOrGapCountMin = 0;
+
+export const createMaritimeMovementBodyConfidenceDefault = `medium`;
+
+
+export const CreateMaritimeMovementBody = zod.object({
+  "theatre": zod.string().min(1),
+  "chokepoint": zod.string().nullish(),
+  "dataAsOf": zod.coerce.date(),
+  "totalVessels": zod.number().min(createMaritimeMovementBodyTotalVesselsMin).nullish(),
+  "inboundCount": zod.number().min(createMaritimeMovementBodyInboundCountMin).nullish(),
+  "outboundCount": zod.number().min(createMaritimeMovementBodyOutboundCountMin).nullish(),
+  "tankersCount": zod.number().min(createMaritimeMovementBodyTankersCountMin).nullish(),
+  "bulkCarriersCount": zod.number().min(createMaritimeMovementBodyBulkCarriersCountMin).nullish(),
+  "containerCount": zod.number().min(createMaritimeMovementBodyContainerCountMin).nullish(),
+  "lngLpgCount": zod.number().min(createMaritimeMovementBodyLngLpgCountMin).nullish(),
+  "anchoredOrWaitingCount": zod.number().min(createMaritimeMovementBodyAnchoredOrWaitingCountMin).nullish(),
+  "aisVisibleCount": zod.number().min(createMaritimeMovementBodyAisVisibleCountMin).nullish(),
+  "aisDarkOrGapCount": zod.number().min(createMaritimeMovementBodyAisDarkOrGapCountMin).nullish(),
+  "changeVs7DayBaseline": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "confidence": zod.enum(['low', 'medium', 'high']).default(createMaritimeMovementBodyConfidenceDefault),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().nullish(),
+  "rawPayload": zod.unknown().optional()
+}).describe('Manual upload payload for one movement snapshot from a licensed provider. All count fields are optional; omit a count to record it as \"not reported\" rather than zero.')
+
+
+/**
+ * @summary The latest movement snapshot per theatre (one row per theatre).
+ */
+export const ListLatestMaritimeMovementResponseItem = zod.object({
+  "id": zod.number(),
+  "theatre": zod.string(),
+  "chokepoint": zod.string().nullish(),
+  "dataAsOf": zod.coerce.date(),
+  "totalVessels": zod.number().nullish(),
+  "inboundCount": zod.number().nullish(),
+  "outboundCount": zod.number().nullish(),
+  "tankersCount": zod.number().nullish(),
+  "bulkCarriersCount": zod.number().nullish(),
+  "containerCount": zod.number().nullish(),
+  "lngLpgCount": zod.number().nullish(),
+  "anchoredOrWaitingCount": zod.number().nullish(),
+  "aisVisibleCount": zod.number().nullish(),
+  "aisDarkOrGapCount": zod.number().nullish(),
+  "changeVs7DayBaseline": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "confidence": zod.string(),
+  "sourceName": zod.string(),
+  "sourceUrl": zod.string().nullish(),
+  "rawPayload": zod.unknown().optional(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('A maritime vessel-MOVEMENT context snapshot (AIS-derived traffic) for a theatre. CONTEXT only — it is never an incident and never inflates any incident count. AIS dark \/ gap activity is an indicator, not hostile intent. Count fields are null when \"not reported\" (never assumed zero).')
+export const ListLatestMaritimeMovementResponse = zod.array(ListLatestMaritimeMovementResponseItem)
+
+
+/**
  * @summary Live conflict-event points from Liveuamap for a region (cached server-side proxy)
  */
 export const listLiveuamapEventsQueryCountMax = 100;

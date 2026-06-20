@@ -1095,6 +1095,128 @@ export interface MarketPrice {
 }
 
 /**
+ * A maritime vessel-MOVEMENT context snapshot (AIS-derived traffic) for a theatre. CONTEXT only — it is never an incident and never inflates any incident count. AIS dark / gap activity is an indicator, not hostile intent. Count fields are null when "not reported" (never assumed zero).
+ */
+export interface MaritimeMovement {
+  id: number;
+  theatre: string;
+  /** @nullable */
+  chokepoint?: string | null;
+  dataAsOf: string;
+  /** @nullable */
+  totalVessels?: number | null;
+  /** @nullable */
+  inboundCount?: number | null;
+  /** @nullable */
+  outboundCount?: number | null;
+  /** @nullable */
+  tankersCount?: number | null;
+  /** @nullable */
+  bulkCarriersCount?: number | null;
+  /** @nullable */
+  containerCount?: number | null;
+  /** @nullable */
+  lngLpgCount?: number | null;
+  /** @nullable */
+  anchoredOrWaitingCount?: number | null;
+  /** @nullable */
+  aisVisibleCount?: number | null;
+  /** @nullable */
+  aisDarkOrGapCount?: number | null;
+  /** @nullable */
+  changeVs7DayBaseline?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  confidence: string;
+  sourceName: string;
+  /** @nullable */
+  sourceUrl?: string | null;
+  rawPayload?: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MaritimeMovementInputConfidence = typeof MaritimeMovementInputConfidence[keyof typeof MaritimeMovementInputConfidence];
+
+
+export const MaritimeMovementInputConfidence = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+/**
+ * Manual upload payload for one movement snapshot from a licensed provider. All count fields are optional; omit a count to record it as "not reported" rather than zero.
+ */
+export interface MaritimeMovementInput {
+  /** @minLength 1 */
+  theatre: string;
+  /** @nullable */
+  chokepoint?: string | null;
+  dataAsOf: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  totalVessels?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  inboundCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  outboundCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  tankersCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  bulkCarriersCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  containerCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  lngLpgCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  anchoredOrWaitingCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  aisVisibleCount?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  aisDarkOrGapCount?: number | null;
+  /** @nullable */
+  changeVs7DayBaseline?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  confidence?: MaritimeMovementInputConfidence;
+  /** @minLength 1 */
+  sourceName: string;
+  /** @nullable */
+  sourceUrl?: string | null;
+  rawPayload?: unknown;
+}
+
+/**
  * A UN OCHA ReliefWeb situational / humanitarian report stored as supporting CONTEXT for a monitored APAC country. NOT an incident: these rows live in their own table and never feed any incident count.
  */
 export interface ReliefWebReport {
@@ -1221,6 +1343,19 @@ export type ListMarketPricesParams = {
  * Limit to one monitor group (fuel | energy | fertiliser)
  */
 group?: string;
+};
+
+export type ListMaritimeMovementParams = {
+/**
+ * Limit to one theatre (exact match), e.g. "Strait of Hormuz"
+ */
+theatre?: string;
+/**
+ * Max number of most-recent snapshots to return (1-200)
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };
 
 export type ListLiveuamapEventsParams = {

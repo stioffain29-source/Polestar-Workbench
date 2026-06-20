@@ -4,6 +4,7 @@ import {
   useGetReport,
   useUpdateReport,
   useListIncidents,
+  useListLatestMaritimeMovement,
   useListReliefWebReports,
   getGetReportQueryKey,
   getListReportsQueryKey,
@@ -121,6 +122,10 @@ export default function ReportEditor() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [exporting, setExporting] = useState(false);
   const { data: incidents } = useListIncidents({});
+  // Maritime movement (AIS) context for the Shipping Watch report. Context
+  // only — never an incident; the board degrades to "movement data
+  // unavailable" when empty.
+  const { data: movement = [] } = useListLatestMaritimeMovement();
   // Supporting UN OCHA ReliefWeb context for the Conflict Watch report. Fetched
   // unconditionally but only surfaced for the conflict topic; degrades to an
   // empty list (and a hidden section) when the feed is unconfigured/unapproved.
@@ -245,7 +250,12 @@ export default function ReportEditor() {
           filename,
         );
       } else if (form.topic === "shipping") {
-        await exportShippingReportPdf(pdfPayload, incidentsForExport, filename);
+        await exportShippingReportPdf(
+          pdfPayload,
+          incidentsForExport,
+          filename,
+          movement,
+        );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
           pdfPayload,
@@ -1343,6 +1353,7 @@ export default function ReportEditor() {
             <ShippingReportPreview
               report={form}
               incidents={incidentsForExport}
+              movement={movement}
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview

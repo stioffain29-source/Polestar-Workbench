@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
@@ -14,6 +14,13 @@ import {
   SHIPPING_SEV_LABEL,
   shippingSevKey,
 } from "@/lib/shippingReportDataset";
+import { resolveReportWindow } from "@/lib/reportWindow";
+import type { MaritimeMovement } from "@workspace/api-client-react";
+import {
+  buildMaritimeIntelligence,
+  MARITIME_RISK_COLOR,
+  type MaritimeIntelligence,
+} from "@/lib/maritimeIntelligence";
 
 // Polestar disclaimer text used at the foot of every report. Kept inline
 // here (rather than imported from the PDF chrome) so the on-screen
@@ -443,12 +450,135 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
   );
 }
 
+const MARITIME_CONF_LABEL: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+function MaritimeSubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="uppercase mb-2 mt-5"
+      style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Maritime Intelligence — the shared deterministic board, rendered in the
+// report in the SAME order as the live Shipping monitor and the SAME order
+// exportShippingReportPdf draws it. Movement (AIS) is CONTEXT only and
+// degrades to "movement data unavailable". #A33232 is reserved for level 5.
+function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntelligence }) {
+  const { bluf, risk, movementSnapshot, incidentSnapshot, keyRiskIndicators, businessImpact, sourceHealth } = board;
+  const categoryCards: KpiCard[] = incidentSnapshot.byCategory.map((c) => ({
+    label: c.category,
+    value: String(c.count),
+    severity: c.highestSeverityKey,
+  }));
+  const latest = incidentSnapshot.latest;
+  return (
+    <Section title="Maritime Intelligence">
+      <div className="rounded-sm p-4" style={{ background: NAVY }}>
+        <div
+          className="uppercase"
+          style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.18em", marginBottom: 6 }}
+        >
+          Bottom Line Up Front
+        </div>
+        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 14, lineHeight: 1.6, fontWeight: 300, margin: 0 }}>
+          {bluf}
+        </p>
+      </div>
+
+      <MaritimeSubLabel>Current Maritime Risk Level</MaritimeSubLabel>
+      <div className="flex items-center gap-3 mb-3">
+        <span
+          className="inline-flex items-center justify-center"
+          style={{ width: 38, height: 38, background: MARITIME_RISK_COLOR[risk.level], color: "#fff", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 18 }}
+        >
+          {risk.level}
+        </span>
+        <div>
+          <div style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>{risk.label}</div>
+          <div className="uppercase" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 10, letterSpacing: "0.1em" }}>
+            Confidence: {MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}
+          </div>
+        </div>
+      </div>
+      <Paragraphs text={risk.rationale} />
+
+      <MaritimeSubLabel>Movement Snapshot &mdash; Context</MaritimeSubLabel>
+      {movementSnapshot ? (
+        <ul className="space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+          {movementSnapshot.theatres.map((t) => (
+            <li key={t.theatre} className="text-[13px] leading-[1.6]">
+              <span style={{ color: NAVY, fontWeight: 700 }}>{t.theatre}</span>
+              {t.totalVessels != null && <span> &mdash; {t.totalVessels} vessels tracked</span>}
+              {t.changeVs7DayBaseline && <span> &middot; {t.changeVs7DayBaseline} vs 7-day baseline</span>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[13px] leading-[1.6]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+          Movement data unavailable. Risk is assessed from confirmed incidents alone.
+        </p>
+      )}
+
+      <MaritimeSubLabel>Incident Snapshot &mdash; Confirmed Incidents by Category</MaritimeSubLabel>
+      <p className="text-[13px] mb-3" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+        Confirmed maritime incidents in window:{" "}
+        <span style={{ color: NAVY, fontWeight: 700 }}>{incidentSnapshot.total}</span>
+      </p>
+      {categoryCards.length > 0 ? (
+        <KpiGrid cards={categoryCards} />
+      ) : (
+        <p className="text-[13px]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+          No confirmed maritime security incidents in the window.
+        </p>
+      )}
+      {latest && (
+        <p className="text-[13px] mt-3" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+          <span className="uppercase" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.1em", marginRight: 6 }}>
+            Latest
+          </span>
+          {format(parseISO(latest.occurredAt), "d MMM yyyy")} &mdash; {latest.title}. {latest.category}
+          {latest.chokepoint ? `, ${latest.chokepoint}` : ""}.
+        </p>
+      )}
+
+      <MaritimeSubLabel>Key Risk Indicators</MaritimeSubLabel>
+      <Bullets text={keyRiskIndicators.map((k) => `- ${k}`).join("\n")} max={8} />
+
+      <MaritimeSubLabel>Business Impact</MaritimeSubLabel>
+      <div className="flex flex-wrap gap-1.5">
+        {businessImpact.map((b) => (
+          <span
+            key={b}
+            className="text-[12px]"
+            style={{ border: `1px solid ${POLAR}`, color: DUSK, fontFamily: "Roboto, sans-serif", padding: "3px 8px", borderRadius: 2 }}
+          >
+            {b}
+          </span>
+        ))}
+      </div>
+
+      <MaritimeSubLabel>Source Health</MaritimeSubLabel>
+      <Paragraphs text={sourceHealth.note} />
+    </Section>
+  );
+}
+
 export default function ShippingReportPreview({
   report,
   incidents,
+  movement = [],
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
+  movement?: MaritimeMovement[];
 }) {
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -459,6 +589,18 @@ export default function ShippingReportPreview({
     () => buildShippingReportDataset(incidents, topic, issueDate),
     [incidents, topic, issueDate],
   );
+
+  // The one shared deterministic Maritime Intelligence board, aligned to THIS
+  // report's window so the report agrees with the live Shipping monitor.
+  const maritimeBoard = useMemo(() => {
+    const win = resolveReportWindow(topic, issueDate);
+    return buildMaritimeIntelligence({
+      incidents,
+      movement,
+      windowStart: win.start,
+      windowEnd: win.end,
+    });
+  }, [incidents, movement, topic, issueDate]);
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -549,6 +691,8 @@ export default function ShippingReportPreview({
             <Paragraphs text={report.executiveSummary} />
           </Section>
         )}
+
+        <MaritimeIntelligenceReportSection board={maritimeBoard} />
 
         <Section title="Fast Facts">
           <KpiGrid cards={ds.fastFacts} />

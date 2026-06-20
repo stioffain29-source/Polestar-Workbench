@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
-import { useListIncidents } from "@workspace/api-client-react";
-import type { Incident } from "@workspace/api-client-react";
+import {
+  useListIncidents,
+  useListLatestMaritimeMovement,
+  createMaritimeMovement,
+  getListLatestMaritimeMovementQueryKey,
+  getListMaritimeMovementQueryKey,
+} from "@workspace/api-client-react";
+import type { Incident, MaritimeMovementInput } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
@@ -25,6 +32,12 @@ import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import {
+  buildMaritimeIntelligence,
+  MARITIME_RISK_COLOR,
+  type MaritimeRiskLevel,
+  type MaritimeIntelligence,
+} from "@/lib/maritimeIntelligence";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
 
@@ -93,12 +106,25 @@ function darken(hex: string, amount = 0.18): string {
 
 export default function Shipping() {
   const { data: incidents = [], isLoading } = useListIncidents({ topic: "shipping" });
+  // Movement (AIS) CONTEXT — latest snapshot per theatre. Empty until a
+  // licensed-provider row is uploaded; the board degrades to "movement data
+  // unavailable" rather than inventing numbers.
+  const { data: movement = [] } = useListLatestMaritimeMovement();
 
   // Date-range window. Defaults to the widest option so the first load shows the
   // full record set; the analyst narrows the whole dashboard from the header.
   const [range, setRange] = useState<RangeKey>("2y");
   const windowDays = RANGE_DAYS[range];
   const now = useMemo(() => new Date(), []);
+
+  // Maritime Intelligence board — ONE shared deterministic dataset (also used by
+  // the Shipping Watch report). Always a 7-day weekly assessment regardless of
+  // the range toggle above, so the BLUF/risk read as a current weekly picture.
+  // Movement is CONTEXT only; it never becomes or inflates an incident here.
+  const maritimeBoard = useMemo(
+    () => buildMaritimeIntelligence({ incidents, movement, windowDays: 7, asOf: now }),
+    [incidents, movement, now],
+  );
 
   // Scope: APAC + Middle East only. Records that classify to a country outside
   // those regions are dropped from this view. Records with no identifiable
@@ -419,6 +445,12 @@ export default function Shipping() {
         </div>
         <RangeToggle range={range} onChange={setRange} />
       </div>
+
+      {/* 1a. Maritime Intelligence board — shared with the Shipping Watch report */}
+      <MaritimeIntelligenceBoard board={maritimeBoard} />
+
+      {/* 1a-i. Admin-gated manual upload for movement (AIS) context. */}
+      <MaritimeMovementUploadForm hasMovement={movement.length > 0} />
 
       {outOfScopeCount > 0 && (
         <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
@@ -1244,5 +1276,519 @@ function EmptyChart({ message }: { message: string }) {
     <div className="h-full flex items-center justify-center text-xs text-muted-foreground italic">
       {message}
     </div>
+  );
+}
+
+// --- Maritime Intelligence board ---------------------------------------------
+// Renders the one shared deterministic dataset (buildMaritimeIntelligence). The
+// Shipping Watch report renders the SAME dataset in the same section order, so
+// the live board and the report can never disagree. Brand: #0B0B3D / #4655FF /
+// #A33232 reserved for level-5 / Extreme only. Terse; no parenthetical counts
+// in prose (counts appear only on stat tiles / captions).
+
+const MARITIME_CONFIDENCE_LABEL: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+function MaritimeRiskChip({ level, label }: { level: MaritimeRiskLevel; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-bold uppercase tracking-wider"
+      style={{ background: MARITIME_RISK_COLOR[level], color: "#FFFFFF" }}
+    >
+      Level {level} · {label}
+    </span>
+  );
+}
+
+function MaritimeBoardCard({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white border border-border rounded-sm p-4">
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Movement (AIS) context is NEVER scraped — there is no AIS API. Rows arrive via
+// this admin-token-gated manual upload from a licensed provider. A successful
+// upload invalidates the latest-movement query so the board AND the Shipping
+// Watch report immediately render the new movement context. The token is sent
+// per-request as an Authorization: Bearer header; it is never persisted and the
+// workbench never holds a global auth token.
+const MOVEMENT_COUNT_FIELDS: { key: keyof MaritimeMovementInput; label: string }[] = [
+  { key: "totalVessels", label: "Total vessels" },
+  { key: "inboundCount", label: "Inbound" },
+  { key: "outboundCount", label: "Outbound" },
+  { key: "tankersCount", label: "Tankers" },
+  { key: "bulkCarriersCount", label: "Bulk carriers" },
+  { key: "containerCount", label: "Container" },
+  { key: "lngLpgCount", label: "LNG / LPG" },
+  { key: "anchoredOrWaitingCount", label: "Anchored / waiting" },
+  { key: "aisVisibleCount", label: "AIS visible" },
+  { key: "aisDarkOrGapCount", label: "AIS dark / gap" },
+];
+
+const MOVEMENT_INPUT_CLASS =
+  "w-full border border-border rounded-sm px-2 py-1.5 text-sm font-sans bg-white text-foreground";
+const MOVEMENT_LABEL_CLASS =
+  "block text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-1";
+
+function MaritimeMovementUploadForm({ hasMovement }: { hasMovement: boolean }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [token, setToken] = useState("");
+  const [theatre, setTheatre] = useState("Strait of Hormuz");
+  const [chokepoint, setChokepoint] = useState("");
+  const [dataAsOf, setDataAsOf] = useState(() => format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+  const [sourceName, setSourceName] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [confidence, setConfidence] = useState<"low" | "medium" | "high">("medium");
+  const [changeVs7DayBaseline, setChangeVs7DayBaseline] = useState("");
+  const [notes, setNotes] = useState("");
+  const [counts, setCounts] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ kind: "ok" | "error"; msg: string } | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setResult(null);
+
+    if (!token.trim()) {
+      setResult({ kind: "error", msg: "Admin token is required to upload." });
+      return;
+    }
+    if (!theatre.trim() || !sourceName.trim() || !dataAsOf) {
+      setResult({ kind: "error", msg: "Theatre, source name and data-as-of are required." });
+      return;
+    }
+
+    const input: MaritimeMovementInput = {
+      theatre: theatre.trim(),
+      dataAsOf: new Date(dataAsOf).toISOString(),
+      sourceName: sourceName.trim(),
+      confidence,
+    };
+    if (chokepoint.trim()) input.chokepoint = chokepoint.trim();
+    if (sourceUrl.trim()) input.sourceUrl = sourceUrl.trim();
+    if (changeVs7DayBaseline.trim()) input.changeVs7DayBaseline = changeVs7DayBaseline.trim();
+    if (notes.trim()) input.notes = notes.trim();
+    for (const { key } of MOVEMENT_COUNT_FIELDS) {
+      const raw = counts[key as string];
+      if (raw != null && raw.trim() !== "") {
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 0) {
+          (input as unknown as Record<string, unknown>)[key as string] = Math.round(n);
+        }
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      await createMaritimeMovement(input, {
+        headers: { Authorization: `Bearer ${token.trim()}` },
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getListLatestMaritimeMovementQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getListMaritimeMovementQueryKey() }),
+      ]);
+      setResult({
+        kind: "ok",
+        msg: "Movement snapshot uploaded. The board and the Shipping Watch report now carry this context.",
+      });
+      setCounts({});
+      setNotes("");
+      setChangeVs7DayBaseline("");
+    } catch (err) {
+      const httpStatus = (err as { status?: number })?.status;
+      let msg = "Upload failed. Check the values and try again.";
+      if (httpStatus === 401) {
+        msg = "Unauthorized — the admin token is missing or incorrect.";
+      } else if (httpStatus === 503) {
+        msg = "Upload disabled — no admin token is configured on the server.";
+      } else if (httpStatus === 400) {
+        msg = "Rejected — one or more fields are invalid (counts must be whole numbers ≥ 0).";
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      setResult({ kind: "error", msg });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Section title="Movement Data Upload — Admin">
+      <div className="flex items-center justify-between gap-4 flex-wrap -mt-1">
+        <p className="text-xs text-muted-foreground font-sans max-w-3xl">
+          Movement (AIS) figures are CONTEXT, never incidents. There is no AIS feed — a licensed
+          provider's snapshot is uploaded here. Admin token required.{" "}
+          {hasMovement
+            ? "A snapshot is on file; uploading adds a newer one."
+            : "No snapshot on file — both surfaces read movement data unavailable until one is added."}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-xs font-sans uppercase tracking-widest border border-border rounded-sm px-3 py-1.5 text-primary hover:bg-muted/40"
+        >
+          {open ? "Hide form" : "Upload snapshot"}
+        </button>
+      </div>
+
+      {open && (
+        <form onSubmit={handleSubmit} className="mt-3 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Admin token *</label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                autoComplete="off"
+                placeholder="INGEST_ADMIN_TOKEN"
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Theatre *</label>
+              <input
+                type="text"
+                value={theatre}
+                onChange={(e) => setTheatre(e.target.value)}
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Chokepoint</label>
+              <input
+                type="text"
+                value={chokepoint}
+                onChange={(e) => setChokepoint(e.target.value)}
+                placeholder="optional"
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Data as of *</label>
+              <input
+                type="datetime-local"
+                value={dataAsOf}
+                onChange={(e) => setDataAsOf(e.target.value)}
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Source name *</label>
+              <input
+                type="text"
+                value={sourceName}
+                onChange={(e) => setSourceName(e.target.value)}
+                placeholder="Licensed AIS provider"
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Source URL</label>
+              <input
+                type="url"
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+                placeholder="optional"
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Confidence</label>
+              <select
+                value={confidence}
+                onChange={(e) => setConfidence(e.target.value as "low" | "medium" | "high")}
+                className={MOVEMENT_INPUT_CLASS}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className={MOVEMENT_LABEL_CLASS}>Change vs 7-day baseline</label>
+              <input
+                type="text"
+                value={changeVs7DayBaseline}
+                onChange={(e) => setChangeVs7DayBaseline(e.target.value)}
+                placeholder="e.g. +12% 7d"
+                className={MOVEMENT_INPUT_CLASS}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
+              Vessel counts — leave blank for "not reported" (blank is never read as zero)
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {MOVEMENT_COUNT_FIELDS.map(({ key, label }) => (
+                <div key={key as string}>
+                  <label className={MOVEMENT_LABEL_CLASS}>{label}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={counts[key as string] ?? ""}
+                    onChange={(e) =>
+                      setCounts((c) => ({ ...c, [key as string]: e.target.value }))
+                    }
+                    className={MOVEMENT_INPUT_CLASS}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className={MOVEMENT_LABEL_CLASS}>Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="optional analyst note"
+              className={MOVEMENT_INPUT_CLASS}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="text-xs font-sans uppercase tracking-widest rounded-sm px-4 py-2 text-white disabled:opacity-60"
+              style={{ background: "#4655FF" }}
+            >
+              {submitting ? "Uploading…" : "Upload movement snapshot"}
+            </button>
+            {result && (
+              <span
+                className="text-xs font-sans"
+                style={{ color: result.kind === "ok" ? "#1d6b3a" : "#A33232" }}
+              >
+                {result.msg}
+              </span>
+            )}
+          </div>
+        </form>
+      )}
+    </Section>
+  );
+}
+
+function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
+  const {
+    bluf,
+    risk,
+    movementSnapshot,
+    incidentSnapshot,
+    keyRiskIndicators,
+    businessImpact,
+    watchNext,
+    sourceHealth,
+  } = board;
+
+  return (
+    <Section title="Maritime Intelligence">
+      <p className="text-xs text-muted-foreground font-sans -mt-1">
+        Weekly assessment · last 7 days. One shared dataset, identical to the Shipping Watch report.
+      </p>
+
+      {/* BLUF */}
+      <div className="rounded-sm p-4" style={{ background: "#0B0B3D" }}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="text-[10px] uppercase tracking-widest font-sans" style={{ color: "#9aa0c8" }}>
+            Bottom line up front
+          </div>
+          <MaritimeRiskChip level={risk.level} label={risk.label} />
+        </div>
+        <p className="text-sm font-sans leading-snug mt-2" style={{ color: "#FFFFFF" }}>
+          {bluf}
+        </p>
+      </div>
+
+      {/* Risk · Movement · Source health */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <MaritimeBoardCard label="Current Maritime Risk Level">
+          <div className="flex items-center gap-3">
+            <div
+              className="font-serif font-bold leading-none text-3xl"
+              style={{ color: MARITIME_RISK_COLOR[risk.level] }}
+            >
+              {risk.level}
+            </div>
+            <div>
+              <div className="font-serif font-bold text-primary text-lg leading-tight">
+                {risk.label}
+              </div>
+              <div className="text-[10px] uppercase tracking-widest font-sans text-muted-foreground">
+                Confidence: {MARITIME_CONFIDENCE_LABEL[risk.confidence] ?? risk.confidence}
+              </div>
+            </div>
+          </div>
+          <p className="text-[12px] text-foreground/80 font-sans leading-snug mt-2">
+            {risk.rationale}
+          </p>
+        </MaritimeBoardCard>
+
+        <MaritimeBoardCard label="Movement Snapshot (Context)">
+          {movementSnapshot ? (
+            <div className="space-y-2">
+              <div className="text-[11px] text-muted-foreground font-sans">
+                As of {format(parseISO(movementSnapshot.asOf ?? new Date().toISOString()), "dd MMM yyyy")} ·{" "}
+                {movementSnapshot.sourceName ?? "Licensed provider"} · Confidence{" "}
+                {MARITIME_CONFIDENCE_LABEL[movementSnapshot.confidence ?? "low"] ?? movementSnapshot.confidence}
+              </div>
+              <ul className="space-y-1.5">
+                {movementSnapshot.theatres.map((t) => (
+                  <li key={t.theatre} className="text-[12px] font-sans leading-snug">
+                    <span className="font-serif font-bold text-primary">{t.theatre}</span>
+                    {t.totalVessels != null && (
+                      <span className="text-foreground/80"> — {t.totalVessels} vessels tracked</span>
+                    )}
+                    {t.changeVs7DayBaseline && (
+                      <span className="text-muted-foreground"> · {t.changeVs7DayBaseline} vs 7-day baseline</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="text-[12px] font-sans italic text-muted-foreground">
+              Movement data unavailable. Upload a licensed-provider snapshot to populate this card. Risk is assessed from incidents alone.
+            </div>
+          )}
+        </MaritimeBoardCard>
+
+        <MaritimeBoardCard label="Source Health">
+          <ul className="space-y-1.5 text-[12px] font-sans">
+            <li className="flex items-center gap-2">
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ background: sourceHealth.incidentsAvailable ? "#4655FF" : "#B8C2CC" }}
+              />
+              <span className="text-foreground/80">
+                Incident feed: {sourceHealth.incidentsAvailable ? "available" : "no records"}
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ background: sourceHealth.movementAvailable ? "#4655FF" : "#B8C2CC" }}
+              />
+              <span className="text-foreground/80">
+                Movement context: {sourceHealth.movementAvailable ? "available" : "unavailable"}
+              </span>
+            </li>
+          </ul>
+          <p className="text-[11px] text-muted-foreground font-sans leading-snug mt-2">
+            {sourceHealth.note}
+          </p>
+        </MaritimeBoardCard>
+      </div>
+
+      {/* Incident snapshot */}
+      <MaritimeBoardCard label="Incident Snapshot — Confirmed Incidents by Category">
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="font-serif font-bold text-primary text-2xl leading-none">
+            {incidentSnapshot.total}
+          </span>
+          <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-sans">
+            confirmed maritime incidents in window
+          </span>
+        </div>
+        {incidentSnapshot.byCategory.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {incidentSnapshot.byCategory.map((c) => (
+              <div
+                key={c.category}
+                className="flex items-center justify-between gap-2 border border-border rounded-sm px-2.5 py-1.5"
+              >
+                <span className="text-[12px] font-sans text-foreground/90 leading-snug">{c.category}</span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span
+                    className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm"
+                    style={severityBadgeStyle(c.highestSeverityKey)}
+                  >
+                    {SEVERITY_LABELS[c.highestSeverityKey] ?? c.highestSeverityKey}
+                  </span>
+                  <span className="font-mono text-sm text-primary">{c.count}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-[12px] font-sans italic text-muted-foreground">
+            No confirmed maritime security incidents in the window.
+          </div>
+        )}
+        {incidentSnapshot.latest && (
+          <div className="mt-3 pt-3 border-t border-border text-[12px] font-sans">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-2">Latest</span>
+            <span className="font-mono text-muted-foreground mr-2">
+              {format(parseISO(incidentSnapshot.latest.occurredAt), "dd MMM")}
+            </span>
+            <span className="text-foreground/90">{incidentSnapshot.latest.title}</span>
+            <span className="text-muted-foreground">
+              {" "}— {incidentSnapshot.latest.category}
+              {incidentSnapshot.latest.chokepoint ? ` · ${incidentSnapshot.latest.chokepoint}` : ""}
+            </span>
+          </div>
+        )}
+      </MaritimeBoardCard>
+
+      {/* Indicators · Business impact · Watch next */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <MaritimeBoardCard label="Key Risk Indicators">
+          <ul className="space-y-1.5">
+            {keyRiskIndicators.map((k, i) => (
+              <li key={i} className="text-[12px] font-sans leading-snug text-foreground/85 flex gap-2">
+                <span style={{ color: "#4655FF" }}>•</span>
+                <span>{k}</span>
+              </li>
+            ))}
+          </ul>
+        </MaritimeBoardCard>
+
+        <MaritimeBoardCard label="Business Impact">
+          <div className="flex flex-wrap gap-1.5">
+            {businessImpact.map((b) => (
+              <span
+                key={b}
+                className="px-2 py-0.5 text-[11px] font-sans rounded-sm border"
+                style={{ borderColor: "#E2E2E2", color: "#303030" }}
+              >
+                {b}
+              </span>
+            ))}
+          </div>
+        </MaritimeBoardCard>
+
+        <MaritimeBoardCard label="Watch Next">
+          <ul className="space-y-1.5">
+            {watchNext.map((w, i) => (
+              <li key={i} className="text-[12px] font-sans leading-snug text-foreground/85 flex gap-2">
+                <span style={{ color: "#4655FF" }}>•</span>
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        </MaritimeBoardCard>
+      </div>
+    </Section>
   );
 }

@@ -31,6 +31,7 @@ import {
   SEV_LABEL,
   sevKey,
   type Ctx,
+  type KpiCardData,
 } from "./pdfChrome";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
@@ -45,6 +46,12 @@ import {
   type VesselRow,
   type PiracyRow,
 } from "./shippingReportDataset";
+import type { MaritimeMovement } from "@workspace/api-client-react";
+import {
+  buildMaritimeIntelligence,
+  MARITIME_RISK_COLOR,
+  type MaritimeIntelligence,
+} from "./maritimeIntelligence";
 
 void _LOCATION_NOT_IDENTIFIED;
 
@@ -543,12 +550,188 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   ctx.y += 13;
 }
 
+// Maritime Intelligence (shared board) -------------------------------------
+// Mirrors MaritimeIntelligenceReportSection in ShippingReportPreview.tsx —
+// same sections, same order, same dataset, so preview == PDF.
+
+const MARITIME_CONF_LABEL: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+// Bullets without a section heading — mirrors drawBulletSection's body so the
+// indent, circle marker and line spacing match the rest of the report.
+function drawMiniBullets(ctx: Ctx, items: string[], maxBullets = 8) {
+  const bullets = items.slice(0, maxBullets);
+  if (bullets.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  const lineH = 17;
+  const bulletIndent = 14;
+  const gapBetween = 10;
+  const applyProseStyle = () => {
+    setRoboto(pdf, "light");
+    setText(pdf, DUSK);
+    pdf.setFontSize(11);
+  };
+  applyProseStyle();
+  for (const b of bullets) {
+    const lines: string[] = pdf.splitTextToSize(sanitize(b), CW - bulletIndent);
+    const blockH = lines.length * lineH + gapBetween;
+    if (ctx.y + blockH > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      applyProseStyle();
+    }
+    setFill(pdf, DUSK);
+    pdf.circle(MX + 4, ctx.y + 7, 1.5, "F");
+    for (const ln of lines) {
+      ensureSpace(ctx, lineH);
+      applyProseStyle();
+      pdf.text(ln, MX + bulletIndent, ctx.y + 11);
+      ctx.y += lineH;
+    }
+    ctx.y += gapBetween;
+  }
+  ctx.y += 6;
+}
+
+// Filled navy BLUF callout — the white-on-navy "Bottom Line Up Front" box that
+// opens the preview's Maritime Intelligence section.
+function drawBlufBox(ctx: Ctx, text: string) {
+  const { pdf, MX, CW } = ctx;
+  const padH = 10;
+  const padV = 10;
+  const labelH = 14;
+  const lineH = 15;
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
+  const lines: string[] = pdf.splitTextToSize(sanitize(text), CW - padH * 2);
+  const boxH = padV + labelH + lines.length * lineH + padV;
+  if (ctx.y + boxH > ctx.H - ctx.BOTTOM) newPage(ctx);
+  setFill(pdf, NAVY);
+  pdf.rect(MX, ctx.y, CW, boxH, "F");
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(8);
+  setText(pdf, POLAR);
+  pdf.text("BOTTOM LINE UP FRONT", MX + padH, ctx.y + padV + 8);
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
+  setText(pdf, WHITE);
+  let yy = ctx.y + padV + labelH + 11;
+  for (const ln of lines) {
+    pdf.text(ln, MX + padH, yy);
+    yy += lineH;
+  }
+  ctx.y += boxH + 14;
+}
+
+function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
+  const { pdf, MX } = ctx;
+  const {
+    bluf,
+    risk,
+    movementSnapshot,
+    incidentSnapshot,
+    keyRiskIndicators,
+    businessImpact,
+    sourceHealth,
+  } = board;
+
+  drawSectionHeading(ctx, "Maritime Intelligence");
+  drawBlufBox(ctx, bluf);
+
+  // Current maritime risk level — number + label coloured by tier (#A33232
+  // reserved for level 5), with the confidence beneath it.
+  drawSubtitle(ctx, "Current Maritime Risk Level");
+  ensureSpace(ctx, 30);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(12);
+  setText(pdf, MARITIME_RISK_COLOR[risk.level]);
+  pdf.text(sanitize(`${risk.level} \u2014 ${risk.label}`), MX, ctx.y + 11);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  setText(pdf, DUSK);
+  pdf.text(
+    sanitize(`Confidence: ${MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}`),
+    MX,
+    ctx.y + 25,
+  );
+  ctx.y += 32;
+  renderProse(ctx, risk.rationale);
+
+  // Movement snapshot — CONTEXT only. Degrades to "movement data unavailable".
+  drawSubtitle(ctx, "Movement Snapshot \u2014 Context");
+  if (movementSnapshot) {
+    const items = movementSnapshot.theatres.map((t) => {
+      const parts = [t.theatre];
+      if (t.totalVessels != null) parts.push(`${t.totalVessels} vessels tracked`);
+      if (t.changeVs7DayBaseline) {
+        parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
+      }
+      return parts.join(" \u2014 ");
+    });
+    drawMiniBullets(ctx, items);
+  } else {
+    renderProse(
+      ctx,
+      "Movement data unavailable. Risk is assessed from confirmed incidents alone.",
+    );
+  }
+
+  // Incident snapshot — confirmed incidents by category.
+  drawSubtitle(ctx, "Incident Snapshot \u2014 Confirmed Incidents by Category");
+  renderProse(
+    ctx,
+    `Confirmed maritime incidents in window: ${incidentSnapshot.total}.`,
+  );
+  const cards: KpiCardData[] = incidentSnapshot.byCategory.map((c) => ({
+    label: c.category,
+    value: String(c.count),
+    severity: c.highestSeverityKey,
+  }));
+  if (cards.length > 0) {
+    drawFastFactsKpiCards(ctx, cards);
+  } else {
+    renderProse(
+      ctx,
+      "No confirmed maritime security incidents in the window.",
+    );
+  }
+  const latest = incidentSnapshot.latest;
+  if (latest) {
+    let when = latest.occurredAt;
+    try {
+      when = format(parseISO(latest.occurredAt), "d MMM yyyy");
+    } catch {
+      /* keep raw */
+    }
+    const tail = latest.chokepoint ? `, ${latest.chokepoint}` : "";
+    renderProse(
+      ctx,
+      `Latest: ${when} \u2014 ${latest.title}. ${latest.category}${tail}.`,
+    );
+  }
+
+  // Key risk indicators.
+  drawSubtitle(ctx, "Key Risk Indicators");
+  drawMiniBullets(ctx, keyRiskIndicators);
+
+  // Business impact.
+  drawSubtitle(ctx, "Business Impact");
+  renderProse(ctx, `${businessImpact.join("; ")}.`);
+
+  // Source health.
+  drawSubtitle(ctx, "Source Health");
+  renderProse(ctx, sourceHealth.note);
+}
+
 // Exporter ------------------------------------------------------------------
 
 export async function exportShippingReportPdf(
   data: ShippingReportData,
   incidents: ShippingReportIncident[],
   filename: string,
+  movement: MaritimeMovement[] = [],
 ): Promise<void> {
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
@@ -591,6 +774,17 @@ export async function exportShippingReportPdf(
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, data.executiveSummary);
   }
+
+  // Maritime Intelligence — the one shared deterministic board, aligned to this
+  // report's window so the PDF agrees with the live Shipping monitor. Drawn in
+  // the SAME order ShippingReportPreview renders it (preview == PDF).
+  const maritimeBoard = buildMaritimeIntelligence({
+    incidents,
+    movement,
+    windowStart: win.start,
+    windowEnd: win.end,
+  });
+  drawMaritimeIntelligence(ctx, maritimeBoard);
 
   const ds = buildShippingReportDataset(incidents, data.topic, data.issueDate);
 

@@ -65,6 +65,63 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/MarketPrice" }
 
+  /maritime-movement:
+    get:
+      operationId: listMaritimeMovement
+      tags: [maritime-movement]
+      summary: >-
+        Maritime vessel-MOVEMENT context snapshots (AIS-derived traffic). Context
+        only — never incidents. An empty list means movement data is unavailable.
+      parameters:
+        - name: theatre
+          in: query
+          description: Limit to one theatre (exact match), e.g. "Strait of Hormuz"
+          schema: { type: string }
+        - name: limit
+          in: query
+          description: Max number of most-recent snapshots to return (1-200)
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaritimeMovement" }
+    post:
+      operationId: createMaritimeMovement
+      tags: [maritime-movement]
+      summary: >-
+        Manual upload of one movement snapshot from a licensed provider
+        (admin-token-gated; there is no AIS API). Movement is context, never an
+        incident.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaritimeMovementInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaritimeMovement" }
+
+  /maritime-movement/latest:
+    get:
+      operationId: listLatestMaritimeMovement
+      tags: [maritime-movement]
+      summary: The latest movement snapshot per theatre (one row per theatre).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaritimeMovement" }
+
   /liveuamap/events:
     get:
       operationId: listLiveuamapEvents
@@ -2072,6 +2129,69 @@ components:
           type: ["array", "null"]
           items: { $ref: "#/components/schemas/MarketPriceTrajectoryPoint" }
         updatedAt: { type: string, format: date-time }
+
+    MaritimeMovement:
+      type: object
+      description: >-
+        A maritime vessel-MOVEMENT context snapshot (AIS-derived traffic) for a
+        theatre. CONTEXT only — it is never an incident and never inflates any
+        incident count. AIS dark / gap activity is an indicator, not hostile
+        intent. Count fields are null when "not reported" (never assumed zero).
+      required: [id, theatre, dataAsOf, confidence, sourceName, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        theatre: { type: string }
+        chokepoint: { type: ["string", "null"] }
+        dataAsOf: { type: string, format: date-time }
+        totalVessels: { type: ["integer", "null"] }
+        inboundCount: { type: ["integer", "null"] }
+        outboundCount: { type: ["integer", "null"] }
+        tankersCount: { type: ["integer", "null"] }
+        bulkCarriersCount: { type: ["integer", "null"] }
+        containerCount: { type: ["integer", "null"] }
+        lngLpgCount: { type: ["integer", "null"] }
+        anchoredOrWaitingCount: { type: ["integer", "null"] }
+        aisVisibleCount: { type: ["integer", "null"] }
+        aisDarkOrGapCount: { type: ["integer", "null"] }
+        changeVs7DayBaseline: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        confidence: { type: string }
+        sourceName: { type: string }
+        sourceUrl: { type: ["string", "null"] }
+        rawPayload: {}
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MaritimeMovementInput:
+      type: object
+      description: >-
+        Manual upload payload for one movement snapshot from a licensed provider.
+        All count fields are optional; omit a count to record it as "not
+        reported" rather than zero.
+      required: [theatre, dataAsOf, sourceName]
+      properties:
+        theatre: { type: string, minLength: 1 }
+        chokepoint: { type: ["string", "null"] }
+        dataAsOf: { type: string, format: date-time }
+        totalVessels: { type: ["integer", "null"], minimum: 0 }
+        inboundCount: { type: ["integer", "null"], minimum: 0 }
+        outboundCount: { type: ["integer", "null"], minimum: 0 }
+        tankersCount: { type: ["integer", "null"], minimum: 0 }
+        bulkCarriersCount: { type: ["integer", "null"], minimum: 0 }
+        containerCount: { type: ["integer", "null"], minimum: 0 }
+        lngLpgCount: { type: ["integer", "null"], minimum: 0 }
+        anchoredOrWaitingCount: { type: ["integer", "null"], minimum: 0 }
+        aisVisibleCount: { type: ["integer", "null"], minimum: 0 }
+        aisDarkOrGapCount: { type: ["integer", "null"], minimum: 0 }
+        changeVs7DayBaseline: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        confidence:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+        sourceName: { type: string, minLength: 1 }
+        sourceUrl: { type: ["string", "null"] }
+        rawPayload: {}
 
     ReliefWebReport:
       type: object

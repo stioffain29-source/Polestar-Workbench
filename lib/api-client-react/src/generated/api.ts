@@ -47,6 +47,7 @@ import type {
   IntegrationStatusResponse,
   ListIncidentsParams,
   ListLiveuamapEventsParams,
+  ListMaritimeMovementParams,
   ListMarketPricesParams,
   ListReliefWebReportsParams,
   ListReportsParams,
@@ -54,6 +55,8 @@ import type {
   ListSpotReportsParams,
   ListStrikesParams,
   LiveuamapEventsResponse,
+  MaritimeMovement,
+  MaritimeMovementInput,
   MarketPrice,
   ReliefWebReport,
   Report,
@@ -312,6 +315,238 @@ export function useListMarketPrices<TData = Awaited<ReturnType<typeof listMarket
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMarketPricesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMaritimeMovementUrl = (params?: ListMaritimeMovementParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/maritime-movement?${stringifiedParams}` : `/api/maritime-movement`
+}
+
+/**
+ * @summary Maritime vessel-MOVEMENT context snapshots (AIS-derived traffic). Context only — never incidents. An empty list means movement data is unavailable.
+ */
+export const listMaritimeMovement = async (params?: ListMaritimeMovementParams, options?: RequestInit): Promise<MaritimeMovement[]> => {
+
+  return customFetch<MaritimeMovement[]>(getListMaritimeMovementUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMaritimeMovementQueryKey = (params?: ListMaritimeMovementParams,) => {
+    return [
+    `/api/maritime-movement`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMaritimeMovementQueryOptions = <TData = Awaited<ReturnType<typeof listMaritimeMovement>>, TError = ErrorType<unknown>>(params?: ListMaritimeMovementParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMaritimeMovement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMaritimeMovementQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMaritimeMovement>>> = ({ signal }) => listMaritimeMovement(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMaritimeMovement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMaritimeMovementQueryResult = NonNullable<Awaited<ReturnType<typeof listMaritimeMovement>>>
+export type ListMaritimeMovementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Maritime vessel-MOVEMENT context snapshots (AIS-derived traffic). Context only — never incidents. An empty list means movement data is unavailable.
+ */
+
+export function useListMaritimeMovement<TData = Awaited<ReturnType<typeof listMaritimeMovement>>, TError = ErrorType<unknown>>(
+ params?: ListMaritimeMovementParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMaritimeMovement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMaritimeMovementQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateMaritimeMovementUrl = () => {
+
+
+
+
+  return `/api/maritime-movement`
+}
+
+/**
+ * @summary Manual upload of one movement snapshot from a licensed provider (admin-token-gated; there is no AIS API). Movement is context, never an incident.
+ */
+export const createMaritimeMovement = async (maritimeMovementInput: MaritimeMovementInput, options?: RequestInit): Promise<MaritimeMovement> => {
+
+  return customFetch<MaritimeMovement>(getCreateMaritimeMovementUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      maritimeMovementInput,)
+  }
+);}
+
+
+
+
+export const getCreateMaritimeMovementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMaritimeMovement>>, TError,{data: BodyType<MaritimeMovementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMaritimeMovement>>, TError,{data: BodyType<MaritimeMovementInput>}, TContext> => {
+
+const mutationKey = ['createMaritimeMovement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMaritimeMovement>>, {data: BodyType<MaritimeMovementInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMaritimeMovement(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMaritimeMovementMutationResult = NonNullable<Awaited<ReturnType<typeof createMaritimeMovement>>>
+    export type CreateMaritimeMovementMutationBody = BodyType<MaritimeMovementInput>
+    export type CreateMaritimeMovementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manual upload of one movement snapshot from a licensed provider (admin-token-gated; there is no AIS API). Movement is context, never an incident.
+ */
+export const useCreateMaritimeMovement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMaritimeMovement>>, TError,{data: BodyType<MaritimeMovementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMaritimeMovement>>,
+        TError,
+        {data: BodyType<MaritimeMovementInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMaritimeMovementMutationOptions(options));
+    }
+
+export const getListLatestMaritimeMovementUrl = () => {
+
+
+
+
+  return `/api/maritime-movement/latest`
+}
+
+/**
+ * @summary The latest movement snapshot per theatre (one row per theatre).
+ */
+export const listLatestMaritimeMovement = async ( options?: RequestInit): Promise<MaritimeMovement[]> => {
+
+  return customFetch<MaritimeMovement[]>(getListLatestMaritimeMovementUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLatestMaritimeMovementQueryKey = () => {
+    return [
+    `/api/maritime-movement/latest`
+    ] as const;
+    }
+
+
+export const getListLatestMaritimeMovementQueryOptions = <TData = Awaited<ReturnType<typeof listLatestMaritimeMovement>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLatestMaritimeMovement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLatestMaritimeMovementQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLatestMaritimeMovement>>> = ({ signal }) => listLatestMaritimeMovement({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLatestMaritimeMovement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLatestMaritimeMovementQueryResult = NonNullable<Awaited<ReturnType<typeof listLatestMaritimeMovement>>>
+export type ListLatestMaritimeMovementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary The latest movement snapshot per theatre (one row per theatre).
+ */
+
+export function useListLatestMaritimeMovement<TData = Awaited<ReturnType<typeof listLatestMaritimeMovement>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLatestMaritimeMovement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLatestMaritimeMovementQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

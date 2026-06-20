@@ -302,6 +302,43 @@ export async function runDataMigrations(): Promise<void> {
         ON incident_corroborations (incident_id)
     `);
 
+    // Schema: maritime vessel-MOVEMENT context (AIS-derived traffic snapshots).
+    // CONTEXT only — never an incident and can never create one; AIS dark/gap is
+    // an indicator, not hostile intent. Populated via an admin-token-gated manual
+    // upload (no AIS API configured); an empty table reads as "movement data
+    // unavailable". drizzle push only reaches dev, so the prod primary gains the
+    // table here on boot. All idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS maritime_movement (
+        id serial PRIMARY KEY,
+        theatre text NOT NULL,
+        chokepoint text,
+        data_as_of timestamptz NOT NULL,
+        total_vessels integer,
+        inbound_count integer,
+        outbound_count integer,
+        tankers_count integer,
+        bulk_carriers_count integer,
+        container_count integer,
+        lng_lpg_count integer,
+        anchored_or_waiting_count integer,
+        ais_visible_count integer,
+        ais_dark_or_gap_count integer,
+        change_vs_7_day_baseline text,
+        notes text,
+        confidence text NOT NULL DEFAULT 'medium',
+        source_name text NOT NULL,
+        source_url text,
+        raw_payload jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS maritime_movement_theatre_asof_idx
+        ON maritime_movement (theatre, data_as_of DESC)
+    `);
+
     // Schema: ReliefWeb (UN OCHA) situational/context reports. A SEPARATE table
     // from incident_corroborations — it stores ReliefWeb reports as standalone
     // supporting context (never as incidents), so it can NEVER inflate incident
