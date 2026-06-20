@@ -2,9 +2,8 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { ensureRobotoLoaded, setRoboto } from "./pdfFonts";
+import { buildPageSlices, refineBreakCandidates } from "./pdfPageBreaks";
 
-const MIN_PAGE_FILL = 0.45;
-const PAGE_BREAK_GUARD_PX = 24;
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const POLAR = "#e2e2e2";
@@ -529,6 +528,11 @@ function lineBreakTops(el: HTMLElement, rootTop: number): number[] {
   return tops.sort((a, b) => a - b);
 }
 
+// Measure the live DOM for legal break offsets (section / card / table / row
+// tops, plus line-level tops inside opted-in `data-pdf-flow` prose), then hand
+// the raw tops to the pure `refineBreakCandidates` for de-duping/filtering. The
+// refinement + slicing geometry lives in `pdfPageBreaks.ts` so it is unit-tested
+// without a DOM.
 function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): number[] {
   const rootRect = root.getBoundingClientRect();
   const selectors = [
@@ -539,11 +543,10 @@ function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): numbe
     "[data-pdf-row]",
     "[data-pdf-break-before]",
   ].join(",");
-  const candidates = new Set<number>([0, root.scrollHeight]);
+  const rawTops: number[] = [];
 
   root.querySelectorAll<HTMLElement>(selectors).forEach((node) => {
-    const top = Math.round(node.getBoundingClientRect().top - rootRect.top);
-    if (top > 0 && top < root.scrollHeight) candidates.add(top);
+    rawTops.push(Math.round(node.getBoundingClientRect().top - rootRect.top));
   });
 
   // Line-level break points inside opted-in prose (data-pdf-flow). Without these
@@ -553,57 +556,10 @@ function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): numbe
   root.querySelectorAll<HTMLElement>("[data-pdf-flow]").forEach((el) => {
     lineBreakTops(el, rootRect.top)
       .slice(1)
-      .forEach((top) => {
-        if (top > 0 && top < root.scrollHeight) candidates.add(top);
-      });
+      .forEach((top) => rawTops.push(top));
   });
 
-  const sorted = Array.from(candidates)
-    .filter((y) => y >= 0 && y <= root.scrollHeight)
-    .sort((a, b) => a - b);
-  // De-dupe against the previous KEPT candidate (not the immediate predecessor)
-  // so a run of evenly-spaced line tops isn't cascade-dropped down to one.
-  const kept: number[] = [];
-  for (const y of sorted) {
-    if (kept.length === 0 || y - kept[kept.length - 1] > PAGE_BREAK_GUARD_PX) kept.push(y);
-  }
-  return kept.filter((y) => y === 0 || y === root.scrollHeight || y > pageCssHeight * 0.15);
-}
-
-function buildPageSlices(
-  totalHeight: number,
-  pageCssHeight: number,
-  candidates: number[],
-  initialStart = 0,
-): Array<{ start: number; end: number }> {
-  const pages: Array<{ start: number; end: number }> = [];
-  let start = initialStart;
-
-  while (start < totalHeight - 1) {
-    const target = Math.min(start + pageCssHeight, totalHeight);
-    let end = target;
-
-    if (target < totalHeight) {
-      const minUsefulBreak = start + pageCssHeight * MIN_PAGE_FILL;
-      const useful = candidates.filter((y) =>
-        y > start + PAGE_BREAK_GUARD_PX &&
-        y <= target - PAGE_BREAK_GUARD_PX &&
-        y >= minUsefulBreak
-      );
-      if (useful.length > 0) {
-        end = useful[useful.length - 1];
-      }
-    }
-
-    if (end <= start + PAGE_BREAK_GUARD_PX) {
-      end = target;
-    }
-
-    pages.push({ start, end });
-    start = end;
-  }
-
-  return pages;
+  return refineBreakCandidates(rawTops, root.scrollHeight, pageCssHeight);
 }
 
 function hexToRgb(hex: string): [number, number, number] {
