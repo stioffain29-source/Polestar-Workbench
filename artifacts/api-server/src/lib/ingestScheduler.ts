@@ -35,6 +35,15 @@ import { logger } from "./logger";
 const DEFAULT_INTERVAL_HOURS = 12;
 const MS_PER_HOUR = 60 * 60 * 1000;
 
+// Freshness SLA for the live AIS ship-movement board, in days. Mirrors
+// FRESH_DAYS in lib/maritimeSources.ts: the board flips from "live" to "stale"
+// once its newest snapshot ages past this window. The boot/interval catch-up
+// targets the much shorter INGEST_INTERVAL_HOURS so movement is normally
+// refreshed long before this SLA; a breach here means the refresh path is not
+// actually keeping up (e.g. a persistently-failing AIS fetch, or an autoscale
+// app that never cold-starts), and is logged at WARN as an operational alert.
+const MOVEMENT_FRESH_DAYS = 14;
+
 // One-time forced boot ingest, keyed to a code version. The boot catch-up is
 // normally gated on data freshness so autoscale cold starts stay cheap — but
 // that means a republish carrying NEW scraper/classifier logic does NOT refresh
@@ -157,6 +166,86 @@ async function hoursSinceNewestStrike(): Promise<number | null> {
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
+ * True when the live AIS movement feed is BOTH keyed and not switched off. Only
+ * then does maritime-movement staleness justify forcing a boot catch-up: with
+ * no AIS key (or AIS_ENABLED=false) the maritime_movement table is permanently
+ * empty by design, so gating on its freshness would force a full scrape on
+ * every cold start for no benefit. Mirrors the aisEnv() logic in
+ * lib/maritimeSources.ts (key present AND not falsey).
+ */
+function aisMovementActive(): boolean {
+  const keyed = (process.env["AIS_API_KEY"]?.trim().length ?? 0) > 0;
+  const v = process.env["AIS_ENABLED"]?.trim().toLowerCase();
+  const off = v === "false" || v === "0" || v === "off" || v === "no";
+  return keyed && !off;
+}
+
+/**
+ * Hours since the newest AIS-fed maritime_movement snapshot (or null when none
+ * exist). The ship-movement board flips to "stale" once its newest snapshot
+ * ages past the 14-day freshness window (lib/maritimeSources.ts). Movement
+ * refreshes ONLY inside a full ingest (runIngestOnce → runMaritimeMovementIngest),
+ * so — like strikes and the scraped land topics — the boot catch-up must treat a
+ * stale movement table as a reason to run. Without this an intermittently-failing
+ * AIS pass lets the board drift stale even while incidents stay fresh (which on
+ * its own only does the cheap price top-up, never the full ingest). Scoped to
+ * source_name ILIKE '%ais%' so a one-off manual upload never suppresses the
+ * live-feed catch-up.
+ */
+async function hoursSinceNewestMovement(): Promise<number | null> {
+  const res = await db.execute(sql`
+    SELECT MAX(data_as_of) AS last
+    FROM maritime_movement
+    WHERE source_name ILIKE '%ais%'
+  `);
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
+ * Operational SLA monitor for the live AIS ship-movement board. Emits a WARN
+ * (an alert hook for log-based monitoring) when AIS is keyed+enabled but the
+ * newest movement snapshot has aged past the MOVEMENT_FRESH_DAYS window, i.e.
+ * the refresh path is no longer keeping the board fresh. Stays silent (no
+ * alarm) when AIS is unconfigured — absence is not an outage. Never throws; a
+ * probe failure is logged and swallowed so it can never disturb the caller.
+ *
+ * This is what turns "keep the board fresh" into something verifiable: a stale
+ * board surfaces as a discrete, queryable log line in production rather than
+ * being noticed only when an analyst opens Source Health.
+ */
+async function monitorMovementFreshness(reason: string): Promise<void> {
+  if (!aisMovementActive()) return;
+  let ageHours: number | null;
+  try {
+    ageHours = await hoursSinceNewestMovement();
+  } catch (err) {
+    logger.error({ err, reason }, "movement freshness probe failed");
+    return;
+  }
+  const freshDays = MOVEMENT_FRESH_DAYS;
+  if (ageHours === null) {
+    logger.warn(
+      { reason, freshDays },
+      "AIS movement: no live snapshot recorded yet — ship-movement board reads unavailable",
+    );
+    return;
+  }
+  if (ageHours >= freshDays * 24) {
+    logger.warn(
+      { reason, movementAgeHours: Math.round(ageHours), freshDays },
+      "AIS movement STALE beyond freshness window — ship-movement board is out of SLA",
+    );
+  } else {
+    logger.info(
+      { reason, movementAgeHours: Math.round(ageHours), freshDays },
+      "AIS movement freshness within SLA",
+    );
+  }
 }
 
 /**
@@ -371,11 +460,40 @@ export function startIngestScheduler(): void {
           });
           // Strikes live in their own table (no heartbeat), so check it the same way.
           const strikesStale = strikeAge === null || strikeAge >= hours;
+          // Live AIS ship-movement context also refreshes ONLY inside a full
+          // ingest. Treat a stale movement table as a reason to run so the
+          // Shipping Watch board stays within its 14-day freshness window even
+          // when incidents are fresh (which alone skips the full ingest). Only
+          // considered when AIS is keyed+enabled — otherwise the table is empty
+          // by design and would force a needless scrape on every cold start.
+          const aisActive = aisMovementActive();
+          const movementAge = aisActive
+            ? await hoursSinceNewestMovement()
+            : null;
+          const movementStale =
+            aisActive && (movementAge === null || movementAge >= hours);
+          // A movement table already past the 14-day SLA at boot means the
+          // refresh path fell behind (the catch-up below restores it, but the
+          // breach itself is worth an alert in production).
+          if (
+            aisActive &&
+            movementAge !== null &&
+            movementAge >= MOVEMENT_FRESH_DAYS * 24
+          ) {
+            logger.warn(
+              {
+                movementAgeHours: Math.round(movementAge),
+                freshDays: MOVEMENT_FRESH_DAYS,
+              },
+              "boot ingest: AIS movement past freshness SLA — forcing catch-up to restore it",
+            );
+          }
           if (
             age === null ||
             age >= hours ||
             staleLandTopics.length > 0 ||
-            strikesStale
+            strikesStale ||
+            movementStale
           ) {
             logger.info(
               {
@@ -390,6 +508,9 @@ export function startIngestScheduler(): void {
                 strikeAgeHours:
                   strikeAge === null ? null : Math.round(strikeAge),
                 strikesStale,
+                movementAgeHours:
+                  movementAge === null ? null : Math.round(movementAge),
+                movementStale,
               },
               "boot ingest: data stale, running catch-up",
             );
@@ -417,7 +538,14 @@ export function startIngestScheduler(): void {
 
   // Recurring refresh for warm/always-on processes. unref() so the timer never
   // blocks process shutdown (the server's listen handle keeps the process up).
-  const timer = setInterval(() => void tick("interval"), hours * MS_PER_HOUR);
+  const timer = setInterval(
+    () =>
+      void (async () => {
+        await tick("interval");
+        await monitorMovementFreshness("interval");
+      })(),
+    hours * MS_PER_HOUR,
+  );
   timer.unref();
 
   logger.info({ intervalHours: hours }, "ingest scheduler started");
