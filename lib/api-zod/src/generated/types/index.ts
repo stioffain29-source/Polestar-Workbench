@@ -26,6 +26,7 @@ export * from './countryBaselineInput';
 export * from './countryBaselineWatchlistItem';
 export * from './countryProseResult';
 export * from './countryProseSections';
+export * from './countryProseSectionsIncidentSummaries';
 export * from './countryReport';
 export * from './countryReportInput';
 export * from './countryReportUpdate';

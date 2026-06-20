@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryProseSectionsIncidentSummaries } from './countryProseSectionsIncidentSummaries';
 
 export interface CountryProseSections {
   executiveSummary: string;
@@ -15,4 +16,5 @@ export interface CountryProseSections {
   watchNext: string[];
   polestarView: string;
   outlook?: string;
+  incidentSummaries?: CountryProseSectionsIncidentSummaries;
 }

@@ -968,6 +968,8 @@ export interface CountryBaselineInput {
 
 export interface ProseIncidentInput {
   /** @nullable */
+  id?: string | null;
+  /** @nullable */
   topic?: string | null;
   /** @nullable */
   title?: string | null;
@@ -1004,6 +1006,8 @@ export interface ProseBaselineContext {
   resourceSectorExposure?: string | null;
 }
 
+export type CountryProseSectionsIncidentSummaries = {[key: string]: string};
+
 export interface CountryProseSections {
   executiveSummary: string;
   situation: string;
@@ -1013,6 +1017,7 @@ export interface CountryProseSections {
   watchNext: string[];
   polestarView: string;
   outlook?: string;
+  incidentSummaries?: CountryProseSectionsIncidentSummaries;
 }
 
 export type GenerateCountryProseInputVariant = typeof GenerateCountryProseInputVariant[keyof typeof GenerateCountryProseInputVariant];

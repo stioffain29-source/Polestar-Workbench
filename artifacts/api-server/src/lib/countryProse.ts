@@ -26,7 +26,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated.
-export const PROSE_PROMPT_VERSION = "v2";
+export const PROSE_PROMPT_VERSION = "v3";
 
 // The model only ever sees this many incidents, and the cache fingerprint hashes
 // exactly the same capped set — so the cache key and the prompt input can never
@@ -40,6 +40,7 @@ export const MAX_PROSE_INCIDENTS = 60;
 export const MAX_PROSE_INCIDENTS_ACCEPTED = 1000;
 
 export interface ProseIncidentInput {
+  id?: string | null;
   topic?: string | null;
   title?: string | null;
   summary?: string | null;
@@ -99,6 +100,10 @@ function incidentIdentity(i: ProseIncidentInput): string {
   const date = (i.occurredAt ?? "").slice(0, 10);
   const norm = (v?: string | null) => (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
   return [
+    // id is included because the per-incident summaries (png variant) are keyed
+    // by it: if the id changes the cached summary map can no longer be matched to
+    // the rendered card, so the fingerprint must flip and regenerate.
+    norm(i.id),
     norm(i.title),
     date,
     norm(i.severity),
@@ -204,10 +209,18 @@ WRITING RULES:
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
 
+PER-INCIDENT SUMMARIES ("incidentSummaries"):
+- For EVERY numbered incident in the INCIDENTS list, write one concise factual analyst summary of THAT specific incident.
+- Ground each summary ONLY on that incident's own title and summary line — never on any other incident, the standing background, or outside knowledge. Do not invent, infer or add facts, casualty figures, place names, group names or attributions that are not in that incident's own text.
+- State plainly what happened, where, who or what was affected, and the operational implication for staff movement, site access or continuity ONLY where that incident's own text supports it.
+- One sentence is usually enough; use two only when the incident's text genuinely carries that much. When the source text is thin, keep it short rather than padding.
+- Do NOT state numeric counts of incidents or records, and do NOT repeat the incident's title verbatim.
+
 Return STRICT JSON with EXACTLY these keys and no others:
 {
   "executiveSummary": string,  // 3-4 sentences: the headline judgement for this window — the dominant provinces and event types — and what it means for operations now.
-  "outlook": string            // 2-3 sentences: the forward view for the coming period, grounded in this window's pattern and the standing background; what to expect and where pressure is likely.
+  "outlook": string,           // 2-3 sentences: the forward view for the coming period, grounded in this window's pattern and the standing background; what to expect and where pressure is likely.
+  "incidentSummaries": object  // Keys are the incident NUMBERS from the INCIDENTS list as strings ("1", "2", ...); each value is that incident's factual summary as described above. Include an entry for every numbered incident.
 }
 Return ONLY the JSON object.`;
 }
@@ -277,7 +290,11 @@ function coerceList(v: unknown): string[] {
     .filter(Boolean);
 }
 
-function parseSections(content: string, variant: ProseVariant): CountryProseSections | null {
+function parseSections(
+  content: string,
+  variant: ProseVariant,
+  incidents: ProseIncidentInput[],
+): CountryProseSections | null {
   let raw: unknown;
   try {
     raw = JSON.parse(content);
@@ -295,12 +312,30 @@ function parseSections(content: string, variant: ProseVariant): CountryProseSect
   const o = raw as Record<string, unknown>;
 
   if (variant === "png") {
-    // The PNG brief only consumes Executive Summary + Outlook; the structured
-    // builder owns every other section. The remaining keys are written empty so
-    // the stored shape stays a valid CountryProseSections.
+    // The PNG brief consumes Executive Summary + Outlook + the per-incident
+    // summaries; the structured builder owns every other section. The remaining
+    // keys are written empty so the stored shape stays a valid
+    // CountryProseSections.
+    //
+    // incidentSummaries are returned keyed by the 1-based incident NUMBER from
+    // the prompt. The prompt numbers the canonical capped set, so map each number
+    // back to that incident's id to produce the id-keyed map the client renders.
+    const canon = canonicalIncidents(incidents);
+    const incidentSummaries: Record<string, string> = {};
+    const rawSummaries = o.incidentSummaries;
+    if (rawSummaries && typeof rawSummaries === "object" && !Array.isArray(rawSummaries)) {
+      for (const [k, v] of Object.entries(rawSummaries as Record<string, unknown>)) {
+        const idx = Number(k) - 1;
+        const inc = Number.isInteger(idx) ? canon[idx] : undefined;
+        const text = coerceStr(v);
+        const id = inc?.id != null ? String(inc.id).trim() : "";
+        if (id && text) incidentSummaries[id] = text;
+      }
+    }
     const sections: CountryProseSections = {
       executiveSummary: coerceStr(o.executiveSummary),
       outlook: coerceStr(o.outlook),
+      incidentSummaries,
       situation: "",
       whatHappened: "",
       whatMatters: "",
@@ -377,7 +412,7 @@ async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome
     const content = choice?.message?.content;
     if (!content) return { ok: false, error: `empty-content(${choice?.finish_reason ?? "?"})` };
 
-    const sections = parseSections(content, variant);
+    const sections = parseSections(content, variant, input.incidents);
     if (!sections) return { ok: false, error: "bad-json" };
     return { ok: true, sections, model: MODEL };
   } catch (err) {

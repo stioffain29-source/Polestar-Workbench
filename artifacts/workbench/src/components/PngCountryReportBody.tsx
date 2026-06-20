@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import { format } from "date-fns";
 import type {
   PngReportDataset,
@@ -5,6 +6,14 @@ import type {
   StructuredLocationAugmentation,
   StructuredLocationBucket,
 } from "@/lib/pngReportDataset";
+
+// Per-incident AI analyst summaries, keyed by incident id, provided by the
+// page. When an incident has an entry it replaces the deterministic
+// category-impact line on the card; otherwise the card falls back to that
+// deterministic line (the page also shows a visible "AI narrative unavailable"
+// banner in that case). Threaded via context so the shared ItemCard reads it
+// without prop-drilling through every section variant.
+const IncidentSummaryContext = createContext<Record<string, string>>({});
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -101,6 +110,12 @@ function dateLine(item: PngReportItem): string {
 
 function ItemCard({ item }: { item: PngReportItem }) {
   const color = SEV_COLOR[item.severity] ?? ELECTRIC;
+  const summaries = useContext(IncidentSummaryContext);
+  // AI per-incident analyst summary when available; otherwise the deterministic
+  // category-impact line (a "AI narrative unavailable" banner labels this case
+  // page-side). Never both — the recycled category line is hidden when the AI
+  // summary is present.
+  const bodyText = summaries[item.id]?.trim() || item.businessImpact;
   return (
     <div
       style={{
@@ -112,18 +127,31 @@ function ItemCard({ item }: { item: PngReportItem }) {
         marginBottom: 10,
       }}
     >
-      <div className="flex items-start justify-between" style={{ gap: 12 }}>
-        <div style={{ fontFamily: ROBOTO, fontSize: 14, fontWeight: 600, color: NAVY, lineHeight: 1.3 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            textAlign: "left",
+            fontFamily: ROBOTO,
+            fontSize: 14,
+            fontWeight: 600,
+            color: NAVY,
+            lineHeight: "22px",
+          }}
+        >
           {item.title}
         </div>
-        <SeverityChip item={item} />
+        <div style={{ flexShrink: 0 }}>
+          <SeverityChip item={item} />
+        </div>
       </div>
-      <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 6, letterSpacing: "0.02em" }}>
+      <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 6, letterSpacing: "0.02em", textAlign: "left" }}>
         {[item.category, item.province ?? "Location not specified", dateLine(item)].join("  ·  ")}
         {item.source ? `  ·  ${item.source}` : ""}
       </div>
-      <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 6, lineHeight: 1.5 }}>
-        {item.businessImpact}
+      <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 6, lineHeight: 1.5, textAlign: "left" }}>
+        {bodyText}
       </div>
     </div>
   );
@@ -261,10 +289,16 @@ function StrandedLocationSection({
   );
 }
 
-export default function PngCountryReportBody({ dataset }: { dataset: PngReportDataset }) {
+export default function PngCountryReportBody({
+  dataset,
+  incidentSummaries = {},
+}: {
+  dataset: PngReportDataset;
+  incidentSummaries?: Record<string, string>;
+}) {
   const d = dataset;
   return (
-    <>
+    <IncidentSummaryContext.Provider value={incidentSummaries}>
       {/* 1. Executive Summary */}
       <Section title="Executive Summary">
         <Prose text={d.executiveSummary} />
@@ -339,7 +373,7 @@ export default function PngCountryReportBody({ dataset }: { dataset: PngReportDa
       <Section title="Source Confidence & Reporting Gaps">
         <DiagnosticsBlock dataset={d} />
       </Section>
-    </>
+    </IncidentSummaryContext.Provider>
   );
 }
 

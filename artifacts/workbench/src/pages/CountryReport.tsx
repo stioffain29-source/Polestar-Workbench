@@ -455,9 +455,10 @@ export default function CountryReport() {
   const proseIncidents: ProseIncidentInput[] = useMemo(() => {
     if (isStructured && pngDataset) {
       return pngDataset.windowItems.map((it) => ({
+        id: it.id,
         topic: it.category,
         title: it.title,
-        summary: null,
+        summary: it.summary ?? null,
         location: it.province ?? null,
         country: country?.name ?? "",
         severity: it.severity,
@@ -484,6 +485,7 @@ export default function CountryReport() {
     const ids = proseIncidents
       .map((i) =>
         [
+          (i.id ?? "").trim().toLowerCase(),
           (i.title ?? "").trim().toLowerCase(),
           (i.occurredAt ?? "").slice(0, 10),
           (i.severity ?? "").toLowerCase(),
@@ -659,8 +661,29 @@ export default function CountryReport() {
     return pngDataset;
   }, [pngDataset, editing, proseDraft, proseResult]);
 
+  // PNG: the per-incident AI analyst summaries (keyed by incident id) from the
+  // same effective source as the prose above — live draft while editing,
+  // otherwise the saved/edited server prose. Empty when no AI prose exists, in
+  // which case each card falls back to its deterministic category line.
+  const pngIncidentSummaries = useMemo<Record<string, string>>(() => {
+    const src =
+      editing && proseDraft
+        ? proseDraft
+        : proseResult
+          ? (proseResult.edited ?? proseResult.sections)
+          : null;
+    return src?.incidentSummaries ?? {};
+  }, [editing, proseDraft, proseResult]);
+
   const setProseField = (k: keyof CountryProseSections, v: string | string[]) =>
     setProseDraft((d) => (d ? { ...d, [k]: v } : d));
+
+  // Update a single per-incident summary in the live draft (keyed by incident
+  // id). Persisted for free because the whole proseDraft is sent on save.
+  const setIncidentSummary = (id: string, text: string) =>
+    setProseDraft((d) =>
+      d ? { ...d, incidentSummaries: { ...(d.incidentSummaries ?? {}), [id]: text } } : d,
+    );
 
   useEffect(() => {
     if (!country) return;
@@ -1114,6 +1137,24 @@ export default function CountryReport() {
           </div>
           <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
           <BaselineTextField label="Outlook — Next Week" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
+          {pngDataset && pngDataset.windowItems.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 6 }}>
+                Incident Summaries
+              </div>
+              <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
+                One analyst summary per incident, grounded on its own reporting. Shown on each incident card.
+              </div>
+              {pngDataset.windowItems.map((it) => (
+                <BaselineTextField
+                  key={it.id}
+                  label={it.title}
+                  value={proseDraft.incidentSummaries?.[it.id] ?? ""}
+                  onChange={(v) => setIncidentSummary(it.id, v)}
+                />
+              ))}
+            </div>
+          )}
         </Section>
       )}
 
@@ -1133,7 +1174,9 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {isStructured && pngEffectiveDataset && <PngCountryReportBody dataset={pngEffectiveDataset} />}
+      {isStructured && pngEffectiveDataset && (
+        <PngCountryReportBody dataset={pngEffectiveDataset} incidentSummaries={pngIncidentSummaries} />
+      )}
 
       {!isStructured && (
       <>

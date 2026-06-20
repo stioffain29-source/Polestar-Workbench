@@ -1976,6 +1976,7 @@ components:
     ProseIncidentInput:
       type: object
       properties:
+        id: { type: ["string", "null"] }
         topic: { type: ["string", "null"] }
         title: { type: ["string", "null"] }
         summary: { type: ["string", "null"] }
@@ -2019,6 +2020,11 @@ components:
         # Forward-looking paragraph. Only the PNG brief (variant "png") populates
         # this; the generic country report omits it.
         outlook: { type: string }
+        # Per-incident analyst summaries for the structured brief (variant
+        # "png"), keyed by incident id. Omitted by the generic country report.
+        incidentSummaries:
+          type: object
+          additionalProperties: { type: string }
 
     GenerateCountryProseInput:
       type: object

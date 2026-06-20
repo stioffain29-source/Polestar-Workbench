@@ -8,6 +8,8 @@
 
 export interface ProseIncidentInput {
   /** @nullable */
+  id?: string | null;
+  /** @nullable */
   topic?: string | null;
   /** @nullable */
   title?: string | null;

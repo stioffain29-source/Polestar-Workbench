@@ -14,6 +14,11 @@ export interface CountryProseSections {
   // Forward-looking outlook paragraph. Only the PNG country brief (variant
   // "png") populates this; the generic country report leaves it undefined.
   outlook?: string;
+  // Per-incident analyst summaries for the structured brief (variant "png"),
+  // keyed by incident id. Each is a short factual summary grounded only on that
+  // incident's own title + summary. Cached/edited with the rest of the sections;
+  // absent for the generic country report.
+  incidentSummaries?: Record<string, string>;
 }
 
 // Cache of AI-generated country-report prose, keyed one-row-per-country.

@@ -221,6 +221,10 @@ export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
 export interface PngReportItem {
   id: string;
   title: string;
+  // The incident's own reported summary text. Carried through so the AI
+  // per-incident analyst summary can be grounded on title + summary, and used as
+  // the fingerprint/grounding input for the prose engine.
+  summary: string;
   province: string | null;
   category: PngCategory;
   businessImpact: string;
@@ -320,6 +324,7 @@ function toItem(i: PngSourceIncident): PngReportItem {
   return {
     id: String(i.id ?? `${i.title}-${i.occurredAt}`),
     title,
+    summary: (i.summary ?? "").trim(),
     province,
     category,
     businessImpact: impact,
