@@ -17,3 +17,11 @@ throw "column does not exist" while dev works fine.
 
 **How to apply:** any new schema column/table — add the IF NOT EXISTS DDL to the
 migration runner so it self-applies on the next deploy. Idempotent, safe to re-run.
+
+**Enforced by a test:** `__tests__/db/schemaBootMigrationDrift.test.ts` compares
+every Drizzle table/column (via `getTableConfig`) against the `CREATE TABLE` /
+`ALTER ... ADD COLUMN IF NOT EXISTS` DDL parsed from `migrations.ts`, and fails
+the jest run on drift. It carries a FROZEN baseline of pre-guard tables/columns
+(incidents/sources/reports original cols + whole strikes/spot_reports/
+market_prices, all verified present in prod). Do NOT grow that baseline for new
+schema — add boot DDL instead, or the guard is pointless.
