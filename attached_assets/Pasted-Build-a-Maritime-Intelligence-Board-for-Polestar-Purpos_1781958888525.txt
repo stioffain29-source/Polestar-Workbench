@@ -1,0 +1,110 @@
+Build a Maritime Intelligence Board for Polestar.
+
+Purpose:
+Create a Shipping Watch / Maritime Security board that separates confirmed incidents from wider maritime movement intelligence.
+
+Core principle:
+Do not mix vessel movement data with security incidents. AIS movement, dark activity and traffic counts are context indicators. They are not incidents unless a discrete event is confirmed.
+
+Data layers:
+
+1. Confirmed maritime incidents
+Sources:
+- UKMTO warnings and advisories
+- IMB piracy and armed robbery map
+- Reuters / AP / credible maritime reporting
+- Port authority notices where available
+
+Incident categories:
+- Attack
+- Attempted attack
+- Boarded
+- Fired upon
+- Hijacked / seized
+- Suspicious approach
+- Explosion / projectile impact
+- Port closure / port disruption
+- Maritime protest / labour disruption
+- Other confirmed maritime security event
+
+2. Maritime movement context
+Sources:
+- AIS provider API if available
+- VesselFinder / Spire / MarineTraffic / Lloyd’s / Windward depending on subscription
+- Manual upload fallback if no API is available
+
+Movement context fields:
+- theatre
+- chokepoint
+- data_as_of
+- total_vessels
+- inbound_count
+- outbound_count
+- tankers_count
+- bulk_carriers_count
+- container_count
+- LNG_LPG_count
+- anchored_or_waiting_count
+- AIS_visible_count
+- AIS_dark_or_gap_count
+- change_vs_7_day_baseline
+- notes
+- confidence
+- source_name
+- source_url
+- raw_payload
+
+3. Risk scoring
+Create a Polestar maritime risk level from 1 to 5:
+1 Normal
+2 Watch
+3 Elevated
+4 High
+5 Extreme
+
+Risk score should consider:
+- Number of confirmed incidents in last 7 days
+- Severity of incidents
+- Proximity to chokepoints
+- Change in vessel movement versus baseline
+- AIS visibility reduction
+- Vessel classes affected
+- Port or route disruption
+- Confidence level
+
+Board layout:
+- BLUF
+- Current maritime risk level
+- Movement snapshot
+- Incident snapshot
+- Key risk indicators
+- Business impact
+- Watch next
+- Source health
+
+Business impact options:
+- No material impact
+- Crew vigilance only
+- Delay risk
+- Insurance / war risk premium risk
+- Rerouting risk
+- Port disruption risk
+- Cargo delay risk
+- Chartering / fixture caution
+- Severe route disruption
+
+Rules:
+- AIS dark activity is an indicator, not an incident.
+- Do not infer hostile intent from AIS gaps alone.
+- Do not claim sanctions exposure unless sourced from a licensed compliance data provider or official sanctions list.
+- Do not copy paid provider prose into Polestar reports.
+- Store provider data attribution.
+- Show confidence level on every assessment.
+- If AIS API is unavailable, degrade cleanly and show movement data unavailable.
+
+Acceptance tests:
+- UKMTO / IMB incidents appear as confirmed incidents.
+- AIS movement data appears only in maritime context.
+- No new incident is created from vessel movement alone.
+- Shipping Watch can produce a BLUF, movement summary, incident summary, business impact and Polestar View.
+- Source Health shows each maritime source as live, stale, disabled or unavailable.
