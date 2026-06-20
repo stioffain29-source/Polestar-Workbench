@@ -74,3 +74,29 @@ change. **Scope discipline that held:** do NOT blanket re-rate `legacy:db` rows 
 the classifier wouldn't reproduce (e.g. a military-PR "anniversary" headline) — that is the
 flagged-unsafe ~414-row territory; the heal only touches rows a specific predicate matches. The
 Missile Strike Tracker (`strikes` TABLE, separate from the `strikes` topic) is left untouched.
+
+## Illness / biographical death — the FOURTH strip-and-retest guard, and its cancel-list trap
+
+`isBiographicalOrIllnessDeath` joins natural-cause/judicial as a guard against bare-`death` over-rating:
+a Father's-Day-concert puff piece ("the death of his father … to Covid-19" six years ago) read
+EXTREME. It fires on illness/obituary/biographical cues (covid/cancer/"passed away"/"death of his
+father"/"late father") **only when no `SECURITY_OR_CROWD_SIGNAL_RE` is present**.
+**Trap:** that cancel-list is what stops the guard from suppressing a REAL violent death that merely
+mentions a relative ("death of his father after a hijacking"). It was missing common violent-crime
+cues — `robber*|hijack*|homicide|murder*|kidnap*|abduct*|hostage` — so adding new bio cues without
+those creates false-negative suppression. The cancel-list errs toward KEEPING Extreme; widen it in
+lockstep with any bio-cue addition.
+
+## Cross-language gap — severity is set at INGEST, BEFORE translation
+
+`classifySeverity` is English-only and runs at ingest, *before* `display_title` translation, so a
+non-English violent headline matches no keyword and falls to the LOW default — a Bahasa "Pelajar …
+ditembak saat operasi militer" (student shot in a military op) read LOW. **Do NOT fix this by moving
+classification after translation** (translation is best-effort/optional and may never run). Fix it
+with language-specific markers in the classifier itself: `ID_FATAL_RE` (violent killings → Extreme),
+`ID_VIOLENCE_RE` (violence/injury → High), surfaced via `hasIndonesianViolenceSignal`. Keep them
+TIGHTLY violence-bound and exclude cross-language homonyms — `serangan` (also "heart attack"), bare
+`tewas`/`korban jiwa` (also disaster/accident tolls) — and mirror the violent terms into
+`SECURITY_OR_CROWD_SIGNAL_RE` so the death guards never suppress a genuine foreign-language killing.
+The heal upgrades existing Bahasa-violence rows; other languages remain an open gap (extend the same
+way per language).

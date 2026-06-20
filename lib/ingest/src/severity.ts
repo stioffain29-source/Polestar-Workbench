@@ -113,7 +113,7 @@ const NATURAL_CAUSE_RE =
 // so any of these present cancels the natural-cause suppression (a missed
 // downgrade is harmless; wrongly hiding a real massacre is not).
 const SECURITY_OR_CROWD_SIGNAL_RE =
-  /\b(air ?strikes?|drone|missile|rocket|shell(ed|ing|s)?|artillery|mortar|bomb\w*|blast|explos\w*|grenade|ied|landmine|land mine|gun\w*|shot|shoot\w*|firing|opened fire|ambush\w*|raid\w*|clash\w*|attack\w*|assault\w*|militant\w*|insurgent\w*|terror\w*|rebel\w*|junta|army|troops?|soldiers?|security force|stab\w*|machete|arson|riot\w*|stampede|crush|trampl\w*|crowd|protest\w*|police)\b/i;
+  /\b(air ?strikes?|drone|missile|rocket|shell(ed|ing|s)?|artillery|mortar|bomb\w*|blast|explos\w*|grenade|ied|landmine|land mine|gun\w*|shot|shoot\w*|firing|opened fire|ambush\w*|raid\w*|clash\w*|attack\w*|assault\w*|militant\w*|insurgent\w*|terror\w*|rebel\w*|junta|army|troops?|soldiers?|security force|robber\w*|hijack\w*|homicide|murder\w*|kidnap\w*|abduct\w*|hostage|stab\w*|machete|arson|riot\w*|stampede|crush|trampl\w*|crowd|protest\w*|police|ditembak|penembakan|baku tembak|tembak mati|dibunuh|pembunuhan|terbunuh|penyerangan|serangan bersenjata|kekerasan|bentrok\w*|kerusuhan)\b/i;
 
 /**
  * True if the text describes a natural / accidental death (lightning, flood,
@@ -126,10 +126,59 @@ export function isNaturalCauseDeath(title: string, summary: string): boolean {
   return NATURAL_CAUSE_RE.test(hay) && !SECURITY_OR_CROWD_SIGNAL_RE.test(hay);
 }
 
+// Illness / biographical / commemorative death. A bare "death" word can appear
+// in a human-interest or obituary context — "after the death of his father to
+// Covid-19", "dies at 82 after a long illness", "death anniversary", "late
+// father" — which is NOT a security event and must never occupy the reserved
+// Extreme tier next to airstrikes and massacres. (Reported case: an entertainer
+// reflecting on his late father's Covid death read EXTREME.) Mirrors
+// isNaturalCauseDeath: an explicit illness/biographical cue with NO security,
+// violence or crowd signal cancels the Extreme rating; the row still falls
+// through to the lower tiers on any other signal.
+const ILLNESS_BIO_DEATH_RE =
+  /\b(covid|coronavirus|cancer|leukae?mia|tumou?r|illness|ailment|disease|pneumonia|heart attack|cardiac|stroke|diabet\w*|kidney|liver failure|sepsis|organ failure|natural causes|old age|passed away|passing|obituary|laid to rest|funeral|wake|memorial service|in memoriam|condolences?|dies? (?:at|aged)\s+\d+|died (?:at|aged)\s+\d+|aged \d+|death anniversary|anniversary of (?:his|her|their|the) death|death of (?:his|her|their|my|the late)\b|lost (?:his|her|their|my) (?:father|mother|dad|mum|mom|husband|wife|son|daughter|brother|sister|grand\w+)|late (?:father|mother|dad|husband|wife|son|daughter|brother|sister|grand\w+))\b/i;
+
+/**
+ * True if the text describes an illness / biographical / commemorative death
+ * (Covid, cancer, "passed away", obituary, "death of his father", a death
+ * anniversary, …) with NO security, violence or crowd signal — a death that
+ * must NOT read as a reserved-tier security Extreme. Exported so the one-time
+ * DB heal can downgrade such mis-rated machine rows.
+ */
+export function isBiographicalOrIllnessDeath(title: string, summary: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return ILLNESS_BIO_DEATH_RE.test(hay) && !SECURITY_OR_CROWD_SIGNAL_RE.test(hay);
+}
+
+// Indonesian-language violence signals. The classifier is otherwise English-only,
+// so a Bahasa headline ("Pelajar … ditembak saat operasi militer" — a student
+// shot during a military operation) carried NO English keyword and collapsed to
+// the LOW default though it describes a shooting. These terms are distinctly
+// Indonesian (no English homonym); the ambiguous ones are deliberately excluded
+// (bare "serangan" = also "serangan jantung"/heart attack; bare "tewas"/"korban
+// jiwa" = also disaster death tolls) so a non-security Indonesian death does not
+// reach the reserved tiers. ID_FATAL terms denote a violent killing → Extreme;
+// ID_VIOLENCE terms denote a violent/injurious act → High.
+const ID_FATAL_RE =
+  /\b(dibunuh|pembunuhan|terbunuh|tembak mati|ditembak mati|tewas ditembak)\b/i;
+const ID_VIOLENCE_RE =
+  /\b(ditembak|penembakan|baku tembak|penyerangan|serangan bersenjata|kekerasan|bentrokan|bentrok|kerusuhan|melukai|terluka|luka tembak)\b/i;
+
+/**
+ * True if the text carries an Indonesian-language fatal or violence signal.
+ * Exported so the one-time DB heal can scope its UPGRADE strictly to the Bahasa
+ * rows this change re-rates.
+ */
+export function hasIndonesianViolenceSignal(title: string, summary: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return ID_FATAL_RE.test(hay) || ID_VIOLENCE_RE.test(hay);
+}
+
 // Fatalities, mass casualties, emergency rule. Reserved tier — drives the
 // subdued-red marker only.
 const EXTREME: RegExp[] = [
   /\b(killed|dead|deaths?|died|fatal(it(y|ies))?|massacre|killings?|slain|shot dead|gunned down|burn(ed|t) (?:to death|alive)|stampede)\b/i,
+  ID_FATAL_RE,
   PRESENT_TENSE_FATAL_RE,
   PRESENT_TENSE_FATAL_COUNT_RE,
   /\b(martial law|state of emergency|emergency declared)\b/i,
@@ -145,6 +194,7 @@ const HIGH: RegExp[] = [
   /\b(curfew|crackdown|mass arrests?|state forces (open|fire))\b/i,
   /\b(at gunpoint|armed (robbery|men|gang|hijack|heist)|gunpoint|brandish|machete|hijack(ed|ing) at|held up)\b/i,
   /\b(stormed|besieg(e|ed)|breach(ed)? the|overran)\b/i,
+  ID_VIOLENCE_RE,
 ];
 
 // Active confrontation, arrests, blockades, operational disruption.
@@ -274,7 +324,20 @@ export function classifySeverity(
   // is not a killing event, so it must not occupy the reserved Extreme tier.
   const judicialDeath = isJudicialDeath(title, summary);
 
-  if (!reactionLed && !naturalCauseDeath && !judicialDeath && EXTREME.some((re) => re.test(hay)))
+  // Illness / biographical guard. An obituary / human-interest death (Covid,
+  // cancer, "death of his father", a death anniversary) with NO security signal
+  // must not occupy the reserved Extreme tier. Like the natural-cause guard it
+  // only suppresses the bare-death EXTREME match; a genuine violent death keeps
+  // its own security signal so this never fires on a real attack.
+  const biographicalDeath = isBiographicalOrIllnessDeath(title, summary);
+
+  if (
+    !reactionLed &&
+    !naturalCauseDeath &&
+    !judicialDeath &&
+    !biographicalDeath &&
+    EXTREME.some((re) => re.test(hay))
+  )
     return "extreme";
   if (!reactionLed && HIGH.some((re) => re.test(hay))) return "high";
   if (MODERATE.some((re) => re.test(hay))) return "moderate";

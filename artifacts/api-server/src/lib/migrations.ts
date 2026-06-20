@@ -15,6 +15,8 @@ import {
   isNaturalCauseDeath,
   isFatalKineticAttack,
   isJudicialDeath,
+  isBiographicalOrIllnessDeath,
+  hasIndonesianViolenceSignal,
   severityFromFatalities,
   maxSeverity,
   SEVERITY_RANK,
@@ -1402,6 +1404,90 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { scanned: candidates.length, upgraded, downgraded, marker: markerKey },
           "One-time severity heal: present-tense fatal upgrade + natural-cause downgrade",
+        );
+      }
+    }
+
+    // 3g-3) One-time heal for two classifier corrections shipped together, each
+    //       direction gated on the narrow predicate for exactly this change so
+    //       the pass never sweeps unrelated rows:
+    //         (a) UPGRADE — Bahasa-language incidents the English-only classifier
+    //             could not read, so a real shooting ("Pelajar … ditembak saat
+    //             operasi militer" — a student shot during a military operation)
+    //             collapsed to LOW. classifySeverity now carries Indonesian
+    //             violence/fatal markers, so NEW rows rate correctly while stored
+    //             machine rows keep the stale LOW chip (hasIndonesianViolenceSignal).
+    //         (b) DOWNGRADE — illness / biographical deaths (Covid, obituary,
+    //             "the death of his father") the bare-death EXTREME regex wrongly
+    //             rated EXTREME (reported case: an entertainer's Father's Day
+    //             concert piece). isBiographicalOrIllnessDeath now suppresses
+    //             these, so stored rows must vacate the reserved tier.
+    //       Machine-provenance flashpoint/conflict/strikes rows only, never below
+    //       a structured fatality floor, only when strictly stronger/weaker.
+    //       Marker-gated → runs once per environment.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_intl_violence_and_bio_death_heal_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, ["flashpoint", "conflict", "strikes"]),
+              or(
+                like(incidentsTable.analystNotes, "auto-scraped:%"),
+                like(incidentsTable.analystNotes, "legacy:db:%"),
+              ),
+            ),
+          );
+        let upgraded = 0;
+        let downgraded = 0;
+        for (const r of candidates) {
+          const isUpgradeCandidate = hasIndonesianViolenceSignal(r.title, r.summary ?? "");
+          const isDowngradeCandidate = isBiographicalOrIllnessDeath(r.title, r.summary ?? "");
+          if (!isUpgradeCandidate && !isDowngradeCandidate) continue;
+          const topic = r.topic === "conflict" || r.topic === "strikes" ? "conflict" : "flashpoint";
+          const fromText = classifySeverity(r.title, r.summary ?? "", topic);
+          const floor = severityFromFatalities(r.fatalities);
+          const next = floor ? maxSeverity(fromText, floor) : fromText;
+          const stored = r.severity as Severity;
+          if (isUpgradeCandidate && !isDowngradeCandidate && SEVERITY_RANK[next] > SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            upgraded++;
+          } else if (isDowngradeCandidate && SEVERITY_RANK[next] < SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            downgraded++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: candidates.length, upgraded, downgraded, marker: markerKey },
+          "One-time severity heal: Bahasa violence upgrade + illness/biographical death downgrade",
         );
       }
     }
