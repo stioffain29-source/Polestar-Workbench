@@ -6,9 +6,18 @@ import {
   runIngestOnce,
   runReliefWebReportsOnce,
   runIccPiracyOnce,
+  runMovementOnce,
 } from "../lib/ingestRunner";
+import { backfillRelevance } from "../lib/migrations";
 
 const router: IRouter = Router();
+
+// In-process guard so two concurrent /admin/relevance-backfill calls (or a
+// rapid double-click) can't both run the pool-bounded write pass at once and
+// amplify pool pressure. backfillRelevance is idempotent, so this is a
+// pool-hygiene guard, not a correctness lock; cross-instance runs are harmless
+// (each instance has its own pool, and the work converges to the same result).
+let relevanceBackfillRunning = false;
 
 // Protected production ingestion trigger.
 //
@@ -311,5 +320,128 @@ router.post("/admin/icc-piracy", async (req: Request, res: Response) => {
     }
   }
 });
+
+// Movement-only refresh (the "Live Fleet Intelligence" / ship-movement board).
+//
+// Runs ONLY runMaritimeMovementIngest (live AIS positions per chokepoint +
+// the vessel-registry cargo-class pass) via the shared runMovementOnce. This is
+// the fast, deterministic way to repopulate every tracked chokepoint from
+// inside the deployment runtime — the boot scheduler does the same on a cold
+// start, but on autoscale that boot window is unreliable, so this lets an
+// operator force a full movement refresh in a single request and verify it.
+//
+// Same token gate + advisory lock as /admin/ingest.
+router.post("/admin/movement", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin movement called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  try {
+    req.log.info("admin movement started");
+    const result = await runMovementOnce();
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const mm = result.maritimeMovement;
+    req.log.info(
+      {
+        provider: mm.provider,
+        theatresWritten: mm.theatresWritten,
+        vesselsSeen: mm.vesselsSeen,
+        durationMs: result.durationMs,
+      },
+      "admin movement finished",
+    );
+    res.json({
+      ok: true,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      provider: mm.provider,
+      theatresWritten: mm.theatresWritten,
+      vesselsSeen: mm.vesselsSeen,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin movement failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Relevance re-evaluation (data hygiene).
+//
+// Re-runs the relevance classifier over every incident whose stored rule
+// version differs from the current RELEVANCE_RULE_VERSION, marking off-scope
+// rows 'irrelevant' so they drop from the read surfaces. This normally runs on
+// boot, but on autoscale the boot window is unreliable (a slow run was being
+// torn down mid-pass, leaving most rows stale); this forces it to completion in
+// a single request. Idempotent and safe to re-run.
+//
+// Same token gate as /admin/ingest.
+router.post(
+  "/admin/relevance-backfill",
+  async (req: Request, res: Response) => {
+    const expected = process.env["INGEST_ADMIN_TOKEN"];
+    if (!expected) {
+      req.log.warn(
+        "admin relevance-backfill called but INGEST_ADMIN_TOKEN is not configured",
+      );
+      res.status(503).json({
+        error: "ingestion_disabled",
+        message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+      });
+      return;
+    }
+
+    const presented = presentedToken(req);
+    if (!presented || !safeEqual(presented, expected)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    if (relevanceBackfillRunning) {
+      res.status(409).json({ error: "backfill_in_progress" });
+      return;
+    }
+
+    relevanceBackfillRunning = true;
+    try {
+      req.log.info("admin relevance-backfill started");
+      const result = await backfillRelevance();
+      req.log.info(
+        { updated: result.updated, version: result.version },
+        "admin relevance-backfill finished",
+      );
+      res.json({ ok: true, updated: result.updated, version: result.version });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, "admin relevance-backfill failed");
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .json({ ok: false, error: "ingestion_failed", message });
+      }
+    } finally {
+      relevanceBackfillRunning = false;
+    }
+  },
+);
 
 export default router;

@@ -88,6 +88,25 @@ for `app_migration_markers` (is `ingest_force_v<N>` present? if absent the run n
 `sources.last_success_at/last_failure_at` (do writes stop dead mid-run?); read the deployment
 runtime via `fetch_deployment_logs` (does anything follow the "forced run" line, or silence?).
 
+## WHY the boot work freezes: cloudrun throttles POST-LISTEN background CPU
+The freeze above is not random — on cloudrun autoscale, CPU is allocated essentially
+only DURING request handling. `index.ts` fires `runDataMigrations()` + `startIngestScheduler()`
+in an un-awaited `void (async()=>{})()` AFTER `app.listen`, so all of it is post-listen
+background work that gets throttled to ~0 between requests and is torn down before finishing.
+That is why a ~10k-row sequential relevance backfill stalled partway in prod (most rows left
+on the OLD `relevance_version`) and the boot movement run never committed.
+**Reliable in-app fix WITHOUT a Scheduled/always-on deployment:** do the heavy work INSIDE an
+HTTP request — a token-gated `POST /api/admin/<job>` runs in the request handler, where cloudrun
+gives full CPU, so it completes to the end and returns a verifiable JSON result. This is a real
+alternative to a Scheduled Deployment for one-shot/triggered jobs (not for guaranteed cadence).
+**Also make boot work cheap regardless:** any post-listen pass must be bounded — batch DB writes
+in POOL-bounded chunks (shared `pg` Pool defaults to max:10; cap chunk ≤8 to leave headroom for
+request handlers) instead of one awaited UPDATE per row. Fast boot work + an in-request trigger
+together cover the trafficked-autoscale case; only a guaranteed cadence still needs always-on.
+**Verify, don't trust boot:** after republish, curl the admin trigger then read
+`executeSql({environment:"production"})` to PROVE the row counts changed — never assume the cold
+start finished the job.
+
 ## Google News rate-limits the PROD egress IP (not a code bug)
 Dev (workspace IP) scrapes every feed operational; prod consistently times out ~20+ Google-News
 feeds (`Request timed out after 20000ms`) on the same energy/shipping/strikes/fertiliser set.

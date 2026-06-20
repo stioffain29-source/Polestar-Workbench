@@ -698,6 +698,18 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   // "index rises/falls" wires flooded the Confirmed Maritime Incidents board.
   /\bbaltic (dry|exchange|capesize|panamax|supramax) index\b/,
   /\bbaltic dry\b/,
+  // UK Royal-Navy mine-countermeasures KIT / procurement stories (e.g.
+  // "Defender-Viper: Royal Navy's new minehunting drone", "Royal Navy readies
+  // minesweeper drones for ...") are capability announcements, not chokepoint
+  // incidents — dropped even when a tracked theatre is name-dropped as the
+  // intended area of use (this list, unlike the off-region gate, is NOT
+  // theatre-suppressed). Gated on PROCUREMENT/CAPABILITY framing only — an
+  // operational minehunter actually clearing mines in a tracked strait, or an
+  // attack ON a minesweeper, must stay in-scope, so this no longer fires on the
+  // bare word "drone"/"vessel".
+  /\b(readies|readying|unveil\w*|procur\w*|acquir\w*|fleet of)\b[^.]{0,40}\b(minehunt\w*|minesweep\w*|mine[- ]hunting|mine[- ]sweeping)\b/,
+  /\b(minehunt\w*|minesweep\w*|mine[- ]hunting|mine[- ]sweeping)\b[^.]{0,40}\b(programme|program|procurement|on order|under contract|sea trials?|capabilit\w*)\b/,
+  /\bdefender[- ]viper\b/,
 ];
 
 // Tracked chokepoint theatres — the board follows the Gulf + Asia straits
@@ -721,6 +733,15 @@ const SHIPPING_OFF_REGION: RegExp[] = [
   /\bnorth sea\b/,
   /\bscottish (waters|coast|isles|islands)\b/,
   /\bscotland\b/,
+  // Russian navy / "Putin's tanker" Channel & Atlantic harassment stories — a
+  // European naval-news beat, not a Gulf/Asia chokepoint incident. Bound tightly
+  // (an explicit Russian/Putin vessel, or warship/yacht near "channel") and
+  // still theatre-suppressed, so a Russian warship incident IN a tracked strait
+  // is kept.
+  /\brussian warship\b/,
+  /\bputin'?s?\b[^.]{0,25}\b(tanker|fleet|warship|ship|navy)\b/,
+  /\bchannel\b[^.]{0,30}\b(yacht|warship|crossing|migrant\w*)\b/,
+  /\b(yacht|warship|migrant\w*)\b[^.]{0,30}\bchannel\b/,
   // Russian "shadow fleet" interdiction by the UK / Baltic states — a European
   // sanctions-enforcement story, not a Gulf/Asia chokepoint incident. Bound to
   // the European actor so a shadow-fleet tanker transiting Hormuz still keeps.

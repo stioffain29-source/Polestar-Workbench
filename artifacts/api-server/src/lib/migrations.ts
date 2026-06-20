@@ -2392,7 +2392,10 @@ export async function runDataMigrations(): Promise<void> {
  * whole table on the next boot. The API default-filter then hides the rows
  * marked 'irrelevant' across every read surface.
  */
-async function backfillRelevance(): Promise<void> {
+export async function backfillRelevance(): Promise<{
+  updated: number;
+  version: string;
+}> {
   const rows = await db
     .select({
       id: incidentsTable.id,
@@ -2413,16 +2416,15 @@ async function backfillRelevance(): Promise<void> {
 
   if (rows.length === 0) {
     logger.info("backfillRelevance: nothing to evaluate (DB current)");
-    return;
+    return { updated: 0, version: RELEVANCE_RULE_VERSION };
   }
 
   const now = new Date();
   const perTopic = new Map<string, { relevant: number; irrelevant: number }>();
-  let updated = 0;
 
-  // Sequential UPDATEs keep memory flat and the advisory-free path simple;
-  // this only does real work when the rule version changes.
-  for (const r of rows) {
+  // Evaluate every stale row in memory first (pure CPU, no I/O), tallying per
+  // topic as we go.
+  const writes = rows.map((r) => {
     const v = evaluateIncidentRelevance(r.topic, {
       topic: r.topic,
       title: r.title,
@@ -2431,25 +2433,46 @@ async function backfillRelevance(): Promise<void> {
       sourceUrl: r.sourceUrl ?? "",
       location: r.location ?? null,
     });
-    await db
-      .update(incidentsTable)
-      .set({
-        relevanceStatus: v.status,
-        relevanceScore: v.score,
-        relevanceReason: v.reason,
-        relevanceVersion: v.version,
-        relevanceEvaluatedAt: now,
-      })
-      .where(eq(incidentsTable.id, r.id));
-    updated++;
     const bucket = perTopic.get(r.topic) ?? { relevant: 0, irrelevant: 0 };
     if (v.relevant) bucket.relevant++;
     else bucket.irrelevant++;
     perTopic.set(r.topic, bucket);
+    return { id: r.id, v };
+  });
+
+  // Write in POOL-BOUNDED concurrency chunks. The previous fully-sequential
+  // loop (one awaited UPDATE per row) took minutes for ~10k rows — long enough
+  // that the autoscale (cloudrun) instance was torn down mid-backfill, leaving
+  // most rows on the OLD rule version (so off-scope incidents stayed flagged
+  // relevant). Chunked Promise.all completes the same work in seconds. The
+  // shared pg Pool defaults to max:10 connections; we cap the chunk at 8 so the
+  // backfill can never monopolise the pool and starve concurrent request
+  // handlers while this runs post-listen at boot. It still finishes inside the
+  // cold-start warm window AND inside a single admin-trigger request.
+  const CHUNK = 8;
+  let updated = 0;
+  for (let i = 0; i < writes.length; i += CHUNK) {
+    const chunk = writes.slice(i, i + CHUNK);
+    await Promise.all(
+      chunk.map((w) =>
+        db
+          .update(incidentsTable)
+          .set({
+            relevanceStatus: w.v.status,
+            relevanceScore: w.v.score,
+            relevanceReason: w.v.reason,
+            relevanceVersion: w.v.version,
+            relevanceEvaluatedAt: now,
+          })
+          .where(eq(incidentsTable.id, w.id)),
+      ),
+    );
+    updated += chunk.length;
   }
 
   logger.info(
     { updated, version: RELEVANCE_RULE_VERSION, perTopic: Object.fromEntries(perTopic) },
     "backfillRelevance: evaluated rows",
   );
+  return { updated, version: RELEVANCE_RULE_VERSION };
 }
