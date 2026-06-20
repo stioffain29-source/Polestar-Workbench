@@ -633,13 +633,42 @@ const FP_SCHOOL_ADMISSION_RE =
 // (verdict that sparks protests / clashes / a rally), via the companion guard.
 const FP_COURT_PROCESS_RE =
   /\b(court|tribunal|judge|judiciary|prosecutor\w*|prosecution|the bench)\b[^.]{0,45}\b(sentenc\w*|jail\w*|imprison\w*|convict\w*|acquit\w*|verdict|ruling|rules?|ruled|indict\w*|on trial|found guilty|guilty)\b|\bsentenc\w*\b[^.]{0,30}\b(to|jail|prison|year|years|life)\b|\b(jail|prison) term\b|\bjailed (for|over)\b|\b\d+[- ]year (jail|prison)\b/i;
-// Keep-guard for the court drop: a real unrest reaction to a verdict. Uses
-// LEADING-\b STEMS ONLY (never a trailing \b) so plurals/inflections —
-// "protests", "clashes", "demonstrations", "rioted" — all match. (The older
-// FP_REAL_UNREST_COMPANION_RE has the trailing-\b plural trap, so it is NOT
-// reused here.) "march" is omitted to avoid colliding with the month.
-const FP_COURT_UNREST_KEEP_RE =
-  /\b(protest|demonstrat|rall(y|ies|ied)|riot|clash|unrest|uprising|tear ?gas|water cannon|barricad|stormed|storming|looting|arson|curfew|hartal|bandh|gherao|picket|sit-?in|walkout)/i;
+// Keep-guard for the court drop: only a LIVE unrest reaction TO THE OUTCOME
+// rescues a court/legal-process record — not the bare appearance of a protest
+// word describing the PAST event the case concerns ("union rally death",
+// "protest death", "during a 2024 rally"). The earlier version rescued on any
+// bare "rally"/"protest"/"riot", which let retrospective verdicts about a past
+// rally lead the severity ranking. Three rescue paths, all LEADING-\b STEMS
+// ONLY (never a trailing \b) so plurals/inflections still match:
+//   (a) strong active-response tokens that essentially never appear merely
+//       recounting a past rally (tear gas / water cannon / baton charge /
+//       barricades / curfew / looting / arson / torched / hartal / bandh);
+//   (b) the verdict/ruling/sentence SPARKS or TRIGGERS fresh unrest;
+//   (c) protests/clashes break out AFTER / OVER / AGAINST the ruling.
+// "march" stays omitted to avoid colliding with the month.
+const FP_COURT_UNREST_KEEP_RE = new RegExp(
+  [
+    // (a) active-response tokens (an outcome being met with force / disorder)
+    /\b(tear ?gas|water cannon|baton charg|lathi charg|barricad|curfew|looting|arson|torched|set (ablaze|on fire|alight)|ransack|hartal|bandh|gherao|stormed|storming)/.source,
+    // (b) the ruling/verdict/sentence sparks/triggers a fresh unrest reaction.
+    //     The outcome can be a bare outcome NOUN ("verdict sparks protests") OR
+    //     an institution governing an outcome VERB ("Court jails leader,
+    //     sparking protests") — mirrors FP_COURT_PROCESS_RE's outcome family so
+    //     every phrasing the drop catches can also be rescued.
+    /\b(?:(?:verdict|ruling|sentenc\w*|conviction|acquitt\w*|judg(?:e)?ment|court (?:decision|order|ruling|verdict))|(?:court|tribunal|judge|judiciary)\b[^.]{0,30}\b(?:jail\w*|imprison\w*|convict\w*|sentenc\w*|verdict|ruled|rules?|found guilty|guilty))\b[^.]{0,40}\b(spark\w*|trigger\w*|ignit\w*|prompt\w*|sets? off|setting off|unleash\w*|provok\w*|touch\w* off|led to|lead\w* to|fuel\w*|erupt\w*|flar\w*)\b[^.]{0,45}\b(protest|demonstrat|rall(?:y|ies|ied)|riot|clash|unrest|uprising|walkout|strike)/.source,
+    // (c) protests/clashes break out AFTER / OVER / AGAINST the outcome
+    /\b(protest|demonstrat|rall(?:y|ies|ied)|riot|clash|unrest|uprising|sit-?in|picket|walkout|strike)\w*\b[^.]{0,45}\b(after|over|against|following|amid|amidst|in response to|in reaction to|denounc\w*|reject\w*|condemn\w*|outrag\w*)\b[^.]{0,30}\b(verdict|ruling|sentenc\w*|conviction|acquitt\w*|court|judg(?:e)?ment|decision)/.source,
+    // (d) an unrest verb directly governing the COURT outcome — "Hundreds
+    //     protest court ruling", "demonstrators storm court over verdict".
+    //     Requires the institutional "court" word AS THE OBJECT (not a bare
+    //     "protest verdict", which is the verdict OF a past protest case), so
+    //     a retrospective "court convicts protest activists" — where the
+    //     court word PRECEDES the unrest word — never re-qualifies. "march" is
+    //     omitted here too (month collision: "March court ruling...").
+    /\b(protest|demonstrat|rall(?:y|ies|ied)|riot|clash|storm)\w*\b[^.]{0,20}\bcourt\b[^.]{0,20}\b(ruling|rules?|ruled|verdict|order|decision|judg(?:e)?ment|sentenc\w*|acquitt\w*|conviction|convict\w*)/.source,
+  ].join("|"),
+  "i",
+);
 
 const SHIPPING_EXCLUDE: RegExp[] = [
   /\bfao\b/,
