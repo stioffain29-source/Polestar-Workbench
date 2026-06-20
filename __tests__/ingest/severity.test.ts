@@ -39,8 +39,10 @@ describe("classifySeverity", () => {
     );
   });
 
-  it("prefers extreme tier over topic defaults", () => {
-    expect(classifySeverity("Refinery fire killed workers", "", "fuel")).toBe("extreme");
+  // A confirmed fatality overrides the mild fuel topic default, but a single /
+  // unspecified toll reads High — Extreme is reserved for a mass-casualty count.
+  it("rates a confirmed-fatality incident above the topic default", () => {
+    expect(classifySeverity("Refinery fire killed workers", "", "fuel")).toBe("high");
   });
 
   // Reaction guard: an advocacy / statement headline that REFERENCES a prior
@@ -83,20 +85,54 @@ describe("classifySeverity", () => {
   });
 
   // The guard is scoped to civil-unrest / conflict — a reaction-framed deadly
-  // maritime attack keeps its escalation (it is likely the only record).
+  // maritime attack keeps its escalation (it is likely the only record). The
+  // confirmed killing reads High; Extreme stays reserved for a mass-casualty toll.
   it("does not apply the reaction guard to commodity/maritime topics", () => {
     expect(
       classifySeverity("Union condemns missile strike that killed two crew", "", "shipping"),
-    ).toBe("extreme");
+    ).toBe("high");
   });
 
   // Invariant the one-time severity heal relies on: a reaction-led headline
-  // text-rates Low, but a structured GDELT fatality count floors it back to
-  // Extreme — so a confirmed-fatality row is NEVER downgraded by the migration.
-  it("fatality floor keeps a reaction-led headline with confirmed deaths at extreme", () => {
+  // text-rates Low, but a structured fatality count floors it back up — so a
+  // confirmed-fatality row is NEVER downgraded by the migration. A single / low
+  // toll floors to High; only a mass-casualty count (>= MASS_FATALITY_THRESHOLD)
+  // floors to the reserved Extreme tier.
+  it("fatality floor lifts a reaction-led headline to at least high", () => {
     const text = classifySeverity("Villagers seek justice for slain farmer", "", "conflict");
     expect(text).toBe("low");
-    const floored = maxSeverity(text, severityFromFatalities(2)!);
-    expect(floored).toBe("extreme");
+    expect(maxSeverity(text, severityFromFatalities(2)!)).toBe("high");
+    expect(maxSeverity(text, severityFromFatalities(8)!)).toBe("extreme");
+  });
+
+  // A confirmed killing by a security force is the under-rating that was
+  // reported ("killed in military op" reading low) — it must lift to High.
+  it("rates a confirmed security-force killing as high", () => {
+    expect(
+      classifySeverity("Militant killed by security forces in Chhattisgarh encounter", "", "conflict"),
+    ).toBe("high");
+  });
+
+  // Year guard: a 4-digit dateline year must never be read as a mass body count.
+  // A court-process headline citing a 2-fatality shootout reads High, not Extreme.
+  it("does not read a dateline year as a mass-casualty count", () => {
+    expect(
+      classifySeverity(
+        "Ambush or self defense? Trial begins in 2025 Lorain shootout that killed 2",
+        "",
+        "conflict",
+      ),
+    ).toBe("high");
+  });
+
+  // The year guard must not suppress a genuine mass toll alongside a year.
+  it("keeps a genuine mass toll Extreme even next to a year", () => {
+    expect(
+      classifySeverity(
+        "Anniversary of 2019 Pulwama attack that killed 40 marked in Kashmir",
+        "",
+        "conflict",
+      ),
+    ).toBe("extreme");
   });
 });

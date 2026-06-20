@@ -121,7 +121,7 @@ const NATURAL_CAUSE_RE =
 // so any of these present cancels the natural-cause suppression (a missed
 // downgrade is harmless; wrongly hiding a real massacre is not).
 const SECURITY_OR_CROWD_SIGNAL_RE =
-  /\b(air ?strikes?|drone|missile|rocket|shell(ed|ing|s)?|artillery|mortar|bomb\w*|blast|explos\w*|grenade|ied|landmine|land mine|gun\w*|shot|shoot\w*|firing|opened fire|ambush\w*|raid\w*|clash\w*|attack\w*|assault\w*|militant\w*|insurgent\w*|terror\w*|rebel\w*|junta|army|troops?|soldiers?|security force|robber\w*|hijack\w*|homicide|murder\w*|kidnap\w*|abduct\w*|hostage|stab\w*|machete|arson|riot\w*|stampede|crush|trampl\w*|crowd|protest\w*|police|ditembak|penembakan|baku tembak|tembak mati|dibunuh|pembunuhan|terbunuh|penyerangan|serangan bersenjata|kekerasan|bentrok\w*|kerusuhan)\b/i;
+  /\b(air ?strikes?|drone|missile|rocket|shell(ed|ing|s)?|artillery|mortar|bomb\w*|blast|explos\w*|grenade|ied|landmine|land mine|gun\w*|shot|shoot\w*|firing|opened fire|ambush\w*|raid\w*|clash\w*|attack\w*|assault\w*|militant\w*|insurgent\w*|terror\w*|rebel\w*|maoist\w*|naxal\w*|separatist\w*|guerrilla\w*|junta|army|troops?|soldiers?|security forces?|paramilitar\w*|robber\w*|hijack\w*|homicide|murder\w*|kidnap\w*|abduct\w*|hostage|stab\w*|machete|arson|riot\w*|stampede|crush|trampl\w*|crowd|protest\w*|police|ditembak|penembakan|baku tembak|tembak mati|dibunuh|pembunuhan|terbunuh|penyerangan|serangan bersenjata|kekerasan|bentrok\w*|kerusuhan)\b/i;
 
 /**
  * True if the text describes a natural / accidental death (lightning, flood,
@@ -186,7 +186,13 @@ export function hasIndonesianViolenceSignal(title: string, summary: string): boo
 // 10-9999) or a vague large quantity (dozens / scores / hundreds). The unit
 // guard stops a non-toll number — a reward "Rs 8 lakh", an age "10-year-old",
 // "kills 200 jobs" — from reading as a body count.
-const MASS_COUNT = "(?:[6-9]|[1-9]\\d{1,3}|dozens?|scores?|hundreds?)";
+// A 4-digit 19xx / 20xx token is almost always a YEAR ("2025 shootout", "the
+// 2019 attack"), not a body count — the year-unit in COUNT_UNIT_GUARD only
+// catches a number FOLLOWED by "years", not a bare year standing in for the
+// count itself. Reject it up front so a dateline year can never be read as a
+// mass-casualty toll and push a routine court/anniversary item to Extreme.
+const MASS_COUNT =
+  "(?:[6-9]|(?!(?:19|20)\\d\\d\\b)[1-9]\\d{1,3}|dozens?|scores?|hundreds?)";
 const COUNT_UNIT_GUARD =
   "(?!\\s*-?\\s*(?:lakhs?|crores?|millions?|billions?|thousands?|hundreds?|rupees?|rs|dollars?|usd|cents?|percent|per[- ]?cent|points?|votes?|seats?|years?|year[- ]?old|months?|weeks?|days?|hours?|minutes?|km|kg|tonnes?|tons?|acres?|hectares?|met(?:re|er)s?|feet|jobs?)\\b)";
 // "kills 24", "killed at least 12", "kill 30" — fatal verb + a mass toll not
@@ -379,6 +385,32 @@ export function classifySeverity(
   )
     return "extreme";
   if (!reactionLed && HIGH.some((re) => re.test(hay))) return "high";
+
+  // Confirmed killing => HIGH. A bare fatal word ("killed", "shot dead",
+  // "fatalities") is escalated to High ONLY when it co-occurs with a security /
+  // violence / crowd signal (militant, troops, gunfire, ambush, raid, riot, …),
+  // so a genuine fatal security event that carries no explicit clash keyword —
+  // "Suspected militant killed by SFs in Manipur", "protester shot dead",
+  // "two soldiers killed in encounter" — reads High instead of collapsing to the
+  // LOW default. This is NOT the reserved Extreme tier (that still requires the
+  // mass-casualty toll above), and it is suppressed by the SAME reaction /
+  // natural-cause / judicial / biographical guards as Extreme, so a court "rally
+  // death", an obituary, a lightning death or a "condemns the killing of"
+  // reaction stays out of it. FATAL_SIGNAL_RE was defined and documented to
+  // drive this tier but was never wired into the function body — confirmed
+  // killings therefore under-rated to LOW; this restores the intended behaviour.
+  if (
+    !reactionLed &&
+    !naturalCauseDeath &&
+    !judicialDeath &&
+    !biographicalDeath &&
+    (FATAL_SIGNAL_RE.test(hay) ||
+      PRESENT_TENSE_FATAL_RE.test(hay) ||
+      PRESENT_TENSE_FATAL_COUNT_RE.test(hay)) &&
+    SECURITY_OR_CROWD_SIGNAL_RE.test(hay)
+  )
+    return "high";
+
   if (MODERATE.some((re) => re.test(hay))) return "moderate";
 
   // Cargo crime: an actual theft (stolen/robbery/burglary/heist) without

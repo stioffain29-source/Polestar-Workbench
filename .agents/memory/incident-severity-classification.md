@@ -87,6 +87,29 @@ cues — `robber*|hijack*|homicide|murder*|kidnap*|abduct*|hostage` — so addin
 those creates false-negative suppression. The cancel-list errs toward KEEPING Extreme; widen it in
 lockstep with any bio-cue addition.
 
+## A dateline YEAR misread as a mass body-count (false Extreme)
+
+The mass-casualty regexes (`MASS_COUNT_FATAL_RE` = a count then a fatal word within ~3 words)
+matched a bare 4-digit YEAR standing in for the toll: "Trial begins in **2025** Lorain shootout
+that **killed** 2" read EXTREME — "2025" satisfied `MASS_COUNT`, then "...shootout that killed"
+satisfied the fatal-word window. `COUNT_UNIT_GUARD` only rejects a number FOLLOWED by a unit
+("200 jobs", "10-year-old"), not a year used AS the count.
+**Fix:** a year guard inside `MASS_COUNT` — `(?!(?:19|20)\d\d\b)` before the numeric branch — so a
+19xx/20xx token can never be the count. A REAL toll next to a year survives because the real number
+is elsewhere ("**2019** Pulwama attack that **killed 40**" → 40 matches → still Extreme).
+**Why / how to apply:** any headline carrying a four-digit year within a few words of killed/dead is
+a false-Extreme risk; tradeoff is a rare text-only toll of exactly 1900–2099 deaths is now
+suppressed (acceptable — structured `severityFromFatalities` still floors those to Extreme).
+
+## Confirmed-killing → HIGH rule placement (cannot suppress Extreme)
+
+The "killed in military op → low" under-rating is fixed by a confirmed-killing→**High** rule placed
+AFTER the Extreme + High scans and BEFORE Moderate, so it can only lift a sub-High row and can
+NEVER downgrade a genuine Extreme (mass-casualty is matched and returned first). It fires only when
+a fatal-signal regex matches AND `SECURITY_OR_CROWD_SIGNAL_RE` matches, gated by the four
+strip-and-retest death guards (reaction/natural/judicial/biographical). Extreme stays reserved for a
+mass toll ≥ `MASS_FATALITY_THRESHOLD` (6) — a single/low-count killing is High, by design.
+
 ## Cross-language gap — severity is set at INGEST, BEFORE translation
 
 `classifySeverity` is English-only and runs at ingest, *before* `display_title` translation, so a

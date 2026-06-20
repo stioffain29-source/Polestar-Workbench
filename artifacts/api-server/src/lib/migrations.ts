@@ -2372,6 +2372,39 @@ export async function runDataMigrations(): Promise<void> {
       );
     }
 
+    // One-time re-rate of stored severity onto the CURRENT classifySeverity for
+    // machine-provenance rows. Severity is otherwise written once at ingest, so
+    // a classifier change (reserving Extreme for mass casualties; confirmed
+    // killing => High) never reached historical rows — leaving routine single-
+    // fatality items stuck on a stale Extreme. Marker-gated so it runs once per
+    // rule revision (bump the key to re-run); the admin route runs it on demand
+    // regardless, which is the reliable path on CPU-throttled autoscale boots.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_rerate_2026_06_20_v2";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await backfillSeverity();
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { marker: markerKey, ...res },
+          "One-time severity re-rate of machine-provenance incidents",
+        );
+      }
+    } catch (sevErr) {
+      logger.error({ err: sevErr }, "Severity re-rate failed");
+    }
+
     try {
       await backfillRelevance();
     } catch (relErr) {
@@ -2475,4 +2508,128 @@ export async function backfillRelevance(): Promise<{
     "backfillRelevance: evaluated rows",
   );
   return { updated, version: RELEVANCE_RULE_VERSION };
+}
+
+// Topics whose incidents are content-rated by classifySeverity. Legacy
+// `protests` rows are rated with the flashpoint ruleset (the protests monitor
+// resolves to the flashpoint data topic). Any topic not listed here is left
+// untouched by the re-rate.
+const SEVERITY_RERATE_TOPIC: Record<
+  string,
+  Parameters<typeof classifySeverity>[2]
+> = {
+  flashpoint: "flashpoint",
+  protests: "flashpoint",
+  conflict: "conflict",
+  cargo_watch: "cargo_watch",
+  shipping: "shipping",
+  energy: "energy",
+  fertiliser: "fertiliser",
+  fuel: "fuel",
+};
+
+/**
+ * Re-rate stored incident severity against the CURRENT classifySeverity, scoped
+ * to MACHINE-PROVENANCE rows only (auto-scraped / legacy:db) so analyst-curated
+ * severities are never overwritten. Severity is written once at ingest time and
+ * is otherwise only touched by narrow one-time heals, so a classifier change —
+ * e.g. reserving Extreme for genuine mass-casualty events, and wiring
+ * confirmed-killing => High — does NOT reach historical rows on its own. That is
+ * why the monitors kept showing routine single-fatality "encounter" items as
+ * Extreme (stale stored value) while the live classifier already rated them
+ * correctly. This brings the whole machine-rated backlog onto the current rules.
+ *
+ * Mirrors backfillRelevance: pure-CPU evaluation first, then POOL-BOUNDED chunked
+ * writes; idempotent and safe to re-run (a row already on the current tier is
+ * skipped, so a second pass updates nothing). The structured GDELT fatality floor
+ * (severityFromFatalities) is still applied via maxSeverity, so a confirmed
+ * mass-casualty count can never be downgraded below what the toll implies.
+ */
+export async function backfillSeverity(): Promise<{
+  scanned: number;
+  updated: number;
+  upgraded: number;
+  downgraded: number;
+  perTopic: Record<string, { upgraded: number; downgraded: number }>;
+}> {
+  const rows = await db
+    .select({
+      id: incidentsTable.id,
+      topic: incidentsTable.topic,
+      title: incidentsTable.title,
+      summary: incidentsTable.summary,
+      severity: incidentsTable.severity,
+      fatalities: incidentsTable.fatalities,
+    })
+    .from(incidentsTable)
+    .where(
+      or(
+        like(incidentsTable.analystNotes, "auto-scraped:%"),
+        like(incidentsTable.analystNotes, "legacy:db:%"),
+      ),
+    );
+
+  if (rows.length === 0) {
+    logger.info("backfillSeverity: no machine-provenance rows to evaluate");
+    return { scanned: 0, updated: 0, upgraded: 0, downgraded: 0, perTopic: {} };
+  }
+
+  const perTopic = new Map<string, { upgraded: number; downgraded: number }>();
+  const writes = rows.flatMap((r) => {
+    const st = SEVERITY_RERATE_TOPIC[r.topic];
+    if (!st) return [];
+    const fromText = classifySeverity(r.title, r.summary ?? "", st);
+    const floor = severityFromFatalities(r.fatalities);
+    const next = floor ? maxSeverity(fromText, floor) : fromText;
+    if (next === r.severity) return [];
+    const prevRank = SEVERITY_RANK[r.severity as Severity];
+    const bucket = perTopic.get(r.topic) ?? { upgraded: 0, downgraded: 0 };
+    if (prevRank === undefined || SEVERITY_RANK[next] > prevRank) bucket.upgraded++;
+    else bucket.downgraded++;
+    perTopic.set(r.topic, bucket);
+    return [{ id: r.id, next }];
+  });
+
+  // POOL-BOUNDED chunked writes (same rationale as backfillRelevance: a fully
+  // sequential per-row UPDATE took minutes for ~10k rows and could be torn down
+  // mid-run on autoscale; the shared pg Pool is max:10 so cap the chunk at 8).
+  const CHUNK = 8;
+  let updated = 0;
+  for (let i = 0; i < writes.length; i += CHUNK) {
+    const chunk = writes.slice(i, i + CHUNK);
+    await Promise.all(
+      chunk.map((w) =>
+        db
+          .update(incidentsTable)
+          .set({ severity: w.next })
+          .where(eq(incidentsTable.id, w.id)),
+      ),
+    );
+    updated += chunk.length;
+  }
+
+  let upgraded = 0;
+  let downgraded = 0;
+  for (const b of perTopic.values()) {
+    upgraded += b.upgraded;
+    downgraded += b.downgraded;
+  }
+
+  logger.info(
+    {
+      scanned: rows.length,
+      updated,
+      upgraded,
+      downgraded,
+      perTopic: Object.fromEntries(perTopic),
+    },
+    "backfillSeverity: re-rated machine-provenance rows",
+  );
+  return {
+    scanned: rows.length,
+    updated,
+    upgraded,
+    downgraded,
+    perTopic: Object.fromEntries(perTopic),
+  };
 }

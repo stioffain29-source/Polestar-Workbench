@@ -8,7 +8,7 @@ import {
   runIccPiracyOnce,
   runMovementOnce,
 } from "../lib/ingestRunner";
-import { backfillRelevance } from "../lib/migrations";
+import { backfillRelevance, backfillSeverity } from "../lib/migrations";
 
 const router: IRouter = Router();
 
@@ -18,6 +18,8 @@ const router: IRouter = Router();
 // pool-hygiene guard, not a correctness lock; cross-instance runs are harmless
 // (each instance has its own pool, and the work converges to the same result).
 let relevanceBackfillRunning = false;
+// Same pool-hygiene guard for the severity re-rate pass.
+let severityBackfillRunning = false;
 
 // Protected production ingestion trigger.
 //
@@ -440,6 +442,73 @@ router.post(
       }
     } finally {
       relevanceBackfillRunning = false;
+    }
+  },
+);
+
+// Severity re-rate (data hygiene).
+//
+// Re-runs classifySeverity over every machine-provenance incident
+// (auto-scraped / legacy) and rewrites the stored severity when it differs from
+// the current rules, applying the GDELT fatality floor via maxSeverity. Severity
+// is otherwise written once at ingest, so a classifier change (reserving Extreme
+// for mass casualties; confirmed killing => High) does not reach historical
+// rows. The boot path is marker-gated and runs once per rule revision, but on
+// CPU-throttled autoscale boots that pass is unreliable; this forces it to
+// completion in a single request. Idempotent and safe to re-run; analyst-edited
+// rows are never touched.
+//
+// Same token gate as /admin/ingest.
+router.post(
+  "/admin/severity-backfill",
+  async (req: Request, res: Response) => {
+    const expected = process.env["INGEST_ADMIN_TOKEN"];
+    if (!expected) {
+      req.log.warn(
+        "admin severity-backfill called but INGEST_ADMIN_TOKEN is not configured",
+      );
+      res.status(503).json({
+        error: "ingestion_disabled",
+        message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+      });
+      return;
+    }
+
+    const presented = presentedToken(req);
+    if (!presented || !safeEqual(presented, expected)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    if (severityBackfillRunning) {
+      res.status(409).json({ error: "backfill_in_progress" });
+      return;
+    }
+
+    severityBackfillRunning = true;
+    try {
+      req.log.info("admin severity-backfill started");
+      const result = await backfillSeverity();
+      req.log.info(
+        {
+          scanned: result.scanned,
+          updated: result.updated,
+          upgraded: result.upgraded,
+          downgraded: result.downgraded,
+        },
+        "admin severity-backfill finished",
+      );
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, "admin severity-backfill failed");
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .json({ ok: false, error: "ingestion_failed", message });
+      }
+    } finally {
+      severityBackfillRunning = false;
     }
   },
 );
