@@ -19,6 +19,15 @@ module.exports = {
     "^@assets/.*$": "<rootDir>/__tests__/mocks/asset.ts",
     "\\.(ttf|woff2?|png|jpe?g|svg|gif|webp)(\\?url)?$":
       "<rootDir>/__tests__/mocks/asset.ts",
+    // Heavy chart/map children (recharts, leaflet) that block rendering in jest.
+    // The page-break marker test only asserts the parent preview's markers, so
+    // stub these to an inert placeholder. Must come BEFORE the generic `@/` rule.
+    "^@/components/JetFuelTrajectoryChart$":
+      "<rootDir>/__tests__/mocks/component.tsx",
+    "^@/components/CargoTrendChart$": "<rootDir>/__tests__/mocks/component.tsx",
+    "^@/components/IncidentMap$": "<rootDir>/__tests__/mocks/component.tsx",
+    "^@/components/SituationalContextSection$":
+      "<rootDir>/__tests__/mocks/component.tsx",
     // Workbench `@/` path alias (mirrors vite.config.ts / tsconfig paths).
     "^@/(.*)$": "<rootDir>/artifacts/workbench/src/$1",
     // React + date-fns live in the workbench package, not the repo root, so map

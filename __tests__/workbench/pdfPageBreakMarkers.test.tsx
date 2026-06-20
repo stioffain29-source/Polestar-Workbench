@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import PngCountryReportBody from "../../artifacts/workbench/src/components/PngCountryReportBody";
 import FlashpointReportPreview from "../../artifacts/workbench/src/components/FlashpointReportPreview";
 import ShippingReportPreview from "../../artifacts/workbench/src/components/ShippingReportPreview";
+import ReportPreview from "../../artifacts/workbench/src/components/ReportPreview";
+import ConflictReportPreview from "../../artifacts/workbench/src/components/ConflictReportPreview";
+import SpotReportPreview from "../../artifacts/workbench/src/components/SpotReportPreview";
 import type {
   PngReportDataset,
   PngReportItem,
@@ -160,5 +163,65 @@ describe("report preview cover marker", () => {
       />,
     );
     expect(html).toContain('class="pdf-cover-page"');
+  });
+
+  // ReportPreview is the shared body for the topic/fuel/cargo reports — each
+  // carries a `.pdf-cover-page` cover. The heavy recharts children
+  // (JetFuelTrajectoryChart / CargoTrendChart) are stubbed via jest's
+  // moduleNameMapper so the cover chrome renders without a layout engine.
+  it("ReportPreview (topic) emits a .pdf-cover-page cover", () => {
+    const html = renderToStaticMarkup(
+      <ReportPreview report={{ ...report }} incidents={[]} />,
+    );
+    expect(html).toContain('class="pdf-cover-page"');
+  });
+
+  it("ReportPreview (fuel) emits a .pdf-cover-page cover", () => {
+    const html = renderToStaticMarkup(
+      <ReportPreview report={{ ...report, topic: "fuel" }} incidents={[]} />,
+    );
+    expect(html).toContain('class="pdf-cover-page"');
+  });
+
+  it("ReportPreview (cargo) emits a .pdf-cover-page cover", () => {
+    const html = renderToStaticMarkup(
+      <ReportPreview
+        report={{ ...report, topic: "cargo_watch" }}
+        incidents={[]}
+      />,
+    );
+    expect(html).toContain('class="pdf-cover-page"');
+  });
+
+  // ConflictReportPreview carries a cover too; SituationalContextSection is
+  // stubbed via moduleNameMapper.
+  it("ConflictReportPreview emits a .pdf-cover-page cover", () => {
+    const html = renderToStaticMarkup(
+      <ConflictReportPreview
+        report={{ ...report, topic: "conflict" }}
+        incidents={[]}
+      />,
+    );
+    expect(html).toContain('class="pdf-cover-page"');
+  });
+
+  // Spot Reports do NOT use a cover page — they open with a title block — but
+  // their prose flows ARE marked `data-pdf-flow` for line-level page breaks.
+  // IncidentMap (leaflet) is stubbed via moduleNameMapper.
+  it("SpotReportPreview emits data-pdf-flow prose markers", () => {
+    const html = renderToStaticMarkup(
+      <SpotReportPreview
+        report={
+          {
+            id: 1,
+            title: "Test Spot Report",
+            reportDate: "2026-06-15",
+            bluf: "Lead paragraph carrying the bottom line up front.",
+          } as never
+        }
+        incidents={[]}
+      />,
+    );
+    expect(html).toContain('data-pdf-flow="true"');
   });
 });
