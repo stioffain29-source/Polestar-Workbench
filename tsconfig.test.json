@@ -5,6 +5,7 @@
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "node",
     "noEmit": true,
+    "jsx": "react-jsx",
     "types": ["jest", "node"],
     "baseUrl": ".",
     "paths": {
@@ -17,5 +18,9 @@
       "@workspace/api-client-react": ["lib/api-client-react/src/index.ts"]
     }
   },
-  "include": ["__tests__/**/*.ts", "lib/**/src/**/*.ts"]
+  "include": [
+    "__tests__/**/*.ts",
+    "__tests__/**/*.tsx",
+    "lib/**/src/**/*.ts"
+  ]
 }

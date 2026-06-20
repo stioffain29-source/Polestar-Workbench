@@ -13,6 +13,26 @@ module.exports = {
   coverageReporters: ["text", "lcov"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
+    // Asset imports (`@assets/*.png|jpg`, font `.ttf?url`) pulled in transitively
+    // by the report preview chrome must not be parsed as JS modules — redirect
+    // them to a string stub.
+    "^@assets/.*$": "<rootDir>/__tests__/mocks/asset.ts",
+    "\\.(ttf|woff2?|png|jpe?g|svg|gif|webp)(\\?url)?$":
+      "<rootDir>/__tests__/mocks/asset.ts",
+    // Workbench `@/` path alias (mirrors vite.config.ts / tsconfig paths).
+    "^@/(.*)$": "<rootDir>/artifacts/workbench/src/$1",
+    // React + date-fns live in the workbench package, not the repo root, so map
+    // the bare specifiers to the workbench copy for rendering tests.
+    "^react$": "<rootDir>/artifacts/workbench/node_modules/react",
+    "^react-dom/server$":
+      "<rootDir>/artifacts/workbench/node_modules/react-dom/server.node.js",
+    "^react-dom$": "<rootDir>/artifacts/workbench/node_modules/react-dom",
+    "^react/jsx-runtime$":
+      "<rootDir>/artifacts/workbench/node_modules/react/jsx-runtime",
+    "^react/jsx-dev-runtime$":
+      "<rootDir>/artifacts/workbench/node_modules/react/jsx-dev-runtime",
+    "^date-fns$": "<rootDir>/artifacts/workbench/node_modules/date-fns",
+    "^date-fns/(.*)$": "<rootDir>/artifacts/workbench/node_modules/date-fns/$1",
     "^@workspace/db$": "<rootDir>/__tests__/mocks/db.ts",
     "^@workspace/db/schema$": "<rootDir>/lib/db/src/schema/index.ts",
     "^@workspace/ingest$": "<rootDir>/lib/ingest/src/index.ts",
