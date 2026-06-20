@@ -34,6 +34,7 @@ import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import VesselMap from "@/components/VesselMap";
+import FleetIntelligence from "@/components/FleetIntelligence";
 import {
   buildMaritimeIntelligence,
   formatMovementSummary,
@@ -1915,6 +1916,14 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
           Individual vessels at their most recent transmitted position inside the tracked chokepoints. Positions are live AIS CONTEXT — they never count as incidents and never raise the risk level on their own.
         </p>
         <VesselMap />
+      </MaritimeBoardCard>
+
+      {/* Live fleet intelligence — flags of registry & composition from the same AIS sightings */}
+      <MaritimeBoardCard label="Live Fleet Intelligence — Flags of Registry & Composition (AIS)">
+        <p className="text-[11px] text-muted-foreground font-sans leading-snug mb-3">
+          The live fleet in the tracked chokepoints, broken down by flag of registry and vessel class. Derived from the same AIS positions plotted above — flag from each vessel's MMSI country code, class from its broadcast AIS ship-type. Live context, never incidents.
+        </p>
+        <FleetIntelligence />
       </MaritimeBoardCard>
 
       {/* Maritime context panel — movement / AIS only */}
