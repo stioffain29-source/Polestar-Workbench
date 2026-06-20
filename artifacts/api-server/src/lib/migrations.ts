@@ -339,6 +339,28 @@ export async function runDataMigrations(): Promise<void> {
         ON maritime_movement (theatre, data_as_of DESC)
     `);
 
+    // Schema: per-vessel AIS sighting state, kept ACROSS sample windows so a
+    // vessel's transmission GAP can be measured (the live receive stream only
+    // shows vessels that ARE transmitting, so an "AIS-dark" vessel is detectable
+    // only by remembering where it was last seen and noticing it stopped). One
+    // row per MMSI; CONTEXT scaffolding only — never an incident. drizzle push
+    // only reaches dev, so the prod primary gains the table here on boot.
+    // Idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS maritime_vessel_sighting (
+        mmsi integer PRIMARY KEY,
+        theatre text NOT NULL,
+        last_seen_at timestamptz NOT NULL,
+        last_sog real,
+        last_nav_status integer,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS maritime_vessel_sighting_theatre_seen_idx
+        ON maritime_vessel_sighting (theatre, last_seen_at DESC)
+    `);
+
     // Schema: ReliefWeb (UN OCHA) situational/context reports. A SEPARATE table
     // from incident_corroborations — it stores ReliefWeb reports as standalone
     // supporting context (never as incidents), so it can NEVER inflate incident

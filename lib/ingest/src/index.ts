@@ -15,10 +15,12 @@ export {
   runMaritimeMovementIngest,
   isAisConfigured,
   AIS_THEATRES,
+  computeDarkByTheatre,
 } from "./maritimeMovement";
 export type {
   MaritimeMovementSummary,
   MaritimeMovementOptions,
+  PriorVesselSighting,
 } from "./maritimeMovement";
 export {
   resolveVesselClasses,

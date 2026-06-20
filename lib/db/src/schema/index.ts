@@ -12,3 +12,4 @@ export * from "./appMigrationMarkers";
 export * from "./marketPrices";
 export * from "./cards";
 export * from "./maritimeMovement";
+export * from "./maritimeVesselSightings";

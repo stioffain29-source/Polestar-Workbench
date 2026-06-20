@@ -1,5 +1,11 @@
-import { db, maritimeMovementTable, type InsertMaritimeMovement } from "@workspace/db";
-import { and, desc, ilike, lte, eq, sql } from "drizzle-orm";
+import {
+  db,
+  maritimeMovementTable,
+  maritimeVesselSightingTable,
+  type InsertMaritimeMovement,
+  type InsertMaritimeVesselSighting,
+} from "@workspace/db";
+import { and, desc, ilike, lte, gte, lt, eq, sql } from "drizzle-orm";
 import {
   resolveVesselClasses,
   readVesselRegistryConfig,
@@ -32,9 +38,16 @@ import {
 //     registry (lib/ingest/src/vesselRegistry.ts, keyed on IMO/MMSI) resolves a
 //     definitive class; absent that registry, or for any vessel it cannot
 //     resolve, they stay NULL ("not reported"), never a fabricated zero.
-//     Inbound/outbound, anchored and "AIS dark" are likewise NULL when the
-//     short open-stream sample cannot derive them.
-//   * A theatre that observed no vessels gets NO row (absence, not "0 traffic").
+//     Inbound/outbound and anchored are likewise NULL when the short open-stream
+//     sample cannot derive them.
+//   * "AIS dark"/gap IS derived — but NOT from this single live sample (which
+//     only shows vessels that ARE transmitting). It is STATEFUL: per-vessel
+//     sightings are persisted across runs (maritime_vessel_sighting) so a
+//     loitering vessel that later stops transmitting can be flagged. The count
+//     is NULL when there was no prior baseline to measure (never fabricated).
+//   * A theatre with neither live traffic NOR a measured dark signal gets NO row
+//     (absence, not "0 traffic"); a dark-only theatre DOES get a row so an
+//     all-gone-silent chokepoint is not swallowed by the absence rule.
 //   * source_name contains "ais" so the AIS row on Source Health flips to live.
 //
 // Nothing here closes the shared DB pool — only the CLI wrapper does.
@@ -90,6 +103,32 @@ const MOVING_SOG_KNOTS = 1.0;
 const NAV_AT_ANCHOR = 1;
 const NAV_MOORED = 5;
 
+// AIS-dark / transmission-gap detection thresholds.
+//
+// "Going dark" is inherently STATEFUL: a single live sample only shows vessels
+// that ARE transmitting, so the only way to spot one that has STOPPED is to
+// remember where vessels were last seen and notice they vanished. We persist
+// per-vessel sightings (maritime_vessel_sighting) and, on each run, flag prior
+// CANDIDATES that have since gone silent.
+//
+//   * LOOKBACK — a prior sighting older than this is too stale to reason about
+//     (the vessel has long since legitimately moved on); it is pruned and never
+//     counted.
+//   * MIN_GAP — a prior sighting must be at least this old for its absence to be
+//     meaningful. Without it, two runs minutes apart would flag a vessel that
+//     simply has not re-transmitted yet.
+//
+// CANDIDATE = a vessel last seen LOITERING (anchored/moored or near-stationary)
+// inside the theatre. A loitering vessel that stops transmitting is the genuine
+// dark signal (e.g. an STS transfer or sanctioned tanker); a fast transiting
+// vessel that leaves the bounding box is normal traffic, NOT dark, so it is
+// deliberately excluded to avoid a fabricated count.
+const DARK_LOOKBACK_HOURS = 24;
+const DARK_MIN_GAP_MINUTES = 30;
+// At/under this speed (knots) a vessel is loitering rather than transiting, so
+// its disappearance is a meaningful dark signal rather than a normal departure.
+const LOITER_SOG_KNOTS = 1.0;
+
 /** AIS course-over-ground is reported 0-359.9°; 360 is the "not available" sentinel. */
 function validCog(c: number | null): number | null {
   return c !== null && c >= 0 && c < 360 ? c : null;
@@ -125,6 +164,64 @@ function isAnchored(sog: number | null, navStatus: number | null): boolean {
   return sog !== null && sog < ANCHOR_SOG_KNOTS;
 }
 
+/**
+ * A vessel reads as LOITERING (a dark-detection candidate) when it is anchored/
+ * moored or moving at/under the loiter speed. Such a vessel is not transiting
+ * out of the box, so if it later stops transmitting that is a genuine gap — not
+ * a normal departure. Requires a known speed or an explicit anchored status, so
+ * a vessel with no movement data is NOT treated as a candidate (it would be a
+ * fabricated signal).
+ */
+function isLoitering(sog: number | null, navStatus: number | null): boolean {
+  if (navStatus === NAV_AT_ANCHOR || navStatus === NAV_MOORED) return true;
+  return sog !== null && sog <= LOITER_SOG_KNOTS;
+}
+
+/** A prior-window vessel sighting considered for dark/gap detection. */
+export interface PriorVesselSighting {
+  mmsi: number;
+  theatre: string;
+  lastSog: number | null;
+  lastNavStatus: number | null;
+}
+
+/**
+ * Pure AIS-dark/gap computation. Given the vessel sightings from a prior window
+ * (already filtered to the [lookback, min-gap] band by the caller) and the set
+ * of MMSIs heard in the CURRENT live sample, return a per-theatre dark count.
+ *
+ * Honesty rules:
+ *   * Only LOITERING vessels (anchored/moored or SOG ≤ threshold) are eligible —
+ *     a vessel that was simply transiting and has moved on is not "dark".
+ *   * A vessel is dark when it was a loitering candidate but is ABSENT from the
+ *     current sample (stopped transmitting).
+ *   * A theatre with NO candidates yields NULL ("not measurable"), never a
+ *     fabricated 0; a theatre with candidates none of which went dark yields a
+ *     genuine 0. The zero-current-vessels case (every candidate absent) yields
+ *     the full candidate count.
+ */
+export function computeDarkByTheatre(
+  priorRows: PriorVesselSighting[],
+  currentMmsis: Set<number>,
+  theatres: readonly string[] = AIS_THEATRES.map((t) => t.theatre),
+): Map<string, number | null> {
+  const candidates = new Map<string, number>();
+  const dark = new Map<string, number>();
+  for (const r of priorRows) {
+    if (!isLoitering(r.lastSog, r.lastNavStatus)) continue;
+    candidates.set(r.theatre, (candidates.get(r.theatre) ?? 0) + 1);
+    if (!currentMmsis.has(r.mmsi)) {
+      dark.set(r.theatre, (dark.get(r.theatre) ?? 0) + 1);
+    }
+  }
+  const out = new Map<string, number | null>();
+  for (const t of theatres) {
+    const c = candidates.get(t) ?? 0;
+    out.set(t, c > 0 ? dark.get(t) ?? 0 : null);
+  }
+  return out;
+}
+
 export type MaritimeMovementSummary = {
   provider: string;
   mode: "commit" | "dry-run";
@@ -155,6 +252,7 @@ export type MaritimeMovementSummary = {
     bulk: number | null;
     container: number | null;
     lngLpg: number | null;
+    aisDarkOrGap: number | null;
     change: string | null;
   }>;
   /** External vessel-registry precision layer (bulk/container/LNG-LPG split). */
@@ -642,65 +740,138 @@ export async function runMaritimeMovementIngest(
   const cutoff = new Date(observedAt.getTime() - 7 * 86_400_000);
   const rows: InsertMaritimeMovement[] = [];
 
+  // -------------------------------------------------------------------------
+  // AIS-dark / transmission-gap detection (STATEFUL — reads persisted
+  // sightings). The live sample only shows vessels that ARE transmitting, so a
+  // dark vessel is found by comparing the set seen NOW against vessels that were
+  // recently LOITERING in a theatre and have since gone silent.
+  //
+  //   darkByTheatre = number of prior loitering candidates now absent, OR null
+  //   when there were no candidates to measure (so a 0 is only ever a genuine
+  //   "had loitering vessels, none went dark", never a fabricated zero).
+  // -------------------------------------------------------------------------
+  const currentMmsis = new Set<number>(byMmsi.keys());
+  const lookbackCutoff = new Date(
+    observedAt.getTime() - DARK_LOOKBACK_HOURS * 3_600_000,
+  );
+  const minGapCutoff = new Date(
+    observedAt.getTime() - DARK_MIN_GAP_MINUTES * 60_000,
+  );
+  const darkByTheatre = new Map<string, number | null>();
+  try {
+    // Prior sightings that are recent enough to still matter (≥ lookback) AND
+    // old enough that absence is meaningful (< min-gap).
+    const priorRows = await db
+      .select({
+        mmsi: maritimeVesselSightingTable.mmsi,
+        theatre: maritimeVesselSightingTable.theatre,
+        lastSog: maritimeVesselSightingTable.lastSog,
+        lastNavStatus: maritimeVesselSightingTable.lastNavStatus,
+      })
+      .from(maritimeVesselSightingTable)
+      .where(
+        and(
+          gte(maritimeVesselSightingTable.lastSeenAt, lookbackCutoff),
+          lt(maritimeVesselSightingTable.lastSeenAt, minGapCutoff),
+        ),
+      );
+    const computed = computeDarkByTheatre(
+      priorRows.map((r) => ({
+        mmsi: r.mmsi,
+        theatre: r.theatre,
+        lastSog: r.lastSog ?? null,
+        lastNavStatus: r.lastNavStatus ?? null,
+      })),
+      currentMmsis,
+    );
+    for (const [theatre, count] of computed) darkByTheatre.set(theatre, count);
+  } catch (err) {
+    // Detection is best-effort: a query failure leaves every count NULL ("not
+    // measurable"), never a fabricated zero, and never fails the ingest.
+    const m = err instanceof Error ? err.message : String(err);
+    logLines.push(`AIS dark/gap detection skipped — ${m}.`);
+  }
+
   // Iterate in board order for stable output.
   for (const t of AIS_THEATRES) {
     const a = agg.get(t.theatre);
-    if (!a || a.total === 0) continue; // absence, never a fabricated zero
-    const baseline = await baselineTotal(t.theatre, cutoff);
-    const change = formatChange(a.total, baseline);
+    // Genuine gap detection (null when not measurable — never fabricated).
+    const aisDarkOrGap = darkByTheatre.get(t.theatre) ?? null;
+    const hasTraffic = !!a && a.total > 0;
+    const hasDark = aisDarkOrGap != null && aisDarkOrGap > 0;
+    // A snapshot is written when EITHER live traffic was observed OR a dark/gap
+    // signal was measured for the theatre. The dark-only case matters: vessels
+    // that were loitering here and have all since gone silent leave zero live
+    // traffic, yet that is the STRONGEST dark signal — emitting the row keeps it
+    // from being swallowed by the "absence" rule. A theatre with neither is true
+    // absence and gets no row (never a fabricated zero).
+    if (!hasTraffic && !hasDark) continue;
+
+    const baseline = hasTraffic ? await baselineTotal(t.theatre, cutoff) : null;
+    const change = hasTraffic ? formatChange(a!.total, baseline) : null;
     // A count is only written when we actually OBSERVED the signal it needs:
     //   direction needs ≥1 course-classifiable vessel; anchored needs ≥1 vessel
     //   reporting speed/nav-status. Otherwise the column stays NULL ("not
-    //   reported"), never a fabricated zero.
-    const inbound = a.directionObserved > 0 ? a.inbound : null;
-    const outbound = a.directionObserved > 0 ? a.outbound : null;
-    const anchored = a.motionObserved > 0 ? a.anchored : null;
+    //   reported"), never a fabricated zero. With no live traffic every live
+    //   count stays NULL — only the (cross-window) dark/gap signal is reported.
+    const inbound = hasTraffic && a!.directionObserved > 0 ? a!.inbound : null;
+    const outbound = hasTraffic && a!.directionObserved > 0 ? a!.outbound : null;
+    const anchored = hasTraffic && a!.motionObserved > 0 ? a!.anchored : null;
+    const tankers = hasTraffic && a!.tankers > 0 ? a!.tankers : null;
+    const total = hasTraffic ? a!.total : null;
     // The bulk/container/LNG-LPG split is filled ONLY when the external registry
     // resolved ≥1 vessel in this theatre. A theatre with zero successful
     // lookups (registry off, or no match) keeps all three NULL ("not
     // reported"); a 0 only appears when we DID resolve vessels and none were of
     // that class — a real measurement, never a fabricated zero.
-    const registryResolved = a.registryResolved > 0;
-    const bulk = registryResolved ? a.bulk : null;
-    const container = registryResolved ? a.container : null;
-    const lngLpg = registryResolved ? a.lngLpg : null;
+    const registryResolved = hasTraffic && a!.registryResolved > 0;
+    const bulk = registryResolved ? a!.bulk : null;
+    const container = registryResolved ? a!.container : null;
+    const lngLpg = registryResolved ? a!.lngLpg : null;
     perTheatre.push({
       theatre: t.theatre,
-      totalVessels: a.total,
-      tankers: a.tankers,
+      totalVessels: total ?? 0,
+      tankers: tankers ?? 0,
       inbound,
       outbound,
       anchored,
       bulk,
       container,
       lngLpg,
+      aisDarkOrGap,
       change,
     });
     rows.push({
       theatre: t.theatre,
       dataAsOf: observedAt,
-      totalVessels: a.total,
+      // NULL (not 0) when no live traffic was observed — the dark signal does
+      // not assert visible vessels.
+      totalVessels: total,
       inboundCount: inbound,
       outboundCount: outbound,
-      tankersCount: a.tankers > 0 ? a.tankers : null,
+      tankersCount: tankers,
       // Bulk vs container vs LNG/LPG cannot be separated from the AIS ship-type
       // code alone (70-79 is "cargo" with no sub-class; gas carriers are not a
       // distinct code) — that split needs the external vessel registry (keyed on
       // IMO/MMSI). When the registry is configured these are registry-resolved
       // counts; otherwise they stay NULL rather than a fabricated guess.
-      // Likewise AIS-dark/gap is not derivable from a live receive stream (it
-      // only shows vessels that ARE transmitting), so it stays NULL too.
       bulkCarriersCount: bulk,
       containerCount: container,
       lngLpgCount: lngLpg,
       anchoredOrWaitingCount: anchored,
-      aisVisibleCount: a.total,
+      aisVisibleCount: total,
+      // AIS-dark/gap IS derived here — not from this single live sample (which
+      // only shows vessels that ARE transmitting), but from cross-window state:
+      // loitering vessels seen in a prior run that have since gone silent. NULL
+      // when there was no prior baseline to measure against (never fabricated).
+      aisDarkOrGapCount: aisDarkOrGap,
       changeVs7DayBaseline: change,
-      confidence: confidenceFor(a.total),
+      confidence: hasTraffic ? confidenceFor(a!.total) : "low",
       sourceName: SOURCE_NAME,
       sourceUrl: SOURCE_URL,
-      notes:
-        "Live AIS sample of vessels currently transiting the theatre. Movement is context, never an incident.",
+      notes: hasTraffic
+        ? "Live AIS sample of vessels currently transiting the theatre. Movement is context, never an incident."
+        : "No live AIS traffic observed; prior loitering vessels have gone silent (AIS-dark/gap). Indicator only, never an incident.",
       rawPayload: {
         provider: "aisstream",
         collectSeconds,
@@ -708,10 +879,11 @@ export async function runMaritimeMovementIngest(
         observedAt: observedAt.toISOString(),
         boundingBox: [t.minLat, t.maxLat, t.minLon, t.maxLon],
         inboundBearing: t.inboundBearing,
-        directionObserved: a.directionObserved,
-        motionObserved: a.motionObserved,
-        registryResolved: a.registryResolved,
+        directionObserved: a?.directionObserved ?? 0,
+        motionObserved: a?.motionObserved ?? 0,
+        registryResolved: a?.registryResolved ?? 0,
         registryProvider: registry.configured ? registryConfig.provider : null,
+        aisDarkOrGap,
       },
     });
   }
@@ -748,6 +920,58 @@ export async function runMaritimeMovementIngest(
         errors,
         logLines,
       };
+    }
+  }
+
+  // Persist this run's sightings so a FUTURE run can measure a vessel's gap.
+  // One row per MMSI, reflecting the LAST theatre seen — so a vessel that
+  // legitimately moves to another theatre updates in place and can never be
+  // mis-flagged as "dark" in the old one. Only on commit (dry-run keeps no
+  // history); non-fatal so a sighting write never fails the movement ingest.
+  if (opts.commit) {
+    const sightingRows: InsertMaritimeVesselSighting[] = [];
+    for (const [mmsi, obs] of byMmsi) {
+      if (!obs.theatre) continue; // only persist vessels inside a tracked theatre
+      sightingRows.push({
+        mmsi,
+        theatre: obs.theatre,
+        lastSeenAt: observedAt,
+        lastSog: obs.sog,
+        lastNavStatus: obs.navStatus,
+        updatedAt: observedAt,
+      });
+    }
+    if (sightingRows.length > 0) {
+      try {
+        await db
+          .insert(maritimeVesselSightingTable)
+          .values(sightingRows)
+          .onConflictDoUpdate({
+            target: maritimeVesselSightingTable.mmsi,
+            set: {
+              theatre: sql`excluded.theatre`,
+              lastSeenAt: sql`excluded.last_seen_at`,
+              // Preserve the last KNOWN movement when this sample lacked it (a
+              // static-only report has no speed/nav-status), so loiter state is
+              // not erased to NULL.
+              lastSog: sql`COALESCE(excluded.last_sog, ${maritimeVesselSightingTable.lastSog})`,
+              lastNavStatus: sql`COALESCE(excluded.last_nav_status, ${maritimeVesselSightingTable.lastNavStatus})`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        logLines.push(`AIS sighting persistence skipped — ${m}.`);
+      }
+    }
+    // Prune sightings older than the lookback window — they are too stale to
+    // reason about and keep the table bounded.
+    try {
+      await db
+        .delete(maritimeVesselSightingTable)
+        .where(lt(maritimeVesselSightingTable.lastSeenAt, lookbackCutoff));
+    } catch {
+      /* non-fatal housekeeping */
     }
   }
 
