@@ -12,6 +12,7 @@ import {
 import { SEV_COLOR } from "@/lib/pdfChrome";
 import SituationalContextSection from "@/components/SituationalContextSection";
 import type { ReliefWebReport } from "@workspace/api-client-react";
+import { resolveIncidentSummary } from "@/lib/incidentSummary";
 
 // Conflict Watch on-screen preview. Renders the same sections, in the same
 // order, from the same dataset (buildConflictReportDataset) as
@@ -276,7 +277,7 @@ interface ConflictEnrichedAreaLike {
   paragraph: string;
 }
 
-function RelatedIncidentsTable({ rows }: { rows: ConflictEnrichedIncident[] }) {
+function RelatedIncidentsTable({ rows, summaries }: { rows: ConflictEnrichedIncident[]; summaries: Record<string, string> }) {
   if (rows.length === 0) {
     return (
       <p
@@ -340,12 +341,17 @@ function RelatedIncidentsTable({ rows }: { rows: ConflictEnrichedIncident[] }) {
               fontFamily: "Roboto, sans-serif",
               fontSize: 12,
               color: DUSK,
-              alignItems: "center",
+              alignItems: "flex-start",
             }}
           >
             <div>{format(r.date, "dd MMM yyyy")}</div>
             <div>{r.issue}</div>
-            <div style={{ color: NAVY }}>{r.displayTitle ?? r.title}</div>
+            <div style={{ color: NAVY }}>
+              {r.displayTitle ?? r.title}
+              <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
+                {resolveIncidentSummary(r, summaries)}
+              </div>
+            </div>
             <div>
               <SeverityChip
                 sevKey={sevKey(r.severity)}
@@ -363,10 +369,12 @@ export default function ConflictReportPreview({
   report,
   incidents,
   situationalReports,
+  incidentSummaries = {},
 }: {
   report: ConflictPreviewReport;
   incidents: ConflictReportIncident[];
   situationalReports?: ReliefWebReport[] | null;
+  incidentSummaries?: Record<string, string>;
 }) {
   const topic = report.topic ?? "conflict";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -533,7 +541,7 @@ export default function ConflictReportPreview({
         <SituationalContextSection reports={situationalReports} max={6} />
 
         <Section title="Related Incidents">
-          <RelatedIncidentsTable rows={ds.relatedIncidents} />
+          <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={incidentSummaries} />
         </Section>
 
         <Section title="Disclaimer">

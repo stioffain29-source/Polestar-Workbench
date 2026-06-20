@@ -490,6 +490,18 @@ export async function runDataMigrations(): Promise<void> {
       )
     `);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS report_incident_summaries (
+        id serial PRIMARY KEY,
+        report_id integer NOT NULL UNIQUE,
+        fingerprint text NOT NULL,
+        summaries jsonb NOT NULL,
+        edited jsonb,
+        model text NOT NULL,
+        generated_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS country_baselines (
         id serial PRIMARY KEY,
         slug text NOT NULL UNIQUE,

@@ -38,6 +38,7 @@ import {
   reportCadence,
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
+import { resolveIncidentSummary } from "./incidentSummary";
 import { selectRelatedIncidents } from "./relatedIncidents";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
@@ -101,6 +102,10 @@ export interface ExportTopicReportPdfOptions {
    *  and surface the warnings in the document. Defaults to false (fail
    *  closed) so authors cannot accidentally ship a hollow report. */
   allowMissingMarketData?: boolean;
+  /** Per-incident AI summaries keyed by incident id. When an id is absent a
+   *  deterministic fallback summary is rendered, so the table always shows a
+   *  summary line under each title in parity with the on-screen preview. */
+  incidentSummaries?: Record<string, string>;
 }
 
 export interface TopicReportData {
@@ -700,6 +705,7 @@ function drawRelatedIncidents(
   windowIncidents: TopicReportIncident[],
   topic: string,
   _topicLabels: Record<string, string>,
+  summaries: Record<string, string>,
 ) {
   // Row selection (title dedupe, weak-bucket filtering, recency order, cap)
   // is delegated to the ONE shared selector so this PDF table renders the
@@ -744,7 +750,16 @@ function drawRelatedIncidents(
       sanitize(i.title),
       colTitleW - 8,
     );
-    const rh = Math.max(rowH, titleLines.length * 11 + 8);
+    pdf.setFontSize(6.5);
+    const summaryLines: string[] = pdf.splitTextToSize(
+      sanitize(resolveIncidentSummary(i, summaries)),
+      colTitleW - 8,
+    );
+    pdf.setFontSize(7);
+    const rh = Math.max(
+      rowH,
+      titleLines.length * 11 + summaryLines.length * 9 + 12,
+    );
     // Prevent row from splitting across pages - ensure space for the entire row
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
@@ -772,7 +787,14 @@ function drawRelatedIncidents(
     );
     pdf.text(typeLines, MX + colDateW + 6, ctx.y + 12);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colTypeW + 6, ctx.y + 12);
+    const titleX = MX + colDateW + colTypeW + 6;
+    pdf.text(titleLines, titleX, ctx.y + 12);
+    if (summaryLines.length > 0) {
+      setText(pdf, DUSK);
+      pdf.setFontSize(6.5);
+      pdf.text(summaryLines, titleX, ctx.y + 12 + titleLines.length * 11 + 2);
+      pdf.setFontSize(7);
+    }
 
     const sevKeyStr = sevKey(i.severity);
     const sevDisplay = SEV_LABEL[sevKeyStr] ?? i.severity ?? "";
@@ -1082,6 +1104,7 @@ export async function exportTopicReportPdf(
       filterTopicReportIncidents(incidents, data.topic, data.issueDate),
       data.topic,
       topicLabels,
+      options.incidentSummaries ?? {},
     );
   }
 

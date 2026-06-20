@@ -36,7 +36,9 @@ import type {
   CountryReportUpdate,
   DashboardOverview,
   EditCountryProseInput,
+  EditReportIncidentSummariesInput,
   GenerateCountryProseInput,
+  GenerateReportIncidentSummariesInput,
   GetIncidentCountsByTopicParams,
   GetRecentIncidentsParams,
   GetStrikeSummaryParams,
@@ -62,6 +64,7 @@ import type {
   MarketPrice,
   ReliefWebReport,
   Report,
+  ReportIncidentSummariesResult,
   ReportInput,
   ReportUpdate,
   Source,
@@ -4356,5 +4359,137 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getEditCountryProseMutationOptions(options));
+    }
+
+export const getGenerateReportIncidentSummariesUrl = (id: number,) => {
+
+
+
+
+  return `/api/reports/${id}/incident-summaries`
+}
+
+export const generateReportIncidentSummaries = async (id: number,
+    generateReportIncidentSummariesInput: GenerateReportIncidentSummariesInput, options?: RequestInit): Promise<ReportIncidentSummariesResult> => {
+
+  return customFetch<ReportIncidentSummariesResult>(getGenerateReportIncidentSummariesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateReportIncidentSummariesInput,)
+  }
+);}
+
+
+
+
+export const getGenerateReportIncidentSummariesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportIncidentSummaries>>, TError,{id: number;data: BodyType<GenerateReportIncidentSummariesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateReportIncidentSummaries>>, TError,{id: number;data: BodyType<GenerateReportIncidentSummariesInput>}, TContext> => {
+
+const mutationKey = ['generateReportIncidentSummaries'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateReportIncidentSummaries>>, {id: number;data: BodyType<GenerateReportIncidentSummariesInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  generateReportIncidentSummaries(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateReportIncidentSummariesMutationResult = NonNullable<Awaited<ReturnType<typeof generateReportIncidentSummaries>>>
+    export type GenerateReportIncidentSummariesMutationBody = BodyType<GenerateReportIncidentSummariesInput>
+    export type GenerateReportIncidentSummariesMutationError = ErrorType<void>
+
+    export const useGenerateReportIncidentSummaries = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportIncidentSummaries>>, TError,{id: number;data: BodyType<GenerateReportIncidentSummariesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateReportIncidentSummaries>>,
+        TError,
+        {id: number;data: BodyType<GenerateReportIncidentSummariesInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateReportIncidentSummariesMutationOptions(options));
+    }
+
+export const getEditReportIncidentSummariesUrl = (id: number,) => {
+
+
+
+
+  return `/api/reports/${id}/incident-summaries/edit`
+}
+
+export const editReportIncidentSummaries = async (id: number,
+    editReportIncidentSummariesInput: EditReportIncidentSummariesInput, options?: RequestInit): Promise<ReportIncidentSummariesResult> => {
+
+  return customFetch<ReportIncidentSummariesResult>(getEditReportIncidentSummariesUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      editReportIncidentSummariesInput,)
+  }
+);}
+
+
+
+
+export const getEditReportIncidentSummariesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editReportIncidentSummaries>>, TError,{id: number;data: BodyType<EditReportIncidentSummariesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof editReportIncidentSummaries>>, TError,{id: number;data: BodyType<EditReportIncidentSummariesInput>}, TContext> => {
+
+const mutationKey = ['editReportIncidentSummaries'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editReportIncidentSummaries>>, {id: number;data: BodyType<EditReportIncidentSummariesInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  editReportIncidentSummaries(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditReportIncidentSummariesMutationResult = NonNullable<Awaited<ReturnType<typeof editReportIncidentSummaries>>>
+    export type EditReportIncidentSummariesMutationBody = BodyType<EditReportIncidentSummariesInput>
+    export type EditReportIncidentSummariesMutationError = ErrorType<void>
+
+    export const useEditReportIncidentSummaries = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editReportIncidentSummaries>>, TError,{id: number;data: BodyType<EditReportIncidentSummariesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof editReportIncidentSummaries>>,
+        TError,
+        {id: number;data: BodyType<EditReportIncidentSummariesInput>},
+        TContext
+      > => {
+      return useMutation(getEditReportIncidentSummariesMutationOptions(options));
     }
 

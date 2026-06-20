@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
   useGetReport,
@@ -7,9 +7,12 @@ import {
   useListLatestMaritimeMovement,
   useListMaritimeSecurityEvents,
   useListReliefWebReports,
+  useGenerateReportIncidentSummaries,
+  useEditReportIncidentSummaries,
   getGetReportQueryKey,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
+  type ReportIncidentSummariesResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -38,6 +41,11 @@ import {
   type DraftableIncident,
 } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { selectRelatedIncidents } from "@/lib/relatedIncidents";
+import { filterTopicReportIncidents } from "@/lib/topicFastFacts";
+import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
+import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
+import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate } from "@/lib/reportDataStatus";
@@ -189,6 +197,149 @@ export default function ReportEditor() {
   const [exportError, setExportError] = useState<string | null>(null);
 
   const incidentsForExport = incidents ?? [];
+
+  // Per-incident AI summaries for the Related Incidents table of TOPIC,
+  // CONFLICT and SHIPPING reports (flashpoint/protests/fuel carry no such
+  // table). The same prompt contract, fingerprint cache and editable-fallback
+  // pattern as the country reports; generation is keyed by the EXACT rendered
+  // related set (≤ backend cap) so the cache can never lag the data and every
+  // key resolves to the row that renders it.
+  const summariesEnabled =
+    form.topic !== "flashpoint" &&
+    form.topic !== "protests" &&
+    form.topic !== "fuel";
+
+  const relatedForSummaries = useMemo(() => {
+    if (!summariesEnabled) return [];
+    let rows: Array<Record<string, unknown>> = [];
+    if (form.topic === "shipping") {
+      rows = buildShippingReportDataset(
+        incidentsForExport,
+        form.topic,
+        form.issueDate,
+        maritimeSecurityEvents,
+      ).relatedIncidents as unknown as Array<Record<string, unknown>>;
+    } else if (form.topic === "conflict") {
+      rows = buildConflictReportDataset(
+        incidentsForExport,
+        form.topic,
+        form.issueDate,
+      ).relatedIncidents as unknown as Array<Record<string, unknown>>;
+    } else {
+      // Mirror the generic-topic preview/PDF pipeline EXACTLY: window-filter
+      // first (filterTopicReportIncidents on the issue date), then
+      // selectRelatedIncidents — otherwise the generation payload would be the
+      // global incident pool and its summary keys would not match the rendered
+      // (windowed) rows.
+      rows = selectRelatedIncidents(
+        filterTopicReportIncidents(
+          incidentsForExport,
+          form.topic,
+          form.issueDate,
+        ),
+        form.topic,
+      ) as unknown as Array<Record<string, unknown>>;
+    }
+    return rows.map((i) => ({
+      id: i.id != null ? String(i.id) : undefined,
+      topic: typeof i.topic === "string" ? i.topic : form.topic,
+      title: typeof i.title === "string" ? i.title : "",
+      summary: typeof i.summary === "string" ? i.summary : "",
+      location: typeof i.location === "string" ? i.location : "",
+      country: typeof i.country === "string" ? i.country : "",
+      severity: typeof i.severity === "string" ? i.severity : "",
+      occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
+      source: typeof i.source === "string" ? i.source : "",
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    summariesEnabled,
+    form.topic,
+    form.issueDate,
+    incidentsForExport,
+    maritimeSecurityEvents,
+  ]);
+
+  const [summaryRes, setSummaryRes] =
+    useState<ReportIncidentSummariesResult | null>(null);
+  const [editedSummaries, setEditedSummaries] = useState<Record<
+    string,
+    string
+  > | null>(null);
+  const [summaryEditError, setSummaryEditError] = useState<string | null>(null);
+  const lastGenKey = useRef<string>("");
+  const generateSummaries = useGenerateReportIncidentSummaries();
+  const editSummaries = useEditReportIncidentSummaries();
+
+  useEffect(() => {
+    if (!id) return;
+    if (relatedForSummaries.length === 0) {
+      if (lastGenKey.current !== "") {
+        lastGenKey.current = "";
+        setSummaryRes(null);
+        setEditedSummaries(null);
+      }
+      return;
+    }
+    // Key on the FULL canonical incident identity (the same fields the backend
+    // fingerprint + prompt grounding use), not just [id,title] — otherwise an
+    // incident whose summary/severity/location changes without a title change
+    // would never re-trigger generation and the cached line would go stale.
+    const key = JSON.stringify(relatedForSummaries);
+    if (key === lastGenKey.current) return;
+    lastGenKey.current = key;
+    generateSummaries.mutate(
+      { id, data: { incidents: relatedForSummaries } },
+      {
+        onSuccess: (res) => {
+          setSummaryRes(res);
+          setEditedSummaries((res.edited as Record<string, string>) ?? null);
+        },
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, relatedForSummaries]);
+
+  // Effective per-incident summaries = AI-generated, overlaid with analyst
+  // edits (live draft, else saved edits). Empty when AI is unavailable, in
+  // which case each row falls back to its deterministic line.
+  const effectiveSummaries = useMemo<Record<string, string>>(() => {
+    const gen = (summaryRes?.summaries as Record<string, string>) ?? {};
+    const ed =
+      editedSummaries ??
+      (summaryRes?.edited as Record<string, string> | null) ??
+      {};
+    return { ...gen, ...ed };
+  }, [summaryRes, editedSummaries]);
+
+  const setIncidentSummary = (incidentId: string, text: string) =>
+    setEditedSummaries((d) => ({ ...(d ?? {}), [incidentId]: text }));
+
+  const saveIncidentSummaries = () => {
+    if (!id || !summaryRes) return;
+    setSummaryEditError(null);
+    editSummaries.mutate(
+      {
+        id,
+        data: {
+          fingerprint: summaryRes.fingerprint,
+          summaries: editedSummaries ?? {},
+        },
+      },
+      {
+        onSuccess: (res) => {
+          setSummaryRes(res);
+          setEditedSummaries((res.edited as Record<string, string>) ?? null);
+        },
+        onError: () => {
+          setSummaryEditError(
+            "Summaries are out of date — regenerate before editing.",
+          );
+        },
+      },
+    );
+  };
+
   const downloadPdf = async (opts?: { forceAllowMissing?: boolean }) => {
     setExporting(true);
     setExportError(null);
@@ -263,6 +414,7 @@ export default function ReportEditor() {
           filename,
           movement,
           maritimeSecurityEvents,
+          effectiveSummaries,
         );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
@@ -270,6 +422,7 @@ export default function ReportEditor() {
           incidentsForExport,
           filename,
           situationalReports,
+          effectiveSummaries,
         );
       } else {
         await exportTopicReportPdf(
@@ -280,7 +433,10 @@ export default function ReportEditor() {
           incidentsForExport,
           TOPIC_LABELS,
           filename,
-          { allowMissingMarketData: allow },
+          {
+            allowMissingMarketData: allow,
+            incidentSummaries: effectiveSummaries,
+          },
         );
       }
       setAllowMissingExport(false);
@@ -964,6 +1120,113 @@ export default function ReportEditor() {
             />
           </Field>
 
+          {summariesEnabled && relatedForSummaries.length > 0 && (
+            <div className="border-t border-border pt-4 mt-2 space-y-3">
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+                    Related Incident Summaries
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                    One short line per related incident, shown under its title in
+                    the preview and PDF. Edit any line below, then Save
+                    summaries. Regenerate redraws from the current data.
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-sm h-8 text-xs"
+                    disabled={generateSummaries.isPending}
+                    onClick={() => {
+                      if (!id) return;
+                      setSummaryEditError(null);
+                      generateSummaries.mutate(
+                        {
+                          id,
+                          data: { incidents: relatedForSummaries, force: true },
+                        },
+                        {
+                          onSuccess: (res) => {
+                            setSummaryRes(res);
+                            setEditedSummaries(
+                              (res.edited as Record<string, string>) ?? null,
+                            );
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    {generateSummaries.isPending ? "Working…" : "Regenerate"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-sm h-8 text-xs"
+                    disabled={editSummaries.isPending || !summaryRes}
+                    onClick={saveIncidentSummaries}
+                  >
+                    {editSummaries.isPending ? "Saving…" : "Save summaries"}
+                  </Button>
+                </div>
+              </div>
+
+              {summaryRes && !summaryRes.available && (
+                <div className="text-[11px] text-muted-foreground leading-snug">
+                  AI summaries are unavailable, so each row shows a deterministic
+                  fallback line. You can still edit any line below.
+                </div>
+              )}
+              {summaryEditError && (
+                <div
+                  className="text-[12px] p-2 rounded-sm border"
+                  style={{
+                    background: "#f7eded",
+                    borderColor: "#a33232",
+                    color: "#a33232",
+                    fontFamily: "Roboto, sans-serif",
+                  }}
+                >
+                  {summaryEditError}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {relatedForSummaries.map((row) => {
+                  const key = row.id ?? "";
+                  if (!key) return null;
+                  const value = resolveIncidentSummary(
+                    {
+                      id: key,
+                      topic: row.topic,
+                      title: row.title,
+                      summary: row.summary,
+                      location: row.location,
+                      severity: row.severity,
+                      occurredAt: row.occurredAt,
+                      source: row.source,
+                    },
+                    effectiveSummaries,
+                  );
+                  return (
+                    <div key={key} className="space-y-1">
+                      <div className="text-[11px] font-medium leading-snug text-foreground">
+                        {row.title || "Untitled incident"}
+                      </div>
+                      <Textarea
+                        rows={2}
+                        value={value}
+                        onChange={(e) => setIncidentSummary(key, e.target.value)}
+                        className="rounded-sm text-[12px]"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {form.topic === "fuel" && (
             <div className="border-t border-border pt-4 mt-2 space-y-3">
               {sampleAutoSeeded && (
@@ -1363,6 +1626,7 @@ export default function ReportEditor() {
               incidents={incidentsForExport}
               movement={movement}
               maritimeSecurityEvents={maritimeSecurityEvents}
+              incidentSummaries={effectiveSummaries}
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview
@@ -1374,6 +1638,7 @@ export default function ReportEditor() {
               report={form}
               incidents={incidentsForExport}
               situationalReports={situationalReports}
+              incidentSummaries={effectiveSummaries}
             />
           ) : (
             <ReportPreview
@@ -1382,6 +1647,7 @@ export default function ReportEditor() {
                 hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
               }}
               incidents={incidentsForExport}
+              incidentSummaries={effectiveSummaries}
             />
           )}
         </div>

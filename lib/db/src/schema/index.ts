@@ -7,6 +7,7 @@ export * from "./reports";
 export * from "./spotReports";
 export * from "./countryReports";
 export * from "./countryReportProse";
+export * from "./reportIncidentSummaries";
 export * from "./countryBaselines";
 export * from "./appMigrationMarkers";
 export * from "./marketPrices";

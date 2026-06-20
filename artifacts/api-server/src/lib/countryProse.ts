@@ -475,3 +475,160 @@ export async function generateCountryProse(
   }
   return last;
 }
+
+// --- Per-incident summaries (TOPIC / CONFLICT / SHIPPING report tables) -------
+//
+// A focused, summaries-ONLY use of the same prompt contract, LLM client, cache
+// fingerprint and id-keyed mapping the country brief uses. It produces one short
+// factual analyst summary per incident for the Related Incidents table of a
+// topic/conflict/shipping report — grounded ONLY on each incident's own text,
+// British English, five-tier severity vocab, no fabricated facts, no
+// parenthetical counts. The caller caches the result by reportId keyed on the
+// fingerprint and falls back to a deterministic per-incident line when the LLM
+// is unavailable.
+
+export type IncidentSummariesOutcome =
+  | { ok: true; summaries: Record<string, string>; model: string }
+  | { ok: false; error: string; retryAfterMs?: number };
+
+// Standalone per-incident-summaries prompt. It reuses the SAME per-incident
+// rules as the country brief's PER-INCIDENT SUMMARIES block, but asks for ONLY
+// the incidentSummaries object (no narrative sections), since these reports own
+// their own narrative elsewhere.
+const INCIDENT_SUMMARIES_SYSTEM_PROMPT = `You are a senior security-intelligence analyst writing short per-incident summaries for the Related Incidents table of a corporate security report. You are given a numbered list of incidents and you write one concise factual analyst summary for each.
+
+GROUNDING — non-negotiable:
+- Ground each summary ONLY on that incident's own title and summary line — never on any other incident or outside knowledge. Do not invent, infer or add facts, casualty figures, numbers, dates, place names, group names or attributions that are not in that incident's own text.
+- State plainly what happened, where, who or what was affected, and the operational implication for staff movement, site access or continuity ONLY where that incident's own text supports it.
+- One sentence is usually enough; use two only when the incident's text genuinely carries that much. When the source text is thin, keep it short rather than padding.
+
+WRITING RULES:
+- Do NOT state numeric counts of incidents or records (e.g. "three incidents", "2 records").
+- Do NOT repeat the incident's title verbatim.
+- Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
+- Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
+- Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the incident — not about the process.
+- British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
+
+Return STRICT JSON with EXACTLY this shape and no other keys:
+{
+  "incidentSummaries": object  // Keys are the incident NUMBERS from the INCIDENTS list as strings ("1", "2", ...); each value is that incident's factual summary as described above. Include an entry for every numbered incident.
+}
+Return ONLY the JSON object.`;
+
+/**
+ * Deterministic fingerprint of the incident set the per-incident summaries are
+ * grounded on. Hashes the SAME canonical/capped set the model is given, so the
+ * cache hits for identical data and any change to the incidents flips it.
+ */
+export function computeIncidentSummariesFingerprint(input: {
+  scope: string;
+  incidents: ProseIncidentInput[];
+}): string {
+  const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
+  const payload = JSON.stringify({
+    v: PROSE_PROMPT_VERSION,
+    kind: "incident-summaries",
+    scope: input.scope,
+    ids,
+  });
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+async function callSummariesOnce(
+  incidents: ProseIncidentInput[],
+): Promise<IncidentSummariesOutcome> {
+  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (!base || !key) return { ok: false, error: "llm-unavailable" };
+
+  const userPrompt = [
+    "INCIDENTS (the ONLY source of facts; write one summary per numbered item):",
+    incidentBlock(incidents),
+  ].join("\n");
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: INCIDENT_SUMMARIES_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+      signal: ac.signal,
+    });
+
+    if (res.status === 429 || res.status >= 500) {
+      const ra = res.headers.get("retry-after");
+      let retryAfterMs: number | undefined;
+      if (ra) {
+        const secs = Number(ra);
+        if (Number.isFinite(secs)) retryAfterMs = secs * 1000;
+        else {
+          const when = Date.parse(ra);
+          if (Number.isFinite(when)) retryAfterMs = Math.max(0, when - Date.now());
+        }
+      }
+      return { ok: false, error: `http-${res.status}`, retryAfterMs };
+    }
+    if (!res.ok) return { ok: false, error: `http-${res.status}` };
+
+    const json = (await res.json()) as {
+      choices?: { message?: { content?: string }; finish_reason?: string }[];
+    };
+    const choice = json.choices?.[0];
+    const content = choice?.message?.content;
+    if (!content) return { ok: false, error: `empty-content(${choice?.finish_reason ?? "?"})` };
+
+    let raw: unknown;
+    try {
+      raw = JSON.parse(content);
+    } catch {
+      const m = content.match(/\{[\s\S]*\}/);
+      if (!m) return { ok: false, error: "bad-json" };
+      try {
+        raw = JSON.parse(m[0]);
+      } catch {
+        return { ok: false, error: "bad-json" };
+      }
+    }
+    if (!raw || typeof raw !== "object") return { ok: false, error: "bad-json" };
+    const summaries = mapIncidentSummaries(
+      (raw as Record<string, unknown>).incidentSummaries,
+      incidents,
+    );
+    if (Object.keys(summaries).length === 0) return { ok: false, error: "bad-json" };
+    return { ok: true, summaries, model: MODEL };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: ac.signal.aborted ? "timeout" : msg };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Generate per-incident summaries with retries + exponential backoff. */
+export async function generateIncidentSummaries(
+  incidents: ProseIncidentInput[],
+  retries = 2,
+): Promise<IncidentSummariesOutcome> {
+  let last: IncidentSummariesOutcome = { ok: false, error: "not-attempted" };
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    last = await callSummariesOnce(incidents);
+    if (last.ok) return last;
+    const retryable = RETRYABLE.has(last.error) || last.error.startsWith("http-");
+    if (!retryable || attempt === retries) return last;
+    const serverHint = !last.ok ? last.retryAfterMs : undefined;
+    const backoff = serverHint ?? 1000 * Math.pow(2, attempt);
+    const jitter = Math.random() * 500;
+    await new Promise((r) => setTimeout(r, Math.min(backoff, 15000) + jitter));
+  }
+  return last;
+}

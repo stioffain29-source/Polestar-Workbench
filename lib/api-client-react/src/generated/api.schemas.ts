@@ -1053,6 +1053,31 @@ export interface CountryProseResult {
   generatedAt: string;
 }
 
+export interface GenerateReportIncidentSummariesInput {
+  force?: boolean;
+  incidents: ProseIncidentInput[];
+}
+
+export type EditReportIncidentSummariesInputSummaries = {[key: string]: string};
+
+export interface EditReportIncidentSummariesInput {
+  fingerprint: string;
+  summaries: EditReportIncidentSummariesInputSummaries;
+}
+
+export type ReportIncidentSummariesResultSummaries = {[key: string]: string};
+
+export type ReportIncidentSummariesResultEdited = {[key: string]: string} | null;
+
+export interface ReportIncidentSummariesResult {
+  available: boolean;
+  fingerprint: string;
+  summaries: ReportIncidentSummariesResultSummaries;
+  edited?: ReportIncidentSummariesResultEdited;
+  model: string;
+  generatedAt: string;
+}
+
 export interface DashboardTopicCard {
   topic: Topic;
   label: string;

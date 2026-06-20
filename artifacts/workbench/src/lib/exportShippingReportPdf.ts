@@ -1,4 +1,5 @@
 import { format, parseISO } from "date-fns";
+import { resolveIncidentSummary } from "./incidentSummary";
 import {
   createCtx,
   newPage,
@@ -476,7 +477,11 @@ function drawHorizontalBarChart(
 
 // Related Incidents ---------------------------------------------------------
 
-function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
+function drawRelatedIncidents(
+  ctx: Ctx,
+  rows: EnrichedIncident[],
+  summaries: Record<string, string>,
+) {
   if (rows.length === 0) return;
   // Guard against a stranded heading at the foot of a page: pre-allocate
   // heading + header row + a couple of body rows.
@@ -521,9 +526,16 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
       sanitize(i.issue),
       colIssueW - 8,
     );
+    pdf.setFontSize(7);
+    const summaryLines: string[] = pdf.splitTextToSize(
+      sanitize(resolveIncidentSummary(i, summaries)),
+      colTitleW - 8,
+    );
+    pdf.setFontSize(8.5);
+    const titleBlockH = titleLines.length * 12 + summaryLines.length * 9 + 4;
     const rh = Math.max(
       rowH,
-      Math.max(titleLines.length, issueLines.length) * 12 + 10,
+      Math.max(titleBlockH, issueLines.length * 12) + 10,
     );
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
@@ -542,7 +554,19 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
     pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 14, textOpts);
     pdf.text(issueLines, MX + colDateW + 6, ctx.y + 14, textOpts);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 14, textOpts);
+    const titleX = MX + colDateW + colIssueW + 6;
+    pdf.text(titleLines, titleX, ctx.y + 14, textOpts);
+    if (summaryLines.length > 0) {
+      setText(pdf, DUSK);
+      pdf.setFontSize(7);
+      pdf.text(
+        summaryLines,
+        titleX,
+        ctx.y + 14 + titleLines.length * 12 + 2,
+        textOpts,
+      );
+      pdf.setFontSize(8.5);
+    }
 
     const sk = sevKey(i.severity);
     setFill(pdf, SEV_COLOR[sk] ?? "#999999");
@@ -877,6 +901,7 @@ export async function exportShippingReportPdf(
   filename: string,
   movement: MaritimeMovement[] = [],
   maritimeSecurityEvents: MaritimeSecurityEvent[] = [],
+  incidentSummaries: Record<string, string> = {},
 ): Promise<void> {
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
@@ -1055,7 +1080,7 @@ export async function exportShippingReportPdf(
     pickProse(data.polestarView, ds.autoPolestarView),
   );
 
-  drawRelatedIncidents(ctx, ds.relatedIncidents);
+  drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
 
   drawDisclaimer(ctx);
 

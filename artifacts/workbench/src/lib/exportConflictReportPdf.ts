@@ -1,4 +1,5 @@
 import { format, parseISO } from "date-fns";
+import { resolveIncidentSummary } from "./incidentSummary";
 import {
   createCtx,
   newPage,
@@ -125,7 +126,11 @@ function drawTopActivityAreas(ctx: Ctx, areas: ConflictActivityArea[]) {
 }
 
 // --- Related Incidents -----------------------------------------------------
-function drawRelatedIncidents(ctx: Ctx, rows: ConflictEnrichedIncident[]) {
+function drawRelatedIncidents(
+  ctx: Ctx,
+  rows: ConflictEnrichedIncident[],
+  summaries: Record<string, string>,
+) {
   ensureSpace(ctx, 24 + 18 + 40);
   drawSectionHeading(ctx, "Related Incidents");
   if (rows.length === 0) {
@@ -183,9 +188,16 @@ function drawRelatedIncidents(ctx: Ctx, rows: ConflictEnrichedIncident[]) {
       sanitize(i.issue),
       colIssueW - 8,
     );
+    pdf.setFontSize(7);
+    const summaryLines: string[] = pdf.splitTextToSize(
+      sanitize(resolveIncidentSummary(i, summaries)),
+      colTitleW - 8,
+    );
+    pdf.setFontSize(8.5);
+    const titleBlockH = titleLines.length * 12 + summaryLines.length * 9 + 4;
     const rh = Math.max(
       rowH,
-      Math.max(titleLines.length, issueLines.length) * 12 + 10,
+      Math.max(titleBlockH, issueLines.length * 12) + 10,
     );
     if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
@@ -204,7 +216,19 @@ function drawRelatedIncidents(ctx: Ctx, rows: ConflictEnrichedIncident[]) {
     pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 14, textOpts);
     pdf.text(issueLines, MX + colDateW + 6, ctx.y + 14, textOpts);
     setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 14, textOpts);
+    const titleX = MX + colDateW + colIssueW + 6;
+    pdf.text(titleLines, titleX, ctx.y + 14, textOpts);
+    if (summaryLines.length > 0) {
+      setText(pdf, DUSK);
+      pdf.setFontSize(7);
+      pdf.text(
+        summaryLines,
+        titleX,
+        ctx.y + 14 + titleLines.length * 12 + 2,
+        textOpts,
+      );
+      pdf.setFontSize(8.5);
+    }
 
     const sk = sevKey(i.severity);
     setFill(pdf, SEV_COLOR[sk] ?? "#999999");
@@ -229,6 +253,7 @@ export async function exportConflictReportPdf(
   incidents: ConflictReportIncident[],
   filename: string,
   situationalReports?: ReliefWebReport[] | null,
+  incidentSummaries: Record<string, string> = {},
 ): Promise<void> {
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const canon = canonicalTopic(data.topic);
@@ -312,7 +337,7 @@ export async function exportConflictReportPdf(
 
   drawSituationalContextPdf(ctx, buildSituationalContext(situationalReports, { max: 6 }));
 
-  drawRelatedIncidents(ctx, ds.relatedIncidents);
+  drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
 
   drawDisclaimer(ctx);
 

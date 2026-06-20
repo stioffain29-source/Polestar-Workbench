@@ -14,6 +14,7 @@ import {
   SHIPPING_SEV_LABEL,
   shippingSevKey,
 } from "@/lib/shippingReportDataset";
+import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
@@ -411,7 +412,7 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
   );
 }
 
-function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
+function RelatedIncidentsTable({ rows, summaries }: { rows: EnrichedIncident[]; summaries: Record<string, string> }) {
   if (rows.length === 0) return null;
   return (
     <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
@@ -445,12 +446,17 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
             fontFamily: "Roboto, sans-serif",
             fontSize: 12,
             color: DUSK,
-            alignItems: "center",
+            alignItems: "flex-start",
           }}
         >
           <div>{format(r.date, "dd MMM yyyy")}</div>
           <div>{r.issue}</div>
-          <div style={{ color: NAVY }}>{r.title}</div>
+          <div style={{ color: NAVY }}>
+            {r.title}
+            <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
+              {resolveIncidentSummary(r, summaries)}
+            </div>
+          </div>
           <div>
             <SeverityChip
               sevKey={shippingSevKey(r.severity)}
@@ -638,11 +644,13 @@ export default function ShippingReportPreview({
   incidents,
   movement = [],
   maritimeSecurityEvents = [],
+  incidentSummaries = {},
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
   movement?: MaritimeMovement[];
   maritimeSecurityEvents?: MaritimeSecurityEvent[];
+  incidentSummaries?: Record<string, string>;
 }) {
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -923,7 +931,7 @@ export default function ShippingReportPreview({
 
         {ds.relatedIncidents.length > 0 && (
           <Section title="Related Incidents">
-            <RelatedIncidentsTable rows={ds.relatedIncidents} />
+            <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={incidentSummaries} />
           </Section>
         )}
 

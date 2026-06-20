@@ -1032,6 +1032,56 @@ paths:
         "409":
           description: Fingerprint stale, regenerate first
 
+  /reports/{id}/incident-summaries:
+    post:
+      operationId: generateReportIncidentSummaries
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerateReportIncidentSummariesInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportIncidentSummariesResult" }
+        "400":
+          description: Invalid request
+        "404":
+          description: Report not found
+
+  /reports/{id}/incident-summaries/edit:
+    put:
+      operationId: editReportIncidentSummaries
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditReportIncidentSummariesInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportIncidentSummariesResult" }
+        "404":
+          description: No generated summaries to edit
+        "409":
+          description: Fingerprint stale, regenerate first
+
 components:
   schemas:
     HealthStatus:
@@ -2091,6 +2141,41 @@ components:
         edited:
           oneOf:
             - { $ref: "#/components/schemas/CountryProseSections" }
+            - { type: "null" }
+        model: { type: string }
+        generatedAt: { type: string, format: date-time }
+
+    GenerateReportIncidentSummariesInput:
+      type: object
+      required: [incidents]
+      properties:
+        force: { type: boolean }
+        incidents:
+          type: array
+          items: { $ref: "#/components/schemas/ProseIncidentInput" }
+
+    EditReportIncidentSummariesInput:
+      type: object
+      required: [fingerprint, summaries]
+      properties:
+        fingerprint: { type: string }
+        summaries:
+          type: object
+          additionalProperties: { type: string }
+
+    ReportIncidentSummariesResult:
+      type: object
+      required: [available, fingerprint, summaries, model, generatedAt]
+      properties:
+        available: { type: boolean }
+        fingerprint: { type: string }
+        summaries:
+          type: object
+          additionalProperties: { type: string }
+        edited:
+          oneOf:
+            - type: object
+              additionalProperties: { type: string }
             - { type: "null" }
         model: { type: string }
         generatedAt: { type: string, format: date-time }

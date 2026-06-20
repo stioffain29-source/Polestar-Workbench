@@ -7,6 +7,7 @@ import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
+import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import {
   buildCargoSecurityRead,
   buildCargoWhatHappened,
@@ -320,7 +321,7 @@ function CargoCountryTable({ rows }: { rows: CargoCountryRow[] }) {
   );
 }
 
-function RelatedIncidentsTable({ rows }: { rows: TopicFastFactsIncident[] }) {
+function RelatedIncidentsTable({ rows, summaries }: { rows: TopicFastFactsIncident[]; summaries: Record<string, string> }) {
   const th: React.CSSProperties = {
     background: NAVY,
     color: "#fff",
@@ -367,6 +368,9 @@ function RelatedIncidentsTable({ rows }: { rows: TopicFastFactsIncident[] }) {
               <td style={td}>{classifyIncidentType(r)}</td>
               <td style={{ ...td, color: NAVY }}>
                 {r.title}
+                <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
+                  {resolveIncidentSummary(r, summaries)}
+                </div>
                 {src && (
                   <div style={{ fontSize: 10, fontStyle: "italic", opacity: 0.7, marginTop: 3 }}>
                     Source: {src}
@@ -420,9 +424,11 @@ function computePreviewFastFacts(
 export default function ReportPreview({
   report,
   incidents = [],
+  incidentSummaries = {},
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
+  incidentSummaries?: Record<string, string>;
 }) {
   void canonicalTopic; void format; void parseISO;
   const resolvedTitle = report.topic
@@ -774,7 +780,7 @@ export default function ReportPreview({
                   />
                   {relatedRows.length > 0 && (
                     <Section title="Related Incidents">
-                      <RelatedIncidentsTable rows={relatedRows} />
+                      <RelatedIncidentsTable rows={relatedRows} summaries={incidentSummaries} />
                     </Section>
                   )}
                 </>

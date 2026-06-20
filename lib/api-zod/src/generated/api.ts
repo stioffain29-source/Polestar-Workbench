@@ -2839,3 +2839,51 @@ export const EditCountryProseResponse = zod.object({
 })
 
 
+export const GenerateReportIncidentSummariesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GenerateReportIncidentSummariesBody = zod.object({
+  "force": zod.boolean().optional(),
+  "incidents": zod.array(zod.object({
+  "id": zod.string().nullish(),
+  "topic": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "summary": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "occurredAt": zod.string().nullish(),
+  "source": zod.string().nullish()
+}))
+})
+
+export const GenerateReportIncidentSummariesResponse = zod.object({
+  "available": zod.boolean(),
+  "fingerprint": zod.string(),
+  "summaries": zod.record(zod.string(), zod.string()),
+  "edited": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional(),
+  "model": zod.string(),
+  "generatedAt": zod.coerce.date()
+})
+
+
+export const EditReportIncidentSummariesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EditReportIncidentSummariesBody = zod.object({
+  "fingerprint": zod.string(),
+  "summaries": zod.record(zod.string(), zod.string())
+})
+
+export const EditReportIncidentSummariesResponse = zod.object({
+  "available": zod.boolean(),
+  "fingerprint": zod.string(),
+  "summaries": zod.record(zod.string(), zod.string()),
+  "edited": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional(),
+  "model": zod.string(),
+  "generatedAt": zod.coerce.date()
+})
+
+
