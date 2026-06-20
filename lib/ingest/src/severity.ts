@@ -29,18 +29,26 @@ export function maxSeverity(a: Severity, b: Severity): Severity {
   return SEVERITY_RANK[a] >= SEVERITY_RANK[b] ? a : b;
 }
 
+// A confirmed fatality count at or above this is a mass-casualty event and may
+// occupy the reserved Extreme tier; a smaller toll is a serious but
+// non-reserved High. Extreme is kept for genuine catastrophes (massacres,
+// mass-casualty attacks, emergency rule) rather than every single-fatality
+// security incident — see the EXTREME tier and the reserve rationale below.
+export const MASS_FATALITY_THRESHOLD = 6;
+
 /**
  * Severity FLOOR implied by a confirmed fatality count from a structured feed
- * (GDELT). A protest/unrest event with one or more confirmed deaths is at least
- * Extreme (matching the EXTREME tier's casualty signals); a fatality count of
- * zero is informative but carries no floor. Null when no count is known. This
- * lets severity scoring consume the structured fatality field where present and
- * fall back to text classification when absent.
+ * (GDELT). A mass-casualty toll (>= MASS_FATALITY_THRESHOLD confirmed deaths)
+ * floors at Extreme; a smaller confirmed toll floors at High (a serious event,
+ * but the reserved tier is kept for mass casualties). A fatality count of zero
+ * is informative but carries no floor; null when no count is known. This lets
+ * severity scoring consume the structured fatality field where present and fall
+ * back to text classification when absent.
  */
 export function severityFromFatalities(fatalities: number | null | undefined): Severity | null {
   if (fatalities === null || fatalities === undefined) return null;
   if (!Number.isFinite(fatalities) || fatalities <= 0) return null;
-  return "extreme";
+  return fatalities >= MASS_FATALITY_THRESHOLD ? "extreme" : "high";
 }
 
 // Topics whose incidents are content-classified by classifySeverity.
@@ -174,17 +182,48 @@ export function hasIndonesianViolenceSignal(title: string, summary: string): boo
   return ID_FATAL_RE.test(hay) || ID_VIOLENCE_RE.test(hay);
 }
 
-// Fatalities, mass casualties, emergency rule. Reserved tier — drives the
-// subdued-red marker only.
+// A mass-casualty toll: a digit count >= MASS_FATALITY_THRESHOLD (6-9, or any
+// 10-9999) or a vague large quantity (dozens / scores / hundreds). The unit
+// guard stops a non-toll number — a reward "Rs 8 lakh", an age "10-year-old",
+// "kills 200 jobs" — from reading as a body count.
+const MASS_COUNT = "(?:[6-9]|[1-9]\\d{1,3}|dozens?|scores?|hundreds?)";
+const COUNT_UNIT_GUARD =
+  "(?!\\s*-?\\s*(?:lakhs?|crores?|millions?|billions?|thousands?|hundreds?|rupees?|rs|dollars?|usd|cents?|percent|per[- ]?cent|points?|votes?|seats?|years?|year[- ]?old|months?|weeks?|days?|hours?|minutes?|km|kg|tonnes?|tons?|acres?|hectares?|met(?:re|er)s?|feet|jobs?)\\b)";
+// "kills 24", "killed at least 12", "kill 30" — fatal verb + a mass toll not
+// bound to a figurative / unit object.
+const MASS_FATAL_VERB_COUNT_RE = new RegExp(
+  `\\bkill(?:s|ed|ing)?\\b\\s+${FATAL_QUALIFIER}${MASS_COUNT}\\b${COUNT_UNIT_GUARD}(?!\\s+${NON_CASUALTY}\\b)`,
+  "i",
+);
+// "24 killed", "at least 12 worshippers dead", "30 bodies" — a mass toll
+// followed (within a few words) by a fatal word.
+const MASS_COUNT_FATAL_RE = new RegExp(
+  `\\b${FATAL_QUALIFIER}${MASS_COUNT}\\b${COUNT_UNIT_GUARD}\\s+(?:\\w+[\\s,]+){0,3}?(?:killed|dead|deaths?|fatalit(?:y|ies)|slain|bodies|corpses)\\b`,
+  "i",
+);
+
+// Mass casualties, massacre, emergency rule. RESERVED tier — drives the
+// subdued-red marker only. A single / low-count confirmed fatality is NOT here:
+// it is a High security event (see FATAL_SIGNAL_RE + the decision in
+// classifySeverity). Extreme requires a mass-casualty toll
+// (>= MASS_FATALITY_THRESHOLD), a massacre / mass-casualty wording, or emergency
+// rule — so a counter-insurgency "encounter" that kills a few militants or a
+// single-fatality ambush no longer reads Extreme.
 const EXTREME: RegExp[] = [
-  /\b(killed|dead|deaths?|died|fatal(it(y|ies))?|massacre|killings?|slain|shot dead|gunned down|burn(ed|t) (?:to death|alive)|stampede)\b/i,
-  ID_FATAL_RE,
-  PRESENT_TENSE_FATAL_RE,
-  PRESENT_TENSE_FATAL_COUNT_RE,
+  /\bmassacre\b/i,
   /\b(martial law|state of emergency|emergency declared)\b/i,
-  /\b(dozens|scores|hundreds|mass) (killed|dead|feared dead)\b/i,
-  /\b(mass casualt|multiple (deaths|fatalities))\b/i,
+  /\b(dozens|scores|hundreds|mass) (killed|dead|feared dead|slain|fatalities)\b/i,
+  /\b(mass casualt|multiple (deaths|fatalities|killings)|many (?:killed|dead))\b/i,
+  MASS_FATAL_VERB_COUNT_RE,
+  MASS_COUNT_FATAL_RE,
 ];
+
+// A confirmed killing (single / unspecified toll). Serious — drives the High
+// tier — but NOT the reserved Extreme tier unless a mass-casualty signal is also
+// present. Suppressed by the reaction / natural-cause / judicial / biographical
+// guards exactly like the old bare-fatal EXTREME match was.
+const FATAL_SIGNAL_RE =
+  /\b(killed|dead|deaths?|died|fatal(?:it(?:y|ies))?|killings?|slain|shot dead|gunned down|burn(?:ed|t) (?:to death|alive)|stampede)\b/i;
 
 // Violence, injuries, weapons, severe coercive response or disruption.
 const HIGH: RegExp[] = [
