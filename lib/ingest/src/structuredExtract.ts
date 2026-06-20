@@ -39,7 +39,7 @@ export type IncidentCategory =
 // Ordered most-specific-first. The first regex to match wins.
 const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: string }> = [
   {
-    re: /\b(armed robbery|hold[- ]?up|carjack(?:ing|ed)?|stick[- ]?up|heist)\b/i,
+    re: /\b(armed robbery|hold[- ]?up|carjack(?:ing|ed)?|stick[- ]?up|heist|raskol|rascal gang|gang robbery|armed hold[- ]?up)\b/i,
     category: "Armed robbery / hold-up",
     impact: "Direct threat to staff, cash-in-transit and premises in the affected area; review movement and security cover.",
   },
@@ -49,7 +49,7 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     impact: "Road closures, supply-chain disruption and personnel-movement risk across the affected district.",
   },
   {
-    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed)\b/i,
+    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed|shooting|opened fire)\b/i,
     category: "Homicide / violent crime",
     impact: "Heightened personal-security risk locally; review after-hours exposure and movement protocols.",
   },

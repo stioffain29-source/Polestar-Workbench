@@ -1,0 +1,101 @@
+PNG crime feed fix, Port Moresby and Raskol activity
+
+The current PNG crime reporting is too sparse and is creating a false impression that Port Moresby had little or no crime activity during the week. That is not credible for NCD and needs fixing.
+
+The issue is not necessarily the report prose. The issue is that the scrape is missing the places where PNG crime is actually reported, especially police posts, local media snippets and social updates.
+
+Required change
+
+Improve the PNG crime scrape so it captures Port Moresby and NCD crime activity more reliably, including Raskol type activity, armed robbery, vehicle theft, carjacking, assault, firearms incidents, roadblocks, settlement violence and police operations.
+
+Sources to add or prioritise
+
+1. RPNGC official site
+2. RPNGC Facebook / police media posts where available
+3. NCD and Central Police social posts
+4. PNG Haus Bung
+5. TVWAN News
+6. Post Courier
+7. The National
+8. NBC PNG
+9. EMTV
+10. Google News fallback for PNG crime terms
+
+Search terms / keywords
+
+Use a wider PNG specific keyword set, including:
+
+Port Moresby crime
+NCD crime
+Raskol
+rascal
+armed robbery
+robbery
+carjacking
+vehicle theft
+stolen vehicle
+hold up
+firearms
+shooting
+assault
+roadblock
+settlement fight
+Nine Mile
+Bomana
+Gordons
+Waigani
+Boroko
+Hohola
+Koki
+Erima
+Moresby South
+Moresby North East
+Moresby North West
+
+Important handling
+
+Do not treat lack of mainstream news articles as no activity.
+
+If no clean incident is found inside the 7 day window, the report should say:
+
+“Open source incident reporting was limited during the period. This should not be read as an absence of crime.”
+
+Raskol wording
+
+Only use “Raskol” if the source uses that wording or if the incident clearly matches Raskol type street gang activity.
+
+Preferred wording:
+
+“Raskol type activity”
+“urban gang related crime”
+“armed robbery and vehicle crime”
+“opportunistic street crime”
+
+Avoid overclaiming unless the source is explicit.
+
+Report logic
+
+The PNG country report should separate:
+
+1. Confirmed date stamped incidents
+2. Police activity and arrests
+3. Crime trend indicators
+4. Standing operating risk
+
+This prevents the report from saying nothing happened just because the scrape missed individual incidents.
+
+Acceptance criteria
+
+The weekly PNG report should no longer produce a blank or near blank Port Moresby crime section unless the source search genuinely returns nothing.
+
+For each weekly report, the system should try to identify:
+
+At least one Port Moresby / NCD crime incident, police arrest, police operation or crime trend indicator.
+
+If none are found, the report must include a caveat that reporting is sparse and does not indicate an improved security environment.
+
+The output should include short, useful prose such as:
+
+“Crime remained a standing concern in Port Moresby during the reporting period, although open source incident reporting was limited. Raskol type activity continues to shape the operating environment, particularly armed robbery, vehicle theft, carjacking and opportunistic street crime. The absence of detailed daily reporting should not be read as an improvement in conditions.”
+
+Also check that the crime section is not being filtered out because of strict date logic, weak keyword matching, source parsing failure or over aggressive deduplication.
