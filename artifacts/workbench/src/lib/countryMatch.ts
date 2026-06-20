@@ -98,8 +98,11 @@ const WEST_PAPUA_CONTEXT_RE =
 // Genuine Papua New Guinea markers (the state, its cities, provinces and
 // institutions). If any of these appear, the record is directly relevant
 // to PNG and must NOT be stripped as Indonesian West Papua noise.
+// Kept in EXACT lockstep with PNG_MARKERS in lib/ingest/src/flashpoint.ts.
+// Generic NCD homonyms (ncd, "national capital district", "nine mile"/"six
+// mile", bare "gordon") are deliberately excluded here too.
 const PNG_CONTEXT_RE =
-  /\b(papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
+  /\b(papua new guinea|png|port moresby|gerehu|boroko|waigani|hohola|erima|tokarara|korobosea|hanuabada|badili|bomana|gordons|koki|morata|kaugere|sabama|moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
 
 /**
  * True when a record's narrative is clearly about Indonesian West Papua

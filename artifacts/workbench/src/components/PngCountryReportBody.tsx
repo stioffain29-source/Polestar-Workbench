@@ -1,5 +1,10 @@
 import { format } from "date-fns";
-import type { PngReportDataset, PngReportItem } from "@/lib/pngReportDataset";
+import type {
+  PngReportDataset,
+  PngReportItem,
+  StructuredLocationAugmentation,
+  StructuredLocationBucket,
+} from "@/lib/pngReportDataset";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -152,6 +157,110 @@ function LocationSection({
   );
 }
 
+// Strand sub-heading inside an augmented location section.
+function StrandLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontFamily: ROBOTO,
+        fontSize: 11,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: ELECTRIC,
+        fontWeight: 700,
+        margin: "16px 0 8px 0",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Emphasised caveat shown when a location had no confirmed incidents this
+// period — gives the required "absence of reporting is not absence of crime"
+// wording visible weight rather than a faint footnote.
+function CaveatNote({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontFamily: ROBOTO,
+        fontSize: 13,
+        lineHeight: 1.55,
+        color: DUSK,
+        background: "#f4f5f7",
+        borderLeft: `3px solid ${ELECTRIC}`,
+        padding: "10px 12px",
+        borderRadius: 2,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Augmented location section (PNG Port Moresby / NCD): the bucket's incidents
+// are split into Confirmed Incidents / Police Activity & Arrests / Crime Trend
+// Indicators, followed by an always-present Standing Operating Risk paragraph so
+// the section is never blank. When there are no confirmed incidents this period
+// the EXACT sparse-reporting caveat is shown instead of the bare fallback.
+function StrandedLocationSection({
+  title,
+  strands,
+  augmentation,
+  hadFeatured,
+  featuredNote,
+}: {
+  title: string;
+  strands: NonNullable<StructuredLocationBucket["strands"]>;
+  augmentation: StructuredLocationAugmentation;
+  hadFeatured: boolean;
+  featuredNote: string;
+}) {
+  return (
+    <Section title={title}>
+      <StrandLabel>Confirmed Incidents</StrandLabel>
+      {strands.confirmed.length > 0 ? (
+        <div>
+          {strands.confirmed.map((it) => (
+            <ItemCard key={it.id} item={it} />
+          ))}
+        </div>
+      ) : hadFeatured ? (
+        <EmptyNote>{featuredNote}</EmptyNote>
+      ) : (
+        <CaveatNote>{augmentation.sparseCaveat}</CaveatNote>
+      )}
+
+      <StrandLabel>Police Activity &amp; Arrests</StrandLabel>
+      {strands.police.length > 0 ? (
+        <div>
+          {strands.police.map((it) => (
+            <ItemCard key={it.id} item={it} />
+          ))}
+        </div>
+      ) : (
+        <EmptyNote>
+          No police operations or arrests were separately reported for the district this period.
+        </EmptyNote>
+      )}
+
+      <StrandLabel>Crime Trend Indicators</StrandLabel>
+      {strands.trend.length > 0 ? (
+        <div>
+          {strands.trend.map((it) => (
+            <ItemCard key={it.id} item={it} />
+          ))}
+        </div>
+      ) : (
+        <EmptyNote>No additional crime-trend signals were reported this period.</EmptyNote>
+      )}
+
+      <StrandLabel>Standing Operating Risk</StrandLabel>
+      <Prose text={augmentation.standingOperatingRisk} />
+    </Section>
+  );
+}
+
 export default function PngCountryReportBody({ dataset }: { dataset: PngReportDataset }) {
   const d = dataset;
   return (
@@ -174,17 +283,30 @@ export default function PngCountryReportBody({ dataset }: { dataset: PngReportDa
         )}
       </Section>
 
-      {/* 3-N. Location buckets (config-driven) + catch-all */}
-      {d.buckets.map((b) => (
-        <LocationSection
-          key={b.key}
-          title={b.label}
-          items={b.items}
-          emptyFallback={d.emptyLocationFallback}
-          hadFeatured={b.hadFeatured}
-          featuredNote={d.featuredAboveNote}
-        />
-      ))}
+      {/* 3-N. Location buckets (config-driven) + catch-all. Buckets with a
+          locationAugmentation (PNG NCD) render the strand layout + standing
+          operating-risk block; the rest render the flat location list. */}
+      {d.buckets.map((b) =>
+        b.augmentation && b.strands ? (
+          <StrandedLocationSection
+            key={b.key}
+            title={b.label}
+            strands={b.strands}
+            augmentation={b.augmentation}
+            hadFeatured={b.hadFeatured}
+            featuredNote={d.featuredAboveNote}
+          />
+        ) : (
+          <LocationSection
+            key={b.key}
+            title={b.label}
+            items={b.items}
+            emptyFallback={d.emptyLocationFallback}
+            hadFeatured={b.hadFeatured}
+            featuredNote={d.featuredAboveNote}
+          />
+        ),
+      )}
       <LocationSection
         title={d.otherBucketLabel}
         items={d.otherNational}

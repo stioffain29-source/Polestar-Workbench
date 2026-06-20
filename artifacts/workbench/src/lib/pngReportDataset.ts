@@ -124,6 +124,21 @@ export interface StructuredBucketDef {
   provinces: string[];
 }
 
+// Optional per-location augmentation. When a bucket key carries one, the
+// renderer splits that location into labelled strands (confirmed incidents /
+// police activity & arrests / crime trend indicators) and ALWAYS renders a
+// standing operating-risk paragraph so the section is never blank — even in a
+// week with no fresh reporting. Used for PNG's Port Moresby / NCD section;
+// theatres that omit it (e.g. West Papua) render the flat location list.
+export interface StructuredLocationAugmentation {
+  // EXACT caveat shown when no confirmed incidents were reported in-window for
+  // this location. Required wording per the brief spec — do not alter.
+  sparseCaveat: string;
+  // Standing operating-risk prose, ALWAYS rendered for this location so a quiet
+  // reporting week never reads as an absence of risk.
+  standingOperatingRisk: string;
+}
+
 export interface StructuredTheatreConfig {
   countryName: string;
   buckets: StructuredBucketDef[];
@@ -135,6 +150,9 @@ export interface StructuredTheatreConfig {
   // single quiet week as provisional."
   outlookVolatilityClause: string;
   deriveProvince: (location: string | null | undefined, text: string) => string | null;
+  // Optional, keyed by bucket key (e.g. "ncd"). Buckets without an entry render
+  // the standard flat location list.
+  locationAugmentations?: Record<string, StructuredLocationAugmentation>;
 }
 
 export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -152,6 +170,14 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
     "With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic crime in urban centres, periodic tribal and communal flare-ups in the Highlands, and intermittent road, power and connectivity disruption. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
   outlookVolatilityClause: "paydays, court rulings, election cycles and tribal-payback events",
   deriveProvince: derivePngProvince,
+  locationAugmentations: {
+    ncd: {
+      sparseCaveat:
+        "Open source incident reporting was limited during the period. This should not be read as an absence of crime.",
+      standingOperatingRisk:
+        "Port Moresby and the wider National Capital District carry a persistently high baseline of urban crime that holds regardless of week-to-week reporting. Armed robbery, hold-ups, carjacking and vehicle theft, opportunistic street crime and organised gang activity are entrenched — concentrated around settlements, markets, transport corridors and commercial premises, and rising around paydays, month-end and public holidays. Treat the standing threat as continuous: maintain movement security, premises protection and after-hours precautions irrespective of how much fresh reporting comes through in any given week.",
+    },
+  },
 };
 
 export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -227,6 +253,16 @@ export interface StructuredLocationBucket {
   // into Top 3 above, so the section shows a "featured above" note rather than a
   // false "no fresh reporting" fallback.
   hadFeatured: boolean;
+  // Present only for buckets with a config locationAugmentation (PNG NCD). When
+  // set, the renderer shows the strand layout + standing-risk block.
+  augmentation?: StructuredLocationAugmentation;
+  // The bucket's items split into the three incident strands. Present iff
+  // `augmentation` is set. Standing operating risk is config prose, not items.
+  strands?: {
+    confirmed: PngReportItem[];
+    police: PngReportItem[];
+    trend: PngReportItem[];
+  };
 }
 
 export interface PngReportDataset {
@@ -306,6 +342,23 @@ function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
   return db - da;
 }
 
+// Strand assignment for an augmented location section (currently PNG NCD).
+// Policing operations and arrests form their own strand; crime/violence
+// incidents are "confirmed incidents"; everything else (contextual, governance
+// or infrastructure signals) is treated as a crime-trend indicator. Matches on
+// the curated category label, so it tracks the ingest rulebook's categories.
+function strandForItem(item: PngReportItem): "confirmed" | "police" | "trend" {
+  const c = item.category.toLowerCase();
+  if (/(polic|arrest|detention|corrections|custody|operation|patrol)/.test(c)) return "police";
+  if (
+    /(robbery|hold-up|homicide|violent|tribal|communal|theft|break-in|assault|unrest|protest|kidnap|arson|sexual|attack|crime)/.test(
+      c,
+    )
+  )
+    return "confirmed";
+  return "trend";
+}
+
 function joinList(parts: string[]): string {
   const clean = parts.filter(Boolean);
   if (clean.length === 0) return "";
@@ -382,11 +435,25 @@ function buildStructuredReportDataset(
   const buckets: StructuredLocationBucket[] = config.buckets.map((b) => {
     const provSet = new Set(b.provinces);
     const inBucket = (it: PngReportItem) => it.province != null && provSet.has(it.province);
+    const items = bucketableItems.filter(inBucket).sort(sortBySeverityThenRecency);
+    const augmentation = config.locationAugmentations?.[b.key];
+    let strands: StructuredLocationBucket["strands"];
+    if (augmentation) {
+      const grouped = {
+        confirmed: [] as PngReportItem[],
+        police: [] as PngReportItem[],
+        trend: [] as PngReportItem[],
+      };
+      for (const it of items) grouped[strandForItem(it)].push(it);
+      strands = grouped;
+    }
     return {
       key: b.key,
       label: b.label,
-      items: bucketableItems.filter(inBucket).sort(sortBySeverityThenRecency),
+      items,
       hadFeatured: windowItems.some((it) => topThreeIds.has(it.id) && inBucket(it)),
+      augmentation,
+      strands,
     };
   });
   const inOther = (it: PngReportItem) => !it.province || !bucketProvinces.has(it.province);

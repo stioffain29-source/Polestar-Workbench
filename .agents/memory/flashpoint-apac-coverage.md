@@ -44,6 +44,27 @@ gap is almost always one un-threaded link in this chain.
 **How to apply:** when adding APAC countries, also add their capital to the
 interstate nation list and replay the live feed for these two homonym shapes.
 
+# Suburb tokens: markers vs gazetteer split (generic homonyms)
+
+When widening a country's localities, suburb names live in TWO places with
+DIFFERENT homonym tolerance. The country-resolution markers (`PNG_MARKERS` in
+`flashpoint.ts`, lockstep twin `PNG_CONTEXT_RE` in workbench `countryMatch.ts`)
+gate EVERY incoming story, so a generic token there mis-stamps foreign news to
+the country (e.g. bare `ncd` = non-communicable disease, "national capital
+district", "nine mile"/"six mile", bare "gordon"). Put ONLY distinctly-unique
+suburb names in the markers; keep the generic/homonym ones in the
+post-resolution gazetteer (`PNG_PROVINCE_BY_CITY` in `pngExtract.ts`), which
+runs AFTER the row is already resolved to the country so homonyms are safe.
+Suburb-only stories carrying a generic token are instead rescued via the
+authoritative single-country masthead/feed fallback (`AUTHORITATIVE_MASTHEADS`/
+`AUTHORITATIVE_FEEDS`) — anchor broadcaster brands tightly ("nbc png", never
+bare "nbc", which collides with US NBC).
+
+**Why:** an architect review caught that mirroring the full gazetteer into the
+markers would leak cross-country false positives.
+**How to apply:** new locality → unique name to markers (both twins), homonym to
+gazetteer only; broadcaster masthead anchored with the country suffix.
+
 # Backfill timing gotcha (don't conclude "it didn't fire")
 
 `backfillRelevance` (boot, in `migrations.ts`) re-rates EVERY row whose stored

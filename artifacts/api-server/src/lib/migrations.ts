@@ -126,6 +126,21 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "EMTV (PNG)",              url: "https://news.google.com/rss/search?q=site:emtv.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. EMTV — national broadcaster (Port Moresby). Collected via Google-News site-scope (direct feed redirects/blocks our egress IP). Security/crime/operational cues, last 14 days." },
   { name: "PNG Haus Bung",          url: "https://news.google.com/rss/search?q=site:pnghausbung.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. PNG Haus Bung — popular PNG news blog (tabloid register; corroborate before use). Collected via Google-News site-scope. Security/crime cues, last 14 days." },
   { name: "One PNG",                url: "https://news.google.com/rss/search?q=site:onepng.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. One PNG — community news aggregator. Collected via Google-News site-scope. Security/crime cues, last 14 days." },
+  // NBC PNG (National Broadcasting Corporation) — PNG's state broadcaster. The
+  // direct feed (nbc.com.pg) blocks our egress IP, so collected via Google-News
+  // site-scope like the other mastheads. Broadens NCD crime/security coverage.
+  { name: "NBC PNG",                url: "https://news.google.com/rss/search?q=site:nbc.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. NBC PNG — National Broadcasting Corporation (state broadcaster, Port Moresby). Collected via Google-News site-scope (direct feed blocks our egress IP). Security/crime/operational cues, last 14 days." },
+  // TVWAN News (Digicel) — no standalone news site; its digital output is
+  // carried by Loop PNG (already collected above). Name-anchored Google-News
+  // query so TVWAN-branded reporting still surfaces when syndicated elsewhere.
+  { name: "TVWAN News",             url: "https://news.google.com/rss/search?q=%22TVWAN%22+(%22Papua+New+Guinea%22+OR+PNG+OR+%22Port+Moresby%22)+(police+OR+robbery+OR+crime+OR+killed+OR+arrest+OR+violence)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. TVWAN News (Digicel broadcaster) — no standalone news website; digital output carried by Loop PNG (separate feed). Name-anchored query for TVWAN-branded reporting. Last 14 days." },
+  // Port Moresby / National Capital District crime FALLBACK. The country-wide
+  // crime feed above under-captures NCD because most Port Moresby crime stories
+  // name a suburb, not the city/country. This feed anchors on POM + the major
+  // NCD suburbs (Gerehu, Gordons, Waigani, Boroko, Nine Mile, Bomana) plus a
+  // wide crime-term set (raskol, armed robbery, carjacking, vehicle theft,
+  // hold-up, firearm) so suburb-named NCD incidents surface and bucket to NCD.
+  { name: "Google News — Papua New Guinea (Port Moresby / NCD Crime)", url: "https://news.google.com/rss/search?q=(%22Port+Moresby%22+OR+Gerehu+OR+Gordons+OR+Waigani+OR+Boroko+OR+%22Nine+Mile%22+OR+Bomana)+(raskol+OR+%22armed+robbery%22+OR+carjacking+OR+%22vehicle+theft%22+OR+robbery+OR+shooting+OR+hold-up+OR+firearm)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. Port Moresby / NCD crime aggregator, anchored on POM + major NCD suburbs (Gerehu, Gordons, Waigani, Boroko, Nine Mile, Bomana) + wide crime cues so suburb-named NCD incidents that omit the city/country name are captured and bucket to NCD. Last 14 days." },
   // RPNGC (Royal Papua New Guinea Constabulary) — official police statements.
   // CONFIRMATION source, not a discovery feed: used to corroborate incidents
   // surfaced by the mastheads above (named operations, arrests, casualty

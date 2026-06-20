@@ -262,8 +262,14 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
 // Resolve them explicitly. Keep these markers in sync with the report-side
 // guards in artifacts/workbench/src/lib/countryMatch.ts
 // (WEST_PAPUA_CONTEXT_RE / PNG_CONTEXT_RE).
+// NCD suburb tokens are restricted to the DISTINCTLY-PNG names here. The
+// generic homonyms in the gazetteer (ncd = non-communicable disease, "national
+// capital district", "nine mile"/"six mile", bare "gordon") are deliberately
+// EXCLUDED from country resolution — they would mis-stamp foreign stories to
+// PNG. Suburb-only stories carrying those generic tokens are instead rescued by
+// the authoritative PNG masthead/feed fallback (Post-Courier/EMTV/NBC PNG/etc).
 const PNG_MARKERS =
-  /\b(papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
+  /\b(papua new guinea|png|port moresby|gerehu|boroko|waigani|hohola|erima|tokarara|korobosea|hanuabada|badili|bomana|gordons|koki|morata|kaugere|sabama|moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago)\b/i;
 const WEST_PAPUA_MARKERS =
   /\b(west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|papua pegunungan|papua tengah|papua selatan|papua barat daya|highland papua|intan jaya|bilogai|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|kiwirok|maybrat|beoga|kenyam|mulia|damai cartenz|koops habema|kodam cenderawasih|lanny jaya|tolikara|pegunungan bintang|dogiyai|deiyai|mappi|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
 const INDONESIA_CONTEXT = /\b(indonesia|indonesian|tni|polri|jakarta)\b/i;
@@ -298,8 +304,11 @@ interface OutletCountry {
 // after the trailing " - " / " | "). Rescues Google-News site: feeds AND any
 // multi-publisher feed item that still carries one of these publishers'
 // mastheads (e.g. a Post-Courier story surfaced via a broad PNG query).
+// "nbc png" / "tvwan" are PNG single-country broadcasters. We anchor NBC as
+// "nbc png" (never bare "nbc") so the US National Broadcasting Company masthead
+// can never mis-resolve to PNG.
 const AUTHORITATIVE_MASTHEADS: OutletCountry[] = [
-  { re: /\b(png haus bung|emtv|loop png|one ?png|post[ -]?courier|png ?facts)\b/i, country: "Papua New Guinea" },
+  { re: /\b(png haus bung|emtv|loop png|one ?png|post[ -]?courier|png ?facts|nbc png|tvwan)\b/i, country: "Papua New Guinea" },
   { re: /\b(jubi|suara papua)\b/i, country: "West Papua" },
 ];
 
@@ -307,7 +316,7 @@ const AUTHORITATIVE_MASTHEADS: OutletCountry[] = [
 // the host of a direct RSS feed). Rescues DIRECT outlet feeds whose item titles
 // are bare (no " - Publisher" suffix), e.g. postcourier.com.pg, jubi.id.
 const AUTHORITATIVE_FEEDS: OutletCountry[] = [
-  { re: /\b(emtv\.com\.pg|looppng\.com|onepng\.com|pnghausbung\.com|postcourier\.com\.pg|pngfacts\.com)\b/i, country: "Papua New Guinea" },
+  { re: /\b(emtv\.com\.pg|looppng\.com|onepng\.com|pnghausbung\.com|postcourier\.com\.pg|pngfacts\.com|nbc\.com\.pg)\b/i, country: "Papua New Guinea" },
   { re: /\b(jubi\.id|suarapapua\.com)\b/i, country: "West Papua" },
 ];
 

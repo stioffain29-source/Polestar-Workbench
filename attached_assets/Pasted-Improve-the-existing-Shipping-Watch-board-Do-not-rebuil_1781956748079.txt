@@ -1,0 +1,152 @@
+Improve the existing Shipping Watch board. Do not rebuild it.
+
+Objective:
+Turn the current Shipping Watch page into a maritime intelligence board that separates confirmed maritime incidents from wider movement and risk context.
+
+Do not:
+1. Do not rebuild the page from scratch.
+2. Do not merge AIS movement data into the incident table.
+3. Do not treat AIS gaps or dark activity as confirmed incidents.
+4. Do not copy provider prose directly into Polestar outputs.
+5. Do not inflate incident totals with vessel movement data.
+
+Required layout:
+
+1. Executive summary row
+Add four top cards:
+a. Maritime Risk Level
+b. Confirmed Incidents in the last 7 days
+c. Chokepoints Affected
+d. Business Impact
+
+2. BLUF panel
+Add a short generated BLUF under the top cards.
+Maximum 3 sentences.
+Plain English.
+No generic filler.
+
+3. Chokepoint cards
+Add cards for:
+a. Strait of Hormuz
+b. Bab el Mandeb
+c. Red Sea
+d. Gulf of Aden
+e. Singapore Strait
+f. Malacca Strait
+
+Each card should show:
+a. Current risk level
+b. Last confirmed incident
+c. Incident count in last 7 days
+d. Movement context if available
+e. Business impact
+f. Confidence level
+
+4. Confirmed incidents table
+Show only confirmed maritime events.
+Allowed categories:
+a. Attack
+b. Attempted attack
+c. Boarded
+d. Fired upon
+e. Hijacked or seized
+f. Suspicious approach
+g. Port disruption
+h. Maritime protest
+i. Other confirmed maritime security event
+
+5. Maritime context panel
+Create or use a separate maritime_context table.
+This is for vessel movement and AIS context only.
+
+Fields:
+a. id
+b. theatre
+c. chokepoint
+d. data_as_of
+e. total_vessels
+f. inbound_count
+g. outbound_count
+h. tankers_count
+i. bulk_carriers_count
+j. container_count
+k. lng_lpg_count
+l. anchored_or_waiting_count
+m. ais_visible_count
+n. ais_gap_count
+o. change_vs_7_day_baseline
+p. confidence
+q. source_name
+r. source_url
+s. notes
+t. raw_payload
+u. created_at
+
+6. Polestar View panel
+Add a generated assessment panel with:
+a. Assessment
+b. Business impact
+c. Confidence
+d. Watch next
+
+7. Risk scoring
+Use the existing Polestar risk language:
+a. Insignificant
+b. Low
+c. Moderate
+d. High
+e. Extreme
+
+For Shipping Watch display:
+a. Normal can map to Low
+b. Watch can map to Moderate
+c. Elevated can map to High
+d. Severe route disruption can map to Extreme
+
+Scoring inputs:
+a. Confirmed incidents in last 7 days
+b. Severity of incidents
+c. Proximity to chokepoints
+d. Repeated events in same area
+e. Vessel class affected
+f. Port disruption
+g. Movement change if AIS data exists
+h. Confidence level
+
+8. Source health
+Add maritime source health for:
+a. UKMTO
+b. IMB Piracy Reporting Centre
+c. Reuters or news verification feed
+d. AIS provider if configured
+e. Windward if configured
+f. Manual context upload if used
+
+Statuses:
+a. Live
+b. Stale
+c. Disabled
+d. Unavailable
+
+9. AIS provider handling
+Add optional environment variables:
+a. AIS_PROVIDER
+b. AIS_API_KEY
+c. AIS_ENABLED
+d. WINDWARD_ENABLED
+e. WINDWARD_API_KEY
+
+If no AIS key exists:
+a. Board must still load
+b. Movement panel should show Movement data unavailable
+c. Incident reporting must still work
+d. Source Health should show AIS unavailable
+
+Acceptance tests:
+1. Shipping Watch loads without AIS API keys.
+2. Confirmed UKMTO and IMB incidents appear in the confirmed incident table.
+3. AIS movement context appears only in the maritime context panel.
+4. No incident is created from vessel count, AIS gap or movement data alone.
+5. The board shows BLUF, risk level, chokepoint cards, confirmed incidents, business impact and Polestar View.
+6. Source Health shows current status for each maritime source.
+7. PDF or report export uses the same structure as the board.
