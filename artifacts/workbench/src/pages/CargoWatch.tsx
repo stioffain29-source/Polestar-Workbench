@@ -16,6 +16,7 @@ import {
   classifyIncidentType,
   parseUsdLoss,
   identifyCountry,
+  cargoCountry,
   type Region,
 } from "@/lib/cargoAnalysis";
 import { dedupeMonitorRows } from "@/lib/monitorDedupe";
@@ -96,12 +97,18 @@ export default function CargoWatch() {
   // No DB writes — pure UI filtering and derivation.
   const allEnriched = useMemo(
     () => incidents.map((i) => {
-      const region = classifyRegion(i.country);
+      const rawRegion = classifyRegion(i.country);
+      // Effective country = stored, else recovered from text for an in-scope
+      // place. The region shown follows the effective country so a recovered
+      // record reads "APAC" rather than contradicting itself.
+      const displayCountry = cargoCountry(i);
+      const region: Region = displayCountry ? classifyRegion(displayCountry) : "Country not identified";
       return {
         ...i,
+        displayCountry,
         region,
         category: classifyCategory(i),
-        scope: classifyScope(i, region),
+        scope: classifyScope(i, rawRegion),
         locationType: classifyLocationType(i),
         incidentType: classifyIncidentType(i),
         usdLoss: parseUsdLoss(i),
@@ -113,9 +120,14 @@ export default function CargoWatch() {
 
   type Enriched = (typeof allEnriched)[number];
 
+  // Raw source-data buckets (pre-dedup) — these FOUR scopes partition every
+  // fetched record, so they always sum exactly to totalInDb and the banner can
+  // account for every row instead of leaving a silent remainder.
   const totalInDb = allEnriched.length;
+  const inScopeRaw = allEnriched.filter((i) => i.scope === "in_scope").length;
   const outOfScopeCount = allEnriched.filter((i) => i.scope === "out_of_scope_geo").length;
   const excludedNonCargoCount = allEnriched.filter((i) => i.scope === "excluded_non_cargo").length;
+  const reviewCount = allEnriched.filter((i) => i.scope === "country_review").length;
 
   // Collapse syndicated re-runs of the same wire (an identical headline carried
   // by many outlets) BEFORE deriving the visible working sets, so the record
@@ -135,6 +147,10 @@ export default function CargoWatch() {
   // All in-scope records (no time filter) — used by the long-range trend chart.
   const inScope = useMemo(() => deduped.filter((i) => i.scope === "in_scope"), [deduped]);
   const needsReview = useMemo(() => deduped.filter((i) => i.scope === "country_review"), [deduped]);
+  // Distinct (deduped, all-time) in-scope events vs the raw pre-dedup count, so
+  // the banner can explain how many syndicated copies were collapsed.
+  const distinctInScope = inScope.length;
+  const collapsedCopies = Math.max(0, inScopeRaw - distinctInScope);
 
   // Time-window filter drives the map, recent list, country chart, KPIs, table.
   const cutoff = useMemo(() => (range === "all" ? null : subDays(new Date(), RANGE_DAYS[range])), [range]);
@@ -152,20 +168,20 @@ export default function CargoWatch() {
   const total = enriched.length;
   const confirmedValue = enriched.reduce((s, i) => s + (i.usdLoss ?? 0), 0);
   const companiesNamed = enriched.filter((i) => i.company).length;
-  const countriesCovered = new Set(enriched.map((i) => identifyCountry(i.country)).filter(Boolean)).size;
+  const countriesCovered = new Set(enriched.map((i) => i.displayCountry).filter(Boolean)).size;
   // Markers: prefer precise DB coordinates; otherwise fall back to the country
   // centroid (jittered, flagged approximate) so real incidents still appear on
   // the map. Records with no identifiable in-scope country are dropped.
   const markers = useMemo(
     () => enriched.flatMap((i) => {
       if (i.latitude != null && i.longitude != null) {
-        return [{ id: i.id, lat: i.latitude, lng: i.longitude, approx: false, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.country }];
+        return [{ id: i.id, lat: i.latitude, lng: i.longitude, approx: false, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.displayCountry }];
       }
-      const c = identifyCountry(i.country);
+      const c = i.displayCountry;
       const ctr = c ? COUNTRY_CENTROID[c] : null;
       if (!ctr) return [];
       const [dLat, dLng] = jitter(i.id);
-      return [{ id: i.id, lat: ctr[0] + dLat, lng: ctr[1] + dLng, approx: true, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.country }];
+      return [{ id: i.id, lat: ctr[0] + dLat, lng: ctr[1] + dLng, approx: true, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.displayCountry }];
     }),
     [enriched],
   );
@@ -174,8 +190,8 @@ export default function CargoWatch() {
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
     enriched.forEach((i) => {
-      const c = identifyCountry(i.country);
-      if (c === null) return;
+      const c = i.displayCountry;
+      if (c == null) return;
       m.set(c, (m.get(c) ?? 0) + 1);
     });
     return Array.from(m.entries())
@@ -199,7 +215,7 @@ export default function CargoWatch() {
       const row: Record<string, string | number> = { country };
       categories.forEach((cat) => { row[cat] = 0; });
       enriched
-        .filter((i) => identifyCountry(i.country) === country)
+        .filter((i) => i.displayCountry === country)
         .forEach((i) => { row[i.category] = (row[i.category] as number) + 1; });
       return row;
     });
@@ -382,7 +398,7 @@ export default function CargoWatch() {
                   </div>
                   <div className="text-[11px] text-muted-foreground font-sans mt-1 flex items-center justify-between gap-2">
                     <span className="truncate">{i.source ?? "—"}</span>
-                    <span className="whitespace-nowrap">{identifyCountry(i.country) ?? "Review"}</span>
+                    <span className="whitespace-nowrap">{i.displayCountry ?? "Review"}</span>
                   </div>
                 </div>
               ))
@@ -455,14 +471,12 @@ export default function CargoWatch() {
 
       <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2 space-y-1">
         <div>
-          Showing {total} in-scope cargo / logistics crime record{total === 1 ? "" : "s"} from {totalInDb} total in source data ({rangeText}). Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
+          Showing {total} distinct in-scope cargo / logistics crime record{total === 1 ? "" : "s"} ({rangeText}). Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
         </div>
-        {outOfScopeCount > 0 && (
-          <div>Out-of-scope records excluded (incident location outside APAC / Middle East): {outOfScopeCount}.</div>
-        )}
-        {excludedNonCargoCount > 0 && (
-          <div>Non-cargo records excluded (governance, civil affairs, film reviews, electricity theft, port congestion, freight rates, etc.): {excludedNonCargoCount}.</div>
-        )}
+        <div>
+          Source data holds {totalInDb} cargo record{totalInDb === 1 ? "" : "s"} in total, every one accounted for: {inScopeRaw} in scope
+          {collapsedCopies > 0 ? ` (merged to ${distinctInScope} distinct after collapsing ${collapsedCopies} syndicated ${collapsedCopies === 1 ? "copy" : "copies"})` : ""}; {outOfScopeCount} out-of-scope location (outside APAC / Middle East); {excludedNonCargoCount} non-cargo (governance, civil affairs, film reviews, electricity theft, port congestion, freight rates, etc.); {reviewCount} unidentified country — needs review (see the Needs Review tab).
+        </div>
       </div>
 
       {/* Captured incidents table */}
@@ -495,7 +509,7 @@ export default function CargoWatch() {
                 {enriched.map((i) => (
                   <tr key={i.id} className="hover:bg-muted/30">
                     <td className="p-2 font-mono text-xs whitespace-nowrap">{format(new Date(i.occurredAt), "yyyy-MM-dd")}</td>
-                    <td className="p-2 text-xs">{i.location?.trim() || identifyCountry(i.country) || "—"}</td>
+                    <td className="p-2 text-xs">{i.location?.trim() || i.displayCountry || "—"}</td>
                     <td className="p-2 text-xs">{i.locationType}</td>
                     <td className="p-2 text-xs">{i.incidentType}</td>
                     <td className="p-2 text-xs">{i.category}</td>

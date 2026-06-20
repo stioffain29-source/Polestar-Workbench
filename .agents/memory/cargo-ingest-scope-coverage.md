@@ -49,3 +49,29 @@ piracy coverage (`shipping.ts` feeds/ALLOW + `relevance/topicRelevance.ts`).
   `FOREIGN_CONTEXT` ("north korea"/"pyongyang"/"dprk") rather than a new alias.
 - Widening country coverage does NOT loosen precision: the ALLOW/DENY phrase
   gates still require a cargo-crime phrase and still drop military/maritime noise.
+
+## "Cargo looks thin" is often a DISPLAY/attribution gap, not missing rows
+When the OpenAI secret is absent the ingest LLM is inert, so the cargo "thin"
+fix is a DETERMINISTIC FRONTEND layer in `cargoAnalysis.ts` (NO DB writes):
+- A **Bahasa cargo-vocab gate** (`gudang/kargo/truk/...` NOUN **AND** a theft
+  VERB `pencurian/dibobol/dijarah/...`) rescues local-language warehouse/truck
+  theft the English-only `CARGO_INCIDENT_RE` dumped into `excluded_non_cargo`.
+  Require BOTH noun+verb — Bahasa is ASCII so a noun-only gate leaks generic theft.
+- A curated **sub-national gazetteer** recovers an in-scope country for rows the
+  source left `Unknown`. Read **title+summary only, never the source/feed label**
+  (feed names carry misleading regions, e.g. "Australia Freight & Truck Theft").
+- **Recovery branch must use a STRICTER predicate than the broad cargo gate**:
+  cargo NOUN + crime verb, OR a cargo action (hijack/smuggle/pilfer/siphon), OR
+  the Bahasa noun+verb pair. **Why:** for an unattributed row, the broad gate's
+  bare generic-crime words (`theft|robbery|raid`) + a gazetteer place would admit
+  "motorcycle theft in Penang". Attributed (stored-country) rows keep the broad gate.
+- Genuinely-cargo-but-unattributed rows go to **needs-review, never fabricated**
+  into a country.
+- The reconciliation **banner must partition EVERY record**: in_scope_raw +
+  out_of_scope_geo + excluded_non_cargo + needs_review = total; report dedup
+  separately (distinct vs collapsed syndicated copies). The original "thin"
+  complaint was largely this banner hiding a big needs-review bucket.
+**How to verify safely:** replay old-vs-new `classifyScope` over the live
+`relevance_status='relevant'` rows (the page set; raw DB count is larger) and
+confirm every newly-in-scope row is genuine + the strict gate demotes zero
+genuine recoveries.

@@ -79,6 +79,64 @@ const CARGO_INCIDENT_RE = /\b(cargo|freight|container|truck|lorry|hijack|warehou
 // Non-cargo "fish/lobster/oyster" pattern unless cargo framing is present.
 const NON_CARGO_FISH_RE = /\b(lobster|oyster|fish theft)\b/i;
 
+// Bahasa-Indonesia cargo-crime vocabulary. Many genuine APAC incidents are
+// local-language reports the English CARGO_INCIDENT_RE never matched (gudang =
+// warehouse, kargo = cargo, truk = truck), so they were wrongly dumped into
+// "excluded_non_cargo". A Bahasa record only counts as cargo when it carries
+// BOTH a cargo noun AND a theft verb — far stricter than the English gate — so
+// generic Indonesian theft ("pencurian motor") never leaks in.
+const CARGO_BAHASA_NOUN_RE = /\b(gudang|pergudangan|kargo|peti kemas|kontainer|truk|logistik|ekspedisi)\b/i;
+const CRIME_BAHASA_RE = /\b(pencurian|dicuri|mencuri|maling|rampok|dirampok|perampokan|jarah|dijarah|penjarahan|bobol|dibobol|pembobolan|curanmor|gasak|digasak)\b/i;
+
+function hasCargoVocab(text: string): boolean {
+  if (CARGO_INCIDENT_RE.test(text)) return true;
+  return CARGO_BAHASA_NOUN_RE.test(text) && CRIME_BAHASA_RE.test(text);
+}
+
+// Cargo-specific NOUNS (objects / premises / conveyances) — excludes the bare
+// generic-crime words (theft/robbery/raid) that CARGO_INCIDENT_RE also carries.
+const CARGO_NOUN_RE = /\b(cargo|freight|container|containers|truck|trucks|lorry|lorries|warehouse|godown|depot|consignment|shipment|shipments|parcel|parcels|logistic|logistics)\b/i;
+
+// Cargo-specific crime ACTIONS that imply cargo on their own.
+const CARGO_ACTION_RE = /\b(hijack|pilfer|seal[- ]?tamper|siphon|smuggl)\w*/i;
+
+// Generic crime verbs — only meaningful for scope when paired with a cargo noun.
+const CRIME_VERB_RE = /\b(theft|thie(?:f|ves)|stolen|stole|steal\w*|rob|robbed|robbery|robbers|burglar\w*|break[- ]?in|broke into|broken into|raid\w*|loot\w*|seiz\w*|busted|heist)\b/i;
+
+// Stricter cargo predicate used ONLY when recovering an in-scope country for an
+// UNATTRIBUTED record. A bare generic-crime headline that merely names a
+// recovered place ("Motorcycle theft in Penang") must NOT be admitted: it needs
+// a cargo NOUN + crime verb, a cargo-specific action, or the Bahasa noun+verb
+// pair. Attributed (stored-country) rows keep the broader hasCargoVocab gate.
+function hasStrictCargoVocab(text: string): boolean {
+  if (CARGO_ACTION_RE.test(text)) return true;
+  if (CARGO_NOUN_RE.test(text) && CRIME_VERB_RE.test(text)) return true;
+  return CARGO_BAHASA_NOUN_RE.test(text) && CRIME_BAHASA_RE.test(text);
+}
+
+// Curated APAC / Middle East place gazetteer used ONLY to recover an in-scope
+// country for a record the source left unattributed (country null / "Unknown").
+// Word-bounded, observed sub-national place names plus unambiguous large cities.
+// Consulted against title + summary only — never the source / feed label, which
+// often carries a misleading region name ("Australia Freight & Truck Theft").
+const RECOVERY_PLACES: Array<[string, RegExp]> = [
+  ["Indonesia", /\b(tuban|sragen|ngrampal|singkawang|bengkulu|tapanuli|sumatera|sumatra|tanjung priok|priok|surabaya|bandung|semarang|makassar|bekasi|tangerang|medan|palembang|batam|bogor|depok)\b/i],
+  ["Malaysia", /\b(penang|bintulu|kuching|johor|selangor|klang|sarawak|sabah|shah alam|petaling)\b/i],
+  ["Philippines", /\b(bulacan|valenzuela|caloocan|quezon city|luzon|cebu|davao|cavite|laguna|pampanga|paranaque|parañaque)\b/i],
+  ["China", /\b(fo tan|kwai chung|tsuen wan|kowloon|sha tin|kwun tong|tuen mun|yuen long)\b/i],
+];
+
+// Best-effort in-scope country recovered from incident text. Returns null when
+// no curated place token is present (we recover only PROVABLE APAC/ME records;
+// everything else honestly stays "needs review").
+export function recoverCargoCountryFromText(i: CargoIncidentLike): string | null {
+  const text = `${i.title} ${i.summary ?? ""}`;
+  for (const [country, re] of RECOVERY_PLACES) {
+    if (re.test(text)) return country;
+  }
+  return null;
+}
+
 export type Scope = "in_scope" | "out_of_scope_geo" | "excluded_non_cargo" | "country_review";
 
 export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
@@ -89,8 +147,8 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|warehouse|depot|consignment|shipment|logistic)\b/i.test(text)) {
     return "excluded_non_cargo";
   }
-  // Must reference cargo / logistics crime vocabulary at all.
-  if (!CARGO_INCIDENT_RE.test(text)) return "excluded_non_cargo";
+  // Must reference cargo / logistics crime vocabulary at all (English or Bahasa).
+  if (!hasCargoVocab(text)) return "excluded_non_cargo";
   // Foreign-location override: text says incident is in a non-scope country.
   if (OOS_CONTEXT_RE.test(text)) return "out_of_scope_geo";
   if (NATIONALITY_OFFSHORE_RE.test(text) && /\b(Canada|United States|USA|US|UK|Britain|Italy|Europe|Africa|Brazil|Mexico|Australia)\b/i.test(text) && region !== "APAC" && region !== "Middle East") {
@@ -98,13 +156,33 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   }
   // Country-driven classification.
   if (region === "Out of scope") return "out_of_scope_geo";
-  if (region === "Country not identified") return "country_review";
+  if (region === "Country not identified") {
+    // Recover only records that NAME an in-scope APAC/ME place in their text AND
+    // carry cargo-NOUN-anchored crime vocabulary (a bare "motorcycle theft in
+    // Penang" is not enough). Unattributed US/global commentary and generic
+    // local crime stay in the needs-review bucket.
+    const recovered = recoverCargoCountryFromText(i);
+    if (recovered && hasStrictCargoVocab(text)) {
+      const recRegion = classifyRegion(recovered);
+      if (recRegion === "APAC" || recRegion === "Middle East") return "in_scope";
+    }
+    return "country_review";
+  }
   return "in_scope";
 }
 
 // Convenience: full scope decision straight from a record.
 export function cargoScope(i: CargoIncidentLike): Scope {
   return classifyScope(i, classifyRegion(i.country));
+}
+
+// Effective in-scope country for display: the stored country when present,
+// otherwise a text-recovered one. Used by every cargo surface so a recovered
+// record shows its country on the map, country chart and tables.
+export function cargoCountry(i: CargoIncidentLike): string | null {
+  const stored = identifyCountry(i.country);
+  if (stored) return stored;
+  return recoverCargoCountryFromText(i);
 }
 
 export function isCargoInScope(i: CargoIncidentLike): boolean {
