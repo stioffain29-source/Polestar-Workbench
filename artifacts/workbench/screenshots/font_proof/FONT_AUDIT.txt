@@ -1,0 +1,30 @@
+
+==== shipping_12_final.pdf ====
+  page obj 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Regular']
+  page obj 5: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 7: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 9: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 11: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 13: Tf-used fonts = ['Roboto-Bold', 'Roboto-Italic', 'Roboto-Light', 'Roboto-Regular']
+  page obj 15: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 17: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 19: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  --> ALL fonts USED via Tf: ['Roboto-Bold', 'Roboto-Italic', 'Roboto-Light', 'Roboto-Regular']
+  --> NON-Roboto used: NONE — PASS
+
+==== shipping_20.pdf ====
+  page obj 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Regular']
+  page obj 5: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 7: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 9: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 11: Tf-used fonts = ['Roboto-Bold', 'Roboto-Italic', 'Roboto-Light', 'Roboto-Regular']
+  page obj 13: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 15: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page obj 17: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  --> ALL fonts USED via Tf: ['Roboto-Bold', 'Roboto-Italic', 'Roboto-Light', 'Roboto-Regular']
+  --> NON-Roboto used: NONE — PASS
+
+Audit method: per-page content-stream Tf-operator inventory (resolves each
+selected font resource back to its BaseFont). jsPDF auto-registers the 14
+standard PDF fonts in the font dictionary, but only /Roboto* may be SELECTED
+by a Tf operator. PASS = no non-Roboto font is ever selected.

@@ -646,8 +646,8 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   // Chokepoints Affected, Business Impact). Same four the board shows.
   const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
   const execCards: KpiCardData[] = [
-    { label: "Maritime Risk Level", value: `${risk.level} \u2014 ${risk.label}` },
-    { label: "Confirmed Incidents 7d", value: String(incidentSnapshot.total) },
+    { label: "Maritime Risk Level", value: `L${risk.level} \u00b7 ${risk.label}` },
+    { label: "Confirmed Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
     { label: "Chokepoints Affected", value: `${chokepointsAffected} / ${chokepointCards.length}` },
     {
       label: "Business Impact",

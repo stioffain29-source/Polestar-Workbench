@@ -61,10 +61,15 @@ interface AnyReport {
 async function main() {
   const report = (await fetch(`${API}/api/reports/${REPORT_ID}`).then((r) => r.json())) as AnyReport;
   const incidents = (await fetch(`${API}/api/incidents?limit=500`).then((r) => r.json())) as unknown[];
+  // Optional ISSUE_DATE override so a headless export can reproduce the SAME
+  // reporting window the in-editor preview renders. The editor advances a draft
+  // to today and clamps to the latest record, so a verification run that wants
+  // numeric parity with the on-screen board passes the editor's effective date.
+  const issueDateOverride = process.env.ISSUE_DATE?.trim();
   const data = {
     title: report.title,
     topic: report.topic,
-    issueDate: report.issueDate,
+    issueDate: issueDateOverride || report.issueDate,
     author: report.author,
     executiveSummary: report.executiveSummary ?? report.situation,
     situation: report.situation,
