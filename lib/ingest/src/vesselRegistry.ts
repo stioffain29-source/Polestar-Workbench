@@ -129,11 +129,27 @@ export function classifyVesselClass(raw: string | null | undefined): VesselClass
 /**
  * Pull the most specific type string from a datalastic-shaped vessel record.
  * Tolerant of partial shapes: prefers `type_specific`, falls back to `type`.
+ *
+ * Datalastic's single-vessel endpoint (`/vessel?imo=…`|`&mmsi=…`) wraps the
+ * record in a `data` OBJECT (verified against docs.datalastic.com):
+ *   { "data": { "type": "Cargo", "type_specific": "Bulk Carrier", … },
+ *     "meta": { "success": true } }
+ * Its multi-vessel / bulk endpoints instead return `data` as an ARRAY, so we
+ * also accept a single-element array defensively (we always look up one hull).
  */
 function extractTypeText(json: unknown): string | null {
   if (!json || typeof json !== "object") return null;
   const data = (json as { data?: unknown }).data;
-  const rec = (data && typeof data === "object" ? data : json) as Record<string, unknown>;
+  let rec: Record<string, unknown>;
+  if (Array.isArray(data)) {
+    const first = data[0];
+    if (!first || typeof first !== "object") return null;
+    rec = first as Record<string, unknown>;
+  } else if (data && typeof data === "object") {
+    rec = data as Record<string, unknown>;
+  } else {
+    rec = json as Record<string, unknown>;
+  }
   const specific = rec.type_specific;
   if (typeof specific === "string" && specific.trim()) return specific;
   const type = rec.type;

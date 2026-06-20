@@ -127,3 +127,126 @@ describe("resolveVesselClasses", () => {
     expect(res.errors[0]).toContain("unsupported");
   });
 });
+
+describe("resolveVesselClasses against datalastic response shapes", () => {
+  const realFetch = global.fetch;
+  const cfg = {
+    configured: true,
+    enabled: true,
+    provider: "datalastic",
+    base: "https://api.datalastic.com/api/v0",
+    apiKey: "abc",
+    maxLookups: 150,
+  };
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  function mockFetch(handler: (url: string) => unknown) {
+    global.fetch = (async (input: unknown) => {
+      const url = String(input);
+      const body = handler(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => body,
+      } as unknown as Response;
+    }) as typeof fetch;
+  }
+
+  // The single-vessel endpoint (/vessel?imo=…|&mmsi=…) wraps the record in a
+  // `data` OBJECT — the exact shape published at docs.datalastic.com.
+  it("classifies a datalastic single-vessel object envelope (type_specific)", async () => {
+    mockFetch(() => ({
+      data: {
+        uuid: "b8625b67",
+        name: "MAERSK CHENNAI",
+        mmsi: "566093000",
+        imo: "9525338",
+        type: "Cargo - Hazard A (Major)",
+        type_specific: "Container Ship",
+      },
+      meta: { success: true },
+    }));
+    const res = await resolveVesselClasses([{ mmsi: 566093000, imo: 9525338 }], {
+      config: cfg,
+    });
+    expect(res.lookups).toBe(1);
+    expect(res.resolved).toBe(1);
+    expect(res.classByMmsi.get(566093000)).toBe("container");
+  });
+
+  it("falls back to the parent `type` when `type_specific` is absent", async () => {
+    mockFetch(() => ({
+      data: { mmsi: "100", type: "Bulk Carrier" },
+      meta: { success: true },
+    }));
+    const res = await resolveVesselClasses([{ mmsi: 100, imo: null }], {
+      config: cfg,
+    });
+    expect(res.classByMmsi.get(100)).toBe("bulk");
+  });
+
+  it("classifies an LNG tanker via type_specific", async () => {
+    mockFetch(() => ({
+      data: { mmsi: "200", type: "Tanker", type_specific: "LNG Tanker" },
+      meta: { success: true },
+    }));
+    const res = await resolveVesselClasses([{ mmsi: 200, imo: 9000200 }], {
+      config: cfg,
+    });
+    expect(res.classByMmsi.get(200)).toBe("lng-lpg");
+  });
+
+  // Datalastic's multi-vessel / bulk endpoints return `data` as an ARRAY; the
+  // parser accepts a single-element array defensively.
+  it("classifies a datalastic array envelope (single element)", async () => {
+    mockFetch(() => ({
+      data: [{ mmsi: "300", type: "Cargo", type_specific: "Bulk Carrier" }],
+      meta: { total: 1, success: true },
+    }));
+    const res = await resolveVesselClasses([{ mmsi: 300, imo: 9000300 }], {
+      config: cfg,
+    });
+    expect(res.classByMmsi.get(300)).toBe("bulk");
+  });
+
+  it("prefers IMO over MMSI in the lookup URL", async () => {
+    let seen = "";
+    mockFetch((url) => {
+      seen = url;
+      return { data: { type_specific: "Container Ship" }, meta: {} };
+    });
+    await resolveVesselClasses([{ mmsi: 566093000, imo: 9525338 }], {
+      config: cfg,
+    });
+    expect(seen).toContain("imo=9525338");
+    expect(seen).not.toContain("mmsi=");
+    expect(seen).toContain("api-key=abc");
+  });
+
+  it("falls back to MMSI when no IMO is available", async () => {
+    let seen = "";
+    mockFetch((url) => {
+      seen = url;
+      return { data: { type_specific: "Container Ship" }, meta: {} };
+    });
+    await resolveVesselClasses([{ mmsi: 566093000, imo: null }], {
+      config: cfg,
+    });
+    expect(seen).toContain("mmsi=566093000");
+    expect(seen).not.toContain("imo=");
+  });
+
+  it("leaves a vessel unclassified when the registry has no record (404)", async () => {
+    global.fetch = (async () =>
+      ({ ok: false, status: 404, json: async () => ({}) }) as unknown as Response) as typeof fetch;
+    const res = await resolveVesselClasses([{ mmsi: 400, imo: 9000400 }], {
+      config: cfg,
+    });
+    expect(res.lookups).toBe(1);
+    expect(res.resolved).toBe(0);
+    expect(res.classByMmsi.has(400)).toBe(false);
+    expect(res.errors).toHaveLength(0);
+  });
+});
