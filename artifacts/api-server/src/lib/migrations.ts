@@ -2030,6 +2030,194 @@ export async function runDataMigrations(): Promise<void> {
       logger.error({ err: wpErr }, "West Papua extraction backfill failed");
     }
 
+    // 3j) ONE-TIME re-home of stranded West Papua / Papua legacy "protests" rows.
+    //
+    //     `protests` is a DEAD legacy topic: no feed writes it and the
+    //     "Protests & Civil Unrest" monitor reads the `flashpoint` topic, so
+    //     every topic='protests' row is invisible to the product. The migrated
+    //     `legacy:db:regional_incidents` seed filed genuine West Papua armed-
+    //     conflict events (TPNPB ambushes, the Tembagapura mining-area shooting,
+    //     firefights, IED finds) AND genuine protests under it — and because the
+    //     protests bucket is scored under the flashpoint public-order rule, the
+    //     armed-conflict rows were marked irrelevant and dropped everywhere
+    //     ("seeing nothing from the Freeport mining area"). Re-home each
+    //     Papua-province row to the topic whose rule actually keeps it: conflict
+    //     first (armed violence), else flashpoint (civil unrest), re-rating
+    //     relevance with the shared engine so the verdict matches the new topic.
+    //     Rows neither rule keeps (petty crime / labour disputes) are left on the
+    //     inert protests bucket — moving them would mis-file them under a live
+    //     topic while still hidden. Single-token country='Papua' is normalised to
+    //     the canonical 'West Papua'. Marker-gated → runs once per environment
+    //     (prod is writable only in the deployment runtime). Placed before
+    //     backfillRelevance so the final relevance pass is a no-op for these.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "west_papua_legacy_protests_rehome_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        // COUNTRY_GROUPS['papua'] tokens (workbench countryMatch.ts) — the
+        // Indonesian Papua provinces. Pure 'Papua New Guinea' / 'PNG' are
+        // deliberately absent so this never touches the PNG theatre; a cross-
+        // border 'West Papua; Papua New Guinea' row IS eligible (it carries a
+        // Papua token) and is left cross-border.
+        const PAPUA_TOKENS = new Set([
+          "papua",
+          "west papua",
+          "papua barat",
+          "highland papua",
+          "papua pegunungan",
+          "central papua",
+          "papua tengah",
+          "south papua",
+          "papua selatan",
+          "southwest papua",
+          "papua barat daya",
+        ]);
+        const isPapuaSlice = (country: string | null): boolean =>
+          (country ?? "")
+            .split(";")
+            .map((t) => t.trim().toLowerCase())
+            .filter(Boolean)
+            .some((t) => PAPUA_TOKENS.has(t));
+
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            country: incidentsTable.country,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            source: incidentsTable.source,
+            sourceUrl: incidentsTable.sourceUrl,
+            location: incidentsTable.location,
+            occurredAt: incidentsTable.occurredAt,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              eq(incidentsTable.topic, "protests"),
+              like(incidentsTable.analystNotes, "legacy:db:regional_incidents%"),
+            ),
+          );
+
+        // Duplicate guard: never create a second copy of a row that already
+        // lives on a target topic. Key on non-empty source_url, and on
+        // (normalised title + calendar day) for seed rows without a URL.
+        const existingTargets = await db
+          .select({
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            sourceUrl: incidentsTable.sourceUrl,
+            occurredAt: incidentsTable.occurredAt,
+          })
+          .from(incidentsTable)
+          .where(inArray(incidentsTable.topic, ["conflict", "flashpoint"]));
+        const dayKey = (d: Date | null): string =>
+          d ? new Date(d).toISOString().slice(0, 10) : "";
+        const urlKeys = new Set<string>();
+        const titleDayKeys = new Set<string>();
+        for (const e of existingTargets) {
+          if (e.sourceUrl) urlKeys.add(`${e.topic}\u0000${e.sourceUrl}`);
+          titleDayKeys.add(
+            `${e.topic}\u0000${(e.title ?? "").trim().toLowerCase()}\u0000${dayKey(e.occurredAt)}`,
+          );
+        }
+
+        const now = new Date();
+        let toConflict = 0;
+        let toFlashpoint = 0;
+        let skippedDup = 0;
+        let leftInert = 0;
+        for (const r of candidates) {
+          if (!isPapuaSlice(r.country)) continue;
+          const base = {
+            title: r.title,
+            summary: r.summary ?? "",
+            source: r.source ?? "",
+            sourceUrl: r.sourceUrl ?? "",
+            location: r.location ?? null,
+          };
+          let target: "conflict" | "flashpoint" | null = null;
+          let verdict = evaluateIncidentRelevance("conflict", {
+            topic: "conflict",
+            ...base,
+          });
+          if (verdict.relevant) {
+            target = "conflict";
+          } else {
+            const flashpointVerdict = evaluateIncidentRelevance("flashpoint", {
+              topic: "flashpoint",
+              ...base,
+            });
+            if (flashpointVerdict.relevant) {
+              target = "flashpoint";
+              verdict = flashpointVerdict;
+            }
+          }
+          // Neither rule keeps it (petty crime / labour dispute) — leave on the
+          // inert protests bucket rather than mis-file it under a live topic.
+          if (!target) {
+            leftInert++;
+            continue;
+          }
+
+          const titleDay = `${target}\u0000${(r.title ?? "").trim().toLowerCase()}\u0000${dayKey(r.occurredAt)}`;
+          const isDup =
+            (r.sourceUrl !== null &&
+              r.sourceUrl !== "" &&
+              urlKeys.has(`${target}\u0000${r.sourceUrl}`)) ||
+            titleDayKeys.has(titleDay);
+          if (isDup) {
+            skippedDup++;
+            continue;
+          }
+
+          const normalisedCountry =
+            (r.country ?? "").trim().toLowerCase() === "papua"
+              ? "West Papua"
+              : r.country;
+          await db
+            .update(incidentsTable)
+            .set({
+              topic: target,
+              country: normalisedCountry,
+              relevanceStatus: verdict.status,
+              relevanceScore: verdict.score,
+              relevanceReason: verdict.reason,
+              relevanceVersion: verdict.version,
+              relevanceEvaluatedAt: now,
+            })
+            .where(eq(incidentsTable.id, r.id));
+          // Record this just-moved row so a later duplicate candidate in the
+          // same batch is caught by the guard above (the pre-loop snapshot only
+          // saw rows already on the target topics).
+          if (r.sourceUrl) urlKeys.add(`${target}\u0000${r.sourceUrl}`);
+          titleDayKeys.add(titleDay);
+          if (target === "conflict") toConflict++;
+          else toFlashpoint++;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { toConflict, toFlashpoint, skippedDup, leftInert, marker: markerKey },
+          "One-time re-home of stranded West Papua/Papua legacy protests rows to conflict/flashpoint",
+        );
+      }
+    } catch (rehomeErr) {
+      logger.error(
+        { err: rehomeErr },
+        "West Papua legacy protests re-home failed",
+      );
+    }
+
     try {
       await backfillRelevance();
     } catch (relErr) {
