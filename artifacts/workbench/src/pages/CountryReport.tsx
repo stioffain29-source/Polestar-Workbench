@@ -30,6 +30,7 @@ import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import { dedupeCountryWindowIncidents } from "@/lib/monitorDedupe";
+import { shouldGenerateProse } from "@/lib/countryProseGate";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
 import {
   buildPngReportDataset,
@@ -561,20 +562,25 @@ export default function CountryReport() {
   }, [persistedBaseline]);
 
   useEffect(() => {
+    // Gate the prose generation on every precondition (country loaded, not
+    // editing, incidents query SETTLED, structured dataset built). The settle
+    // gate is the regeneration-loop fix: firing while the incidents query is
+    // still loading would ground prose on a transient empty set and race a
+    // second fingerprint (the full set) into the cache. A genuinely empty week
+    // still proceeds — the query settles with an empty array. See
+    // shouldGenerateProse for the full predicate.
+    if (
+      !shouldGenerateProse({
+        hasCountry: Boolean(country),
+        editing,
+        incidentsSuccess,
+        incidentsError,
+        isStructured,
+        structuredReady: Boolean(pngDataset),
+      })
+    )
+      return;
     if (!country) return;
-    if (editing) return;
-    // Wait until the incidents query has SETTLED (success or error) before
-    // grounding the prose. While it is still loading, `proseIncidents` is empty,
-    // so the effect would fire once on the empty set and again on the full set —
-    // two different fingerprints racing to write the cache (a regeneration loop)
-    // and, worse, prose grounded on zero incidents. A genuinely empty week still
-    // proceeds: the query settles with an empty array, so quiet windows are
-    // unaffected.
-    if (!incidentsSuccess && !incidentsError) return;
-    // The structured brief waits until its dataset has built so the fingerprint
-    // hashes the same window items the brief renders (the request derives from
-    // pngDataset).
-    if (isStructured && !pngDataset) return;
     if (proseRequestKey.current === proseContentKey) return;
     proseRequestKey.current = proseContentKey;
     let cancelled = false;
