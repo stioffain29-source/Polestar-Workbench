@@ -16,6 +16,7 @@ import {
   runReliefWebReportsIngest,
   runGdeltEnrich,
   runPngExtractBackfill,
+  runWestPapuaExtractBackfill,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
@@ -369,6 +370,24 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       );
     } catch (err) {
       logger.error({ err }, "PNG per-incident extraction pass failed");
+    }
+    // West Papua per-incident structured extraction — the SAME pattern as PNG
+    // for the Indonesian-Papua country brief. Scoped to rows whose country tag
+    // contains "papua" but NOT "papua new guinea" (cross-border rows keep their
+    // PNG enrichment). Idempotent + converging onlyNull pass; isolated in its
+    // own try so a failure can never fail the incident ingest.
+    try {
+      const wp = await runWestPapuaExtractBackfill({ commit: true, onlyNull: true });
+      logger.info(
+        {
+          candidates: wp.candidates,
+          updated: wp.updated,
+          provinceFilled: wp.provinceFilled,
+        },
+        "West Papua per-incident extraction pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "West Papua per-incident extraction pass failed");
     }
     // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
     // West Papua feeds) into clean English advisory titles AFTER the scrapers

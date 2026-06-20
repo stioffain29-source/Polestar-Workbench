@@ -1,11 +1,19 @@
 ---
-name: PNG structured country report
-description: How the Papua New Guinea country brief is built — client-side extraction mirror, 9-section layout, why headless jsPDF/AI prose were skipped.
+name: PNG/West Papua structured country report
+description: How the config-driven structured country brief is built (serves Papua New Guinea AND Indonesian West Papua) — client-side extraction mirror, 9-section layout, why headless jsPDF/AI prose were skipped, cross-border-safe enrichment.
 ---
 
-# PNG (Papua New Guinea) structured country report
+# Structured country report (Papua New Guinea + West Papua)
 
-The PNG country report (slug `papua-new-guinea`) is a bespoke 9-section security brief, separate from the generic country-report template. It renders only for PNG; all other country slugs keep the generic layout.
+The structured 9-section security brief (location buckets + incident cards) is now CONFIG-DRIVEN and serves TWO theatres: Papua New Guinea (slug `papua-new-guinea`) and the Indonesian West Papua report (slug `papua`). All other country slugs keep the generic country-report template.
+
+## Adding/maintaining a structured theatre (the generalization)
+`pngReportDataset.ts` holds a `StructuredTheatreConfig` (name, buckets→provinces, empty-location fallback, anchors); `PNG_REPORT_CONFIG` + `WEST_PAPUA_REPORT_CONFIG` drive a generic `buildStructuredReportDataset`. Public wrappers stay: `buildPngReportDataset` / `buildWestPapuaReportDataset`. `PngCountryReportBody` renders `dataset.buckets[]` generically (no hardcoded bucket keys) + an "Other …" catch-all. `CountryReport.tsx` routes via a `structuredTheatre` memo (`"png"|"westPapua"|null` from `acceptedCountryTokens`; `papua-new-guinea`→png, `papua`→westPapua); everything keys off `isStructured` NOT `isPng`. **Do NOT touch the local cross-border incident-filter memo** (its own isPng/isPapua at ~L198-219) — it stays separate from the structured gate.
+**How to apply (a miss silently degrades that theatre):** new structured theatre = gazetteer + extract wrapper (`lib/ingest`) + backfill wrapper + dataset config + `structuredTheatre` gate + country-aware prose + SEED_SOURCES feeds + marker-gated boot backfill.
+
+## Cross-border-safe enrichment (PNG vs West Papua must never overwrite each other)
+One incident gets ONE theatre's province/category/business_impact/incident_date. PNG matches `country ILIKE '%papua new guinea%'`; West Papua matches `ILIKE '%papua%' AND NOT ILIKE '%papua new guinea%'`. The inline flashpoint ingest mirrors this; the WP backfill (`runWestPapuaExtractBackfill`) and the marker-gated boot block (`west_papua_structured_extract_backfill_v1`) use the exclusion, so a cross-border row keeps its single PNG enrichment rather than being clobbered by WP.
+**Why:** without the `NOT ILIKE papua new guinea` guard the two passes fight over shared rows.
 
 ## Client-side extraction via the SHARED rulebook (the key architectural decision)
 Per-item attributes (province / category / business-impact / occurred-vs-reported date) are derived **client-side** in the workbench. The duplicated copy was retired: `pngReportDataset.ts` now IMPORTS the one canonical rulebook from `@workspace/ingest/pngExtract` (subpath export; pure module — its only import is `./text` hasWord, no server deps), so there is a single source of truth shared by ingest + the report. Reason the derive still runs at all: the nullable DB columns (province/category/businessImpact/incidentDate) are NOT plumbed through the incidents API/OpenAPI/generated types, and prod is read-only from the workspace — columns stay null until republish + a fresh ingest WITH a backfill that does not yet exist (migrations only ADD columns; re-ingest only INSERTs new rows). Empirically EVERY PNG incidents-API row reads these four fields null in dev too, so the report is rendered entirely by the derive path today.

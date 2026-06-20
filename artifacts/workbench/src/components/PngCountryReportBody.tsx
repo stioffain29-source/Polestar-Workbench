@@ -1,6 +1,5 @@
 import { format } from "date-fns";
 import type { PngReportDataset, PngReportItem } from "@/lib/pngReportDataset";
-import { PNG_EMPTY_LOCATION_FALLBACK } from "@/lib/pngReportDataset";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -125,11 +124,19 @@ function ItemCard({ item }: { item: PngReportItem }) {
   );
 }
 
-function LocationSection({ title, items }: { title: string; items: PngReportItem[] }) {
+function LocationSection({
+  title,
+  items,
+  emptyFallback,
+}: {
+  title: string;
+  items: PngReportItem[];
+  emptyFallback: string;
+}) {
   return (
     <Section title={title}>
       {items.length === 0 ? (
-        <EmptyNote>{PNG_EMPTY_LOCATION_FALLBACK}</EmptyNote>
+        <EmptyNote>{emptyFallback}</EmptyNote>
       ) : (
         <div>
           {items.map((it) => (
@@ -153,7 +160,7 @@ export default function PngCountryReportBody({ dataset }: { dataset: PngReportDa
       {/* 2. Top 3 Incidents This Week */}
       <Section title="Top 3 Incidents This Week">
         {d.topThree.length === 0 ? (
-          <EmptyNote>{PNG_EMPTY_LOCATION_FALLBACK}</EmptyNote>
+          <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
         ) : (
           <div>
             {d.topThree.map((it) => (
@@ -163,20 +170,16 @@ export default function PngCountryReportBody({ dataset }: { dataset: PngReportDa
         )}
       </Section>
 
-      {/* 3-6. Location buckets */}
-      <LocationSection title="Port Moresby / National Capital District" items={d.ncd} />
-      <LocationSection title="Lae / Morobe" items={d.morobe} />
-      <LocationSection title="Mt Hagen / Western Highlands" items={d.westernHighlands} />
-      <LocationSection title="Other National Security-Relevant Activity" items={d.otherNational} />
+      {/* 3-N. Location buckets (config-driven) + catch-all */}
+      {d.buckets.map((b) => (
+        <LocationSection key={b.key} title={b.label} items={b.items} emptyFallback={d.emptyLocationFallback} />
+      ))}
+      <LocationSection title={d.otherBucketLabel} items={d.otherNational} emptyFallback={d.emptyLocationFallback} />
 
-      {/* 7. Business Impact */}
+      {/* Business Impact */}
       <Section title="Business Impact">
         {d.businessImpact.length === 0 ? (
-          <EmptyNote>
-            No fresh incident-driven business impact was identified this period. Standing exposures —
-            urban crime, Highlands tribal violence, and intermittent road, power and connectivity
-            disruption — continue to apply.
-          </EmptyNote>
+          <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
         ) : (
           <ul style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}>
             {d.businessImpact.map((line, i) => (

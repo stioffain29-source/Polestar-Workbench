@@ -29,7 +29,11 @@ import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
 import { dedupeCountryWindowIncidents } from "@/lib/monitorDedupe";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
-import { buildPngReportDataset, type PngSourceIncident } from "@/lib/pngReportDataset";
+import {
+  buildPngReportDataset,
+  buildWestPapuaReportDataset,
+  type PngSourceIncident,
+} from "@/lib/pngReportDataset";
 import {
   incidentMatchesCountry,
   acceptedCountryTokens,
@@ -298,6 +302,18 @@ export default function CountryReport() {
     () => acceptedCountryTokens(country?.name ?? "").includes("papua new guinea"),
     [country],
   );
+  // The structured nine-section brief now serves TWO theatres: Papua New Guinea
+  // and the Indonesian West Papua report (slug `papua`, token "papua" but NOT the
+  // PNG group). Both render the same PngCountryReportBody from a config-driven
+  // dataset; everything below keys off `isStructured` rather than `isPng` so the
+  // West Papua brief reaches parity. Any other country keeps the generic brief.
+  const structuredTheatre = useMemo<"png" | "westPapua" | null>(() => {
+    const tokens = acceptedCountryTokens(country?.name ?? "");
+    if (tokens.includes("papua new guinea")) return "png";
+    if (tokens.includes("papua")) return "westPapua";
+    return null;
+  }, [country]);
+  const isStructured = structuredTheatre !== null;
   const layers: CountryLayerBuckets = useMemo(
     () => buildCountryLayers(incidents as CountryFastFactsIncident[], issueDate),
     [incidents, issueDate],
@@ -391,15 +407,18 @@ export default function CountryReport() {
   // prose path below can ground its Executive Summary + Outlook on the SAME
   // deduped window items the brief renders.
   const pngDataset = useMemo(() => {
-    if (!isPng) return null;
-    return buildPngReportDataset({
+    if (!structuredTheatre) return null;
+    const args = {
       windowIncidents: active.incidents as PngSourceIncident[],
       thirtyDay: layers.thirtyDay as PngSourceIncident[],
       ninetyDay: layers.ninetyDay as PngSourceIncident[],
       baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
       periodLabel: active.basisLabel,
-    });
-  }, [isPng, active, layers, baseline]);
+    };
+    return structuredTheatre === "westPapua"
+      ? buildWestPapuaReportDataset(args)
+      : buildPngReportDataset(args);
+  }, [structuredTheatre, active, layers, baseline]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -432,15 +451,15 @@ export default function CountryReport() {
   // PNG grounds the AI prose on the SAME deduped, province/category-attributed
   // window items the brief renders (richer than the raw incident rows); every
   // other country uses the raw window incidents.
-  const proseVariant: "country" | "png" = isPng ? "png" : "country";
+  const proseVariant: "country" | "png" = isStructured ? "png" : "country";
   const proseIncidents: ProseIncidentInput[] = useMemo(() => {
-    if (isPng && pngDataset) {
+    if (isStructured && pngDataset) {
       return pngDataset.windowItems.map((it) => ({
         topic: it.category,
         title: it.title,
         summary: null,
         location: it.province ?? null,
-        country: "Papua New Guinea",
+        country: country?.name ?? "",
         severity: it.severity,
         occurredAt: (it.incidentDate ?? it.reportedDate).toISOString(),
         source: it.source ?? null,
@@ -451,7 +470,7 @@ export default function CountryReport() {
       location: i.location, country: i.country,
       severity: i.severity, occurredAt: i.occurredAt, source: i.source,
     }));
-  }, [isPng, pngDataset, active]);
+  }, [isStructured, pngDataset, active, country]);
 
   const periodWord = useMemo(
     () =>
@@ -492,9 +511,10 @@ export default function CountryReport() {
   useEffect(() => {
     if (!country) return;
     if (editing) return;
-    // PNG waits until its dataset has built so the fingerprint hashes the same
-    // window items the brief renders (the request derives from pngDataset).
-    if (isPng && !pngDataset) return;
+    // The structured brief waits until its dataset has built so the fingerprint
+    // hashes the same window items the brief renders (the request derives from
+    // pngDataset).
+    if (isStructured && !pngDataset) return;
     if (proseRequestKey.current === proseContentKey) return;
     proseRequestKey.current = proseContentKey;
     let cancelled = false;
@@ -1086,7 +1106,7 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {editing && proseDraft && isPng && (
+      {editing && proseDraft && isStructured && (
         <Section title="Narrative (editable)">
           <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
             AI-generated from this window's incidents. Edits are saved against the current data; if the
@@ -1097,7 +1117,7 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {editing && proseDraft && !isPng && (
+      {editing && proseDraft && !isStructured && (
         <Section title="Narrative (editable)">
           <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
             AI-generated from this window's incidents. Edits are saved against the current data; if the
@@ -1113,9 +1133,9 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {isPng && pngEffectiveDataset && <PngCountryReportBody dataset={pngEffectiveDataset} />}
+      {isStructured && pngEffectiveDataset && <PngCountryReportBody dataset={pngEffectiveDataset} />}
 
-      {!isPng && (
+      {!isStructured && (
       <>
       <Section title="Executive Summary">
         <Prose text={displayProse.executiveSummary} />

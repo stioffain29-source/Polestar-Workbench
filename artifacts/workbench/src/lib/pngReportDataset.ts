@@ -1,26 +1,30 @@
-// PNG (Papua New Guinea) structured country-brief dataset builder.
+// Structured country-brief dataset builder (Papua New Guinea + West Papua).
 //
-// Builds the nine-section Papua New Guinea security brief from the live
-// incident feed. PNG only: this module is invoked exclusively for the PNG
-// country report, so its broadened scope and derived attributes never leak
-// into any other country report or the topic monitors.
+// Builds the nine-section structured security brief from the live incident feed.
+// Originally PNG-only; now config-driven so the West Papua brief reuses the
+// IDENTICAL section order, card shape and prose engine — only the theatre config
+// (country name, location buckets -> provinces, and a few theatre-specific prose
+// anchors) differs. This module is invoked exclusively for the structured
+// country reports, so its broadened scope and derived attributes never leak into
+// any other country report or the topic monitors.
 //
 // Per-item extraction (province / category / business impact / occurred-vs-
 // reported date) is read STRAIGHT FROM THE INCIDENTS API. The columns are
-// populated server-side by the canonical rulebook in `lib/ingest/src/pngExtract.ts`
-// — at ingest for new rows and via the marker-gated PNG backfill + the live-
-// ingest onlyNull enrichment pass for every PNG-tagged row across topics — so
-// the client no longer recomputes them and can never drift from ingest. The
-// columns are nullable, so a residual unextracted row falls back to the
-// rulebook's own "Other security" default (NOT a re-run of the rulebook); after
-// the backfill + ingest passes no PNG-report row should reach the report
-// unextracted.
+// populated server-side by the canonical rulebook in
+// `lib/ingest/src/structuredExtract.ts` (bound to a theatre gazetteer in
+// pngExtract.ts / westPapuaExtract.ts) — at ingest for new rows and via the
+// marker-gated backfill + the live-ingest onlyNull enrichment pass for every
+// tagged row across topics — so the client no longer recomputes them and can
+// never drift from ingest. The columns are nullable, so a residual unextracted
+// row falls back to the rulebook's own "Other security" default (NOT a re-run of
+// the rulebook).
 //
-// `derivePngProvince` is still imported below — but only to map curated
-// watchlist LABELS to provinces for the coverage-gap check, which is not
-// per-incident recomputation.
+// `derivePngProvince` / `deriveWestPapuaProvince` are imported below — but only
+// to map curated watchlist LABELS to provinces for the coverage-gap check, which
+// is not per-incident recomputation.
 
 import { derivePngProvince } from "@workspace/ingest/pngExtract";
+import { deriveWestPapuaProvince } from "@workspace/ingest/westPapuaExtract";
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
@@ -43,11 +47,11 @@ export interface PngSourceIncident {
   sourceUrl?: string | null;
   resolvedUrl?: string | null;
   confidence?: string | null;
-  // Server-extracted PNG enrichment (see lib/ingest/src/pngExtract.ts), surfaced
-  // through the incidents API. When present these are authoritative and the
-  // client derivation below is skipped; when null (non-PNG / not-yet-backfilled
-  // rows, e.g. prod before a republish+ingest) the client falls back to the
-  // mirrored rulebook so the report renders identically either way.
+  // Server-extracted enrichment (see lib/ingest/src/structuredExtract.ts),
+  // surfaced through the incidents API. When present these are authoritative and
+  // the client derivation below is skipped; when null (non-structured-theatre /
+  // not-yet-backfilled rows, e.g. prod before a republish+ingest) the client
+  // falls back to the rulebook default so the report renders either way.
   province?: string | null;
   category?: string | null;
   businessImpact?: string | null;
@@ -56,7 +60,7 @@ export interface PngSourceIncident {
 
 // Generic word-boundary helper — used only by the watchlist-gap check further
 // down. Province / category / occurred-date derivation all come from the shared
-// @workspace/ingest/pngExtract rulebook imported above (no duplicated copy).
+// @workspace/ingest rulebook imported above (no duplicated copy).
 function hasWord(haystack: string, needle: string): boolean {
   if (!needle) return false;
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -81,7 +85,7 @@ function cleanTitle(title: string | null | undefined, source: string | null | un
   if (m) {
     const tail = m[2].trim();
     const wordCount = tail.split(/\s+/).length;
-    const looksLikeMasthead = /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media|emtv|national)\b/i.test(tail);
+    const looksLikeMasthead = /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media|emtv|national|jubi|antara|kompas|detik|tempo|tribun|suara|cendrawasih|tabloid)\b/i.test(tail);
     if (wordCount <= 6 && !/\d/.test(tail) && looksLikeMasthead) return m[1].trim();
   }
   return t;
@@ -95,9 +99,88 @@ const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme",
 };
 
-// Empty-location fallback — EXACT wording required by the brief spec.
+// Empty-location fallback — EXACT wording required by the brief spec. Both
+// theatres use the same location-generic sentence.
 export const PNG_EMPTY_LOCATION_FALLBACK =
   "No fresh publicly reported protest, theft, robbery or major crime incident identified in open sources for this location during the reporting period.";
+
+// ---------------------------------------------------------------------------
+// Theatre configuration
+// ---------------------------------------------------------------------------
+// A structured-brief theatre supplies its country name, the location buckets
+// (each bucket maps one or more provinces from its gazetteer), and a handful of
+// theatre-specific prose anchors. Everything else (section order, card shape,
+// diagnostics, dedup, severity sorting) is shared.
+export interface StructuredBucketDef {
+  key: string;
+  label: string;
+  provinces: string[];
+}
+
+export interface StructuredTheatreConfig {
+  countryName: string;
+  buckets: StructuredBucketDef[];
+  otherBucketLabel: string;
+  emptyLocationFallback: string;
+  businessImpactEmptyNote: string;
+  emptyOutlook: string;
+  // Inserted into "Conditions can shift quickly around <clause>, so treat any
+  // single quiet week as provisional."
+  outlookVolatilityClause: string;
+  deriveProvince: (location: string | null | undefined, text: string) => string | null;
+}
+
+export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
+  countryName: "Papua New Guinea",
+  buckets: [
+    { key: "ncd", label: "Port Moresby / National Capital District", provinces: ["National Capital District"] },
+    { key: "morobe", label: "Lae / Morobe", provinces: ["Morobe"] },
+    { key: "westernHighlands", label: "Mt Hagen / Western Highlands", provinces: ["Western Highlands"] },
+  ],
+  otherBucketLabel: "Other National Security-Relevant Activity",
+  emptyLocationFallback: PNG_EMPTY_LOCATION_FALLBACK,
+  businessImpactEmptyNote:
+    "No fresh incident-driven business impact was identified this period. Standing exposures — urban crime, Highlands tribal violence, and intermittent road, power and connectivity disruption — continue to apply.",
+  emptyOutlook:
+    "With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic crime in urban centres, periodic tribal and communal flare-ups in the Highlands, and intermittent road, power and connectivity disruption. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
+  outlookVolatilityClause: "paydays, court rulings, election cycles and tribal-payback events",
+  deriveProvince: derivePngProvince,
+};
+
+export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
+  countryName: "West Papua",
+  buckets: [
+    {
+      key: "centralHighlands",
+      label: "Central Highlands (Highland & Central Papua)",
+      provinces: ["Papua Pegunungan", "Papua Tengah"],
+    },
+    {
+      key: "jayapuraNorthCoast",
+      label: "Jayapura & North Coast (Papua Province)",
+      provinces: ["Papua"],
+    },
+    {
+      key: "southPapua",
+      label: "Merauke & South Papua",
+      provinces: ["Papua Selatan"],
+    },
+    {
+      key: "birdsHead",
+      label: "Bird's Head (West & Southwest Papua)",
+      provinces: ["Papua Barat", "Papua Barat Daya"],
+    },
+  ],
+  otherBucketLabel: "Other Provincial / National Security-Relevant Activity",
+  emptyLocationFallback: PNG_EMPTY_LOCATION_FALLBACK,
+  businessImpactEmptyNote:
+    "No fresh incident-driven business impact was identified this period. Standing exposures — security-force and insurgent activity in the central highlands, periodic urban unrest around Jayapura, and intermittent road, air and connectivity disruption — continue to apply.",
+  emptyOutlook:
+    "With no fresh reporting this period, expect the standing risk pattern to persist: security-force and insurgent activity in the central highlands, periodic unrest around Jayapura and the university districts, and intermittent road, air and connectivity disruption. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
+  outlookVolatilityClause:
+    "security-force operations, separatist anniversaries, student mobilisation and flashpoints around resource projects",
+  deriveProvince: deriveWestPapuaProvince,
+};
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -129,14 +212,21 @@ export interface PngDiagnostics {
   ninetyDayCount: number;
 }
 
+export interface StructuredLocationBucket {
+  key: string;
+  label: string;
+  items: PngReportItem[];
+}
+
 export interface PngReportDataset {
   periodLabel: string;
   executiveSummary: string;
   topThree: PngReportItem[];
-  ncd: PngReportItem[];
-  morobe: PngReportItem[];
-  westernHighlands: PngReportItem[];
+  buckets: StructuredLocationBucket[];
   otherNational: PngReportItem[];
+  otherBucketLabel: string;
+  emptyLocationFallback: string;
+  businessImpactEmptyNote: string;
   businessImpact: string[];
   outlook: string;
   diagnostics: PngDiagnostics;
@@ -153,18 +243,18 @@ interface BuildArgs {
 
 // Rulebook "Other security" default — used ONLY for a residual row that somehow
 // reaches the report without server-extracted columns (after the backfill + the
-// live-ingest enrichment pass this should not occur for any PNG-report row).
-// Kept in sync with OTHER_SECURITY_IMPACT / the default category in
-// lib/ingest/src/pngExtract.ts. This is a benign fallback, NOT a re-run of the
-// rulebook — the client no longer recomputes per-incident attributes.
+// live-ingest enrichment pass this should not occur for any structured-report
+// row). Kept in sync with OTHER_SECURITY_IMPACT / the default category in
+// lib/ingest/src/structuredExtract.ts. This is a benign fallback, NOT a re-run
+// of the rulebook — the client no longer recomputes per-incident attributes.
 const DEFAULT_CATEGORY: PngCategory = "Other security";
 const DEFAULT_BUSINESS_IMPACT =
   "Security-relevant development; monitor for operational follow-on in the affected area.";
 
 function toItem(i: PngSourceIncident): PngReportItem {
-  // Read the PNG per-incident enrichment STRAIGHT from the incidents API. The
+  // Read the per-incident enrichment STRAIGHT from the incidents API. The
   // columns are populated server-side (ingest + backfill + onlyNull enrichment
-  // pass) for every PNG-tagged row, so the client no longer recomputes them.
+  // pass) for every tagged row, so the client no longer recomputes them.
   // category + businessImpact are written together by the ingest rulebook, so
   // they are present or absent as a pair.
   const province = i.province ?? null;
@@ -251,20 +341,31 @@ function dedupeByTitle(items: PngReportItem[]): PngReportItem[] {
   return Array.from(best.values());
 }
 
-export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
+// Generic config-driven builder. The PNG and West Papua entry points below are
+// thin wrappers that pass their theatre config.
+function buildStructuredReportDataset(
+  args: BuildArgs,
+  config: StructuredTheatreConfig,
+): PngReportDataset {
   const { windowIncidents, thirtyDay, ninetyDay, baselineWatchlist, periodLabel } = args;
   const windowItems = dedupeByTitle(windowIncidents.map(toItem));
 
-  const ncd = windowItems
-    .filter((it) => it.province === "National Capital District")
-    .sort(sortBySeverityThenRecency);
-  const morobe = windowItems.filter((it) => it.province === "Morobe").sort(sortBySeverityThenRecency);
-  const westernHighlands = windowItems
-    .filter((it) => it.province === "Western Highlands")
-    .sort(sortBySeverityThenRecency);
-  const regionalProvinces = new Set(["National Capital District", "Morobe", "Western Highlands"]);
+  // Location buckets from the theatre config; each bucket owns one or more
+  // provinces (no overlap). "Other" captures everything not in any bucket.
+  const bucketProvinces = new Set<string>();
+  for (const b of config.buckets) for (const p of b.provinces) bucketProvinces.add(p);
+  const buckets: StructuredLocationBucket[] = config.buckets.map((b) => {
+    const provSet = new Set(b.provinces);
+    return {
+      key: b.key,
+      label: b.label,
+      items: windowItems
+        .filter((it) => it.province != null && provSet.has(it.province))
+        .sort(sortBySeverityThenRecency),
+    };
+  });
   const otherNational = windowItems
-    .filter((it) => !it.province || !regionalProvinces.has(it.province))
+    .filter((it) => !it.province || !bucketProvinces.has(it.province))
     .sort(sortBySeverityThenRecency);
 
   const topThree = [...windowItems].sort(sortBySeverityThenRecency).slice(0, 3);
@@ -272,7 +373,7 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
   // --- Executive summary (deterministic, event-led, no parenthetical counts) -
   let executiveSummary: string;
   if (windowItems.length === 0) {
-    executiveSummary = `${PNG_EMPTY_LOCATION_FALLBACK} The standing operating picture for Papua New Guinea carries over from the preceding period; treat the absence of fresh reporting as a coverage signal, not as an improvement in conditions.`;
+    executiveSummary = `${config.emptyLocationFallback} The standing operating picture for ${config.countryName} carries over from the preceding period; treat the absence of fresh reporting as a coverage signal, not as an improvement in conditions.`;
   } else {
     const cats = topLabels(windowItems, (it) => it.category, 3).map((c) => c.toLowerCase());
     const provs = topLabels(
@@ -287,7 +388,7 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
       worst && worst.severityRank >= 4
         ? ` The most serious entry reached ${worst.severityLabel.toLowerCase()} severity.`
         : "";
-    const p1 = `Open-source reporting for Papua New Guinea this period was led by ${catText}.${provText}${sevText}`;
+    const p1 = `Open-source reporting for ${config.countryName} this period was led by ${catText}.${provText}${sevText}`;
     const p2 = `The picture is operational rather than a single dramatic event: the priority for business users is movement security, premises protection and continuity at exposed sites while this picture holds.`;
     executiveSummary = `${p1}\n\n${p2}`;
   }
@@ -305,7 +406,7 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
   // --- Outlook (forward-looking, anchored to recurring provinces/categories) -
   let outlook: string;
   if (windowItems.length === 0) {
-    outlook = `With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic crime in urban centres, periodic tribal and communal flare-ups in the Highlands, and intermittent road, power and connectivity disruption. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.`;
+    outlook = config.emptyOutlook;
   } else {
     const recurringProv = topLabels(
       windowItems.filter((it) => it.province),
@@ -322,7 +423,7 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
     const watchClause = baselineWatchlist.length
       ? ` Keep the curated location watchlist (${joinList(baselineWatchlist.slice(0, 4))}) under active review.`
       : "";
-    outlook = `Looking to the week ahead, ${provClause}${catClause}. Conditions can shift quickly around paydays, court rulings, election cycles and tribal-payback events, so treat any single quiet week as provisional.${watchClause}`;
+    outlook = `Looking to the week ahead, ${provClause}${catClause}. Conditions can shift quickly around ${config.outlookVolatilityClause}, so treat any single quiet week as provisional.${watchClause}`;
   }
 
   // --- Diagnostics (Source confidence & reporting gaps) ----------------------
@@ -345,7 +446,7 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
 
   const coveredProvinces = new Set(windowItems.map((it) => it.province).filter(Boolean) as string[]);
   const watchlistGaps = baselineWatchlist.filter((loc) => {
-    const prov = derivePngProvince(loc, loc);
+    const prov = config.deriveProvince(loc, loc);
     if (prov) return !coveredProvinces.has(prov);
     return ![...coveredProvinces].some((p) => hasWord(loc, p.toLowerCase()));
   });
@@ -364,13 +465,22 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
     periodLabel,
     executiveSummary,
     topThree,
-    ncd,
-    morobe,
-    westernHighlands,
+    buckets,
     otherNational,
+    otherBucketLabel: config.otherBucketLabel,
+    emptyLocationFallback: config.emptyLocationFallback,
+    businessImpactEmptyNote: config.businessImpactEmptyNote,
     businessImpact,
     outlook,
     diagnostics,
     windowItems,
   };
+}
+
+export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
+  return buildStructuredReportDataset(args, PNG_REPORT_CONFIG);
+}
+
+export function buildWestPapuaReportDataset(args: BuildArgs): PngReportDataset {
+  return buildStructuredReportDataset(args, WEST_PAPUA_REPORT_CONFIG);
 }

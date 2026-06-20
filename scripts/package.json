@@ -27,6 +27,7 @@
     "backfill:strikes": "tsx ./src/backfill-strikes.ts",
     "backfill:cargo-country": "tsx ./src/backfill-cargo-country.ts",
     "backfill:png-extract": "tsx ./src/backfill-png-extract.ts",
+    "backfill:west-papua-extract": "tsx ./src/backfill-west-papua-extract.ts",
     "eval:gdelt": "tsx ./src/gdelt-eval.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -61,10 +61,12 @@ export interface ProseBaselineContext {
   resourceSectorExposure?: string | null;
 }
 
-// "country" = the generic seven-section country brief. "png" = the bespoke Papua
-// New Guinea brief, which is rendered by its own deterministic builder and only
-// wants two AI paragraphs (Executive Summary + Outlook); the other sections come
-// from the structured PNG dataset, not the model.
+// "country" = the generic seven-section country brief. "png" = the bespoke
+// structured brief (Papua New Guinea AND the Indonesian West Papua report), which
+// is rendered by its own deterministic builder and only wants two AI paragraphs
+// (Executive Summary + Outlook); the other sections come from the structured
+// dataset, not the model. The prompt is country-aware (structuredSystemPrompt)
+// so the two theatres are never framed as each other.
 export type ProseVariant = "country" | "png";
 
 export interface GenerateProseInput {
@@ -179,14 +181,18 @@ Return STRICT JSON with EXACTLY these keys and no others:
 }
 Return ONLY the JSON object.`;
 
-// PNG brief variant: the deterministic builder already produces the per-province
-// and per-category breakdown, watchlist and Polestar assessment. The model only
-// writes the two free-prose paragraphs at the top and tail of the brief.
-const PNG_SYSTEM_PROMPT = `You are a senior security-intelligence analyst writing the Papua New Guinea country brief for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded for Papua New Guinea over a reporting window, plus verified standing background, and you produce TWO narrative paragraphs for the brief.
+// Structured brief variant: the deterministic builder already produces the
+// per-province and per-category breakdown, watchlist and Polestar assessment.
+// The model only writes the two free-prose paragraphs at the top and tail of the
+// brief. Country-aware so the SAME structured brief serves Papua New Guinea and
+// the Indonesian West Papua report without one being framed as the other.
+function structuredSystemPrompt(countryName: string): string {
+  return `You are a senior security-intelligence analyst writing the ${countryName} country brief for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded for ${countryName} over a reporting window, plus verified standing background, and you produce TWO narrative paragraphs for the brief.
 
 GROUNDING — non-negotiable:
+- The brief is about ${countryName} and ONLY ${countryName}. Never describe, name or frame the brief around a DIFFERENT country, even one with a similar name. In particular, "Papua" (a province of Indonesia, also called West Papua) and "Papua New Guinea" (a separate sovereign state) are DIFFERENT places: a brief for one must never be framed as the other or adopt its risk profile, cities or institutions. For a cross-border incident, write it strictly from ${countryName}'s perspective.
 - Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
-- You MAY use the supplied STANDING BACKGROUND (verified, analyst-curated) and well-established, uncontroversial facts about Papua New Guinea's operating environment for framing — but never present background as if it happened during this window.
+- You MAY use the supplied STANDING BACKGROUND (verified, analyst-curated) and well-established, uncontroversial facts about ${countryName}'s operating environment for framing — but never present background as if it happened during this window.
 - If the window has few or no incidents, say so plainly and lean on the standing background. A quiet window reflects limited reporting, not safety: never imply the country has become calm, and never fabricate activity to fill space.
 
 WRITING RULES:
@@ -204,6 +210,7 @@ Return STRICT JSON with EXACTLY these keys and no others:
   "outlook": string            // 2-3 sentences: the forward view for the coming period, grounded in this window's pattern and the standing background; what to expect and where pressure is likely.
 }
 Return ONLY the JSON object.`;
+}
 
 function baselineBlock(b?: ProseBaselineContext | null): string {
   if (!b) return "none provided";
@@ -327,7 +334,8 @@ async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome
   if (!base || !key) return { ok: false, error: "llm-unavailable" };
 
   const variant: ProseVariant = input.variant ?? "country";
-  const systemPrompt = variant === "png" ? PNG_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  const systemPrompt =
+    variant === "png" ? structuredSystemPrompt(input.countryName) : SYSTEM_PROMPT;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);

@@ -6,6 +6,7 @@ import {
   runStrikesBackfill,
   runNewsCountryBackfill,
   runPngExtractBackfill,
+  runWestPapuaExtractBackfill,
   runFlashpointMastheadRelocate,
   runFlashpointUnknownReattribute,
   classifySeverity,
@@ -98,6 +99,18 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "ABC News Australia",      url: "https://www.abc.net.au/news/feed/45910/rss.xml",                                 sourceType: "rss",  reliability: 4, notes: "Owner: ANZ desk. National broadcaster — protest, industrial action and policing across capitals." },
   { name: "Benar News",              url: "https://www.benarnews.org/english/rss2.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: Asia desk. SE Asia regional desk — Philippines, Indonesia, Bangladesh." },
   { name: "Jubi.id (West Papua)",    url: "https://jubi.id/feed/",                                                          sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Jayapura / Indonesian Papua — community protest and security operations. Manual translation review required." },
+  // Suara Papua — Indonesian-language West Papua outlet (direct WordPress feed,
+  // like Jubi). Strong on highland security operations, displacement and
+  // land-rights coverage the PNG-anchored feeds miss. Bahasa headlines route
+  // through the Indonesian-marker translation gate. Broadens the Papua country
+  // brief's source base beyond Jubi.
+  { name: "Suara Papua",             url: "https://suarapapua.com/feed/",                                                   sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Indonesian West Papua — highland security operations, displacement, land-rights. Bahasa; manual translation review required." },
+  // ANTARA Papua bureau — the state newswire's regional desk. Collected via
+  // Google-News site-scope (the direct regional feed is unreliable from our
+  // egress IP) anchored on Papua place names + security/operational cues, last
+  // 14 days. Authoritative confirmation source for named operations and official
+  // statements across the six Papua provinces.
+  { name: "ANTARA Papua",            url: "https://news.google.com/rss/search?q=site:papua.antaranews.com+(polisi+OR+TNI+OR+keamanan+OR+KKB+OR+OPM+OR+penembakan+OR+tewas+OR+demo+OR+konflik+OR+bandara)+when:14d&hl=id-ID&gl=ID&ceid=ID:id", sourceType: "rss", reliability: 4, notes: "Owner: Pacific desk. ANTARA Papua bureau (state newswire) — named security operations and official statements across the six Papua provinces. Google-News site-scope (direct regional feed unreliable from our egress IP). Bahasa; manual translation review required. Last 14 days." },
   { name: "Post-Courier (PNG)",      url: "https://www.postcourier.com.pg/feed/",                                           sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Port Moresby — political demonstrations, sectoral strike action." },
   // Named PNG mastheads for the Papua New Guinea country brief. The direct
   // publisher RSS feeds (thenational.com.pg, emtv.com.pg, looppng.com,
@@ -1887,6 +1900,48 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (pngErr) {
       logger.error({ err: pngErr }, "PNG extraction backfill failed");
+    }
+
+    // ---- One-time West Papua structured-extraction backfill --------------
+    //   Mirrors the PNG backfill above for the Indonesian West Papua theatre
+    //   (slug `papua`). Fills province / category / business_impact /
+    //   incident_date on historical West-Papua-attributed rows so the Papua
+    //   country brief reaches PNG parity. The backfill scope EXCLUDES
+    //   cross-border PNG rows (those keep their PNG enrichment), so the two
+    //   theatres never overwrite each other. Reaches the writable prod DB only
+    //   after a republish (the deployment runtime is the only writable-prod
+    //   context); new West-Papua rows thereafter are kept filled by the
+    //   live-ingest onlyNull enrichment pass in runIngestOnce.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "west_papua_structured_extract_backfill_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const summary = await runWestPapuaExtractBackfill({ commit: true });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            candidates: summary.candidates,
+            updated: summary.updated,
+            provinceFilled: summary.provinceFilled,
+            incidentDateFilled: summary.incidentDateFilled,
+            marker: markerKey,
+          },
+          "One-time backfill of West Papua per-incident structured extraction (province / category / business_impact / incident_date)",
+        );
+      }
+    } catch (wpErr) {
+      logger.error({ err: wpErr }, "West Papua extraction backfill failed");
     }
 
     try {

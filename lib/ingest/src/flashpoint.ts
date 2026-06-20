@@ -7,6 +7,7 @@ import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { fetchFeed } from "./feedFetch";
 import { extractPngItem, derivePngProvince, derivePngIncidentDate } from "./pngExtract";
+import { extractWestPapuaItem, deriveWestPapuaIncidentDate } from "./westPapuaExtract";
 import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
 
 // Feed fetching is centralised in feedFetch.ts: a real browser User-Agent,
@@ -915,11 +916,24 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       sourceUrl: a.sourceUrl,
       location: geo?.location ?? null,
     });
-    // PNG-only structured extraction. Other countries leave these columns null.
-    const png = a.isPng ? extractPngItem(a.title, a.summary, geo?.location ?? null) : null;
+    // Structured extraction for the per-incident country briefs. PNG (incl.
+    // cross-border "West Papua; Papua New Guinea") uses the PNG gazetteer;
+    // pure Indonesian-Papua rows use the West Papua gazetteer. Other countries
+    // leave these columns null. isWp mirrors the West Papua backfill scope
+    // (country contains "papua" but NOT "papua new guinea"), so cross-border
+    // rows keep their PNG enrichment and never get double-tagged.
+    const countryTag = a.country ?? "";
+    const isWp = /papua/i.test(countryTag) && !/papua new guinea/i.test(countryTag);
+    const structured = a.isPng
+      ? extractPngItem(a.title, a.summary, geo?.location ?? null)
+      : isWp
+        ? extractWestPapuaItem(a.title, a.summary, geo?.location ?? null)
+        : null;
     const incidentDate = a.isPng
       ? derivePngIncidentDate(`${a.title} ${a.summary}`, a.occurredAt)
-      : null;
+      : isWp
+        ? deriveWestPapuaIncidentDate(`${a.title} ${a.summary}`, a.occurredAt)
+        : null;
     return {
       topic: "flashpoint",
       title: a.title,
@@ -930,9 +944,9 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       longitude: geo?.longitude ?? null,
       occurredAt: a.occurredAt,
       incidentDate,
-      province: png?.province ?? null,
-      category: png?.category ?? null,
-      businessImpact: png?.businessImpact ?? null,
+      province: structured?.province ?? null,
+      category: structured?.category ?? null,
+      businessImpact: structured?.businessImpact ?? null,
       severity: classifySeverity(a.title, a.summary, "flashpoint"),
       confidence: "low",
       source: a.source,

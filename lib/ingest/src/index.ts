@@ -45,8 +45,17 @@ export type { SeverityBackfillSummary } from "./backfillSeverity";
 export { runCargoCountryBackfill } from "./backfillCargoCountry";
 export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { runNewsCountryBackfill } from "./backfillNewsCountry";
-export { runPngExtractBackfill } from "./backfillPngExtract";
+export { runPngExtractBackfill, runWestPapuaExtractBackfill } from "./backfillPngExtract";
 export type { PngExtractBackfillSummary } from "./backfillPngExtract";
+export { derivePngProvince, extractPngItem, derivePngIncidentDate } from "./pngExtract";
+export type { PngCategory, PngExtraction } from "./pngExtract";
+export {
+  deriveWestPapuaProvince,
+  extractWestPapuaItem,
+  deriveWestPapuaIncidentDate,
+} from "./westPapuaExtract";
+export type { WestPapuaCategory, WestPapuaExtraction } from "./westPapuaExtract";
+export type { IncidentCategory } from "./structuredExtract";
 export type { NewsCountryBackfillSummary } from "./backfillNewsCountry";
 export { geocode } from "./geocode";
 export type { GeoResult } from "./geocode";
