@@ -16,6 +16,8 @@ export {
   isAisConfigured,
   AIS_THEATRES,
   computeDarkByTheatre,
+  isLoitering,
+  isWithinDarkWindow,
 } from "./maritimeMovement";
 export type {
   MaritimeMovementSummary,

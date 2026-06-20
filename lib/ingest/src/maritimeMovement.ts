@@ -172,15 +172,34 @@ function isAnchored(sog: number | null, navStatus: number | null): boolean {
  * a vessel with no movement data is NOT treated as a candidate (it would be a
  * fabricated signal).
  */
-function isLoitering(sog: number | null, navStatus: number | null): boolean {
+export function isLoitering(sog: number | null, navStatus: number | null): boolean {
   if (navStatus === NAV_AT_ANCHOR || navStatus === NAV_MOORED) return true;
   return sog !== null && sog <= LOITER_SOG_KNOTS;
+}
+
+/**
+ * True when a prior sighting falls inside the dark-detection band relative to
+ * `now`: recent enough to still matter (≥ now − LOOKBACK) AND old enough that an
+ * absence is meaningful (< now − MIN_GAP). A sighting outside this band is
+ * either too stale to reason about (legitimately moved on) or too fresh (may
+ * simply not have re-transmitted yet), so it is NOT a dark candidate. The SQL
+ * pre-filter in `runMaritimeMovementIngest` mirrors this same band using the
+ * same constants; this is the authoritative, unit-tested gate.
+ */
+export function isWithinDarkWindow(lastSeenAt: Date, now: Date): boolean {
+  const ageMs = now.getTime() - lastSeenAt.getTime();
+  return (
+    ageMs >= DARK_MIN_GAP_MINUTES * 60_000 &&
+    ageMs <= DARK_LOOKBACK_HOURS * 3_600_000
+  );
 }
 
 /** A prior-window vessel sighting considered for dark/gap detection. */
 export interface PriorVesselSighting {
   mmsi: number;
   theatre: string;
+  /** When the vessel was last observed transmitting inside the theatre. */
+  lastSeenAt: Date;
   lastSog: number | null;
   lastNavStatus: number | null;
 }
@@ -204,10 +223,13 @@ export function computeDarkByTheatre(
   priorRows: PriorVesselSighting[],
   currentMmsis: Set<number>,
   theatres: readonly string[] = AIS_THEATRES.map((t) => t.theatre),
+  now: Date = new Date(),
 ): Map<string, number | null> {
   const candidates = new Map<string, number>();
   const dark = new Map<string, number>();
   for (const r of priorRows) {
+    // Authoritative lookback/min-gap window gate (the SQL pre-filter mirrors it).
+    if (!isWithinDarkWindow(r.lastSeenAt, now)) continue;
     if (!isLoitering(r.lastSog, r.lastNavStatus)) continue;
     candidates.set(r.theatre, (candidates.get(r.theatre) ?? 0) + 1);
     if (!currentMmsis.has(r.mmsi)) {
@@ -765,6 +787,7 @@ export async function runMaritimeMovementIngest(
       .select({
         mmsi: maritimeVesselSightingTable.mmsi,
         theatre: maritimeVesselSightingTable.theatre,
+        lastSeenAt: maritimeVesselSightingTable.lastSeenAt,
         lastSog: maritimeVesselSightingTable.lastSog,
         lastNavStatus: maritimeVesselSightingTable.lastNavStatus,
       })
@@ -779,10 +802,13 @@ export async function runMaritimeMovementIngest(
       priorRows.map((r) => ({
         mmsi: r.mmsi,
         theatre: r.theatre,
+        lastSeenAt: r.lastSeenAt,
         lastSog: r.lastSog ?? null,
         lastNavStatus: r.lastNavStatus ?? null,
       })),
       currentMmsis,
+      AIS_THEATRES.map((t) => t.theatre),
+      observedAt,
     );
     for (const [theatre, count] of computed) darkByTheatre.set(theatre, count);
   } catch (err) {
