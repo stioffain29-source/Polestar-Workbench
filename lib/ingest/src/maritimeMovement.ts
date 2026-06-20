@@ -90,15 +90,22 @@ interface TheatreBox {
   minLon: number;
   maxLon: number;
   inboundBearing: number;
+  // Centre of the chokepoint itself (NOT the bounding-box centroid, which can sit
+  // well off the strait for a large theatre) and the radius (nautical miles) of
+  // the Datalastic vessel_inradius query. The aisstream path uses the box; the
+  // Datalastic path queries this centre+radius. Datalastic caps radius at 50 NM.
+  centerLat: number;
+  centerLon: number;
+  radiusNm: number;
 }
 
 export const AIS_THEATRES: TheatreBox[] = [
-  { theatre: "Strait of Hormuz", minLat: 24.0, maxLat: 27.5, minLon: 54.0, maxLon: 58.5, inboundBearing: 315 },
-  { theatre: "Bab el-Mandeb", minLat: 12.0, maxLat: 14.0, minLon: 42.5, maxLon: 44.5, inboundBearing: 0 },
-  { theatre: "Gulf of Aden", minLat: 10.5, maxLat: 15.0, minLon: 44.5, maxLon: 51.5, inboundBearing: 270 },
-  { theatre: "Singapore Strait", minLat: 1.0, maxLat: 1.5, minLon: 103.4, maxLon: 104.2, inboundBearing: 90 },
-  { theatre: "Malacca Strait", minLat: 1.0, maxLat: 6.5, minLon: 98.0, maxLon: 103.4, inboundBearing: 135 },
-  { theatre: "Red Sea", minLat: 14.0, maxLat: 28.0, minLon: 32.0, maxLon: 43.5, inboundBearing: 0 },
+  { theatre: "Strait of Hormuz", minLat: 24.0, maxLat: 27.5, minLon: 54.0, maxLon: 58.5, inboundBearing: 315, centerLat: 26.55, centerLon: 56.4, radiusNm: 50 },
+  { theatre: "Bab el-Mandeb", minLat: 12.0, maxLat: 14.0, minLon: 42.5, maxLon: 44.5, inboundBearing: 0, centerLat: 12.6, centerLon: 43.4, radiusNm: 50 },
+  { theatre: "Gulf of Aden", minLat: 10.5, maxLat: 15.0, minLon: 44.5, maxLon: 51.5, inboundBearing: 270, centerLat: 12.5, centerLon: 47.5, radiusNm: 50 },
+  { theatre: "Singapore Strait", minLat: 1.0, maxLat: 1.5, minLon: 103.4, maxLon: 104.2, inboundBearing: 90, centerLat: 1.23, centerLon: 103.85, radiusNm: 40 },
+  { theatre: "Malacca Strait", minLat: 1.0, maxLat: 6.5, minLon: 98.0, maxLon: 103.4, inboundBearing: 135, centerLat: 2.9, centerLon: 100.9, radiusNm: 50 },
+  { theatre: "Red Sea", minLat: 14.0, maxLat: 28.0, minLon: 32.0, maxLon: 43.5, inboundBearing: 0, centerLat: 20.0, centerLon: 38.5, radiusNm: 50 },
 ];
 
 // Speed-over-ground thresholds (knots). At/under ANCHOR a vessel reads as
