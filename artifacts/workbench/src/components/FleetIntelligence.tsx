@@ -28,6 +28,63 @@ function Stat({ value, label }: { value: number | string; label: string }) {
   );
 }
 
+// Flat, single-colour cargo-ship silhouette. No gradient, shadow or glow — the
+// fill is the class colour so the tile reads as one of the map legend classes.
+function ShipIcon({ color }: { color: string }) {
+  return (
+    <svg
+      viewBox="0 0 64 32"
+      width="46"
+      height="23"
+      role="presentation"
+      aria-hidden="true"
+    >
+      {/* hull */}
+      <path d="M4 18 H60 L52 28 H12 Z" fill={color} />
+      {/* deck cargo */}
+      <rect x="14" y="10" width="26" height="8" fill={color} />
+      {/* bridge */}
+      <rect x="43" y="5" width="9" height="13" fill={color} />
+    </svg>
+  );
+}
+
+// One vessel-class tile in the colour-coded composition row. The count and icon
+// take the class colour; the share is computed from the live fleet total so the
+// three tiles always sum to the tracked vessels (no fabricated figure).
+function FleetClassTile({
+  color,
+  label,
+  count,
+  total,
+}: {
+  color: string;
+  label: string;
+  count: number;
+  total: number;
+}) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="border border-[#e2e2e2] rounded-sm bg-white px-3 py-3 flex flex-col items-center text-center gap-2">
+      <span className="flex items-center justify-center w-full rounded-sm bg-muted/30 py-2">
+        <ShipIcon color={color} />
+      </span>
+      <div
+        className="font-serif text-[26px] font-bold leading-none tabular-nums"
+        style={{ color }}
+      >
+        {count}
+      </div>
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans leading-snug min-h-[26px] flex items-center justify-center">
+        {label}
+      </div>
+      <div className="text-[10px] text-muted-foreground font-sans tabular-nums">
+        {pct}% of fleet
+      </div>
+    </div>
+  );
+}
+
 /**
  * Live Fleet Intelligence — flags of registry and fleet composition derived
  * from the same real AIS sightings the Live Vessel Map plots. Shares the vessel
@@ -58,12 +115,6 @@ export default function FleetIntelligence() {
   const topFlags = fleet.flags.slice(0, 10);
   const maxFlag = topFlags.length > 0 ? topFlags[0].count : 1;
   const otherFlags = fleet.flags.slice(10).reduce((s, f) => s + f.count, 0);
-  const maxClass = Math.max(
-    fleet.classes.tanker,
-    fleet.classes.cargo,
-    fleet.classes.other,
-    1,
-  );
 
   return (
     <div className="space-y-5">
@@ -90,7 +141,42 @@ export default function FleetIntelligence() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Fleet composition — colour-coded tile row, one tile per vessel class.
+          Colours match the Live Vessel Map legend so map and composition read
+          as one system. */}
+      <div className="border border-[#e2e2e2] rounded-sm p-4">
+        <div className="flex items-baseline justify-between gap-2 mb-3">
+          <div className="font-serif text-[13px] font-bold uppercase tracking-wide text-primary">
+            Fleet Composition
+          </div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
+            {fleet.total} vessels · last 24 h
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {CLASS_META.map((c) => (
+            <FleetClassTile
+              key={c.key}
+              color={c.color}
+              label={c.label}
+              count={fleet.classes[c.key]}
+              total={fleet.total}
+            />
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground font-sans mt-3 leading-snug">
+          Class is the broadcast AIS ship-type ({fleet.typeReported} of{" "}
+          {fleet.total} report one). Vessels with no ship-type are counted as
+          Other, never guessed; a precise bulk / container / gas split needs the
+          vessel-registry layer.
+        </p>
+      </div>
+
+      <div
+        className={`grid grid-cols-1 gap-6 ${
+          fleet.theatres.length > 0 ? "lg:grid-cols-2" : ""
+        }`}
+      >
         {/* Top flags of registry */}
         <div>
           <div className="font-serif text-[13px] font-bold uppercase tracking-wide text-primary mb-2">
@@ -131,64 +217,23 @@ export default function FleetIntelligence() {
           </p>
         </div>
 
-        {/* Fleet composition */}
-        <div>
-          <div className="font-serif text-[13px] font-bold uppercase tracking-wide text-primary mb-2">
-            Fleet Composition
-          </div>
-          <div className="space-y-1.5">
-            {CLASS_META.map((c) => {
-              const count = fleet.classes[c.key];
-              return (
-                <div key={c.key} className="flex items-center gap-2">
-                  <span
-                    className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-[#e2e2e2]"
-                    style={{ background: c.color }}
-                  />
-                  <div className="w-32 shrink-0 text-[12px] font-sans text-foreground truncate">
-                    {c.label}
-                  </div>
-                  <div className="flex-1 h-2.5 bg-[#e2e2e2] rounded-sm overflow-hidden">
-                    <div
-                      className="h-2.5 rounded-sm"
-                      style={{
-                        width: `${Math.max(count > 0 ? 4 : 0, (count / maxClass) * 100)}%`,
-                        background: c.color,
-                      }}
-                    />
-                  </div>
-                  <div className="w-7 shrink-0 text-right text-[12px] font-sans tabular-nums text-foreground">
-                    {count}
-                  </div>
+        {/* Per-theatre breakdown */}
+        {fleet.theatres.length > 0 && (
+          <div>
+            <div className="font-serif text-[13px] font-bold uppercase tracking-wide text-primary mb-2">
+              By Chokepoint
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+              {fleet.theatres.map((t) => (
+                <div key={t.theatre} className="text-[12px] font-sans">
+                  <span className="text-foreground">{t.theatre}</span>
+                  <span className="text-muted-foreground"> — {t.count}</span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-          <p className="text-[10px] text-muted-foreground font-sans mt-2 leading-snug">
-            Class is the broadcast AIS ship-type ({fleet.typeReported} of{" "}
-            {fleet.total} report one). Vessels with no ship-type are counted as
-            Other, never guessed; a precise bulk / container / gas split needs
-            the vessel-registry layer.
-          </p>
-        </div>
+        )}
       </div>
-
-      {/* Per-theatre breakdown */}
-      {fleet.theatres.length > 0 && (
-        <div>
-          <div className="font-serif text-[13px] font-bold uppercase tracking-wide text-primary mb-2">
-            By Chokepoint
-          </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-            {fleet.theatres.map((t) => (
-              <div key={t.theatre} className="text-[12px] font-sans">
-                <span className="text-foreground">{t.theatre}</span>
-                <span className="text-muted-foreground"> — {t.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <p className="text-[11px] text-muted-foreground font-sans leading-snug">
         Live AIS context — vessel positions, flags and composition never count
