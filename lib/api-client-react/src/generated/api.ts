@@ -48,6 +48,7 @@ import type {
   ListIncidentsParams,
   ListLiveuamapEventsParams,
   ListMaritimeMovementParams,
+  ListMaritimeSecurityEventsParams,
   ListMarketPricesParams,
   ListReliefWebReportsParams,
   ListReportsParams,
@@ -57,6 +58,7 @@ import type {
   LiveuamapEventsResponse,
   MaritimeMovement,
   MaritimeMovementInput,
+  MaritimeSecurityEvent,
   MarketPrice,
   ReliefWebReport,
   Report,
@@ -715,6 +717,90 @@ export function useListReliefWebReports<TData = Awaited<ReturnType<typeof listRe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListReliefWebReportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMaritimeSecurityEventsUrl = (params?: ListMaritimeSecurityEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/maritime-security-events?${stringifiedParams}` : `/api/maritime-security-events`
+}
+
+/**
+ * @summary ICC CCS / IMB Piracy Reporting Centre maritime piracy & armed-robbery events for the current calendar year, stored as a STANDALONE maritime-security source (never as incidents, so they never inflate any count).
+ */
+export const listMaritimeSecurityEvents = async (params?: ListMaritimeSecurityEventsParams, options?: RequestInit): Promise<MaritimeSecurityEvent[]> => {
+
+  return customFetch<MaritimeSecurityEvent[]>(getListMaritimeSecurityEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMaritimeSecurityEventsQueryKey = (params?: ListMaritimeSecurityEventsParams,) => {
+    return [
+    `/api/maritime-security-events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMaritimeSecurityEventsQueryOptions = <TData = Awaited<ReturnType<typeof listMaritimeSecurityEvents>>, TError = ErrorType<unknown>>(params?: ListMaritimeSecurityEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMaritimeSecurityEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMaritimeSecurityEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMaritimeSecurityEvents>>> = ({ signal }) => listMaritimeSecurityEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMaritimeSecurityEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMaritimeSecurityEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listMaritimeSecurityEvents>>>
+export type ListMaritimeSecurityEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary ICC CCS / IMB Piracy Reporting Centre maritime piracy & armed-robbery events for the current calendar year, stored as a STANDALONE maritime-security source (never as incidents, so they never inflate any count).
+ */
+
+export function useListMaritimeSecurityEvents<TData = Awaited<ReturnType<typeof listMaritimeSecurityEvents>>, TError = ErrorType<unknown>>(
+ params?: ListMaritimeSecurityEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMaritimeSecurityEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMaritimeSecurityEventsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

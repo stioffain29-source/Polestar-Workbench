@@ -8,10 +8,12 @@ import {
   useListIncidents,
   useListStrikes,
   useListLiveuamapEvents,
+  useListMaritimeSecurityEvents,
   getListLiveuamapEventsQueryKey,
   LiveuamapRegion,
 } from "@workspace/api-client-react";
 import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
+import { toMaritimeRow, maritimeTypeSeverityKey } from "@/lib/maritimeSecurity";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
@@ -29,8 +31,13 @@ const INCIDENT_CATEGORIES = [
   "Energy / Grid",
   "Shipping",
   "Cargo",
+  "Maritime Security (IMB)",
   "Other",
 ] as const;
+
+// Category for the standalone ICC/IMB maritime-security layer. These points are
+// plotted for geospatial context only — they are NOT incidents and feed no count.
+const MARITIME_SECURITY_CATEGORY = "Maritime Security (IMB)";
 
 const MARITIME_CATEGORIES = ["Maritime Strike"] as const;
 const LAND_CATEGORIES = ["Land Strike"] as const;
@@ -118,6 +125,11 @@ export default function MapPage() {
   const { data: incidents = [] } = useListIncidents({ days });
   const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz", days });
   const { data: land = [] } = useListStrikes({ theatre: "land_gcc", days });
+  // Standalone ICC/IMB maritime-security events (current calendar year). Plotted
+  // as their own toggleable layer on the incidents tab; never an incident count.
+  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents({
+    limit: 500,
+  });
 
   // Liveuamap live overlay — a separate reference layer, kept apart from the
   // curated incident data. It only fetches while the toggle is on (no paid call
@@ -152,7 +164,7 @@ export default function MapPage() {
 
   const allPoints = useMemo<Point[]>(() => {
     if (view === "incidents") {
-      return incidents
+      const incidentPoints = incidents
         .filter((i) => i.latitude != null && i.longitude != null)
         .map<Point>((i) => {
           const [dLat, dLng] = jitter(i.id);
@@ -176,6 +188,35 @@ export default function MapPage() {
           gdeltConfidence: i.gdeltConfidence ?? null,
           };
         });
+      // Append the standalone ICC/IMB maritime-security layer (own category,
+      // own colour-by-type-severity). Plotted only where the IMB position is
+      // usable. These are NOT incidents and never enter any count.
+      const msWindowStart =
+        days == null ? null : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const maritimePoints = maritimeSecurityEvents
+        .map(toMaritimeRow)
+        .filter((r) => r.lat != null && r.lng != null)
+        .filter((r) => !msWindowStart || (r.date != null && r.date >= msWindowStart))
+        .map<Point>((r) => ({
+          id: `ms-${r.id}`,
+          lat: r.lat!,
+          lng: r.lng!,
+          title: r.incidentNumber ? `${r.type} · ${r.incidentNumber}` : r.type,
+          displayTitle: null,
+          category: MARITIME_SECURITY_CATEGORY,
+          country: r.country ?? "—",
+          location: r.location ?? null,
+          when: r.date ? r.date.toISOString() : "",
+          rating: maritimeTypeSeverityKey(r.type),
+          summary: r.narrative ?? `${r.type} reported by the ICC IMB Piracy Reporting Centre.`,
+          corroborations: [],
+          fatalities: null,
+          actors: null,
+          gdeltEventType: null,
+          gdeltSubEventType: null,
+          gdeltConfidence: null,
+        }));
+      return [...incidentPoints, ...maritimePoints];
     }
     const strikes = view === "maritime" ? maritime : land;
     const fixedCat = view === "maritime" ? "Maritime Strike" : "Land Strike";
@@ -200,7 +241,7 @@ export default function MapPage() {
         gdeltSubEventType: null,
         gdeltConfidence: null,
       }));
-  }, [view, incidents, maritime, land]);
+  }, [view, incidents, maritime, land, maritimeSecurityEvents]);
 
   // The API already returns only records within the selected window, so the
   // fetched set is the windowed set — no client-side date filtering needed.

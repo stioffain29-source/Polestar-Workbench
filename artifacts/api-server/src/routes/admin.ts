@@ -2,7 +2,11 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { type IngestSummary } from "@workspace/ingest";
 import { summarizeIngestFailures } from "../lib/ingestFailureSummary";
-import { runIngestOnce, runReliefWebReportsOnce } from "../lib/ingestRunner";
+import {
+  runIngestOnce,
+  runReliefWebReportsOnce,
+  runIccPiracyOnce,
+} from "../lib/ingestRunner";
 
 const router: IRouter = Router();
 
@@ -228,6 +232,80 @@ router.post("/admin/reliefweb-reports", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin reliefweb-reports failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Protected manual trigger for ONLY the ICC CCS / IMB maritime-security pass.
+//
+// Same token gate + concurrency guarantees as /admin/ingest (shares the cross-
+// instance advisory lock via runIccPiracyOnce), but refreshes the piracy &
+// armed-robbery feed WITHOUT re-running the full multi-minute incident chain.
+// These rows are NEVER incidents and can never inflate any count.
+router.post("/admin/icc-piracy", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin icc-piracy called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  try {
+    req.log.info("admin icc-piracy started");
+    const result = await runIccPiracyOnce();
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const r = result.iccPiracy;
+    req.log.info(
+      {
+        markersFetched: r.markersFetched,
+        currentYear: r.currentYear,
+        inserted: r.inserted,
+        totalAfter: r.totalAfter,
+        fetchOk: r.fetchOk,
+        durationMs: result.durationMs,
+      },
+      "admin icc-piracy finished",
+    );
+    res.json({
+      ok: true,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      iccPiracy: {
+        year: r.year,
+        markersFetched: r.markersFetched,
+        rejected: r.rejected,
+        currentYear: r.currentYear,
+        duplicateInDb: r.duplicateInDb,
+        newToInsert: r.newToInsert,
+        inserted: r.inserted,
+        totalAfter: r.totalAfter,
+        latestEventDate: r.latestEventDate,
+        countriesCovered: r.countriesCovered,
+        byType: r.byType,
+        fetchOk: r.fetchOk,
+        errors: r.errors,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin icc-piracy failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

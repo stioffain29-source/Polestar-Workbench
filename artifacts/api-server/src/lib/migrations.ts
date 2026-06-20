@@ -406,6 +406,55 @@ export async function runDataMigrations(): Promise<void> {
         ON reliefweb_reports (published_at)
     `);
 
+    // Schema: ICC CCS / IMB maritime piracy & armed-robbery events. A STANDALONE
+    // maritime-security source — SEPARATE from both the news-scraped `incidents`
+    // table and the AIS `maritime_movement` context table — so it can NEVER
+    // inflate any incident / crime / protest / conflict count. drizzle push only
+    // reaches dev, so the prod primary gains the table here on boot. All
+    // idempotent (IF NOT EXISTS). Mirrors lib/db/src/schema/maritimeSecurityEvents.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS maritime_security_events (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL DEFAULT 'icc_imb',
+        event_key text NOT NULL,
+        incident_number text,
+        incident_type text NOT NULL DEFAULT 'Unknown Maritime Security Incident',
+        category_raw text,
+        title text NOT NULL,
+        narrative text,
+        raw_sitrep text,
+        location_name text,
+        country text,
+        latitude double precision,
+        longitude double precision,
+        raw_position_text text,
+        coordinate_quality text NOT NULL DEFAULT 'missing',
+        incident_date timestamptz,
+        year integer,
+        source_url text,
+        classification text NOT NULL DEFAULT 'maritime_security',
+        content_hash text,
+        fetched_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS maritime_security_events_source_key_unique
+        ON maritime_security_events (source_name, event_key)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS maritime_security_events_date_idx
+        ON maritime_security_events (incident_date)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS maritime_security_events_country_idx
+        ON maritime_security_events (country)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS maritime_security_events_year_idx
+        ON maritime_security_events (year)
+    `);
+
     // Schema: AI-generated country-report narratives + sibling tables that the
     // country/PNG report builder relies on. These were previously created only by
     // the dev-only drizzle `push`, so a fresh production database never had them.

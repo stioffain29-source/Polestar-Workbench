@@ -447,6 +447,40 @@ export const ListReliefWebReportsResponseItem = zod.object({
 export const ListReliefWebReportsResponse = zod.array(ListReliefWebReportsResponseItem)
 
 
+/**
+ * @summary ICC CCS / IMB Piracy Reporting Centre maritime piracy & armed-robbery events for the current calendar year, stored as a STANDALONE maritime-security source (never as incidents, so they never inflate any count).
+ */
+export const listMaritimeSecurityEventsQueryLimitMax = 500;
+
+
+
+export const ListMaritimeSecurityEventsQueryParams = zod.object({
+  "country": zod.coerce.string().optional().describe('Limit to one country (exact match on the parsed IMB country name)'),
+  "limit": zod.coerce.number().min(1).max(listMaritimeSecurityEventsQueryLimitMax).optional().describe('Max number of most-recent events to return (1-500)')
+})
+
+export const ListMaritimeSecurityEventsResponseItem = zod.object({
+  "id": zod.number(),
+  "eventKey": zod.string(),
+  "incidentNumber": zod.string().nullish(),
+  "incidentType": zod.string(),
+  "categoryRaw": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "narrative": zod.string().nullish(),
+  "locationName": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "rawPositionText": zod.string().nullish(),
+  "coordinateQuality": zod.string().optional(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "year": zod.number().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "classification": zod.string()
+}).describe('An ICC CCS \/ IMB Piracy Reporting Centre maritime piracy or armed-robbery-at-sea event for the current calendar year, stored as a STANDALONE maritime-security source. NOT an incident: these rows live in their own table and never feed any incident count.')
+export const ListMaritimeSecurityEventsResponse = zod.array(ListMaritimeSecurityEventsResponseItem)
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 

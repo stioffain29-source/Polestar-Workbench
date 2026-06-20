@@ -55,6 +55,8 @@ export {
   emptyReliefWebReportsSummary,
 } from "./reliefwebReports";
 export type { ReliefWebReportsSummary } from "./reliefwebReports";
+export { runIccPiracyIngest, emptyIccPiracySummary } from "./iccPiracy";
+export type { IccPiracySummary } from "./iccPiracy";
 export {
   runGdeltEnrich,
   isGdeltConfigured,

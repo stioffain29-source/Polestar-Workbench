@@ -1247,6 +1247,41 @@ export interface ReliefWebReport {
   tags?: string[];
 }
 
+/**
+ * An ICC CCS / IMB Piracy Reporting Centre maritime piracy or armed-robbery-at-sea event for the current calendar year, stored as a STANDALONE maritime-security source. NOT an incident: these rows live in their own table and never feed any incident count.
+ */
+export interface MaritimeSecurityEvent {
+  id: number;
+  eventKey: string;
+  /** @nullable */
+  incidentNumber?: string | null;
+  incidentType: string;
+  /** @nullable */
+  categoryRaw?: string | null;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  narrative?: string | null;
+  /** @nullable */
+  locationName?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  rawPositionText?: string | null;
+  coordinateQuality?: string;
+  /** @nullable */
+  incidentDate?: string | null;
+  /** @nullable */
+  year?: number | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+  classification: string;
+}
+
 export type LiveuamapRegion = typeof LiveuamapRegion[keyof typeof LiveuamapRegion];
 
 
@@ -1405,6 +1440,19 @@ country?: string;
  * Max number of most-recent reports to return (1-100)
  * @minimum 1
  * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListMaritimeSecurityEventsParams = {
+/**
+ * Limit to one country (exact match on the parsed IMB country name)
+ */
+country?: string;
+/**
+ * Max number of most-recent events to return (1-500)
+ * @minimum 1
+ * @maximum 500
  */
 limit?: number;
 };

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   useListIncidents,
   useListLatestMaritimeMovement,
+  useListMaritimeSecurityEvents,
   createMaritimeMovement,
   getListLatestMaritimeMovementQueryKey,
   getListMaritimeMovementQueryKey,
@@ -41,6 +42,12 @@ import {
   type ChokepointCard,
   type LatestIncident,
 } from "@/lib/maritimeIntelligence";
+import {
+  buildMaritimeSecuritySummary,
+  maritimeTypeColor,
+  MARITIME_SECURITY_SOURCE_LABEL,
+  MARITIME_SECURITY_SOURCE_PAGE,
+} from "@/lib/maritimeSecurity";
 
 const NOT_IDENTIFIED = LOCATION_NOT_IDENTIFIED;
 
@@ -113,6 +120,12 @@ export default function Shipping() {
   // licensed-provider row is uploaded; the board degrades to "movement data
   // unavailable" rather than inventing numbers.
   const { data: movement = [] } = useListLatestMaritimeMovement();
+  // ICC CCS / IMB maritime-security events — a STANDALONE reference source
+  // (current calendar year). These rows live in their own table and are NEVER
+  // mixed into the incident pool above, so they can never inflate any count.
+  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents({
+    limit: 500,
+  });
 
   // Date-range window. Defaults to the widest option so the first load shows the
   // full record set; the analyst narrows the whole dashboard from the header.
@@ -433,6 +446,20 @@ export default function Shipping() {
     () => vesselIncidents.filter((v) => v.vesselType === "Attack" || v.vesselType === "Seized").length,
     [vesselIncidents],
   );
+
+  // ICC CCS / IMB maritime-security events for the current window. Standalone
+  // reference layer — windowed by the same range toggle as the rest of the page
+  // for consistency, but it never feeds any incident count.
+  const maritimeSecurity = useMemo(() => {
+    const windowStart =
+      windowDays === null
+        ? null
+        : new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    return buildMaritimeSecuritySummary(maritimeSecurityEvents, {
+      windowStart,
+      limit: 40,
+    });
+  }, [maritimeSecurityEvents, windowDays]);
 
   // Page render
   return (
@@ -818,6 +845,79 @@ export default function Shipping() {
                     <td className="p-2">
                       {incidentSourceUrl(i) ? (
                         <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      {/* 3d. Maritime Security — ICC CCS / IMB Piracy Reporting Centre */}
+      <Section title="Maritime Security — ICC CCS / IMB Piracy Reporting Centre">
+        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
+          Reported piracy and armed-robbery-at-sea events from the{" "}
+          <a href={MARITIME_SECURITY_SOURCE_PAGE} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+            {MARITIME_SECURITY_SOURCE_LABEL}
+          </a>{" "}
+          live piracy map (current calendar year). This is a standalone reference
+          source: it is shown alongside the monitor but is never added to the
+          shipping incident counts above.
+        </p>
+        {maritimeSecurity.byType.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {maritimeSecurity.byType.map((t) => (
+              <span
+                key={t.type}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-[11px] font-sans bg-white border border-border"
+              >
+                <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: t.color }} />
+                <span className="text-primary font-medium">{t.type}</span>
+                <span className="text-muted-foreground font-mono">{t.count}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        {maritimeSecurity.rows.length === 0 ? (
+          <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
+            No ICC/IMB maritime-security events in the selected window. (Source
+            may be pending external network validation — see Source Health.)
+          </div>
+        ) : (
+          <div className="bg-white border border-border rounded-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2 font-sans font-medium w-[110px]">Date</th>
+                  <th className="text-left p-2 font-sans font-medium w-[70px]">Ref</th>
+                  <th className="text-left p-2 font-sans font-medium w-[150px]">Type</th>
+                  <th className="text-left p-2 font-sans font-medium">Description</th>
+                  <th className="text-left p-2 font-sans font-medium w-[150px]">Location</th>
+                  <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {maritimeSecurity.rows.map((r) => (
+                  <tr key={r.eventKey} className="hover:bg-muted/30 align-top">
+                    <td className="p-2 font-mono text-xs whitespace-nowrap">
+                      {r.date ? format(r.date, "dd MMM yyyy") : "—"}
+                    </td>
+                    <td className="p-2 font-mono text-xs whitespace-nowrap">{r.incidentNumber ?? "—"}</td>
+                    <td className="p-2 text-xs font-sans">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-sm" style={{ background: maritimeTypeColor(r.type) }} />
+                        {r.type}
+                      </span>
+                    </td>
+                    <td className="p-2 text-xs text-foreground/80">{r.narrative ?? "—"}</td>
+                    <td className="p-2 text-xs">{r.country ?? r.location ?? NOT_IDENTIFIED}</td>
+                    <td className="p-2">
+                      {r.sourceUrl ? (
+                        <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs">
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       ) : <span className="text-muted-foreground text-xs">—</span>}

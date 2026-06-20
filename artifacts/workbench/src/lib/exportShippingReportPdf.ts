@@ -46,13 +46,18 @@ import {
   type VesselRow,
   type PiracyRow,
 } from "./shippingReportDataset";
-import type { MaritimeMovement } from "@workspace/api-client-react";
+import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
   buildMaritimeIntelligence,
   formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
 } from "./maritimeIntelligence";
+import {
+  MARITIME_SECURITY_SOURCE_LABEL,
+  maritimeTypeColor,
+  type MaritimeSecuritySummary,
+} from "./maritimeSecurity";
 import {
   MARITIME_CONF_LABEL,
   MARITIME_SUBSECTION_ORDER,
@@ -556,6 +561,127 @@ function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   ctx.y += 13;
 }
 
+// Maritime Security (ICC CCS / IMB) ----------------------------------------
+// Mirrors the "Maritime Security (ICC CCS / IMB)" section in
+// ShippingReportPreview.tsx — same prose, type chips and table columns, in the
+// same order, so preview == PDF. These events are a standalone source and are
+// never part of any incident count.
+
+function drawMaritimeSecurity(ctx: Ctx, summary: MaritimeSecuritySummary) {
+  ensureSpace(ctx, 24 + 30);
+  drawSectionHeading(ctx, "Maritime Security (ICC CCS / IMB)");
+  renderProse(ctx, summary.read);
+
+  const { pdf, MX, CW } = ctx;
+
+  // Per-classification count chips.
+  if (summary.byType.length > 0) {
+    ensureSpace(ctx, 22);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    let cx = MX;
+    const chipH = 14;
+    const chipGap = 6;
+    for (const b of summary.byType) {
+      const label = `${b.type}: ${b.count}`;
+      const w = pdf.getTextWidth(label) + 14;
+      if (cx + w > MX + CW) {
+        cx = MX;
+        ctx.y += chipH + 4;
+        ensureSpace(ctx, chipH + 4);
+      }
+      setFill(pdf, maritimeTypeColor(b.type));
+      pdf.rect(cx, ctx.y, w, chipH, "F");
+      setText(pdf, WHITE);
+      pdf.text(sanitize(label), cx + 7, ctx.y + 9.6);
+      cx += w + chipGap;
+    }
+    ctx.y += chipH + 12;
+  }
+
+  if (summary.rows.length === 0) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(9);
+    pdf.text(
+      sanitize(
+        `No piracy or armed-robbery activity recorded for this period by the ${MARITIME_SECURITY_SOURCE_LABEL}.`,
+      ),
+      MX,
+      ctx.y + 10,
+    );
+    setRoboto(pdf, "regular");
+    ctx.y += 24;
+    return;
+  }
+
+  const colDateW = 86;
+  const colTypeW = 130;
+  const colCountryW = 120;
+  const colLocW = CW - colDateW - colTypeW - colCountryW - 6;
+  const rowH = 20;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("DATE", MX + 6, ctx.y + 13);
+    pdf.text("TYPE", MX + colDateW + 6, ctx.y + 13);
+    pdf.text("LOCATION", MX + colDateW + colTypeW + 6, ctx.y + 13);
+    pdf.text("COASTAL STATE", MX + colDateW + colTypeW + colLocW + 6, ctx.y + 13);
+    ctx.y += rowH;
+  };
+
+  ensureSpace(ctx, rowH * 2);
+  drawHeader();
+
+  for (const r of summary.rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+    const typeLines = pdf.splitTextToSize(sanitize(r.type), colTypeW - 16);
+    const locLines = pdf.splitTextToSize(sanitize(r.location ?? "—"), colLocW - 8);
+    const countryLines = pdf.splitTextToSize(
+      sanitize(r.country ?? "—"),
+      colCountryW - 8,
+    );
+    const maxLines = Math.max(typeLines.length, locLines.length, countryLines.length);
+    const rh = Math.max(rowH, maxLines * 12 + 10);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
+
+    const textOpts = { lineHeightFactor: 1.4 };
+    setText(pdf, DUSK);
+    pdf.text(r.date ? format(r.date, "dd MMM yyyy") : "—", MX + 6, ctx.y + 14, textOpts);
+    // Type swatch + label.
+    setFill(pdf, maritimeTypeColor(r.type));
+    pdf.rect(MX + colDateW + 6, ctx.y + 6, 7, 7, "F");
+    setText(pdf, NAVY);
+    pdf.text(typeLines, MX + colDateW + 17, ctx.y + 14, textOpts);
+    setText(pdf, DUSK);
+    pdf.text(locLines, MX + colDateW + colTypeW + 6, ctx.y + 14, textOpts);
+    pdf.text(countryLines, MX + colDateW + colTypeW + colLocW + 6, ctx.y + 14, textOpts);
+
+    ctx.y += rh;
+  }
+  ctx.y += 13;
+}
+
 // Maritime Intelligence (shared board) -------------------------------------
 // Mirrors MaritimeIntelligenceReportSection in ShippingReportPreview.tsx —
 // same sections, same order, same dataset, so preview == PDF.
@@ -750,6 +876,7 @@ export async function exportShippingReportPdf(
   incidents: ShippingReportIncident[],
   filename: string,
   movement: MaritimeMovement[] = [],
+  maritimeSecurityEvents: MaritimeSecurityEvent[] = [],
 ): Promise<void> {
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
@@ -804,7 +931,12 @@ export async function exportShippingReportPdf(
   });
   drawMaritimeIntelligence(ctx, maritimeBoard);
 
-  const ds = buildShippingReportDataset(incidents, data.topic, data.issueDate);
+  const ds = buildShippingReportDataset(
+    incidents,
+    data.topic,
+    data.issueDate,
+    maritimeSecurityEvents,
+  );
 
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);
@@ -839,6 +971,11 @@ export async function exportShippingReportPdf(
       emptyMessage: "No piracy or armed-robbery reports this week.",
     },
   );
+
+  // Maritime Security (ICC CCS / IMB) — standalone source, drawn in the SAME
+  // order ShippingReportPreview renders it (preview == PDF). These events are
+  // never part of any incident count above.
+  drawMaritimeSecurity(ctx, ds.maritimeSecurity);
 
   // Commercial Impact on Shipping — prose leads the operational
   // commercial-pressure table; pure market commentary is filtered out

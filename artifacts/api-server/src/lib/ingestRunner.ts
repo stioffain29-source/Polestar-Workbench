@@ -15,6 +15,7 @@ import {
   runResolveGoogleNewsUrls,
   runReliefWebCorroboration,
   runReliefWebReportsIngest,
+  runIccPiracyIngest,
   runGdeltEnrich,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
@@ -25,6 +26,7 @@ import {
   type StrikesIngestSummary,
   type ReliefWebCorroborationSummary,
   type ReliefWebReportsSummary,
+  type IccPiracySummary,
   type GdeltEnrichSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -64,6 +66,7 @@ export type IngestRunResult =
       strikes: StrikesIngestSummary;
       corroboration: ReliefWebCorroborationSummary;
       reliefwebReports: ReliefWebReportsSummary;
+      iccPiracy: IccPiracySummary;
       gdeltEnrich: GdeltEnrichSummary;
     }
   | { ran: false; reason: "locked" };
@@ -95,6 +98,16 @@ export type StrikesRunResult =
       finishedAt: Date;
       durationMs: number;
       strikes: StrikesIngestSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type IccPiracyRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      iccPiracy: IccPiracySummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -207,6 +220,28 @@ function emptyReliefWebReports(err: unknown): ReliefWebReportsSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`ReliefWeb situational reports failed: ${msg}`],
+  };
+}
+
+function emptyIccPiracy(err: unknown): IccPiracySummary {
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    source: "icc_imb",
+    mode: "commit",
+    year: new Date().getUTCFullYear(),
+    markersFetched: 0,
+    rejected: 0,
+    currentYear: 0,
+    duplicateInDb: 0,
+    newToInsert: 0,
+    inserted: 0,
+    totalAfter: 0,
+    latestEventDate: null,
+    countriesCovered: [],
+    byType: {},
+    fetchOk: false,
+    errors: [msg],
+    logLines: [`ICC piracy ingest failed: ${msg}`],
   };
 }
 
@@ -350,6 +385,29 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     } catch (err) {
       logger.error({ err }, "strikes ingest failed");
       strikes = emptyStrikes(err);
+    }
+    // ICC CCS / IMB maritime piracy & armed-robbery events. Like strikes it
+    // writes its OWN isolated table (maritime_security_events) and shares NOTHING
+    // with the incidents dedupe below — these rows are NEVER incidents and can
+    // never inflate any count. Runs early (alongside strikes) so an autoscale
+    // teardown is least likely to drop it, and isolated in its own try so an
+    // ICC/Cloudflare outage can never fail the rest of the chain.
+    let iccPiracy: IccPiracySummary;
+    try {
+      iccPiracy = await runIccPiracyIngest({ commit: true });
+      logger.info(
+        {
+          markersFetched: iccPiracy.markersFetched,
+          currentYear: iccPiracy.currentYear,
+          inserted: iccPiracy.inserted,
+          totalAfter: iccPiracy.totalAfter,
+          fetchOk: iccPiracy.fetchOk,
+        },
+        "ICC piracy pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "ICC piracy ingest failed");
+      iccPiracy = emptyIccPiracy(err);
     }
     // Sequential: these share the same DB pool and dedupe against the incidents
     // table; running them one after another mirrors scrape:prod. Each is isolated
@@ -600,6 +658,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       strikes,
       corroboration,
       reliefwebReports,
+      iccPiracy,
       gdeltEnrich,
     };
   });
@@ -690,6 +749,34 @@ export async function runStrikesOnce(): Promise<StrikesRunResult> {
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       strikes,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the ICC CCS / IMB maritime-security ingest, committing to the
+ * database. Used by the manual admin trigger so an operator can refresh the
+ * piracy & armed-robbery feed WITHOUT re-running the full multi-minute incident
+ * chain. Shares the same advisory lock so it can never collide with a full run.
+ */
+export async function runIccPiracyOnce(): Promise<IccPiracyRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let iccPiracy: IccPiracySummary;
+    try {
+      iccPiracy = await runIccPiracyIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "ICC piracy ingest failed");
+      iccPiracy = emptyIccPiracy(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      iccPiracy,
     };
   });
   if (!res.ran) return res;

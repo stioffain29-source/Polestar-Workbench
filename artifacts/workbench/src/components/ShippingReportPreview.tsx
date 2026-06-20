@@ -15,7 +15,7 @@ import {
   shippingSevKey,
 } from "@/lib/shippingReportDataset";
 import { resolveReportWindow } from "@/lib/reportWindow";
-import type { MaritimeMovement } from "@workspace/api-client-react";
+import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
   buildMaritimeIntelligence,
   formatMovementSummary,
@@ -30,6 +30,10 @@ import {
   MARITIME_SUBSECTION_ORDER,
   maritimeExecCards,
 } from "@/lib/maritimeReportView";
+import {
+  MARITIME_SECURITY_SOURCE_LABEL,
+  maritimeTypeColor,
+} from "@/lib/maritimeSecurity";
 
 // Polestar disclaimer text used at the foot of every report. Kept inline
 // here (rather than imported from the PDF chrome) so the on-screen
@@ -633,10 +637,12 @@ export default function ShippingReportPreview({
   report,
   incidents,
   movement = [],
+  maritimeSecurityEvents = [],
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
   movement?: MaritimeMovement[];
+  maritimeSecurityEvents?: MaritimeSecurityEvent[];
 }) {
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -644,8 +650,14 @@ export default function ShippingReportPreview({
   void canonicalTopic; void format;
 
   const ds = useMemo(
-    () => buildShippingReportDataset(incidents, topic, issueDate),
-    [incidents, topic, issueDate],
+    () =>
+      buildShippingReportDataset(
+        incidents,
+        topic,
+        issueDate,
+        maritimeSecurityEvents,
+      ),
+    [incidents, topic, issueDate, maritimeSecurityEvents],
   );
 
   // The one shared deterministic Maritime Intelligence board, aligned to THIS
@@ -789,6 +801,79 @@ export default function ShippingReportPreview({
             actFor={(r) => r.act}
             emptyMessage="No piracy or armed-robbery reports this week."
           />
+        </Section>
+
+        <Section title="Maritime Security (ICC CCS / IMB)">
+          <Paragraphs text={ds.maritimeSecurity.read} />
+          {ds.maritimeSecurity.byType.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4 mb-3">
+              {ds.maritimeSecurity.byType.map((b) => (
+                <span
+                  key={b.type}
+                  style={{
+                    fontFamily: "Roboto, sans-serif",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#fff",
+                    backgroundColor: maritimeTypeColor(b.type),
+                    padding: "3px 9px",
+                    borderRadius: 2,
+                  }}
+                >
+                  {b.type}: {b.count}
+                </span>
+              ))}
+            </div>
+          )}
+          {ds.maritimeSecurity.rows.length > 0 ? (
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+              <thead>
+                <tr>
+                  {["Date", "Type", "Location", "Coastal State"].map((h) => (
+                    <th
+                      key={h}
+                      className="uppercase"
+                      style={{
+                        textAlign: "left",
+                        fontFamily: "Roboto, sans-serif",
+                        fontWeight: 700,
+                        fontSize: 9,
+                        letterSpacing: "0.1em",
+                        color: DUSK,
+                        borderBottom: `1px solid ${POLAR}`,
+                        padding: "5px 8px",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ds.maritimeSecurity.rows.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px", whiteSpace: "nowrap" }}>
+                      {r.date ? format(r.date, "dd MMM yyyy") : "—"}
+                    </td>
+                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px" }}>
+                      <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, backgroundColor: maritimeTypeColor(r.type), marginRight: 6, verticalAlign: "middle" }} />
+                      {r.type}
+                    </td>
+                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px" }}>
+                      {r.location ?? "—"}
+                    </td>
+                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px" }}>
+                      {r.country ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, marginTop: 8 }}>
+              No piracy or armed-robbery activity recorded for this period by the {MARITIME_SECURITY_SOURCE_LABEL}.
+            </p>
+          )}
         </Section>
 
         <Section title="Commercial Impact on Shipping">

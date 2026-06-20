@@ -5,6 +5,7 @@ import {
   useListIncidents,
   useListSources,
   useListReliefWebReports,
+  useListMaritimeSecurityEvents,
   useUpdateCountryReport,
   useGetCountryBaseline,
   useUpsertCountryBaseline,
@@ -45,6 +46,11 @@ import {
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import SituationalContextSection from "@/components/SituationalContextSection";
+import {
+  buildMaritimeSecuritySummary,
+  maritimeTypeColor,
+  MARITIME_SECURITY_SOURCE_LABEL,
+} from "@/lib/maritimeSecurity";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
@@ -190,6 +196,13 @@ export default function CountryReport() {
   // empty list (and a hidden section) when the feed is unconfigured/unapproved.
   const { data: situationalReports } = useListReliefWebReports(
     country ? { country: country.name ?? undefined, limit: 40 } : {},
+    { query: { enabled: !!country } } as never,
+  );
+  // Standalone ICC CCS / IMB maritime-security events. Their own source — NEVER
+  // an incident and never added to any count on this page; surfaced only as a
+  // separate reference section when the coastal state has reported activity.
+  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents(
+    country ? { limit: 500 } : {},
     { query: { enabled: !!country } } as never,
   );
   const incidents = useMemo(() => {
@@ -862,6 +875,14 @@ export default function CountryReport() {
     .slice(0, 8);
   const typeChartMax = typeChartData.length > 0 ? Math.max(...typeChartData.map((d) => d.n)) : 0;
 
+  // Standalone ICC CCS / IMB maritime-security layer for this coastal state.
+  // Current-year only (the ingest already scopes to the calendar year), never
+  // windowed to the report period and never added to any incident count.
+  const maritimeSummary = buildMaritimeSecuritySummary(maritimeSecurityEvents, {
+    country: effective.name ?? undefined,
+    limit: 20,
+  });
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-6" style={{ fontFamily: ROBOTO, color: DUSK }}>
       {/* Top toolbar (not printed) */}
@@ -1308,6 +1329,60 @@ export default function CountryReport() {
         country={effective.name}
         max={6}
       />
+
+      {/* Maritime Security (ICC CCS / IMB standalone layer — never an incident,
+          never added to any count). Hidden entirely when the coastal state has
+          no reported activity in the current year. */}
+      {maritimeSummary.total > 0 && (
+        <Section title="Maritime Security">
+          <Prose text={maritimeSummary.read} />
+          <div className="flex flex-wrap gap-2" style={{ margin: "10px 0 12px" }}>
+            {maritimeSummary.byType.map((t) => (
+              <span
+                key={t.type}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: ROBOTO,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: DUSK,
+                  border: `1px solid ${POLAR}`,
+                  borderRadius: 2,
+                  padding: "3px 8px",
+                  background: "#fff",
+                }}
+              >
+                <span style={{ width: 10, height: 10, background: t.color, borderRadius: 2, display: "inline-block" }} />
+                {t.type}: {t.count}
+              </span>
+            ))}
+          </div>
+          <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
+            <div className="grid" style={{ gridTemplateColumns: "120px 150px minmax(0, 1fr) 160px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              <div className="p-2.5">Date</div>
+              <div className="p-2.5">Type</div>
+              <div className="p-2.5">Location</div>
+              <div className="p-2.5">Coastal State</div>
+            </div>
+            {maritimeSummary.rows.map((r) => (
+              <div key={r.id} className="grid items-center" style={{ gridTemplateColumns: "120px 150px minmax(0, 1fr) 160px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
+                <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{r.date ? format(r.date, "dd MMM yyyy") : "—"}</div>
+                <div className="p-2.5" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 9, height: 9, background: maritimeTypeColor(r.type), borderRadius: 2, display: "inline-block", flexShrink: 0 }} />
+                  {r.type}
+                </div>
+                <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{r.location ?? "—"}</div>
+                <div className="p-2.5">{r.country ?? "—"}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontFamily: ROBOTO, fontSize: 10, color: DUSK, opacity: 0.7, marginTop: 6 }}>
+            Source: {MARITIME_SECURITY_SOURCE_LABEL}. Standalone reference layer — not an incident and not included in any incident total.
+          </div>
+        </Section>
+      )}
 
       {/* 10. Related Incidents */}
       <Section title="Related Incidents">

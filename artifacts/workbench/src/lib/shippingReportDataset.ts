@@ -13,6 +13,11 @@ import {
   FREIGHT_MARKET_INDEX_RE,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
+import {
+  buildMaritimeSecuritySummary,
+  type MaritimeSecuritySummary,
+} from "./maritimeSecurity";
+import type { MaritimeSecurityEvent } from "@workspace/api-client-react";
 
 // Single source of truth for the Shipping report's analysed dataset.
 // Both the PDF exporter (exportShippingReportPdf) and the on-screen
@@ -98,6 +103,9 @@ export interface ShippingReportDataset {
   autoWatchNext: string;
   autoPolestarView: string;
   dataNote: string;
+  /** Standalone ICC CCS / IMB maritime-security summary for the report window.
+   *  These events live in their own table and NEVER enter any incident count. */
+  maritimeSecurity: MaritimeSecuritySummary;
 }
 
 const SEV_RANK: Record<string, number> = {
@@ -441,8 +449,18 @@ export function buildShippingReportDataset(
   incidents: ShippingReportIncident[],
   topic: string,
   issueDate: string,
+  maritimeSecurityEvents: MaritimeSecurityEvent[] = [],
 ): ShippingReportDataset {
   const win = resolveReportWindow(topic, issueDate);
+
+  // Standalone ICC/IMB maritime-security layer, bounded to the SAME report
+  // window as every other section. It is its own source and is NEVER added to
+  // any incident, vessel or piracy count above.
+  const maritimeSecurity = buildMaritimeSecuritySummary(maritimeSecurityEvents, {
+    windowStart: win.start,
+    windowEnd: win.end,
+    limit: 40,
+  });
 
   // Same scope filter as the Shipping dashboard: shipping topic only, strip
   // off-topic noise, then drop records that classify outside APAC + ME.
@@ -832,6 +850,7 @@ export function buildShippingReportDataset(
     autoWatchNext,
     autoPolestarView,
     dataNote,
+    maritimeSecurity,
   };
 }
 

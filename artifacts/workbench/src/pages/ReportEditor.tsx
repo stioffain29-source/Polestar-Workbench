@@ -5,6 +5,7 @@ import {
   useUpdateReport,
   useListIncidents,
   useListLatestMaritimeMovement,
+  useListMaritimeSecurityEvents,
   useListReliefWebReports,
   getGetReportQueryKey,
   getListReportsQueryKey,
@@ -126,6 +127,12 @@ export default function ReportEditor() {
   // only — never an incident; the board degrades to "movement data
   // unavailable" when empty.
   const { data: movement = [] } = useListLatestMaritimeMovement();
+  // Standalone ICC CCS / IMB maritime-security events for the Shipping Watch
+  // report. Their own source — never an incident; the section degrades to an
+  // empty-state line when the feed is unconfigured/blocked.
+  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents({
+    limit: 500,
+  });
   // Supporting UN OCHA ReliefWeb context for the Conflict Watch report. Fetched
   // unconditionally but only surfaced for the conflict topic; degrades to an
   // empty list (and a hidden section) when the feed is unconfigured/unapproved.
@@ -255,6 +262,7 @@ export default function ReportEditor() {
           incidentsForExport,
           filename,
           movement,
+          maritimeSecurityEvents,
         );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
@@ -1354,6 +1362,7 @@ export default function ReportEditor() {
               report={form}
               incidents={incidentsForExport}
               movement={movement}
+              maritimeSecurityEvents={maritimeSecurityEvents}
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview

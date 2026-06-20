@@ -13,6 +13,7 @@ import marketPricesRouter from "./marketPrices";
 import maritimeMovementRouter from "./maritimeMovement";
 import liveuamapRouter from "./liveuamap";
 import reliefwebReportsRouter from "./reliefwebReports";
+import maritimeSecurityEventsRouter from "./maritimeSecurityEvents";
 import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
@@ -36,6 +37,7 @@ router.use(marketPricesRouter);
 router.use(maritimeMovementRouter);
 router.use(liveuamapRouter);
 router.use(reliefwebReportsRouter);
+router.use(maritimeSecurityEventsRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
 

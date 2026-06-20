@@ -169,6 +169,33 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ReliefWebReport" }
 
+  /maritime-security-events:
+    get:
+      operationId: listMaritimeSecurityEvents
+      tags: [maritime-security-events]
+      summary: >-
+        ICC CCS / IMB Piracy Reporting Centre maritime piracy & armed-robbery
+        events for the current calendar year, stored as a STANDALONE
+        maritime-security source (never as incidents, so they never inflate any
+        count).
+      parameters:
+        - name: country
+          in: query
+          description: Limit to one country (exact match on the parsed IMB country name)
+          schema: { type: string }
+        - name: limit
+          in: query
+          description: Max number of most-recent events to return (1-500)
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaritimeSecurityEvent" }
+
   /incidents:
     get:
       operationId: listIncidents
@@ -2225,6 +2252,33 @@ components:
         tags:
           type: array
           items: { type: string }
+
+    MaritimeSecurityEvent:
+      type: object
+      description: >-
+        An ICC CCS / IMB Piracy Reporting Centre maritime piracy or
+        armed-robbery-at-sea event for the current calendar year, stored as a
+        STANDALONE maritime-security source. NOT an incident: these rows live in
+        their own table and never feed any incident count.
+      required: [id, eventKey, incidentType, classification]
+      properties:
+        id: { type: integer }
+        eventKey: { type: string }
+        incidentNumber: { type: ["string", "null"] }
+        incidentType: { type: string }
+        categoryRaw: { type: ["string", "null"] }
+        title: { type: ["string", "null"] }
+        narrative: { type: ["string", "null"] }
+        locationName: { type: ["string", "null"] }
+        country: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        rawPositionText: { type: ["string", "null"] }
+        coordinateQuality: { type: string }
+        incidentDate: { type: ["string", "null"], format: date-time }
+        year: { type: ["integer", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        classification: { type: string }
 
     LiveuamapRegion:
       type: string

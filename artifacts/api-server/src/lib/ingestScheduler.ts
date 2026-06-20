@@ -53,7 +53,7 @@ const MOVEMENT_FRESH_DAYS = 14;
 // freshness, so a deploy that changes what the scrapers accept/reject takes
 // effect immediately. The marker is stored in app_migration_markers keyed by
 // version, so the forced run happens once per environment per version bump.
-const INGEST_FORCE_VERSION = 17;
+const INGEST_FORCE_VERSION = 18;
 
 /**
  * True when the current INGEST_FORCE_VERSION has not yet run in this
@@ -201,6 +201,27 @@ async function hoursSinceNewestMovement(): Promise<number | null> {
     FROM maritime_movement
     WHERE source_name ILIKE '%ais%'
   `);
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
+ * Hours since the newest stored ICC maritime-security event (or null when the
+ * table is empty). Like strikes and the scraped land topics, ICC piracy events
+ * refresh ONLY inside a full ingest (runIngestOnce → runIccPiracyIngest), so a
+ * stale-but-populated table should force a boot catch-up. IMPORTANT: unlike the
+ * land topics, an EMPTY table (null) is NOT treated as a trigger — the ICC live
+ * map sits behind Cloudflare and routinely blocks datacenter egress, so a never-
+ * populated table would otherwise force a full scrape on every cold start for no
+ * benefit. Initial population rides the forced-version bump and the regular
+ * incident-staleness catch-up (which runs the full chain, ICC included). Uses
+ * created_at (insertion heartbeat) so a quiet reporting week does not look stale.
+ */
+async function hoursSinceNewestMaritimeSecurity(): Promise<number | null> {
+  const res = await db.execute(
+    sql`SELECT MAX(created_at) AS last FROM maritime_security_events`,
+  );
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
   return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
@@ -472,6 +493,15 @@ export function startIngestScheduler(): void {
             : null;
           const movementStale =
             aisActive && (movementAge === null || movementAge >= hours);
+          // ICC maritime-security events also refresh ONLY inside a full ingest.
+          // Force a catch-up when the table is POPULATED but stale; an empty
+          // table is deliberately NOT a trigger (the ICC map routinely blocks
+          // datacenter egress, so gating on emptiness would re-scrape every cold
+          // start). Initial population rides the forced-version bump + the
+          // incident-staleness catch-up.
+          const maritimeSecurityAge = await hoursSinceNewestMaritimeSecurity();
+          const maritimeSecurityStale =
+            maritimeSecurityAge !== null && maritimeSecurityAge >= hours;
           // A movement table already past the 14-day SLA at boot means the
           // refresh path fell behind (the catch-up below restores it, but the
           // breach itself is worth an alert in production).
@@ -493,7 +523,8 @@ export function startIngestScheduler(): void {
             age >= hours ||
             staleLandTopics.length > 0 ||
             strikesStale ||
-            movementStale
+            movementStale ||
+            maritimeSecurityStale
           ) {
             logger.info(
               {
@@ -511,6 +542,11 @@ export function startIngestScheduler(): void {
                 movementAgeHours:
                   movementAge === null ? null : Math.round(movementAge),
                 movementStale,
+                maritimeSecurityAgeHours:
+                  maritimeSecurityAge === null
+                    ? null
+                    : Math.round(maritimeSecurityAge),
+                maritimeSecurityStale,
               },
               "boot ingest: data stale, running catch-up",
             );
