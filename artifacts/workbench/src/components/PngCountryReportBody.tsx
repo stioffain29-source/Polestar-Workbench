@@ -128,15 +128,19 @@ function LocationSection({
   title,
   items,
   emptyFallback,
+  hadFeatured,
+  featuredNote,
 }: {
   title: string;
   items: PngReportItem[];
   emptyFallback: string;
+  hadFeatured: boolean;
+  featuredNote: string;
 }) {
   return (
     <Section title={title}>
       {items.length === 0 ? (
-        <EmptyNote>{emptyFallback}</EmptyNote>
+        <EmptyNote>{hadFeatured ? featuredNote : emptyFallback}</EmptyNote>
       ) : (
         <div>
           {items.map((it) => (
@@ -172,9 +176,22 @@ export default function PngCountryReportBody({ dataset }: { dataset: PngReportDa
 
       {/* 3-N. Location buckets (config-driven) + catch-all */}
       {d.buckets.map((b) => (
-        <LocationSection key={b.key} title={b.label} items={b.items} emptyFallback={d.emptyLocationFallback} />
+        <LocationSection
+          key={b.key}
+          title={b.label}
+          items={b.items}
+          emptyFallback={d.emptyLocationFallback}
+          hadFeatured={b.hadFeatured}
+          featuredNote={d.featuredAboveNote}
+        />
       ))}
-      <LocationSection title={d.otherBucketLabel} items={d.otherNational} emptyFallback={d.emptyLocationFallback} />
+      <LocationSection
+        title={d.otherBucketLabel}
+        items={d.otherNational}
+        emptyFallback={d.emptyLocationFallback}
+        hadFeatured={d.otherNationalHadFeatured}
+        featuredNote={d.featuredAboveNote}
+      />
 
       {/* Business Impact */}
       <Section title="Business Impact">

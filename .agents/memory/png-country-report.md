@@ -30,5 +30,10 @@ The PNG Executive Summary and Outlook are now LLM-generated, fingerprint-cached,
 ## Syndication dedup
 The page feeds the PNG builder the RAW window incidents (buildCountryLayers does not dedupe; only the lookback-prose set runs dropSyndicatedRehashes). So the builder must dedupe itself. Feeds carry the same story under headlines that differ only by a trailing " - Publisher" tail that cleanTitle leaves on when the tail doesn't match the row's own source (e.g. a Jubi.id story syndicated via a Google News feed). Dedup key therefore strips a trailing dash/pipe segment when the surviving prefix is still a substantial headline (≥5 words), then collapses to one representative (best by severity then recency).
 
+## Cross-section dedup (Top 3 vs location buckets)
+"Top 3 Incidents This Week" and the regional location buckets both derive from the SAME windowItems, so without an exclusion a top-3 incident is rendered twice (once in Top 3, again in its province bucket / "Other") — read as "duplication in reporting". The builder excludes the top-three ids from `bucketableItems` (feeds both config buckets AND otherNational); each incident is reported once. AGGREGATE sections (Executive Summary, Business Impact, Outlook, diagnostics) stay on the FULL windowItems — only the per-incident CARD lists get the exclusion.
+**Why:** once-only reporting; a highlight section must not double-count.
+**Edge case (do not regress):** a bucket whose only incidents were promoted to Top 3 is now items-empty, but rendering the empty-location fallback there would FALSELY claim no fresh reporting. So each bucket (and otherNational) carries `hadFeatured` (true when a windowItems∩top3 row belongs to it); the renderer shows `featuredAboveNote` (PNG_FEATURED_ABOVE_NOTE) instead of the empty fallback. With ≤3 total incidents every populated bucket goes featured-empty — provably truthful (hadFeatured true ⇒ featured note; truly-empty ⇒ fallback).
+
 ## Empty-location fallback (exact string, do not paraphrase)
 "No fresh publicly reported protest, theft, robbery or major crime incident identified in open sources for this location during the reporting period."

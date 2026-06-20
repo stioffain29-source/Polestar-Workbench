@@ -104,6 +104,13 @@ const SEV_LABEL: Record<string, string> = {
 export const PNG_EMPTY_LOCATION_FALLBACK =
   "No fresh publicly reported protest, theft, robbery or major crime incident identified in open sources for this location during the reporting period.";
 
+// Shown for a location section whose only incidents this period were promoted
+// into "Top 3 Incidents This Week" above. Without this the section would render
+// the empty-location fallback, which would falsely claim no fresh reporting for
+// a location that in fact had a headline incident.
+export const PNG_FEATURED_ABOVE_NOTE =
+  "The most significant incidents for this location this period appear under Top 3 Incidents This Week above; no additional reporting was identified for this location during the reporting period.";
+
 // ---------------------------------------------------------------------------
 // Theatre configuration
 // ---------------------------------------------------------------------------
@@ -216,6 +223,10 @@ export interface StructuredLocationBucket {
   key: string;
   label: string;
   items: PngReportItem[];
+  // True when this location had incident(s) this period but all were promoted
+  // into Top 3 above, so the section shows a "featured above" note rather than a
+  // false "no fresh reporting" fallback.
+  hadFeatured: boolean;
 }
 
 export interface PngReportDataset {
@@ -224,8 +235,12 @@ export interface PngReportDataset {
   topThree: PngReportItem[];
   buckets: StructuredLocationBucket[];
   otherNational: PngReportItem[];
+  // True when the "Other" catch-all had incident(s) this period but all were
+  // promoted into Top 3 above (see StructuredLocationBucket.hadFeatured).
+  otherNationalHadFeatured: boolean;
   otherBucketLabel: string;
   emptyLocationFallback: string;
+  featuredAboveNote: string;
   businessImpactEmptyNote: string;
   businessImpact: string[];
   outlook: string;
@@ -350,25 +365,35 @@ function buildStructuredReportDataset(
   const { windowIncidents, thirtyDay, ninetyDay, baselineWatchlist, periodLabel } = args;
   const windowItems = dedupeByTitle(windowIncidents.map(toItem));
 
+  // Headline highlights: the three most significant incidents this period.
+  // They get their own "Top 3" section, so they are EXCLUDED from the location
+  // buckets below — otherwise the same incident is reported twice (once in
+  // Top 3, again in its regional section). The regional sections therefore show
+  // the REMAINDER. Aggregate sections (Executive Summary, Business Impact,
+  // Outlook, diagnostics) still draw on the full windowItems set.
+  const topThree = [...windowItems].sort(sortBySeverityThenRecency).slice(0, 3);
+  const topThreeIds = new Set(topThree.map((it) => it.id));
+  const bucketableItems = windowItems.filter((it) => !topThreeIds.has(it.id));
+
   // Location buckets from the theatre config; each bucket owns one or more
   // provinces (no overlap). "Other" captures everything not in any bucket.
   const bucketProvinces = new Set<string>();
   for (const b of config.buckets) for (const p of b.provinces) bucketProvinces.add(p);
   const buckets: StructuredLocationBucket[] = config.buckets.map((b) => {
     const provSet = new Set(b.provinces);
+    const inBucket = (it: PngReportItem) => it.province != null && provSet.has(it.province);
     return {
       key: b.key,
       label: b.label,
-      items: windowItems
-        .filter((it) => it.province != null && provSet.has(it.province))
-        .sort(sortBySeverityThenRecency),
+      items: bucketableItems.filter(inBucket).sort(sortBySeverityThenRecency),
+      hadFeatured: windowItems.some((it) => topThreeIds.has(it.id) && inBucket(it)),
     };
   });
-  const otherNational = windowItems
-    .filter((it) => !it.province || !bucketProvinces.has(it.province))
-    .sort(sortBySeverityThenRecency);
-
-  const topThree = [...windowItems].sort(sortBySeverityThenRecency).slice(0, 3);
+  const inOther = (it: PngReportItem) => !it.province || !bucketProvinces.has(it.province);
+  const otherNational = bucketableItems.filter(inOther).sort(sortBySeverityThenRecency);
+  const otherNationalHadFeatured = windowItems.some(
+    (it) => topThreeIds.has(it.id) && inOther(it),
+  );
 
   // --- Executive summary (deterministic, event-led, no parenthetical counts) -
   let executiveSummary: string;
@@ -467,8 +492,10 @@ function buildStructuredReportDataset(
     topThree,
     buckets,
     otherNational,
+    otherNationalHadFeatured,
     otherBucketLabel: config.otherBucketLabel,
     emptyLocationFallback: config.emptyLocationFallback,
+    featuredAboveNote: PNG_FEATURED_ABOVE_NOTE,
     businessImpactEmptyNote: config.businessImpactEmptyNote,
     businessImpact,
     outlook,
