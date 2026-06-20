@@ -26,7 +26,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated.
-export const PROSE_PROMPT_VERSION = "v4";
+export const PROSE_PROMPT_VERSION = "v5";
 
 // The model only ever sees this many incidents, and the cache fingerprint hashes
 // exactly the same capped set — so the cache key and the prompt input can never
@@ -178,6 +178,7 @@ WRITING RULES:
 - Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the brief.
 - Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
 - Write concrete, information-dense sentences. Name the actual places, actors and event types from the incidents. No filler ("the pattern is clear enough to act on"), no hedging boilerplate, no generic risk-management truisms.
+- Write impersonally about the country and its risk trajectory. NEVER address, name or label the reader or audience. Do not use words such as "corporate operators", "operators", "clients", "companies", "businesses", "organisations" or "the reader", and never write "[anyone] should expect ..." or "in the coming period, [audience] should expect ...". State what is likely to happen and where pressure is likely — not what a reader should expect. (The imperative actions are the only place for direct advice, and even there name the action, not the audience.)
 - Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
@@ -221,6 +222,7 @@ WRITING RULES:
 - Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the brief.
 - Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
 - Write concrete, information-dense sentences. Name the actual provinces, actors and event types from the incidents. No filler, no hedging boilerplate, no generic risk-management truisms.
+- Write impersonally about the country and its risk trajectory. NEVER address, name or label the reader or audience. Do not use words such as "corporate operators", "operators", "clients", "companies", "businesses", "organisations" or "the reader", and never write "[anyone] should expect ..." or "in the coming period, [audience] should expect ...". State what is likely to happen and where pressure is likely — not what a reader should expect.
 - Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
