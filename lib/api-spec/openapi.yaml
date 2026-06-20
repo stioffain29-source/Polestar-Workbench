@@ -122,6 +122,39 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/MaritimeMovement" }
 
+  /maritime-movement/vessels:
+    get:
+      operationId: listMaritimeVessels
+      tags: [maritime-movement]
+      summary: >-
+        Individual live vessel POSITIONS (last AIS sighting per MMSI) for the
+        interactive map. Context only — never incidents. Each row is a vessel's
+        most recent transmitted position inside a tracked chokepoint. An empty
+        list means no live position data is available.
+      parameters:
+        - name: theatre
+          in: query
+          description: Limit to one theatre (exact match), e.g. "Singapore Strait"
+          schema: { type: string }
+        - name: maxAgeHours
+          in: query
+          description: >-
+            Only return vessels last seen within this many hours (1-168, default
+            24). Older sightings are stale positions and excluded.
+          schema: { type: integer, minimum: 1, maximum: 168 }
+        - name: limit
+          in: query
+          description: Max number of vessels to return (1-2000, default 1000)
+          schema: { type: integer, minimum: 1, maximum: 2000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaritimeVessel" }
+
   /liveuamap/events:
     get:
       operationId: listLiveuamapEvents
@@ -2310,6 +2343,29 @@ components:
         sourceName: { type: string, minLength: 1 }
         sourceUrl: { type: ["string", "null"] }
         rawPayload: {}
+
+    MaritimeVessel:
+      type: object
+      description: >-
+        One vessel's most recent live AIS position inside a tracked chokepoint,
+        for the interactive map. CONTEXT only — a position is never an incident
+        and never inflates any incident count. `vesselClass` is derived from the
+        AIS ship-type code: tanker (80-89), cargo (70-89 not tanker) or other.
+      required: [mmsi, theatre, latitude, longitude, lastSeenAt]
+      properties:
+        mmsi: { type: integer }
+        name: { type: ["string", "null"] }
+        theatre: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        courseOverGround: { type: ["number", "null"] }
+        speedOverGround: { type: ["number", "null"] }
+        navStatus: { type: ["integer", "null"] }
+        shipType: { type: ["integer", "null"] }
+        vesselClass:
+          type: string
+          enum: [tanker, cargo, other]
+        lastSeenAt: { type: string, format: date-time }
 
     ReliefWebReport:
       type: object

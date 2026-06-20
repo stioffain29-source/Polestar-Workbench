@@ -393,6 +393,11 @@ interface VesselObs {
   cog: number | null;
   sog: number | null;
   navStatus: number | null;
+  /** Last reported position (decimal degrees) — drives the live vessel map. */
+  lat: number | null;
+  lon: number | null;
+  /** Vessel name from MetaData / ShipStaticData (may be absent in a frame). */
+  name: string | null;
 }
 
 interface CollectResult {
@@ -477,7 +482,12 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
           return;
         }
         const meta = obj.MetaData as
-          | { MMSI?: number; latitude?: number; longitude?: number }
+          | {
+              MMSI?: number;
+              latitude?: number;
+              longitude?: number;
+              ShipName?: string;
+            }
           | undefined;
         const mmsi = typeof meta?.MMSI === "number" ? meta.MMSI : null;
         if (mmsi === null) return;
@@ -486,6 +496,12 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
         const lat = typeof meta?.latitude === "number" ? meta.latitude : null;
         const lon = typeof meta?.longitude === "number" ? meta.longitude : null;
         const theatre = lat !== null && lon !== null ? assignTheatre(lat, lon) : null;
+        // Name can arrive on the MetaData of any frame; the static frame below
+        // may carry a cleaner one. Trim and treat blank as absent.
+        let name: string | null =
+          typeof meta?.ShipName === "string" && meta.ShipName.trim().length > 0
+            ? meta.ShipName.trim()
+            : null;
 
         let type: number | null = null;
         let imo: number | null = null;
@@ -494,12 +510,15 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
         let navStatus: number | null = null;
         if (obj.MessageType === "ShipStaticData") {
           const msg = obj.Message as
-            | { ShipStaticData?: { Type?: number; ImoNumber?: number } }
+            | { ShipStaticData?: { Type?: number; ImoNumber?: number; Name?: string } }
             | undefined;
           const t = msg?.ShipStaticData?.Type;
           if (typeof t === "number") type = t;
           const imoNum = msg?.ShipStaticData?.ImoNumber;
           if (typeof imoNum === "number" && imoNum > 0) imo = imoNum;
+          const staticName = msg?.ShipStaticData?.Name;
+          if (typeof staticName === "string" && staticName.trim().length > 0)
+            name = staticName.trim();
         } else if (obj.MessageType === "PositionReport") {
           const msg = obj.Message as
             | {
@@ -526,8 +545,12 @@ function collectAisStream(apiKey: string, collectMs: number): Promise<CollectRes
           if (cog !== null) existing.cog = cog;
           if (sog !== null) existing.sog = sog;
           if (navStatus !== null) existing.navStatus = navStatus;
+          // Keep the latest VALID position + the best-known name.
+          if (lat !== null) existing.lat = lat;
+          if (lon !== null) existing.lon = lon;
+          if (name !== null) existing.name = name;
         } else {
-          byMmsi.set(mmsi, { theatre, type, imo, cog, sog, navStatus });
+          byMmsi.set(mmsi, { theatre, type, imo, cog, sog, navStatus, lat, lon, name });
         }
       })();
     });
@@ -1001,6 +1024,11 @@ export async function runMaritimeMovementIngest(
         lastSeenAt: observedAt,
         lastSog: obs.sog,
         lastNavStatus: obs.navStatus,
+        latitude: obs.lat,
+        longitude: obs.lon,
+        lastCog: obs.cog,
+        name: obs.name,
+        shipType: obs.type,
         updatedAt: observedAt,
       });
     }
@@ -1019,6 +1047,13 @@ export async function runMaritimeMovementIngest(
               // not erased to NULL.
               lastSog: sql`COALESCE(excluded.last_sog, ${maritimeVesselSightingTable.lastSog})`,
               lastNavStatus: sql`COALESCE(excluded.last_nav_status, ${maritimeVesselSightingTable.lastNavStatus})`,
+              // Latest VALID position wins; name/ship-type carried over from a
+              // static frame are preserved when this frame lacked them.
+              latitude: sql`COALESCE(excluded.latitude, ${maritimeVesselSightingTable.latitude})`,
+              longitude: sql`COALESCE(excluded.longitude, ${maritimeVesselSightingTable.longitude})`,
+              lastCog: sql`COALESCE(excluded.last_cog, ${maritimeVesselSightingTable.lastCog})`,
+              name: sql`COALESCE(excluded.name, ${maritimeVesselSightingTable.name})`,
+              shipType: sql`COALESCE(excluded.ship_type, ${maritimeVesselSightingTable.shipType})`,
               updatedAt: sql`excluded.updated_at`,
             },
           });

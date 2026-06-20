@@ -33,6 +33,7 @@ import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import VesselMap from "@/components/VesselMap";
 import {
   buildMaritimeIntelligence,
   formatMovementSummary,
@@ -1907,6 +1908,14 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
 
       {/* Confirmed incidents table */}
       <ConfirmedIncidentsTable rows={confirmedIncidents} />
+
+      {/* Live vessel map — individual AIS positions in the tracked chokepoints */}
+      <MaritimeBoardCard label="Live Vessel Map — AIS Positions (Middle East & Asia-Pacific)">
+        <p className="text-[11px] text-muted-foreground font-sans leading-snug mb-3">
+          Individual vessels at their most recent transmitted position inside the tracked chokepoints. Positions are live AIS CONTEXT — they never count as incidents and never raise the risk level on their own.
+        </p>
+        <VesselMap />
+      </MaritimeBoardCard>
 
       {/* Maritime context panel — movement / AIS only */}
       <MaritimeBoardCard label="Maritime Context — Vessel Movement (AIS)">

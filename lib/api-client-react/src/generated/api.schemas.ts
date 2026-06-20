@@ -1246,6 +1246,37 @@ export interface MaritimeMovementInput {
   rawPayload?: unknown;
 }
 
+export type MaritimeVesselVesselClass = typeof MaritimeVesselVesselClass[keyof typeof MaritimeVesselVesselClass];
+
+
+export const MaritimeVesselVesselClass = {
+  tanker: 'tanker',
+  cargo: 'cargo',
+  other: 'other',
+} as const;
+
+/**
+ * One vessel's most recent live AIS position inside a tracked chokepoint, for the interactive map. CONTEXT only — a position is never an incident and never inflates any incident count. `vesselClass` is derived from the AIS ship-type code: tanker (80-89), cargo (70-89 not tanker) or other.
+ */
+export interface MaritimeVessel {
+  mmsi: number;
+  /** @nullable */
+  name?: string | null;
+  theatre: string;
+  latitude: number;
+  longitude: number;
+  /** @nullable */
+  courseOverGround?: number | null;
+  /** @nullable */
+  speedOverGround?: number | null;
+  /** @nullable */
+  navStatus?: number | null;
+  /** @nullable */
+  shipType?: number | null;
+  vesselClass?: MaritimeVesselVesselClass;
+  lastSeenAt: string;
+}
+
 /**
  * A UN OCHA ReliefWeb situational / humanitarian report stored as supporting CONTEXT for a monitored APAC country. NOT an incident: these rows live in their own table and never feed any incident count.
  */
@@ -1439,6 +1470,25 @@ theatre?: string;
  * Max number of most-recent snapshots to return (1-200)
  * @minimum 1
  * @maximum 200
+ */
+limit?: number;
+};
+
+export type ListMaritimeVesselsParams = {
+/**
+ * Limit to one theatre (exact match), e.g. "Singapore Strait"
+ */
+theatre?: string;
+/**
+ * Only return vessels last seen within this many hours (1-168, default 24). Older sightings are stale positions and excluded.
+ * @minimum 1
+ * @maximum 168
+ */
+maxAgeHours?: number;
+/**
+ * Max number of vessels to return (1-2000, default 1000)
+ * @minimum 1
+ * @maximum 2000
  */
 limit?: number;
 };

@@ -28,6 +28,21 @@ export const maritimeVesselSightingTable = pgTable("maritime_vessel_sighting", {
   lastSog: real("last_sog"),
   /** Last AIS navigational status code (1 = at anchor, 5 = moored, etc.). */
   lastNavStatus: integer("last_nav_status"),
+  // Last known POSITION + identity for the live vessel map. All nullable and
+  // additive: a sighting captured before these columns existed, or a sample
+  // that carried no position/static frame, simply leaves them NULL — the map
+  // plots only rows with a real latitude+longitude. These never feed an
+  // incident count; movement remains CONTEXT only.
+  /** Last reported latitude (decimal degrees) inside the theatre. */
+  latitude: real("latitude"),
+  /** Last reported longitude (decimal degrees) inside the theatre. */
+  longitude: real("longitude"),
+  /** Last valid course-over-ground (degrees), for the heading arrow. */
+  lastCog: real("last_cog"),
+  /** Vessel name from the AIS static frame (may be absent in a sample). */
+  name: text("name"),
+  /** AIS ship-type code (70-79 cargo, 80-89 tanker, etc.); null when unseen. */
+  shipType: integer("ship_type"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

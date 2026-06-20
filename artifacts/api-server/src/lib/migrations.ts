@@ -360,6 +360,25 @@ export async function runDataMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS maritime_vessel_sighting_theatre_seen_idx
         ON maritime_vessel_sighting (theatre, last_seen_at DESC)
     `);
+    // Additive: last-known POSITION + identity for the live vessel map. The base
+    // table predates these columns, so the prod primary gains them here on boot
+    // (drizzle push only reaches dev). All nullable — a row with no latitude is
+    // simply not plotted. Movement stays CONTEXT only; these never feed a count.
+    await db.execute(
+      sql`ALTER TABLE maritime_vessel_sighting ADD COLUMN IF NOT EXISTS latitude real`,
+    );
+    await db.execute(
+      sql`ALTER TABLE maritime_vessel_sighting ADD COLUMN IF NOT EXISTS longitude real`,
+    );
+    await db.execute(
+      sql`ALTER TABLE maritime_vessel_sighting ADD COLUMN IF NOT EXISTS last_cog real`,
+    );
+    await db.execute(
+      sql`ALTER TABLE maritime_vessel_sighting ADD COLUMN IF NOT EXISTS name text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE maritime_vessel_sighting ADD COLUMN IF NOT EXISTS ship_type integer`,
+    );
 
     // Schema: ReliefWeb (UN OCHA) situational/context reports. A SEPARATE table
     // from incident_corroborations — it stores ReliefWeb reports as standalone

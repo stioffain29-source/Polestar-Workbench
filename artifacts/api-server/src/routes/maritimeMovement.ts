@@ -1,11 +1,21 @@
 import { Router, type IRouter } from "express";
-import { db, maritimeMovementTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { db, maritimeMovementTable, maritimeVesselSightingTable } from "@workspace/db";
+import { and, desc, eq, gte, isNotNull } from "drizzle-orm";
 import {
   CreateMaritimeMovementBody,
   ListMaritimeMovementQueryParams,
+  ListMaritimeVesselsQueryParams,
 } from "@workspace/api-zod";
 import { requireAdminToken } from "../lib/adminAuth.js";
+
+// Derive the map's coarse vessel class from the AIS ship-type code. AIS encodes
+// 80-89 = tanker and 70-79 = cargo; everything else (passenger, fishing, tug,
+// service, unknown) is "other". This is the SAME split the colour legend uses.
+function vesselClassFor(shipType: number | null): "tanker" | "cargo" | "other" {
+  if (shipType !== null && shipType >= 80 && shipType <= 89) return "tanker";
+  if (shipType !== null && shipType >= 70 && shipType <= 79) return "cargo";
+  return "other";
+}
 
 // Maritime vessel-MOVEMENT context (AIS-derived traffic snapshots).
 //
@@ -70,6 +80,46 @@ router.get("/maritime-movement/latest", async (_req, res): Promise<void> => {
     .from(maritimeMovementTable)
     .orderBy(maritimeMovementTable.theatre, desc(maritimeMovementTable.dataAsOf));
   res.json(rows);
+});
+
+// Individual live vessel POSITIONS for the interactive map: the most recent AIS
+// sighting per MMSI, filtered to rows that carry a real lat/lon and are recent
+// enough to plot. CONTEXT only — a position is never an incident.
+router.get("/maritime-movement/vessels", async (req, res): Promise<void> => {
+  const parsed = ListMaritimeVesselsQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { theatre, maxAgeHours, limit } = parsed.data;
+  const cutoff = new Date(Date.now() - (maxAgeHours ?? 24) * 3_600_000);
+  const rows = await db
+    .select({
+      mmsi: maritimeVesselSightingTable.mmsi,
+      name: maritimeVesselSightingTable.name,
+      theatre: maritimeVesselSightingTable.theatre,
+      latitude: maritimeVesselSightingTable.latitude,
+      longitude: maritimeVesselSightingTable.longitude,
+      courseOverGround: maritimeVesselSightingTable.lastCog,
+      speedOverGround: maritimeVesselSightingTable.lastSog,
+      navStatus: maritimeVesselSightingTable.lastNavStatus,
+      shipType: maritimeVesselSightingTable.shipType,
+      lastSeenAt: maritimeVesselSightingTable.lastSeenAt,
+    })
+    .from(maritimeVesselSightingTable)
+    .where(
+      and(
+        isNotNull(maritimeVesselSightingTable.latitude),
+        isNotNull(maritimeVesselSightingTable.longitude),
+        gte(maritimeVesselSightingTable.lastSeenAt, cutoff),
+        theatre ? eq(maritimeVesselSightingTable.theatre, theatre) : undefined,
+      ),
+    )
+    .orderBy(desc(maritimeVesselSightingTable.lastSeenAt))
+    .limit(limit ?? 1000);
+  res.json(
+    rows.map((r) => ({ ...r, vesselClass: vesselClassFor(r.shipType) })),
+  );
 });
 
 router.post(

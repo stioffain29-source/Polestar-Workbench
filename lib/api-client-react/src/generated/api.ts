@@ -51,6 +51,7 @@ import type {
   ListLiveuamapEventsParams,
   ListMaritimeMovementParams,
   ListMaritimeSecurityEventsParams,
+  ListMaritimeVesselsParams,
   ListMarketPricesParams,
   ListReliefWebReportsParams,
   ListReportsParams,
@@ -61,6 +62,7 @@ import type {
   MaritimeMovement,
   MaritimeMovementInput,
   MaritimeSecurityEvent,
+  MaritimeVessel,
   MarketPrice,
   ReliefWebReport,
   Report,
@@ -552,6 +554,90 @@ export function useListLatestMaritimeMovement<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListLatestMaritimeMovementQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMaritimeVesselsUrl = (params?: ListMaritimeVesselsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/maritime-movement/vessels?${stringifiedParams}` : `/api/maritime-movement/vessels`
+}
+
+/**
+ * @summary Individual live vessel POSITIONS (last AIS sighting per MMSI) for the interactive map. Context only — never incidents. Each row is a vessel's most recent transmitted position inside a tracked chokepoint. An empty list means no live position data is available.
+ */
+export const listMaritimeVessels = async (params?: ListMaritimeVesselsParams, options?: RequestInit): Promise<MaritimeVessel[]> => {
+
+  return customFetch<MaritimeVessel[]>(getListMaritimeVesselsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMaritimeVesselsQueryKey = (params?: ListMaritimeVesselsParams,) => {
+    return [
+    `/api/maritime-movement/vessels`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMaritimeVesselsQueryOptions = <TData = Awaited<ReturnType<typeof listMaritimeVessels>>, TError = ErrorType<unknown>>(params?: ListMaritimeVesselsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMaritimeVessels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMaritimeVesselsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMaritimeVessels>>> = ({ signal }) => listMaritimeVessels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMaritimeVessels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMaritimeVesselsQueryResult = NonNullable<Awaited<ReturnType<typeof listMaritimeVessels>>>
+export type ListMaritimeVesselsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Individual live vessel POSITIONS (last AIS sighting per MMSI) for the interactive map. Context only — never incidents. Each row is a vessel's most recent transmitted position inside a tracked chokepoint. An empty list means no live position data is available.
+ */
+
+export function useListMaritimeVessels<TData = Awaited<ReturnType<typeof listMaritimeVessels>>, TError = ErrorType<unknown>>(
+ params?: ListMaritimeVesselsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMaritimeVessels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMaritimeVesselsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

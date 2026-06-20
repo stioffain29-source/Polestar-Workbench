@@ -384,6 +384,37 @@ export const ListLatestMaritimeMovementResponse = zod.array(ListLatestMaritimeMo
 
 
 /**
+ * @summary Individual live vessel POSITIONS (last AIS sighting per MMSI) for the interactive map. Context only — never incidents. Each row is a vessel's most recent transmitted position inside a tracked chokepoint. An empty list means no live position data is available.
+ */
+export const listMaritimeVesselsQueryMaxAgeHoursMax = 168;
+
+export const listMaritimeVesselsQueryLimitMax = 2000;
+
+
+
+export const ListMaritimeVesselsQueryParams = zod.object({
+  "theatre": zod.coerce.string().optional().describe('Limit to one theatre (exact match), e.g. \"Singapore Strait\"'),
+  "maxAgeHours": zod.coerce.number().min(1).max(listMaritimeVesselsQueryMaxAgeHoursMax).optional().describe('Only return vessels last seen within this many hours (1-168, default 24). Older sightings are stale positions and excluded.'),
+  "limit": zod.coerce.number().min(1).max(listMaritimeVesselsQueryLimitMax).optional().describe('Max number of vessels to return (1-2000, default 1000)')
+})
+
+export const ListMaritimeVesselsResponseItem = zod.object({
+  "mmsi": zod.number(),
+  "name": zod.string().nullish(),
+  "theatre": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "courseOverGround": zod.number().nullish(),
+  "speedOverGround": zod.number().nullish(),
+  "navStatus": zod.number().nullish(),
+  "shipType": zod.number().nullish(),
+  "vesselClass": zod.enum(['tanker', 'cargo', 'other']).optional(),
+  "lastSeenAt": zod.coerce.date()
+}).describe('One vessel\'s most recent live AIS position inside a tracked chokepoint, for the interactive map. CONTEXT only — a position is never an incident and never inflates any incident count. `vesselClass` is derived from the AIS ship-type code: tanker (80-89), cargo (70-89 not tanker) or other.')
+export const ListMaritimeVesselsResponse = zod.array(ListMaritimeVesselsResponseItem)
+
+
+/**
  * @summary Live conflict-event points from Liveuamap for a region (cached server-side proxy)
  */
 export const listLiveuamapEventsQueryCountMax = 100;
