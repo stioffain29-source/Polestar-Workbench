@@ -55,6 +55,7 @@ import type {
   ListMarketPricesParams,
   ListReliefWebReportsParams,
   ListReportsParams,
+  ListSocialRawItemsParams,
   ListSocialWatchItemsParams,
   ListSourcesParams,
   ListSpotReportsParams,
@@ -70,6 +71,7 @@ import type {
   ReportIncidentSummariesResult,
   ReportInput,
   ReportUpdate,
+  SocialRawItem,
   SocialWatchItem,
   Source,
   SourceHealth,
@@ -972,6 +974,160 @@ export const usePromoteSocialWatchItem = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPromoteSocialWatchItemMutationOptions(options));
+    }
+
+export const getListSocialRawItemsUrl = (params?: ListSocialRawItemsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social-raw?${stringifiedParams}` : `/api/social-raw`
+}
+
+/**
+ * @summary Facebook OSINT monitoring items for the Papua New Guinea + Indonesian Papua theatres, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit, server-re-derived promote action.
+ */
+export const listSocialRawItems = async (params?: ListSocialRawItemsParams, options?: RequestInit): Promise<SocialRawItem[]> => {
+
+  return customFetch<SocialRawItem[]>(getListSocialRawItemsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSocialRawItemsQueryKey = (params?: ListSocialRawItemsParams,) => {
+    return [
+    `/api/social-raw`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSocialRawItemsQueryOptions = <TData = Awaited<ReturnType<typeof listSocialRawItems>>, TError = ErrorType<unknown>>(params?: ListSocialRawItemsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSocialRawItems>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSocialRawItemsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSocialRawItems>>> = ({ signal }) => listSocialRawItems(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSocialRawItems>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSocialRawItemsQueryResult = NonNullable<Awaited<ReturnType<typeof listSocialRawItems>>>
+export type ListSocialRawItemsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Facebook OSINT monitoring items for the Papua New Guinea + Indonesian Papua theatres, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit, server-re-derived promote action.
+ */
+
+export function useListSocialRawItems<TData = Awaited<ReturnType<typeof listSocialRawItems>>, TError = ErrorType<unknown>>(
+ params?: ListSocialRawItemsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSocialRawItems>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSocialRawItemsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPromoteSocialRawItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/social-raw/${id}/promote`
+}
+
+/**
+ * @summary Promote a security-relevant, credible Facebook OSINT item into an incident. The server RE-DERIVES eligibility from the stored row (never trusting a client claim): the item must be security-relevant AND credible (declared official/local-media page, a linked credible domain, or cross-feed corroboration), and must not duplicate an existing incident. Armed/violent-crime categories file under conflict; protest / policing / governance categories under flashpoint. The created incident links back to the source post.
+ */
+export const promoteSocialRawItem = async (id: number, options?: RequestInit): Promise<Incident> => {
+
+  return customFetch<Incident>(getPromoteSocialRawItemUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPromoteSocialRawItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof promoteSocialRawItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof promoteSocialRawItem>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['promoteSocialRawItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof promoteSocialRawItem>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  promoteSocialRawItem(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PromoteSocialRawItemMutationResult = NonNullable<Awaited<ReturnType<typeof promoteSocialRawItem>>>
+
+    export type PromoteSocialRawItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Promote a security-relevant, credible Facebook OSINT item into an incident. The server RE-DERIVES eligibility from the stored row (never trusting a client claim): the item must be security-relevant AND credible (declared official/local-media page, a linked credible domain, or cross-feed corroboration), and must not duplicate an existing incident. Armed/violent-crime categories file under conflict; protest / policing / governance categories under flashpoint. The created incident links back to the source post.
+ */
+export const usePromoteSocialRawItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof promoteSocialRawItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof promoteSocialRawItem>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPromoteSocialRawItemMutationOptions(options));
     }
 
 export const getListMaritimeSecurityEventsUrl = (params?: ListMaritimeSecurityEventsParams,) => {

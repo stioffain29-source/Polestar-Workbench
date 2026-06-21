@@ -489,6 +489,80 @@ export async function runDataMigrations(): Promise<void> {
         ON social_watch_items (posted_at)
     `);
 
+    // Schema: Facebook OSINT monitoring for the Papua New Guinea + Indonesian
+    // Papua theatres. A CONTEXT source modelled on social_watch_items — a
+    // Facebook post is NEVER an incident and lives in its OWN table precisely so
+    // it can never inflate any incident count. The ONLY path into `incidents` is
+    // the explicit, gated PROMOTE action, with the server re-deriving eligibility.
+    // PRIVACY: only public page posts; captions sanitised; comments / author
+    // profiles / phone / email / token-bearing URLs are never stored. drizzle
+    // push only reaches dev, so the prod primary gains the table here on boot.
+    // All idempotent (IF NOT EXISTS). Mirrors lib/db/src/schema/socialRaw.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS social_raw (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL DEFAULT 'facebook_osint',
+        platform text NOT NULL DEFAULT 'facebook',
+        page_handle text NOT NULL,
+        page_name text,
+        source_tier text NOT NULL DEFAULT 'osint',
+        external_id text NOT NULL,
+        posted_at timestamptz,
+        incident_date timestamptz,
+        caption text,
+        image_urls jsonb NOT NULL DEFAULT '[]'::jsonb,
+        links jsonb NOT NULL DEFAULT '[]'::jsonb,
+        detected_credible_domains jsonb NOT NULL DEFAULT '[]'::jsonb,
+        country text NOT NULL DEFAULT 'Unknown',
+        province text,
+        location text,
+        category text NOT NULL DEFAULT 'Other security',
+        business_impact text,
+        security_relevant boolean NOT NULL DEFAULT false,
+        credible boolean NOT NULL DEFAULT false,
+        credibility_reason text,
+        corroborated boolean NOT NULL DEFAULT false,
+        corroboration_reason text,
+        corroborating_incident_id integer,
+        promotion_topic text NOT NULL DEFAULT 'flashpoint',
+        url text NOT NULL,
+        classification text NOT NULL DEFAULT 'context',
+        dedup_key text NOT NULL,
+        raw_payload jsonb,
+        promotable boolean NOT NULL DEFAULT false,
+        promoted_incident_id integer,
+        promoted_at timestamptz,
+        last_checked_at timestamptz NOT NULL DEFAULT now(),
+        fetched_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS social_raw_dedup_unique
+        ON social_raw (dedup_key)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_external_idx
+        ON social_raw (source_name, external_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_country_idx
+        ON social_raw (country)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_category_idx
+        ON social_raw (category)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_promotable_idx
+        ON social_raw (promotable)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_posted_idx
+        ON social_raw (posted_at)
+    `);
+
     // Schema: ICC CCS / IMB maritime piracy & armed-robbery events. A STANDALONE
     // maritime-security source — SEPARATE from both the news-scraped `incidents`
     // table and the AIS `maritime_movement` context table — so it can NEVER

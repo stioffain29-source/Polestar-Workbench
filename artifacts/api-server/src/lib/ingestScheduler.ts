@@ -324,6 +324,37 @@ async function hoursSinceNewestSocialWatch(): Promise<number | null> {
 }
 
 /**
+ * True when the Facebook OSINT ingest is active — i.e. a key is present and the
+ * source is not switched off. Mirrors isFacebookOsintActive() in
+ * lib/ingest/src/facebookOsint.ts so the scheduler gates on the SAME condition
+ * the collector uses: when unconfigured the social_raw table is empty by design,
+ * so gating on its freshness would force a needless scrape on every cold start.
+ */
+function facebookOsintActive(): boolean {
+  const v = process.env["FACEBOOK_OSINT_ENABLED"]?.trim().toLowerCase();
+  const off = v === "false" || v === "0" || v === "off" || v === "no";
+  if (off) return false;
+  return (process.env["FACEBOOK_API_KEY"]?.trim().length ?? 0) > 0;
+}
+
+/**
+ * Hours since the newest stored Facebook OSINT item (or null when the table is
+ * empty). social_raw refreshes ONLY inside a full ingest (runIngestOnce →
+ * runFacebookOsintIngest), so — like strikes, the land topics, AIS movement and
+ * KAMMI social-watch — a stale-but-populated table should force a boot catch-up.
+ * Uses created_at (insertion heartbeat) so a quiet posting week does not look
+ * stale. Only considered when facebookOsintActive().
+ */
+async function hoursSinceNewestSocialRaw(): Promise<number | null> {
+  const res = await db.execute(
+    sql`SELECT MAX(created_at) AS last FROM social_raw`,
+  );
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
  * Operational SLA monitor for the live AIS ship-movement board. Emits a WARN
  * (an alert hook for log-based monitoring) when AIS is keyed+enabled but the
  * newest movement snapshot has aged past the MOVEMENT_FRESH_DAYS window, i.e.
@@ -690,6 +721,18 @@ export function startIngestScheduler(): void {
             : null;
           const socialWatchStale =
             socialActive && (socialWatchAge === null || socialWatchAge >= hours);
+          // Facebook OSINT (social_raw) also refreshes ONLY inside a full
+          // ingest. Same shape as KAMMI social-watch: a stale table is a reason
+          // to run, but ONLY when the source is active — otherwise the table is
+          // empty by design and gating on it would force a needless scrape on
+          // every cold start. An empty table while active IS a trigger (initial
+          // population).
+          const fbOsintActive = facebookOsintActive();
+          const socialRawAge = fbOsintActive
+            ? await hoursSinceNewestSocialRaw()
+            : null;
+          const socialRawStale =
+            fbOsintActive && (socialRawAge === null || socialRawAge >= hours);
           // A movement table already past the 14-day SLA at boot means the
           // refresh path fell behind (the catch-up below restores it, but the
           // breach itself is worth an alert in production).
@@ -713,7 +756,8 @@ export function startIngestScheduler(): void {
             strikesStale ||
             movementStale ||
             maritimeSecurityStale ||
-            socialWatchStale
+            socialWatchStale ||
+            socialRawStale
           ) {
             logger.info(
               {
@@ -740,6 +784,9 @@ export function startIngestScheduler(): void {
                 socialWatchAgeHours:
                   socialWatchAge === null ? null : Math.round(socialWatchAge),
                 socialWatchStale,
+                socialRawAgeHours:
+                  socialRawAge === null ? null : Math.round(socialRawAge),
+                socialRawStale,
               },
               "boot ingest: data stale, running catch-up",
             );

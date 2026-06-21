@@ -86,6 +86,45 @@ export type {
   RawSocialPost,
 } from "./socialWatch";
 export {
+  runFacebookOsintIngest,
+  emptyFacebookOsintSummary,
+  readFacebookOsintConfig,
+  isFacebookOsintActive,
+  classifyPost,
+  resolveScope,
+  normaliseFacebookPost,
+  sanitiseUrl,
+  makeFacebookDedupKey,
+  FACEBOOK_OSINT_HEALTH_NAME,
+} from "./facebookOsint";
+export type {
+  FacebookOsintSummary,
+  FacebookOsintConfig,
+  FbClassification,
+  RawFacebookPost,
+  ScopeResolution,
+} from "./facebookOsint";
+export {
+  deriveEligibility,
+  detectCredibleDomains,
+  extractHosts,
+  pickCorroboration,
+  pickDuplicate,
+  categoryToTopic,
+  normaliseSourceTier,
+  tokenize,
+  CREDIBLE_DOMAINS,
+} from "./facebookOsintEligibility";
+export type {
+  SourceTier,
+  CredibleDomainMatch,
+  IncidentCandidate,
+  IncidentMatch,
+  EligibilityInput,
+  Eligibility,
+  PostMatchInput,
+} from "./facebookOsintEligibility";
+export {
   runGdeltEnrich,
   isGdeltConfigured,
   isGdeltEnrichEnabled,

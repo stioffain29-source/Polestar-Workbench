@@ -1360,6 +1360,56 @@ export interface SocialWatchItem {
 }
 
 /**
+ * A Facebook OSINT monitoring item (Papua New Guinea / Indonesian Papua) stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which the server re-derives and which sets promotedIncidentId. The stored payload is minimised/redacted (no comments, author profiles, PII, or token-bearing URLs).
+ */
+export interface SocialRawItem {
+  id: number;
+  sourceName?: string;
+  platform: string;
+  pageHandle: string;
+  /** @nullable */
+  pageName?: string | null;
+  sourceTier: string;
+  externalId: string;
+  /** @nullable */
+  postedAt?: string | null;
+  /** @nullable */
+  incidentDate?: string | null;
+  /** @nullable */
+  caption?: string | null;
+  imageUrls?: string[];
+  links?: string[];
+  detectedCredibleDomains?: string[];
+  country: string;
+  /** @nullable */
+  province?: string | null;
+  /** @nullable */
+  location?: string | null;
+  category: string;
+  /** @nullable */
+  businessImpact?: string | null;
+  securityRelevant: boolean;
+  credible: boolean;
+  /** @nullable */
+  credibilityReason?: string | null;
+  corroborated: boolean;
+  /** @nullable */
+  corroborationReason?: string | null;
+  /** @nullable */
+  corroboratingIncidentId?: number | null;
+  promotionTopic: string;
+  url: string;
+  classification: string;
+  promotable: boolean;
+  /** @nullable */
+  promotedIncidentId?: number | null;
+  /** @nullable */
+  promotedAt?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+/**
  * An ICC CCS / IMB Piracy Reporting Centre maritime piracy or armed-robbery-at-sea event for the current calendar year, stored as a STANDALONE maritime-security source. NOT an incident: these rows live in their own table and never feed any incident count.
  */
 export interface MaritimeSecurityEvent {
@@ -1603,6 +1653,31 @@ export const ListSocialWatchItemsPlatform = {
   instagram: 'instagram',
   telegram: 'telegram',
 } as const;
+
+export type ListSocialRawItemsParams = {
+/**
+ * Filter to one theatre (Papua New Guinea | Indonesia)
+ */
+country?: string;
+/**
+ * Filter to one security category
+ */
+category?: string;
+/**
+ * Limit to items eligible for promotion to an incident
+ */
+promotable?: boolean;
+/**
+ * Filter by whether the item has already been promoted
+ */
+promoted?: boolean;
+/**
+ * Max number of most-recent items to return (1-200)
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+};
 
 export type ListMaritimeSecurityEventsParams = {
 /**

@@ -261,6 +261,76 @@ paths:
         "409":
           description: Item not promotable, or already promoted
 
+  /social-raw:
+    get:
+      operationId: listSocialRawItems
+      tags: [social-raw]
+      summary: >-
+        Facebook OSINT monitoring items for the Papua New Guinea + Indonesian
+        Papua theatres, stored as supporting CONTEXT (never as incidents, so they
+        never inflate any count). The only path into incidents is the explicit,
+        server-re-derived promote action.
+      parameters:
+        - name: country
+          in: query
+          description: Filter to one theatre (Papua New Guinea | Indonesia)
+          schema: { type: string }
+        - name: category
+          in: query
+          description: Filter to one security category
+          schema: { type: string }
+        - name: promotable
+          in: query
+          description: Limit to items eligible for promotion to an incident
+          schema: { type: boolean }
+        - name: promoted
+          in: query
+          description: Filter by whether the item has already been promoted
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          description: Max number of most-recent items to return (1-200)
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SocialRawItem" }
+
+  /social-raw/{id}/promote:
+    post:
+      operationId: promoteSocialRawItem
+      tags: [social-raw]
+      summary: >-
+        Promote a security-relevant, credible Facebook OSINT item into an
+        incident. The server RE-DERIVES eligibility from the stored row (never
+        trusting a client claim): the item must be security-relevant AND credible
+        (declared official/local-media page, a linked credible domain, or
+        cross-feed corroboration), and must not duplicate an existing incident.
+        Armed/violent-crime categories file under conflict; protest / policing /
+        governance categories under flashpoint. The created incident links back to
+        the source post.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Created — the new incident
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incident" }
+        "404":
+          description: Item not found
+        "409":
+          description: >-
+            Item not promotable (not security-relevant / not credible), already
+            promoted, or duplicates an existing incident
+
   /maritime-security-events:
     get:
       operationId: listMaritimeSecurityEvents
@@ -2499,6 +2569,71 @@ components:
         promotedIncidentId: { type: ["integer", "null"] }
         promotedAt: { type: ["string", "null"], format: date-time }
         postedAtDisplay: { type: ["string", "null"] }
+
+    SocialRawItem:
+      type: object
+      description: >-
+        A Facebook OSINT monitoring item (Papua New Guinea / Indonesian Papua)
+        stored as supporting CONTEXT. NOT an incident: these rows live in their
+        own table and never feed any incident count. The only path into incidents
+        is the explicit promote action, which the server re-derives and which sets
+        promotedIncidentId. The stored payload is minimised/redacted (no comments,
+        author profiles, PII, or token-bearing URLs).
+      required:
+        [
+          id,
+          platform,
+          pageHandle,
+          sourceTier,
+          externalId,
+          country,
+          category,
+          securityRelevant,
+          credible,
+          corroborated,
+          promotionTopic,
+          url,
+          classification,
+          promotable,
+        ]
+      properties:
+        id: { type: integer }
+        sourceName: { type: string }
+        platform: { type: string }
+        pageHandle: { type: string }
+        pageName: { type: ["string", "null"] }
+        sourceTier: { type: string }
+        externalId: { type: string }
+        postedAt: { type: ["string", "null"], format: date-time }
+        incidentDate: { type: ["string", "null"], format: date-time }
+        caption: { type: ["string", "null"] }
+        imageUrls:
+          type: array
+          items: { type: string }
+        links:
+          type: array
+          items: { type: string }
+        detectedCredibleDomains:
+          type: array
+          items: { type: string }
+        country: { type: string }
+        province: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        category: { type: string }
+        businessImpact: { type: ["string", "null"] }
+        securityRelevant: { type: boolean }
+        credible: { type: boolean }
+        credibilityReason: { type: ["string", "null"] }
+        corroborated: { type: boolean }
+        corroborationReason: { type: ["string", "null"] }
+        corroboratingIncidentId: { type: ["integer", "null"] }
+        promotionTopic: { type: string }
+        url: { type: string }
+        classification: { type: string }
+        promotable: { type: boolean }
+        promotedIncidentId: { type: ["integer", "null"] }
+        promotedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: ["string", "null"], format: date-time }
 
     MaritimeSecurityEvent:
       type: object

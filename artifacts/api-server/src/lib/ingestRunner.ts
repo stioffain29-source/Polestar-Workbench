@@ -18,6 +18,8 @@ import {
   runIccPiracyIngest,
   runSocialWatchIngest,
   emptySocialWatchSummary,
+  runFacebookOsintIngest,
+  emptyFacebookOsintSummary,
   runGdeltEnrich,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
@@ -30,6 +32,7 @@ import {
   type ReliefWebReportsSummary,
   type IccPiracySummary,
   type SocialWatchSummary,
+  type FacebookOsintSummary,
   type GdeltEnrichSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -71,6 +74,7 @@ export type IngestRunResult =
       reliefwebReports: ReliefWebReportsSummary;
       iccPiracy: IccPiracySummary;
       socialWatch: SocialWatchSummary;
+      facebookOsint: FacebookOsintSummary;
       gdeltEnrich: GdeltEnrichSummary;
     }
   | { ran: false; reason: "locked" };
@@ -288,6 +292,19 @@ function emptySocialWatch(err: unknown): SocialWatchSummary {
     mode: "commit",
     errors: [msg],
     logLines: [`social-watch ingest failed: ${msg}`],
+  };
+}
+
+function emptyFacebookOsint(err: unknown): FacebookOsintSummary {
+  const base = emptyFacebookOsintSummary();
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    mode: "commit",
+    fetchOk: false,
+    error: msg,
+    errors: [msg],
+    logLines: [`facebook-osint ingest failed: ${msg}`],
   };
 }
 
@@ -666,6 +683,30 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "KAMMI social-watch pass failed");
       socialWatch = emptySocialWatch(err);
     }
+    // Facebook OSINT (Papua/PNG). Writes ONLY the isolated social_raw store —
+    // CONTEXT ONLY, these rows are NEVER incidents and can never inflate any
+    // incident count (the only path into incidents is the explicit, gated,
+    // server-re-derived promote action). No-ops cleanly + reports
+    // "not_configured" when FACEBOOK_API_KEY is unset. Isolated in its own try
+    // so an Apify/network failure can never fail the wider ingest.
+    let facebookOsint: FacebookOsintSummary;
+    try {
+      facebookOsint = await runFacebookOsintIngest({ commit: true });
+      logger.info(
+        {
+          active: facebookOsint.active,
+          fetched: facebookOsint.fetched,
+          inScope: facebookOsint.inScope,
+          promotable: facebookOsint.promotable,
+          inserted: facebookOsint.inserted,
+          totalAfter: facebookOsint.totalAfter,
+        },
+        "Facebook OSINT (Papua/PNG) pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "Facebook OSINT (Papua/PNG) pass failed");
+      facebookOsint = emptyFacebookOsint(err);
+    }
     // GDELT precision enrichment. ADDITIVE — attaches structured ACLED-style
     // fields (precise sub-national geo, fatality counts, named actors, event
     // coding, AI confidence) onto EXISTING flashpoint rows; never replaces the
@@ -709,6 +750,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       reliefwebReports,
       iccPiracy,
       socialWatch,
+      facebookOsint,
       gdeltEnrich,
     };
   });

@@ -4,7 +4,11 @@ import {
   useListSocialWatchItems,
   usePromoteSocialWatchItem,
   getListSocialWatchItemsQueryKey,
+  useListSocialRawItems,
+  usePromoteSocialRawItem,
+  getListSocialRawItemsQueryKey,
   type SocialWatchItem,
+  type SocialRawItem,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
@@ -60,6 +64,13 @@ export default function Protests() {
   // lets an operator promote a confirmed-active item to a flashpoint incident.
   const { data: socialItems = [], isLoading: socialLoading } =
     useListSocialWatchItems({ limit: 60 });
+
+  // Facebook OSINT watch — Papua New Guinea + Indonesian Papua. ADDITIVE context
+  // only (own `social_raw` table; never feeds incident counts). The board lets an
+  // operator promote a security-relevant, credible post to a flashpoint OR
+  // conflict incident; the server re-derives eligibility and dedups on promote.
+  const { data: osintItems = [], isLoading: osintLoading } =
+    useListSocialRawItems({ limit: 100 });
 
   // Date-range window. Defaults to the widest option so the first load shows the
   // full record set; the analyst can narrow the whole dashboard from the header.
@@ -620,6 +631,11 @@ export default function Protests() {
       <Section title="KAMMI / Indonesia Social Watch">
         <SocialWatchPanel items={socialItems} isLoading={socialLoading} />
       </Section>
+
+      {/* Papua / PNG Facebook OSINT — additive context, never incidents */}
+      <Section title="Papua / PNG Facebook OSINT">
+        <FacebookOsintPanel items={osintItems} isLoading={osintLoading} />
+      </Section>
     </div>
   );
 }
@@ -852,6 +868,206 @@ function SocialWatchGroup({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// Source-tier badge for a Facebook OSINT page. Mirrors the brand five-tier
+// palette: official = Electric Blue, local media = Midnight, OSINT = Dusk Gray.
+const OSINT_TIER_COLOR: Record<string, string> = {
+  official: "#465bff",
+  local_media: "#0B0B3D",
+  osint: "#303030",
+};
+
+const OSINT_TIER_LABEL: Record<string, string> = {
+  official: "Official",
+  local_media: "Local media",
+  osint: "OSINT",
+};
+
+function OsintTierBadge({ tier }: { tier: string }) {
+  return (
+    <span
+      className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
+      style={{ backgroundColor: OSINT_TIER_COLOR[tier] ?? "#303030" }}
+    >
+      {OSINT_TIER_LABEL[tier] ?? tier}
+    </span>
+  );
+}
+
+function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLoading: boolean }) {
+  const promote = usePromoteSocialRawItem();
+  const queryClient = useQueryClient();
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const stats = useMemo(() => {
+    let securityRelevant = 0;
+    let promotable = 0;
+    let promoted = 0;
+    for (const it of items) {
+      if (it.securityRelevant) securityRelevant += 1;
+      if (it.promotable && it.promotedIncidentId == null) promotable += 1;
+      if (it.promotedIncidentId != null) promoted += 1;
+    }
+    return { securityRelevant, promotable, promoted };
+  }, [items]);
+
+  async function onPromote(id: number) {
+    setError(null);
+    setPendingId(id);
+    try {
+      await promote.mutateAsync({ id });
+      // The mutation does not auto-refetch the board, so the promoted row would
+      // otherwise keep showing a live "Promote" button. Invalidate every
+      // social-raw list query so the row flips to its back-linked
+      // "Incident #N" state.
+      await queryClient.invalidateQueries({
+        queryKey: getListSocialRawItemsQueryKey(),
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Promotion failed — the item may already be promoted, ineligible, or a duplicate of a tracked incident.",
+      );
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-white border border-border rounded-sm p-8 text-center text-sm text-muted-foreground">
+        Loading Facebook OSINT…
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground">
+        No Facebook OSINT posts collected yet. Collection requires a paid Apify scraper key; without it this pass is disabled. These posts are supporting context only — they are never counted as incidents. See Source Health for the live configuration state.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi label="Posts on file" value={items.length} accent="#465bff" small />
+        <Kpi label="Security-relevant" value={stats.securityRelevant} accent="#0B0B3D" small />
+        <Kpi label="Awaiting review" value={stats.promotable} accent="#A33232" small />
+        <Kpi label="Promoted" value={stats.promoted} accent="#303030" small />
+      </div>
+
+      <p className="text-[11px] text-muted-foreground font-sans leading-snug">
+        Public Facebook posts for Papua New Guinea and Indonesian Papua, monitored
+        as ADDITIVE context — never incidents, so they never affect any incident
+        count. Only a security-relevant, credible post can be promoted (to a
+        flashpoint or conflict incident), which links the new incident back to the
+        source post; the server re-derives eligibility and blocks duplicates of
+        already-tracked incidents. Captions are sanitised; no comments, author
+        profiles, or personal contact data are stored.
+      </p>
+
+      {error && (
+        <p className="text-[12px] font-sans" style={{ color: "#A33232" }}>
+          {error}
+        </p>
+      )}
+
+      <div className="bg-white border border-border rounded-sm overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="text-left p-2 font-sans font-medium w-[120px]">Source</th>
+              <th className="text-left p-2 font-sans font-medium w-[120px]">When</th>
+              <th className="text-left p-2 font-sans font-medium w-[140px]">Where</th>
+              <th className="text-left p-2 font-sans font-medium w-[130px]">Category</th>
+              <th className="text-left p-2 font-sans font-medium">Caption / eligibility</th>
+              <th className="text-left p-2 font-sans font-medium w-[60px]">Link</th>
+              <th className="text-left p-2 font-sans font-medium w-[150px]">Promote</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {items.map((it) => {
+              const when =
+                (it.incidentDate
+                  ? format(new Date(it.incidentDate), "dd MMM yyyy")
+                  : null) ||
+                (it.postedAt ? format(new Date(it.postedAt), "dd MMM yyyy") : null) ||
+                "—";
+              const where = it.location || it.province || it.country || "—";
+              const promoted = it.promotedIncidentId != null;
+              return (
+                <tr key={it.id} className="hover:bg-muted/30 align-top">
+                  <td className="p-2 whitespace-nowrap">
+                    <OsintTierBadge tier={it.sourceTier} />
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      {it.pageName || it.pageHandle}
+                    </span>
+                  </td>
+                  <td className="p-2 text-xs whitespace-nowrap">{when}</td>
+                  <td className="p-2 text-xs">{where}</td>
+                  <td className="p-2 text-xs">
+                    {it.category}
+                    {!it.securityRelevant && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        not security-relevant
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2 text-xs text-foreground/80">
+                    <span className="line-clamp-2">
+                      {it.caption || <span className="text-muted-foreground">—</span>}
+                    </span>
+                    {it.credibilityReason && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        {it.credibilityReason}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {it.url ? (
+                      <a
+                        href={it.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline inline-flex items-center gap-1 text-xs"
+                        aria-label="Open post"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="p-2 text-xs">
+                    {promoted ? (
+                      <span className="text-muted-foreground">Incident #{it.promotedIncidentId}</span>
+                    ) : it.promotable ? (
+                      <button
+                        type="button"
+                        onClick={() => onPromote(it.id)}
+                        disabled={pendingId === it.id}
+                        className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
+                        style={{ backgroundColor: "#465bff" }}
+                      >
+                        {pendingId === it.id ? "Promoting…" : "Promote"}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">Not eligible</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

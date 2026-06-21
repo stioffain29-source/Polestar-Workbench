@@ -531,6 +531,65 @@ export const PromoteSocialWatchItemParams = zod.object({
 
 
 /**
+ * @summary Facebook OSINT monitoring items for the Papua New Guinea + Indonesian Papua theatres, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit, server-re-derived promote action.
+ */
+export const listSocialRawItemsQueryLimitMax = 200;
+
+
+
+export const ListSocialRawItemsQueryParams = zod.object({
+  "country": zod.coerce.string().optional().describe('Filter to one theatre (Papua New Guinea | Indonesia)'),
+  "category": zod.coerce.string().optional().describe('Filter to one security category'),
+  "promotable": zod.coerce.boolean().optional().describe('Limit to items eligible for promotion to an incident'),
+  "promoted": zod.coerce.boolean().optional().describe('Filter by whether the item has already been promoted'),
+  "limit": zod.coerce.number().min(1).max(listSocialRawItemsQueryLimitMax).optional().describe('Max number of most-recent items to return (1-200)')
+})
+
+export const ListSocialRawItemsResponseItem = zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string().optional(),
+  "platform": zod.string(),
+  "pageHandle": zod.string(),
+  "pageName": zod.string().nullish(),
+  "sourceTier": zod.string(),
+  "externalId": zod.string(),
+  "postedAt": zod.coerce.date().nullish(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "caption": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
+  "links": zod.array(zod.string()).optional(),
+  "detectedCredibleDomains": zod.array(zod.string()).optional(),
+  "country": zod.string(),
+  "province": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "category": zod.string(),
+  "businessImpact": zod.string().nullish(),
+  "securityRelevant": zod.boolean(),
+  "credible": zod.boolean(),
+  "credibilityReason": zod.string().nullish(),
+  "corroborated": zod.boolean(),
+  "corroborationReason": zod.string().nullish(),
+  "corroboratingIncidentId": zod.number().nullish(),
+  "promotionTopic": zod.string(),
+  "url": zod.string(),
+  "classification": zod.string(),
+  "promotable": zod.boolean(),
+  "promotedIncidentId": zod.number().nullish(),
+  "promotedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date().nullish()
+}).describe('A Facebook OSINT monitoring item (Papua New Guinea \/ Indonesian Papua) stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which the server re-derives and which sets promotedIncidentId. The stored payload is minimised\/redacted (no comments, author profiles, PII, or token-bearing URLs).')
+export const ListSocialRawItemsResponse = zod.array(ListSocialRawItemsResponseItem)
+
+
+/**
+ * @summary Promote a security-relevant, credible Facebook OSINT item into an incident. The server RE-DERIVES eligibility from the stored row (never trusting a client claim): the item must be security-relevant AND credible (declared official/local-media page, a linked credible domain, or cross-feed corroboration), and must not duplicate an existing incident. Armed/violent-crime categories file under conflict; protest / policing / governance categories under flashpoint. The created incident links back to the source post.
+ */
+export const PromoteSocialRawItemParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary ICC CCS / IMB Piracy Reporting Centre maritime piracy & armed-robbery events for the current calendar year, stored as a STANDALONE maritime-security source (never as incidents, so they never inflate any count).
  */
 export const listMaritimeSecurityEventsQueryLimitMax = 500;
