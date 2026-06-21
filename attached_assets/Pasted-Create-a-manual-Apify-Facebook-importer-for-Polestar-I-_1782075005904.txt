@@ -1,0 +1,75 @@
+Create a manual Apify Facebook importer for Polestar.
+
+I have already added APIFY_TOKEN in Replit Secrets.
+
+Build a script that imports one Apify dataset into Polestar.
+
+Script name:
+scripts/import-apify-facebook.ts
+
+It should run like this:
+pnpm tsx scripts/import-apify-facebook.ts --datasetId DATASET_ID_HERE
+
+The script must:
+1. Use APIFY_TOKEN from environment variables.
+2. Fetch all items from the Apify dataset.
+3. Save them into a new table called social_raw.
+4. Do not create incidents automatically.
+5. Do not change the existing incident ingest pipeline.
+6. Do not change reports or PDF export.
+
+social_raw fields:
+- id
+- platform
+- source_name
+- group_url
+- post_url
+- post_text
+- published_at
+- scraped_at
+- country
+- location_guess
+- matched_keywords
+- category_guess
+- confidence_score
+- review_status
+- raw_json
+- created_at
+- updated_at
+
+Map Apify fields like this:
+- group_url from facebookUrl or groupUrl
+- post_text from text or postText
+- post_url from url, postUrl, link or permalink
+- published_at from time, timestamp, date or createdAt
+- likes from likesCount if available
+- comments from commentsCount if available
+
+Set:
+platform = facebook
+review_status = pending_review
+
+Add keyword matching for PNG and Indonesian Papua.
+
+PNG keywords:
+raskol, rascal, robbery, armed robbery, holdup, hold up, carjacking, theft, stabbing, shooting, murder, assault, attack, ambush, kidnap, roadblock, road block, road closed, protest, riot, looting, burning, arson, tribal fight, tribal fighting, clan fight, payback, clash, fighting, police, curfew, PMV, Okuk Highway, Highlands Highway.
+
+Indonesian Papua keywords:
+penembakan, baku tembak, kontak tembak, serangan, penyerangan, penikaman, pembunuhan, korban, tewas, luka, bentrokan, kerusuhan, konflik, perang suku, pembakaran, dibakar, blokade, blokade jalan, jalan ditutup, demo, demonstrasi, aksi, unjuk rasa, sweeping, razia, penangkapan, aparat, polisi, TNI, Polri, Brimob, Satgas, KKB, OPM, TPNPB, TPN-PB, separatis, kelompok bersenjata, evakuasi, mengungsi, situasi mencekam.
+
+Add location matching for:
+Port Moresby, POM, NCD, Gerehu, Waigani, Boroko, Gordons, Erima, Koki, Hohola, 9 Mile, 6 Mile, Tokarara, Badili, Lae, Morobe, Mt Hagen, Mount Hagen, Wabag, Enga, Porgera, Mendi, Hela, Tari, Goroka, Madang, Kimbe, Kokopo, Alotau, Popondetta, Okuk Highway, Highlands Highway, Jayapura, Sentani, Wamena, Timika, Mimika, Nabire, Paniai, Dogiyai, Deiyai, Intan Jaya, Puncak, Nduga, Yahukimo, Pegunungan Bintang, Mappi, Boven Digoel, Merauke, Sorong, Manokwari, Biak, Sarmi.
+
+Deduplicate by:
+1. post_url if available
+2. otherwise same text, same date, same location guess
+
+Add a simple Social Review page showing:
+source_name, country, location_guess, category_guess, matched_keywords, published_at, post_text, post_url, confidence_score.
+
+Buttons:
+Ignore
+Keep as Context
+Promote to Incident
+
+Promotion to Incident must be manual only.

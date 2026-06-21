@@ -6,6 +6,7 @@ import {
   getListSocialWatchItemsQueryKey,
   useListSocialRawItems,
   usePromoteSocialRawItem,
+  useUpdateSocialRawReviewStatus,
   getListSocialRawItemsQueryKey,
   type SocialWatchItem,
   type SocialRawItem,
@@ -899,8 +900,10 @@ function OsintTierBadge({ tier }: { tier: string }) {
 
 function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLoading: boolean }) {
   const promote = usePromoteSocialRawItem();
+  const updateStatus = useUpdateSocialRawReviewStatus();
   const queryClient = useQueryClient();
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [statusPendingId, setStatusPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const stats = useMemo(() => {
@@ -918,16 +921,25 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
     return { securityRelevant, flagged, eligible, promoted };
   }, [items]);
 
-  // Group by review/eligible state so an analyst sees the actionable queue first.
-  // promotable ⊂ reviewFlag (both require security-relevance), so the buckets are
-  // mutually exclusive in this precedence: promoted → eligible → flagged → other.
+  // Group so an analyst sees the actionable queue first, then their decided
+  // (context / ignored) rows, then promoted. Precedence: promoted → ignored →
+  // context → (auto-triaged pending) eligible → flagged → other. The analyst's
+  // explicit Ignore / Keep-as-context decision overrides the auto signals and
+  // pulls a row out of the actionable queue.
   const groups = useMemo(() => {
     const eligible: SocialRawItem[] = [];
     const review: SocialRawItem[] = [];
-    const promoted: SocialRawItem[] = [];
     const other: SocialRawItem[] = [];
+    const context: SocialRawItem[] = [];
+    const ignored: SocialRawItem[] = [];
+    const promoted: SocialRawItem[] = [];
     for (const it of items) {
+      // Precedence: a promoted row is terminal; then the analyst's explicit
+      // Ignore / Keep-as-context decision pulls the row OUT of the actionable
+      // queue; only a still-pending row is triaged by the auto-derived signals.
       if (it.promotedIncidentId != null) promoted.push(it);
+      else if (it.reviewStatus === "ignored") ignored.push(it);
+      else if (it.reviewStatus === "context") context.push(it);
       else if (it.promotable) eligible.push(it);
       else if (it.reviewFlag) review.push(it);
       else other.push(it);
@@ -950,6 +962,18 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
         title: "Other context",
         note: "Not flagged as security-relevant; retained as background context only.",
         items: other,
+      },
+      {
+        key: "context",
+        title: "Kept as context",
+        note: "An analyst marked these as supporting context — out of the actionable queue, retained for reference.",
+        items: context,
+      },
+      {
+        key: "ignored",
+        title: "Ignored",
+        note: "An analyst dismissed these as noise — out of the actionable queue. Re-open to restore.",
+        items: ignored,
       },
       {
         key: "promoted",
@@ -980,6 +1004,29 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
       );
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function onSetStatus(
+    id: number,
+    status: "pending_review" | "ignored" | "context",
+  ) {
+    setError(null);
+    setStatusPendingId(id);
+    try {
+      await updateStatus.mutateAsync({ id, data: { reviewStatus: status } });
+      // Orval mutations don't auto-invalidate the board, so without this refetch
+      // the row would keep its old buttons. Invalidate every social-raw list
+      // query so the row moves to its new review bucket.
+      await queryClient.invalidateQueries({
+        queryKey: getListSocialRawItemsQueryKey(),
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not update the review status.",
+      );
+    } finally {
+      setStatusPendingId(null);
     }
   }
 
@@ -1041,7 +1088,9 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
           <OsintTable
             items={g.items}
             pendingId={pendingId}
+            statusPendingId={statusPendingId}
             onPromote={onPromote}
+            onSetStatus={onSetStatus}
           />
         </div>
       ))}
@@ -1064,14 +1113,94 @@ function ConfidenceCell({ value }: { value: number }) {
   );
 }
 
+function OsintActions({
+  it,
+  pendingId,
+  statusPendingId,
+  onPromote,
+  onSetStatus,
+}: {
+  it: SocialRawItem;
+  pendingId: number | null;
+  statusPendingId: number | null;
+  onPromote: (id: number) => void;
+  onSetStatus: (id: number, status: "pending_review" | "ignored" | "context") => void;
+}) {
+  // A promoted row is terminal — it back-links to its incident and has no actions.
+  if (it.promotedIncidentId != null) {
+    return (
+      <span className="text-muted-foreground">Incident #{it.promotedIncidentId}</span>
+    );
+  }
+
+  const busy = pendingId === it.id || statusPendingId === it.id;
+  const decided = it.reviewStatus === "ignored" || it.reviewStatus === "context";
+  const btn =
+    "px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm disabled:opacity-50";
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {it.promotable && (
+        <button
+          type="button"
+          onClick={() => onPromote(it.id)}
+          disabled={busy}
+          className={btn + " text-white"}
+          style={{ backgroundColor: "#465bff" }}
+        >
+          {pendingId === it.id ? "Promoting…" : "Promote"}
+        </button>
+      )}
+      {decided ? (
+        <button
+          type="button"
+          onClick={() => onSetStatus(it.id, "pending_review")}
+          disabled={busy}
+          className={btn + " border border-border bg-white text-primary"}
+        >
+          {statusPendingId === it.id ? "Saving…" : "Re-open"}
+        </button>
+      ) : (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => onSetStatus(it.id, "context")}
+            disabled={busy}
+            className={btn + " border border-border bg-white text-primary"}
+          >
+            Context
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetStatus(it.id, "ignored")}
+            disabled={busy}
+            className={btn + " border border-border bg-white text-muted-foreground"}
+          >
+            Ignore
+          </button>
+        </div>
+      )}
+      {!it.promotable && !decided && (
+        <span className="text-muted-foreground text-[10px]">
+          Not eligible to promote
+        </span>
+      )}
+    </div>
+  );
+}
+
 function OsintTable({
   items,
   pendingId,
+  statusPendingId,
   onPromote,
+  onSetStatus,
 }: {
   items: SocialRawItem[];
   pendingId: number | null;
+  statusPendingId: number | null;
   onPromote: (id: number) => void;
+  onSetStatus: (id: number, status: "pending_review" | "ignored" | "context") => void;
 }) {
   return (
     <div className="bg-white border border-border rounded-sm overflow-x-auto">
@@ -1085,7 +1214,7 @@ function OsintTable({
             <th className="text-left p-2 font-sans font-medium w-[70px]">Confidence</th>
             <th className="text-left p-2 font-sans font-medium">Caption / signals</th>
             <th className="text-left p-2 font-sans font-medium w-[50px]">Link</th>
-            <th className="text-left p-2 font-sans font-medium w-[140px]">Promote</th>
+            <th className="text-left p-2 font-sans font-medium w-[160px]">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -1097,7 +1226,6 @@ function OsintTable({
               (it.postedAt ? format(new Date(it.postedAt), "dd MMM yyyy") : null) ||
               "—";
             const where = it.location || it.province || it.country || "—";
-            const promoted = it.promotedIncidentId != null;
             const keywords = it.detectedKeywords ?? [];
             return (
               <tr key={it.id} className="hover:bg-muted/30 align-top">
@@ -1163,21 +1291,13 @@ function OsintTable({
                   )}
                 </td>
                 <td className="p-2 text-xs">
-                  {promoted ? (
-                    <span className="text-muted-foreground">Incident #{it.promotedIncidentId}</span>
-                  ) : it.promotable ? (
-                    <button
-                      type="button"
-                      onClick={() => onPromote(it.id)}
-                      disabled={pendingId === it.id}
-                      className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
-                      style={{ backgroundColor: "#465bff" }}
-                    >
-                      {pendingId === it.id ? "Promoting…" : "Promote"}
-                    </button>
-                  ) : (
-                    <span className="text-muted-foreground">Not eligible</span>
-                  )}
+                  <OsintActions
+                    it={it}
+                    pendingId={pendingId}
+                    statusPendingId={statusPendingId}
+                    onPromote={onPromote}
+                    onSetStatus={onSetStatus}
+                  />
                 </td>
               </tr>
             );

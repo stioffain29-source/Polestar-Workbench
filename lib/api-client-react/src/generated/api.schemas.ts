@@ -1404,6 +1404,8 @@ export interface SocialRawItem {
   corroboratingIncidentId?: number | null;
   promotionTopic: string;
   url: string;
+  /** @nullable */
+  pageUrl?: string | null;
   classification: string;
   promotable: boolean;
   /** Minimised public engagement counts (likes/comments/shares) when the provider returns them — context only, never PII. */
@@ -1413,12 +1415,31 @@ export interface SocialRawItem {
   reviewFlag: boolean;
   /** @nullable */
   reviewReason?: string | null;
+  /** Analyst review DECISION: pending_review (default) | ignored | context | promoted. Distinct from the auto-derived reviewFlag triage. Drives the actionable queue. */
+  reviewStatus: string;
   /** @nullable */
   promotedIncidentId?: number | null;
   /** @nullable */
   promotedAt?: string | null;
   /** @nullable */
   createdAt?: string | null;
+}
+
+/**
+ * The analyst decision. "promoted" is NOT accepted here — it is set only by the promote action.
+ */
+export type UpdateSocialRawReviewStatusRequestReviewStatus = typeof UpdateSocialRawReviewStatusRequestReviewStatus[keyof typeof UpdateSocialRawReviewStatusRequestReviewStatus];
+
+
+export const UpdateSocialRawReviewStatusRequestReviewStatus = {
+  pending_review: 'pending_review',
+  ignored: 'ignored',
+  context: 'context',
+} as const;
+
+export interface UpdateSocialRawReviewStatusRequest {
+  /** The analyst decision. "promoted" is NOT accepted here — it is set only by the promote action. */
+  reviewStatus: UpdateSocialRawReviewStatusRequestReviewStatus;
 }
 
 /**

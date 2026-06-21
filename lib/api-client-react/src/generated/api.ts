@@ -85,7 +85,8 @@ import type {
   StrikeInput,
   StrikeSummary,
   StrikeUpdate,
-  TopicCount
+  TopicCount,
+  UpdateSocialRawReviewStatusRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1128,6 +1129,78 @@ export const usePromoteSocialRawItem = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPromoteSocialRawItemMutationOptions(options));
+    }
+
+export const getUpdateSocialRawReviewStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/social-raw/${id}/review-status`
+}
+
+/**
+ * @summary Set the analyst review DECISION on a Facebook OSINT item — Ignore, Keep-as-Context, or re-open (pending_review). This NEVER creates or modifies an incident; it only moves the item in or out of the actionable review queue. "promoted" is reserved for the promote action and is not accepted here; a row that has already been promoted cannot be re-decided.
+ */
+export const updateSocialRawReviewStatus = async (id: number,
+    updateSocialRawReviewStatusRequest: UpdateSocialRawReviewStatusRequest, options?: RequestInit): Promise<SocialRawItem> => {
+
+  return customFetch<SocialRawItem>(getUpdateSocialRawReviewStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateSocialRawReviewStatusRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSocialRawReviewStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSocialRawReviewStatus>>, TError,{id: number;data: BodyType<UpdateSocialRawReviewStatusRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSocialRawReviewStatus>>, TError,{id: number;data: BodyType<UpdateSocialRawReviewStatusRequest>}, TContext> => {
+
+const mutationKey = ['updateSocialRawReviewStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSocialRawReviewStatus>>, {id: number;data: BodyType<UpdateSocialRawReviewStatusRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSocialRawReviewStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSocialRawReviewStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateSocialRawReviewStatus>>>
+    export type UpdateSocialRawReviewStatusMutationBody = BodyType<UpdateSocialRawReviewStatusRequest>
+    export type UpdateSocialRawReviewStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Set the analyst review DECISION on a Facebook OSINT item — Ignore, Keep-as-Context, or re-open (pending_review). This NEVER creates or modifies an incident; it only moves the item in or out of the actionable review queue. "promoted" is reserved for the promote action and is not accepted here; a row that has already been promoted cannot be re-decided.
+ */
+export const useUpdateSocialRawReviewStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSocialRawReviewStatus>>, TError,{id: number;data: BodyType<UpdateSocialRawReviewStatusRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSocialRawReviewStatus>>,
+        TError,
+        {id: number;data: BodyType<UpdateSocialRawReviewStatusRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateSocialRawReviewStatusMutationOptions(options));
     }
 
 export const getListMaritimeSecurityEventsUrl = (params?: ListMaritimeSecurityEventsParams,) => {

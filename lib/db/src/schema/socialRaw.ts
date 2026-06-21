@@ -97,6 +97,9 @@ export const socialRawTable = pgTable(
     promotionTopic: text("promotion_topic").notNull().default("flashpoint"),
     // Public source URL of the post.
     url: text("url").notNull(),
+    // Public URL of the source page / group the post came from (distinct from the
+    // post `url` above), when the provider supplies it. Null when not reported.
+    pageUrl: text("page_url"),
     // Guard that this row is supporting context, not an incident.
     classification: text("classification").notNull().default("context"),
     // Content/image fingerprint — UNIQUE so re-fetches/reshares collapse to one.
@@ -120,6 +123,12 @@ export const socialRawTable = pgTable(
     reviewFlag: boolean("review_flag").notNull().default(false),
     // Human-readable explanation of the review-flag decision (null when unflagged).
     reviewReason: text("review_reason"),
+    // Analyst review DECISION (distinct from the auto-derived `reviewFlag` triage):
+    // "pending_review" (default) | "ignored" | "context" | "promoted". Set by the
+    // review UI's Ignore / Keep-as-Context / Promote actions; "promoted" is also
+    // set automatically by the promote transaction. Drives the actionable queue —
+    // ignored/context rows drop out of it but are retained as context.
+    reviewStatus: text("review_status").notNull().default("pending_review"),
     // Minimised, redacted echo of the source payload (no comments/PII/tokens).
     rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>(),
     // True only when the re-derived gate (security AND credible) passes — i.e.
@@ -149,6 +158,7 @@ export const socialRawTable = pgTable(
     byCategory: index("social_raw_category_idx").on(t.category),
     byPromotable: index("social_raw_promotable_idx").on(t.promotable),
     byReview: index("social_raw_review_idx").on(t.reviewFlag),
+    byReviewStatus: index("social_raw_review_status_idx").on(t.reviewStatus),
     byPosted: index("social_raw_posted_idx").on(t.postedAt),
   }),
 );

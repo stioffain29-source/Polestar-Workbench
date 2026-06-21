@@ -343,6 +343,40 @@ paths:
             Item not promotable (not security-relevant / not credible), already
             promoted, or duplicates an existing incident
 
+  /social-raw/{id}/review-status:
+    patch:
+      operationId: updateSocialRawReviewStatus
+      tags: [social-raw]
+      summary: >-
+        Set the analyst review DECISION on a Facebook OSINT item — Ignore,
+        Keep-as-Context, or re-open (pending_review). This NEVER creates or
+        modifies an incident; it only moves the item in or out of the actionable
+        review queue. "promoted" is reserved for the promote action and is not
+        accepted here; a row that has already been promoted cannot be re-decided.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/UpdateSocialRawReviewStatusRequest" }
+      responses:
+        "200":
+          description: OK — the updated item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SocialRawItem" }
+        "400":
+          description: Invalid review status
+        "404":
+          description: Item not found
+        "409":
+          description: Item already promoted — its review status is fixed
+
   /maritime-security-events:
     get:
       operationId: listMaritimeSecurityEvents
@@ -2610,6 +2644,7 @@ components:
           detectedKeywords,
           confidence,
           reviewFlag,
+          reviewStatus,
         ]
       properties:
         id: { type: integer }
@@ -2644,6 +2679,7 @@ components:
         corroboratingIncidentId: { type: ["integer", "null"] }
         promotionTopic: { type: string }
         url: { type: string }
+        pageUrl: { type: ["string", "null"] }
         classification: { type: string }
         promotable: { type: boolean }
         engagement:
@@ -2660,9 +2696,26 @@ components:
         confidence: { type: integer }
         reviewFlag: { type: boolean }
         reviewReason: { type: ["string", "null"] }
+        reviewStatus:
+          type: string
+          description: >-
+            Analyst review DECISION: pending_review (default) | ignored | context
+            | promoted. Distinct from the auto-derived reviewFlag triage. Drives
+            the actionable queue.
         promotedIncidentId: { type: ["integer", "null"] }
         promotedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: ["string", "null"], format: date-time }
+
+    UpdateSocialRawReviewStatusRequest:
+      type: object
+      required: [reviewStatus]
+      properties:
+        reviewStatus:
+          type: string
+          enum: [pending_review, ignored, context]
+          description: >-
+            The analyst decision. "promoted" is NOT accepted here — it is set only
+            by the promote action.
 
     MaritimeSecurityEvent:
       type: object

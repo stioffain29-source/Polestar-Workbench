@@ -152,6 +152,41 @@ export function deriveProvince(
   return null;
 }
 
+// Localities that should display as an acronym rather than title-case.
+const LOCALITY_ACRONYMS = new Set(["ncd", "png", "opm"]);
+
+function formatLocality(key: string): string {
+  return key
+    .split(/[\s-]+/)
+    .map((w) =>
+      LOCALITY_ACRONYMS.has(w)
+        ? w.toUpperCase()
+        : w.charAt(0).toUpperCase() + w.slice(1),
+    )
+    .join(" ");
+}
+
+/**
+ * Resolve the matched gazetteer LOCALITY (city / suburb / regency) as a display
+ * string, mirroring {@link deriveProvince}'s matching (explicit location first,
+ * then longest-first word-boundary scan of the text). Returns null when nothing
+ * matches. Purely additive: only fills a locality when a known place name
+ * literally appears, so it never fabricates a location.
+ */
+export function deriveLocality(
+  location: string | null | undefined,
+  text: string,
+  gazetteer: CompiledGazetteer,
+): string | null {
+  const loc = (location ?? "").trim().toLowerCase();
+  if (loc && gazetteer.map[loc]) return formatLocality(loc);
+  const hay = `${location ?? ""} ${text}`;
+  for (const key of gazetteer.keys) {
+    if (hasWord(hay, key)) return formatLocality(key);
+  }
+  return null;
+}
+
 export interface StructuredExtraction {
   province: string | null;
   category: IncidentCategory;

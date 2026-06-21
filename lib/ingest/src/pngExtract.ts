@@ -17,6 +17,7 @@
 import {
   compileGazetteer,
   deriveProvince,
+  deriveLocality,
   extractStructuredItem,
   deriveIncidentDate,
   type IncidentCategory,
@@ -98,7 +99,39 @@ export const PNG_PROVINCE_BY_CITY: Record<string, string> = {
   alotau: "Milne Bay",
   daru: "Western",
   kavieng: "New Ireland",
+  namatanai: "New Ireland",
+  lihir: "New Ireland",
   lorengau: "Manus",
+  // Chimbu (Simbu)
+  kundiawa: "Chimbu",
+  kerowagi: "Chimbu",
+  gumine: "Chimbu",
+  chuave: "Chimbu",
+  simbu: "Chimbu",
+  chimbu: "Chimbu",
+  // Western (Fly / Ok Tedi)
+  kiunga: "Western",
+  tabubil: "Western",
+  "ok tedi": "Western",
+  // West Sepik (Sandaun)
+  aitape: "West Sepik",
+  // Morobe (further localities)
+  finschhafen: "Morobe",
+  menyamya: "Morobe",
+  // Enga (further localities)
+  laiagam: "Enga",
+  kandep: "Enga",
+  kompiam: "Enga",
+  // Hela / Southern Highlands (further localities)
+  koroba: "Hela",
+  kopiago: "Hela",
+  pangia: "Southern Highlands",
+  // Gulf / Oro / Milne Bay / East Sepik / Bougainville
+  kikori: "Gulf",
+  kokoda: "Oro",
+  samarai: "Milne Bay",
+  angoram: "East Sepik",
+  kieta: "Bougainville",
 };
 
 const PNG_GAZETTEER = compileGazetteer(PNG_PROVINCE_BY_CITY);
@@ -114,6 +147,17 @@ export type PngExtraction = StructuredExtraction;
  */
 export function derivePngProvince(location: string | null | undefined, text: string): string | null {
   return deriveProvince(location, text, PNG_GAZETTEER);
+}
+
+/**
+ * Resolve the matched PNG locality (city / suburb) for display, or null when no
+ * known locality appears. Additive — never fabricates a place.
+ */
+export function derivePngLocality(
+  location: string | null | undefined,
+  text: string,
+): string | null {
+  return deriveLocality(location, text, PNG_GAZETTEER);
 }
 
 /**

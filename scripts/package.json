@@ -6,6 +6,7 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "import:legacy": "tsx ./src/import-legacy.ts",
+    "import:apify-facebook": "tsx ./src/import-apify-facebook.ts",
     "scrape:cargo-watch": "tsx ./src/scrape-cargo-watch.ts",
     "scrape:flashpoint": "tsx ./src/scrape-flashpoint.ts",
     "scrape:shipping": "tsx ./src/scrape-shipping.ts",

@@ -10,11 +10,13 @@ import { sanitiseCaption } from "./socialWatch";
 import {
   extractPngItem,
   derivePngProvince,
+  derivePngLocality,
   derivePngIncidentDate,
 } from "./pngExtract";
 import {
   extractWestPapuaItem,
   deriveWestPapuaProvince,
+  deriveWestPapuaLocality,
   deriveWestPapuaIncidentDate,
 } from "./westPapuaExtract";
 import type { IncidentCategory } from "./structuredExtract";
@@ -303,6 +305,8 @@ export interface RawFacebookPost {
   // Optional so direct unit construction of a post stays terse.
   pageHandle?: string;
   pageName?: string | null;
+  /** Public page/group URL the post belongs to, when the provider supplies it. */
+  pageUrl?: string | null;
   sourceTier?: SourceTier;
   origin?: "page" | "search";
 }
@@ -428,6 +432,8 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
     asString(r.postUrl) ||
     asString(r.facebookUrl) ||
     asString(r.topLevelUrl) ||
+    asString(r.permalink) ||
+    asString(r.permalinkUrl) ||
     asString(r.link);
   if (!id && !url) return null;
   if (!url && id) url = `https://www.facebook.com/${id}`;
@@ -478,7 +484,10 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
     parseTimestamp(r.timestamp) ??
     parseTimestamp(r.date) ??
     parseTimestamp(r.publishedTime) ??
-    parseTimestamp(r.publish_time);
+    parseTimestamp(r.publish_time) ??
+    parseTimestamp(r.createdAt) ??
+    parseTimestamp(r.created_time) ??
+    parseTimestamp(r.creationTime);
 
   const explicitLinks: string[] = [];
   const addLink = (s: string) => {
@@ -495,6 +504,36 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
     }
   }
 
+  // Source page / group provenance (dataset items carry this; the live fetch
+  // loop overrides handle/name/tier from its own per-page config afterwards).
+  const pageObj =
+    r.page && typeof r.page === "object"
+      ? (r.page as Record<string, unknown>)
+      : undefined;
+  const groupObj =
+    r.group && typeof r.group === "object"
+      ? (r.group as Record<string, unknown>)
+      : undefined;
+  const userObj =
+    r.user && typeof r.user === "object"
+      ? (r.user as Record<string, unknown>)
+      : undefined;
+  const pageUrl =
+    sanitiseUrl(
+      asString(r.pageUrl) ||
+        asString(r.groupUrl) ||
+        asString(pageObj?.url) ||
+        asString(groupObj?.url),
+    ) || null;
+  const pageName =
+    asString(r.pageName) ||
+    asString(r.groupTitle) ||
+    asString(r.groupName) ||
+    asString(pageObj?.name) ||
+    asString(groupObj?.name) ||
+    asString(userObj?.name) ||
+    null;
+
   return {
     externalId,
     url: cleanUrl,
@@ -507,6 +546,8 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
       .filter(Boolean),
     postedAt,
     engagement: parseEngagement(r),
+    pageUrl,
+    pageName,
   };
 }
 
@@ -567,6 +608,94 @@ async function fetchApifyDataset(
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/** Resilient GET (timeout + transient-status backoff). Errors carry no token. */
+async function apifyGetJson(url: string): Promise<unknown> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: ctrl.signal,
+        redirect: "follow",
+      });
+      if (!res.ok) {
+        const transient = res.status === 429 || res.status >= 500;
+        const err = new Error(`status ${res.status}`);
+        if (transient && attempt < FETCH_ATTEMPTS - 1) {
+          lastErr = err;
+          await sleep(BASE_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
+          continue;
+        }
+        throw err;
+      }
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+      const aborted = ctrl.signal.aborted;
+      if (attempt < FETCH_ATTEMPTS - 1) {
+        await sleep(BASE_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
+      } else {
+        throw aborted ? new Error(`timed out after ${FETCH_TIMEOUT_MS}ms`) : err;
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/**
+ * Fetch ALL items of an existing Apify dataset (the result of a previously-run
+ * actor) via GET /v2/datasets/{id}/items, paginating in 1000-item pages until
+ * the dataset is exhausted or `limit` items are collected. Used by the MANUAL
+ * importer — no actor run, no charge. The token rides as a query param ONLY and
+ * is scrubbed from every thrown error (never logged or stored). Returns the raw
+ * item objects; the caller runs them through {@link normaliseFacebookPost}.
+ */
+export async function fetchApifyDatasetItems(
+  token: string,
+  datasetId: string,
+  opts: { limit?: number; apiBase?: string; log?: (s: string) => void } = {},
+): Promise<unknown[]> {
+  const apiBase = opts.apiBase ?? DEFAULT_API_BASE;
+  const log = opts.log ?? (() => {});
+  const hardCap = opts.limit && opts.limit > 0 ? opts.limit : Infinity;
+  const PAGE = 1000;
+  const items: unknown[] = [];
+  let offset = 0;
+  while (items.length < hardCap) {
+    const want = Math.min(PAGE, hardCap - items.length);
+    const url =
+      `${apiBase}/v2/datasets/${encodeURIComponent(datasetId)}/items` +
+      `?clean=true&format=json&offset=${offset}&limit=${want}` +
+      `&token=${encodeURIComponent(token)}`;
+    let batch: unknown;
+    try {
+      batch = await apifyGetJson(url);
+    } catch (err) {
+      throw new Error(
+        redactToken(err instanceof Error ? err.message : String(err), token),
+      );
+    }
+    const arr = Array.isArray(batch)
+      ? batch
+      : batch &&
+          typeof batch === "object" &&
+          Array.isArray((batch as Record<string, unknown>).items)
+        ? ((batch as Record<string, unknown>).items as unknown[])
+        : [];
+    if (arr.length === 0) break;
+    items.push(...arr);
+    log(`  apify dataset: +${arr.length} item(s) (total ${items.length})`);
+    if (arr.length < want) break;
+    offset += arr.length;
+  }
+  return hardCap === Infinity ? items : items.slice(0, hardCap);
 }
 
 /** Extract + normalise the post array out of any Apify dataset shape. */
@@ -733,6 +862,18 @@ const KEYWORD_CUES: { label: string; re: RegExp }[] = [
   { label: "separatist", re: /\bseparatist|\bwest papua liberation\b|\bOPM\b|\bTPNPB\b/i },
   { label: "highlands", re: /\bhighlands?\b|\benga\b|\bhela\b|\bporgera\b/i },
   { label: "curfew", re: /\bcurfew\b|\bstate of emergency\b/i },
+  // PNG-specific security vocabulary.
+  { label: "sorcery-accusation violence", re: /\bsorcery[- ]?accus\w*|\bsanguma\b|\bsorcery[- ]?related\b/i },
+  { label: "raskol gang", re: /\braskol(?:s)?\b|\brascal gang\b/i },
+  { label: "tribal weapons", re: /\bbows? and arrows?\b|\bhomemade gun|\bfactory[- ]?made (?:gun|firearm)|\bhigh[- ]?powered (?:gun|firearm|rifle)/i },
+  // Indonesian-Papua (Bahasa) security vocabulary — captions arrive untranslated.
+  { label: "security-force deployment", re: /\bbrimob\b|\bmobile squad\b|\bjoint security\b|\btroops? deploy|\bsoldiers? deployed\b|\bpasukan\b/i },
+  { label: "Indonesian military", re: /\bTNI\b|\bkopassus\b|\bpolri\b|\bindonesian (?:military|army|soldiers|forces)\b/i },
+  { label: "armed group (KKB)", re: /\bKKB\b|\bKST\b|\barmed criminal group\b/i },
+  { label: "shooting (id)", re: /\bpenembakan\b|\bbaku ?tembak\b|\btertembak\b/i },
+  { label: "armed contact (id)", re: /\bkontak (?:senjata|tembak)\b/i },
+  { label: "protest (id)", re: /\bunjuk rasa\b|\bdemonstrasi\b|\baksi (?:demo|protes|massa)\b/i },
+  { label: "abduction (id)", re: /\bpenyanderaan\b|\bdisandera\b|\bpenculikan\b/i },
 ];
 
 /**
@@ -785,12 +926,15 @@ export function classifyPost(post: RawFacebookPost): FbClassification | null {
 
   const credibleDomains = detectCredibleDomains(post.outboundLinks);
   const category = extraction.category;
+  const location = isPng
+    ? derivePngLocality(null, caption)
+    : deriveWestPapuaLocality(null, caption);
 
   return {
     caption,
     country: scope.country,
     province: extraction.province ?? scope.province,
-    location: null,
+    location,
     category,
     businessImpact: extraction.businessImpact,
     incidentDate,
@@ -947,6 +1091,243 @@ async function findCorroboration(
   return match ? { incidentId: match.incident.id, reason: match.reason } : null;
 }
 
+// --- Persist (shared) --------------------------------------------------------
+
+/** Per-source defaults + provenance hooks for {@link persistFacebookPosts}. */
+export interface PersistFacebookOptions {
+  /** Write rows when true; otherwise dry-run (classify/dedup/score only). */
+  commit?: boolean;
+  /** Credibility tier for posts lacking per-source metadata (default "osint"). */
+  defaultSourceTier?: SourceTier;
+  /** Page handle for posts lacking per-source metadata. */
+  defaultPageHandle?: string;
+  /** Page display name for posts lacking per-source metadata. */
+  defaultPageName?: string | null;
+  /** Page/group URL for posts lacking per-source metadata. */
+  defaultPageUrl?: string | null;
+  /** Resolve the provenance "actor"/source label stored in the minimised payload. */
+  resolveActor?: (post: RawFacebookPost) => string;
+  /** Optional progress log sink. */
+  log?: (s: string) => void;
+}
+
+/** Counts returned by {@link persistFacebookPosts}. */
+export interface PersistFacebookResult {
+  inScope: number;
+  securityRelevant: number;
+  credible: number;
+  corroborated: number;
+  promotable: number;
+  reviewFlagged: number;
+  duplicateInDb: number;
+  newToInsert: number;
+  inserted: number;
+  totalAfter: number;
+  latestPostedAt: string | null;
+}
+
+/**
+ * Classify → dedup → credibility-score → store a batch of raw Facebook posts as
+ * supporting CONTEXT (never incidents). Shared by BOTH the live ingest engine
+ * (runFacebookOsintIngest) and the manual Apify dataset importer so the two
+ * paths run byte-identical scope/credibility/dedup logic.
+ *
+ * Dedup is layered: in-run by clean post URL/id (externalId) first, then the
+ * content/image fingerprint (dedupKey); against the table by dedup_key (UNIQUE)
+ * with external_id as a fallback. Re-fetches, re-shares and duplicate dataset
+ * items therefore all collapse to a single row. Never throws on a corroboration
+ * lookup failure (a soft credibility upgrade only); never closes the shared pool.
+ */
+export async function persistFacebookPosts(
+  posts: readonly RawFacebookPost[],
+  opts: PersistFacebookOptions = {},
+): Promise<PersistFacebookResult> {
+  const commit = opts.commit ?? false;
+  const log = opts.log ?? (() => {});
+  const defaultTier: SourceTier = opts.defaultSourceTier ?? "osint";
+  const result: PersistFacebookResult = {
+    inScope: 0,
+    securityRelevant: 0,
+    credible: 0,
+    corroborated: 0,
+    promotable: 0,
+    reviewFlagged: 0,
+    duplicateInDb: 0,
+    newToInsert: 0,
+    inserted: 0,
+    totalAfter: 0,
+    latestPostedAt: null,
+  };
+
+  // --- Classify + scope-filter.
+  interface Candidate {
+    post: RawFacebookPost;
+    cls: FbClassification;
+  }
+  const candidates: Candidate[] = [];
+  for (const post of posts) {
+    const cls = classifyPost(post);
+    if (!cls) continue;
+    candidates.push({ post, cls });
+  }
+  result.inScope = candidates.length;
+  result.securityRelevant = candidates.filter(
+    (c) => c.cls.securityRelevant,
+  ).length;
+
+  // --- In-run dedup: clean post URL/id (externalId) first, then the
+  // content/image fingerprint (dedupKey). Keeps the first occurrence of either,
+  // so duplicate dataset items / re-shares collapse before any DB write.
+  const byKey = new Map<string, Candidate>();
+  const seenExt = new Set<string>();
+  for (const c of candidates) {
+    if (byKey.has(c.cls.dedupKey)) continue;
+    if (seenExt.has(c.post.externalId)) continue;
+    byKey.set(c.cls.dedupKey, c);
+    seenExt.add(c.post.externalId);
+  }
+  let unique = Array.from(byKey.values());
+
+  // --- Dedup against the table (dedup_key primary; external_id fallback).
+  if (unique.length > 0) {
+    const keys = unique.map((u) => u.cls.dedupKey);
+    const extIds = unique.map((u) => u.post.externalId);
+    const existing = await db
+      .select({
+        dedupKey: socialRawTable.dedupKey,
+        externalId: socialRawTable.externalId,
+      })
+      .from(socialRawTable)
+      .where(
+        or(
+          inArray(socialRawTable.dedupKey, keys),
+          inArray(socialRawTable.externalId, extIds),
+        ),
+      );
+    const haveKey = new Set(existing.map((e) => e.dedupKey));
+    const haveExt = new Set(existing.map((e) => e.externalId));
+    const before = unique.length;
+    unique = unique.filter(
+      (u) => !haveKey.has(u.cls.dedupKey) && !haveExt.has(u.post.externalId),
+    );
+    result.duplicateInDb = before - unique.length;
+  }
+  result.newToInsert = unique.length;
+
+  // --- Build insert rows: corroboration (read-only) + final eligibility.
+  const values: InsertSocialRawItem[] = [];
+  for (const { post, cls } of unique) {
+    const date = cls.incidentDate ?? post.postedAt ?? new Date();
+    let corroboration: { incidentId: number; reason: string } | null = null;
+    try {
+      corroboration = await findCorroboration(cls, date);
+    } catch (err) {
+      // Corroboration is a soft credibility upgrade — never fail the ingest.
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`  corroboration lookup failed: ${msg}`);
+    }
+    // Per-source credibility tier (a page's declared tier, or "osint" for the
+    // search/import pass) — falls back to the caller's default only for posts
+    // built without origin metadata.
+    const tier = post.sourceTier ?? defaultTier;
+    const eligibility = deriveEligibility({
+      category: cls.category,
+      sourceTier: tier,
+      credibleDomainLabels: cls.credibleDomains.labels,
+      corroborated: corroboration !== null,
+      corroborationReason: corroboration?.reason ?? null,
+    });
+    const review = deriveReview({
+      inScope: true,
+      securityRelevant: eligibility.securityRelevant,
+      promotable: eligibility.promotable,
+      category: cls.category,
+    });
+    const confidence = computeConfidence({
+      inScope: true,
+      localityPrecise: cls.province != null,
+      securityRelevant: eligibility.securityRelevant,
+      credible: eligibility.credible,
+      corroborated: corroboration !== null,
+      hasIncidentDate: cls.incidentDate != null,
+      keywordCount: cls.detectedKeywords.length,
+    });
+    if (corroboration) result.corroborated++;
+    if (eligibility.credible) result.credible++;
+    if (eligibility.promotable) result.promotable++;
+    if (review.reviewFlag) result.reviewFlagged++;
+
+    values.push({
+      sourceName: SOURCE_NAME,
+      platform: PLATFORM,
+      pageHandle: post.pageHandle ?? opts.defaultPageHandle ?? DEFAULT_PAGE_HANDLE,
+      pageName: post.pageName ?? opts.defaultPageName ?? null,
+      sourceTier: tier,
+      externalId: post.externalId,
+      postedAt: post.postedAt,
+      incidentDate: cls.incidentDate,
+      caption: cls.caption,
+      imageUrls: post.imageUrls,
+      links: post.outboundLinks,
+      detectedCredibleDomains: cls.credibleDomains.labels,
+      country: cls.country,
+      province: cls.province,
+      location: cls.location,
+      category: cls.category,
+      businessImpact: cls.businessImpact,
+      securityRelevant: eligibility.securityRelevant,
+      credible: eligibility.credible,
+      credibilityReason: eligibility.credibilityReason,
+      corroborated: corroboration !== null,
+      corroborationReason: corroboration?.reason ?? null,
+      corroboratingIncidentId: corroboration?.incidentId ?? null,
+      promotionTopic: cls.promotionTopic,
+      url: post.url,
+      pageUrl: post.pageUrl ?? opts.defaultPageUrl ?? null,
+      classification: "context",
+      dedupKey: cls.dedupKey,
+      engagement: post.engagement ?? null,
+      detectedKeywords: cls.detectedKeywords,
+      confidence,
+      reviewFlag: review.reviewFlag,
+      reviewReason: review.reviewReason,
+      // MINIMISED, token-free provenance — never the full payload (no comments,
+      // author profile, reactions, phone/email).
+      rawPayload: {
+        externalId: post.externalId,
+        url: post.url,
+        postedAt: post.postedAt ? post.postedAt.toISOString() : null,
+        imageCount: post.imageUrls.length,
+        linkHosts: cls.credibleDomains.hosts,
+        actor: opts.resolveActor ? opts.resolveActor(post) : post.origin ?? "import",
+        page: post.pageHandle ?? opts.defaultPageHandle ?? DEFAULT_PAGE_HANDLE,
+        origin: post.origin ?? "page",
+      },
+      promotable: eligibility.promotable,
+      lastCheckedAt: new Date(),
+      fetchedAt: new Date(),
+    });
+  }
+
+  // --- Persist.
+  if (commit && values.length > 0) {
+    const inserted = await db
+      .insert(socialRawTable)
+      .values(values)
+      .onConflictDoNothing()
+      .returning({ id: socialRawTable.id });
+    result.inserted = inserted.length;
+    log(`  committed: ${result.inserted} new row(s)`);
+  } else if (!commit) {
+    log("  DRY-RUN — no rows written.");
+  }
+
+  const stats = await tableStats();
+  result.totalAfter = stats.total;
+  result.latestPostedAt = stats.latest ? stats.latest.toISOString() : null;
+  return result;
+}
+
 // --- Run ---------------------------------------------------------------------
 
 /**
@@ -999,161 +1380,27 @@ export async function runFacebookOsintIngest(
     log("  facebook: not configured (FACEBOOK_API_KEY unset or disabled)");
   }
 
-  // --- Classify + scope-filter.
-  interface Candidate {
-    post: RawFacebookPost;
-    cls: FbClassification;
-  }
-  const candidates: Candidate[] = [];
-  for (const post of collected) {
-    const cls = classifyPost(post);
-    if (!cls) continue;
-    candidates.push({ post, cls });
-  }
-  summary.inScope = candidates.length;
-  summary.securityRelevant = candidates.filter(
-    (c) => c.cls.securityRelevant,
-  ).length;
-
-  // --- In-run dedup by dedupKey.
-  const byKey = new Map<string, Candidate>();
-  for (const c of candidates) {
-    if (!byKey.has(c.cls.dedupKey)) byKey.set(c.cls.dedupKey, c);
-  }
-  let unique = Array.from(byKey.values());
-
-  // --- Dedup against the table (dedup_key primary; external_id fallback).
-  if (unique.length > 0) {
-    const keys = unique.map((u) => u.cls.dedupKey);
-    const extIds = unique.map((u) => u.post.externalId);
-    const existing = await db
-      .select({
-        dedupKey: socialRawTable.dedupKey,
-        externalId: socialRawTable.externalId,
-      })
-      .from(socialRawTable)
-      .where(
-        or(
-          inArray(socialRawTable.dedupKey, keys),
-          inArray(socialRawTable.externalId, extIds),
-        ),
-      );
-    const haveKey = new Set(existing.map((e) => e.dedupKey));
-    const haveExt = new Set(existing.map((e) => e.externalId));
-    const before = unique.length;
-    unique = unique.filter(
-      (u) => !haveKey.has(u.cls.dedupKey) && !haveExt.has(u.post.externalId),
-    );
-    summary.duplicateInDb = before - unique.length;
-  }
-  summary.newToInsert = unique.length;
-
-  // --- Build insert rows: corroboration (read-only) + final eligibility.
-  const values: InsertSocialRawItem[] = [];
-  for (const { post, cls } of unique) {
-    const date = cls.incidentDate ?? post.postedAt ?? new Date();
-    let corroboration: { incidentId: number; reason: string } | null = null;
-    try {
-      corroboration = await findCorroboration(cls, date);
-    } catch (err) {
-      // Corroboration is a soft credibility upgrade — never fail the ingest.
-      const msg = err instanceof Error ? err.message : String(err);
-      log(`  corroboration lookup failed: ${msg}`);
-    }
-    // Per-source credibility tier (a page's declared tier, or "osint" for the
-    // search pass) — NOT the primary-page tier. Falls back to the primary only
-    // for posts built without origin metadata (direct unit construction).
-    const tier = post.sourceTier ?? cfg.sourceTier;
-    const eligibility = deriveEligibility({
-      category: cls.category,
-      sourceTier: tier,
-      credibleDomainLabels: cls.credibleDomains.labels,
-      corroborated: corroboration !== null,
-      corroborationReason: corroboration?.reason ?? null,
-    });
-    const review = deriveReview({
-      inScope: true,
-      securityRelevant: eligibility.securityRelevant,
-      promotable: eligibility.promotable,
-      category: cls.category,
-    });
-    const confidence = computeConfidence({
-      inScope: true,
-      localityPrecise: cls.province != null,
-      securityRelevant: eligibility.securityRelevant,
-      credible: eligibility.credible,
-      corroborated: corroboration !== null,
-      hasIncidentDate: cls.incidentDate != null,
-      keywordCount: cls.detectedKeywords.length,
-    });
-    if (corroboration) summary.corroborated++;
-    if (eligibility.credible) summary.credible++;
-    if (eligibility.promotable) summary.promotable++;
-    if (review.reviewFlag) summary.reviewFlagged++;
-
-    values.push({
-      sourceName: SOURCE_NAME,
-      platform: PLATFORM,
-      pageHandle: post.pageHandle ?? cfg.pageHandle,
-      pageName: post.pageName ?? cfg.pageName,
-      sourceTier: tier,
-      externalId: post.externalId,
-      postedAt: post.postedAt,
-      incidentDate: cls.incidentDate,
-      caption: cls.caption,
-      imageUrls: post.imageUrls,
-      links: post.outboundLinks,
-      detectedCredibleDomains: cls.credibleDomains.labels,
-      country: cls.country,
-      province: cls.province,
-      location: cls.location,
-      category: cls.category,
-      businessImpact: cls.businessImpact,
-      securityRelevant: eligibility.securityRelevant,
-      credible: eligibility.credible,
-      credibilityReason: eligibility.credibilityReason,
-      corroborated: corroboration !== null,
-      corroborationReason: corroboration?.reason ?? null,
-      corroboratingIncidentId: corroboration?.incidentId ?? null,
-      promotionTopic: cls.promotionTopic,
-      url: post.url,
-      classification: "context",
-      dedupKey: cls.dedupKey,
-      engagement: post.engagement ?? null,
-      detectedKeywords: cls.detectedKeywords,
-      confidence,
-      reviewFlag: review.reviewFlag,
-      reviewReason: review.reviewReason,
-      // MINIMISED, token-free provenance — never the full payload (no comments,
-      // author profile, reactions, phone/email).
-      rawPayload: {
-        externalId: post.externalId,
-        url: post.url,
-        postedAt: post.postedAt ? post.postedAt.toISOString() : null,
-        imageCount: post.imageUrls.length,
-        linkHosts: cls.credibleDomains.hosts,
-        actor: post.origin === "search" ? cfg.searchActor : cfg.actor,
-        page: post.pageHandle ?? cfg.pageHandle,
-        origin: post.origin ?? "page",
-      },
-      promotable: eligibility.promotable,
-      lastCheckedAt: new Date(),
-      fetchedAt: new Date(),
-    });
-  }
-
-  // --- Persist.
-  if (commit && values.length > 0) {
-    const inserted = await db
-      .insert(socialRawTable)
-      .values(values)
-      .onConflictDoNothing()
-      .returning({ id: socialRawTable.id });
-    summary.inserted = inserted.length;
-    log(`  committed: ${summary.inserted} new row(s)`);
-  } else if (!commit) {
-    log("  DRY-RUN — no rows written.");
-  }
+  // --- Classify, dedup, credibility-score and persist (shared with the manual
+  // Apify dataset importer so both paths run identical logic).
+  const persisted = await persistFacebookPosts(collected, {
+    commit,
+    defaultSourceTier: cfg.sourceTier,
+    defaultPageHandle: cfg.pageHandle,
+    defaultPageName: cfg.pageName,
+    defaultPageUrl: cfg.pageUrl,
+    resolveActor: (post) =>
+      post.origin === "search" ? cfg.searchActor : cfg.actor,
+    log,
+  });
+  summary.inScope = persisted.inScope;
+  summary.securityRelevant = persisted.securityRelevant;
+  summary.corroborated = persisted.corroborated;
+  summary.credible = persisted.credible;
+  summary.promotable = persisted.promotable;
+  summary.reviewFlagged = persisted.reviewFlagged;
+  summary.duplicateInDb = persisted.duplicateInDb;
+  summary.newToInsert = persisted.newToInsert;
+  summary.inserted = persisted.inserted;
 
   // --- Stamp last-checked on existing rows when the fetch succeeded.
   if (commit && cfg.configured && summary.fetchOk) {
@@ -1168,9 +1415,8 @@ export async function runFacebookOsintIngest(
     await recordSourceHealthForPage(cfg, summary);
   }
 
-  const stats = await tableStats();
-  summary.totalAfter = stats.total;
-  summary.latestPostedAt = stats.latest ? stats.latest.toISOString() : null;
+  summary.totalAfter = persisted.totalAfter;
+  summary.latestPostedAt = persisted.latestPostedAt;
   return summary;
 }
 

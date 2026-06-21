@@ -589,6 +589,29 @@ export async function runDataMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS social_raw_review_idx
         ON social_raw (review_flag)
     `);
+    // Analyst review-decision state + source page/group URL. Idempotent so the
+    // prod primary gains them on boot. Mirrors lib/db/src/schema/socialRaw.ts.
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS page_url text
+    `);
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS review_status text NOT NULL DEFAULT 'pending_review'
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_review_status_idx
+        ON social_raw (review_status)
+    `);
+    // Backfill: already-promoted rows reflect the 'promoted' decision (the column
+    // defaults new rows to 'pending_review'). Idempotent — only flips promoted
+    // rows still left at the default.
+    await db.execute(sql`
+      UPDATE social_raw
+        SET review_status = 'promoted'
+        WHERE promoted_incident_id IS NOT NULL
+          AND review_status = 'pending_review'
+    `);
 
     // Schema: ICC CCS / IMB maritime piracy & armed-robbery events. A STANDALONE
     // maritime-security source — SEPARATE from both the news-scraped `incidents`

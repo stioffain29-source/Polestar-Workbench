@@ -574,6 +574,7 @@ export const ListSocialRawItemsResponseItem = zod.object({
   "corroboratingIncidentId": zod.number().nullish(),
   "promotionTopic": zod.string(),
   "url": zod.string(),
+  "pageUrl": zod.string().nullish(),
   "classification": zod.string(),
   "promotable": zod.boolean(),
   "engagement": zod.union([zod.record(zod.string(), zod.number().nullable()),zod.null()]).optional().describe('Minimised public engagement counts (likes\/comments\/shares) when the provider returns them — context only, never PII.'),
@@ -581,6 +582,7 @@ export const ListSocialRawItemsResponseItem = zod.object({
   "confidence": zod.number(),
   "reviewFlag": zod.boolean(),
   "reviewReason": zod.string().nullish(),
+  "reviewStatus": zod.string().describe('Analyst review DECISION: pending_review (default) | ignored | context | promoted. Distinct from the auto-derived reviewFlag triage. Drives the actionable queue.'),
   "promotedIncidentId": zod.number().nullish(),
   "promotedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date().nullish()
@@ -594,6 +596,59 @@ export const ListSocialRawItemsResponse = zod.array(ListSocialRawItemsResponseIt
 export const PromoteSocialRawItemParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
+/**
+ * @summary Set the analyst review DECISION on a Facebook OSINT item — Ignore, Keep-as-Context, or re-open (pending_review). This NEVER creates or modifies an incident; it only moves the item in or out of the actionable review queue. "promoted" is reserved for the promote action and is not accepted here; a row that has already been promoted cannot be re-decided.
+ */
+export const UpdateSocialRawReviewStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSocialRawReviewStatusBody = zod.object({
+  "reviewStatus": zod.enum(['pending_review', 'ignored', 'context']).describe('The analyst decision. \"promoted\" is NOT accepted here — it is set only by the promote action.')
+})
+
+export const UpdateSocialRawReviewStatusResponse = zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string().optional(),
+  "platform": zod.string(),
+  "pageHandle": zod.string(),
+  "pageName": zod.string().nullish(),
+  "sourceTier": zod.string(),
+  "externalId": zod.string(),
+  "postedAt": zod.coerce.date().nullish(),
+  "incidentDate": zod.coerce.date().nullish(),
+  "caption": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
+  "links": zod.array(zod.string()).optional(),
+  "detectedCredibleDomains": zod.array(zod.string()).optional(),
+  "country": zod.string(),
+  "province": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "category": zod.string(),
+  "businessImpact": zod.string().nullish(),
+  "securityRelevant": zod.boolean(),
+  "credible": zod.boolean(),
+  "credibilityReason": zod.string().nullish(),
+  "corroborated": zod.boolean(),
+  "corroborationReason": zod.string().nullish(),
+  "corroboratingIncidentId": zod.number().nullish(),
+  "promotionTopic": zod.string(),
+  "url": zod.string(),
+  "pageUrl": zod.string().nullish(),
+  "classification": zod.string(),
+  "promotable": zod.boolean(),
+  "engagement": zod.union([zod.record(zod.string(), zod.number().nullable()),zod.null()]).optional().describe('Minimised public engagement counts (likes\/comments\/shares) when the provider returns them — context only, never PII.'),
+  "detectedKeywords": zod.array(zod.string()),
+  "confidence": zod.number(),
+  "reviewFlag": zod.boolean(),
+  "reviewReason": zod.string().nullish(),
+  "reviewStatus": zod.string().describe('Analyst review DECISION: pending_review (default) | ignored | context | promoted. Distinct from the auto-derived reviewFlag triage. Drives the actionable queue.'),
+  "promotedIncidentId": zod.number().nullish(),
+  "promotedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date().nullish()
+}).describe('A Facebook OSINT monitoring item (Papua New Guinea \/ Indonesian Papua) stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which the server re-derives and which sets promotedIncidentId. The stored payload is minimised\/redacted (no comments, author profiles, PII, or token-bearing URLs).')
 
 
 /**

@@ -38,8 +38,29 @@ trailing slash, else "". Applied in `normaliseFacebookPost` to `url` (also
 drives `externalId`), `imageUrls`, `outboundLinks` — so `rawPayload.url` is
 clean and no token-bearing / signed (`oh=`/`oe=`/`fbclid`) URL is stored.
 
-**Unkeyed install = inactive.** No Apify key → the pass no-ops, Source Health
-reads `not_configured`, the panel shows its empty-state; never half-runs.
+**Two distinct, separately-keyed feeders share ONE persist seam.** The LIVE
+scheduled ingest is keyed by `FACEBOOK_API_KEY`; a SEPARATE MANUAL importer
+(`scripts import:apify-facebook --datasetId X [--commit]`) is keyed by
+`APIFY_TOKEN` and pulls a one-off Apify dataset. Both normalise into
+`RawFacebookPost` and call the SHARED `persistFacebookPosts(posts, {commit})`,
+so dedup/scope/insert behave identically regardless of source. Do NOT conflate
+the two env vars. Apify dataset items use aliases the normaliser must keep:
+`permalink`→url, `groupUrl`→pageUrl, `createdAt`→postedAt, `likesCount`/
+`commentsCount`→engagement.
+**Why:** the importer was added to backfill from Apify runs without standing up
+a live key; one persist seam guarantees a manual import can never behave
+differently (e.g. skip the isolation/dedup invariants) from the live feed.
+
+**Unkeyed install = inactive.** Neither key set → the relevant pass no-ops,
+Source Health reads `not_configured`, the panel shows its empty-state; never
+half-runs.
+
+**Review status is a non-destructive triage layer, NOT a promote.** Analysts
+set `reviewStatus` via `PATCH /social-raw/:id/review-status` accepting ONLY
+`pending_review|ignored|context` — it never mints/touches an incident. `promoted`
+is NOT a PATCHable value (→ 400); ONLY the promote route sets it, and a row with
+a non-null `promotedIncidentId` is frozen (any re-review → 409). **Why:** keeps
+the "only promote mints an incident" invariant true even as triage state grows.
 
 **Test-stub caveat:** the in-memory db stub in `socialRawPromote.test.ts`
 models `.returning()` + the `isNull` claim guard + transaction snapshot/rollback

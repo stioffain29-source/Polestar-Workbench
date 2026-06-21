@@ -20,6 +20,7 @@
 import {
   compileGazetteer,
   deriveProvince,
+  deriveLocality,
   extractStructuredItem,
   deriveIncidentDate,
   type IncidentCategory,
@@ -104,6 +105,29 @@ export const WEST_PAPUA_PROVINCE_BY_CITY: Record<string, string> = {
   maybrat: "Papua Barat Daya",
   kumurkek: "Papua Barat Daya",
   teminabuan: "Papua Barat Daya",
+  ayamaru: "Papua Barat Daya",
+  aifat: "Papua Barat Daya",
+  aitinyo: "Papua Barat Daya",
+  // Papua (Jayapura / Yapen / coast — further localities)
+  serui: "Papua",
+  yapen: "Papua",
+  depapre: "Papua",
+  demta: "Papua",
+  // Papua Pegunungan (further localities)
+  mapenduma: "Papua Pegunungan",
+  kobakma: "Papua Pegunungan",
+  ninia: "Papua Pegunungan",
+  okbibab: "Papua Pegunungan",
+  // Papua Tengah (Freeport belt + highlands — further localities)
+  tembagapura: "Papua Tengah",
+  "kuala kencana": "Papua Tengah",
+  sinak: "Papua Tengah",
+  agandugume: "Papua Tengah",
+  homeyo: "Papua Tengah",
+  // Papua Barat (Bintuni belt — further localities)
+  babo: "Papua Barat",
+  windesi: "Papua Barat",
+  kebar: "Papua Barat",
 };
 
 const WEST_PAPUA_GAZETTEER = compileGazetteer(WEST_PAPUA_PROVINCE_BY_CITY);
@@ -116,6 +140,13 @@ export type WestPapuaExtraction = StructuredExtraction;
  * known) or by scanning the incident text for a known locality. Returns null
  * when nothing matches, so the report falls back to the location/country label.
  */
+export function deriveWestPapuaLocality(
+  location: string | null | undefined,
+  text: string,
+): string | null {
+  return deriveLocality(location, text, WEST_PAPUA_GAZETTEER);
+}
+
 export function deriveWestPapuaProvince(
   location: string | null | undefined,
   text: string,

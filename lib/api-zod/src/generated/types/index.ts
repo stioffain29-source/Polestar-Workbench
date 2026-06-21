@@ -132,3 +132,5 @@ export * from './strikeUpdate';
 export * from './targetCategory';
 export * from './topic';
 export * from './topicCount';
+export * from './updateSocialRawReviewStatusRequest';
+export * from './updateSocialRawReviewStatusRequestReviewStatus';

@@ -15,6 +15,8 @@ import {
 import {
   ListSocialRawItemsQueryParams,
   PromoteSocialRawItemParams,
+  UpdateSocialRawReviewStatusParams,
+  UpdateSocialRawReviewStatusBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -41,6 +43,49 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // duplicate window (4 days) so pickDuplicate applies the real bar; over-fetching
 // a few extra rows costs nothing and keeps the gate honest.
 const DUP_QUERY_WINDOW_DAYS = 6;
+
+// Shared public projection for list + review-status reads so the GET feed and the
+// PATCH response never disagree. Deliberately omits the minimised raw payload.
+const LIST_COLUMNS = {
+  id: socialRawTable.id,
+  sourceName: socialRawTable.sourceName,
+  platform: socialRawTable.platform,
+  pageHandle: socialRawTable.pageHandle,
+  pageName: socialRawTable.pageName,
+  sourceTier: socialRawTable.sourceTier,
+  externalId: socialRawTable.externalId,
+  postedAt: socialRawTable.postedAt,
+  incidentDate: socialRawTable.incidentDate,
+  caption: socialRawTable.caption,
+  imageUrls: socialRawTable.imageUrls,
+  links: socialRawTable.links,
+  detectedCredibleDomains: socialRawTable.detectedCredibleDomains,
+  country: socialRawTable.country,
+  province: socialRawTable.province,
+  location: socialRawTable.location,
+  category: socialRawTable.category,
+  businessImpact: socialRawTable.businessImpact,
+  securityRelevant: socialRawTable.securityRelevant,
+  credible: socialRawTable.credible,
+  credibilityReason: socialRawTable.credibilityReason,
+  corroborated: socialRawTable.corroborated,
+  corroborationReason: socialRawTable.corroborationReason,
+  corroboratingIncidentId: socialRawTable.corroboratingIncidentId,
+  promotionTopic: socialRawTable.promotionTopic,
+  url: socialRawTable.url,
+  pageUrl: socialRawTable.pageUrl,
+  classification: socialRawTable.classification,
+  promotable: socialRawTable.promotable,
+  engagement: socialRawTable.engagement,
+  detectedKeywords: socialRawTable.detectedKeywords,
+  confidence: socialRawTable.confidence,
+  reviewFlag: socialRawTable.reviewFlag,
+  reviewReason: socialRawTable.reviewReason,
+  reviewStatus: socialRawTable.reviewStatus,
+  promotedIncidentId: socialRawTable.promotedIncidentId,
+  promotedAt: socialRawTable.promotedAt,
+  createdAt: socialRawTable.createdAt,
+};
 
 router.get("/social-raw", async (req, res): Promise<void> => {
   const parsed = ListSocialRawItemsQueryParams.safeParse(req.query);
@@ -80,50 +125,62 @@ router.get("/social-raw", async (req, res): Promise<void> => {
     );
 
   const rows = await db
-    .select({
-      id: socialRawTable.id,
-      sourceName: socialRawTable.sourceName,
-      platform: socialRawTable.platform,
-      pageHandle: socialRawTable.pageHandle,
-      pageName: socialRawTable.pageName,
-      sourceTier: socialRawTable.sourceTier,
-      externalId: socialRawTable.externalId,
-      postedAt: socialRawTable.postedAt,
-      incidentDate: socialRawTable.incidentDate,
-      caption: socialRawTable.caption,
-      imageUrls: socialRawTable.imageUrls,
-      links: socialRawTable.links,
-      detectedCredibleDomains: socialRawTable.detectedCredibleDomains,
-      country: socialRawTable.country,
-      province: socialRawTable.province,
-      location: socialRawTable.location,
-      category: socialRawTable.category,
-      businessImpact: socialRawTable.businessImpact,
-      securityRelevant: socialRawTable.securityRelevant,
-      credible: socialRawTable.credible,
-      credibilityReason: socialRawTable.credibilityReason,
-      corroborated: socialRawTable.corroborated,
-      corroborationReason: socialRawTable.corroborationReason,
-      corroboratingIncidentId: socialRawTable.corroboratingIncidentId,
-      promotionTopic: socialRawTable.promotionTopic,
-      url: socialRawTable.url,
-      classification: socialRawTable.classification,
-      promotable: socialRawTable.promotable,
-      engagement: socialRawTable.engagement,
-      detectedKeywords: socialRawTable.detectedKeywords,
-      confidence: socialRawTable.confidence,
-      reviewFlag: socialRawTable.reviewFlag,
-      reviewReason: socialRawTable.reviewReason,
-      promotedIncidentId: socialRawTable.promotedIncidentId,
-      promotedAt: socialRawTable.promotedAt,
-      createdAt: socialRawTable.createdAt,
-    })
+    .select(LIST_COLUMNS)
     .from(socialRawTable)
     .where(conditions.length > 1 ? and(...conditions) : conditions[0])
     .orderBy(desc(socialRawTable.postedAt), desc(socialRawTable.id))
     .limit(limit ?? DEFAULT_LIMIT);
 
   res.json(rows);
+});
+
+// Set the analyst review DECISION (Ignore / Keep-as-Context / re-open). Public
+// posture, in line with the rest of the workbench. This NEVER creates or touches
+// an incident — it only moves the row in or out of the actionable review queue.
+// "promoted" is reserved for the promote action; a row already promoted is fixed.
+router.patch("/social-raw/:id/review-status", async (req, res): Promise<void> => {
+  const parsedParams = UpdateSocialRawReviewStatusParams.safeParse({
+    id: req.params.id,
+  });
+  if (!parsedParams.success) {
+    res.status(400).json({ error: parsedParams.error.message });
+    return;
+  }
+  const parsedBody = UpdateSocialRawReviewStatusBody.safeParse(req.body);
+  if (!parsedBody.success) {
+    res.status(400).json({ error: parsedBody.error.message });
+    return;
+  }
+  const id = parsedParams.data.id;
+  const reviewStatus = parsedBody.data.reviewStatus;
+
+  const [item] = await db
+    .select({
+      id: socialRawTable.id,
+      promotedIncidentId: socialRawTable.promotedIncidentId,
+    })
+    .from(socialRawTable)
+    .where(eq(socialRawTable.id, id))
+    .limit(1);
+  if (!item) {
+    res.status(404).json({ error: "Facebook OSINT item not found" });
+    return;
+  }
+  if (item.promotedIncidentId !== null) {
+    res.status(409).json({
+      error: "Item already promoted — its review status is fixed",
+      incidentId: item.promotedIncidentId,
+    });
+    return;
+  }
+
+  const [updated] = await db
+    .update(socialRawTable)
+    .set({ reviewStatus, updatedAt: new Date() })
+    .where(eq(socialRawTable.id, id))
+    .returning(LIST_COLUMNS);
+
+  res.json(updated);
 });
 
 router.post("/social-raw/:id/promote", async (req, res): Promise<void> => {
@@ -301,6 +358,7 @@ router.post("/social-raw/:id/promote", async (req, res): Promise<void> => {
         .set({
           promotedIncidentId: row!.id,
           promotedAt: new Date(),
+          reviewStatus: "promoted",
           updatedAt: new Date(),
         })
         .where(

@@ -87,6 +87,8 @@ export type {
 } from "./socialWatch";
 export {
   runFacebookOsintIngest,
+  persistFacebookPosts,
+  fetchApifyDatasetItems,
   emptyFacebookOsintSummary,
   readFacebookOsintConfig,
   isFacebookOsintActive,
@@ -105,6 +107,8 @@ export type {
   FbClassification,
   RawFacebookPost,
   ScopeResolution,
+  PersistFacebookOptions,
+  PersistFacebookResult,
 } from "./facebookOsint";
 export {
   deriveEligibility,
@@ -148,14 +152,21 @@ export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { runNewsCountryBackfill } from "./backfillNewsCountry";
 export { runPngExtractBackfill, runWestPapuaExtractBackfill } from "./backfillPngExtract";
 export type { PngExtractBackfillSummary } from "./backfillPngExtract";
-export { derivePngProvince, extractPngItem, derivePngIncidentDate } from "./pngExtract";
+export {
+  derivePngProvince,
+  derivePngLocality,
+  extractPngItem,
+  derivePngIncidentDate,
+} from "./pngExtract";
 export type { PngCategory, PngExtraction } from "./pngExtract";
 export {
   deriveWestPapuaProvince,
+  deriveWestPapuaLocality,
   extractWestPapuaItem,
   deriveWestPapuaIncidentDate,
 } from "./westPapuaExtract";
 export type { WestPapuaCategory, WestPapuaExtraction } from "./westPapuaExtract";
+export { deriveLocality } from "./structuredExtract";
 export type { IncidentCategory } from "./structuredExtract";
 export type { NewsCountryBackfillSummary } from "./backfillNewsCountry";
 export { geocode } from "./geocode";

@@ -16,6 +16,7 @@ import {
   resolveScope,
   normaliseFacebookPost,
   classifyPost,
+  persistFacebookPosts,
   makeFacebookDedupKey,
   isFacebookOsintActive,
   readFacebookOsintConfig,
@@ -32,6 +33,7 @@ import {
   type RawFacebookPost,
   type IncidentCandidate,
 } from "@workspace/ingest";
+import { db } from "@workspace/db";
 
 // ---------------------------------------------------------------------------
 // PII redaction (shared with the KAMMI watch sanitiser).
@@ -599,5 +601,210 @@ describe("detectKeywords", () => {
   it("does not duplicate a cue that matches more than once", () => {
     const kws = detectKeywords("protest, protests and more protesters at the protest");
     expect(kws.filter((k) => k === "protest")).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Apify dataset normalisation aliases. The MANUAL importer feeds dataset items
+// straight through normaliseFacebookPost, so these lock the field aliases the
+// real Apify Facebook scrapers emit — an import must never silently drop a
+// post's url / page provenance / timestamp / engagement.
+// ---------------------------------------------------------------------------
+describe("normaliseFacebookPost — Apify dataset aliases", () => {
+  it("accepts a permalink-only item as the canonical url", () => {
+    const norm = normaliseFacebookPost({
+      permalink: "https://www.facebook.com/p/abc123",
+      text: "Clash reported in Lae",
+    });
+    expect(norm).not.toBeNull();
+    expect(norm!.url).toBe("https://www.facebook.com/p/abc123");
+    expect(norm!.externalId).toMatch(/^fb_/);
+  });
+
+  it("captures groupUrl as the page/group provenance url", () => {
+    const norm = normaliseFacebookPost({
+      postId: "g1",
+      text: "Roadblock near the highway",
+      groupUrl: "https://www.facebook.com/groups/123456",
+    });
+    expect(norm).not.toBeNull();
+    expect(norm!.pageUrl).toBe("https://www.facebook.com/groups/123456");
+  });
+
+  it("reads createdAt as the posted timestamp", () => {
+    const norm = normaliseFacebookPost({
+      postId: "t1",
+      text: "Curfew imposed overnight",
+      createdAt: "2026-06-18T09:30:00.000Z",
+    });
+    expect(norm).not.toBeNull();
+    expect(norm!.postedAt).toBeInstanceOf(Date);
+    expect(norm!.postedAt!.toISOString()).toBe("2026-06-18T09:30:00.000Z");
+  });
+
+  it("maps likesCount / commentsCount to coarse engagement counts", () => {
+    const norm = normaliseFacebookPost({
+      postId: "e1",
+      text: "Protest march in Jayapura",
+      likesCount: 42,
+      commentsCount: 7,
+    });
+    expect(norm).not.toBeNull();
+    expect(norm!.engagement).toEqual({ reactions: 42, comments: 7 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Expanded PNG + Indonesian-Papua keyword cues (collection-time transparency).
+// Bahasa captions arrive untranslated, so the cue set must match the local
+// security vocabulary directly — these lock the new terms against real samples.
+// ---------------------------------------------------------------------------
+describe("detectKeywords — expanded PNG + Indonesian-Papua cues", () => {
+  it("matches PNG-specific security vocabulary", () => {
+    expect(
+      detectKeywords("Sorcery-accusation related violence in the highlands"),
+    ).toContain("sorcery-accusation violence");
+    expect(detectKeywords("A raskol gang held up a store")).toContain(
+      "raskol gang",
+    );
+  });
+
+  it("matches untranslated Bahasa Indonesia security vocabulary", () => {
+    expect(detectKeywords("Penembakan di Intan Jaya")).toContain("shooting (id)");
+    expect(detectKeywords("Aksi unjuk rasa di Jayapura")).toContain(
+      "protest (id)",
+    );
+    expect(detectKeywords("Pasukan Brimob dikerahkan ke lokasi")).toContain(
+      "security-force deployment",
+    );
+    expect(detectKeywords("Penculikan seorang warga dilaporkan")).toContain(
+      "abduction (id)",
+    );
+    expect(detectKeywords("Kontak senjata antara TNI dan KKB")).toEqual(
+      expect.arrayContaining([
+        "armed contact (id)",
+        "Indonesian military",
+        "armed group (KKB)",
+      ]),
+    );
+  });
+
+  it("does not fire on a benign Bahasa caption with no security cue", () => {
+    expect(
+      detectKeywords("Selamat pagi, semoga harimu menyenangkan"),
+    ).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// classifyPost — expanded theatre locality. The gazetteer resolves a sub-national
+// place from the caption for BOTH theatres (PNG highlands + Indonesian-Papua
+// regencies) so the analyst queue carries a precise location, not just a country.
+// ---------------------------------------------------------------------------
+describe("classifyPost — expanded theatre locality", () => {
+  const base: RawFacebookPost = {
+    externalId: "fb_loc",
+    url: "https://www.facebook.com/p/loc",
+    caption: "",
+    imageUrls: [],
+    outboundLinks: [],
+    postedAt: new Date("2026-06-20T00:00:00Z"),
+  };
+
+  it("resolves a PNG highlands town to a location", () => {
+    const c = classifyPost({
+      ...base,
+      caption: "Tribal fighting erupts in Mount Hagen, Papua New Guinea",
+    });
+    expect(c).not.toBeNull();
+    expect(c!.country).toBe("Papua New Guinea");
+    expect(c!.location?.toLowerCase()).toContain("mount hagen");
+  });
+
+  it("resolves an Indonesian-Papua regency to a location", () => {
+    const c = classifyPost({
+      ...base,
+      caption: "Penembakan dilaporkan di Intan Jaya, Papua",
+    });
+    expect(c).not.toBeNull();
+    expect(c!.country).toBe("Indonesia");
+    expect(c!.location?.toLowerCase()).toContain("intan jaya");
+    expect(c!.detectedKeywords).toContain("shooting (id)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// persistFacebookPosts — in-run de-duplication seam (shared by the live engine
+// AND the manual Apify importer). The DB is fully stubbed to return no rows, so
+// this isolates the in-memory collapse: a re-shared post (same content → same
+// dedupKey) or a repeated dataset item (same externalId) must reduce to ONE row
+// BEFORE any write. Dry-run, so nothing is inserted.
+// ---------------------------------------------------------------------------
+describe("persistFacebookPosts collapses duplicates in-run (dry-run)", () => {
+  function emptyQuery(): Record<string, unknown> {
+    const chain: Record<string, unknown> = {
+      from: () => chain,
+      where: () => chain,
+      orderBy: () => chain,
+      limit: () => chain,
+      groupBy: () => chain,
+      then: (res: (v: unknown[]) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve([] as unknown[]).then(res, rej),
+      catch: (rej: (e: unknown) => unknown) =>
+        Promise.resolve([] as unknown[]).catch(rej),
+      finally: (f: () => void) => Promise.resolve([] as unknown[]).finally(f),
+    };
+    return chain;
+  }
+
+  let insertSpy: jest.SpiedFunction<typeof db.insert>;
+  beforeEach(() => {
+    jest.spyOn(db, "select").mockImplementation(() => emptyQuery() as never);
+    insertSpy = jest.spyOn(db, "insert");
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const base: RawFacebookPost = {
+    externalId: "fb_a",
+    url: "https://www.facebook.com/p/a",
+    caption:
+      "Armed robbery and shooting at a store in Port Moresby, Papua New Guinea",
+    imageUrls: ["https://cdn/x.jpg"],
+    outboundLinks: [],
+    postedAt: new Date("2026-06-20T00:00:00Z"),
+  };
+
+  it("collapses re-shared posts with identical content (same dedupKey)", async () => {
+    const res = await persistFacebookPosts(
+      [
+        base,
+        { ...base, externalId: "fb_b", url: "https://www.facebook.com/p/b" },
+      ],
+      { commit: false },
+    );
+    expect(res.inScope).toBe(2);
+    expect(res.newToInsert).toBe(1);
+    expect(res.inserted).toBe(0);
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
+
+  it("collapses repeated dataset items sharing one externalId", async () => {
+    const res = await persistFacebookPosts(
+      [
+        base,
+        {
+          ...base,
+          caption: "Tribal fighting erupts in Mount Hagen, Papua New Guinea",
+          imageUrls: ["https://cdn/y.jpg"],
+        },
+      ],
+      { commit: false },
+    );
+    expect(res.inScope).toBe(2);
+    expect(res.newToInsert).toBe(1);
+    expect(res.inserted).toBe(0);
+    expect(insertSpy).not.toHaveBeenCalled();
   });
 });

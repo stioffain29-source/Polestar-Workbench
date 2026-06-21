@@ -227,6 +227,18 @@ function makeUpdateBuilder(table: unknown, vals: Row, cond: unknown) {
 function installDbStub(): void {
   jest.spyOn(db, "select").mockImplementation(() => selectChain() as never);
 
+  // The review-status PATCH updates the row OUTSIDE a transaction, so mock the
+  // top-level db.update with the same builder the transaction uses. A non-claim
+  // SET (reviewStatus + updatedAt) lands on the row matched by id.
+  jest.spyOn(db, "update").mockImplementation(
+    (table: unknown) =>
+      ({
+        set: (vals: Row) => ({
+          where: (cond: unknown) => makeUpdateBuilder(table, vals, cond),
+        }),
+      }) as never,
+  );
+
   // The only sanctioned incident write goes through promote's transaction, which
   // here SNAPSHOTS and ROLLS BACK on throw so a guard rejection (e.g. a lost
   // concurrent claim) undoes the speculative incident insert — exactly like a
@@ -365,6 +377,7 @@ function seedSocialRawItem(over: Partial<Row> = {}): Row {
     promotionTopic: "conflict",
     url: "https://www.facebook.com/p/abc123/",
     classification: "context",
+    reviewStatus: "pending_review",
     promotable: true,
     promotedIncidentId: null,
     promotedAt: null,
@@ -597,5 +610,101 @@ describe("GET /social-raw review + eligibility filters", () => {
     expect(after.some((r) => r.id === item.id)).toBe(false);
     const complement = await listSocialRaw("?eligible=");
     expect(complement.some((r) => r.id === item.id)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Analyst review actions. A non-destructive PATCH lets the analyst triage a row
+// (ignore / keep-as-context / re-open) WITHOUT minting an incident. Promote is
+// the only path that fixes the row to 'promoted'; an already-promoted row is
+// frozen so its decided status can never be overwritten.
+// ---------------------------------------------------------------------------
+describe("PATCH /social-raw/:id/review-status", () => {
+  async function setReview(id: number, reviewStatus: string) {
+    const res = await fetch(`${baseUrl}/api/social-raw/${id}/review-status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reviewStatus }),
+    });
+    return { status: res.status, json: await res.json() };
+  }
+
+  it("ignores / keeps-as-context / re-opens a row and persists each transition", async () => {
+    seedFlashpointIncidents(2);
+    const incidentsBefore = incidents.length;
+    const item = seedSocialRawItem({ reviewStatus: "pending_review" });
+
+    const ignored = await setReview(item.id as number, "ignored");
+    expect(ignored.status).toBe(200);
+    expect(ignored.json.reviewStatus).toBe("ignored");
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "ignored",
+    );
+
+    const context = await setReview(item.id as number, "context");
+    expect(context.status).toBe(200);
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "context",
+    );
+
+    const reopened = await setReview(item.id as number, "pending_review");
+    expect(reopened.status).toBe(200);
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "pending_review",
+    );
+
+    // Triage is non-destructive: NO incident is ever minted by a review action.
+    expect(incidents.length).toBe(incidentsBefore);
+  });
+
+  it("rejects an unknown review status with 400 and writes nothing", async () => {
+    const item = seedSocialRawItem({ reviewStatus: "pending_review" });
+    const bad = await setReview(item.id as number, "archived");
+    expect(bad.status).toBe(400);
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "pending_review",
+    );
+  });
+
+  it("refuses to set 'promoted' via PATCH (400) — only promote may do that", async () => {
+    const item = seedSocialRawItem({ reviewStatus: "pending_review" });
+    const bad = await setReview(item.id as number, "promoted");
+    expect(bad.status).toBe(400);
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "pending_review",
+    );
+  });
+
+  it("returns 404 for a row that does not exist", async () => {
+    const res = await setReview(9999, "ignored");
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses to re-review an already-promoted row (409)", async () => {
+    const item = seedSocialRawItem({
+      reviewStatus: "promoted",
+      promotedIncidentId: 4242,
+    });
+    const res = await setReview(item.id as number, "ignored");
+    expect(res.status).toBe(409);
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "promoted",
+    );
+  });
+});
+
+describe("promote fixes reviewStatus to 'promoted'", () => {
+  it("sets reviewStatus='promoted' on a successful promote", async () => {
+    seedFlashpointIncidents(0);
+    const item = seedSocialRawItem({
+      sourceTier: "official",
+      promotable: true,
+      reviewStatus: "pending_review",
+    });
+    const { status } = await promote(item.id as number);
+    expect(status).toBe(201);
+    expect(socialItems.find((r) => r.id === item.id)!.reviewStatus).toBe(
+      "promoted",
+    );
   });
 });
