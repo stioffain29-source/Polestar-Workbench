@@ -55,6 +55,7 @@ import type {
   ListMarketPricesParams,
   ListReliefWebReportsParams,
   ListReportsParams,
+  ListSocialWatchItemsParams,
   ListSourcesParams,
   ListSpotReportsParams,
   ListStrikesParams,
@@ -69,6 +70,7 @@ import type {
   ReportIncidentSummariesResult,
   ReportInput,
   ReportUpdate,
+  SocialWatchItem,
   Source,
   SourceHealth,
   SourceInput,
@@ -817,6 +819,160 @@ export function useListReliefWebReports<TData = Awaited<ReturnType<typeof listRe
 
 
 
+
+export const getListSocialWatchItemsUrl = (params?: ListSocialWatchItemsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social-watch?${stringifiedParams}` : `/api/social-watch`
+}
+
+/**
+ * @summary KAMMI Pusat public Instagram + Telegram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
+ */
+export const listSocialWatchItems = async (params?: ListSocialWatchItemsParams, options?: RequestInit): Promise<SocialWatchItem[]> => {
+
+  return customFetch<SocialWatchItem[]>(getListSocialWatchItemsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSocialWatchItemsQueryKey = (params?: ListSocialWatchItemsParams,) => {
+    return [
+    `/api/social-watch`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSocialWatchItemsQueryOptions = <TData = Awaited<ReturnType<typeof listSocialWatchItems>>, TError = ErrorType<unknown>>(params?: ListSocialWatchItemsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSocialWatchItems>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSocialWatchItemsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSocialWatchItems>>> = ({ signal }) => listSocialWatchItems(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSocialWatchItems>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSocialWatchItemsQueryResult = NonNullable<Awaited<ReturnType<typeof listSocialWatchItems>>>
+export type ListSocialWatchItemsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary KAMMI Pusat public Instagram + Telegram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
+ */
+
+export function useListSocialWatchItems<TData = Awaited<ReturnType<typeof listSocialWatchItems>>, TError = ErrorType<unknown>>(
+ params?: ListSocialWatchItemsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSocialWatchItems>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSocialWatchItemsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPromoteSocialWatchItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/social-watch/${id}/promote`
+}
+
+/**
+ * @summary Promote a confirmed-active social-watch item into a flashpoint incident (Indonesia). Only items whose text/image confirms the protest is active are eligible; planned/mobilisation, cancelled and unclear items are rejected. The created incident links back to the source post.
+ */
+export const promoteSocialWatchItem = async (id: number, options?: RequestInit): Promise<Incident> => {
+
+  return customFetch<Incident>(getPromoteSocialWatchItemUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPromoteSocialWatchItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof promoteSocialWatchItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof promoteSocialWatchItem>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['promoteSocialWatchItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof promoteSocialWatchItem>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  promoteSocialWatchItem(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PromoteSocialWatchItemMutationResult = NonNullable<Awaited<ReturnType<typeof promoteSocialWatchItem>>>
+
+    export type PromoteSocialWatchItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Promote a confirmed-active social-watch item into a flashpoint incident (Indonesia). Only items whose text/image confirms the protest is active are eligible; planned/mobilisation, cancelled and unclear items are rejected. The created incident links back to the source post.
+ */
+export const usePromoteSocialWatchItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof promoteSocialWatchItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof promoteSocialWatchItem>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPromoteSocialWatchItemMutationOptions(options));
+    }
 
 export const getListMaritimeSecurityEventsUrl = (params?: ListMaritimeSecurityEventsParams,) => {
   const normalizedParams = new URLSearchParams();

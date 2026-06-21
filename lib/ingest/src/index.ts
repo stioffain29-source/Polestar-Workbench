@@ -60,6 +60,32 @@ export type { ReliefWebReportsSummary } from "./reliefwebReports";
 export { runIccPiracyIngest, emptyIccPiracySummary } from "./iccPiracy";
 export type { IccPiracySummary } from "./iccPiracy";
 export {
+  runSocialWatchIngest,
+  emptySocialWatchSummary,
+  readSocialWatchConfig,
+  isSocialWatchActive,
+  sanitiseCaption,
+  classifyStatus,
+  isProtestRelevant,
+  isPromotable,
+  extractLocation,
+  extractIssue,
+  extractEventDateTime,
+  detectAlertReasons,
+  makeDedupKey,
+  parseTelegramHtml,
+  SOCIAL_WATCH_STATUSES,
+  SOCIAL_WATCH_IG_HEALTH_NAME,
+  SOCIAL_WATCH_TG_HEALTH_NAME,
+} from "./socialWatch";
+export type {
+  SocialWatchSummary,
+  SocialWatchConfig,
+  SocialWatchStatus,
+  PlatformResult as SocialWatchPlatformResult,
+  RawSocialPost,
+} from "./socialWatch";
+export {
   runGdeltEnrich,
   isGdeltConfigured,
   isGdeltEnrichEnabled,

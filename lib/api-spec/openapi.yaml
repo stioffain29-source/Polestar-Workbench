@@ -202,6 +202,65 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ReliefWebReport" }
 
+  /social-watch:
+    get:
+      operationId: listSocialWatchItems
+      tags: [social-watch]
+      summary: >-
+        KAMMI Pusat public Instagram + Telegram protest-watch items, stored as
+        supporting CONTEXT (never as incidents, so they never inflate any count).
+        The only path into incidents is the explicit promote action.
+      parameters:
+        - name: status
+          in: query
+          description: Filter to one derived status
+          schema: { $ref: "#/components/schemas/SocialWatchStatus" }
+        - name: platform
+          in: query
+          description: Filter to one platform (instagram | telegram)
+          schema: { type: string, enum: [instagram, telegram] }
+        - name: promotable
+          in: query
+          description: Limit to items eligible for promotion to an incident
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          description: Max number of most-recent items to return (1-200)
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SocialWatchItem" }
+
+  /social-watch/{id}/promote:
+    post:
+      operationId: promoteSocialWatchItem
+      tags: [social-watch]
+      summary: >-
+        Promote a confirmed-active social-watch item into a flashpoint incident
+        (Indonesia). Only items whose text/image confirms the protest is active
+        are eligible; planned/mobilisation, cancelled and unclear items are
+        rejected. The created incident links back to the source post.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Created — the new incident
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incident" }
+        "404":
+          description: Item not found
+        "409":
+          description: Item not promotable, or already promoted
+
   /maritime-security-events:
     get:
       operationId: listMaritimeSecurityEvents
@@ -2393,6 +2452,53 @@ components:
         tags:
           type: array
           items: { type: string }
+
+    SocialWatchStatus:
+      type: string
+      enum: [planned, active, dispersed, cancelled, unclear]
+      description: >-
+        Derived protest status of a social-watch item: planned (announced /
+        mobilisation), active (confirmed under way), dispersed (broken up / clash
+        / arrests), cancelled (called off / postponed), or unclear.
+
+    SocialWatchItem:
+      type: object
+      description: >-
+        A KAMMI Pusat public Instagram / Telegram protest-watch item stored as
+        supporting CONTEXT. NOT an incident: these rows live in their own table
+        and never feed any incident count. The only path into incidents is the
+        explicit promote action, which sets promotedIncidentId.
+      required: [id, platform, channel, status, confidence, url, classification, promotable]
+      properties:
+        id: { type: integer }
+        platform: { type: string }
+        channel: { type: string }
+        actor: { type: ["string", "null"] }
+        externalId: { type: string }
+        postedAt: { type: ["string", "null"], format: date-time }
+        eventDate: { type: ["string", "null"], format: date-time }
+        eventTimeText: { type: ["string", "null"] }
+        caption: { type: ["string", "null"] }
+        imageUrls:
+          type: array
+          items: { type: string }
+        location: { type: ["string", "null"] }
+        city: { type: string }
+        province: { type: ["string", "null"] }
+        issue: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/SocialWatchStatus" }
+        confidence: { type: string }
+        url: { type: string }
+        country: { type: string }
+        topic: { type: string }
+        classification: { type: string }
+        alertReasons:
+          type: array
+          items: { type: string }
+        promotable: { type: boolean }
+        promotedIncidentId: { type: ["integer", "null"] }
+        promotedAt: { type: ["string", "null"], format: date-time }
+        postedAtDisplay: { type: ["string", "null"] }
 
     MaritimeSecurityEvent:
       type: object

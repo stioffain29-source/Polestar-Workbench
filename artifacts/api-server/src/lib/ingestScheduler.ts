@@ -285,6 +285,45 @@ async function hoursSinceNewestMaritimeSecurity(): Promise<number | null> {
 }
 
 /**
+ * True when the KAMMI social-watch ingest is active — i.e. at least one platform
+ * is both configured (key/handle present) and not switched off. Mirrors
+ * isSocialWatchActive() in lib/ingest/src/socialWatch.ts so the scheduler gates
+ * on the SAME condition the collector uses: when no platform is active the
+ * social_watch_items table is empty by design, so gating on its freshness would
+ * force a needless scrape on every cold start.
+ */
+function socialWatchActive(): boolean {
+  if (process.env["SOCIAL_WATCH_ENABLED"]?.trim().toLowerCase() === "false")
+    return false;
+  const off = (v: string | undefined): boolean => {
+    const s = v?.trim().toLowerCase();
+    return s === "false" || s === "0" || s === "off" || s === "no";
+  };
+  const igKeyed = (process.env["INSTAGRAM_API_KEY"]?.trim().length ?? 0) > 0;
+  const igActive = igKeyed && !off(process.env["INSTAGRAM_ENABLED"]);
+  // Telegram uses the free public web view: active unless explicitly disabled.
+  const tgActive = !off(process.env["TELEGRAM_ENABLED"]);
+  return igActive || tgActive;
+}
+
+/**
+ * Hours since the newest stored KAMMI social-watch item (or null when the table
+ * is empty). Social-watch items refresh ONLY inside a full ingest (runIngestOnce
+ * → runSocialWatchIngest), so — like strikes, the land topics and AIS movement —
+ * a stale-but-populated table should force a boot catch-up. Uses created_at
+ * (insertion heartbeat) so a quiet protest week does not look stale. Only
+ * considered when socialWatchActive(); an empty table is otherwise not a trigger.
+ */
+async function hoursSinceNewestSocialWatch(): Promise<number | null> {
+  const res = await db.execute(
+    sql`SELECT MAX(created_at) AS last FROM social_watch_items`,
+  );
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
  * Operational SLA monitor for the live AIS ship-movement board. Emits a WARN
  * (an alert hook for log-based monitoring) when AIS is keyed+enabled but the
  * newest movement snapshot has aged past the MOVEMENT_FRESH_DAYS window, i.e.
@@ -639,6 +678,18 @@ export function startIngestScheduler(): void {
           const maritimeSecurityAge = await hoursSinceNewestMaritimeSecurity();
           const maritimeSecurityStale =
             maritimeSecurityAge !== null && maritimeSecurityAge >= hours;
+          // KAMMI social-watch context also refreshes ONLY inside a full ingest.
+          // Treat a stale table as a reason to run, but ONLY when a platform is
+          // active — otherwise the table is empty by design and gating on it
+          // would force a needless scrape on every cold start. An empty table
+          // while active IS a trigger (initial population) since the free
+          // Telegram web view is normally reachable.
+          const socialActive = socialWatchActive();
+          const socialWatchAge = socialActive
+            ? await hoursSinceNewestSocialWatch()
+            : null;
+          const socialWatchStale =
+            socialActive && (socialWatchAge === null || socialWatchAge >= hours);
           // A movement table already past the 14-day SLA at boot means the
           // refresh path fell behind (the catch-up below restores it, but the
           // breach itself is worth an alert in production).
@@ -661,7 +712,8 @@ export function startIngestScheduler(): void {
             staleLandTopics.length > 0 ||
             strikesStale ||
             movementStale ||
-            maritimeSecurityStale
+            maritimeSecurityStale ||
+            socialWatchStale
           ) {
             logger.info(
               {
@@ -685,6 +737,9 @@ export function startIngestScheduler(): void {
                     ? null
                     : Math.round(maritimeSecurityAge),
                 maritimeSecurityStale,
+                socialWatchAgeHours:
+                  socialWatchAge === null ? null : Math.round(socialWatchAge),
+                socialWatchStale,
               },
               "boot ingest: data stale, running catch-up",
             );

@@ -479,6 +479,58 @@ export const ListReliefWebReportsResponse = zod.array(ListReliefWebReportsRespon
 
 
 /**
+ * @summary KAMMI Pusat public Instagram + Telegram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
+ */
+export const listSocialWatchItemsQueryLimitMax = 200;
+
+
+
+export const ListSocialWatchItemsQueryParams = zod.object({
+  "status": zod.enum(['planned', 'active', 'dispersed', 'cancelled', 'unclear']).optional().describe('Filter to one derived status'),
+  "platform": zod.enum(['instagram', 'telegram']).optional().describe('Filter to one platform (instagram | telegram)'),
+  "promotable": zod.coerce.boolean().optional().describe('Limit to items eligible for promotion to an incident'),
+  "limit": zod.coerce.number().min(1).max(listSocialWatchItemsQueryLimitMax).optional().describe('Max number of most-recent items to return (1-200)')
+})
+
+export const ListSocialWatchItemsResponseItem = zod.object({
+  "id": zod.number(),
+  "platform": zod.string(),
+  "channel": zod.string(),
+  "actor": zod.string().nullish(),
+  "externalId": zod.string().optional(),
+  "postedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullish(),
+  "eventTimeText": zod.string().nullish(),
+  "caption": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
+  "location": zod.string().nullish(),
+  "city": zod.string().optional(),
+  "province": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "status": zod.enum(['planned', 'active', 'dispersed', 'cancelled', 'unclear']).describe('Derived protest status of a social-watch item: planned (announced \/ mobilisation), active (confirmed under way), dispersed (broken up \/ clash \/ arrests), cancelled (called off \/ postponed), or unclear.'),
+  "confidence": zod.string(),
+  "url": zod.string(),
+  "country": zod.string().optional(),
+  "topic": zod.string().optional(),
+  "classification": zod.string(),
+  "alertReasons": zod.array(zod.string()).optional(),
+  "promotable": zod.boolean(),
+  "promotedIncidentId": zod.number().nullish(),
+  "promotedAt": zod.coerce.date().nullish(),
+  "postedAtDisplay": zod.string().nullish()
+}).describe('A KAMMI Pusat public Instagram \/ Telegram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.')
+export const ListSocialWatchItemsResponse = zod.array(ListSocialWatchItemsResponseItem)
+
+
+/**
+ * @summary Promote a confirmed-active social-watch item into a flashpoint incident (Indonesia). Only items whose text/image confirms the protest is active are eligible; planned/mobilisation, cancelled and unclear items are rejected. The created incident links back to the source post.
+ */
+export const PromoteSocialWatchItemParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary ICC CCS / IMB Piracy Reporting Centre maritime piracy & armed-robbery events for the current calendar year, stored as a STANDALONE maritime-security source (never as incidents, so they never inflate any count).
  */
 export const listMaritimeSecurityEventsQueryLimitMax = 500;

@@ -16,6 +16,8 @@ import {
   runReliefWebCorroboration,
   runReliefWebReportsIngest,
   runIccPiracyIngest,
+  runSocialWatchIngest,
+  emptySocialWatchSummary,
   runGdeltEnrich,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
@@ -27,6 +29,7 @@ import {
   type ReliefWebCorroborationSummary,
   type ReliefWebReportsSummary,
   type IccPiracySummary,
+  type SocialWatchSummary,
   type GdeltEnrichSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -67,6 +70,7 @@ export type IngestRunResult =
       corroboration: ReliefWebCorroborationSummary;
       reliefwebReports: ReliefWebReportsSummary;
       iccPiracy: IccPiracySummary;
+      socialWatch: SocialWatchSummary;
       gdeltEnrich: GdeltEnrichSummary;
     }
   | { ran: false; reason: "locked" };
@@ -273,6 +277,17 @@ function emptyGdeltEnrich(err: unknown): GdeltEnrichSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`GDELT enrichment failed: ${msg}`],
+  };
+}
+
+function emptySocialWatch(err: unknown): SocialWatchSummary {
+  const base = emptySocialWatchSummary();
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    mode: "commit",
+    errors: [msg],
+    logLines: [`social-watch ingest failed: ${msg}`],
   };
 }
 
@@ -627,6 +642,30 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ReliefWeb situational reports pass failed");
       reliefwebReports = emptyReliefWebReports(err);
     }
+    // KAMMI Pusat public social-media protest watch (Instagram + Telegram).
+    // Writes ONLY the isolated social_watch_items store — CONTEXT ONLY, these
+    // rows are NEVER incidents and can never inflate any incident count (the
+    // only path into incidents is the explicit, gated promote action). No-ops
+    // cleanly when no platform is configured/enabled. Isolated in its own try so
+    // a scraper/network failure can never fail the wider ingest.
+    let socialWatch: SocialWatchSummary;
+    try {
+      socialWatch = await runSocialWatchIngest({ commit: true });
+      logger.info(
+        {
+          active: socialWatch.active,
+          fetched: socialWatch.fetched,
+          relevant: socialWatch.relevant,
+          inserted: socialWatch.inserted,
+          alertsRaised: socialWatch.alertsRaised,
+          totalAfter: socialWatch.totalAfter,
+        },
+        "KAMMI social-watch pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "KAMMI social-watch pass failed");
+      socialWatch = emptySocialWatch(err);
+    }
     // GDELT precision enrichment. ADDITIVE — attaches structured ACLED-style
     // fields (precise sub-national geo, fatality counts, named actors, event
     // coding, AI confidence) onto EXISTING flashpoint rows; never replaces the
@@ -669,6 +708,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       corroboration,
       reliefwebReports,
       iccPiracy,
+      socialWatch,
       gdeltEnrich,
     };
   });

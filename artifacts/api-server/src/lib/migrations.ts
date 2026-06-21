@@ -425,6 +425,70 @@ export async function runDataMigrations(): Promise<void> {
         ON reliefweb_reports (published_at)
     `);
 
+    // Schema: KAMMI Pusat Instagram + Telegram public social-media protest WATCH
+    // items. A CONTEXT source modelled on reliefweb_reports / maritime_movement:
+    // a social item is NEVER an incident and lives in its OWN table precisely so
+    // a mobilisation / "planned protest" post can never inflate any incident
+    // count. The only path into `incidents` is the explicit, gated promote
+    // action. PRIVACY: only public posts; captions sanitised; no phone numbers /
+    // personal accounts / WhatsApp / member data are ever stored. drizzle push
+    // only reaches dev, so the prod primary gains the table here on boot. All
+    // idempotent (IF NOT EXISTS). Mirrors lib/db/src/schema/socialWatchItems.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS social_watch_items (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL DEFAULT 'social_watch',
+        platform text NOT NULL,
+        channel text NOT NULL,
+        actor text,
+        external_id text NOT NULL,
+        posted_at timestamptz,
+        event_date timestamptz,
+        event_time_text text,
+        caption text,
+        image_urls jsonb NOT NULL DEFAULT '[]'::jsonb,
+        location text,
+        city text NOT NULL DEFAULT 'Jakarta',
+        province text,
+        issue text,
+        status text NOT NULL DEFAULT 'planned',
+        confidence text NOT NULL DEFAULT 'medium',
+        url text NOT NULL,
+        country text NOT NULL DEFAULT 'Indonesia',
+        topic text NOT NULL DEFAULT 'flashpoint',
+        classification text NOT NULL DEFAULT 'context',
+        dedup_key text NOT NULL,
+        alert_reasons jsonb NOT NULL DEFAULT '[]'::jsonb,
+        promotable boolean NOT NULL DEFAULT false,
+        promoted_incident_id integer,
+        promoted_at timestamptz,
+        last_checked_at timestamptz NOT NULL DEFAULT now(),
+        fetched_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS social_watch_items_dedup_unique
+        ON social_watch_items (dedup_key)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_watch_items_external_idx
+        ON social_watch_items (source_name, external_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_watch_items_status_idx
+        ON social_watch_items (status)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_watch_items_platform_idx
+        ON social_watch_items (platform)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_watch_items_posted_idx
+        ON social_watch_items (posted_at)
+    `);
+
     // Schema: ICC CCS / IMB maritime piracy & armed-robbery events. A STANDALONE
     // maritime-security source — SEPARATE from both the news-scraped `incidents`
     // table and the AIS `maritime_movement` context table — so it can NEVER

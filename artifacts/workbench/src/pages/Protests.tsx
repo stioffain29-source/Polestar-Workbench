@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import { useListIncidents } from "@workspace/api-client-react";
+import {
+  useListIncidents,
+  useListSocialWatchItems,
+  usePromoteSocialWatchItem,
+  type SocialWatchItem,
+} from "@workspace/api-client-react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
@@ -47,6 +52,12 @@ export default function Protests() {
   // Resolve to the live topic — consistent with the reports / data-status
   // protests→flashpoint mapping.
   const { data: raw = [], isLoading } = useListIncidents({ topic: "flashpoint" });
+
+  // KAMMI social-media protest watch — ADDITIVE context only (own table; never
+  // feeds incident counts). The board groups planned vs active mobilisation and
+  // lets an operator promote a confirmed-active item to a flashpoint incident.
+  const { data: socialItems = [], isLoading: socialLoading } =
+    useListSocialWatchItems({ limit: 60 });
 
   // Date-range window. Defaults to the widest option so the first load shows the
   // full record set; the analyst can narrow the whole dashboard from the header.
@@ -602,6 +613,235 @@ export default function Protests() {
           Highest severity on file: {highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}. Type is keyword-classified from the headline and summary; where uncertain, records default to Protest.
         </p>
       </Section>
+
+      {/* KAMMI / Indonesia Social Watch — additive context, never incidents */}
+      <Section title="KAMMI / Indonesia Social Watch">
+        <SocialWatchPanel items={socialItems} isLoading={socialLoading} />
+      </Section>
+    </div>
+  );
+}
+
+// Status → board grouping. "Planned" gathers mobilisation that is announced but
+// not yet underway; "Active" gathers anything currently on the street (active /
+// dispersed / arrests); "Other" holds cancelled/unclear context.
+const SOCIAL_ACTIVE_STATUSES = new Set(["active", "dispersed"]);
+const SOCIAL_PLANNED_STATUSES = new Set(["planned"]);
+
+const SOCIAL_STATUS_COLOR: Record<string, string> = {
+  planned: "#1B6B7A",
+  active: "#A33232",
+  dispersed: "#303030",
+  cancelled: "#303030",
+  unclear: "#303030",
+};
+
+function SocialStatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
+      style={{ backgroundColor: SOCIAL_STATUS_COLOR[status] ?? "#303030" }}
+    >
+      {status}
+    </span>
+  );
+}
+
+function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLoading: boolean }) {
+  const promote = usePromoteSocialWatchItem();
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const groups = useMemo(() => {
+    const planned: SocialWatchItem[] = [];
+    const active: SocialWatchItem[] = [];
+    const other: SocialWatchItem[] = [];
+    for (const it of items) {
+      if (SOCIAL_ACTIVE_STATUSES.has(it.status)) active.push(it);
+      else if (SOCIAL_PLANNED_STATUSES.has(it.status)) planned.push(it);
+      else other.push(it);
+    }
+    return { planned, active, other };
+  }, [items]);
+
+  const alertCount = useMemo(
+    () => items.filter((i) => (i.alertReasons?.length ?? 0) > 0).length,
+    [items],
+  );
+
+  async function onPromote(id: number) {
+    setError(null);
+    setPendingId(id);
+    try {
+      await promote.mutateAsync({ id });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Promotion failed — the item may already be promoted or no longer eligible.",
+      );
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-white border border-border rounded-sm p-8 text-center text-sm text-muted-foreground">
+        Loading social watch…
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground">
+        No KAMMI social-media posts collected yet. Instagram requires a paid scraper key; the Telegram public channel is read free. These posts are supporting context only — they are never counted as incidents. See Source Health for the live configuration state.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi label="Posts on file" value={items.length} accent="#465bff" small />
+        <Kpi label="Planned" value={groups.planned.length} accent="#1B6B7A" small />
+        <Kpi label="Active / on-street" value={groups.active.length} accent="#A33232" small />
+        <Kpi label="Watch alerts" value={alertCount} accent="#303030" small />
+      </div>
+
+      <p className="text-[11px] text-muted-foreground font-sans leading-snug">
+        Public KAMMI Pusat Instagram and Telegram posts, monitored as ADDITIVE
+        context — never incidents, so they never affect any incident count. Only a
+        confirmed-active item can be promoted to a flashpoint incident (Indonesia),
+        which links the new incident back to the source post. Captions are
+        sanitised; no phone numbers, personal accounts or member data are stored.
+      </p>
+
+      {error && (
+        <p className="text-[12px] font-sans" style={{ color: "#A33232" }}>
+          {error}
+        </p>
+      )}
+
+      <SocialWatchGroup
+        title="Planned mobilisation"
+        items={groups.planned}
+        empty="No planned mobilisation posts."
+        onPromote={onPromote}
+        pendingId={pendingId}
+      />
+      <SocialWatchGroup
+        title="Active / on-street"
+        items={groups.active}
+        empty="No active mobilisation posts."
+        onPromote={onPromote}
+        pendingId={pendingId}
+      />
+      <SocialWatchGroup
+        title="Other context (cancelled / unclear)"
+        items={groups.other}
+        empty="No additional context posts."
+        onPromote={onPromote}
+        pendingId={pendingId}
+      />
+    </div>
+  );
+}
+
+function SocialWatchGroup({
+  title,
+  items,
+  empty,
+  onPromote,
+  pendingId,
+}: {
+  title: string;
+  items: SocialWatchItem[];
+  empty: string;
+  onPromote: (id: number) => void;
+  pendingId: number | null;
+}) {
+  return (
+    <div className="bg-white border border-border rounded-sm">
+      <div className="px-3 py-2 border-b border-border flex items-baseline justify-between">
+        <h3 className="font-serif font-bold uppercase text-primary text-xs tracking-wide">{title}</h3>
+        <span className="text-[11px] font-mono text-muted-foreground">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="p-4 text-sm text-muted-foreground italic">{empty}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-2 font-sans font-medium w-[90px]">Platform</th>
+                <th className="text-left p-2 font-sans font-medium w-[110px]">Status</th>
+                <th className="text-left p-2 font-sans font-medium w-[140px]">When</th>
+                <th className="text-left p-2 font-sans font-medium w-[130px]">Where</th>
+                <th className="text-left p-2 font-sans font-medium">Caption</th>
+                <th className="text-left p-2 font-sans font-medium w-[70px]">Source</th>
+                <th className="text-left p-2 font-sans font-medium w-[150px]">Promote</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((it) => {
+                const when =
+                  it.eventTimeText ||
+                  (it.eventDate ? format(new Date(it.eventDate), "dd MMM yyyy") : null) ||
+                  it.postedAtDisplay ||
+                  (it.postedAt ? format(new Date(it.postedAt), "dd MMM yyyy") : null) ||
+                  "—";
+                const where = it.location || it.city || "—";
+                const promoted = it.promotedIncidentId != null;
+                return (
+                  <tr key={it.id} className="hover:bg-muted/30 align-top">
+                    <td className="p-2 text-xs capitalize whitespace-nowrap">{it.platform}</td>
+                    <td className="p-2">
+                      <SocialStatusBadge status={it.status} />
+                      {(it.alertReasons?.length ?? 0) > 0 && (
+                        <span className="ml-1 px-1 py-0.5 text-[9px] font-bold uppercase rounded-sm border" style={{ color: "#A33232", borderColor: "#A33232" }}>
+                          alert
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2 text-xs whitespace-nowrap">{when}</td>
+                    <td className="p-2 text-xs">{where}</td>
+                    <td className="p-2 text-xs text-foreground/80">
+                      <span className="line-clamp-2">{it.caption || <span className="text-muted-foreground">—</span>}</span>
+                      {it.issue && <span className="block text-[10px] text-muted-foreground mt-0.5">Issue: {it.issue}</span>}
+                    </td>
+                    <td className="p-2">
+                      {it.url ? (
+                        <a href={it.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open post">
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {promoted ? (
+                        <span className="text-muted-foreground">Incident #{it.promotedIncidentId}</span>
+                      ) : it.promotable ? (
+                        <button
+                          type="button"
+                          onClick={() => onPromote(it.id)}
+                          disabled={pendingId === it.id}
+                          className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
+                          style={{ backgroundColor: "#465bff" }}
+                        >
+                          {pendingId === it.id ? "Promoting…" : "Promote"}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">Not eligible</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

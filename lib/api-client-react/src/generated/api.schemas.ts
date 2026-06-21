@@ -1304,6 +1304,62 @@ export interface ReliefWebReport {
 }
 
 /**
+ * Derived protest status of a social-watch item: planned (announced / mobilisation), active (confirmed under way), dispersed (broken up / clash / arrests), cancelled (called off / postponed), or unclear.
+ */
+export type SocialWatchStatus = typeof SocialWatchStatus[keyof typeof SocialWatchStatus];
+
+
+export const SocialWatchStatus = {
+  planned: 'planned',
+  active: 'active',
+  dispersed: 'dispersed',
+  cancelled: 'cancelled',
+  unclear: 'unclear',
+} as const;
+
+/**
+ * A KAMMI Pusat public Instagram / Telegram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.
+ */
+export interface SocialWatchItem {
+  id: number;
+  platform: string;
+  channel: string;
+  /** @nullable */
+  actor?: string | null;
+  externalId?: string;
+  /** @nullable */
+  postedAt?: string | null;
+  /** @nullable */
+  eventDate?: string | null;
+  /** @nullable */
+  eventTimeText?: string | null;
+  /** @nullable */
+  caption?: string | null;
+  imageUrls?: string[];
+  /** @nullable */
+  location?: string | null;
+  city?: string;
+  /** @nullable */
+  province?: string | null;
+  /** @nullable */
+  issue?: string | null;
+  status: SocialWatchStatus;
+  confidence: string;
+  url: string;
+  country?: string;
+  topic?: string;
+  classification: string;
+  alertReasons?: string[];
+  promotable: boolean;
+  /** @nullable */
+  promotedIncidentId?: number | null;
+  /** @nullable */
+  promotedAt?: string | null;
+  /** @nullable */
+  postedAtDisplay?: string | null;
+}
+
+/**
  * An ICC CCS / IMB Piracy Reporting Centre maritime piracy or armed-robbery-at-sea event for the current calendar year, stored as a STANDALONE maritime-security source. NOT an incident: these rows live in their own table and never feed any incident count.
  */
 export interface MaritimeSecurityEvent {
@@ -1518,6 +1574,35 @@ country?: string;
  */
 limit?: number;
 };
+
+export type ListSocialWatchItemsParams = {
+/**
+ * Filter to one derived status
+ */
+status?: SocialWatchStatus;
+/**
+ * Filter to one platform (instagram | telegram)
+ */
+platform?: ListSocialWatchItemsPlatform;
+/**
+ * Limit to items eligible for promotion to an incident
+ */
+promotable?: boolean;
+/**
+ * Max number of most-recent items to return (1-200)
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+};
+
+export type ListSocialWatchItemsPlatform = typeof ListSocialWatchItemsPlatform[keyof typeof ListSocialWatchItemsPlatform];
+
+
+export const ListSocialWatchItemsPlatform = {
+  instagram: 'instagram',
+  telegram: 'telegram',
+} as const;
 
 export type ListMaritimeSecurityEventsParams = {
 /**

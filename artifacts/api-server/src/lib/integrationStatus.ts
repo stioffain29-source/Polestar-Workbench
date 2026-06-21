@@ -17,7 +17,11 @@ import {
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
   REGISTRY_HEALTH_TOPIC,
   REGISTRY_HEALTH_NAME,
+  readSocialWatchConfig,
+  SOCIAL_WATCH_IG_HEALTH_NAME,
+  SOCIAL_WATCH_TG_HEALTH_NAME,
 } from "@workspace/ingest";
+import { socialWatchItemsTable } from "@workspace/db";
 import type {
   IntegrationStatusItem,
   IntegrationStatusMetric,
@@ -495,6 +499,189 @@ async function vesselRegistryStatus(): Promise<IntegrationStatusItem> {
   };
 }
 
+const SOCIAL_WATCH_IG_DETAIL =
+  "Monitors the KAMMI Pusat public Instagram account for planned/active protest mobilisation as ADDITIVE context. Posts are stored in their own table — never as incidents, so they never inflate any count. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
+const SOCIAL_WATCH_TG_DETAIL =
+  "Reads the KAMMI public Telegram channel from the free public web view (no login) for planned/active protest mobilisation as ADDITIVE context. Posts are stored in their own table — never as incidents. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
+
+async function socialWatchPlatformCounts(
+  platform: "instagram" | "telegram",
+): Promise<{ total: number; latest: Date | null }> {
+  const [row] = await db
+    .select({
+      n: sql<number>`count(*)::int`,
+      latest: sql<Date | string | null>`max(${socialWatchItemsTable.postedAt})`,
+    })
+    .from(socialWatchItemsTable)
+    .where(eq(socialWatchItemsTable.platform, platform));
+  const latest = row?.latest ?? null;
+  return { total: row?.n ?? 0, latest: latest ? new Date(latest) : null };
+}
+
+async function socialFeedStatus(name: string): Promise<string | null> {
+  const [health] = await db
+    .select({ status: sourcesTable.status })
+    .from(sourcesTable)
+    .where(and(eq(sourcesTable.name, name), eq(sourcesTable.topic, "flashpoint")));
+  return health?.status ?? null;
+}
+
+async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
+  const envVars = [
+    "INSTAGRAM_API_KEY",
+    "INSTAGRAM_ENABLED",
+    "INSTAGRAM_PROVIDER",
+    "INSTAGRAM_API_BASE",
+    "INSTAGRAM_ACTOR",
+    "KAMMI_INSTAGRAM_HANDLE",
+    "SOCIAL_WATCH_ENABLED",
+  ];
+  const cfg = readSocialWatchConfig();
+  const ig = cfg.instagram;
+  const configured = ig.configured;
+  const docsUrl = "https://apify.com";
+
+  let total = 0;
+  let latest: Date | null = null;
+  let feedStatus: string | null = null;
+  try {
+    const counts = await socialWatchPlatformCounts("instagram");
+    total = counts.total;
+    latest = counts.latest;
+    feedStatus = await socialFeedStatus(SOCIAL_WATCH_IG_HEALTH_NAME);
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "social watch instagram status query failed");
+    return unknownItem({
+      key: "social_watch_instagram",
+      label: "KAMMI Instagram (Social Watch)",
+      configured,
+      envVars,
+      summary: "Status query failed.",
+      detail: SOCIAL_WATCH_IG_DETAIL,
+      docsUrl,
+    });
+  }
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (!cfg.enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (SOCIAL_WATCH_ENABLED=false) — social-media protest monitoring is disabled. Incident feeds are unaffected.";
+  } else if (!ig.enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (INSTAGRAM_ENABLED=false) — the Instagram social-watch source is disabled.";
+  } else if (!configured) {
+    status = "not_configured";
+    summary =
+      "No INSTAGRAM_API_KEY — the paid Instagram scraper is disabled, so no Instagram posts are collected. The Telegram social-watch source and all incident feeds are unaffected.";
+  } else if (feedStatus === "failing") {
+    status = "failing_upstream";
+    summary =
+      "Configured, but the Instagram scraper upstream is returning errors on consecutive runs — no posts are being collected.";
+  } else if (total > 0) {
+    status = "working";
+    summary = `Holding ${total} KAMMI Instagram post(s) as protest-monitoring context — never counted as incidents.`;
+  } else {
+    status = "no_data";
+    summary =
+      "Configured, but no Instagram posts collected yet — awaiting the next scrape or a protest-relevant post.";
+  }
+
+  return {
+    key: "social_watch_instagram",
+    label: "KAMMI Instagram (Social Watch)",
+    status,
+    summary,
+    detail: SOCIAL_WATCH_IG_DETAIL,
+    configured,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("Account", `@${ig.handle}`),
+      metric("Provider", ig.provider),
+      metric("Posts stored", total),
+      metric("Latest post", fmtDate(latest)),
+    ],
+    docsUrl,
+  };
+}
+
+async function socialTelegramStatus(): Promise<IntegrationStatusItem> {
+  const envVars = ["KAMMI_TELEGRAM_CHANNEL", "TELEGRAM_ENABLED", "SOCIAL_WATCH_ENABLED"];
+  const cfg = readSocialWatchConfig();
+  const tg = cfg.telegram;
+  const configured = tg.configured;
+  const docsUrl = `https://t.me/s/${tg.channel}`;
+
+  let total = 0;
+  let latest: Date | null = null;
+  let feedStatus: string | null = null;
+  try {
+    const counts = await socialWatchPlatformCounts("telegram");
+    total = counts.total;
+    latest = counts.latest;
+    feedStatus = await socialFeedStatus(SOCIAL_WATCH_TG_HEALTH_NAME);
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "social watch telegram status query failed");
+    return unknownItem({
+      key: "social_watch_telegram",
+      label: "KAMMI Telegram (Social Watch)",
+      configured,
+      envVars,
+      summary: "Status query failed.",
+      detail: SOCIAL_WATCH_TG_DETAIL,
+      docsUrl,
+    });
+  }
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (!cfg.enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (SOCIAL_WATCH_ENABLED=false) — social-media protest monitoring is disabled. Incident feeds are unaffected.";
+  } else if (!tg.enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (TELEGRAM_ENABLED=false) — the Telegram social-watch source is disabled.";
+  } else if (!configured) {
+    status = "not_configured";
+    summary =
+      "No KAMMI_TELEGRAM_CHANNEL set — the free Telegram public-web reader is disabled.";
+  } else if (feedStatus === "failing") {
+    status = "failing_upstream";
+    summary =
+      "Configured, but the Telegram public web view is currently unreachable — no posts are being collected.";
+  } else if (total > 0) {
+    status = "working";
+    summary = `Holding ${total} KAMMI Telegram post(s) as protest-monitoring context — never counted as incidents.`;
+  } else {
+    status = "no_data";
+    summary =
+      "Configured and reachable, but no protest-relevant Telegram posts collected yet.";
+  }
+
+  return {
+    key: "social_watch_telegram",
+    label: "KAMMI Telegram (Social Watch)",
+    status,
+    summary,
+    detail: SOCIAL_WATCH_TG_DETAIL,
+    configured,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("Channel", tg.channel),
+      metric("Access", "free public web view"),
+      metric("Posts stored", total),
+      metric("Latest post", fmtDate(latest)),
+    ],
+    docsUrl,
+  };
+}
+
 /**
  * Assemble the public integration status snapshot. Each probe catches its own
  * failures and degrades to "unknown" so the endpoint never hard-fails, and the
@@ -509,6 +696,8 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       liveuamapStatus(),
       vesselRegistryStatus(),
       openaiStatus(),
+      socialInstagramStatus(),
+      socialTelegramStatus(),
     ]),
     getMaritimeSourceHealth(),
   ]);

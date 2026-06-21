@@ -15,3 +15,4 @@ export * from "./cards";
 export * from "./maritimeMovement";
 export * from "./maritimeVesselSightings";
 export * from "./maritimeSecurityEvents";
+export * from "./socialWatchItems";
