@@ -89,6 +89,36 @@ const LOCAL_FEEDS: LocalFeed[] = [
       "TH:th",
     ),
   },
+  // Philippines Filipino/Tagalog edition. The English edition carries almost no
+  // PH cargo theft (a handful of Philstar/Tribune hits a year); the Filipino
+  // edition surfaces genuine truck/cargo/warehouse thefts the English feed never
+  // does (diesel siphoned from trucks, copper stripped off a moving truck,
+  // stolen consumer-goods/beauty-product loads, produce loads taken off farms).
+  {
+    label: "Local · Filipino",
+    lang: "Filipino",
+    url: gnewsLocale(
+      `(nakaw OR pagnanakaw OR ninakaw OR holdap OR naholdap OR pinagnakawan) (kargamento OR karga OR trak OR bodega OR kontena OR kalakal OR padala)`,
+      "fil",
+      "PH",
+      "PH:fil",
+    ),
+  },
+  // Sri Lanka Sinhala edition. Sri Lankan cargo theft is very thinly indexed by
+  // Google News in every edition (English hits are India "godown" noise; this
+  // Sinhala net currently returns 0). Kept as a standing net like the Arabic
+  // feed above — when an in-scope item does appear it is captured, at no
+  // steady-state cost (an empty feed screens nothing).
+  {
+    label: "Local · Sinhala",
+    lang: "Sinhala",
+    url: gnewsLocale(
+      `(සොරකම් OR කොල්ලය OR මංකොල්ල OR සොරාගැනීම OR සොරකම) (බහාලුම් OR ට්‍රක් OR ලොරි OR ගබඩාව OR භාණ්ඩ OR කන්ටේනර්)`,
+      "si",
+      "LK",
+      "LK:si",
+    ),
+  },
 ];
 
 // Cap on the number of NEW (unseen) items screened per local feed per run. The LLM

@@ -127,6 +127,33 @@ cluster mostly kept). Tradeoff the owner ACCEPTED: a bare commodity + crime verb
 ("beer stolen from a shop") can admit a petty retail theft — keeping genuine
 commodity cargo was prioritised over that rare false-positive.
 
+## Per-country gaps (Philippines/Sri Lanka) are a LOCAL-LANGUAGE feed gap
+A country reading ~0 cargo rows while Indonesia/Thailand dominate is almost always
+a feed-LANGUAGE gap, not a classifier regression. Indonesia/Thailand lead because
+they have local-language `LOCAL_FEEDS` (Bahasa/Thai); English Google News barely
+surfaces local cargo theft, and an English `"Sri Lanka"` query returns India
+"godown" fire/seizure noise, not real SL cargo crime.
+- Fix = add a `LOCAL_FEEDS` entry (lang label + proven query). The local stage is
+  LANGUAGE-AGNOSTIC: `lang` is only a passthrough label; the LLM screen translates
+  and returns canonical `country` via `canonScopeCountry`, so NO `COUNTRY_ALIASES`
+  edit is needed for screened items (unlike the English title-gate path).
+- Tagalog/Filipino surfaces REAL PH cargo theft (truck diesel-siphon, copper off a
+  moving truck, stolen goods loads). Sinhala/Tamil for Sri Lanka genuinely yields
+  ~0 — SL cargo-theft reporting barely exists even in local press; add it as a
+  standing net (like the zero-yield Arabic feed) but be HONEST that it stays empty.
+- Zero-yield feeds are harmless: 0 items → 0 LLM calls.
+
+## The local-language stage SKIPS in a plain CLI shell (no OpenAI env)
+`scrape:cargo-watch` run from an interactive bash shell only runs the ENGLISH
+regex stage and commits a few rows; the `LOCAL_FEEDS` LLM stage no-ops because the
+shell lacks `AI_INTEGRATIONS_OPENAI_*` (those are injected into the api-server
+WORKFLOW, not your shell — `/api/integrations/status` showing openai `working`
+reflects the api-server process, not the CLI). So you can't observe PH local-feed
+population from a CLI scrape here. The admin route (`POST /api/admin/ingest`) runs
+in the api-server process WITH the env, but is `INGEST_ADMIN_TOKEN`-gated (401
+without the token). Net: dev-verify the feed by fetching its RSS URL directly;
+real population happens on the next prod ingest after republish.
+
 ## "Lack of reporting" in Cargo Watch is usually real sparseness, not a bug
 Genuine RECENT (≤30d) APAC/Middle-East cargo-theft reporting genuinely runs
 only a handful of incidents/month. Broadening feeds and tightening noise is the
