@@ -52,6 +52,36 @@ const CLASS_LABEL: Record<VClass, string> = {
   other: "Other",
 };
 
+// Each vessel TYPE renders as a DISTINCT silhouette so the class reads on the
+// map by SHAPE as well as colour (not colour alone): Tanker = sharp triangle,
+// Cargo = boxy "house" pentagon, Other = round teardrop. A FILLED glyph points
+// along course-over-ground (apex = bearing); a HOLLOW glyph (white body, class
+// outline) has no reported course (anchored / stationary). Flat fills only — no
+// shadow, blur, glow or gradient (brand rule).
+function vesselGlyphPath(cls: VClass): string {
+  if (cls === "tanker") return '<path d="M8 1.5 L14 14.5 L2 14.5 Z" />';
+  if (cls === "cargo") return '<path d="M8 1.5 L14 6.5 L14 14.5 L2 14.5 L2 6.5 Z" />';
+  // other: round body + small bow point
+  return '<circle cx="8" cy="9.7" r="4.8" /><path d="M8 1 L11.4 6.2 L4.6 6.2 Z" />';
+}
+function vesselGlyphSvg(
+  cls: VClass,
+  size: number,
+  color: string,
+  filled: boolean,
+  emphasise: boolean,
+): string {
+  const fill = filled ? color : "#ffffff";
+  const stroke = filled ? "#ffffff" : color;
+  const sw = emphasise ? 2.2 : 1.3;
+  return (
+    `<svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;overflow:visible">` +
+    `<g fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">` +
+    vesselGlyphPath(cls) +
+    `</g></svg>`
+  );
+}
+
 // AIS navigational-status codes worth naming in the detail panel.
 const NAV_STATUS_LABEL: Record<number, string> = {
   0: "Under way (engine)",
@@ -228,11 +258,12 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
 
     const latLngs: L.LatLngExpression[] = [];
     for (const v of plottable) {
-      const color = CLASS_COLOR[classOf(v)];
+      const cls = classOf(v);
+      const color = CLASS_COLOR[cls];
       const cog = v.courseOverGround;
       const isSel = v.mmsi === selectedMmsi;
       const hasCourse = cog !== null && cog !== undefined;
-      const size = isSel ? 18 : 13;
+      const size = isSel ? 20 : 15;
 
       const marker = document.createElement("div");
       marker.style.position = "absolute";
@@ -241,27 +272,17 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
       marker.style.pointerEvents = "auto";
       marker.style.cursor = "pointer";
       marker.style.boxSizing = "border-box";
+      marker.style.transformOrigin = "50% 50%";
 
-      if (hasCourse) {
-        // A triangle arrow pointing along course-over-ground (0 deg = north).
-        marker.style.borderLeft = `${size / 2}px solid transparent`;
-        marker.style.borderRight = `${size / 2}px solid transparent`;
-        marker.style.borderBottom = `${size}px solid ${color}`;
-        marker.style.width = "0";
-        marker.style.height = "0";
-        marker.style.transform = `rotate(${cog}deg)`;
-        marker.style.transformOrigin = "50% 50%";
-        if (isSel) marker.style.filter = "drop-shadow(0 0 0 #ffffff)";
-      } else {
-        // No course: a round dot (anchored / stationary / no position-report yet).
-        marker.style.borderRadius = "50%";
-        marker.style.background = color;
-        marker.style.border = isSel ? "3px solid #ffffff" : "2px solid #ffffff";
-      }
+      // Distinct silhouette per TYPE (triangle / pentagon / teardrop) in the
+      // class colour. Filled glyph rotates so its apex points along course;
+      // a hollow glyph (no reported course) stays upright.
+      marker.innerHTML = vesselGlyphSvg(cls, size, color, hasCourse, isSel);
+      if (hasCourse) marker.style.transform = `rotate(${cog}deg)`;
 
       marker.title = [
         v.name && v.name.trim().length > 0 ? v.name : `MMSI ${v.mmsi}`,
-        `${CLASS_LABEL[classOf(v)]} \u2014 ${v.theatre}`,
+        `${CLASS_LABEL[cls]} \u2014 ${v.theatre}`,
         `${speedText(v.speedOverGround ?? null)} \u00B7 ${courseText(cog ?? null)}`,
       ].join("\n");
       marker.addEventListener("click", (e) => {
@@ -385,13 +406,10 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
         {(["tanker", "cargo", "other"] as const).map((k) => (
           <div key={k} className="flex items-center gap-1.5">
             <span
-              style={{
-                display: "inline-block",
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: CLASS_COLOR[k],
-                border: `1px solid ${POLAR}`,
+              aria-hidden
+              style={{ display: "inline-flex", width: 16, height: 16 }}
+              dangerouslySetInnerHTML={{
+                __html: vesselGlyphSvg(k, 16, CLASS_COLOR[k], true, false),
               }}
             />
             <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
@@ -400,7 +418,7 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
           </div>
         ))}
         <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
-          Arrow points along course; a dot has no reported course.
+          A filled marker points along course; a hollow marker has no reported course.
         </span>
         <span
           style={{
