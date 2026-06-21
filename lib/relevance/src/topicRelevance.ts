@@ -36,6 +36,26 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\bcelebrity\b/,
   /\bentertainment news\b/,
   /\brecipe\b/,
+  // Sports "shootout" / "shoot-out" metaphor — a penalty/World-Cup/college-game
+  // scoring contest, NOT a gun battle. "shootout" is ALSO a conflict-violence
+  // trigger that the conflict override re-admits, so sports usage must be dropped
+  // GLOBALLY here (before any topic gate). Bound tightly to an unambiguous sports
+  // cue or the "shootout or a <rockfight/wipeout>" idiom so a genuine armed
+  // shootout (police/militant gun battle) is never collaterally dropped.
+  /\bpenalty shoot[- ]?out\b/,
+  /\b(world cup|fifa|uefa|champions league|premier league|la liga|copa|asia cup|world series|super bowl|playoff|play[- ]?off|grand final|semi[- ]?final|quarter[- ]?final|nba|nfl|ncaa|epl|\bipl\b|grand prix|cougars|byu|tcu) .{0,40}\bshoot[- ]?out\b/,
+  /\bshoot[- ]?out .{0,40}\b(world cup|fifa|uefa|champions league|premier league|playoff|semi[- ]?final|quarter[- ]?final|grand final|nba|nfl|ncaa|wipeout|rock ?fight|cougars|byu|tcu)\b/,
+  /\bshoot[- ]?out or (a|an|the) (rock ?fight|wipeout)\b/,
+  /\bmind games of sport/,
+  // Exam-logistics human-interest feature ("What's it like getting to a NEET
+  // centre in Manipur?") — a medical-entrance-exam ACCESS story, never a
+  // conflict incident. Bound to a travel/access verb adjacent to "NEET centre"
+  // so a genuine PROTEST about a NEET paper leak or result ("NEET UG paper
+  // leak: Youth Congress protests in Delhi; chief detained") is NOT
+  // collaterally dropped — those carry no travel-to-centre framing.
+  /\b(getting|get|reach\w*|travel\w*|commut\w*|journey\w*|trek\w*|en route|on the way|drive|driving|walk\w*|head(ing|ed)?) .{0,30}\bneet (centre|center)\b/,
+  // Opinion letters ("Dear Editor: …") are commentary, not incident reports.
+  /^dear editor\b/,
   // Scraped page markup leaked into the record body (CMS template CSS / inline
   // style blocks) — a malformed scrape dump, never a clean news incident.
   /\{[^}]{0,40}(object-fit|max-height:\s*calc|width:\s*100%)/,
@@ -839,6 +859,16 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // "declared insurgency-free after troops kill five rebels").
   /\b(insurgenc(y|ies)|militanc(y|ies)|naxal(ism|ite)?|terror(ism|ist)?|rebel(lion)?)[ -]free\b/,
   /\bfree (of|from) (insurgenc(y|ies)|militanc(y|ies)|naxal(ism)?|terror(ism)?|rebel(lion)?|armed (group|conflict))/,
+  // Diplomacy / state-visit / reception commentary whose ONLY conflict tie is a
+  // background "regime"/"rebellion"/"military leader" mention ("China rolled out
+  // an unprecedented welcome for Myanmar's military leader … as his regime fights
+  // to survive a nationwide rebellion"). A state visit or diplomatic welcome is
+  // not an armed-violence event. Bound to a reception/visit cue ADJACENT to a
+  // leader/regime noun and carrying no kinetic word; the violence override above
+  // still re-admits any genuine kinetic event (e.g. a visit cut short by an
+  // ambush, or "junta airstrike" during a state visit).
+  /\b(roll(s|ed)? out [^.]{0,20}welcome|unprecedented welcome|warm welcome|lavish welcome|red[- ]carpet|state visit|official visit|state reception|state banquet|bilateral (talks|meeting|ties|summit)|diplomatic (welcome|visit|ties|push)|courtesy call)\b[^.]{0,70}\b(military leader|junta (chief|leader|head)|regime|senior general|min aung hlaing|head of state|military ruler|military chief|strongman)\b/,
+  /\b(military leader|junta (chief|leader|head)|regime|senior general|min aung hlaing|head of state|military ruler|military chief|strongman)\b[^.]{0,70}\b(roll(s|ed)? out [^.]{0,20}welcome|unprecedented welcome|warm welcome|lavish welcome|red[- ]carpet|state visit|official visit|state reception|state banquet|bilateral (talks|meeting|ties|summit)|diplomatic (welcome|visit|ties|push)|courtesy call)\b/,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are
@@ -962,6 +992,17 @@ const REQUIRED: Record<string, RegExp[]> = {
     // "air and drone strikes kill four civilians". Casualty-bound, so a bare
     // state-visit/trade headline (no kill/wound word near the actor) still fails.
     /\b(junta|military|regime|tatmadaw|militants?|insurgents?|rebels?|separatists?|paramilitar(y|ies)|army|troops|soldiers|air ?force|warplanes?|fighter jets?|drones?|artillery|mortars?|shelling|airstrikes?|air ?strikes?)\b.{0,40}\b(kill(s|ed|ing)?|wound(s|ed|ing)?|massacre[ds]?|civilians? (killed|dead|wounded|hurt|slain))\b/,
+    // Reversed-order companion to the actor->casualty line above. The line above
+    // only fires when the state actor PRECEDES the kill word within 40 chars
+    // ("junta attacks kill three civilians"). When the CIVILIAN casualty leads
+    // and the state force + operation trail it ("Five civilians killed in
+    // Indonesian military operation"), it is the SAME unambiguous state-violence-
+    // against-civilians event but slips the gate. Tightly bound to a civilian-
+    // victim noun + kill word + STATE military force + operation/raid/sweep
+    // context, so a combatant-only toll ("15 Maoists killed in operation"), a
+    // bare "military operation" with no civilian casualty, or an accident
+    // ("civilians killed in road crash, army says") still fails.
+    /\b(civilians?|villagers?|miners?|residents?|locals?|farmers?|townspeople|bystanders?)\b.{0,25}\b(kill(ed|ing|s)?|shot dead|gunned down|massacre[ds]?|slain)\b.{0,40}\b(military|army|troops|soldiers|junta|paramilitar(y|ies)|armed forces|navy|marines)\b.{0,20}\b(operation|operations|sweep|sweeping|raid|raids|offensive|assault|incursion|shelling)\b/,
   ],
   // Protests / Flashpoint use a two-tier match: an UNAMBIGUOUS phrase
   // alone is sufficient, but the ambiguous tokens "rally", "strike"

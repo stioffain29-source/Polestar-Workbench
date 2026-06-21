@@ -207,6 +207,100 @@ describe("explainRelevance", () => {
       expect(result.reason).toContain("required topic phrase");
     });
 
+    it("keeps reversed-order state violence against civilians (casualty leads the actor)", () => {
+      // The actor->casualty REQUIRED line only fires when the state force
+      // PRECEDES the kill word; here the civilian casualty leads and the
+      // military + operation trail it. Same unambiguous event, must be kept.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Five civilians killed in Indonesian military operation at Kali Kabur gold panning area",
+          summary: "A military sweep killed five civilian gold miners and injured a toddler; thousands fled.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("drops a civilian road-accident toll with no armed actor or operation", () => {
+      // Guards the reversed-order pattern: civilian + killed alone is not
+      // enough — it requires a state military force AND an operation context.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Five civilians killed in road accident on national highway",
+          summary: "A bus crash killed five people travelling to a market town.",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+    });
+
+    it("drops sports penalty-shootout features (shootout homonym)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Inside the nail-biting drama of the US-Sweden penalty shootout",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("general-news");
+    });
+
+    it("drops opinion letters that open with 'Dear Editor'", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Dear Editor: Shootout or assassination? Does the service serve the public?",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("general-news");
+    });
+
+    it("drops the NEET exam-centre access human-interest feature", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "‘What if there’s an ambush?’: What’s it like getting to a NEET centre in Manipur?",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("general-news");
+    });
+
+    it("drops a diplomatic state-visit welcome with no kinetic event", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "China rolled out an unprecedented welcome for Myanmar’s military leader this week",
+          summary: "The reception came as his regime fights a nationwide rebellion.",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("keeps a genuine NEET-exam-leak protest (narrowed exam exclude does not over-match)", () => {
+      // The exam-logistics exclude must NOT eat a real protest about a NEET
+      // paper leak — it only targets travel-to-centre framing.
+      const result = explainRelevance(
+        "protests",
+        input({
+          topic: "protests",
+          title: "NEET UG 2026 paper leak: Youth Congress protests in Delhi; chief detained",
+          summary: "Police detained the party chief as members marched over the exam paper leak.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).not.toContain("excluded");
+    });
+
     it("drops post-insurgency investment/business stories", () => {
       const result = explainRelevance(
         "conflict",

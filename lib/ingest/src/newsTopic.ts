@@ -74,6 +74,20 @@ export function detectCountry(hay: string, aliases: CountryAlias[]): string | nu
   return match ? match.canonical : null;
 }
 
+// Remove the publisher masthead from text before COUNTRY detection. Google News
+// repeats the source name into the RSS summary, so a cross-border story from
+// "The Times of India" about strikes "inside Pakistan" carries the token "india"
+// from the masthead — and because detectCountry returns the first alias-ordered
+// match (India is listed before Pakistan), the publisher's country wrongly wins
+// over the event's. Stripping the masthead as a CONTIGUOUS phrase removes only
+// the publisher occurrence; a genuine in-body country mention is untouched. A
+// no-op when the source name is empty or absent from the text.
+export function stripSourceMasthead(hay: string, sourceName: string): string {
+  const masthead = sourceName.toLowerCase().trim();
+  if (!masthead) return hay;
+  return hay.split(masthead).join(" ");
+}
+
 // Countries OUTSIDE every monitor's Asia / Gulf / Oceania footprint. A
 // country-edition Google-News feed routinely cross-syndicates a foreign story
 // that names NO in-region country (e.g. a Libyan "libyaupdate.com" fuel story
@@ -148,7 +162,8 @@ function classify(
   summary: string,
   feed: Feed,
   cfg: NewsTopicConfig,
-  source = "",
+  sourceName = "",
+  host = "",
 ): Classified {
   const hay = `${title}\n${summary}`.toLowerCase();
 
@@ -159,14 +174,19 @@ function classify(
   if (!allowHit) return { kept: false, reason: "no-allowlist-match", country: null };
 
   // Land-based incidents are usually in the feed's country, so accept a country
-  // match anywhere in title+summary then fall back to the per-feed default.
-  const detected = detectCountry(hay, cfg.countryAliases);
+  // match anywhere in title+summary then fall back to the per-feed default. Strip
+  // the publisher masthead FIRST so a source name (e.g. "The Times of India",
+  // repeated into the summary by Google News) cannot stamp the wrong country on a
+  // cross-border event ("strikes ... inside Pakistan" must resolve to Pakistan,
+  // not India).
+  const geoHay = stripSourceMasthead(hay, sourceName);
+  const detected = detectCountry(geoHay, cfg.countryAliases);
 
   // No in-region country in the text means we are about to blind-trust the
   // feed's defaultCountry. Before doing so, reject obvious cross-syndicated
   // foreign stories so they are not mis-stamped onto an in-region centroid.
   if (!detected) {
-    const foreign = detectOutOfRegion(hay, source.toLowerCase());
+    const foreign = detectOutOfRegion(geoHay, `${sourceName} ${host}`.toLowerCase());
     if (foreign) return { kept: false, reason: `out-of-region:${foreign}`, country: null };
   }
 
@@ -277,7 +297,7 @@ export async function runNewsTopicIngest(
           /* link may be a Google News redirect without a parseable host */
         }
 
-        const c = classify(cleanTitle, summary, feed, cfg, `${sourceName} ${host}`);
+        const c = classify(cleanTitle, summary, feed, cfg, sourceName, host);
         if (!c.kept || !c.country) {
           rejected.push({ title, reason: c.reason, feedLabel: feed.label });
           perFeed[feed.label].rejected++;

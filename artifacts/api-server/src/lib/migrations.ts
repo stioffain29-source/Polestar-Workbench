@@ -864,6 +864,49 @@ export async function runDataMigrations(): Promise<void> {
         );
       }
     }
+    // 3c-ii) ONE-TIME relocation of cross-border conflict rows mis-tagged to
+    //     India by source-masthead pollution. A Pakistan-located event reported
+    //     by an Indian outlet ("Afghanistan claims strikes on militant hideouts
+    //     inside Pakistan — The Times of India") had "India" detected from the
+    //     trailing masthead, inflating India's conflict count and deflating
+    //     Pakistan's. The ingest now strips the source masthead before country
+    //     detection (stripSourceMasthead); this repairs rows already stored.
+    //     These are REAL Pakistan events, so RELOCATE (not delete). Bound to a
+    //     "<verb> Pakistan" location phrase with NO India-location token, so a
+    //     genuine India event that merely cites Pakistan ("India charges
+    //     Pakistan-based militant groups in Kashmir killings") is never moved.
+    //     Marker-gated so analyst edits afterwards are never overwritten.
+    //     NOTE: backslashes are DOUBLED (\\y) because this is a JS template
+    //     literal first — a single \y would reach Postgres as a bare "y".
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "conflict_india_to_pakistan_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          UPDATE incidents
+          SET country = 'Pakistan'
+          WHERE topic = 'conflict' AND country = 'India'
+            AND title ~* '\\y(in|inside|on|across|within)[[:space:]]+pakistan\\y'
+            AND title !~* '\\y(india|indian|kashmir|jammu|manipur|delhi|mumbai|chhattisgarh|naxal|maoist|assam|nagaland|imphal|srinagar|pahalgam)\\y'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time relocation of India-mislabelled Pakistan conflict rows (masthead pollution cleanup)",
+        );
+      }
+    }
     // 3d) ONE-TIME purge of out-of-region mis-stamped commodity rows.
     //
     //     The fuel / energy / fertiliser monitors are scoped to Asia / Gulf /

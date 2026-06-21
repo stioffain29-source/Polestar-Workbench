@@ -74,3 +74,23 @@ coords/location. Marker-gated so analyst edits afterwards are preserved.
 - **The masthead is not always after a dash.** The title-suffix strip (`max(lastIndexOf(" - ")," | ")`) assumes Google-News form "<headline> - <Source>". SOME feeds append the source to the SUMMARY ONLY, with NO dash and NO dash in the title either (summary = "<headline> <Source>"). Then the dash strip is a no-op and the unstripped source ("India Today") leaks "india" as a false APAC anchor → gate never fires. Fix: ALSO strip the persisted `i.source` (available on `RelevanceInput`) from both fields.
 - **Strip the source as a WHOLE PHRASE, never a bare substring.** `summary.split(source)` is fine for a long masthead but catastrophic for a short source — `split("ani")` guts "animal", `split("ap")` guts "capture". Use `\b<reEscape(source)>\b` (regex-escape first; sources contain `&`/`.` e.g. "pg&e"). Keeps genuine in-region anchors that appear in the BODY (only the masthead instance is removed).
 - Verified: 15 conflict rows correctly dropped (Niger/Iran/US/Syria/Israel/Nigeria/Lebanon/Egypt/Russia/Ukraine/Nicaragua under APAC feed-default countries), ZERO genuine in-region rows lost (Myanmar airstrikes, India Manipur/Naxal, Pakistan KPK all stay relevant). Pakistan stories keep (Pakistan IS an APAC anchor) even when feed-mislabelled India — that's a separate country-attribution nuance, not this gate.
+
+## newsTopic generic path leaked the masthead COUNTRY (not just a city)
+- Distinct from the geocode CITY leak above: the generic news-topic path
+  (`classify()` in `lib/ingest/src/newsTopic.ts`, used by conflict/energy/
+  fertiliser/fuel) ran `detectCountry` over the RAW title+summary. A cross-
+  border story from an Indian outlet ("Afghanistan strikes militant hideouts
+  inside Pakistan — The Times of India") leaked "india" from the masthead, and
+  because `detectCountry` returns the FIRST alias-ordered match (India before
+  Pakistan), the publisher's country beat the event's. This RESOLVES the
+  "separate country-attribution nuance" flagged at the end of
+  conflict-relevance-excludes.md (Pakistan rows mislabelled India under an
+  India-edition feed).
+- Fix = `stripSourceMasthead(hay, sourceName)` (split out the lowercased source
+  as a contiguous phrase) BEFORE `detectCountry`, on the already-lowercased
+  haystack. Flashpoint already did this; the generic path did not.
+- Existing rows: marker-gated `conflict_india_to_pakistan_relocate_v1` RELOCATES
+  (not deletes) India-tagged conflict rows whose title is a "<verb> Pakistan"
+  event with NO India-location/actor token → Pakistan. The India-token guard is
+  what keeps genuine India events that merely CITE Pakistan (Kashmir/Pahalgam/
+  Parliament-attack) correctly under India.

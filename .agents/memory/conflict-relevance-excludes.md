@@ -29,3 +29,31 @@ FULL conflict row set (haystack is lowercased; `[^.]` spans stop at periods — 
 breaks a span). Confirm it matches ONLY the intended noise and zero currently-relevant
 rows. Lock both the drops and the protected keeps into
 `__tests__/relevance/explainRelevance.test.ts`.
+
+## Reversed-order state-violence companion (actor-leads vs casualty-leads)
+- The conflict REQUIRED "actor→casualty" line only fires when the state force
+  PRECEDES the kill word within a short span ("junta attacks kill three
+  civilians"). A real event where the CIVILIAN casualty leads and the state
+  force + operation TRAIL it ("Five civilians killed in Indonesian military
+  operation") is the SAME unambiguous event but slips the gate and drops.
+- Fix = a SECOND tightly-bound REQUIRED pattern: civilian-victim noun + kill
+  word + state military force + operation/raid/sweep context. Bind all four
+  parts hard or it degrades into a generic "military operation killed" admitter.
+- Guard with a NEGATIVE test (civilian road-accident toll, no force/operation →
+  drop) and replay the full conflict set: the new pattern must add ZERO
+  newly-kept rows beyond the events it is meant to rescue.
+- **Why:** word-order is not semantics; a one-directional adjacency regex
+  silently loses half the real state-violence-against-civilians stories.
+
+## Exam-name excludes must be verb/context-bound, never the bare exam name
+- A bare exam-name exclude (e.g. "neet") meant to kill exam-logistics human-
+  interest ("what's it like getting to a NEET centre") ALSO eats genuine exam-
+  malpractice PROTESTS ("NEET paper leak: Youth Congress protests, chief
+  detained") — a real flashpoint/protests event.
+- Fix = bind the exclude to the travel/logistics FRAME: a movement verb
+  (getting|reach|travel|commute|en route|drive|walk|head…) within ~30 chars of
+  "neet centre/center". The protest copy has no travel-to-centre framing.
+- **Why/how:** EXCLUDE_PHRASES is a flat GLOBAL list (any match → off-topic, no
+  companion gating, no violence override), so an over-broad entry there silently
+  kills real events across EVERY topic. Verify the protected keep with a test +
+  full replay before bumping RELEVANCE_RULE_VERSION.
