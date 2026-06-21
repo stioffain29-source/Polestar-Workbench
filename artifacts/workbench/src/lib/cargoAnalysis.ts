@@ -93,26 +93,12 @@ function hasCargoVocab(text: string): boolean {
   return CARGO_BAHASA_NOUN_RE.test(text) && CRIME_BAHASA_RE.test(text);
 }
 
-// Cargo-specific NOUNS (objects / premises / conveyances) — excludes the bare
-// generic-crime words (theft/robbery/raid) that CARGO_INCIDENT_RE also carries.
-const CARGO_NOUN_RE = /\b(cargo|freight|container|containers|truck|trucks|lorry|lorries|warehouse|godown|depot|consignment|shipment|shipments|parcel|parcels|logistic|logistics)\b/i;
-
 // Cargo-specific crime ACTIONS that imply cargo on their own.
 const CARGO_ACTION_RE = /\b(hijack|pilfer|seal[- ]?tamper|siphon|smuggl)\w*/i;
 
-// Generic crime verbs — only meaningful for scope when paired with a cargo noun.
+// Generic crime verbs — only meaningful for scope when paired with a strong
+// cargo noun or explicit load context.
 const CRIME_VERB_RE = /\b(theft|thie(?:f|ves)|stolen|stole|steal\w*|rob|robbed|robbery|robbers|burglar\w*|break[- ]?in|broke into|broken into|raid\w*|loot\w*|seiz\w*|busted|heist)\b/i;
-
-// Stricter cargo predicate used ONLY when recovering an in-scope country for an
-// UNATTRIBUTED record. A bare generic-crime headline that merely names a
-// recovered place ("Motorcycle theft in Penang") must NOT be admitted: it needs
-// a cargo NOUN + crime verb, a cargo-specific action, or the Bahasa noun+verb
-// pair. Attributed (stored-country) rows keep the broader hasCargoVocab gate.
-function hasStrictCargoVocab(text: string): boolean {
-  if (CARGO_ACTION_RE.test(text)) return true;
-  if (CARGO_NOUN_RE.test(text) && CRIME_VERB_RE.test(text)) return true;
-  return CARGO_BAHASA_NOUN_RE.test(text) && CRIME_BAHASA_RE.test(text);
-}
 
 // Explicit cargo / LOAD context — a freight commodity, a quantity of goods, or
 // a "carrying / laden" framing. When present, a record describing a stolen
@@ -122,6 +108,47 @@ function hasStrictCargoVocab(text: string): boolean {
 // — a different risk picture that is not Cargo Watch.
 const CARGO_LOAD_CONTEXT_RE =
   /\b(cargo|freight|container|containers|consignment|shipment|shipments|laden|loaded|carrying|haul|haulage|pallet|pallets|crate|crates|goods|tonnes?|tons?|kilograms?|\bkg\b|litres?|liters?|bars?|cartons?|boxes|sacks?|bales?|chocolate|electronics|garments?|textiles?|pharmaceutical)\b/i;
+
+// STRONG cargo nouns — inherently supply-chain objects/nodes. A consignment,
+// container, freight shipment, godown, depot or lorry is cargo by definition,
+// so a crime verb alongside one is a genuine cargo incident. The generic
+// premises/conveyance words "warehouse", "truck" and "parcel" are deliberately
+// EXCLUDED here — a warehouse stores anything, a truck can be the stolen object,
+// a parcel can be a doorstep package — so they qualify only with explicit load
+// context (a named freight commodity or quantity of goods) below.
+const STRONG_CARGO_NOUN_RE = /\b(cargo|freight|container|containers|consignment|consignments|shipment|shipments|godown|depot|logistics|lorry|lorries)\b/i;
+const STRONG_CARGO_BAHASA_RE = /\b(kargo|peti kemas|kontainer|logistik|ekspedisi)\b/i;
+
+// Named FREIGHT commodities — bulk/distribution goods that are the stolen TARGET.
+// When one of these is taken the load itself is the target, so the record is a
+// genuine cargo incident even without a premises word (e.g. "12 tonnes of KitKat
+// stolen", "truck robbery of scrap iron", "cigarette distributor warehouse
+// theft"). Deliberately omits petty-theft-prone consumer items (phones, laptops,
+// jewellery) and bare vehicles, which are not Cargo Watch.
+const CARGO_COMMODITY_RE =
+  /\b(scrap|copper|steel|nickel|aluminium|aluminum|iron ore|coal|rice|wheat|grain|grains|sugar|flour|maize|corn|coffee|tea|cocoa|palm oil|cooking oil|edible oil|rubber|timber|logs|plywood|cement|fertili[sz]er|fuel|diesel|petrol|gasoline|kerosene|lpg|tobacco|cigarettes?|liquor|alcohol|beer|wine|spirits|clothing|apparel|garments?|footwear|milk powder|infant formula)\b/i;
+
+// Genuine-cargo predicate: keep ONLY incidents involving real cargo / goods —
+// freight in transit, containers, shipments, consignments, logistics-node
+// (depot/godown) theft, or a named freight commodity/quantity as the target. A
+// cargo-specific ACTION (hijack/pilfer/siphon/smuggle/seal-tamper) qualifies on
+// its own. Otherwise a crime verb must pair with a STRONG cargo noun OR explicit
+// load context. Generic warehouse/truck burglaries with no goods named (cash,
+// unspecified loot, the vehicle itself) are intentionally dropped per the
+// product owner's decision to confine Cargo Watch to real cargo/goods crime.
+function hasGenuineCargo(text: string): boolean {
+  if (CARGO_ACTION_RE.test(text)) return true;
+  const hasLoad = CARGO_LOAD_CONTEXT_RE.test(text) || CARGO_COMMODITY_RE.test(text);
+  if (CRIME_VERB_RE.test(text)) {
+    if (STRONG_CARGO_NOUN_RE.test(text)) return true;
+    if (hasLoad) return true;
+  }
+  if (CRIME_BAHASA_RE.test(text)) {
+    if (STRONG_CARGO_BAHASA_RE.test(text)) return true;
+    if (hasLoad) return true;
+  }
+  return false;
+}
 
 // Generic-crime NOISE classes that name a cargo-ish word (truck / warehouse /
 // parcel) but are NOT cargo / logistics-node theft. Each fires only when no
@@ -146,7 +173,10 @@ const NOISE_RESIDENTIAL_PARCEL_RE =
 // when explicit cargo / load context is present (the goods, not the conveyance
 // or the cash, are the target).
 function isCargoNoise(text: string): boolean {
-  const hasLoad = CARGO_LOAD_CONTEXT_RE.test(text);
+  // Same load definition as hasGenuineCargo: a named freight commodity counts as
+  // load context too, so "diesel stolen from a truck" (a genuine fuel-cargo
+  // theft) is not preemptively dropped as vehicle-theft noise.
+  const hasLoad = CARGO_LOAD_CONTEXT_RE.test(text) || CARGO_COMMODITY_RE.test(text);
   if (NOISE_SAFE_RE.test(text) && !hasLoad) return true;
   if (NOISE_MONEY_AMOUNT_RE.test(text) && !hasLoad) return true;
   if (NOISE_CASH_IN_TRANSIT_RE.test(text) && !hasLoad) return true;
@@ -204,7 +234,7 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
     // Penang" is not enough). Unattributed US/global commentary and generic
     // local crime stay in the needs-review bucket.
     const recovered = recoverCargoCountryFromText(i);
-    if (recovered && hasStrictCargoVocab(text) && !isCargoNoise(text)) {
+    if (recovered && hasGenuineCargo(text) && !isCargoNoise(text)) {
       const recRegion = classifyRegion(recovered);
       if (recRegion === "APAC" || recRegion === "Middle East") return "in_scope";
     }
@@ -215,6 +245,11 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   // vehicle theft, arms dealing, doorstep parcel theft) that lacks any cargo /
   // load context before admitting it as a cargo incident.
   if (isCargoNoise(text)) return "excluded_non_cargo";
+  // Final gate: keep ONLY genuine cargo / goods incidents. A bare warehouse or
+  // truck burglary with no freight, shipment or named commodity (cash thefts,
+  // unspecified loot, the vehicle itself) is dropped here — the bulk of the
+  // generic Indonesian warehouse/truck noise the product owner asked to remove.
+  if (!hasGenuineCargo(text)) return "excluded_non_cargo";
   return "in_scope";
 }
 

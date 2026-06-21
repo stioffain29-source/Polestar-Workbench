@@ -96,6 +96,37 @@ genuine cargo (e.g. "KitKat chocolate bars", "Amman airport warehouse"). Verify
 by replaying old-vs-new `classifyScope` over all rows: confirm only genuine
 noise drops, zero genuine cargo lost.
 
+## Tightening to "genuine cargo only": strong-noun tier + commodity branch
+When the owner demands Cargo Watch keep ONLY real cargo/goods (containers,
+shipments, freight in transit, depots, named commodities) and drop generic
+warehouse/truck/cash theft, tighten `hasGenuineCargo` in `cargoAnalysis.ts`,
+applied to BOTH the attributed-row tail AND the unattributed recovery path:
+- Split cargo nouns into a STRONG tier (`cargo/freight/container/consignment/
+  shipment/godown/depot/logistics/lorry`) that admits with a crime verb alone,
+  and DELIBERATELY EXCLUDE the ambiguous premises/conveyance words
+  `warehouse/truck/parcel` from it — a warehouse stores anything, a truck can BE
+  the stolen object, a parcel can be a doorstep package. Those qualify only WITH
+  load context.
+- Add a named-FREIGHT-COMMODITY branch (`scrap/metals/grains/fuel/cigarettes?/
+  clothing/...`) so the commodity is the stolen TARGET even without a premises
+  word ("12 tonnes KitKat", "scrap iron from a truck", "cigarette distributor
+  warehouse"). Use singular/plural (`cigarettes?`) and include the literal
+  category words the feed tags rows with (`alcohol`, `clothing`). OMIT
+  petty-theft-prone consumer items (phones/laptops/jewellery) and bare vehicles.
+- `isCargoNoise`'s stand-down `hasLoad` MUST use the SAME definition
+  (`CARGO_LOAD_CONTEXT_RE || CARGO_COMMODITY_RE`) as `hasGenuineCargo`, or a
+  commodity-only theft ("diesel stolen from a truck") is dropped as vehicle-theft
+  noise BEFORE the genuine-cargo gate ever runs.
+**Why:** the old broad `CARGO_NOUN_RE` counted bare warehouse/truck/parcel, so
+generic Indonesian warehouse/cash/vehicle burglaries dominated the in-scope set
+(~291–303 raw → 208 after tightening; deduped display ~162 → ~110).
+**How to verify:** frontend-only (NO DB write, NO `RELEVANCE_RULE_VERSION` bump);
+replay old-vs-new `classifyScope` over the live rows and confirm generic
+warehouse/truck/cash drop while container/commodity/hijack rows stay (KitKat
+cluster mostly kept). Tradeoff the owner ACCEPTED: a bare commodity + crime verb
+("beer stolen from a shop") can admit a petty retail theft — keeping genuine
+commodity cargo was prioritised over that rare false-positive.
+
 ## "Lack of reporting" in Cargo Watch is usually real sparseness, not a bug
 Genuine RECENT (≤30d) APAC/Middle-East cargo-theft reporting genuinely runs
 only a handful of incidents/month. Broadening feeds and tightening noise is the
