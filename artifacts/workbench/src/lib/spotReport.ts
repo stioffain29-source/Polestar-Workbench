@@ -8,6 +8,10 @@ export const NAVY = "#0b0a3d";
 export const ELECTRIC = "#465bff";
 export const DUSK = "#363636";
 export const POLAR = "#e2e2e2";
+// Mid neutral gray for de-emphasised / residual ("not reported") categories.
+// Sits between DUSK and POLAR so it is clearly distinct from the near-black
+// NAVY while staying legible on white. Neutral on purpose — never a risk colour.
+export const SLATE = "#6b6b6b";
 
 export const SPOT_SEV_COLOR: Record<string, string> = {
   extreme: "#A33232",

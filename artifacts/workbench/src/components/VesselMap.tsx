@@ -6,7 +6,7 @@ import {
   getListMaritimeVesselsQueryKey,
 } from "@workspace/api-client-react";
 import type { MaritimeVessel } from "@workspace/api-client-react";
-import { NAVY, POLAR, DUSK, ELECTRIC } from "@/lib/spotReport";
+import { NAVY, POLAR, DUSK, ELECTRIC, SLATE } from "@/lib/spotReport";
 
 // The generated MaritimeVessel.vesselClass is optional (string | undefined);
 // the map only ever colours by these three concrete classes, with "other" as
@@ -36,13 +36,15 @@ const THEATRE_BOXES: Array<{
   { theatre: "Suez Canal", minLat: 29.8, maxLat: 31.4, minLon: 32.2, maxLon: 32.7 },
 ];
 
-// Brand-only vessel-class palette. Tanker = Electric Blue, cargo = Midnight,
-// everything else = Dusk Gray. RED IS DELIBERATELY UNUSED — it is reserved for
-// the Extreme severity tier and a vessel position is context, never a severity.
+// Brand-only vessel-class palette. Tanker = Electric Blue, cargo = Midnight Navy,
+// everything else = mid-gray Slate (clearly distinct from the near-black cargo
+// navy and kept in sync with the Fleet Composition tiles). RED IS DELIBERATELY
+// UNUSED — it is reserved for the Extreme severity tier and a vessel position is
+// context, never a severity.
 const CLASS_COLOR: Record<VClass, string> = {
   tanker: ELECTRIC,
   cargo: NAVY,
-  other: DUSK,
+  other: SLATE,
 };
 const CLASS_LABEL: Record<VClass, string> = {
   tanker: "Tanker",

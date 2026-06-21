@@ -4,15 +4,17 @@ import {
   getListMaritimeVesselsQueryKey,
 } from "@workspace/api-client-react";
 import { buildFleetIntelligence } from "@/lib/fleetIntelligence";
-import { NAVY, ELECTRIC, DUSK } from "@/lib/spotReport";
+import { NAVY, ELECTRIC, SLATE } from "@/lib/spotReport";
 
 // Class swatch colours mirror the Live Vessel Map legend so the two panels read
-// as one system. RED IS DELIBERATELY UNUSED — a vessel is context, never a
-// severity, and the subdued red is reserved for the Extreme tier.
+// as one system. Three clearly distinct, on-brand tones: Tanker = Electric Blue,
+// Cargo = near-black Navy, Other / not reported = mid-gray Slate (the residual
+// bucket is intentionally the most muted). RED IS DELIBERATELY UNUSED — a vessel
+// is context, never a severity, and the subdued red is reserved for the Extreme tier.
 const CLASS_META: Array<{ key: "tanker" | "cargo" | "other"; label: string; color: string }> = [
   { key: "tanker", label: "Tanker", color: ELECTRIC },
   { key: "cargo", label: "Cargo", color: NAVY },
-  { key: "other", label: "Other / not reported", color: DUSK },
+  { key: "other", label: "Other / not reported", color: SLATE },
 ];
 
 function Stat({ value, label }: { value: number | string; label: string }) {
