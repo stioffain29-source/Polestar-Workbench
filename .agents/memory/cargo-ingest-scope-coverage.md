@@ -75,3 +75,19 @@ fix is a DETERMINISTIC FRONTEND layer in `cargoAnalysis.ts` (NO DB writes):
 `relevance_status='relevant'` rows (the page set; raw DB count is larger) and
 confirm every newly-in-scope row is genuine + the strict gate demotes zero
 genuine recoveries.
+
+## "Cargo dashboard shows only 4 / hasn't changed" = the 30D filter, not a bug
+The recurring "cargo is light / nothing changed" report is usually the **30D
+range pill** being selected. The Cargo Watch page DEFAULTS to **All Time**
+(`useState<RangeKey>("all")`), which renders the full in-scope set (~160+
+incidents, map spanning APAC + Middle East + East Asia). Recent cargo-theft
+reporting in the covered region genuinely runs only ~6 incidents/month, so ANY
+short window (24h/7d/30d) looks tiny — that is real monthly sparseness, NOT
+staleness or a display bug. The depth lives in the wider windows (e.g. ~174
+records in 180d vs ~6 in 30d).
+**Don't reflexively blame prod-staleness:** verified dev and prod cargo data are
+identical and current (same total, same last-incident, prod self-refreshes), and
+the published app also defaults to All Time and shows the rich set. Before
+"fixing" anything, screenshot the All Time view (dev AND the live prod URL) and
+diff dev vs prod counts — the answer is almost always "working as intended, user
+was on the 30D filter."
