@@ -101,6 +101,7 @@ export * from './reportUpdate';
 export * from './reportUpdateRiskRating';
 export * from './severity';
 export * from './socialRawItem';
+export * from './socialRawItemEngagement';
 export * from './socialWatchItem';
 export * from './socialWatchStatus';
 export * from './source';

@@ -101,6 +101,25 @@ export const socialRawTable = pgTable(
     classification: text("classification").notNull().default("context"),
     // Content/image fingerprint — UNIQUE so re-fetches/reshares collapse to one.
     dedupKey: text("dedup_key").notNull(),
+    // Coarse public engagement counts when the scraper supplies them (reactions /
+    // comments / shares). NEVER includes commenter identities — counts only. Null
+    // when the provider does not report them ("not reported", never a fake zero).
+    engagement: jsonb("engagement")
+      .$type<{ reactions?: number; comments?: number; shares?: number }>(),
+    // Curated security/theatre keywords that actually matched the caption — a
+    // transparency signal for the analyst, derived from real text matches only.
+    detectedKeywords: jsonb("detected_keywords")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    // Deterministic triage score (0-100) combining the concrete signals already
+    // derived for this row. Not a probability; never fabricates certainty.
+    confidence: integer("confidence").notNull().default(0),
+    // True when the row should surface in the analyst review queue (in-scope AND
+    // a real security category). A TRIAGE flag only — never promotes anything.
+    reviewFlag: boolean("review_flag").notNull().default(false),
+    // Human-readable explanation of the review-flag decision (null when unflagged).
+    reviewReason: text("review_reason"),
     // Minimised, redacted echo of the source payload (no comments/PII/tokens).
     rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>(),
     // True only when the re-derived gate (security AND credible) passes — i.e.
@@ -129,6 +148,7 @@ export const socialRawTable = pgTable(
     byCountry: index("social_raw_country_idx").on(t.country),
     byCategory: index("social_raw_category_idx").on(t.category),
     byPromotable: index("social_raw_promotable_idx").on(t.promotable),
+    byReview: index("social_raw_review_idx").on(t.reviewFlag),
     byPosted: index("social_raw_posted_idx").on(t.postedAt),
   }),
 );

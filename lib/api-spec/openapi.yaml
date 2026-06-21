@@ -287,6 +287,18 @@ paths:
           in: query
           description: Filter by whether the item has already been promoted
           schema: { type: boolean }
+        - name: reviewFlagged
+          in: query
+          description: >-
+            Limit to items flagged for human analyst review (in-scope AND
+            security-relevant)
+          schema: { type: boolean }
+        - name: eligible
+          in: query
+          description: >-
+            Limit to items eligible for promotion (alias of promotable;
+            security-relevant AND credible AND not yet promoted)
+          schema: { type: boolean }
         - name: limit
           in: query
           description: Max number of most-recent items to return (1-200)
@@ -2595,6 +2607,9 @@ components:
           url,
           classification,
           promotable,
+          detectedKeywords,
+          confidence,
+          reviewFlag,
         ]
       properties:
         id: { type: integer }
@@ -2631,6 +2646,20 @@ components:
         url: { type: string }
         classification: { type: string }
         promotable: { type: boolean }
+        engagement:
+          description: >-
+            Minimised public engagement counts (likes/comments/shares) when the
+            provider returns them — context only, never PII.
+          oneOf:
+            - type: object
+              additionalProperties: { type: ["integer", "null"] }
+            - type: "null"
+        detectedKeywords:
+          type: array
+          items: { type: string }
+        confidence: { type: integer }
+        reviewFlag: { type: boolean }
+        reviewReason: { type: ["string", "null"] }
         promotedIncidentId: { type: ["integer", "null"] }
         promotedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: ["string", "null"], format: date-time }

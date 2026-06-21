@@ -22,6 +22,9 @@ import {
   detectCredibleDomains,
   extractHosts,
   deriveEligibility,
+  deriveReview,
+  computeConfidence,
+  detectKeywords,
   categoryToTopic,
   pickCorroboration,
   pickDuplicate,
@@ -446,5 +449,155 @@ describe("normaliseSourceTier", () => {
     expect(normaliseSourceTier("press")).toBe("local_media");
     expect(normaliseSourceTier("")).toBe("osint");
     expect(normaliseSourceTier(undefined)).toBe("osint");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review-flag triage — a TRIAGE signal only; it never promotes anything.
+// ---------------------------------------------------------------------------
+describe("deriveReview", () => {
+  it("flags an in-scope, security-relevant post and records WHY", () => {
+    const r = deriveReview({
+      inScope: true,
+      securityRelevant: true,
+      promotable: false,
+      category: "Civil unrest / protest",
+    });
+    expect(r.reviewFlag).toBe(true);
+    expect(r.reviewReason).toMatch(/Civil unrest \/ protest/);
+    // Not yet promotable → the reason names the missing credibility step.
+    expect(r.reviewReason).toMatch(/credible source or cross-feed corroboration/);
+  });
+
+  it("notes promote-eligibility in the reason when already promotable", () => {
+    const r = deriveReview({
+      inScope: true,
+      securityRelevant: true,
+      promotable: true,
+      category: "Armed robbery / hold-up",
+    });
+    expect(r.reviewFlag).toBe(true);
+    expect(r.reviewReason).toMatch(/promote-eligible/);
+  });
+
+  it("does NOT flag an out-of-scope post", () => {
+    const r = deriveReview({
+      inScope: false,
+      securityRelevant: true,
+      promotable: true,
+      category: "Civil unrest / protest",
+    });
+    expect(r.reviewFlag).toBe(false);
+    expect(r.reviewReason).toBeNull();
+  });
+
+  it("does NOT flag a non-security-relevant post", () => {
+    const r = deriveReview({
+      inScope: true,
+      securityRelevant: false,
+      promotable: false,
+      category: "Other security",
+    });
+    expect(r.reviewFlag).toBe(false);
+    expect(r.reviewReason).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Confidence score — deterministic, 0-100, never fabricates certainty.
+// ---------------------------------------------------------------------------
+describe("computeConfidence", () => {
+  it("scores 0 for an out-of-scope post regardless of other signals", () => {
+    expect(
+      computeConfidence({
+        inScope: false,
+        localityPrecise: true,
+        securityRelevant: true,
+        credible: true,
+        corroborated: true,
+        hasIncidentDate: true,
+        keywordCount: 5,
+      }),
+    ).toBe(0);
+  });
+
+  it("a bare in-scope post with no other signal scores the base 25", () => {
+    expect(
+      computeConfidence({
+        inScope: true,
+        localityPrecise: false,
+        securityRelevant: false,
+        credible: false,
+        corroborated: false,
+        hasIncidentDate: false,
+        keywordCount: 0,
+      }),
+    ).toBe(25);
+  });
+
+  it("adds points for each concrete signal that genuinely fired", () => {
+    // 25 + 18 + 22 + 15 + 12 + 5 + 3 = 100 (clamped at the ceiling).
+    expect(
+      computeConfidence({
+        inScope: true,
+        localityPrecise: true,
+        securityRelevant: true,
+        credible: true,
+        corroborated: true,
+        hasIncidentDate: true,
+        keywordCount: 3,
+      }),
+    ).toBe(100);
+  });
+
+  it("requires at least 3 keywords before the keyword bonus applies", () => {
+    const base = {
+      inScope: true,
+      localityPrecise: false,
+      securityRelevant: false,
+      credible: false,
+      corroborated: false,
+      hasIncidentDate: false,
+    };
+    expect(computeConfidence({ ...base, keywordCount: 2 })).toBe(25);
+    expect(computeConfidence({ ...base, keywordCount: 3 })).toBe(28);
+  });
+
+  it("never exceeds 100 and never drops below 5 when in scope", () => {
+    const v = computeConfidence({
+      inScope: true,
+      localityPrecise: false,
+      securityRelevant: false,
+      credible: false,
+      corroborated: false,
+      hasIncidentDate: false,
+      keywordCount: 0,
+    });
+    expect(v).toBeGreaterThanOrEqual(5);
+    expect(v).toBeLessThanOrEqual(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Keyword detection — transparency only; distinct, in cue order, no fabrication.
+// ---------------------------------------------------------------------------
+describe("detectKeywords", () => {
+  it("returns the distinct curated cues that actually matched", () => {
+    const kws = detectKeywords(
+      "Tribal fighting and a shooting near the Enga highlands left people dead",
+    );
+    expect(kws).toEqual(
+      expect.arrayContaining(["tribal fighting", "shooting", "killed", "highlands"]),
+    );
+  });
+
+  it("returns an empty array for empty or signal-free text", () => {
+    expect(detectKeywords("")).toEqual([]);
+    expect(detectKeywords("A quiet community fair was held over the weekend")).toEqual([]);
+  });
+
+  it("does not duplicate a cue that matches more than once", () => {
+    const kws = detectKeywords("protest, protests and more protesters at the protest");
+    expect(kws.filter((k) => k === "protest")).toHaveLength(1);
   });
 });

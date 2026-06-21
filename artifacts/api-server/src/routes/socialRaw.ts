@@ -48,7 +48,8 @@ router.get("/social-raw", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { country, category, promotable, promoted, limit } = parsed.data;
+  const { country, category, promotable, promoted, reviewFlagged, eligible, limit } =
+    parsed.data;
 
   const conditions = [eq(socialRawTable.sourceName, SOURCE_NAME)];
   if (country) conditions.push(eq(socialRawTable.country, country));
@@ -60,6 +61,22 @@ router.get("/social-raw", async (req, res): Promise<void> => {
       promoted
         ? isNotNull(socialRawTable.promotedIncidentId)
         : isNull(socialRawTable.promotedIncidentId),
+    );
+  if (reviewFlagged !== undefined)
+    conditions.push(eq(socialRawTable.reviewFlag, reviewFlagged));
+  // `eligible` = promotable AND not yet promoted (the actionable queue). When
+  // false, surface the complement (not promotable OR already promoted).
+  if (eligible !== undefined)
+    conditions.push(
+      eligible
+        ? and(
+            eq(socialRawTable.promotable, true),
+            isNull(socialRawTable.promotedIncidentId),
+          )!
+        : or(
+            eq(socialRawTable.promotable, false),
+            isNotNull(socialRawTable.promotedIncidentId),
+          )!,
     );
 
   const rows = await db
@@ -92,6 +109,11 @@ router.get("/social-raw", async (req, res): Promise<void> => {
       url: socialRawTable.url,
       classification: socialRawTable.classification,
       promotable: socialRawTable.promotable,
+      engagement: socialRawTable.engagement,
+      detectedKeywords: socialRawTable.detectedKeywords,
+      confidence: socialRawTable.confidence,
+      reviewFlag: socialRawTable.reviewFlag,
+      reviewReason: socialRawTable.reviewReason,
       promotedIncidentId: socialRawTable.promotedIncidentId,
       promotedAt: socialRawTable.promotedAt,
       createdAt: socialRawTable.createdAt,

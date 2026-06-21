@@ -95,17 +95,21 @@ export {
   normaliseFacebookPost,
   sanitiseUrl,
   makeFacebookDedupKey,
+  detectKeywords,
   FACEBOOK_OSINT_HEALTH_NAME,
 } from "./facebookOsint";
 export type {
   FacebookOsintSummary,
   FacebookOsintConfig,
+  FacebookPageSource,
   FbClassification,
   RawFacebookPost,
   ScopeResolution,
 } from "./facebookOsint";
 export {
   deriveEligibility,
+  deriveReview,
+  computeConfidence,
   detectCredibleDomains,
   extractHosts,
   pickCorroboration,
@@ -123,6 +127,9 @@ export type {
   EligibilityInput,
   Eligibility,
   PostMatchInput,
+  ReviewInput,
+  Review,
+  ConfidenceInput,
 } from "./facebookOsintEligibility";
 export {
   runGdeltEnrich,

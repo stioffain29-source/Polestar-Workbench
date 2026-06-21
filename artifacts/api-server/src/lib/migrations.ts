@@ -562,6 +562,33 @@ export async function runDataMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS social_raw_posted_idx
         ON social_raw (posted_at)
     `);
+    // Triage/transparency columns added after the table's first ship. All
+    // idempotent so the prod primary gains them on boot (drizzle push only
+    // reaches dev). Mirrors lib/db/src/schema/socialRaw.ts.
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS engagement jsonb
+    `);
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS detected_keywords jsonb NOT NULL DEFAULT '[]'::jsonb
+    `);
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS confidence integer NOT NULL DEFAULT 0
+    `);
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS review_flag boolean NOT NULL DEFAULT false
+    `);
+    await db.execute(sql`
+      ALTER TABLE social_raw
+        ADD COLUMN IF NOT EXISTS review_reason text
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS social_raw_review_idx
+        ON social_raw (review_flag)
+    `);
 
     // Schema: ICC CCS / IMB maritime piracy & armed-robbery events. A STANDALONE
     // maritime-security source — SEPARATE from both the news-scraped `incidents`

@@ -905,14 +905,59 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
 
   const stats = useMemo(() => {
     let securityRelevant = 0;
-    let promotable = 0;
+    let flagged = 0;
+    let eligible = 0;
     let promoted = 0;
     for (const it of items) {
+      const isPromoted = it.promotedIncidentId != null;
       if (it.securityRelevant) securityRelevant += 1;
-      if (it.promotable && it.promotedIncidentId == null) promotable += 1;
-      if (it.promotedIncidentId != null) promoted += 1;
+      if (it.reviewFlag && !isPromoted) flagged += 1;
+      if (it.promotable && !isPromoted) eligible += 1;
+      if (isPromoted) promoted += 1;
     }
-    return { securityRelevant, promotable, promoted };
+    return { securityRelevant, flagged, eligible, promoted };
+  }, [items]);
+
+  // Group by review/eligible state so an analyst sees the actionable queue first.
+  // promotable ⊂ reviewFlag (both require security-relevance), so the buckets are
+  // mutually exclusive in this precedence: promoted → eligible → flagged → other.
+  const groups = useMemo(() => {
+    const eligible: SocialRawItem[] = [];
+    const review: SocialRawItem[] = [];
+    const promoted: SocialRawItem[] = [];
+    const other: SocialRawItem[] = [];
+    for (const it of items) {
+      if (it.promotedIncidentId != null) promoted.push(it);
+      else if (it.promotable) eligible.push(it);
+      else if (it.reviewFlag) review.push(it);
+      else other.push(it);
+    }
+    return [
+      {
+        key: "eligible",
+        title: "Eligible to promote",
+        note: "Security-relevant and credible — ready for analyst promotion to an incident.",
+        items: eligible,
+      },
+      {
+        key: "review",
+        title: "Flagged for review",
+        note: "Security-relevant but not yet credible — needs an analyst's eye before promotion.",
+        items: review,
+      },
+      {
+        key: "other",
+        title: "Other context",
+        note: "Not flagged as security-relevant; retained as background context only.",
+        items: other,
+      },
+      {
+        key: "promoted",
+        title: "Promoted to incidents",
+        note: "Already linked to a tracked incident.",
+        items: promoted,
+      },
+    ].filter((g) => g.items.length > 0);
   }, [items]);
 
   async function onPromote(id: number) {
@@ -956,10 +1001,11 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="Posts on file" value={items.length} accent="#465bff" small />
         <Kpi label="Security-relevant" value={stats.securityRelevant} accent="#0B0B3D" small />
-        <Kpi label="Awaiting review" value={stats.promotable} accent="#A33232" small />
+        <Kpi label="Flagged for review" value={stats.flagged} accent="#1B6B7A" small />
+        <Kpi label="Eligible to promote" value={stats.eligible} accent="#0B0B3D" small />
         <Kpi label="Promoted" value={stats.promoted} accent="#303030" small />
       </div>
 
@@ -979,95 +1025,165 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
         </p>
       )}
 
-      <div className="bg-white border border-border rounded-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="text-left p-2 font-sans font-medium w-[120px]">Source</th>
-              <th className="text-left p-2 font-sans font-medium w-[120px]">When</th>
-              <th className="text-left p-2 font-sans font-medium w-[140px]">Where</th>
-              <th className="text-left p-2 font-sans font-medium w-[130px]">Category</th>
-              <th className="text-left p-2 font-sans font-medium">Caption / eligibility</th>
-              <th className="text-left p-2 font-sans font-medium w-[60px]">Link</th>
-              <th className="text-left p-2 font-sans font-medium w-[150px]">Promote</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {items.map((it) => {
-              const when =
-                (it.incidentDate
-                  ? format(new Date(it.incidentDate), "dd MMM yyyy")
-                  : null) ||
-                (it.postedAt ? format(new Date(it.postedAt), "dd MMM yyyy") : null) ||
-                "—";
-              const where = it.location || it.province || it.country || "—";
-              const promoted = it.promotedIncidentId != null;
-              return (
-                <tr key={it.id} className="hover:bg-muted/30 align-top">
-                  <td className="p-2 whitespace-nowrap">
-                    <OsintTierBadge tier={it.sourceTier} />
-                    <span className="block text-[10px] text-muted-foreground mt-0.5">
-                      {it.pageName || it.pageHandle}
-                    </span>
-                  </td>
-                  <td className="p-2 text-xs whitespace-nowrap">{when}</td>
-                  <td className="p-2 text-xs">{where}</td>
-                  <td className="p-2 text-xs">
-                    {it.category}
-                    {!it.securityRelevant && (
-                      <span className="block text-[10px] text-muted-foreground mt-0.5">
-                        not security-relevant
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-2 text-xs text-foreground/80">
-                    <span className="line-clamp-2">
-                      {it.caption || <span className="text-muted-foreground">—</span>}
-                    </span>
-                    {it.credibilityReason && (
-                      <span className="block text-[10px] text-muted-foreground mt-0.5">
-                        {it.credibilityReason}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {it.url ? (
-                      <a
-                        href={it.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-accent hover:underline inline-flex items-center gap-1 text-xs"
-                        aria-label="Open post"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="p-2 text-xs">
-                    {promoted ? (
-                      <span className="text-muted-foreground">Incident #{it.promotedIncidentId}</span>
-                    ) : it.promotable ? (
-                      <button
-                        type="button"
-                        onClick={() => onPromote(it.id)}
-                        disabled={pendingId === it.id}
-                        className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
-                        style={{ backgroundColor: "#465bff" }}
-                      >
-                        {pendingId === it.id ? "Promoting…" : "Promote"}
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground">Not eligible</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {groups.map((g) => (
+        <div key={g.key} className="space-y-2">
+          <div>
+            <h3 className="font-sans font-medium text-xs uppercase tracking-wider text-primary">
+              {g.title}{" "}
+              <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                ({g.items.length})
+              </span>
+            </h3>
+            <p className="text-[10px] text-muted-foreground font-sans leading-snug">
+              {g.note}
+            </p>
+          </div>
+          <OsintTable
+            items={g.items}
+            pendingId={pendingId}
+            onPromote={onPromote}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConfidenceCell({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <div className="space-y-1">
+      <div className="text-xs font-mono text-primary">{pct}</div>
+      <div className="h-1 w-12 bg-muted rounded-sm overflow-hidden">
+        <div
+          className="h-full"
+          style={{ width: `${pct}%`, background: "#465bff", opacity: FILL_OPACITY }}
+        />
       </div>
+    </div>
+  );
+}
+
+function OsintTable({
+  items,
+  pendingId,
+  onPromote,
+}: {
+  items: SocialRawItem[];
+  pendingId: number | null;
+  onPromote: (id: number) => void;
+}) {
+  return (
+    <div className="bg-white border border-border rounded-sm overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr>
+            <th className="text-left p-2 font-sans font-medium w-[120px]">Source</th>
+            <th className="text-left p-2 font-sans font-medium w-[110px]">When</th>
+            <th className="text-left p-2 font-sans font-medium w-[130px]">Where</th>
+            <th className="text-left p-2 font-sans font-medium w-[120px]">Category</th>
+            <th className="text-left p-2 font-sans font-medium w-[70px]">Confidence</th>
+            <th className="text-left p-2 font-sans font-medium">Caption / signals</th>
+            <th className="text-left p-2 font-sans font-medium w-[50px]">Link</th>
+            <th className="text-left p-2 font-sans font-medium w-[140px]">Promote</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {items.map((it) => {
+            const when =
+              (it.incidentDate
+                ? format(new Date(it.incidentDate), "dd MMM yyyy")
+                : null) ||
+              (it.postedAt ? format(new Date(it.postedAt), "dd MMM yyyy") : null) ||
+              "—";
+            const where = it.location || it.province || it.country || "—";
+            const promoted = it.promotedIncidentId != null;
+            const keywords = it.detectedKeywords ?? [];
+            return (
+              <tr key={it.id} className="hover:bg-muted/30 align-top">
+                <td className="p-2 whitespace-nowrap">
+                  <OsintTierBadge tier={it.sourceTier} />
+                  <span className="block text-[10px] text-muted-foreground mt-0.5">
+                    {it.pageName || it.pageHandle}
+                  </span>
+                </td>
+                <td className="p-2 text-xs whitespace-nowrap">{when}</td>
+                <td className="p-2 text-xs">{where}</td>
+                <td className="p-2 text-xs">
+                  {it.category}
+                  {!it.securityRelevant && (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      not security-relevant
+                    </span>
+                  )}
+                </td>
+                <td className="p-2">
+                  <ConfidenceCell value={it.confidence} />
+                </td>
+                <td className="p-2 text-xs text-foreground/80">
+                  <span className="line-clamp-2">
+                    {it.caption || <span className="text-muted-foreground">—</span>}
+                  </span>
+                  {keywords.length > 0 && (
+                    <span className="flex flex-wrap gap-1 mt-1">
+                      {keywords.slice(0, 6).map((k) => (
+                        <span
+                          key={k}
+                          className="px-1 py-0.5 text-[9px] uppercase tracking-wider rounded-sm bg-muted text-muted-foreground"
+                        >
+                          {k}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {it.reviewReason && (
+                    <span className="block text-[10px] text-muted-foreground mt-1">
+                      Review: {it.reviewReason}
+                    </span>
+                  )}
+                  {it.credibilityReason && (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      {it.credibilityReason}
+                    </span>
+                  )}
+                </td>
+                <td className="p-2">
+                  {it.url ? (
+                    <a
+                      href={it.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:underline inline-flex items-center gap-1 text-xs"
+                      aria-label="Open post"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">—</span>
+                  )}
+                </td>
+                <td className="p-2 text-xs">
+                  {promoted ? (
+                    <span className="text-muted-foreground">Incident #{it.promotedIncidentId}</span>
+                  ) : it.promotable ? (
+                    <button
+                      type="button"
+                      onClick={() => onPromote(it.id)}
+                      disabled={pendingId === it.id}
+                      className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
+                      style={{ backgroundColor: "#465bff" }}
+                    >
+                      {pendingId === it.id ? "Promoting…" : "Promote"}
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground">Not eligible</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

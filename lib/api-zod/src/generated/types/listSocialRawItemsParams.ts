@@ -24,6 +24,14 @@ promotable?: boolean;
  */
 promoted?: boolean;
 /**
+ * Limit to items flagged for human analyst review (in-scope AND security-relevant)
+ */
+reviewFlagged?: boolean;
+/**
+ * Limit to items eligible for promotion (alias of promotable; security-relevant AND credible AND not yet promoted)
+ */
+eligible?: boolean;
+/**
  * Max number of most-recent items to return (1-200)
  * @minimum 1
  * @maximum 200

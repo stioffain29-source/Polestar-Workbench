@@ -200,6 +200,73 @@ export function deriveEligibility(input: EligibilityInput): Eligibility {
 }
 
 // ---------------------------------------------------------------------------
+// Review-queue flag (pure)
+// ---------------------------------------------------------------------------
+// A post is flagged "for analyst review" when it BOTH matches the PNG /
+// Indonesian-Papua scope AND classifies into a recognised security category.
+// The flag is a TRIAGE signal only — it never promotes anything and never makes
+// a row an incident. The reason records WHY it was flagged and whether it is
+// already promote-eligible, so the review queue can be read at a glance.
+export interface ReviewInput {
+  /** True when the post resolved to the PNG / Indonesian-Papua scope. */
+  inScope: boolean;
+  /** True when the classified category is a real security category. */
+  securityRelevant: boolean;
+  /** The re-derived promote eligibility (security-relevant AND credible). */
+  promotable: boolean;
+  category: IncidentCategory;
+}
+
+export interface Review {
+  reviewFlag: boolean;
+  reviewReason: string | null;
+}
+
+export function deriveReview(input: ReviewInput): Review {
+  if (!input.inScope || !input.securityRelevant) {
+    return { reviewFlag: false, reviewReason: null };
+  }
+  const tail = input.promotable
+    ? "promote-eligible (security-relevant and credible)"
+    : "needs a credible source or cross-feed corroboration before promotion";
+  return {
+    reviewFlag: true,
+    reviewReason: `Flagged for analyst review — ${input.category} in the Papua/PNG theatre; ${tail}.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Confidence score (pure, 0-100)
+// ---------------------------------------------------------------------------
+// A deterministic triage score combining the concrete signals already derived
+// for the row. It is NOT a probability and NEVER fabricates certainty — it only
+// adds points for signals that genuinely fired (precise locality, a security
+// category, a credibility signal, cross-feed corroboration, an explicit incident
+// date, multiple matched keywords). An out-of-scope post scores 0.
+export interface ConfidenceInput {
+  inScope: boolean;
+  /** A gazetteer province/locality (not just a bare country cue) matched. */
+  localityPrecise: boolean;
+  securityRelevant: boolean;
+  credible: boolean;
+  corroborated: boolean;
+  hasIncidentDate: boolean;
+  keywordCount: number;
+}
+
+export function computeConfidence(input: ConfidenceInput): number {
+  if (!input.inScope) return 0;
+  let score = 25;
+  if (input.localityPrecise) score += 18;
+  if (input.securityRelevant) score += 22;
+  if (input.credible) score += 15;
+  if (input.corroborated) score += 12;
+  if (input.hasIncidentDate) score += 5;
+  if (input.keywordCount >= 3) score += 3;
+  return Math.max(5, Math.min(100, score));
+}
+
+// ---------------------------------------------------------------------------
 // Incident matching (corroboration + duplicate-block)
 // ---------------------------------------------------------------------------
 // A compact token/date scorer mirroring the reliefweb corroboration approach:

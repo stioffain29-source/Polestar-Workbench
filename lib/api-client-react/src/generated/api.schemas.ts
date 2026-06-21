@@ -1360,6 +1360,11 @@ export interface SocialWatchItem {
 }
 
 /**
+ * Minimised public engagement counts (likes/comments/shares) when the provider returns them — context only, never PII.
+ */
+export type SocialRawItemEngagement = {[key: string]: number | null} | null;
+
+/**
  * A Facebook OSINT monitoring item (Papua New Guinea / Indonesian Papua) stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which the server re-derives and which sets promotedIncidentId. The stored payload is minimised/redacted (no comments, author profiles, PII, or token-bearing URLs).
  */
 export interface SocialRawItem {
@@ -1401,6 +1406,13 @@ export interface SocialRawItem {
   url: string;
   classification: string;
   promotable: boolean;
+  /** Minimised public engagement counts (likes/comments/shares) when the provider returns them — context only, never PII. */
+  engagement?: SocialRawItemEngagement;
+  detectedKeywords: string[];
+  confidence: number;
+  reviewFlag: boolean;
+  /** @nullable */
+  reviewReason?: string | null;
   /** @nullable */
   promotedIncidentId?: number | null;
   /** @nullable */
@@ -1671,6 +1683,14 @@ promotable?: boolean;
  * Filter by whether the item has already been promoted
  */
 promoted?: boolean;
+/**
+ * Limit to items flagged for human analyst review (in-scope AND security-relevant)
+ */
+reviewFlagged?: boolean;
+/**
+ * Limit to items eligible for promotion (alias of promotable; security-relevant AND credible AND not yet promoted)
+ */
+eligible?: boolean;
 /**
  * Max number of most-recent items to return (1-200)
  * @minimum 1

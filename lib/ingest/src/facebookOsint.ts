@@ -20,6 +20,8 @@ import {
 import type { IncidentCategory } from "./structuredExtract";
 import {
   deriveEligibility,
+  deriveReview,
+  computeConfidence,
   detectCredibleDomains,
   pickCorroboration,
   categoryToTopic,
@@ -57,7 +59,50 @@ import {
 const DEFAULT_PAGE_HANDLE = "PNGFacts";
 const DEFAULT_PROVIDER = "apify";
 const DEFAULT_ACTOR = "apify~facebook-posts-scraper";
+const DEFAULT_SEARCH_ACTOR = "apify~facebook-search-scraper";
 const DEFAULT_API_BASE = "https://api.apify.com";
+
+// Synthetic page handle stamped on rows that came from the keyword post-search
+// pass (no single owning page). Always carries the unverified "osint" tier, so a
+// search hit is never promotable on tier alone — it needs a linked credible
+// domain or a cross-feed corroboration, exactly like any unverified OSINT page.
+const SEARCH_PAGE_HANDLE = "facebook-search";
+
+/** A monitored public page + its config-declared credibility tier. */
+export interface FacebookPageSource {
+  handle: string;
+  url: string;
+  name: string | null;
+  tier: SourceTier;
+}
+
+// Curated, OVERRIDABLE default coverage. PNGFacts stays an unverified OSINT
+// aggregator; the established outlets carry their real "local_media" tier (an
+// analyst still has to click Promote — the tier only governs whether a
+// security-relevant post becomes promote-eligible). A mistyped/dead handle just
+// returns no posts (graceful), so nothing is ever fabricated. Override via
+// FACEBOOK_PAGE_HANDLE(S) / FACEBOOK_PAGE_URL.
+const DEFAULT_PAGES: FacebookPageSource[] = [
+  { handle: "PNGFacts", url: "https://www.facebook.com/PNGFacts", name: "PNG Facts", tier: "osint" },
+  { handle: "EMTVOnlinePNG", url: "https://www.facebook.com/EMTVOnlinePNG", name: "EMTV Online", tier: "local_media" },
+  { handle: "postcourierpng", url: "https://www.facebook.com/postcourierpng", name: "Post-Courier", tier: "local_media" },
+  { handle: "thenationalpng", url: "https://www.facebook.com/thenationalpng", name: "The National (PNG)", tier: "local_media" },
+  { handle: "LoopPNG", url: "https://www.facebook.com/LoopPNG", name: "Loop PNG", tier: "local_media" },
+  { handle: "tabloidjubi", url: "https://www.facebook.com/tabloidjubi", name: "Jubi (Papua)", tier: "local_media" },
+];
+
+// Curated, OVERRIDABLE keyword post-search terms (PNG + Indonesian-Papua
+// security). Override via FACEBOOK_SEARCH_TERMS (comma/semicolon list); set it
+// blank to disable the search pass, or FACEBOOK_SEARCH_ENABLED=false.
+const DEFAULT_SEARCH_TERMS = [
+  "Papua New Guinea unrest",
+  "PNG tribal fighting",
+  "Port Moresby violence",
+  "Bougainville security",
+  "West Papua protest",
+  "Papua shooting",
+  "Jayapura clash",
+];
 
 const SOURCE_NAME = "facebook_osint";
 const PLATFORM = "facebook";
@@ -78,7 +123,18 @@ export interface FacebookOsintConfig {
   provider: string;
   apiKey: string;
   apiBase: string;
+  /** Apify actor for the per-page post pull. */
   actor: string;
+  /** Apify actor for the keyword post-search pass. */
+  searchActor: string;
+  /** Every monitored public page (curated default, configurable). */
+  pages: FacebookPageSource[];
+  /** Keyword post-search terms (empty disables the search pass). */
+  searchTerms: string[];
+  /** True when the search pass is switched on AND has at least one term. */
+  searchEnabled: boolean;
+  // Primary page (pages[0]) — kept for back-compat with the single-page Source
+  // Health row + summary label.
   pageHandle: string;
   pageUrl: string;
   pageName: string | null;
@@ -94,16 +150,70 @@ function envFlag(name: string, dflt: boolean): boolean {
   return !(v === "false" || v === "0" || v === "no" || v === "off");
 }
 
+/**
+ * Resolve the monitored pages. A single-page override
+ * (FACEBOOK_PAGE_HANDLE/URL/NAME/TIER) wins (back-compat); else a
+ * FACEBOOK_PAGE_HANDLES list ("handle|tier|Name" per entry, tier+name
+ * optional); else the curated DEFAULT_PAGES.
+ */
+function resolvePages(): FacebookPageSource[] {
+  const single = process.env.FACEBOOK_PAGE_HANDLE?.trim();
+  const singleUrl = process.env.FACEBOOK_PAGE_URL?.trim();
+  if (single || singleUrl) {
+    const handle = single || DEFAULT_PAGE_HANDLE;
+    return [
+      {
+        handle,
+        url: singleUrl || `https://www.facebook.com/${handle}`,
+        name: process.env.FACEBOOK_PAGE_NAME?.trim() || null,
+        tier: normaliseSourceTier(process.env.FACEBOOK_PAGE_TIER),
+      },
+    ];
+  }
+  const list = (process.env.FACEBOOK_PAGE_HANDLES || "")
+    .split(/[;,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (list.length) {
+    return list.map((entry) => {
+      const [handle, tier, name] = entry.split("|").map((x) => x?.trim());
+      return {
+        handle: handle!,
+        url: `https://www.facebook.com/${handle}`,
+        name: name || null,
+        tier: normaliseSourceTier(tier),
+      };
+    });
+  }
+  return DEFAULT_PAGES;
+}
+
+/** Resolve the post-search terms (unset → curated default; blank → disabled). */
+function resolveSearchTerms(): string[] {
+  const raw = process.env.FACEBOOK_SEARCH_TERMS;
+  if (raw === undefined) return DEFAULT_SEARCH_TERMS;
+  return raw
+    .split(/[;,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export function readFacebookOsintConfig(): FacebookOsintConfig {
   const enabled = envFlag("FACEBOOK_OSINT_ENABLED", true);
   const apiKey = process.env.FACEBOOK_API_KEY?.trim() || "";
   const configured = enabled && apiKey.length > 0;
 
-  const pageHandle =
-    process.env.FACEBOOK_PAGE_HANDLE?.trim() || DEFAULT_PAGE_HANDLE;
-  const pageUrl =
-    process.env.FACEBOOK_PAGE_URL?.trim() ||
-    `https://www.facebook.com/${pageHandle}`;
+  const pages = resolvePages();
+  const primary = pages[0] ?? {
+    handle: DEFAULT_PAGE_HANDLE,
+    url: `https://www.facebook.com/${DEFAULT_PAGE_HANDLE}`,
+    name: null,
+    tier: "osint" as SourceTier,
+  };
+
+  const searchTerms = resolveSearchTerms();
+  const searchEnabled =
+    envFlag("FACEBOOK_SEARCH_ENABLED", true) && searchTerms.length > 0;
 
   const maxRaw = Number(process.env.FACEBOOK_OSINT_MAX_ITEMS);
   const maxItems = Number.isFinite(maxRaw)
@@ -116,10 +226,15 @@ export function readFacebookOsintConfig(): FacebookOsintConfig {
     apiKey,
     apiBase: process.env.FACEBOOK_API_BASE?.trim() || DEFAULT_API_BASE,
     actor: process.env.FACEBOOK_ACTOR?.trim() || DEFAULT_ACTOR,
-    pageHandle,
-    pageUrl,
-    pageName: process.env.FACEBOOK_PAGE_NAME?.trim() || null,
-    sourceTier: normaliseSourceTier(process.env.FACEBOOK_PAGE_TIER),
+    searchActor:
+      process.env.FACEBOOK_SEARCH_ACTOR?.trim() || DEFAULT_SEARCH_ACTOR,
+    pages,
+    searchTerms,
+    searchEnabled,
+    pageHandle: primary.handle,
+    pageUrl: primary.url,
+    pageName: primary.name,
+    sourceTier: primary.tier,
     maxItems,
     configured,
   };
@@ -181,10 +296,62 @@ export interface RawFacebookPost {
   imageUrls: string[];
   outboundLinks: string[];
   postedAt: Date | null;
+  // Coarse public engagement counts when the provider supplies them. Counts
+  // only — never commenter identities. Null when not reported.
+  engagement?: { reactions?: number; comments?: number; shares?: number } | null;
+  // Origin metadata attached by the fetch loop (per source page / search pass).
+  // Optional so direct unit construction of a post stays terse.
+  pageHandle?: string;
+  pageName?: string | null;
+  sourceTier?: SourceTier;
+  origin?: "page" | "search";
 }
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+
+/** Parse a non-negative integer count from a number or comma/space string. */
+function asCount(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
+    return Math.trunc(v);
+  }
+  if (typeof v === "string") {
+    const n = Number(v.replace(/[, ]/g, ""));
+    return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Defensive engagement parse across the many shapes the Apify Facebook scrapers
+ * emit. COUNTS ONLY — no commenter identity is ever read. Returns null when the
+ * provider reports nothing (never a fabricated zero).
+ */
+function parseEngagement(
+  r: Record<string, unknown>,
+): { reactions?: number; comments?: number; shares?: number } | null {
+  const reactionsObj =
+    r.reactions && typeof r.reactions === "object"
+      ? (r.reactions as Record<string, unknown>)
+      : undefined;
+  const reactions =
+    asCount(r.likes) ??
+    asCount(r.likesCount) ??
+    asCount(r.reactionsCount) ??
+    asCount(r.reactionLikeCount) ??
+    asCount(reactionsObj?.total) ??
+    asCount(reactionsObj?.totalCount) ??
+    (reactionsObj ? undefined : asCount(r.reactions));
+  const comments =
+    asCount(r.comments) ?? asCount(r.commentsCount) ?? asCount(r.commentCount);
+  const shares =
+    asCount(r.shares) ?? asCount(r.sharesCount) ?? asCount(r.shareCount);
+  const out: { reactions?: number; comments?: number; shares?: number } = {};
+  if (reactions !== undefined) out.reactions = reactions;
+  if (comments !== undefined) out.comments = comments;
+  if (shares !== undefined) out.shares = shares;
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 function parseTimestamp(v: unknown): Date | null {
@@ -339,6 +506,7 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
       .map(sanitiseUrl)
       .filter(Boolean),
     postedAt,
+    engagement: parseEngagement(r),
   };
 }
 
@@ -356,16 +524,12 @@ function redactToken(msg: string, token: string): string {
 
 async function fetchApifyDataset(
   cfg: FacebookOsintConfig,
+  actor: string,
+  input: Record<string, unknown>,
 ): Promise<unknown> {
   const url = `${cfg.apiBase}/v2/acts/${encodeURIComponent(
-    cfg.actor,
+    actor,
   )}/run-sync-get-dataset-items?token=${encodeURIComponent(cfg.apiKey)}`;
-  const input = {
-    startUrls: [{ url: cfg.pageUrl }],
-    resultsLimit: cfg.maxItems,
-    maxPosts: cfg.maxItems,
-    onlyPostsNewerThanXDaysAgo: 30,
-  };
 
   let lastErr: unknown;
   for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
@@ -405,15 +569,8 @@ async function fetchApifyDataset(
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-async function fetchFacebookPosts(
-  cfg: FacebookOsintConfig,
-): Promise<RawFacebookPost[]> {
-  if (cfg.provider !== "apify") {
-    throw new Error(
-      `Facebook provider "${cfg.provider}" not implemented (only "apify" is supported)`,
-    );
-  }
-  const json = await fetchApifyDataset(cfg);
+/** Extract + normalise the post array out of any Apify dataset shape. */
+function toPosts(json: unknown): RawFacebookPost[] {
   const arr = Array.isArray(json)
     ? json
     : json &&
@@ -427,6 +584,101 @@ async function fetchFacebookPosts(
     if (norm) out.push(norm);
   }
   return out;
+}
+
+export interface FacebookFetchResult {
+  posts: RawFacebookPost[];
+  /** Per-source error strings (token already scrubbed at the run layer). */
+  errors: string[];
+  /** Sources attempted (pages + the optional search pass). */
+  attempted: number;
+  /** Sources that returned without throwing. */
+  ok: number;
+}
+
+/**
+ * Fetch every monitored page, then the optional keyword post-search pass. Each
+ * source is isolated in its own try/catch, so one dead page / failing actor can
+ * NEVER sink the others — the result reports partial success. Each post is
+ * stamped with the page/search origin + that source's credibility tier; search
+ * hits always carry the unverified "osint" tier.
+ */
+async function fetchFacebookPosts(
+  cfg: FacebookOsintConfig,
+): Promise<FacebookFetchResult> {
+  if (cfg.provider !== "apify") {
+    return {
+      posts: [],
+      errors: [
+        `Facebook provider "${cfg.provider}" not implemented (only "apify" is supported)`,
+      ],
+      attempted: 0,
+      ok: 0,
+    };
+  }
+
+  const posts: RawFacebookPost[] = [];
+  const errors: string[] = [];
+  let attempted = 0;
+  let ok = 0;
+
+  for (const page of cfg.pages) {
+    attempted++;
+    try {
+      const json = await fetchApifyDataset(cfg, cfg.actor, {
+        startUrls: [{ url: page.url }],
+        resultsLimit: cfg.maxItems,
+        maxPosts: cfg.maxItems,
+        onlyPostsNewerThanXDaysAgo: 30,
+      });
+      const fetched = toPosts(json);
+      for (const p of fetched) {
+        posts.push({
+          ...p,
+          pageHandle: page.handle,
+          pageName: page.name,
+          sourceTier: page.tier,
+          origin: "page",
+        });
+      }
+      ok++;
+    } catch (err) {
+      errors.push(
+        `page ${page.handle}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  if (cfg.searchEnabled && cfg.searchTerms.length > 0) {
+    attempted++;
+    try {
+      const json = await fetchApifyDataset(cfg, cfg.searchActor, {
+        searchQueries: cfg.searchTerms,
+        query: cfg.searchTerms.join(" OR "),
+        resultsLimit: cfg.maxItems,
+        maxPosts: cfg.maxItems,
+        maxPostsPerQuery: Math.max(5, Math.ceil(cfg.maxItems / cfg.searchTerms.length)),
+        onlyPostsNewerThanXDaysAgo: 30,
+      });
+      const fetched = toPosts(json);
+      for (const p of fetched) {
+        posts.push({
+          ...p,
+          pageHandle: SEARCH_PAGE_HANDLE,
+          pageName: "Facebook post search",
+          sourceTier: "osint",
+          origin: "search",
+        });
+      }
+      ok++;
+    } catch (err) {
+      errors.push(
+        `search: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return { posts, errors, attempted, ok };
 }
 
 // --- Dedup fingerprint -------------------------------------------------------
@@ -458,6 +710,44 @@ export function makeFacebookDedupKey(caption: string, imageUrls: string[]): stri
 
 // --- Classification ----------------------------------------------------------
 
+// Curated theatre + security keyword cues for the transparency signal. These do
+// NOT classify or gate anything (the shared rulebook does that) — they only
+// surface, for the analyst, which security/theatre words actually appeared in
+// the caption. Matched from real text only; never fabricated.
+const KEYWORD_CUES: { label: string; re: RegExp }[] = [
+  { label: "tribal fighting", re: /\btribal\s+(?:fight|clash|war|conflict)/i },
+  { label: "clash", re: /\bclash(?:es|ed|ing)?\b/i },
+  { label: "shooting", re: /\bshoot(?:ing|out)?\b|\bgunfire\b|\bshot dead\b/i },
+  { label: "riot", re: /\briot(?:s|ing|ers)?\b/i },
+  { label: "protest", re: /\bprotest(?:s|ers|ing)?\b|\bdemonstrat(?:ion|ors)\b|\brally\b/i },
+  { label: "looting", re: /\bloot(?:ing|ers|ed)?\b|\bransack/i },
+  { label: "arson", re: /\barson\b|\bset (?:on )?fire\b|\btorch(?:ed|ing)?\b/i },
+  { label: "killed", re: /\bkill(?:ed|ing|ings)?\b|\bdead\b|\bfatalit/i },
+  { label: "machete", re: /\bmachete|\bbush knife\b|\bbush-knife\b/i },
+  { label: "firearm", re: /\bgun(?:men|man|s)?\b|\bfirearm|\brifle|\bweapon/i },
+  { label: "kidnapping", re: /\bkidnap(?:ping|ped)?\b|\babduct(?:ion|ed)?\b|\bhostage/i },
+  { label: "ambush", re: /\bambush(?:ed|es)?\b/i },
+  { label: "police operation", re: /\bpolice (?:operation|raid|crackdown)\b|\bsecurity forces\b/i },
+  { label: "roadblock", re: /\broadblock|\bblockade\b/i },
+  { label: "election violence", re: /\belection(?:-related)? (?:violence|unrest|fraud)\b/i },
+  { label: "separatist", re: /\bseparatist|\bwest papua liberation\b|\bOPM\b|\bTPNPB\b/i },
+  { label: "highlands", re: /\bhighlands?\b|\benga\b|\bhela\b|\bporgera\b/i },
+  { label: "curfew", re: /\bcurfew\b|\bstate of emergency\b/i },
+];
+
+/**
+ * Distinct curated security/theatre keywords that actually matched the caption,
+ * in cue order. Transparency only — pure, no fabrication.
+ */
+export function detectKeywords(text: string): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  for (const cue of KEYWORD_CUES) {
+    if (cue.re.test(text) && !out.includes(cue.label)) out.push(cue.label);
+  }
+  return out;
+}
+
 export interface FbClassification {
   caption: string;
   country: string;
@@ -469,6 +759,7 @@ export interface FbClassification {
   credibleDomains: CredibleDomainMatch;
   promotionTopic: "flashpoint" | "conflict";
   securityRelevant: boolean;
+  detectedKeywords: string[];
   dedupKey: string;
 }
 
@@ -506,6 +797,7 @@ export function classifyPost(post: RawFacebookPost): FbClassification | null {
     credibleDomains,
     promotionTopic: categoryToTopic(category),
     securityRelevant: category !== "Other security",
+    detectedKeywords: detectKeywords(caption),
     dedupKey: makeFacebookDedupKey(caption, post.imageUrls),
   };
 }
@@ -519,6 +811,14 @@ export interface FacebookOsintSummary {
   configured: boolean;
   pageHandle: string;
   sourceTier: SourceTier;
+  /** Monitored pages configured. */
+  pages: number;
+  /** Post-search terms configured (0 when the search pass is off). */
+  searchTerms: number;
+  /** Sources (pages + search) that returned without error. */
+  sourcesOk: number;
+  /** Sources (pages + search) attempted. */
+  sourcesAttempted: number;
   fetchOk: boolean;
   fetched: number;
   inScope: number;
@@ -526,6 +826,8 @@ export interface FacebookOsintSummary {
   credible: number;
   corroborated: number;
   promotable: number;
+  /** Rows flagged for the analyst review queue (in-scope AND security-relevant). */
+  reviewFlagged: number;
   duplicateInDb: number;
   newToInsert: number;
   inserted: number;
@@ -545,6 +847,10 @@ export function emptyFacebookOsintSummary(): FacebookOsintSummary {
     configured: cfg.configured,
     pageHandle: cfg.pageHandle,
     sourceTier: cfg.sourceTier,
+    pages: cfg.pages.length,
+    searchTerms: cfg.searchEnabled ? cfg.searchTerms.length : 0,
+    sourcesOk: 0,
+    sourcesAttempted: 0,
     fetchOk: true,
     fetched: 0,
     inScope: 0,
@@ -552,6 +858,7 @@ export function emptyFacebookOsintSummary(): FacebookOsintSummary {
     credible: 0,
     corroborated: 0,
     promotable: 0,
+    reviewFlagged: 0,
     duplicateInDb: 0,
     newToInsert: 0,
     inserted: 0,
@@ -663,27 +970,31 @@ export async function runFacebookOsintIngest(
   summary.logLines = logLines;
   summary.errors = errors;
   log(
-    `facebook-osint — mode=${commit ? "COMMIT" : "DRY-RUN"} active=${summary.active} page=${cfg.pageHandle} tier=${cfg.sourceTier}`,
+    `facebook-osint — mode=${commit ? "COMMIT" : "DRY-RUN"} active=${summary.active} pages=${cfg.pages.length} search=${cfg.searchEnabled ? cfg.searchTerms.length : 0}`,
   );
 
-  // --- Fetch (no-op when not configured).
+  // --- Fetch (no-op when not configured). Multi-page + optional post-search;
+  // partial-failure tolerant (one dead source never sinks the rest).
   const collected: RawFacebookPost[] = [];
   if (cfg.configured) {
-    try {
-      const posts = await fetchFacebookPosts(cfg);
-      summary.fetched = posts.length;
-      collected.push(...posts);
-      log(`  facebook(${cfg.pageHandle}): ${posts.length} public post(s)`);
-    } catch (err) {
-      const msg = redactToken(
-        err instanceof Error ? err.message : String(err),
-        cfg.apiKey,
-      );
-      summary.fetchOk = false;
-      summary.error = msg;
+    const result = await fetchFacebookPosts(cfg);
+    summary.fetched = result.posts.length;
+    summary.sourcesAttempted = result.attempted;
+    summary.sourcesOk = result.ok;
+    collected.push(...result.posts);
+    for (const e of result.errors) {
+      const msg = redactToken(e, cfg.apiKey);
       errors.push(`facebook: ${msg}`);
-      log(`  facebook FETCH ERROR: ${msg}`);
+      log(`  facebook source error: ${msg}`);
     }
+    // The fetch is "ok" when at least one source returned. All-fail → error.
+    summary.fetchOk = result.ok > 0;
+    if (!summary.fetchOk && result.errors.length > 0) {
+      summary.error = redactToken(result.errors[0]!, cfg.apiKey);
+    }
+    log(
+      `  facebook: ${result.posts.length} public post(s) from ${result.ok}/${result.attempted} source(s)`,
+    );
   } else {
     log("  facebook: not configured (FACEBOOK_API_KEY unset or disabled)");
   }
@@ -749,23 +1060,43 @@ export async function runFacebookOsintIngest(
       const msg = err instanceof Error ? err.message : String(err);
       log(`  corroboration lookup failed: ${msg}`);
     }
+    // Per-source credibility tier (a page's declared tier, or "osint" for the
+    // search pass) — NOT the primary-page tier. Falls back to the primary only
+    // for posts built without origin metadata (direct unit construction).
+    const tier = post.sourceTier ?? cfg.sourceTier;
     const eligibility = deriveEligibility({
       category: cls.category,
-      sourceTier: cfg.sourceTier,
+      sourceTier: tier,
       credibleDomainLabels: cls.credibleDomains.labels,
       corroborated: corroboration !== null,
       corroborationReason: corroboration?.reason ?? null,
     });
+    const review = deriveReview({
+      inScope: true,
+      securityRelevant: eligibility.securityRelevant,
+      promotable: eligibility.promotable,
+      category: cls.category,
+    });
+    const confidence = computeConfidence({
+      inScope: true,
+      localityPrecise: cls.province != null,
+      securityRelevant: eligibility.securityRelevant,
+      credible: eligibility.credible,
+      corroborated: corroboration !== null,
+      hasIncidentDate: cls.incidentDate != null,
+      keywordCount: cls.detectedKeywords.length,
+    });
     if (corroboration) summary.corroborated++;
     if (eligibility.credible) summary.credible++;
     if (eligibility.promotable) summary.promotable++;
+    if (review.reviewFlag) summary.reviewFlagged++;
 
     values.push({
       sourceName: SOURCE_NAME,
       platform: PLATFORM,
-      pageHandle: cfg.pageHandle,
-      pageName: cfg.pageName,
-      sourceTier: cfg.sourceTier,
+      pageHandle: post.pageHandle ?? cfg.pageHandle,
+      pageName: post.pageName ?? cfg.pageName,
+      sourceTier: tier,
       externalId: post.externalId,
       postedAt: post.postedAt,
       incidentDate: cls.incidentDate,
@@ -788,6 +1119,11 @@ export async function runFacebookOsintIngest(
       url: post.url,
       classification: "context",
       dedupKey: cls.dedupKey,
+      engagement: post.engagement ?? null,
+      detectedKeywords: cls.detectedKeywords,
+      confidence,
+      reviewFlag: review.reviewFlag,
+      reviewReason: review.reviewReason,
       // MINIMISED, token-free provenance — never the full payload (no comments,
       // author profile, reactions, phone/email).
       rawPayload: {
@@ -796,8 +1132,9 @@ export async function runFacebookOsintIngest(
         postedAt: post.postedAt ? post.postedAt.toISOString() : null,
         imageCount: post.imageUrls.length,
         linkHosts: cls.credibleDomains.hosts,
-        actor: cfg.actor,
-        page: cfg.pageHandle,
+        actor: post.origin === "search" ? cfg.searchActor : cfg.actor,
+        page: post.pageHandle ?? cfg.pageHandle,
+        origin: post.origin ?? "page",
       },
       promotable: eligibility.promotable,
       lastCheckedAt: new Date(),
@@ -843,7 +1180,10 @@ async function recordSourceHealthForPage(
 ): Promise<void> {
   const name = FACEBOOK_OSINT_HEALTH_NAME;
   const url = cfg.pageUrl;
-  const notes = `Public Facebook page (${cfg.pageHandle}, tier=${cfg.sourceTier}) monitored as supporting OSINT CONTEXT for the PNG/Indonesian-Papua theatres — NEVER incidents. Promotion to an incident is explicit, gated (security category AND a credibility signal) and server-re-derived.`;
+  const searchNote = cfg.searchEnabled
+    ? ` + ${cfg.searchTerms.length} keyword post-search term(s)`
+    : "";
+  const notes = `${cfg.pages.length} public Facebook page(s)${searchNote} monitored as supporting OSINT CONTEXT for the PNG/Indonesian-Papua theatres — NEVER incidents. Promotion to an incident is explicit, gated (security category AND a credibility signal) and server-re-derived.`;
   if (!cfg.configured) {
     await recordSourceHealth(
       HEALTH_TOPIC,

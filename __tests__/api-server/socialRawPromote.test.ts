@@ -49,15 +49,115 @@ function collectNumbers(node: unknown, out: number[], seen: Set<unknown>): void 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Faithful evaluation of the GET /social-raw WHERE clause.
+//
+// The list route filters social rows with eq() / isNull() / isNotNull() leaves
+// combined by and() / or() — e.g. `?reviewFlagged=true` -> eq(reviewFlag,true);
+// `?eligible=true` -> and(eq(promotable,true), isNull(promotedIncidentId)). To
+// exercise those filters end to end the stub must HONOUR the predicate;
+// returning every row regardless would let a broken filter pass unnoticed.
+//
+// Columns are matched by REFERENCE against the table's own column objects (the
+// same Column instances the route passes to eq()/isNull()), so no
+// snake_case/camelCase mapping is needed. Operators are read from the
+// StringChunk text drizzle bakes into each SQL node; values from the bound
+// Param. This walks the real drizzle-orm AST, so it tracks the route exactly.
+const SOCIAL_COL_TO_KEY = new Map<unknown, string>([
+  [socialRawTable.id, "id"],
+  [socialRawTable.sourceName, "sourceName"],
+  [socialRawTable.country, "country"],
+  [socialRawTable.category, "category"],
+  [socialRawTable.promotable, "promotable"],
+  [socialRawTable.promotedIncidentId, "promotedIncidentId"],
+  [socialRawTable.reviewFlag, "reviewFlag"],
+]);
+
+function isSqlNode(n: unknown): n is { queryChunks: unknown[] } {
+  return (
+    !!n &&
+    typeof n === "object" &&
+    Array.isArray((n as { queryChunks?: unknown }).queryChunks)
+  );
+}
+// A drizzle StringChunk holds its text in a `value` string[] — return the joined
+// text, or null for anything that is not a StringChunk.
+function asStringChunk(n: unknown): string | null {
+  if (
+    !!n &&
+    typeof n === "object" &&
+    Array.isArray((n as { value?: unknown }).value) &&
+    (n as { value: unknown[] }).value.every((x) => typeof x === "string")
+  ) {
+    return (n as { value: string[] }).value.join("");
+  }
+  return null;
+}
+function isParamNode(n: unknown): n is { value: unknown } {
+  return (
+    !!n &&
+    typeof n === "object" &&
+    "encoder" in (n as object) &&
+    "value" in (n as object)
+  );
+}
+
+type Pred = (row: Row) => boolean;
+
+function buildWherePredicate(node: unknown): Pred {
+  if (!isSqlNode(node)) return () => true;
+  const chunks = node.queryChunks;
+  const colChunk = chunks.find((c) => SOCIAL_COL_TO_KEY.has(c));
+  if (colChunk) {
+    // Leaf comparison: eq / isNull / isNotNull on one column.
+    const key = SOCIAL_COL_TO_KEY.get(colChunk)!;
+    const opText = chunks
+      .map(asStringChunk)
+      .filter((t): t is string => t !== null)
+      .join("");
+    if (opText.includes("not null")) return (r) => r[key] != null;
+    if (opText.includes("is null")) return (r) => r[key] == null;
+    const param = chunks.find(isParamNode) as { value: unknown } | undefined;
+    const val = param?.value;
+    return (r) => r[key] === val;
+  }
+  // Combinator (and/or): drizzle wraps the operands in a nested join SQL whose
+  // separator (" and " / " or ") carries the operator. Collect the operand
+  // condition nodes and the operator at this level, then recurse into each.
+  const operands: unknown[] = [];
+  let op: "and" | "or" = "and";
+  const visit = (n: { queryChunks: unknown[] }): void => {
+    for (const ch of n.queryChunks) {
+      if (isSqlNode(ch)) {
+        const seps = ch.queryChunks
+          .map(asStringChunk)
+          .filter((t): t is string => t !== null)
+          .join("");
+        if (seps.includes(" or ") || seps.includes(" and ")) {
+          if (seps.includes(" or ")) op = "or";
+          visit(ch); // dig into the join to reach its operand conditions
+        } else {
+          operands.push(ch);
+        }
+      } else {
+        const t = asStringChunk(ch);
+        if (t && t.includes(" or ")) op = "or";
+      }
+    }
+  };
+  visit(node);
+  const preds = operands.map(buildWherePredicate);
+  return op === "or"
+    ? (r) => preds.some((p) => p(r))
+    : (r) => preds.every((p) => p(r));
+}
+
 function resolveSelect(table: unknown, where: unknown): Promise<Row[]> {
   if (table === incidentsTable)
     return Promise.resolve(incidents.map((r) => ({ ...r })));
   if (table === socialRawTable) {
-    const ids: number[] = [];
-    collectNumbers(where, ids, new Set());
-    const rows = ids.length
-      ? socialItems.filter((i) => ids.includes(i.id as number))
-      : socialItems;
+    const pred = buildWherePredicate(where);
+    const rows = socialItems.filter((r) => pred(r));
     return Promise.resolve(rows.map((r) => ({ ...r })));
   }
   return Promise.resolve([]);
@@ -424,5 +524,78 @@ describe("Facebook OSINT posts never inflate the incident count", () => {
     const promoted = rows.find((r) => r.id === item.id);
     expect(promoted).toBeDefined();
     expect(promoted!.promotedIncidentId).toBe(created.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /social-raw review + eligibility filters.
+//
+// These exercise the analyst-facing queues: `?reviewFlagged=true` (items the
+// engine flagged for human review) and `?eligible=true` (the actionable
+// promote queue = promotable AND not yet promoted). The in-memory stub honours
+// the real drizzle WHERE clause (see buildWherePredicate), so a regression that
+// drops or inverts a filter condition fails here rather than silently passing.
+//
+// NOTE on the false/complement branch: the query params use
+// `zod.coerce.boolean()` (the pre-existing repo pattern for promotable/promoted
+// too), under which any NON-EMPTY string — including "false" — coerces to
+// `true`. The only way an HTTP caller yields a parsed `false` is an EMPTY value
+// (`?eligible=`), which is what the complement test sends.
+describe("GET /social-raw review + eligibility filters", () => {
+  async function listSocialRaw(qs: string): Promise<Row[]> {
+    const res = await fetch(`${baseUrl}/api/social-raw${qs}`);
+    expect(res.status).toBe(200);
+    return (await res.json()) as Row[];
+  }
+
+  it("?reviewFlagged=true returns only review-flagged rows", async () => {
+    seedSocialRawItem({ reviewFlag: true, caption: "flagged A" });
+    seedSocialRawItem({ reviewFlag: false, caption: "not flagged" });
+    seedSocialRawItem({ reviewFlag: true, caption: "flagged B" });
+
+    const flagged = await listSocialRaw("?reviewFlagged=true");
+    expect(flagged.length).toBe(2);
+    expect(flagged.every((r) => r.reviewFlag === true)).toBe(true);
+  });
+
+  it("?eligible=true returns only promotable, not-yet-promoted rows", async () => {
+    seedSocialRawItem({ promotable: true, promotedIncidentId: null }); // eligible
+    seedSocialRawItem({ promotable: false, promotedIncidentId: null }); // not promotable
+    seedSocialRawItem({ promotable: true, promotedIncidentId: 4242 }); // already promoted
+
+    const eligible = await listSocialRaw("?eligible=true");
+    expect(eligible.length).toBe(1);
+    expect(eligible[0].promotable).toBe(true);
+    expect(eligible[0].promotedIncidentId).toBeNull();
+  });
+
+  it("?eligible= (empty -> false) returns the complement: not promotable OR already promoted", async () => {
+    seedSocialRawItem({ promotable: true, promotedIncidentId: null }); // eligible -> excluded
+    seedSocialRawItem({ promotable: false, promotedIncidentId: null }); // included
+    seedSocialRawItem({ promotable: true, promotedIncidentId: 4242 }); // included
+
+    const complement = await listSocialRaw("?eligible=");
+    expect(complement.length).toBe(2);
+    expect(
+      complement.every(
+        (r) => r.promotable === false || r.promotedIncidentId != null,
+      ),
+    ).toBe(true);
+  });
+
+  it("a real promote drops the row out of the ?eligible=true queue", async () => {
+    seedFlashpointIncidents(0);
+    const item = seedSocialRawItem({ sourceTier: "official", promotable: true });
+
+    const before = await listSocialRaw("?eligible=true");
+    expect(before.some((r) => r.id === item.id)).toBe(true);
+
+    const { status } = await promote(item.id as number);
+    expect(status).toBe(201);
+
+    const after = await listSocialRaw("?eligible=true");
+    expect(after.some((r) => r.id === item.id)).toBe(false);
+    const complement = await listSocialRaw("?eligible=");
+    expect(complement.some((r) => r.id === item.id)).toBe(true);
   });
 });

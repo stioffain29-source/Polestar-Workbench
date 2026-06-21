@@ -542,6 +542,8 @@ export const ListSocialRawItemsQueryParams = zod.object({
   "category": zod.coerce.string().optional().describe('Filter to one security category'),
   "promotable": zod.coerce.boolean().optional().describe('Limit to items eligible for promotion to an incident'),
   "promoted": zod.coerce.boolean().optional().describe('Filter by whether the item has already been promoted'),
+  "reviewFlagged": zod.coerce.boolean().optional().describe('Limit to items flagged for human analyst review (in-scope AND security-relevant)'),
+  "eligible": zod.coerce.boolean().optional().describe('Limit to items eligible for promotion (alias of promotable; security-relevant AND credible AND not yet promoted)'),
   "limit": zod.coerce.number().min(1).max(listSocialRawItemsQueryLimitMax).optional().describe('Max number of most-recent items to return (1-200)')
 })
 
@@ -574,6 +576,11 @@ export const ListSocialRawItemsResponseItem = zod.object({
   "url": zod.string(),
   "classification": zod.string(),
   "promotable": zod.boolean(),
+  "engagement": zod.union([zod.record(zod.string(), zod.number().nullable()),zod.null()]).optional().describe('Minimised public engagement counts (likes\/comments\/shares) when the provider returns them — context only, never PII.'),
+  "detectedKeywords": zod.array(zod.string()),
+  "confidence": zod.number(),
+  "reviewFlag": zod.boolean(),
+  "reviewReason": zod.string().nullish(),
   "promotedIncidentId": zod.number().nullish(),
   "promotedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date().nullish()
