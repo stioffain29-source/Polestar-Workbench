@@ -50,12 +50,20 @@ function gnewsLocale(query: string, hl: string, gl: string, ceid: string): strin
 
 type LocalFeed = { label: string; lang: string; url: string };
 
+// Each query is a broad (crime-verb) × (cargo-noun) AND-group rather than a
+// short list of exact quoted phrases. Quoted phrases (`"pencurian kargo"`)
+// starve the feed: the live editions returned 0 (Arabic), 0-recent (Thai) and
+// only 3 in 30d (Bahasa). The broad form surfaces 13-77 genuine recent
+// incidents per feed. Precision is NOT the query's job here — the LLM
+// translate+screen stage (translateScreen.ts) plus SCOPE_CANON and the shared
+// relevance gate reject anything that is not an in-scope cargo crime, so a
+// wide net costs only (capped) screening, never page noise.
 const LOCAL_FEEDS: LocalFeed[] = [
   {
     label: "Local · Bahasa",
     lang: "Indonesian",
     url: gnewsLocale(
-      `("pencurian kargo" OR "pembajakan truk" OR "perampokan truk" OR "pencurian gudang" OR "pencurian kontainer" OR "pembobolan gudang")`,
+      `(pencurian OR perampokan OR pembobolan OR dibobol OR dicuri OR rampok OR maling OR jarah) (truk OR gudang OR kargo OR kontainer OR barang OR muatan OR ekspedisi OR logistik)`,
       "id",
       "ID",
       "ID:id",
@@ -65,7 +73,7 @@ const LOCAL_FEEDS: LocalFeed[] = [
     label: "Local · Arabic",
     lang: "Arabic",
     url: gnewsLocale(
-      `("سرقة شحنة" OR "سرقة بضائع" OR "سرقة مستودع" OR "سطو على شاحنة")`,
+      `(سرقة OR سطو OR نهب OR اختلاس) (شحنة OR بضائع OR مستودع OR شاحنة OR حاوية OR مخزن)`,
       "ar",
       "AE",
       "AE:ar",
@@ -74,7 +82,12 @@ const LOCAL_FEEDS: LocalFeed[] = [
   {
     label: "Local · Thai",
     lang: "Thai",
-    url: gnewsLocale(`("ขโมยสินค้า" OR "ปล้นรถบรรทุก" OR "โจรกรรมสินค้า")`, "th", "TH", "TH:th"),
+    url: gnewsLocale(
+      `(ขโมย OR ปล้น OR โจรกรรม OR ลัก) (สินค้า OR รถบรรทุก OR ตู้คอนเทนเนอร์ OR คลังสินค้า OR พัสดุ)`,
+      "th",
+      "TH",
+      "TH:th",
+    ),
   },
 ];
 
