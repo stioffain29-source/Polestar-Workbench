@@ -5,10 +5,12 @@ import {
   useUpdateReport,
   useListIncidents,
   useListLatestMaritimeMovement,
+  useListMaritimeMovement,
   useListMaritimeSecurityEvents,
   useListReliefWebReports,
   useGenerateReportIncidentSummaries,
   useEditReportIncidentSummaries,
+  getListMaritimeMovementQueryKey,
   getGetReportQueryKey,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
@@ -35,6 +37,7 @@ import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
+import { buildGatewayFlow, RED_SEA_GATEWAYS } from "@/lib/maritimeDirectionalFlow";
 import { exportConflictReportPdf } from "@/lib/exportConflictReportPdf";
 import {
   draftTopicReportProse,
@@ -135,6 +138,24 @@ export default function ReportEditor() {
   // only — never an incident; the board degrades to "movement data
   // unavailable" when empty.
   const { data: movement = [] } = useListLatestMaritimeMovement();
+  // Red Sea directional flow — per-gateway movement HISTORY for the inbound vs
+  // outbound bars. Built once here and threaded into BOTH the preview and the
+  // headless PDF so the two render the identical series (screen == PDF).
+  const babFlowParams = { theatre: RED_SEA_GATEWAYS[0].theatre, limit: 40 };
+  const suezFlowParams = { theatre: RED_SEA_GATEWAYS[1].theatre, limit: 40 };
+  const { data: babMovementHistory = [] } = useListMaritimeMovement(babFlowParams, {
+    query: { queryKey: getListMaritimeMovementQueryKey(babFlowParams) },
+  });
+  const { data: suezMovementHistory = [] } = useListMaritimeMovement(suezFlowParams, {
+    query: { queryKey: getListMaritimeMovementQueryKey(suezFlowParams) },
+  });
+  const redSeaFlow = useMemo(
+    () => [
+      buildGatewayFlow(babMovementHistory, RED_SEA_GATEWAYS[0].theatre, RED_SEA_GATEWAYS[0].gate),
+      buildGatewayFlow(suezMovementHistory, RED_SEA_GATEWAYS[1].theatre, RED_SEA_GATEWAYS[1].gate),
+    ],
+    [babMovementHistory, suezMovementHistory],
+  );
   // Standalone ICC CCS / IMB maritime-security events for the Shipping Watch
   // report. Their own source — never an incident; the section degrades to an
   // empty-state line when the feed is unconfigured/blocked.
@@ -419,6 +440,7 @@ export default function ReportEditor() {
           movement,
           maritimeSecurityEvents,
           effectiveSummaries,
+          redSeaFlow,
         );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
@@ -1631,6 +1653,7 @@ export default function ReportEditor() {
               report={form}
               incidents={incidentsForExport}
               movement={movement}
+              redSeaFlow={redSeaFlow}
               maritimeSecurityEvents={maritimeSecurityEvents}
               incidentSummaries={effectiveSummaries}
             />

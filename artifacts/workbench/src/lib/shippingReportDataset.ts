@@ -1027,6 +1027,7 @@ const CHOKEPOINT_NAME_RE: Record<ChokepointKey, RegExp> = {
   "Arabian / Persian Gulf": /\b(arabian|persian)\s+gulf\b/i,
   "Red Sea": /\bred sea\b/i,
   "Bab el-Mandeb": /\b(bab[\s-]?el[\s-]?mandeb|mandeb)\b/i,
+  "Suez Canal": /\bsuez(\s+canal)?\b/i,
   "Gulf of Aden": /\bgulf of aden\b/i,
   "Singapore Strait": /\b(strait of singapore|singapore strait)\b/i,
   "Malacca Strait": /\bmalacca\b/i,

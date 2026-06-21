@@ -8,6 +8,7 @@ export type ChokepointKey =
   | "Arabian / Persian Gulf"
   | "Red Sea"
   | "Bab el-Mandeb"
+  | "Suez Canal"
   | "Gulf of Aden"
   | "Singapore Strait"
   | "Malacca Strait";
@@ -18,6 +19,7 @@ export const CHOKEPOINTS: ChokepointKey[] = [
   "Arabian / Persian Gulf",
   "Red Sea",
   "Bab el-Mandeb",
+  "Suez Canal",
   "Gulf of Aden",
   "Singapore Strait",
   "Malacca Strait",
@@ -47,6 +49,9 @@ const CHOKEPOINT_RULES: CpRule[] = [
   { key: "Gulf of Oman", match: (t) => /\bgulf of oman\b/i.test(t) },
   { key: "Bab el-Mandeb", match: (t) => /\bbab[- ]?(el|al)[- ]?mande[bn]\b/i.test(t) },
   { key: "Red Sea", match: (t) => /\bred sea\b/i.test(t) },
+  // "Suez" is unambiguous (the canal / city), so a bare token is specific
+  // enough — it matches "Suez Canal", "Suez Canal Authority" and "Port Suez".
+  { key: "Suez Canal", match: (t) => /\bsuez\b/i.test(t) },
   { key: "Gulf of Aden", match: (t) => /\bgulf of aden\b/i.test(t) },
   // Singapore Strait requires the "strait" qualifier — a bare "Singapore"
   // reference (port congestion, bunkering market) is NOT the chokepoint.

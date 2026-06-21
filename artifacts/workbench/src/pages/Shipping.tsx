@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   useListIncidents,
   useListLatestMaritimeMovement,
+  useListMaritimeMovement,
   useListMaritimeSecurityEvents,
   createMaritimeMovement,
   getListLatestMaritimeMovementQueryKey,
@@ -35,6 +36,8 @@ import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import VesselMap from "@/components/VesselMap";
 import FleetIntelligence from "@/components/FleetIntelligence";
+import RedSeaDirectionalFlowPanel from "@/components/RedSeaDirectionalFlowPanel";
+import { buildGatewayFlow, RED_SEA_GATEWAYS } from "@/lib/maritimeDirectionalFlow";
 import {
   buildMaritimeIntelligence,
   formatMovementSummary,
@@ -126,6 +129,24 @@ export default function Shipping() {
   // licensed-provider row is uploaded; the board degrades to "movement data
   // unavailable" rather than inventing numbers.
   const { data: movement = [] } = useListLatestMaritimeMovement();
+  // Red Sea directional flow — per-gateway movement HISTORY (not just the latest
+  // snapshot), so the inbound/outbound bars plot a short live time series. Each
+  // gateway is fetched on its own theatre so the two charts stay independent.
+  const babFlowParams = { theatre: RED_SEA_GATEWAYS[0].theatre, limit: 40 };
+  const suezFlowParams = { theatre: RED_SEA_GATEWAYS[1].theatre, limit: 40 };
+  const { data: babMovementHistory = [] } = useListMaritimeMovement(babFlowParams, {
+    query: { queryKey: getListMaritimeMovementQueryKey(babFlowParams) },
+  });
+  const { data: suezMovementHistory = [] } = useListMaritimeMovement(suezFlowParams, {
+    query: { queryKey: getListMaritimeMovementQueryKey(suezFlowParams) },
+  });
+  const redSeaFlow = useMemo(
+    () => [
+      buildGatewayFlow(babMovementHistory, RED_SEA_GATEWAYS[0].theatre, RED_SEA_GATEWAYS[0].gate),
+      buildGatewayFlow(suezMovementHistory, RED_SEA_GATEWAYS[1].theatre, RED_SEA_GATEWAYS[1].gate),
+    ],
+    [babMovementHistory, suezMovementHistory],
+  );
   // ICC CCS / IMB maritime-security events — a STANDALONE reference source
   // (current calendar year). These rows live in their own table and are NEVER
   // mixed into the incident pool above, so they can never inflate any count.
@@ -484,6 +505,11 @@ export default function Shipping() {
 
       {/* 1a. Maritime Intelligence board — shared with the Shipping Watch report */}
       <MaritimeIntelligenceBoard board={maritimeBoard} />
+
+      {/* 1a-ii. Red Sea directional flow — shared with the Shipping Watch report */}
+      <Section title="Red Sea Directional Flow — Gateway Movement (AIS)">
+        <RedSeaDirectionalFlowPanel gateways={redSeaFlow} />
+      </Section>
 
       {/* 1a-i. Admin-gated manual upload for movement (AIS) context. */}
       <MaritimeMovementUploadForm hasMovement={movement.length > 0} />

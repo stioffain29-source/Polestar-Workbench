@@ -529,6 +529,7 @@ export const BOARD_CHOKEPOINTS: ChokepointKey[] = [
   "Strait of Hormuz",
   "Bab el-Mandeb",
   "Red Sea",
+  "Suez Canal",
   "Gulf of Aden",
   "Singapore Strait",
   "Malacca Strait",

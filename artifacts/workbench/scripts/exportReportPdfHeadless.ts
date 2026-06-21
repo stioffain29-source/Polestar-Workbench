@@ -83,7 +83,49 @@ async function main() {
 
   if (TOPIC === "shipping") {
     const { exportShippingReportPdf } = await import("../src/lib/exportShippingReportPdf");
-    await exportShippingReportPdf(data as Parameters<typeof exportShippingReportPdf>[0], incidents as Parameters<typeof exportShippingReportPdf>[1], OUT);
+    const { buildGatewayFlow, RED_SEA_GATEWAYS } = await import(
+      "../src/lib/maritimeDirectionalFlow"
+    );
+    // Fetch live movement so the headless PDF faithfully reproduces the in-app
+    // shipping export. The Maritime Intelligence board reads the global movement
+    // pool (latest snapshot per theatre), so keep the broad fetch for it.
+    const movement = (await fetch(`${API}/api/maritime-movement?limit=200`)
+      .then((r) => r.json())
+      .catch(() => [])) as Parameters<typeof exportShippingReportPdf>[3];
+    // The directional-flow panel reads PER-GATEWAY histories with the SAME params
+    // the monitor + report editor use (theatre-scoped, limit 40) so the headless
+    // PDF cannot diverge from the verified on-screen surfaces in a populated DB.
+    const fetchGatewayRows = async (theatre: string) =>
+      (await fetch(
+        `${API}/api/maritime-movement?theatre=${encodeURIComponent(theatre)}&limit=40`,
+      )
+        .then((r) => r.json())
+        .catch(() => [])) as Parameters<typeof buildGatewayFlow>[0];
+    const [babRows, suezRows] = await Promise.all([
+      fetchGatewayRows(RED_SEA_GATEWAYS[0].theatre),
+      fetchGatewayRows(RED_SEA_GATEWAYS[1].theatre),
+    ]);
+    const redSeaFlow = [
+      buildGatewayFlow(
+        babRows,
+        RED_SEA_GATEWAYS[0].theatre,
+        RED_SEA_GATEWAYS[0].gate,
+      ),
+      buildGatewayFlow(
+        suezRows,
+        RED_SEA_GATEWAYS[1].theatre,
+        RED_SEA_GATEWAYS[1].gate,
+      ),
+    ];
+    await exportShippingReportPdf(
+      data as Parameters<typeof exportShippingReportPdf>[0],
+      incidents as Parameters<typeof exportShippingReportPdf>[1],
+      OUT,
+      movement ?? [],
+      [],
+      {},
+      redSeaFlow,
+    );
   } else if (TOPIC === "flashpoint" || TOPIC === "protests") {
     const { exportFlashpointReportPdf } = await import("../src/lib/exportFlashpointReportPdf");
     await exportFlashpointReportPdf(data as Parameters<typeof exportFlashpointReportPdf>[0], incidents as Parameters<typeof exportFlashpointReportPdf>[1], OUT);

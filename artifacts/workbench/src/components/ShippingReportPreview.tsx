@@ -35,6 +35,11 @@ import {
   MARITIME_SECURITY_SOURCE_LABEL,
   maritimeTypeColor,
 } from "@/lib/maritimeSecurity";
+import RedSeaDirectionalFlowPanel from "@/components/RedSeaDirectionalFlowPanel";
+import {
+  buildRedSeaDirectionalFlow,
+  type GatewayFlowSeries,
+} from "@/lib/maritimeDirectionalFlow";
 
 // Polestar disclaimer text used at the foot of every report. Kept inline
 // here (rather than imported from the PDF chrome) so the on-screen
@@ -643,12 +648,14 @@ export default function ShippingReportPreview({
   report,
   incidents,
   movement = [],
+  redSeaFlow,
   maritimeSecurityEvents = [],
   incidentSummaries = {},
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
   movement?: MaritimeMovement[];
+  redSeaFlow?: GatewayFlowSeries[];
   maritimeSecurityEvents?: MaritimeSecurityEvent[];
   incidentSummaries?: Record<string, string>;
 }) {
@@ -679,6 +686,11 @@ export default function ShippingReportPreview({
       windowEnd: win.end,
     });
   }, [incidents, movement, topic, issueDate]);
+
+  // Red Sea gateway flow: use the series threaded from the editor; if a
+  // caller omits it, fall back to the latest movement snapshot so the panel
+  // still renders honestly (one sample per gateway, or its empty state).
+  const gateways = redSeaFlow ?? buildRedSeaDirectionalFlow(movement);
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -771,6 +783,10 @@ export default function ShippingReportPreview({
         )}
 
         <MaritimeIntelligenceReportSection board={maritimeBoard} />
+
+        <Section title="Red Sea Directional Flow">
+          <RedSeaDirectionalFlowPanel gateways={gateways} />
+        </Section>
 
         <Section title="Fast Facts">
           <KpiGrid cards={ds.fastFacts} />

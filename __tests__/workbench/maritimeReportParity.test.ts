@@ -123,9 +123,9 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     expect(board.bluf.trim().length).toBeGreaterThan(0);
   });
 
-  it("lists the six chokepoint card titles in BOARD order", () => {
+  it("lists the seven chokepoint card titles in BOARD order", () => {
     expect(maritimeChokepointTitles(board)).toEqual(BOARD_CHOKEPOINTS);
-    expect(maritimeChokepointTitles(board)).toHaveLength(6);
+    expect(maritimeChokepointTitles(board)).toHaveLength(7);
   });
 
   it("locks the three mid sub-sections, in order", () => {

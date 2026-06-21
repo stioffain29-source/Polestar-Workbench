@@ -124,6 +124,12 @@ export const AIS_THEATRES: TheatreBox[] = [
   { theatre: "Singapore Strait", minLat: 1.0, maxLat: 1.5, minLon: 103.4, maxLon: 104.2, inboundBearing: 90, centerLat: 1.23, centerLon: 103.85, radiusNm: 40 },
   { theatre: "Malacca Strait", minLat: 1.0, maxLat: 6.5, minLon: 98.0, maxLon: 103.4, inboundBearing: 135, centerLat: 2.9, centerLon: 100.9, radiusNm: 50 },
   { theatre: "Red Sea", minLat: 14.0, maxLat: 28.0, minLon: 32.0, maxLon: 43.5, inboundBearing: 0, centerLat: 20.0, centerLon: 38.5, radiusNm: 50 },
+  // Suez Canal — the Red Sea's NORTH gateway (Bab el-Mandeb is the south
+  // gateway). inboundBearing 180 = southbound, i.e. INTO the Red Sea corridor,
+  // consistent with Bab el-Mandeb's northbound (0) "into the corridor" sense, so
+  // "inbound" reads the same way at both Red Sea gates. The box spans the canal
+  // from Port Said (north) to the Gulf of Suez (south).
+  { theatre: "Suez Canal", minLat: 29.8, maxLat: 31.4, minLon: 32.2, maxLon: 32.7, inboundBearing: 180, centerLat: 30.5, centerLon: 32.35, radiusNm: 50 },
 ];
 
 // Speed-over-ground thresholds (knots). At/under ANCHOR a vessel reads as

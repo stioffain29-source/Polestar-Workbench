@@ -33,6 +33,7 @@ const THEATRE_BOXES: Array<{
   { theatre: "Singapore Strait", minLat: 1.0, maxLat: 1.5, minLon: 103.4, maxLon: 104.2 },
   { theatre: "Malacca Strait", minLat: 1.0, maxLat: 6.5, minLon: 98.0, maxLon: 103.4 },
   { theatre: "Red Sea", minLat: 14.0, maxLat: 28.0, minLon: 32.0, maxLon: 43.5 },
+  { theatre: "Suez Canal", minLat: 29.8, maxLat: 31.4, minLon: 32.2, maxLon: 32.7 },
 ];
 
 // Brand-only vessel-class palette. Tanker = Electric Blue, cargo = Midnight,
