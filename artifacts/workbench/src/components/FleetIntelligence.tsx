@@ -4,17 +4,17 @@ import {
   getListMaritimeVesselsQueryKey,
 } from "@workspace/api-client-react";
 import { buildFleetIntelligence } from "@/lib/fleetIntelligence";
-import { NAVY, ELECTRIC, SLATE } from "@/lib/spotReport";
+import { ELECTRIC, VESSEL_TANKER, VESSEL_CARGO, VESSEL_OTHER } from "@/lib/spotReport";
 
 // Class swatch colours mirror the Live Vessel Map legend so the two panels read
-// as one system. Three clearly distinct, on-brand tones: Tanker = Electric Blue,
-// Cargo = near-black Navy, Other / not reported = mid-gray Slate (the residual
-// bucket is intentionally the most muted). RED IS DELIBERATELY UNUSED — a vessel
-// is context, never a severity, and the subdued red is reserved for the Extreme tier.
+// as one system. Three CONTRASTING, on-brand category tones: Tanker = Electric
+// Blue, Cargo = Amber, Other / not reported = Teal. These encode vessel TYPE
+// (context), never severity — the reserved petrol (#1B6B7A, Insignificant) and
+// subdued red (#A33232, Extreme) are never used for a vessel class.
 const CLASS_META: Array<{ key: "tanker" | "cargo" | "other"; label: string; color: string }> = [
-  { key: "tanker", label: "Tanker", color: ELECTRIC },
-  { key: "cargo", label: "Cargo", color: NAVY },
-  { key: "other", label: "Other / not reported", color: SLATE },
+  { key: "tanker", label: "Tanker", color: VESSEL_TANKER },
+  { key: "cargo", label: "Cargo", color: VESSEL_CARGO },
+  { key: "other", label: "Other / not reported", color: VESSEL_OTHER },
 ];
 
 function Stat({ value, label }: { value: number | string; label: string }) {
@@ -30,23 +30,73 @@ function Stat({ value, label }: { value: number | string; label: string }) {
   );
 }
 
-// Flat, single-colour cargo-ship silhouette. No gradient, shadow or glow — the
-// fill is the class colour so the tile reads as one of the map legend classes.
-function ShipIcon({ color }: { color: string }) {
+// Three flat, single-colour vessel-type silhouettes matching the Vessel Type
+// Legend: Tanker (deck manifold + aft bridge), Cargo / container (stacked
+// container boxes) and Other (general vessel with a central deckhouse). The fill
+// is the class colour so each tile reads as its Live Vessel Map class. No
+// gradient, shadow or glow (brand rule).
+function VesselTypeIcon({
+  kind,
+  color,
+}: {
+  kind: "tanker" | "cargo" | "other";
+  color: string;
+}) {
+  const common = {
+    viewBox: "0 0 64 30",
+    width: 50,
+    height: 24,
+    role: "presentation" as const,
+    "aria-hidden": true,
+  };
+  if (kind === "tanker") {
+    return (
+      <svg {...common}>
+        {/* hull */}
+        <path d="M2 18 H62 L55 26 H9 Z" fill={color} />
+        {/* deck line */}
+        <rect x="7" y="15" width="45" height="3" fill={color} />
+        {/* manifold pipe + risers */}
+        <rect x="13" y="11.4" width="24" height="1.6" fill={color} />
+        <rect x="13" y="10" width="2.4" height="5" fill={color} />
+        <rect x="20" y="10" width="2.4" height="5" fill={color} />
+        <rect x="27" y="10" width="2.4" height="5" fill={color} />
+        <rect x="34" y="10" width="2.4" height="5" fill={color} />
+        {/* aft bridge + mast */}
+        <rect x="50" y="7" width="7" height="11" fill={color} />
+        <rect x="52.6" y="3" width="1.8" height="4" fill={color} />
+      </svg>
+    );
+  }
+  if (kind === "cargo") {
+    return (
+      <svg {...common}>
+        {/* hull */}
+        <path d="M2 18 H62 L55 26 H9 Z" fill={color} />
+        {/* container stacks — gaps reveal the white background as box edges */}
+        <rect x="8" y="13" width="6" height="5" fill={color} />
+        <rect x="15" y="13" width="6" height="5" fill={color} />
+        <rect x="22" y="13" width="6" height="5" fill={color} />
+        <rect x="29" y="13" width="6" height="5" fill={color} />
+        <rect x="8" y="7" width="6" height="5" fill={color} />
+        <rect x="15" y="7" width="6" height="5" fill={color} />
+        <rect x="22" y="7" width="6" height="5" fill={color} />
+        {/* aft bridge */}
+        <rect x="50" y="6" width="7" height="12" fill={color} />
+      </svg>
+    );
+  }
+  // other / general vessel
   return (
-    <svg
-      viewBox="0 0 64 32"
-      width="46"
-      height="23"
-      role="presentation"
-      aria-hidden="true"
-    >
+    <svg {...common}>
       {/* hull */}
-      <path d="M4 18 H60 L52 28 H12 Z" fill={color} />
-      {/* deck cargo */}
-      <rect x="14" y="10" width="26" height="8" fill={color} />
-      {/* bridge */}
-      <rect x="43" y="5" width="9" height="13" fill={color} />
+      <path d="M6 18 H58 L52 26 H12 Z" fill={color} />
+      {/* central deckhouse */}
+      <rect x="25" y="9" width="15" height="9" fill={color} />
+      {/* funnel */}
+      <rect x="42" y="11" width="4" height="7" fill={color} />
+      {/* forward mast */}
+      <rect x="20" y="5" width="1.8" height="13" fill={color} />
     </svg>
   );
 }
@@ -55,11 +105,13 @@ function ShipIcon({ color }: { color: string }) {
 // take the class colour; the share is computed from the live fleet total so the
 // three tiles always sum to the tracked vessels (no fabricated figure).
 function FleetClassTile({
+  kind,
   color,
   label,
   count,
   total,
 }: {
+  kind: "tanker" | "cargo" | "other";
   color: string;
   label: string;
   count: number;
@@ -69,7 +121,7 @@ function FleetClassTile({
   return (
     <div className="border border-[#e2e2e2] rounded-sm bg-white px-3 py-3 flex flex-col items-center text-center gap-2">
       <span className="flex items-center justify-center w-full rounded-sm bg-muted/30 py-2">
-        <ShipIcon color={color} />
+        <VesselTypeIcon kind={kind} color={color} />
       </span>
       <div
         className="font-serif text-[26px] font-bold leading-none tabular-nums"
@@ -159,6 +211,7 @@ export default function FleetIntelligence() {
           {CLASS_META.map((c) => (
             <FleetClassTile
               key={c.key}
+              kind={c.key}
               color={c.color}
               label={c.label}
               count={fleet.classes[c.key]}

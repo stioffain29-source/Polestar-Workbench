@@ -13,6 +13,15 @@ export const POLAR = "#e2e2e2";
 // NAVY while staying legible on white. Neutral on purpose — never a risk colour.
 export const SLATE = "#6b6b6b";
 
+// Vessel-class composition palette — three CONTRASTING category hues shared by the
+// Live Vessel Map legend and the Fleet Composition tiles so the two panels read as
+// one system. These encode vessel TYPE (context), never severity: the reserved
+// petrol #1B6B7A (Insignificant) and subdued red #A33232 (Extreme) are never used
+// for a vessel class. All three are existing category-palette tones, legible on white.
+export const VESSEL_TANKER = ELECTRIC; // Electric Blue
+export const VESSEL_CARGO = "#E67E22"; // Amber
+export const VESSEL_OTHER = "#2A9D8F"; // Teal
+
 export const SPOT_SEV_COLOR: Record<string, string> = {
   extreme: "#A33232",
   high: "#C0392B",
