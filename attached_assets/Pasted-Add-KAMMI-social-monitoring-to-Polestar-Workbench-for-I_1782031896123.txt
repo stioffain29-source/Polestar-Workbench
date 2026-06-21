@@ -1,0 +1,76 @@
+Add KAMMI social monitoring to Polestar Workbench for Indonesia protest watch.
+
+Context:
+KAMMI Pusat has issued a branded mobilisation call for an action at Gedung DPR/MPR RI, Jakarta, on Monday 22 June 2026 from 14:00 WIB under the “Indonesia Darurat” banner. This should feed into the Indonesia protest and civil unrest monitoring workflow.
+
+Task:
+Add KAMMI Pusat Instagram and Telegram monitoring as public source inputs for Indonesia protest watch.
+
+Scope:
+
+1. Identify and confirm the official KAMMI Pusat public Instagram account and any official public Telegram channel linked from KAMMI’s own website, Instagram bio, or other official KAMMI public pages.
+2. Do not ingest private Telegram groups, WhatsApp content, phone numbers, personal accounts or member level data.
+3. Ingest only public posts, captions, images, timestamps, source URL, channel name and any visible location or event details.
+4. Classify these items under:
+   activism / protests / civil unrest
+   country: Indonesia
+   primary city: Jakarta unless another city is clearly stated
+5. Add keyword monitoring for:
+   KAMMI
+   KAMMI Pusat
+   Indonesia Darurat
+   DPR/MPR
+   Gedung DPR
+   Senayan
+   Monas
+   aksi
+   aksi mahasiswa
+   22 Juni
+   Reformati Indonesia
+   MBG
+6. Deduplicate posts so the same Instagram graphic or Telegram repost does not create multiple incidents.
+7. Do not turn a mobilisation post into an incident unless the post confirms that the protest is active, gathering, marching, blocked, dispersed, arrested or clashing.
+8. Planned protest posts should appear as “planned event” or “watch item”, not as confirmed incidents.
+9. Add a confidence field:
+   High: official organiser post or official channel
+   Medium: repost by aligned group or local activist channel
+   Low: unverified third party mention
+10. Add a source health entry showing last successful check, last item found, source name and any scraping/API error.
+
+Display requirement:
+On the Indonesia protest board, show planned and active protest items separately.
+
+Suggested fields:
+Source
+Actor
+Date
+Time
+Location
+City
+Province
+Issue or campaign
+Status: planned / active / dispersed / cancelled / unclear
+Confidence
+Source URL
+Last checked
+
+Alert logic:
+Raise a watch alert if KAMMI or linked accounts post any of the following:
+
+1. Location change
+2. Start time change
+3. March route
+4. Call for wider mobilisation
+5. Crowd images showing active gathering
+6. Police cordon, road closure, arrest, dispersal or clash
+7. Movement from DPR/MPR, Monas, BSI Tower or central Surabaya locations
+
+Acceptance criteria:
+
+1. KAMMI public social posts can be pulled into the Workbench.
+2. Planned protest posts are visible without inflating incident counts.
+3. Active protest updates can be promoted to incidents when supported by the source text or image.
+4. Duplicate reposts are suppressed.
+5. Source health shows whether Instagram and Telegram are working.
+6. No private groups, phone numbers, WhatsApp content or personal data are stored.
+7. Existing Indonesia, PNG, Papua, Shipping Watch and other ingest routes are not broken.
