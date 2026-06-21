@@ -3,8 +3,10 @@ import {
   useListIncidents,
   useListSocialWatchItems,
   usePromoteSocialWatchItem,
+  getListSocialWatchItemsQueryKey,
   type SocialWatchItem,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
@@ -649,6 +651,7 @@ function SocialStatusBadge({ status }: { status: string }) {
 
 function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLoading: boolean }) {
   const promote = usePromoteSocialWatchItem();
+  const queryClient = useQueryClient();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -674,6 +677,13 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
     setPendingId(id);
     try {
       await promote.mutateAsync({ id });
+      // The mutation does not auto-refetch the board, so the promoted row would
+      // otherwise keep showing a live "Promote" button. Invalidate every
+      // social-watch list query so the row flips to its back-linked
+      // "Incident #N" state.
+      await queryClient.invalidateQueries({
+        queryKey: getListSocialWatchItemsQueryKey(),
+      });
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Promotion failed — the item may already be promoted or no longer eligible.",
