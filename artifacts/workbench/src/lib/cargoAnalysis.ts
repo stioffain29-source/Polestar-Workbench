@@ -114,6 +114,48 @@ function hasStrictCargoVocab(text: string): boolean {
   return CARGO_BAHASA_NOUN_RE.test(text) && CRIME_BAHASA_RE.test(text);
 }
 
+// Explicit cargo / LOAD context — a freight commodity, a quantity of goods, or
+// a "carrying / laden" framing. When present, a record describing a stolen
+// truck or an armoured vehicle is a genuine CARGO incident (the goods are the
+// target), so the generic-crime exclusions below MUST stand down. Without it,
+// the same words describe vehicle theft, a safe burglary or a cash-van robbery
+// — a different risk picture that is not Cargo Watch.
+const CARGO_LOAD_CONTEXT_RE =
+  /\b(cargo|freight|container|containers|consignment|shipment|shipments|laden|loaded|carrying|haul|haulage|pallet|pallets|crate|crates|goods|tonnes?|tons?|kilograms?|\bkg\b|litres?|liters?|bars?|cartons?|boxes|sacks?|bales?|chocolate|electronics|garments?|textiles?|pharmaceutical)\b/i;
+
+// Generic-crime NOISE classes that name a cargo-ish word (truck / warehouse /
+// parcel) but are NOT cargo / logistics-node theft. Each fires only when no
+// CARGO_LOAD_CONTEXT_RE is present, so a genuine load-bearing incident (a
+// hijacked bullion truck, a stolen lorry carrying chocolate) is never dropped.
+// These complement the country gate: an attributed APAC/ME row clears
+// hasCargoVocab on a bare "truck"/"warehouse" token, so without this it would
+// admit a stolen-vehicle, safe-burglary or cash-van-robbery story as cargo.
+const NOISE_SAFE_RE = /\b(safe|vault|brankas)\b/i; // breaking into a safe / vault
+const NOISE_MONEY_AMOUNT_RE =
+  /\b(stole|stolen|theft of|robbed|made off with)\b[^.]{0,30}\b(rp\s?[\d.,]+|\d[\d.,]*\s*(?:million|billion)?\s*(?:baht|rupiah|rupees?|ringgit|peso|pesos|dong))\b/i;
+const NOISE_CASH_IN_TRANSIT_RE =
+  /\b(cash[- ]?in[- ]?transit|cash van|cash[- ]carrying (?:van|truck|vehicle)|armou?red (?:van|truck|car|vehicle|cash))\b/i;
+const NOISE_ARMS_DEALER_RE =
+  /\b(?:gun|firearm|firearms|weapon|weapons|arms|ammunition|pistol|rifle)\b[^.]{0,20}\b(?:supplier|dealer|trafficker|smuggler|seller|source|peddler)\b|\b(?:supplier|dealer|trafficker)\b[^.]{0,15}\b(?:gun|firearm|weapon|arms|ammunition)\b/i;
+const NOISE_VEHICLE_TARGET_RE =
+  /\b(steals?|stole|stolen|theft of|made off with|drives? off (?:with|in)|speeds? away (?:in|with))\b[^.]{0,25}\b(six[- ]wheel|ten[- ]wheel|truck|lorry|pickup|pick[- ]up|van|car|vehicle|motorcycle|motorbike|scooter|tuk[- ]tuk)\b/i;
+const NOISE_RESIDENTIAL_PARCEL_RE =
+  /\b(dormitory|dorm|boarding house|residential|apartment|housing (?:complex|estate)|condo)\b[^.]{0,40}\b(parcel|parcels|package|packages)\b|\bposes? as (?:a )?resident\b/i;
+
+// True when a record is generic crime mislabelled cargo. Each class stands down
+// when explicit cargo / load context is present (the goods, not the conveyance
+// or the cash, are the target).
+function isCargoNoise(text: string): boolean {
+  const hasLoad = CARGO_LOAD_CONTEXT_RE.test(text);
+  if (NOISE_SAFE_RE.test(text) && !hasLoad) return true;
+  if (NOISE_MONEY_AMOUNT_RE.test(text) && !hasLoad) return true;
+  if (NOISE_CASH_IN_TRANSIT_RE.test(text) && !hasLoad) return true;
+  if (NOISE_ARMS_DEALER_RE.test(text) && !hasLoad) return true;
+  if (NOISE_VEHICLE_TARGET_RE.test(text) && !hasLoad) return true;
+  if (NOISE_RESIDENTIAL_PARCEL_RE.test(text) && !hasLoad) return true;
+  return false;
+}
+
 // Curated APAC / Middle East place gazetteer used ONLY to recover an in-scope
 // country for a record the source left unattributed (country null / "Unknown").
 // Word-bounded, observed sub-national place names plus unambiguous large cities.
@@ -162,12 +204,17 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
     // Penang" is not enough). Unattributed US/global commentary and generic
     // local crime stay in the needs-review bucket.
     const recovered = recoverCargoCountryFromText(i);
-    if (recovered && hasStrictCargoVocab(text)) {
+    if (recovered && hasStrictCargoVocab(text) && !isCargoNoise(text)) {
       const recRegion = classifyRegion(recovered);
       if (recRegion === "APAC" || recRegion === "Middle East") return "in_scope";
     }
     return "country_review";
   }
+  // Attributed APAC/ME row: clears the cargo-vocab gate on a bare cargo-ish
+  // token, so drop generic-crime noise (safe burglary, cash-van robbery,
+  // vehicle theft, arms dealing, doorstep parcel theft) that lacks any cargo /
+  // load context before admitting it as a cargo incident.
+  if (isCargoNoise(text)) return "excluded_non_cargo";
   return "in_scope";
 }
 
