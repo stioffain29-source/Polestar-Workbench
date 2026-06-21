@@ -459,6 +459,25 @@ async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome
 
 const RETRYABLE = new Set(["timeout", "bad-json", "empty-content"]);
 
+// True only for the transient failures worth retrying: the fixed RETRYABLE set
+// plus rate-limit / server errors (http-429 and any http-5xx, which a brief
+// wait can clear). A non-transient HTTP failure (http-400, http-401, http-404,
+// ...) is NOT retried — a retry cannot fix a malformed request or an auth
+// problem, so retrying only burns the model budget and delays the template
+// fallback. (A bare "http-" prefix check would wrongly retry all of these.)
+function isRetryableProseError(error: string): boolean {
+  if (RETRYABLE.has(error)) return true;
+  // empty-content is emitted with the model's finish_reason appended
+  // (e.g. "empty-content(stop)", "empty-content(length)"), so the bare set
+  // membership check above never matches it — pattern-match the prefix so an
+  // empty reply is retried as the RETRYABLE set intends.
+  if (error.startsWith("empty-content(")) return true;
+  const m = /^http-(\d{3})$/.exec(error);
+  if (!m) return false;
+  const status = Number(m[1]);
+  return status === 429 || status >= 500;
+}
+
 /** Generate country prose with retries + exponential backoff. */
 export async function generateCountryProse(
   input: GenerateProseInput,
@@ -468,7 +487,7 @@ export async function generateCountryProse(
   for (let attempt = 0; attempt <= retries; attempt++) {
     last = await callOnce(input);
     if (last.ok) return last;
-    const retryable = RETRYABLE.has(last.error) || last.error.startsWith("http-");
+    const retryable = isRetryableProseError(last.error);
     if (!retryable || attempt === retries) return last;
     const serverHint = !last.ok ? last.retryAfterMs : undefined;
     const backoff = serverHint ?? 1000 * Math.pow(2, attempt);
@@ -625,7 +644,7 @@ export async function generateIncidentSummaries(
   for (let attempt = 0; attempt <= retries; attempt++) {
     last = await callSummariesOnce(incidents);
     if (last.ok) return last;
-    const retryable = RETRYABLE.has(last.error) || last.error.startsWith("http-");
+    const retryable = isRetryableProseError(last.error);
     if (!retryable || attempt === retries) return last;
     const serverHint = !last.ok ? last.retryAfterMs : undefined;
     const backoff = serverHint ?? 1000 * Math.pow(2, attempt);
