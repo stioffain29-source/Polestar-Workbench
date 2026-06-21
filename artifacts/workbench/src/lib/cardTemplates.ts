@@ -40,7 +40,7 @@ export const CARD_RATING_LABELS: Record<string, string> = {
 // Card rating ramp. Extreme is the subdued red #A33232, reserved for the top
 // tier only (per brand spec — NOT the #800000 used elsewhere in the workbench).
 export const CARD_RATING_COLORS: Record<string, string> = {
-  insignificant: "#B8C2CC",
+  insignificant: "#1B6B7A",
   low: "#6FB872",
   moderate: "#E67E22",
   // Burnt orange, NOT red — the subdued red #A33232 is reserved for the Extreme
@@ -50,7 +50,7 @@ export const CARD_RATING_COLORS: Record<string, string> = {
 };
 
 export const CARD_RATING_TEXT_COLORS: Record<string, string> = {
-  insignificant: "#363636",
+  insignificant: "#FFFFFF",
   low: "#FFFFFF",
   moderate: "#FFFFFF",
   high: "#FFFFFF",

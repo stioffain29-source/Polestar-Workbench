@@ -680,8 +680,8 @@ function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
     const chipW = colSevW - padX * 2;
     setFill(pdf, sevColor);
     pdf.rect(chipX, ctx.y + 5, chipW, 12, "F");
-    // Insignificant keeps dark text for contrast; every other tier is white.
-    setText(pdf, sk === "insignificant" ? DUSK : WHITE);
+    // Every tier (incl. petrol-blue Insignificant) uses white chip text.
+    setText(pdf, WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(6.5);
     pdf.text(

@@ -27,7 +27,7 @@ const SEV_COLOR: Record<string, string> = {
   high: "#C0392B",
   moderate: "#E67E22",
   low: "#6FB872",
-  insignificant: "#B8C2CC",
+  insignificant: "#1B6B7A",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

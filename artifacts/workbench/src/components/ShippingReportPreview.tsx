@@ -162,7 +162,7 @@ function KpiGrid({ cards }: { cards: KpiCard[] }) {
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {cards.map((c, i) => {
         const sevK = c.severity ? shippingSevKey(c.severity) : "";
-        const accent = sevK && SHIPPING_SEV_COLOR[sevK] ? SHIPPING_SEV_COLOR[sevK] : ELECTRIC;
+        const accent = c.accent ?? (sevK && SHIPPING_SEV_COLOR[sevK] ? SHIPPING_SEV_COLOR[sevK] : ELECTRIC);
         return (
           <div
             key={i}

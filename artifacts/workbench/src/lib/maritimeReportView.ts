@@ -11,6 +11,7 @@
 // surfaces consume them makes that class of drift impossible, and the parity
 // test (maritimeReportParity.test.ts) locks these definitions against a fixture.
 
+import { MARITIME_RISK_COLOR } from "./maritimeIntelligence";
 import type { MaritimeIntelligence } from "./maritimeIntelligence";
 
 /** Human label for the board confidence enum. Shared by preview + PDF. */
@@ -31,6 +32,8 @@ export const MARITIME_SECTION_TITLE = "Maritime Intelligence";
 export interface MaritimeExecCard {
   label: string;
   value: string;
+  /** Optional explicit accent-strip colour (overrides the severity ramp). */
+  accent?: string;
 }
 
 export function maritimeExecCards(
@@ -41,7 +44,13 @@ export function maritimeExecCards(
     (b) => b !== "No material impact",
   );
   return [
-    { label: "Maritime Risk Level", value: `L${risk.level} \u00b7 ${risk.label}` },
+    {
+      label: "Maritime Risk Level",
+      value: `L${risk.level} \u00b7 ${risk.label}`,
+      // Accent strip corresponds to the displayed risk level (e.g. Extreme →
+      // subdued red #A33232), matching the L-level chip/value colour.
+      accent: MARITIME_RISK_COLOR[risk.level],
+    },
     { label: "Confirmed Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
     {
       label: "Chokepoints Affected",

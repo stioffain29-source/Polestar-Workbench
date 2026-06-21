@@ -167,7 +167,7 @@ export const MARITIME_RISK_LABEL: Record<MaritimeRiskLevel, string> = {
 // reads as burnt orange (#D35400), NOT red — red of any family is reserved for
 // the Extreme tier per the brand rule (mirrors CARD_RATING_COLORS).
 export const MARITIME_RISK_COLOR: Record<MaritimeRiskLevel, string> = {
-  1: "#B8C2CC",
+  1: "#1B6B7A",
   2: "#6FB872",
   3: "#E67E22",
   4: "#D35400",

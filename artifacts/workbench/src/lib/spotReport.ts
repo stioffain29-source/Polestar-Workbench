@@ -18,7 +18,7 @@ export const SPOT_SEV_COLOR: Record<string, string> = {
   high: "#C0392B",
   moderate: "#E67E22",
   low: "#6FB872",
-  insignificant: "#B8C2CC",
+  insignificant: "#1B6B7A",
 };
 
 export const SPOT_SEV_LABEL: Record<string, string> = {

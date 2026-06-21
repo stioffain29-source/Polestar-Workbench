@@ -21,7 +21,7 @@ export const SEV_COLOR: Record<string, string> = {
   high: "#C0392B",
   moderate: "#E67E22",
   low: "#6FB872",
-  insignificant: "#B8C2CC",
+  insignificant: "#1B6B7A",
 };
 export const SEV_RANK: Record<string, number> = {
   insignificant: 1,
@@ -380,6 +380,8 @@ export interface KpiCardData {
   note?: string;
   /** Severity key (lowercase) to colour the accent strip from SEV_COLOR. */
   severity?: string;
+  /** Optional explicit accent-strip colour (overrides the severity ramp). */
+  accent?: string;
   /** Optional as-of date rendered as a small caption beneath the note. */
   asOf?: string;
   /** Optional source attribution rendered as a small caption. */
@@ -455,7 +457,7 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
     const c = cards[i];
 
     const sevK = c.severity ? sevKey(c.severity) : "";
-    const accent = sevK && SEV_COLOR[sevK] ? SEV_COLOR[sevK] : ELECTRIC;
+    const accent = c.accent ?? (sevK && SEV_COLOR[sevK] ? SEV_COLOR[sevK] : ELECTRIC);
 
     // Card body — full row height
     setFill(pdf, CARD_BG);

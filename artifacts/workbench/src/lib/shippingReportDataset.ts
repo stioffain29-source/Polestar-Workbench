@@ -52,6 +52,8 @@ export interface KpiCard {
   note?: string;
   /** Lowercase severity key — used to pick the accent colour. */
   severity?: string;
+  /** Optional explicit accent-strip colour (overrides the severity ramp). */
+  accent?: string;
 }
 
 export interface ChokepointRow {
@@ -117,7 +119,7 @@ const SEV_LABEL: Record<string, string> = {
 // Five-tier severity palette. Kept separate from the Polestar brand
 // colours so the tiers remain visually distinguishable.
 const SEV_COLOR: Record<string, string> = {
-  insignificant: "#B8C2CC", low: "#6FB872", moderate: "#E67E22", high: "#C0392B", extreme: "#800000",
+  insignificant: "#1B6B7A", low: "#6FB872", moderate: "#E67E22", high: "#C0392B", extreme: "#800000",
 };
 
 function sevKey(s: string | null | undefined): string {
