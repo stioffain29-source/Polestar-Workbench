@@ -76,6 +76,33 @@ fix is a DETERMINISTIC FRONTEND layer in `cargoAnalysis.ts` (NO DB writes):
 confirm every newly-in-scope row is genuine + the strict gate demotes zero
 genuine recoveries.
 
+## Broadening recall must be paired with a LOAD-context noise gate
+Widening the cargoWatch.ts LOCAL_FEEDS queries to (crime-verb)×(cargo-noun)
+raises recall but drags in generic theft that names a cargo-ish word (truck /
+warehouse / parcel) yet is NOT cargo theft (safe/vault burglary, vehicle theft,
+cash-van robbery, arms-dealer story, doorstep-parcel theft). Filter that at the
+DISPLAY gate (`cargoAnalysis.ts` `isCargoNoise` inside `classifyScope`), NOT at
+ingest relevance.
+**Why:** the display gate is the established scope authority (DB already holds
+~170 filtered-out cargo_watch rows) and is reversible per page-load; an
+ingest-exclude regex can't express the stand-down guard, risking irreversible
+false drops, and bumping `RELEVANCE_RULE_VERSION` triggers a heavy global
+all-topic backfill for a frontend-only concern.
+**How to apply:** each noise class MUST stand down when `CARGO_LOAD_CONTEXT_RE`
+(a commodity / quantity / "carrying·laden" framing) is present, so a hijacked
+bullion truck or a lorry carrying chocolate stays in. Do NOT force strict
+cargo-noun vocab as the admit condition — that over-tightens and false-drops
+genuine cargo (e.g. "KitKat chocolate bars", "Amman airport warehouse"). Verify
+by replaying old-vs-new `classifyScope` over all rows: confirm only genuine
+noise drops, zero genuine cargo lost.
+
+## "Lack of reporting" in Cargo Watch is usually real sparseness, not a bug
+Genuine RECENT (≤30d) APAC/Middle-East cargo-theft reporting genuinely runs
+only a handful of incidents/month. Broadening feeds and tightening noise is the
+durable, honest win — recall + precision — NOT a dramatically larger recent
+count. Resist inflating numbers with generic theft to satisfy the complaint;
+the depth lives in the wider windows.
+
 ## "Cargo dashboard shows only 4 / hasn't changed" = the 30D filter, not a bug
 The recurring "cargo is light / nothing changed" report is usually the **30D
 range pill** being selected. The Cargo Watch page DEFAULTS to **All Time**
