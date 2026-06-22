@@ -1,0 +1,144 @@
+Fix the Fuel Tracker. It is missing operational fuel disruption detail from the South Asia fuel shortage alert.
+
+The Fuel Tracker must not only track fuel prices or oil market commentary. It needs to capture and display country level disruption, government controls, rationing, business impact, transport disruption, aviation disruption, power impact and protest risk.
+
+Use this South Asia alert as the test case.
+
+REGIONAL ALERT
+
+Region: South Asia
+Event: Fuel shortages
+Time frame: Through at least late June 2026
+Alert began: 18 June 2026 at 19:04 UTC
+Alert expires: 30 June 2026 at 23:59 UTC
+
+Main drivers:
+Global supply constraints
+Regional export restrictions
+Operational uncertainty in the Strait of Hormuz
+Middle East conflict
+Petroleum and oil price volatility
+
+Primary impacts:
+Transport disruption
+Business disruption
+Flight disruption
+Rising costs
+Possible protests
+
+COUNTRY LEVEL ENTRIES REQUIRED
+
+Bangladesh:
+Government and private offices continue to operate 09:00 to 16:00.
+Banking services available 10:00 to 15:00.
+Government officials state there is no fuel shortage in the country.
+Operational impact: reduced service windows and appointment constraints, but no confirmed national fuel shortage.
+
+India:
+Prime Minister Modi urged residents to adopt fuel conservation measures.
+Measures include work from home, public transport, reduced cooking oil consumption and limiting foreign travel.
+Government has prioritised LPG supply to domestic consumers.
+Excise duty cut on petrol and diesel.
+Export levies increased on diesel and aviation turbine fuel.
+Export duties continue to be adjusted, with the most recent adjustment active as of 16 June 2026.
+Industrial fuel supply has been reduced.
+Input shortages reported across several factory sectors.
+Commercial fuel buyers are banned from purchasing gasoline or diesel from retail stations.
+Daily diesel limit of 200 litres per customer or vehicle is in effect.
+Air India and IndiGo have reduced domestic and international flight schedules through August.
+Routes likely affected include Chicago, Newark, Singapore, Shanghai, San Francisco, Paris and Toronto.
+Operational impact: factory disruption, transport constraints, flight disruption and increased business continuity pressure.
+
+Nepal:
+Civil service and educational institutions reduced from six day to five day working week.
+Government offices operating 09:00 to 17:00, Monday to Friday.
+Authorities have urged work from home where possible.
+Operational impact: reduced public sector availability and slower administration processing.
+
+Pakistan:
+Opening hour restrictions extended until at least 30 June 2026.
+Shops, markets and shopping malls can remain open until 21:00.
+Standalone groceries and kiryana stores can remain open until 22:00.
+Restaurants and food outlets can remain open until 23:00.
+Pharmacies, hospitals, fuel stations, IT firms, sports facilities, takeaway and delivery services remain exempt.
+Sporadic power outages reported across the country.
+Outages are likely to worsen during severe weather or heatwaves.
+Operational impact: reduced commercial hours, power reliability issues and disruption to routine operations.
+
+Sri Lanka:
+National Fuel Pass System is in place.
+Weekly fuel allocation rationing applies by vehicle category.
+Operational impact: movement planning required, especially for business travel, essential services and long distance travel.
+
+REQUIRED DATA FIELDS
+
+Each country fuel disruption entry should support:
+
+Country
+Event type
+Status
+Time frame
+Fuel availability
+Government measures
+Transport impact
+Business impact
+Aviation impact
+Power impact
+Protest or unrest risk
+Operational impact
+Polestar view
+Advice
+Watch next
+
+DISPLAY REQUIREMENTS
+
+Do not bury this under generic oil price commentary.
+
+Fuel Tracker should show:
+
+1. Regional summary card
+2. Country impact cards
+3. Operational impact
+4. Traveller and in location advice
+5. Watch next
+
+REQUIRED POLESTAR VIEW
+
+Fuel shortages across South Asia are producing uneven but operationally relevant disruption. India is the highest concern due to commercial fuel restrictions, industrial supply reduction and airline schedule cuts. Pakistan requires monitoring for power disruption and restricted commercial hours. Sri Lanka remains constrained by rationing. Bangladesh and Nepal are mainly affected through reduced operating hours and conservation measures rather than confirmed national shortage.
+
+WATCH NEXT
+
+Add a Watch Next section that flags:
+
+Extension of restrictions beyond 30 June
+Further airline schedule reductions
+Additional diesel or aviation fuel export controls
+Factory slowdowns in India
+Power outages in Pakistan
+Fuel queue related protests
+Any widening of rationing or commercial fuel restrictions
+
+PARSER REQUIREMENTS
+
+This must be treated as an operational fuel disruption alert, not just a market price alert.
+
+If the current scraper cannot capture this from existing feeds, add a parser category for:
+
+Fuel shortage
+Fuel rationing
+Fuel conservation
+Export levy
+Diesel restriction
+Aviation fuel disruption
+Fuel pass
+Opening hour restrictions
+Power outages linked to fuel shortage
+Fuel related protest risk
+
+ACCEPTANCE TEST
+
+After the fix, the Fuel Tracker must display this South Asia alert with Bangladesh, India, Nepal, Pakistan and Sri Lanka separated into country level cards.
+
+It must not just say fuel prices are rising or show a regional fuel shortage only.
+
+It must show the actual restrictions, operating hours, rationing, business impact, transport impact, aviation impact, power impact and protest risk.

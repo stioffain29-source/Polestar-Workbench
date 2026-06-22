@@ -11,7 +11,7 @@ import { explainRelevance, type RelevanceInput } from "./topicRelevance";
 // Bump whenever the relevance RULES change. The backfill re-evaluates any
 // row whose stored version differs (or is null), so a bump cleans the DB
 // against the latest rules on the next server boot.
-export const RELEVANCE_RULE_VERSION = "2026-06-21.27";
+export const RELEVANCE_RULE_VERSION = "2026-06-22.1";
 
 export type RelevanceStatus = "relevant" | "irrelevant";
 

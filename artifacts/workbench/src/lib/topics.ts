@@ -13,6 +13,7 @@ export const TOPIC_LABELS: Record<string, string> = {
 export const TOPICS = Object.keys(TOPIC_LABELS) as Array<keyof typeof TOPIC_LABELS>;
 
 export const SEVERITY_LEVELS = ["insignificant", "low", "moderate", "high", "extreme"] as const;
+export type SeverityTier = (typeof SEVERITY_LEVELS)[number];
 export const CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
 
 export const SEVERITY_LABELS: Record<string, string> = {

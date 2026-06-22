@@ -279,7 +279,7 @@ const FERT_CONFIG: NewsTopicConfig = {
 };
 
 // ------------------------------------------------------------------ fuel ----
-const FUEL_TERMS = `("fuel shortage" OR "fuel crisis" OR "fuel rationing" OR "petrol shortage" OR "diesel shortage" OR "fuel price hike" OR "refinery fire" OR "refinery outage" OR "fuel subsidy" OR "LPG shortage" OR "pump price")`;
+const FUEL_TERMS = `("fuel shortage" OR "fuel crisis" OR "fuel rationing" OR "fuel conservation" OR "diesel rationing" OR "diesel restriction" OR "petrol shortage" OR "diesel shortage" OR "fuel price hike" OR "refinery fire" OR "refinery outage" OR "fuel subsidy" OR "LPG shortage" OR "pump price" OR "aviation turbine fuel" OR "jet fuel shortage" OR "fuel pass" OR "fuel queue" OR "fuel protest" OR "aviation fuel" OR "fuel export")`;
 
 const FUEL_CONFIG: NewsTopicConfig = {
   topic: "fuel",
@@ -291,7 +291,18 @@ const FUEL_CONFIG: NewsTopicConfig = {
     "fuel shortage",
     "fuel crisis",
     "fuel rationing",
+    "fuel conservation",
+    "diesel rationing",
+    "petrol rationing",
+    "diesel restriction",
     "fuel queue",
+    "fuel protest",
+    "fuel pass",
+    "national fuel pass",
+    "aviation turbine fuel",
+    "jet fuel",
+    "aviation fuel",
+    "fuel export",
     "fuel stockout",
     "fuel supply",
     "petrol shortage",

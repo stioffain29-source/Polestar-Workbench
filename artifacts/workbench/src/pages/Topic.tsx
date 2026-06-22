@@ -20,6 +20,7 @@ import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { GdeltCoding } from "@/components/GdeltCoding";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
+import { FuelDisruptionPanel } from "@/components/FuelDisruptionPanel";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -291,6 +292,10 @@ export default function Topic() {
         </div>
         <RangeToggle range={range} onChange={setRange} />
       </div>
+
+      {/* Operational fuel-disruption alert — leads the fuel page so it is never
+          buried under generic oil-price commentary. */}
+      {topic === "fuel" && <FuelDisruptionPanel />}
 
       {/* 1. Top metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">

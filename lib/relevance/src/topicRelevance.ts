@@ -899,6 +899,28 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\bforecourt (closure|queue|disruption|shut)/,
     /\bhormuz .{0,40}(oil|crude|tanker|fuel|shipping|supply|price)/,
     /\b(oil|crude|tanker|fuel|shipping|supply|price) .{0,40}hormuz\b/,
+    // --- Operational fuel-disruption categories (South Asia alert class) ---
+    /\bfuel conservation\b/,
+    /\b(diesel|petrol|fuel) rationing\b/,
+    /\b(diesel|petrol|fuel) (restriction|restrictions|curb|curbs|quota|quotas|cap|capped|limit|limits)\b/,
+    // Aviation fuel only when it carries a disruption/market-control signal —
+    // bare "jet fuel" technical/market chatter stays out.
+    /\b(aviation turbine fuel|jet fuel|aviation fuel) .{0,30}(shortage|crisis|disrupt|ban|levy|levies|duty|duties|export|ration|supply|cut|cuts|halt|restrict|price hike|surge|schedule)/,
+    /\b(shortage|crisis|disrupt|ban|levy|levies|export|ration|supply (cut|halt|disruption|squeeze)|restrict|price hike|surge) .{0,30}(aviation turbine fuel|jet fuel|aviation fuel)\b/,
+    /\b(national fuel pass|fuel pass)\b/,
+    /\bfuel queue/,
+    /\bfuel[- ]?related protest/,
+    // Export levy / duty / restriction — only when bound to a fuel product.
+    /\bexport (levy|levies|duty|duties|tax|taxes|restriction|restrictions|ban|curb|curbs) .{0,30}(fuel|petrol|diesel|gasoline|aviation turbine fuel|jet fuel|lpg)\b/,
+    /\b(fuel|petrol|diesel|gasoline|aviation turbine fuel|jet fuel|lpg) .{0,30}export (levy|levies|duty|duties|tax|taxes|restriction|restrictions|ban|curb|curbs)\b/,
+    // Power outages ONLY when explicitly tied to a fuel shortage — generic
+    // blackout news stays in the energy monitor, not here.
+    /\b(power|electricity) (outage|outages|cut|cuts|shortage|crisis|rationing) .{0,40}(fuel|diesel|generator fuel)\b/,
+    /\b(fuel|diesel) .{0,40}(power|electricity) (outage|outages|cut|cuts|shortage|crisis|rationing)\b/,
+    // Opening-hour / commercial-hour restrictions ONLY when tied to fuel/energy
+    // conservation — a bare retail-hours story stays out.
+    /\b(fuel|energy|power|electricity)[- ]?(saving|conservation|crisis|shortage) .{0,50}(opening hour|business hour|operating hour|commercial hour|shop|store|market|mall)/,
+    /\b(opening hour|business hour|operating hour|commercial hour) .{0,50}(fuel|energy|power|electricity)[- ]?(saving|conservation|crisis|shortage)/,
   ],
   fertiliser: [
     /\bfertili[sz]er (shortage|price|prices|supply|export|import|stockout|subsidy)/,
