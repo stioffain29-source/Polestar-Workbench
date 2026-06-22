@@ -71,3 +71,20 @@ already landed and inserts only the genuinely-missing ones.
 **Caveat:** this seeds a one-time SNAPSHOT. Ongoing freshness for a feed that
 failed transiently still depends on the normal scheduler retrying it on its
 next ~12h cycle; the seed only closes the immediate gap.
+
+## Workspace → prod POST mechanics (operational gotchas)
+
+- The `code_execution` JS sandbox does NOT expose `process.env` (it is
+  `undefined`). To POST the token-gated prod admin route, run `curl` from a
+  bash tool where `$INGEST_ADMIN_TOKEN` (set via `.replit [env]`) is in scope —
+  reference the var, never the literal, so the value is never printed.
+- `executeSql(...).output` is a psql-style TEXT table, NOT JSON — `JSON.parse`
+  of it fails. To pull dev rows for a payload, dump clean JSON with
+  `psql "$DATABASE_URL" -t -A -c "SELECT json_agg(...) FROM (...) t" > f.json`
+  (tuples-only, unaligned = no header / no "(1 row)"), then `jq` it. json_agg
+  encodes timestamptz as `...+00:00` (parseable), sidestepping the `+00` trap.
+- The prod URL is NOT in the workspace `$REPLIT_DOMAINS` (that is the dev
+  `.replit.dev` domain); get it from `getDeploymentInfo().primaryUrl`.
+- A draft report auto-advances issue date to today + reseeds prose live in the
+  browser, so once the backfill lands the missing rows, the live published
+  report shows them on next load with NO report-row edit needed.
