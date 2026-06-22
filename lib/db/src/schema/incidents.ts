@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, doublePrecision, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, doublePrecision, integer, boolean } from "drizzle-orm/pg-core";
 
 export const incidentsTable = pgTable("incidents", {
   id: serial("id").primaryKey(),
@@ -82,6 +82,14 @@ export const incidentsTable = pgTable("incidents", {
   // not seen within the cadence interval, so QU usage stays inside the free
   // budget and the pass converges across runs.
   gdeltEnrichedAt: timestamp("gdelt_enriched_at", { withTimezone: true }),
+  // Analyst review override (additive, nullable). Set true when an analyst
+  // explicitly resolves a "needs review" incident from the Cargo Watch queue by
+  // assigning its country. A deliberate human "Add to lane" decision is
+  // authoritative: it promotes the row into the in-scope main lane past the
+  // heuristic cargo-genuineness gates (which cannot see what the analyst saw in
+  // the source), but never past the hard non-cargo rejects or out of the
+  // recognized APAC/Middle East geography. Null/false for scraper rows.
+  analystInScope: boolean("analyst_in_scope"),
 });
 
 export type Incident = typeof incidentsTable.$inferSelect;

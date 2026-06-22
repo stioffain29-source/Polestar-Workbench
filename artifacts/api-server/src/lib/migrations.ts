@@ -820,6 +820,13 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_confidence double precision`);
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_enriched_at timestamptz`);
 
+    // Schema: analyst review override (additive, nullable boolean). Set true
+    // when an analyst resolves a Cargo Watch "needs review" incident by
+    // assigning its country from the queue — the row then promotes into the
+    // in-scope main lane regardless of the heuristic cargo-genuineness gates.
+    // drizzle push only reaches dev, so add it on boot (idempotent) for prod.
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS analyst_in_scope boolean`);
+
     // Schema: resolved publisher URL for Google News RSS redirect links
     // (additive — see @workspace/ingest googleNewsUrl.ts). Most flashpoint feeds
     // are Google News aggregators, so source_url is an opaque

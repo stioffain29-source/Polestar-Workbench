@@ -1,6 +1,8 @@
 import {
   cargoScope,
   classifyScope,
+  classifyRegion,
+  IN_SCOPE_COUNTRIES,
 } from "../../artifacts/workbench/src/lib/cargoAnalysis";
 
 // The product owner asked Cargo Watch to keep ONLY real cargo / goods incidents
@@ -90,5 +92,82 @@ describe("classifyScope — unattributed-country recovery uses the genuine-cargo
         "Country not identified",
       ),
     ).toBe("country_review");
+  });
+});
+
+// "Add to lane" on the Needs Review queue persists analystInScope:true together
+// with the analyst-assigned country. That human decision is authoritative: it
+// promotes the row past the heuristic cargo-vocab gate (the analyst read the
+// source; the classifier only sees the headline) — but it can never override the
+// hard non-cargo rejects, and it can never force a row into geography the
+// classifier does not recognize as APAC/Middle East.
+describe("classifyScope — analyst Needs Review override", () => {
+  it("promotes a row the heuristic would have dropped, once a country is assigned", () => {
+    // No cargo vocabulary at all → excluded without the override…
+    expect(cargoScope({ title: "Three men arrested after a street brawl" })).toBe(
+      "excluded_non_cargo",
+    );
+    // …but in_scope once the analyst assigns an in-scope country and resolves it.
+    expect(
+      cargoScope({
+        title: "Three men arrested after a street brawl",
+        country: "Singapore",
+        analystInScope: true,
+      }),
+    ).toBe("in_scope");
+  });
+
+  it("promotes a Middle East assignment too", () => {
+    expect(
+      cargoScope({
+        title: "Goods reported missing from the yard",
+        country: "United Arab Emirates",
+        analystInScope: true,
+      }),
+    ).toBe("in_scope");
+  });
+
+  it("does nothing without the explicit flag (heuristic still governs)", () => {
+    expect(
+      cargoScope({ title: "Three men arrested after a street brawl", country: "Singapore" }),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("cannot force an out-of-scope country into the lane", () => {
+    expect(
+      cargoScope({
+        title: "Container theft at a depot",
+        country: "Germany",
+        analystInScope: true,
+      }),
+    ).toBe("out_of_scope_geo");
+  });
+
+  it("cannot promote a blank/unidentified country (override needs a recognized region)", () => {
+    expect(
+      classifyScope(
+        { title: "Container theft at a depot", country: null, analystInScope: true },
+        "Country not identified",
+      ),
+    ).toBe("country_review");
+  });
+
+  it("never overrides a hard non-cargo reject (port congestion stays excluded)", () => {
+    expect(
+      cargoScope({
+        title: "Port congestion snarls the terminal",
+        country: "Singapore",
+        analystInScope: true,
+      }),
+    ).toBe("excluded_non_cargo");
+  });
+});
+
+// The country picker only offers values the override is allowed to accept, so
+// every entry must resolve to an in-scope region — otherwise an analyst could
+// pick a country that the override then silently refuses to promote.
+describe("IN_SCOPE_COUNTRIES — every picker option is a recognized in-scope region", () => {
+  it.each(IN_SCOPE_COUNTRIES)("%s resolves to APAC or Middle East", (country) => {
+    expect(["APAC", "Middle East"]).toContain(classifyRegion(country));
   });
 });

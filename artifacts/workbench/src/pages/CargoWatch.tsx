@@ -1,6 +1,12 @@
 import { useMemo, useState } from "react";
-import { useListIncidents } from "@workspace/api-client-react";
+import {
+  useListIncidents,
+  useUpdateIncident,
+  getListIncidentsQueryKey,
+  getGetDashboardOverviewQueryKey,
+} from "@workspace/api-client-react";
 import type { Incident } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, formatDistanceToNow, subDays } from "date-fns";
@@ -17,6 +23,7 @@ import {
   parseUsdLoss,
   identifyCountry,
   cargoCountry,
+  IN_SCOPE_COUNTRIES,
   type Region,
 } from "@/lib/cargoAnalysis";
 import { dedupeMonitorRows } from "@/lib/monitorDedupe";
@@ -89,6 +96,38 @@ export default function CargoWatch() {
   const [range, setRange] = useState<RangeKey>("all");
   const [mapMode, setMapMode] = useState<"spot" | "density">("spot");
   const [recentTab, setRecentTab] = useState<"main" | "review">("main");
+
+  // Needs Review resolution: an analyst assigns the correct country to an
+  // unidentified-country incident, which promotes it into the in-scope main
+  // lane (and thus the map, charts and reports). The assignment is persisted
+  // as analystInScope:true so it is authoritative past the heuristic cargo
+  // gates (see classifyScope). The workbench is intentionally public, so no
+  // auth gate is applied (consistent with the project's edit-anywhere policy).
+  const queryClient = useQueryClient();
+  const updateIncident = useUpdateIncident();
+  const [reviewCountry, setReviewCountry] = useState<Record<number, string>>({});
+  const [assigningId, setAssigningId] = useState<number | null>(null);
+
+  const assignReviewCountry = (id: number) => {
+    const country = reviewCountry[id];
+    if (!country) return;
+    setAssigningId(id);
+    updateIncident.mutate(
+      { id, data: { country, analystInScope: true } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListIncidentsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+          setReviewCountry((m) => {
+            const next = { ...m };
+            delete next[id];
+            return next;
+          });
+        },
+        onSettled: () => setAssigningId(null),
+      },
+    );
+  };
 
   // Scope: APAC + Middle East cargo / logistics crime ONLY. Region classified
   // from incident country (with location-text override); non-cargo content and
@@ -398,7 +437,31 @@ export default function CargoWatch() {
                   </div>
                   <div className="text-[11px] text-muted-foreground font-sans mt-1 flex items-center justify-between gap-2">
                     <span className="truncate">{i.source ?? "—"}</span>
-                    {i.displayCountry ? (
+                    {recentTab === "review" ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <select
+                          aria-label="Assign country"
+                          value={reviewCountry[i.id] ?? ""}
+                          onChange={(e) => setReviewCountry((m) => ({ ...m, [i.id]: e.target.value }))}
+                          disabled={assigningId === i.id}
+                          className="h-7 rounded-sm border border-border bg-background px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+                        >
+                          <option value="">Set country…</option>
+                          {IN_SCOPE_COUNTRIES.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => assignReviewCountry(i.id)}
+                          disabled={!reviewCountry[i.id] || assigningId === i.id}
+                          className="h-7 whitespace-nowrap rounded-sm bg-accent px-2 text-[11px] font-medium text-accent-foreground hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Assign this country and add the incident to the in-scope main lane"
+                        >
+                          {assigningId === i.id ? "Adding…" : "Add to lane"}
+                        </button>
+                      </div>
+                    ) : i.displayCountry ? (
                       <span className="whitespace-nowrap">{i.displayCountry}</span>
                     ) : incidentSourceUrl(i) ? (
                       <a

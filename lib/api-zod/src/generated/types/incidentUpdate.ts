@@ -23,4 +23,5 @@ export interface IncidentUpdate {
   source?: string;
   sourceUrl?: string;
   analystNotes?: string;
+  analystInScope?: boolean;
 }

@@ -57,4 +57,6 @@ export interface Incident {
   gdeltConfidence?: number | null;
   /** @nullable */
   gdeltEnrichedAt?: Date | null;
+  /** @nullable */
+  analystInScope?: boolean | null;
 }

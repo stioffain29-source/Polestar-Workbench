@@ -1431,6 +1431,10 @@ components:
         gdeltSubEventType: { type: ["string", "null"] }
         gdeltConfidence: { type: ["number", "null"] }
         gdeltEnrichedAt: { type: ["string", "null"], format: date-time }
+        # Analyst review override (additive). True when an analyst resolved a
+        # Cargo Watch "needs review" incident by assigning its country — the row
+        # is then authoritative for the in-scope main lane. Null for scraper rows.
+        analystInScope: { type: ["boolean", "null"] }
 
     IncidentInput:
       type: object
@@ -1466,6 +1470,7 @@ components:
         source: { type: string }
         sourceUrl: { type: string }
         analystNotes: { type: string }
+        analystInScope: { type: boolean }
 
     TopicCount:
       type: object

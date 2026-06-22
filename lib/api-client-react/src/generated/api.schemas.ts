@@ -199,6 +199,8 @@ export interface Incident {
   gdeltConfidence?: number | null;
   /** @nullable */
   gdeltEnrichedAt?: string | null;
+  /** @nullable */
+  analystInScope?: boolean | null;
 }
 
 export interface IncidentInput {
@@ -232,6 +234,7 @@ export interface IncidentUpdate {
   source?: string;
   sourceUrl?: string;
   analystNotes?: string;
+  analystInScope?: boolean;
 }
 
 export interface TopicCount {

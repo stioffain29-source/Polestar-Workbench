@@ -77,7 +77,8 @@ export const GetDashboardOverviewResponse = zod.object({
   "gdeltEventType": zod.string().nullish(),
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
-  "gdeltEnrichedAt": zod.coerce.date().nullish()
+  "gdeltEnrichedAt": zod.coerce.date().nullish(),
+  "analystInScope": zod.boolean().nullish()
 })),
   "sourceAlerts": zod.array(zod.object({
   "id": zod.number(),
@@ -734,7 +735,8 @@ export const ListIncidentsResponseItem = zod.object({
   "gdeltEventType": zod.string().nullish(),
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
-  "gdeltEnrichedAt": zod.coerce.date().nullish()
+  "gdeltEnrichedAt": zod.coerce.date().nullish(),
+  "analystInScope": zod.boolean().nullish()
 })
 export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
@@ -799,7 +801,8 @@ export const GetIncidentResponse = zod.object({
   "gdeltEventType": zod.string().nullish(),
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
-  "gdeltEnrichedAt": zod.coerce.date().nullish()
+  "gdeltEnrichedAt": zod.coerce.date().nullish(),
+  "analystInScope": zod.boolean().nullish()
 })
 
 
@@ -820,7 +823,8 @@ export const UpdateIncidentBody = zod.object({
   "confidence": zod.enum(['low', 'medium', 'high']).optional(),
   "source": zod.string().optional(),
   "sourceUrl": zod.string().optional(),
-  "analystNotes": zod.string().optional()
+  "analystNotes": zod.string().optional(),
+  "analystInScope": zod.boolean().optional()
 })
 
 export const UpdateIncidentResponse = zod.object({
@@ -859,7 +863,8 @@ export const UpdateIncidentResponse = zod.object({
   "gdeltEventType": zod.string().nullish(),
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
-  "gdeltEnrichedAt": zod.coerce.date().nullish()
+  "gdeltEnrichedAt": zod.coerce.date().nullish(),
+  "analystInScope": zod.boolean().nullish()
 })
 
 
@@ -915,7 +920,8 @@ export const GetRecentIncidentsResponseItem = zod.object({
   "gdeltEventType": zod.string().nullish(),
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
-  "gdeltEnrichedAt": zod.coerce.date().nullish()
+  "gdeltEnrichedAt": zod.coerce.date().nullish(),
+  "analystInScope": zod.boolean().nullish()
 })
 export const GetRecentIncidentsResponse = zod.array(GetRecentIncidentsResponseItem)
 

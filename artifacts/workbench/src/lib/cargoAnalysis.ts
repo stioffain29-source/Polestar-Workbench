@@ -9,7 +9,22 @@ export interface CargoIncidentLike {
   source?: string | null;
   location?: string | null;
   country?: string | null;
+  // Set true when an analyst explicitly resolved this row from the Needs Review
+  // queue by assigning its country. Authoritative: promotes the row into the
+  // in-scope lane past the heuristic cargo gates (see classifyScope).
+  analystInScope?: boolean | null;
 }
+
+// Canonical in-scope countries (APAC then Middle East), used by the Needs
+// Review queue's country picker. Curated literal — every entry is recognized by
+// classifyRegion, so an analyst can only promote a row into recognized in-scope
+// geography (the override below is gated on an APAC/Middle East region).
+export const IN_SCOPE_COUNTRIES: string[] = [
+  "Singapore", "Malaysia", "Indonesia", "Thailand", "Vietnam", "Philippines", "Cambodia", "Laos", "Myanmar",
+  "India", "Pakistan", "Bangladesh", "Sri Lanka", "China", "Taiwan", "South Korea", "Japan",
+  "Australia", "New Zealand", "Papua New Guinea",
+  "Saudi Arabia", "UAE", "Oman", "Qatar", "Bahrain", "Kuwait", "Jordan", "Iran", "Iraq", "Yemen", "Israel", "Lebanon", "Syria",
+];
 
 // Cargo Watch scope: APAC + Middle East cargo / hijack / logistics crime only.
 // Turkey is intentionally excluded per the current scope spec; Iran is included.
@@ -218,6 +233,16 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   // Fish/lobster/oyster only counts as cargo if cargo verbs are also present.
   if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|warehouse|depot|consignment|shipment|logistic)\b/i.test(text)) {
     return "excluded_non_cargo";
+  }
+  // Analyst override: an explicit human "Add to lane" decision on a Needs Review
+  // row is authoritative for a recognized in-scope country. It promotes the row
+  // past the heuristic cargo-vocab / genuineness gates below (the analyst read
+  // the source; the classifier only sees the headline), but NOT past the hard
+  // non-cargo / fish rejects above, and never out of APAC/Middle East geography
+  // (region is derived from the analyst-assigned country, so an out-of-scope or
+  // unrecognized assignment cannot leak in here).
+  if (i.analystInScope === true && (region === "APAC" || region === "Middle East")) {
+    return "in_scope";
   }
   // Must reference cargo / logistics crime vocabulary at all (English or Bahasa).
   if (!hasCargoVocab(text)) return "excluded_non_cargo";
