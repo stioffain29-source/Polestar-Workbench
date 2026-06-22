@@ -321,26 +321,47 @@ describe("reliefweb_reports integration status (situational context)", () => {
   });
 });
 
+describe("admin_controls status", () => {
+  it("is not_configured when INGEST_ADMIN_TOKEN is unset", async () => {
+    delete process.env.INGEST_ADMIN_TOKEN;
+    const item = find(await statuses(), "admin_controls");
+    expect(item.status).toBe("not_configured");
+    expect(item.optional).toBe(false);
+    expect(item.configured).toBe(false);
+  });
+
+  it("is working when INGEST_ADMIN_TOKEN is set", async () => {
+    process.env.INGEST_ADMIN_TOKEN = "operator-token";
+    const item = find(await statuses(), "admin_controls");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(true);
+  });
+});
+
 describe("getIntegrationStatuses envelope", () => {
-  it("returns every optional integration plus a generation timestamp", async () => {
+  it("returns every integration plus a generation timestamp", async () => {
     (isLlmAvailable as jest.Mock).mockReturnValue(false);
     const resp = await statuses();
     expect(resp.generatedAt).toBeInstanceOf(Date);
     const keys = resp.integrations.map((i) => i.key).sort();
     expect(keys).toEqual(
       [
+        "admin_controls",
         "gdelt",
         "liveuamap",
         "openai",
         "reliefweb",
         "reliefweb_reports",
+        "social_watch_instagram",
+        "social_watch_telegram",
         "vessel_registry",
       ].sort(),
     );
     expect(Array.isArray(resp.maritimeSources)).toBe(true);
-    // Every item is flagged optional (none of these gate the core product).
-    for (const item of resp.integrations) {
+    // Optional external integrations are flagged optional; admin_controls is operational.
+    for (const item of resp.integrations.filter((i) => i.key !== "admin_controls")) {
       expect(item.optional).toBe(true);
     }
+    expect(find(resp, "admin_controls").optional).toBe(false);
   });
 });

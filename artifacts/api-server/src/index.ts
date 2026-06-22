@@ -1,7 +1,10 @@
 import app from "./app";
+import { loadDevEnv } from "./lib/loadDevEnv.js";
 import { logger } from "./lib/logger";
 import { runDataMigrations } from "./lib/migrations";
 import { startIngestScheduler } from "./lib/ingestScheduler";
+
+loadDevEnv();
 
 const rawPort = process.env["PORT"];
 

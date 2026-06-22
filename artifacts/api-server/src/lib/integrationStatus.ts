@@ -682,6 +682,25 @@ async function socialTelegramStatus(): Promise<IntegrationStatusItem> {
   };
 }
 
+function adminControlsStatus(): IntegrationStatusItem {
+  const configured = Boolean(process.env["INGEST_ADMIN_TOKEN"]?.trim());
+  return {
+    key: "admin_controls",
+    label: "Admin operator controls",
+    status: configured ? "working" : "not_configured",
+    summary: configured
+      ? "Manual ingest, source mutations, and incident backfill are enabled."
+      : "Manual ingest, source editing, and backfill routes return 503 until INGEST_ADMIN_TOKEN is set.",
+    detail:
+      "Gates POST /api/admin/*, source create/update/delete, maritime movement upload, and incident backfill. Present the token via Authorization: Bearer or x-ingest-token.",
+    configured,
+    optional: false,
+    envVars: ["INGEST_ADMIN_TOKEN"],
+    metrics: [metric("Privileged routes", configured ? "enabled" : "disabled")],
+    docsUrl: null,
+  };
+}
+
 /**
  * Assemble the public integration status snapshot. Each probe catches its own
  * failures and degrades to "unknown" so the endpoint never hard-fails, and the
@@ -690,6 +709,7 @@ async function socialTelegramStatus(): Promise<IntegrationStatusItem> {
 export async function getIntegrationStatuses(): Promise<IntegrationStatusResponse> {
   const [integrations, maritimeSources] = await Promise.all([
     Promise.all([
+      Promise.resolve(adminControlsStatus()),
       gdeltStatus(),
       reliefwebStatus(),
       reliefwebReportsStatus(),

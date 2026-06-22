@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import {
   useListSources, useGetSourceHealth, useGetIntegrationStatus,
-  useCreateSource, useUpdateSource, useDeleteSource,
   getListSourcesQueryKey, getGetSourceHealthQueryKey, getGetDashboardOverviewQueryKey,
+  createSource, updateSource, deleteSource,
   type Source,
+  type SourceInput,
+  type SourceUpdate,
   type IntegrationStatusItem,
   type IntegrationStatusState,
   type MaritimeSourceHealthItem,
@@ -17,6 +19,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
 import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired, isSourceRetrying } from "@/lib/sourceHealth";
+import {
+  adminBearerHeaders,
+  adminMutationErrorMessage,
+  getStoredAdminToken,
+  setStoredAdminToken,
+} from "@/lib/adminToken";
 import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -227,14 +235,18 @@ export default function Sources() {
   const qc = useQueryClient();
   const [topic, setTopic] = useState("");
   const [status, setStatus] = useState("");
+  const [adminToken, setAdminToken] = useState(getStoredAdminToken);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   // Fetch the full source list once, then derive both the filtered
   // table view and the (unfiltered) Action Required panel from the
   // same dataset. This avoids a duplicate `/api/sources` round trip.
   const { data: allSources = [] } = useListSources();
   const { data: health } = useGetSourceHealth();
+  const { data: integrationStatus } = useGetIntegrationStatus();
+  const adminControls = integrationStatus?.integrations.find((i) => i.key === "admin_controls");
   const [editing, setEditing] = useState<Source | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const del = useDeleteSource();
 
   const sources = useMemo(
     () =>
@@ -274,24 +286,82 @@ export default function Sources() {
     qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
   };
 
+  const persistAdminToken = (value: string) => {
+    setAdminToken(value);
+    setStoredAdminToken(value);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete source?")) return;
+    if (!adminToken.trim()) {
+      setMutationError("Admin token is required to delete a source.");
+      return;
+    }
+    setMutationError(null);
+    setDeletingId(id);
+    try {
+      await deleteSource(id, { headers: adminBearerHeaders(adminToken) });
+      invalidate();
+    } catch (err) {
+      const httpStatus = (err as { status?: number })?.status;
+      setMutationError(
+        adminMutationErrorMessage(httpStatus)
+          ?? (err instanceof Error ? err.message : "Delete failed."),
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="max-w-[1800px] mx-auto space-y-5">
-      <div className="flex items-end justify-between">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Operations</div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Source Health</h1>
           <p className="text-muted-foreground font-sans mt-1 text-sm">Live status of every collection source feeding the workbench</p>
         </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"><Plus className="w-4 h-4 mr-2" /> Add Source</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle className="font-serif uppercase tracking-wide">New Source</DialogTitle></DialogHeader>
-            <SourceForm onSaved={() => { invalidate(); setAddOpen(false); }} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="w-64">
+            <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground block mb-1">
+              Admin token
+            </label>
+            <Input
+              type="password"
+              value={adminToken}
+              onChange={(e) => persistAdminToken(e.target.value)}
+              autoComplete="off"
+              placeholder="INGEST_ADMIN_TOKEN"
+              className="rounded-sm"
+            />
+          </div>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"><Plus className="w-4 h-4 mr-2" /> Add Source</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle className="font-serif uppercase tracking-wide">New Source</DialogTitle></DialogHeader>
+              <SourceForm
+                adminToken={adminToken}
+                onError={setMutationError}
+                onSaved={() => { invalidate(); setAddOpen(false); setMutationError(null); }}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {adminControls?.status === "not_configured" && (
+        <div className="bg-card border border-border rounded-sm px-4 py-3 text-sm text-muted-foreground">
+          Admin operator controls are disabled on this server — set <span className="font-mono">INGEST_ADMIN_TOKEN</span> in Secrets (Replit) or <span className="font-mono">.env.local</span> (local dev), then restart the api-server. Automatic ingest still runs on schedule.
+        </div>
+      )}
+
+      {mutationError && (
+        <div className="bg-destructive/5 border border-destructive/30 rounded-sm px-4 py-3 text-sm text-destructive">
+          {mutationError}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-8 gap-px bg-border p-px rounded-sm">
         <Kpi label="Total Sources" value={health?.total ?? 0} />
@@ -412,7 +482,13 @@ export default function Sources() {
                 <div className="p-3 text-xs text-muted-foreground truncate">{s.errorMessage ?? "—"}</div>
                 <div className="p-3 flex items-center gap-2">
                   <button onClick={() => setEditing(s)} className="text-muted-foreground hover:text-accent"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => { if (confirm("Delete source?")) del.mutate({ id: s.id }, { onSuccess: invalidate }); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button
+                    onClick={() => { void handleDelete(s.id); }}
+                    disabled={deletingId === s.id}
+                    className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -423,7 +499,15 @@ export default function Sources() {
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle className="font-serif uppercase tracking-wide">Edit Source</DialogTitle></DialogHeader>
-          {editing && <SourceForm key={editing.id} initial={editing} onSaved={() => { invalidate(); setEditing(null); }} />}
+          {editing && (
+            <SourceForm
+              key={editing.id}
+              initial={editing}
+              adminToken={adminToken}
+              onError={setMutationError}
+              onSaved={() => { invalidate(); setEditing(null); setMutationError(null); }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -449,9 +533,18 @@ function Kpi({ label, value, alert }: { label: string; value: number; alert?: bo
   );
 }
 
-function SourceForm({ initial, onSaved }: { initial?: Source; onSaved: () => void }) {
-  const create = useCreateSource();
-  const update = useUpdateSource();
+function SourceForm({
+  initial,
+  adminToken,
+  onSaved,
+  onError,
+}: {
+  initial?: Source;
+  adminToken: string;
+  onSaved: () => void;
+  onError: (msg: string | null) => void;
+}) {
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     topic: initial?.topic ?? "fuel",
@@ -464,15 +557,36 @@ function SourceForm({ initial, onSaved }: { initial?: Source; onSaved: () => voi
     errorMessage: initial?.errorMessage ?? "",
   });
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
-  const submit = () => {
+  const submit = async () => {
+    if (!adminToken.trim()) {
+      onError("Admin token is required to create or update a source.");
+      return;
+    }
     const data = {
       name: form.name, topic: form.topic, sourceType: form.sourceType,
       url: form.url || undefined, status: form.status, reliability: form.reliability,
       manualReviewRequired: form.manualReviewRequired,
       notes: form.notes || undefined, errorMessage: form.errorMessage || undefined,
-    } as never;
-    if (initial) update.mutate({ id: initial.id, data }, { onSuccess: onSaved });
-    else create.mutate({ data }, { onSuccess: onSaved });
+    };
+    setSaving(true);
+    onError(null);
+    try {
+      const headers = adminBearerHeaders(adminToken);
+      if (initial) {
+        await updateSource(initial.id, data as SourceUpdate, { headers });
+      } else {
+        await createSource(data as SourceInput, { headers });
+      }
+      onSaved();
+    } catch (err) {
+      const httpStatus = (err as { status?: number })?.status;
+      onError(
+        adminMutationErrorMessage(httpStatus)
+          ?? (err instanceof Error ? err.message : "Save failed."),
+      );
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <div className="space-y-3">
@@ -507,7 +621,13 @@ function SourceForm({ initial, onSaved }: { initial?: Source; onSaved: () => voi
         <input type="checkbox" checked={form.manualReviewRequired} onChange={(e) => set("manualReviewRequired", e.target.checked)} />
         Requires manual review
       </label>
-      <Button onClick={submit} className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm w-full">{initial ? "Save" : "Create"}</Button>
+      <Button
+        onClick={() => { void submit(); }}
+        disabled={saving}
+        className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm w-full"
+      >
+        {saving ? "Saving…" : initial ? "Save" : "Create"}
+      </Button>
     </div>
   );
 }
