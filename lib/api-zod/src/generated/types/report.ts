@@ -22,6 +22,8 @@ export interface Report {
   /** @nullable */
   riskRating?: ReportRiskRating;
   /** @nullable */
+  executiveSummary?: string | null;
+  /** @nullable */
   situation?: string | null;
   /** @nullable */
   whatHappened?: string | null;

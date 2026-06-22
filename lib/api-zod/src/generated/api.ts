@@ -103,6 +103,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
   "riskRating": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "executiveSummary": zod.string().nullish(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
   "hardNumbers": zod.union([zod.object({
@@ -1255,6 +1256,7 @@ export const ListReportsResponseItem = zod.object({
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
   "riskRating": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "executiveSummary": zod.string().nullish(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
   "hardNumbers": zod.union([zod.object({
@@ -1397,6 +1399,7 @@ export const CreateReportBody = zod.object({
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
   "riskRating": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "executiveSummary": zod.string().optional(),
   "situation": zod.string().optional(),
   "whatHappened": zod.string().optional(),
   "hardNumbers": zod.union([zod.object({
@@ -1542,6 +1545,7 @@ export const GetReportResponse = zod.object({
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
   "riskRating": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "executiveSummary": zod.string().nullish(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
   "hardNumbers": zod.union([zod.object({
@@ -1687,6 +1691,7 @@ export const UpdateReportBody = zod.object({
   "status": zod.enum(['draft', 'review', 'published']).optional(),
   "issueDate": zod.coerce.date().optional(),
   "riskRating": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "executiveSummary": zod.string().optional(),
   "situation": zod.string().optional(),
   "whatHappened": zod.string().optional(),
   "hardNumbers": zod.union([zod.object({
@@ -1827,6 +1832,7 @@ export const UpdateReportResponse = zod.object({
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
   "riskRating": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
+  "executiveSummary": zod.string().nullish(),
   "situation": zod.string().nullish(),
   "whatHappened": zod.string().nullish(),
   "hardNumbers": zod.union([zod.object({

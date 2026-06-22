@@ -19,6 +19,7 @@ export interface ReportUpdate {
   issueDate?: Date;
   /** @nullable */
   riskRating?: ReportUpdateRiskRating;
+  executiveSummary?: string;
   situation?: string;
   whatHappened?: string;
   hardNumbers?: FuelHardNumbers | KpiCard[];

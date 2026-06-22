@@ -236,6 +236,13 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS risk_rating text`,
     );
 
+    // Schema: persisted executive summary on topic reports. Previously
+    // browser-local only (localStorage); analysts lost summaries across
+    // browsers/sessions. Idempotent — IF NOT EXISTS.
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS executive_summary text`,
+    );
+
     // 0a) Schema: per-feed consecutive-failure counter on `sources`.
     //     drizzle `push` adds this in dev, but the writable prod DB is reached
     //     only from the deployment runtime, so add it idempotently on boot too.

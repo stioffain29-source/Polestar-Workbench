@@ -484,6 +484,8 @@ export interface Report {
   /** @nullable */
   riskRating?: ReportRiskRating;
   /** @nullable */
+  executiveSummary?: string | null;
+  /** @nullable */
   situation?: string | null;
   /** @nullable */
   whatHappened?: string | null;
@@ -523,6 +525,7 @@ export interface ReportInput {
   issueDate: string;
   /** @nullable */
   riskRating?: ReportInputRiskRating;
+  executiveSummary?: string;
   situation?: string;
   whatHappened?: string;
   hardNumbers?: FuelHardNumbers | KpiCard[];
@@ -555,6 +558,7 @@ export interface ReportUpdate {
   issueDate?: string;
   /** @nullable */
   riskRating?: ReportUpdateRiskRating;
+  executiveSummary?: string;
   situation?: string;
   whatHappened?: string;
   hardNumbers?: FuelHardNumbers | KpiCard[];

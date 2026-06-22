@@ -92,6 +92,7 @@ export const reportsTable = pgTable("reports", {
   // card pull falls back to the rating computed from the report's scoped
   // incidents, then to the prose heuristic. See cardAutofill.reportToCard.
   riskRating: text("risk_rating"),
+  executiveSummary: text("executive_summary"),
   situation: text("situation"),
   whatHappened: text("what_happened"),
   hardNumbers: jsonb("hard_numbers").$type<FuelHardNumbers>(),

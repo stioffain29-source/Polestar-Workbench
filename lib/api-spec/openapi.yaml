@@ -1676,6 +1676,7 @@ components:
         status: { $ref: "#/components/schemas/ReportStatus" }
         issueDate: { type: string, format: date }
         riskRating: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
+        executiveSummary: { type: ["string", "null"] }
         situation: { type: ["string", "null"] }
         whatHappened: { type: ["string", "null"] }
         hardNumbers:
@@ -1811,6 +1812,7 @@ components:
         status: { $ref: "#/components/schemas/ReportStatus" }
         issueDate: { type: string, format: date }
         riskRating: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
+        executiveSummary: { type: string }
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:
@@ -1833,6 +1835,7 @@ components:
         status: { $ref: "#/components/schemas/ReportStatus" }
         issueDate: { type: string, format: date }
         riskRating: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
+        executiveSummary: { type: string }
         situation: { type: string }
         whatHappened: { type: string }
         hardNumbers:

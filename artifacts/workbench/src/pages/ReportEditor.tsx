@@ -67,8 +67,28 @@ import {
   type FuelMarketCardForm,
 } from "@/lib/fuelWatchReport";
 
-const execSummaryStorageKey = (id: number) =>
+const legacyExecSummaryStorageKey = (id: number) =>
   `polestar:exec-summary:report:${id}`;
+
+function readLegacyExecSummary(id: number): string {
+  try {
+    return typeof window !== "undefined" && window.localStorage
+      ? (window.localStorage.getItem(legacyExecSummaryStorageKey(id)) ?? "")
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+function clearLegacyExecSummary(id: number): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem(legacyExecSummaryStorageKey(id));
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 // Short scope reminders shown above the editor. Kept tight on purpose so
 // they read as a topic map, not a writing prompt.
@@ -479,16 +499,10 @@ export default function ReportEditor() {
     if (!incidents) return;
     if (seededForId.current === report.id) return;
     seededForId.current = report.id;
-    let exec = "";
-    try {
-      exec =
-        typeof window !== "undefined" && window.localStorage
-          ? (window.localStorage.getItem(execSummaryStorageKey(report.id)) ??
-            "")
-          : "";
-    } catch {
-      exec = "";
-    }
+    const savedExec =
+      (report.executiveSummary ?? "").trim()
+        ? report.executiveSummary
+        : readLegacyExecSummary(report.id);
 
     // Generate an operational draft for any section that is still empty.
     // Saved content always wins; the draft only seeds blank fields so a new
@@ -574,14 +588,7 @@ export default function ReportEditor() {
       status: report.status ?? "draft",
       issueDate,
       riskRating: report.riskRating ?? "",
-      // executiveSummary is browser-local (no DB column) so its "saved" value is
-      // the localStorage copy. It must honour the SAME staleness guard as every
-      // other narrative field: when the window has advanced or live data is
-      // newer, a localStorage summary written against the old window is stale and
-      // must be reseeded from the fresh draft — otherwise the lead development
-      // (the week's dominant headline) silently fails to surface for a browser
-      // that saved an earlier copy. Fresh, non-stale reports keep the saved copy.
-      executiveSummary: pick(exec, draft.executiveSummary),
+      executiveSummary: pick(savedExec, draft.executiveSummary),
       situation: pick(report.situation, draft.situation),
       whatHappened: pick(report.whatHappened, draft.whatHappened),
       whatMatters: pick(report.whatMatters, draft.whatMatters),
@@ -664,40 +671,26 @@ export default function ReportEditor() {
     setForm((f) => ({ ...f, [k]: v }));
 
   const save = () => {
-    const { executiveSummary, ...persistable } = form;
     // Conflict Watch is location-led: it drops the Executive Summary, What
     // Happened and Implications sections. Only Situation / What Matters /
     // Watch Next / Polestar View are editable + persisted; the rest of the
     // spine (Top Activity Areas, Other Watched Theatres) is render-time
     // auto-prose. So never write those dropped fields for conflict.
     const isConflict = form.topic === "conflict";
-    try {
-      if (
-        !isConflict &&
-        typeof window !== "undefined" &&
-        window.localStorage
-      ) {
-        window.localStorage.setItem(
-          execSummaryStorageKey(id),
-          executiveSummary,
-        );
-      }
-    } catch {
-      /* ignore */
-    }
     // Fuel Watch market-data save semantics:
     //   * Advanced JSON view dirty → validate the textarea content and
     //     persist that. Blocks on invalid JSON rather than silently
     //     dropping the edit.
     //   * Otherwise → assemble from the form. Empty form → clear
     //     payload with `hardNumbers: null`.
-    const payload: Record<string, unknown> = { ...persistable };
+    const payload: Record<string, unknown> = { ...form };
     // Conflict reports never persist the dropped narrative fields — they are
     // hidden from the form and rendered nowhere, so leaving them out of the
     // payload keeps the DB free of stale boilerplate written from form state.
     if (isConflict) {
       delete payload.whatHappened;
       delete payload.implications;
+      delete payload.executiveSummary;
     }
     // Empty override → clear the stored rating (card pull falls back to the
     // computed/auto value). A set value persists the analyst's choice.
@@ -748,6 +741,7 @@ export default function ReportEditor() {
           hardNumbersSeededForId.current = null;
           setHardNumbersEdited(undefined);
           setSampleAutoSeeded(false);
+          clearLegacyExecSummary(id);
         },
       },
     );
