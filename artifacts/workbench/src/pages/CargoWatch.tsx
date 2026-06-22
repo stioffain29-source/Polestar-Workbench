@@ -398,7 +398,21 @@ export default function CargoWatch() {
                   </div>
                   <div className="text-[11px] text-muted-foreground font-sans mt-1 flex items-center justify-between gap-2">
                     <span className="truncate">{i.source ?? "—"}</span>
-                    <span className="whitespace-nowrap">{i.displayCountry ?? "Review"}</span>
+                    {i.displayCountry ? (
+                      <span className="whitespace-nowrap">{i.displayCountry}</span>
+                    ) : incidentSourceUrl(i) ? (
+                      <a
+                        href={incidentSourceUrl(i)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="whitespace-nowrap font-medium text-accent hover:underline"
+                        title="Open the source article to review and identify the country"
+                      >
+                        Review
+                      </a>
+                    ) : (
+                      <span className="whitespace-nowrap text-muted-foreground">Review</span>
+                    )}
                   </div>
                 </div>
               ))
