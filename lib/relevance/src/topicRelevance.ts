@@ -817,6 +817,14 @@ const ENERGY_EXCLUDE: RegExp[] = [
   /\bno (power|electricity) (shortage|crisis|cut|outage)/,
   /\bno (scope for|need for) (load[- ]?shedding|power cut|outage)/,
   /\bno load[- ]?shedding\b/,
+  // Coal-policy / energy-transition / climate-finance COMMENTARY. The Indonesia
+  // grid-stress feed (Java/Sumatra PLN coal-supply blackouts) also pulls
+  // coal-exit, plant-early-retirement, decarbonisation and transition-finance
+  // think-pieces that merely share the "coal"/"power plant" vocabulary. These
+  // run BEFORE the REQUIRED gate, so a coal-transition op-ed can never qualify on
+  // the new coal-supply rule, while a genuine "coal supply shortage … power
+  // plants" or "rolling power outages" item (no transition cue) still passes.
+  /\b(coal (transition|exit|phase[- ]?out|pact|production (plan|target|boost)|dependence)|transition finance|just transition|decarboni[sz]|net[- ]?zero|early retirement|coal[- ]?fired .{0,25}(retire|retirement)|clean energy (opportunit|investment|transition)|climate (progress|pact|finance|goal|target))\b/,
 ];
 
 // Conflict topic off-topic noise. The conflict REQUIRED gate keys off actor
@@ -945,6 +953,18 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\benergy (crisis|shortage|tariff|emergency|rationing)/,
     /\b(peak|record) (power |electricity )?demand/,
     /\bgas shortage/,
+    // Power blackouts named WITHOUT an adjacent "power/grid/electricity" word —
+    // a "Major Blackout Hits Sumatra" / "repeated blackouts" / "nationwide
+    // blackout" headline is unambiguous grid stress. Qualifier-bound so the
+    // non-power homonyms (media / news / TV / information / drunk blackout) never
+    // qualify.
+    /\b(nationwide|country[- ]?wide|state[- ]?wide|island[- ]?wide|region[- ]?wide|regional|widespread|wide[- ]?scale|massive|major|severe|prolonged|repeated|recurring|sweeping|rolling|rotating|partial|sudden|total|complete) blackout/,
+    // Coal supply stress feeding the grid (the Indonesia PLN medium-calorie coal
+    // shortfall that triggered the Java/Sumatra rolling outages). Bound to a
+    // shortage / supply-stress word so coal-mining, coal-export and coal-policy
+    // business news does not qualify (those are also dropped by ENERGY_EXCLUDE).
+    /\bcoal (supply )?(shortage|crunch|crisis|shortfall|disruption|squeeze)\b/,
+    /\bcoal supply (concern|concerns|problem|problems)\b/,
   ],
   shipping: [
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,

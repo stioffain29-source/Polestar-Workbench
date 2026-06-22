@@ -51,6 +51,26 @@ tagged the Annapolis storm as **Kuwait (29.31/47.48)**. Stop it at the relevance
 the geocode default is downstream and can't tell US-from-Gulf. Expanded the state list
 too (maryland + NE/Midwest), still omitting `georgia` (country collision).
 
+**Coal-supply vs coal-policy split (Indonesia PLN cluster).** The energy gate admits the
+*operational* coal story — qualifier-bound blackouts (`/(rolling|major|widespread|...) blackout/`,
+never bare "blackout") and `coal (supply )?(shortage|crunch|crisis|shortfall|...)` /
+`coal supply concern(s)` — while `ENERGY_EXCLUDE` drops the *policy/transition*
+homonym (coal transition/exit/phase-out/pact/production-plan/dependence, transition
+finance, just transition, decarbonise, net-zero, early retirement, clean-energy
+opportunity, climate progress/pact/finance). **Tradeoff:** exclude-runs-before-required
+means a genuine operational item *framed around* a policy word (e.g. "blackout forces
+coal early-retirement rethink") is a deliberate false-negative — monitor, don't loosen.
+Soft reassurance/recovery items ("supply improving / system recovers") also fall out
+(no REQUIRED match) and that's acceptable — they're de-escalation, not the incident.
+
+**Admit an in-country cluster with a place/utility-anchored sub-national feed, NOT the
+broad country feed.** The Indonesia story came in via an ID-edition feed anchored on
+Java/Sumatra/Sulawesi/Kalimantan/Jakarta/PLN. The broad `Indonesia` country feed
+blind-stamps its `defaultCountry` on US-local outages that lack any in-region alias and
+aren't flagged out-of-region (observed: "City of Sumter" SC / Teller-Park-Fremont CO /
+"We Energies" WI all tagged **Indonesia**). Place-anchored feeds are materially safer;
+the broad-feed mislabels are a separate, pre-existing defaultCountry-leak class.
+
 **Mechanism reminder:** any rule change here needs a `RELEVANCE_RULE_VERSION` bump
 (`evaluate.ts`) so the api-server boot backfill re-evaluates stored rows; otherwise the
 DB keeps the old verdicts.

@@ -165,6 +165,14 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     // energy query is rank-capped by Google News and these local items rarely
     // make the cut, so a place-anchored PH-edition feed surfaces them.
     { label: "Philippines grid alerts (sub-national)", q: `(Visayas OR Luzon OR Mindanao OR Cebu OR Negros OR Panay OR Iloilo OR Bacolod OR "Metro Cebu") (brownout OR "rotating brownout" OR "rotational brownout" OR "yellow alert" OR "red alert" OR "power outage" OR "power interruption" OR "power supply")`, defaultCountry: "Philippines", ...(EDITIONS["Philippines"] ?? {}) },
+    // Indonesia's mid-2026 grid stress (Java/Sumatra rolling power outages tied
+    // to a PLN medium-calorie coal-supply shortfall) is reported sub-nationally
+    // and via the state utility (PLN); the broad national energy query is
+    // rank-capped by Google News and these local items rarely make the cut, so a
+    // place/utility-anchored ID-edition feed surfaces the cluster. Coal-policy /
+    // energy-transition noise it also pulls is dropped by the deny list +
+    // ENERGY_EXCLUDE.
+    { label: "Indonesia grid/coal stress (sub-national)", q: `(Java OR Sumatra OR Sulawesi OR Kalimantan OR Jakarta OR PLN) (blackout OR "power outage" OR "power outages" OR "rolling outage" OR "rolling blackout" OR "power cut" OR "power shortage" OR "coal supply" OR "coal shortage")`, defaultCountry: "Indonesia", ...(EDITIONS["Indonesia"] ?? {}) },
     { label: "Grid attack/sabotage", q: `(substation OR "transmission line" OR pipeline OR grid) (attack OR sabotage OR blast OR explosion OR fire) (India OR Pakistan OR Myanmar OR Bangladesh OR Iran OR Iraq OR "Saudi Arabia")`, defaultCountry: "Unknown" },
   ],
   allow: [
@@ -203,6 +211,14 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     "generation shortfall",
     "capacity shortfall",
     "supply shortfall",
+    // Coal-as-grid-fuel stress (Indonesia PLN medium-calorie coal shortfall).
+    // Precision-bound to a shortage word so coal-mining / coal-export business
+    // does not slip through; coal-policy noise is dropped by the deny list.
+    "coal shortage",
+    "coal supply shortage",
+    "coal supply crunch",
+    "coal supply concern",
+    "coal supply concerns",
   ],
   deny: [
     ...COMMON_DENY,
@@ -234,6 +250,18 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     "nersa",
     "ferrochrome",
     "eskom",
+    // Coal-policy / energy-transition / climate-finance commentary that shares
+    // the coal / power-plant vocabulary but is not an operational grid event.
+    "coal transition",
+    "coal exit",
+    "coal phase-out",
+    "coal pact",
+    "coal production",
+    "coal dependence",
+    "transition finance",
+    "decarbon",
+    "early retirement",
+    "clean energy opportunit",
   ],
   countryAliases: COUNTRY_ALIASES,
 };
