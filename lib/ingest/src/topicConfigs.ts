@@ -160,6 +160,11 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     ...countryFeeds(ENERGY_COUNTRIES, ENERGY_TERMS),
     { label: "Load shedding (region)", q: `"load shedding" (Pakistan OR Bangladesh OR "Sri Lanka" OR India OR Nepal)`, defaultCountry: "Unknown" },
     { label: "Brownout/tariff (region)", q: `(brownout OR "rolling blackout" OR "electricity tariff" OR "power tariff" OR "tariff hike" OR "electricity price") (India OR Pakistan OR Philippines OR Indonesia OR Australia OR "New Zealand" OR "Saudi Arabia" OR "United Arab Emirates")`, defaultCountry: "Unknown" },
+    // Philippines grid alerts are issued and reported sub-nationally (NGCP
+    // yellow/red alerts, rotating brownouts per region/city). The broad national
+    // energy query is rank-capped by Google News and these local items rarely
+    // make the cut, so a place-anchored PH-edition feed surfaces them.
+    { label: "Philippines grid alerts (sub-national)", q: `(Visayas OR Luzon OR Mindanao OR Cebu OR Negros OR Panay OR Iloilo OR Bacolod OR "Metro Cebu") (brownout OR "rotating brownout" OR "rotational brownout" OR "yellow alert" OR "red alert" OR "power outage" OR "power interruption" OR "power supply")`, defaultCountry: "Philippines", ...(EDITIONS["Philippines"] ?? {}) },
     { label: "Grid attack/sabotage", q: `(substation OR "transmission line" OR pipeline OR grid) (attack OR sabotage OR blast OR explosion OR fire) (India OR Pakistan OR Myanmar OR Bangladesh OR Iran OR Iraq OR "Saudi Arabia")`, defaultCountry: "Unknown" },
   ],
   allow: [
