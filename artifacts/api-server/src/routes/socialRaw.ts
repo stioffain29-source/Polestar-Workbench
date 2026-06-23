@@ -18,6 +18,7 @@ import {
   UpdateSocialRawReviewStatusParams,
   UpdateSocialRawReviewStatusBody,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -138,7 +139,7 @@ router.get("/social-raw", async (req, res): Promise<void> => {
 // posture, in line with the rest of the workbench. This NEVER creates or touches
 // an incident — it only moves the row in or out of the actionable review queue.
 // "promoted" is reserved for the promote action; a row already promoted is fixed.
-router.patch("/social-raw/:id/review-status", async (req, res): Promise<void> => {
+router.patch("/social-raw/:id/review-status", requireAdminToken, async (req, res): Promise<void> => {
   const parsedParams = UpdateSocialRawReviewStatusParams.safeParse({
     id: req.params.id,
   });
@@ -183,7 +184,7 @@ router.patch("/social-raw/:id/review-status", async (req, res): Promise<void> =>
   res.json(updated);
 });
 
-router.post("/social-raw/:id/promote", async (req, res): Promise<void> => {
+router.post("/social-raw/:id/promote", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = PromoteSocialRawItemParams.safeParse({ id: req.params.id });
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

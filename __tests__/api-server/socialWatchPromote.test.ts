@@ -30,6 +30,10 @@ import {
 import { runSocialWatchIngest } from "@workspace/ingest";
 import incidentsRouter from "../../artifacts/api-server/src/routes/incidents";
 import socialWatchRouter from "../../artifacts/api-server/src/routes/socialWatch";
+import {
+  adminAuthHeaders,
+  enableTestAdminToken,
+} from "./adminAuthTestHelpers";
 
 // ---------------------------------------------------------------------------
 // Stateful in-memory DB backing both routers.
@@ -144,6 +148,7 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll((done) => {
+  enableTestAdminToken();
   app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -186,6 +191,7 @@ async function flashpointIncidentCount(): Promise<number> {
 async function promote(id: number) {
   const res = await fetch(`${baseUrl}/api/social-watch/${id}/promote`, {
     method: "POST",
+    headers: adminAuthHeaders(),
   });
   return { status: res.status, json: await res.json() };
 }

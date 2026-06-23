@@ -14,6 +14,7 @@ import {
   MAX_PROSE_INCIDENTS_ACCEPTED,
   type ProseIncidentInput,
 } from "../lib/countryProse";
+import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -53,7 +54,7 @@ function unavailableProse(fingerprint: string) {
 // set, or generate it. The cache is keyed by a fingerprint of the supplied
 // window incidents (the same set the client renders), so a hit costs nothing and
 // the prose can never lag the data. `force: true` bypasses the cache (redraft).
-router.post("/countries/:slug/prose", async (req, res): Promise<void> => {
+router.post("/countries/:slug/prose", requireAdminToken, async (req, res): Promise<void> => {
   const slug = slugOf(req.params.slug);
   const parsed = GenerateCountryProseBody.safeParse(req.body);
   if (!parsed.success) {
@@ -167,7 +168,7 @@ router.post("/countries/:slug/prose", async (req, res): Promise<void> => {
 // The edit is bound to the fingerprint it was written against; if the data has
 // moved on (fingerprint mismatch) the edit is rejected so it can never describe
 // a stale snapshot — the client must regenerate first.
-router.put("/countries/:slug/prose/edit", async (req, res): Promise<void> => {
+router.put("/countries/:slug/prose/edit", requireAdminToken, async (req, res): Promise<void> => {
   const slug = slugOf(req.params.slug);
   const parsed = EditCountryProseBody.safeParse(req.body);
   if (!parsed.success) {

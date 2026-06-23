@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, countryBaselinesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { UpsertCountryBaselineBody } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -39,7 +40,7 @@ router.get("/countries/:slug/baseline", async (req, res): Promise<void> => {
   res.json(serialise(row));
 });
 
-router.put("/countries/:slug/baseline", async (req, res): Promise<void> => {
+router.put("/countries/:slug/baseline", requireAdminToken, async (req, res): Promise<void> => {
   const slug = slugFrom(req);
   if (!slug) {
     res.status(400).json({ error: "Missing slug" });
@@ -86,7 +87,7 @@ router.put("/countries/:slug/baseline", async (req, res): Promise<void> => {
   res.json(serialise(row));
 });
 
-router.delete("/countries/:slug/baseline", async (req, res): Promise<void> => {
+router.delete("/countries/:slug/baseline", requireAdminToken, async (req, res): Promise<void> => {
   const slug = slugFrom(req);
   await db.delete(countryBaselinesTable).where(eq(countryBaselinesTable.slug, slug));
   res.status(204).end();

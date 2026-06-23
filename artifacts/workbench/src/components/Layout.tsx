@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_colour_logo_vert.png";
+import AdminTokenField from "./AdminTokenField";
 
 interface LayoutProps {
   children: ReactNode;
@@ -160,6 +161,7 @@ export default function Layout({ children }: LayoutProps) {
           </div>
           
           <div className="flex items-center gap-4">
+            <AdminTokenField />
             <div className="relative w-64 hidden sm:block">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input 

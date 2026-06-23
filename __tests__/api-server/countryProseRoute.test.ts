@@ -23,6 +23,10 @@ import {
   type ProseIncidentInput,
 } from "../../artifacts/api-server/src/lib/countryProse";
 import proseRouter from "../../artifacts/api-server/src/routes/prose";
+import {
+  adminAuthHeaders,
+  enableTestAdminToken,
+} from "./adminAuthTestHelpers";
 
 type Rows = Record<string, unknown>[];
 
@@ -87,6 +91,7 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll(async () => {
+  enableTestAdminToken();
   app = express();
   app.use(express.json());
   app.use(proseRouter);
@@ -111,7 +116,7 @@ beforeEach(() => {
 async function postProse(body: Record<string, unknown> = BODY) {
   const res = await fetch(`${baseUrl}/countries/${SLUG}/prose`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: adminAuthHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body),
   });
   return { status: res.status, json: await res.json() };

@@ -7,6 +7,7 @@ import {
   ListStrikesQueryParams,
   GetStrikeSummaryQueryParams,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -106,7 +107,7 @@ router.get("/strikes/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/strikes", async (req, res): Promise<void> => {
+router.post("/strikes", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = CreateStrikeBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -116,7 +117,7 @@ router.post("/strikes", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/strikes/:id", async (req, res): Promise<void> => {
+router.patch("/strikes/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateStrikeBody.safeParse(req.body);
   if (!parsed.success) {
@@ -135,7 +136,7 @@ router.patch("/strikes/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.delete("/strikes/:id", async (req, res): Promise<void> => {
+router.delete("/strikes/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(strikesTable).where(eq(strikesTable.id, id));
   res.status(204).end();

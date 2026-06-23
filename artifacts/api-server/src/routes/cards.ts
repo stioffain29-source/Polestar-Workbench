@@ -18,6 +18,7 @@ import {
   UpdateCardTemplateBody,
   UpdateBrandSettingsBody,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -54,7 +55,7 @@ router.get("/card-drafts/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/card-drafts", async (req, res): Promise<void> => {
+router.post("/card-drafts", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = CreateCardDraftBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -65,7 +66,7 @@ router.post("/card-drafts", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/card-drafts/:id", async (req, res): Promise<void> => {
+router.patch("/card-drafts/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateCardDraftBody.safeParse(req.body);
   if (!parsed.success) {
@@ -88,7 +89,7 @@ router.patch("/card-drafts/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.delete("/card-drafts/:id", async (req, res): Promise<void> => {
+router.delete("/card-drafts/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(cardDraftsTable).where(eq(cardDraftsTable.id, id));
   res.status(204).end();
@@ -120,7 +121,7 @@ router.get("/card-templates/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/card-templates", async (req, res): Promise<void> => {
+router.post("/card-templates", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = CreateCardTemplateBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -135,7 +136,7 @@ router.post("/card-templates", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/card-templates/:id", async (req, res): Promise<void> => {
+router.patch("/card-templates/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateCardTemplateBody.safeParse(req.body);
   if (!parsed.success) {
@@ -158,7 +159,7 @@ router.patch("/card-templates/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.delete("/card-templates/:id", async (req, res): Promise<void> => {
+router.delete("/card-templates/:id", requireAdminToken, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   // Protect the seeded built-in presets from deletion.
   const [existing] = await db
@@ -201,7 +202,7 @@ router.get("/brand-settings", async (_req, res): Promise<void> => {
   res.json(row);
 });
 
-router.put("/brand-settings", async (req, res): Promise<void> => {
+router.put("/brand-settings", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = UpdateBrandSettingsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

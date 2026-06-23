@@ -42,6 +42,10 @@ import {
 } from "../../artifacts/api-server/src/lib/countryProse";
 import reportIncidentSummariesRouter from "../../artifacts/api-server/src/routes/reportIncidentSummaries";
 import {
+  adminAuthHeaders,
+  enableTestAdminToken,
+} from "./adminAuthTestHelpers";
+import {
   selectRelatedIncidents,
   type RelatedIncidentInput,
 } from "@/lib/relatedIncidents";
@@ -212,6 +216,7 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll((done) => {
+  enableTestAdminToken();
   app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -239,7 +244,7 @@ afterEach(() => {
 async function postSummaries(body: unknown) {
   const res = await fetch(`${baseUrl}/api/reports/${REPORT_ID}/incident-summaries`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: adminAuthHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body),
   });
   return { status: res.status, json: await res.json() };

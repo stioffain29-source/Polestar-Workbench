@@ -24,7 +24,7 @@ Polestar Advisory Workbench is a public, browser-based intelligence workbench ba
 
 - **Production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/routes/*`, `artifacts/workbench/src/App.tsx`
 - **Highest-risk code areas:** mutating API routes in `routes/incidents.ts`, `routes/reports.ts`, `routes/strikes.ts`, `routes/countries.ts`, `routes/baselines.ts`; operational aggregation in `routes/dashboard.ts`
-- **Privileged boundary:** only `routes/admin.ts` and mutating `routes/sources.ts` currently apply the admin token gate
+- **Privileged boundary:** `requireAdminToken` (backed by `INGEST_ADMIN_TOKEN`) gates admin ingest, source mutations, backfill, and all workbench write routes; read routes remain public
 - **Dev-only area to usually ignore:** `artifacts/mockup-sandbox`
 
 ## Threat Categories

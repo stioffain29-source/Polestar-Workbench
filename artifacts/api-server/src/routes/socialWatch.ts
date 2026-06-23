@@ -7,6 +7,7 @@ import {
   ListSocialWatchItemsQueryParams,
   PromoteSocialWatchItemParams,
 } from "@workspace/api-zod";
+import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -74,7 +75,7 @@ router.get("/social-watch", async (req, res): Promise<void> => {
   res.json(rows);
 });
 
-router.post("/social-watch/:id/promote", async (req, res): Promise<void> => {
+router.post("/social-watch/:id/promote", requireAdminToken, async (req, res): Promise<void> => {
   const parsed = PromoteSocialWatchItemParams.safeParse({ id: req.params.id });
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

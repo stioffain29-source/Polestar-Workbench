@@ -39,6 +39,10 @@ import {
   type ProseIncidentInput,
 } from "../../artifacts/api-server/src/lib/countryProse";
 import reportIncidentSummariesRouter from "../../artifacts/api-server/src/routes/reportIncidentSummaries";
+import {
+  adminAuthHeaders,
+  enableTestAdminToken,
+} from "./adminAuthTestHelpers";
 
 type Rows = Record<string, unknown>[];
 
@@ -118,6 +122,7 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll((done) => {
+  enableTestAdminToken();
   app = express();
   app.use(express.json());
   // pino-http normally attaches req.log; the router's error path calls
@@ -147,7 +152,7 @@ afterEach(() => {
 async function postSummaries(body: unknown) {
   const res = await fetch(`${baseUrl}/api/reports/${REPORT_ID}/incident-summaries`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: adminAuthHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body),
   });
   return { status: res.status, json: await res.json() };
@@ -158,7 +163,7 @@ async function putEdit(body: unknown) {
     `${baseUrl}/api/reports/${REPORT_ID}/incident-summaries/edit`,
     {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: adminAuthHeaders({ "content-type": "application/json" }),
       body: JSON.stringify(body),
     },
   );
