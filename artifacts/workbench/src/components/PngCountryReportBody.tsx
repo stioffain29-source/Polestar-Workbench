@@ -81,10 +81,14 @@ function SeverityChip({ item }: { item: PngReportItem }) {
       style={{
         background: color,
         color: "#fff",
-        padding: "0 10px",
+        // Caps sit on the baseline with no descenders, so a flex-centred line box
+        // leaves them optically high. Nudge the label down by ~half the cap height
+        // (extra top padding) so the uppercase text reads vertically centred. The
+        // PDF export resets chip padding to 0, so this never leaks into the export.
+        padding: "7px 10px 0",
         minWidth: 72,
         height: 22,
-        lineHeight: "22px",
+        lineHeight: 1,
         fontSize: 10,
         fontWeight: 700,
         letterSpacing: "0.08em",
