@@ -1,8 +1,8 @@
 // Weekly Cargo Theft Trend chart for the Cargo Watch report.
 //
-// Reads a weekly count series built by lib/cargoReportData.ts so the
-// preview and the PDF exporter (drawCargoTrendChart in
-// exportTopicReportPdf.ts) always render the same data, in the same shape.
+// Reads a weekly count series built by lib/cargoReportData.ts. The PDF
+// exporter rasterises this component directly (embedReportChartInPdf.ts)
+// so the screen and PDF always share one chart implementation.
 //
 // Brand spec: lowercase hex only, Roboto, electric-blue bars, navy axis
 // labels, polar-gray axes/gridlines. No shadows, blurs, gradients or neon.

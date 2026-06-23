@@ -1,9 +1,8 @@
 // Jet Fuel Price Trajectory chart for Fuel Watch.
 //
 // Reads a parsed series from report.hardNumbers (via the shared
-// jetFuelTrajectory helpers) so the preview and the PDF exporter
-// always read the same data. When fewer than two valid points are
-// available the chart renders an honest empty-state card.
+// jetFuelTrajectory helpers). The PDF exporter rasterises this component
+// directly (embedReportChartInPdf.ts) so preview and PDF share one chart.
 //
 // Brand spec: lowercase hex only, Roboto, no shadows, no gradients on
 // markers, no decorative clutter.

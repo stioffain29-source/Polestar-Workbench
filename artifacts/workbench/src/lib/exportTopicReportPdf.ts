@@ -1,4 +1,7 @@
+import { createElement } from "react";
 import { format, parseISO } from "date-fns";
+import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import CargoTrendChart from "@/components/CargoTrendChart";
 import {
   createCtx,
   newPage,
@@ -25,13 +28,13 @@ import {
   POLAR,
   DUSK,
   WHITE,
-  ELECTRIC,
   SEV_COLOR,
   SEV_LABEL,
   sevKey,
   type Ctx,
   type KpiCardData,
 } from "./pdfChrome";
+import { embedReactChartInPdf } from "./embedReportChartInPdf";
 import {
   resolveReportWindow,
   filterIncidentsToWindow,
@@ -44,14 +47,7 @@ import { selectRelatedIncidents } from "./relatedIncidents";
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant } from "./topicRelevance";
-import {
-  buildCargoReportExtras,
-  formatCargoUsd,
-  cargoUsdNote,
-  cargoCommodityNote,
-  niceCargoCountMax,
-  type CargoTrendPoint,
-} from "./cargoReportData";
+import { buildCargoReportExtras } from "./cargoReportData";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
@@ -69,7 +65,6 @@ import {
   capFuelMarketSeverity,
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
-import type { JetFuelPricePoint } from "./jetFuelTrajectory";
 import {
   buildCargoSecurityRead,
   buildCargoWhatHappened,
@@ -141,293 +136,6 @@ export interface TopicReportIncident {
   location?: string | null;
 }
 
-function formatDateShortPdf(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  return `${d.getUTCDate().toString().padStart(2, "0")} ${months[d.getUTCMonth()]}`;
-}
-
-/**
- * Draw the Jet Fuel Price Trajectory chart in the PDF. Mirrors the SVG
- * version in JetFuelTrajectoryChart.tsx (line plot, electric-blue
- * trajectory, navy latest-value marker, polar-gray axes/gridlines,
- * Roboto throughout). Annotations are drawn only when supplied by data.
- */
-function drawJetFuelChart(
-  ctx: Ctx,
-  series: JetFuelPricePoint[],
-  benchmark: string,
-) {
-  const { pdf, MX, CW } = ctx;
-  const headerH = 32;
-  const chartH = 160;
-  const captionH = 14;
-  const totalH = headerH + chartH + captionH + 16;
-  ensureSpace(ctx, totalH + 10);
-
-  // Pick a display unit from the first point that has one.
-  let unit = "";
-  for (const p of series) {
-    if (p.unit) {
-      unit = p.unit;
-      break;
-    }
-  }
-
-  // Header line: benchmark + unit on the left, latest value on the right.
-  setText(pdf, NAVY);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(10);
-  pdf.text(`${benchmark}${unit ? ` (${unit})` : ""}`, MX, ctx.y + 11);
-  const last = series[series.length - 1];
-  const span = Math.max(
-    Math.max(...series.map((p) => p.value)) -
-      Math.min(...series.map((p) => p.value)),
-    Math.abs(Math.max(...series.map((p) => p.value))) * 0.02,
-    0.01,
-  );
-  const yDecimals = span >= 10 ? 0 : span >= 1 ? 1 : 2;
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(9);
-  const latestStr = `Latest ${formatDateShortPdf(last.date)}: ${last.value.toFixed(yDecimals)}${unit ? ` ${unit}` : ""}`;
-  pdf.text(latestStr, MX + CW, ctx.y + 11, { align: "right" });
-
-  // Chart plot area.
-  const plotX0 = MX + 36;
-  const plotY0 = ctx.y + headerH;
-  const plotW = CW - 36 - 6;
-  const plotH = chartH - 18;
-  const xAxisY = plotY0 + plotH;
-  const minP = Math.min(...series.map((p) => p.value));
-  const maxP = Math.max(...series.map((p) => p.value));
-  const yMin = minP - span * 0.15;
-  const yMax = maxP + span * 0.15;
-  const xAt = (i: number) => plotX0 + (i / (series.length - 1)) * plotW;
-  const yAt = (v: number) => plotY0 + (1 - (v - yMin) / (yMax - yMin)) * plotH;
-
-  // Axes.
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(1);
-  pdf.line(plotX0, plotY0, plotX0, xAxisY);
-  pdf.line(plotX0, xAxisY, plotX0 + plotW, xAxisY);
-
-  // Y gridlines + labels.
-  const yTicks = [0, 1, 2, 3].map((k) => yMin + (k / 3) * (yMax - yMin));
-  pdf.setLineWidth(0.3);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  for (const v of yTicks) {
-    const y = yAt(v);
-    pdf.line(plotX0, y, plotX0 + plotW, y);
-    pdf.text(v.toFixed(yDecimals), plotX0 - 4, y + 3, { align: "right" });
-  }
-
-  // X tick labels.
-  const tickIdx =
-    series.length <= 4
-      ? series.map((_, i) => i)
-      : [
-          0,
-          Math.floor((series.length - 1) / 3),
-          Math.floor((2 * (series.length - 1)) / 3),
-          series.length - 1,
-        ];
-  for (const i of tickIdx) {
-    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, {
-      align: "center",
-    });
-  }
-
-  // Annotations (data-supplied only).
-  for (let i = 0; i < series.length; i++) {
-    const ann = series[i].annotation;
-    if (!ann) continue;
-    setStroke(pdf, DUSK);
-    pdf.setLineWidth(0.3);
-    pdf.setLineDashPattern([2, 2], 0);
-    pdf.line(xAt(i), plotY0, xAt(i), xAxisY);
-    pdf.setLineDashPattern([], 0);
-    setText(pdf, DUSK);
-    pdf.setFontSize(7);
-    pdf.text(ann, xAt(i) + 3, plotY0 + 8);
-    pdf.setFontSize(8);
-  }
-
-  // Trajectory line.
-  setStroke(pdf, ELECTRIC);
-  pdf.setLineWidth(1.2);
-  for (let i = 1; i < series.length; i++) {
-    pdf.line(
-      xAt(i - 1),
-      yAt(series[i - 1].value),
-      xAt(i),
-      yAt(series[i].value),
-    );
-  }
-
-  // Latest-value marker — flat circle.
-  setFill(pdf, NAVY);
-  pdf.circle(xAt(series.length - 1), yAt(last.value), 2.2, "F");
-
-  // Caption below.
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  const caption = `${benchmark}, ${series.length} observations from ${formatDateShortPdf(series[0].date)} to ${formatDateShortPdf(last.date)}.`;
-  pdf.text(caption, MX, plotY0 + plotH + 38);
-
-  ctx.y = plotY0 + plotH + 38 + 12;
-}
-
-function drawJetFuelEmptyCard(ctx: Ctx, benchmark: string) {
-  // Bordered card matching JetFuelTrajectoryChart's preview empty-state:
-  // Polar Gray 1pt border, Navy title, Dusk body, Roboto, no shadow.
-  // The benchmark label is supplied from the same parser the preview
-  // uses (jetFuelBenchmarkLabel) so the two empty-states match.
-  const { pdf, MX, CW } = ctx;
-  const titleH = 14;
-  const bodyH = 18;
-  const padX = 12;
-  const padY = 12;
-  const cardH = titleH + bodyH + padY * 2;
-  ensureSpace(ctx, cardH + 8);
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(1);
-  pdf.rect(MX, ctx.y, CW, cardH, "S");
-  setText(pdf, NAVY);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(10);
-  pdf.text(benchmark, MX + padX, ctx.y + padY + 10);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(9);
-  pdf.text(
-    "Jet fuel trajectory data is not available for this reporting cycle.",
-    MX + padX,
-    ctx.y + padY + titleH + 12,
-  );
-  ctx.y += cardH + 10;
-}
-
-/**
- * Draw the Weekly Cargo Theft Trend bar chart in the PDF. Mirrors the SVG
- * version in CargoTrendChart.tsx (electric-blue bars, navy/dusk labels,
- * polar-gray axes/gridlines, integer count ticks, Roboto throughout) so the
- * screen and the PDF render the same series in the same shape.
- */
-function drawCargoTrendChart(ctx: Ctx, series: CargoTrendPoint[]) {
-  const { pdf, MX, CW } = ctx;
-  const headerH = 16;
-  const chartH = 150;
-  const captionH = 14;
-  ensureSpace(ctx, headerH + chartH + captionH + 18);
-
-  const total = series.reduce((s, d) => s + d.count, 0);
-
-  // Header: title left, total/weeks right.
-  setText(pdf, NAVY);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(10);
-  pdf.text("Weekly Cargo Theft Trend", MX, ctx.y + 11);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(9);
-  pdf.text(
-    `${total} record${total === 1 ? "" : "s"} across ${series.length} weeks`,
-    MX + CW,
-    ctx.y + 11,
-    { align: "right" },
-  );
-
-  const plotX0 = MX + 28;
-  const plotY0 = ctx.y + headerH;
-  const plotW = CW - 28 - 6;
-  const plotH = chartH - 18;
-  const xAxisY = plotY0 + plotH;
-  const yMax = niceCargoCountMax(Math.max(...series.map((d) => d.count)));
-  const ticks =
-    yMax <= 4
-      ? Array.from({ length: yMax + 1 }, (_, k) => k)
-      : [0, 1, 2, 3, 4].map((k) => (k / 4) * yMax);
-
-  const slot = plotW / series.length;
-  const barW = slot * 0.6;
-  const xAt = (i: number) => plotX0 + i * slot + slot / 2;
-  const yAt = (v: number) => plotY0 + (1 - v / yMax) * plotH;
-
-  // Axes.
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(1);
-  pdf.line(plotX0, plotY0, plotX0, xAxisY);
-  pdf.line(plotX0, xAxisY, plotX0 + plotW, xAxisY);
-
-  // Y gridlines + integer labels.
-  pdf.setLineWidth(0.3);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  for (const v of ticks) {
-    const y = yAt(v);
-    pdf.line(plotX0, y, plotX0 + plotW, y);
-    pdf.text(String(Math.round(v)), plotX0 - 4, y + 3, { align: "right" });
-  }
-
-  // Bars.
-  setFill(pdf, ELECTRIC);
-  for (let i = 0; i < series.length; i++) {
-    const h = xAxisY - yAt(series[i].count);
-    if (h > 0) pdf.rect(xAt(i) - barW / 2, yAt(series[i].count), barW, h, "F");
-  }
-
-  // X tick labels (sampled to avoid crowding).
-  const tickIdx =
-    series.length <= 6
-      ? series.map((_, i) => i)
-      : [
-          0,
-          Math.floor((series.length - 1) / 3),
-          Math.floor((2 * (series.length - 1)) / 3),
-          series.length - 1,
-        ];
-  setText(pdf, DUSK);
-  for (const i of tickIdx) {
-    pdf.text(formatDateShortPdf(series[i].date), xAt(i), xAxisY + 11, {
-      align: "center",
-    });
-  }
-
-  // Caption.
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  const caption = `In-scope cargo incidents per week, ${formatDateShortPdf(series[0].date)} to ${formatDateShortPdf(series[series.length - 1].date)}.`;
-  pdf.text(caption, MX, xAxisY + 26);
-
-  ctx.y = xAxisY + 26 + 6;
-}
-
-/**
- * Producer and Buyer Actions table. 4-column layout matching the
- * on-screen preview: Actor / Category / Action (with date) / Operational
- * Read. Header bar in Navy with white text; rows separated by a thin
- * Polar Gray rule. Each row's height is the tallest wrapped cell.
- */
 /**
  * Pre-measure the full Producer/Buyer Actions table (header + all rows +
  * trailing gap) so the caller can keep the whole block together and avoid
@@ -954,18 +662,20 @@ export async function exportTopicReportPdf(
       for (const w of fuelData.validation.warnings) renderProse(ctx, w);
     }
 
-    // Jet Fuel Price Trajectory — render only when the series has
-    // ≥2 valid dated points (the canonical data already enforces this).
+    // Jet Fuel Price Trajectory — rasterise the same React chart the preview
+    // uses so chart styling cannot drift from a hand-ported jsPDF replica.
     drawSectionHeading(ctx, "Jet Fuel Price Trajectory");
-    if (fuelData.marketData.jetFuelTrajectory.length >= 2) {
-      drawJetFuelChart(
-        ctx,
-        fuelData.marketData.jetFuelTrajectory,
-        fuelData.marketData.jetFuelBenchmarkLabel,
-      );
-    } else {
-      drawJetFuelEmptyCard(ctx, fuelData.marketData.jetFuelBenchmarkLabel);
-    }
+    ensureSpace(ctx, 220);
+    await embedReactChartInPdf(
+      ctx,
+      createElement(JetFuelTrajectoryChart, {
+        data:
+          fuelData.marketData.jetFuelTrajectory.length >= 2
+            ? fuelData.marketData.jetFuelTrajectory
+            : null,
+        benchmarkLabel: fuelData.marketData.jetFuelBenchmarkLabel,
+      }),
+    );
 
     // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
     // Operational Read, Regional Highlights, Producer and Buyer Actions)
@@ -1033,6 +743,28 @@ export async function exportTopicReportPdf(
     };
 
     if (isCargo) {
+      const cargoTrendSource = filterTopicReportIncidents(
+        incidents,
+        data.topic,
+        data.issueDate,
+      ).map((i) => ({
+        title: i.title,
+        summary: i.summary ?? null,
+        source: i.source ?? null,
+        location: i.location ?? null,
+        country: i.country ?? null,
+        occurredAt: i.occurredAt,
+      }));
+      const cargoExtras = buildCargoReportExtras(cargoTrendSource);
+      if (cargoExtras.trend.length >= 2) {
+        drawSectionHeading(ctx, "Cargo Theft Trend");
+        ensureSpace(ctx, 220);
+        await embedReactChartInPdf(
+          ctx,
+          createElement(CargoTrendChart, { data: cargoExtras.trend }),
+        );
+      }
+
       const cargoSecurity = buildCargoSecurityRead(windowIncidents);
       const cargoNode = buildLogisticsHubRead(windowIncidents);
       // Editor text always wins on the four standard analyst sections;

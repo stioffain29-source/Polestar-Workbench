@@ -1,8 +1,8 @@
 // Shared Cargo Watch report extras — the SINGLE source for the report's
 // USD cargo-loss Fast Fact, the "most stolen commodity" Fast Fact, and the
 // weekly incident-trend series. Both the on-screen preview (ReportPreview.tsx)
-// and the headless PDF exporter (exportTopicReportPdf.ts) read from here so
-// the screen and the PDF can never disagree.
+// and the PDF exporter rasterise the same chart components so the screen and
+// the PDF can never disagree.
 //
 // Honesty rules:
 //  - USD totals are source-stated only (no FX, no estimates) — see parseUsdLoss.
