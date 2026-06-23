@@ -34,7 +34,6 @@ import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import ConflictReportPreview from "@/components/ConflictReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
-import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { buildGatewayFlow, RED_SEA_GATEWAYS } from "@/lib/maritimeDirectionalFlow";
@@ -471,6 +470,7 @@ export default function ReportEditor() {
           effectiveSummaries,
         );
       } else {
+        const { exportTopicReportPdf } = await import("@/lib/exportTopicReportPdf");
         await exportTopicReportPdf(
           {
             ...pdfPayload,
