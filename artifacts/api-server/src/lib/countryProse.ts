@@ -15,12 +15,13 @@
 
 import { createHash } from "node:crypto";
 import type { CountryProseSections } from "@workspace/db";
+import {
+  isLlmAvailable,
+  openAiProseModel,
+  readOpenAiConfig,
+} from "@workspace/ingest";
 
-// gpt-5.4 is the most capable general-purpose model and prose quality is the
-// whole point of this feature; the call is cached so cost is a non-issue. A
-// generous completion budget avoids the truncated-JSON failures seen when a
-// reasoning model is given a tight token cap.
-const MODEL = "gpt-5.4";
+const MODEL = openAiProseModel();
 const REQUEST_TIMEOUT_MS = 60000;
 const MAX_COMPLETION_TOKENS = 8192;
 
@@ -85,12 +86,7 @@ export type GenerateProseOutcome =
   | { ok: true; sections: CountryProseSections; model: string }
   | { ok: false; error: string; retryAfterMs?: number };
 
-/** True when the Replit OpenAI integration env vars are present. */
-export function isLlmAvailable(): boolean {
-  return Boolean(
-    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  );
-}
+export { isLlmAvailable };
 
 // A stable identity for one incident: EVERY fact that reaches the model and could
 // change the prose. Summary, source, country and topic are included because the
@@ -398,9 +394,9 @@ function parseSections(
 }
 
 async function callOnce(input: GenerateProseInput): Promise<GenerateProseOutcome> {
-  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!base || !key) return { ok: false, error: "llm-unavailable" };
+  const cfg = readOpenAiConfig();
+  if (!cfg) return { ok: false, error: "llm-unavailable" };
+  const { baseUrl: base, apiKey: key } = cfg;
 
   const variant: ProseVariant = input.variant ?? "country";
   const systemPrompt =
@@ -559,9 +555,9 @@ export function computeIncidentSummariesFingerprint(input: {
 async function callSummariesOnce(
   incidents: ProseIncidentInput[],
 ): Promise<IncidentSummariesOutcome> {
-  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!base || !key) return { ok: false, error: "llm-unavailable" };
+  const cfg = readOpenAiConfig();
+  if (!cfg) return { ok: false, error: "llm-unavailable" };
+  const { baseUrl: base, apiKey: key } = cfg;
 
   const userPrompt = [
     "INCIDENTS (the ONLY source of facts; write one summary per numbered item):",

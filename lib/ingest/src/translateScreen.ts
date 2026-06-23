@@ -6,14 +6,16 @@
 // (b) judges whether it is a real in-scope cargo-crime incident (slop filter), and
 // (c) extracts the country and city.
 //
-// Uses the Replit OpenAI integration (AI_INTEGRATIONS_OPENAI_* env vars are
-// auto-provisioned). Self-contained fetch client with bounded concurrency,
+// Uses the shared OpenAI config (Replit AI_INTEGRATIONS_OPENAI_* or local
+// OPENAI_API_KEY). Self-contained fetch client with bounded concurrency,
 // retries with backoff, and a per-request abort timeout so a hung or unavailable
 // model degrades gracefully instead of stalling the ingest. Severity is NOT decided
 // here — the existing English classifier runs on the translated text downstream, so
 // there is a single severity authority across English and translated incidents.
 
-const MODEL = "gpt-5-mini";
+import { isLlmAvailable, openAiFastModel, readOpenAiConfig } from "./openaiConfig";
+
+const MODEL = openAiFastModel();
 const REQUEST_TIMEOUT_MS = 20000;
 // gpt-5-mini is a REASONING model — max_completion_tokens is consumed by reasoning
 // tokens before the JSON verdict is emitted. A low cap risks finish_reason="length"
@@ -37,12 +39,7 @@ export type ScreenOutcome =
   | { ok: true; verdict: ScreenVerdict }
   | { ok: false; error: string; retryAfterMs?: number };
 
-/** True when the Replit OpenAI integration env vars are present. */
-export function isLlmAvailable(): boolean {
-  return Boolean(
-    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  );
-}
+export { isLlmAvailable };
 
 const SYSTEM_PROMPT = `You screen foreign-language news items for a CARGO-CRIME intelligence feed covering ONLY the Asia-Pacific and Middle East regions.
 Return STRICT JSON: {"inScope":boolean,"titleEn":string,"summaryEn":string,"country":string|null,"city":string|null,"reason":string}.
@@ -51,9 +48,9 @@ REJECT (inScope=false, slop) ALL of: opinion/analysis/commentary/statistics/"ris
 country = canonical English country name of the incident location, or null if unclear. city = English city/place name or null. Translate titleEn/summaryEn faithfully to English. reason = <=12 words why kept/rejected.`;
 
 async function callOnce(input: ScreenInput): Promise<ScreenOutcome> {
-  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!base || !key) return { ok: false, error: "llm-unavailable" };
+  const cfg = readOpenAiConfig();
+  if (!cfg) return { ok: false, error: "llm-unavailable" };
+  const { baseUrl: base, apiKey: key } = cfg;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);

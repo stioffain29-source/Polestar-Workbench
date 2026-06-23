@@ -28,7 +28,7 @@ import type {
   IntegrationStatusResponse,
   IntegrationStatusState,
 } from "@workspace/api-zod";
-import { isLlmAvailable } from "./countryProse";
+import { isLlmAvailable, OPENAI_ENV_VARS } from "@workspace/ingest";
 import { getLiveuamapStatus } from "./liveuamap";
 import { getMaritimeSourceHealth } from "./maritimeSources";
 import { logger } from "./logger";
@@ -347,7 +347,7 @@ async function liveuamapStatus(): Promise<IntegrationStatusItem> {
 }
 
 async function openaiStatus(): Promise<IntegrationStatusItem> {
-  const envVars = ["AI_INTEGRATIONS_OPENAI_BASE_URL", "AI_INTEGRATIONS_OPENAI_API_KEY"];
+  const envVars = [...OPENAI_ENV_VARS];
   const configured = isLlmAvailable();
 
   let translated = 0;

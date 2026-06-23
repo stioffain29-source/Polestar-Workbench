@@ -1,10 +1,12 @@
-import { runTitleTranslation } from "@workspace/ingest";
+import { runTitleTranslation, loadDevEnv } from "@workspace/ingest";
 import { pool } from "@workspace/db";
 
 // Thin CLI wrapper. All logic lives in @workspace/ingest so the API server runs
 // the exact same code from the production runtime. Backfills display_title for
 // non-English incident headlines. Use --commit to write; default is a dry-run.
 // Optional --limit=<n> bounds how many null-display rows are scanned per run.
+
+loadDevEnv();
 
 async function main(): Promise<void> {
   const commit = process.argv.includes("--commit");

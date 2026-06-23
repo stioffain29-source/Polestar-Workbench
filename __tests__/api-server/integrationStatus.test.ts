@@ -32,12 +32,13 @@ jest.mock("../../artifacts/api-server/src/lib/liveuamap", () => ({
 jest.mock("../../artifacts/api-server/src/lib/maritimeSources", () => ({
   getMaritimeSourceHealth: jest.fn(async () => []),
 }));
-jest.mock("../../artifacts/api-server/src/lib/countryProse", () => ({
+jest.mock("../../lib/ingest/src/openaiConfig", () => ({
+  ...jest.requireActual("../../lib/ingest/src/openaiConfig"),
   isLlmAvailable: jest.fn(() => false),
 }));
 
 import { getIntegrationStatuses } from "../../artifacts/api-server/src/lib/integrationStatus";
-import { isLlmAvailable } from "../../artifacts/api-server/src/lib/countryProse";
+import { isLlmAvailable } from "../../lib/ingest/src/openaiConfig";
 import { getLiveuamapStatus } from "../../artifacts/api-server/src/lib/liveuamap";
 import type {
   IntegrationStatusItem,

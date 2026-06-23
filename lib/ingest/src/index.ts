@@ -44,6 +44,15 @@ export { runStrikesBackfill } from "./backfillStrikes";
 export type { StrikesBackfillSummary } from "./backfillStrikes";
 export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
+export {
+  isLlmAvailable,
+  readOpenAiConfig,
+  openAiProseModel,
+  openAiFastModel,
+  OPENAI_ENV_VARS,
+} from "./openaiConfig";
+export type { OpenAiConfig } from "./openaiConfig";
+export { loadDevEnv } from "./loadDevEnv";
 export { runResolveGoogleNewsUrls, resolveGoogleNewsUrl, isGoogleNewsRedirect } from "./googleNewsUrl";
 export type { ResolveUrlSummary } from "./googleNewsUrl";
 export {

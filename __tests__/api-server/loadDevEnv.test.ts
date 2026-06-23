@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadDevEnv } from "../../artifacts/api-server/src/lib/loadDevEnv";
+import { loadDevEnv } from "../../lib/ingest/src/loadDevEnv";
 
 const savedEnv = { ...process.env };
 

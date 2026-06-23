@@ -25,9 +25,9 @@
 
 import { sql } from "drizzle-orm";
 import { db, incidentsTable } from "@workspace/db";
-import { isLlmAvailable } from "./translateScreen";
+import { isLlmAvailable, openAiFastModel, readOpenAiConfig } from "./openaiConfig";
 
-const MODEL = "gpt-5-mini";
+const MODEL = openAiFastModel();
 const REQUEST_TIMEOUT_MS = 20000;
 // gpt-5-mini is a REASONING model: max_completion_tokens covers reasoning tokens
 // FIRST, then the visible answer. A small cap (we previously used 200) is spent
@@ -99,9 +99,9 @@ Rules: translate faithfully; preserve only facts present in the headline/summary
 Return STRICT JSON: {"titleEn": string}.`;
 
 async function callOnce(title: string, summary: string): Promise<TranslateOutcome> {
-  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!base || !key) return { ok: false, error: "llm-unavailable" };
+  const cfg = readOpenAiConfig();
+  if (!cfg) return { ok: false, error: "llm-unavailable" };
+  const { baseUrl: base, apiKey: key } = cfg;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);
@@ -204,7 +204,9 @@ export async function runTitleTranslation(
   const logLines: string[] = [];
 
   if (!isLlmAvailable()) {
-    logLines.push("title-translate: LLM unavailable (AI_INTEGRATIONS_OPENAI_* not set) — skipped");
+    logLines.push(
+      "title-translate: LLM unavailable (set AI_INTEGRATIONS_OPENAI_* or OPENAI_API_KEY) — skipped",
+    );
     return { candidates: 0, translated: 0, failed: 0, skipped: true, logLines };
   }
 
