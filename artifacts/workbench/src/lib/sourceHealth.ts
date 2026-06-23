@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { isOptionalIntegrationSource } from "@workspace/ingest";
+import { isOptionalIntegrationSource } from "@workspace/ingest/optionalIntegrations";
 import { sourceStatusClass } from "./topics";
 
 // Single source of truth for how a `sources` row's status and timestamps

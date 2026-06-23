@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
 import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired, isSourceRetrying } from "@/lib/sourceHealth";
-import { isOptionalIntegrationSource } from "@workspace/ingest";
+import { isOptionalIntegrationSource } from "@workspace/ingest/optionalIntegrations";
 import {
   adminBearerHeaders,
   adminMutationErrorMessage,

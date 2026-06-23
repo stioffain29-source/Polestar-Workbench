@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./structuredExtract": "./src/structuredExtract.ts",
     "./pngExtract": "./src/pngExtract.ts",
-    "./westPapuaExtract": "./src/westPapuaExtract.ts"
+    "./westPapuaExtract": "./src/westPapuaExtract.ts",
+    "./optionalIntegrations": "./src/optionalIntegrations.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
