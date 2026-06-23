@@ -216,6 +216,7 @@ describe("liveuamap integration status", () => {
     const item = find(await statuses(), "liveuamap");
     expect(item.status).toBe("failing_upstream");
     expect(item.summary).toContain("unreachable");
+    expect(item.summary).toContain("allowlist");
   });
 
   it("surfaces no_data when the proxy is reachable but returns nothing", async () => {

@@ -101,7 +101,7 @@ const RELIEFWEB_REPORTS_DETAIL =
 const RELIEFWEB_REPORTS_NOT_CONFIGURED_MESSAGE =
   "RELIEFWEB_APPNAME not set to an approved value — situational context disabled. ReliefWeb's v2 API returns 403 without a pre-approved appname (request one at https://apidoc.reliefweb.int/parameters#appname).";
 const LIVEUAMAP_DETAIL =
-  "Server-side proxy for the PAID Liveuamap live-map overlay (the key never reaches the browser; upstream calls are TTL-cached). The incident map works fully without it.";
+  "Server-side proxy for the PAID Liveuamap live-map overlay (the key never reaches the browser; upstream calls are TTL-cached). The incident map works fully without it. If keyed but upstream fails, Liveuamap may be blocking this server's egress IP — ask Liveuamap support to allowlist the deployment's public IP for server-to-server API access.";
 const OPENAI_DETAIL =
   "Powers AI country-report narratives and English translation of foreign-language incident headlines. Both degrade to deterministic non-AI fallbacks when absent.";
 const VESSEL_REGISTRY_DETAIL =
@@ -307,7 +307,8 @@ async function liveuamapStatus(): Promise<IntegrationStatusItem> {
         summary = "No LIVEUAMAP_API_KEY — the paid live-map overlay is disabled. The incident map is unaffected.";
         break;
       case "failing_upstream":
-        summary = "Configured, but the Liveuamap upstream is currently unreachable.";
+        summary =
+          "Configured, but Liveuamap is unreachable from this server (often an egress IP block). The map shows overlay unavailable; ask Liveuamap to allowlist the deployment IP.";
         break;
       case "no_data":
         summary = "Configured and reachable, but no events returned for the default region.";

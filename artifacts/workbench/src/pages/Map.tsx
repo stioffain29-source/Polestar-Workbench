@@ -11,6 +11,7 @@ import {
   useListMaritimeSecurityEvents,
   getListLiveuamapEventsQueryKey,
   LiveuamapRegion,
+  type LiveuamapEventsResponse,
 } from "@workspace/api-client-react";
 import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
 import { toMaritimeRow, maritimeTypeSeverityKey } from "@/lib/maritimeSecurity";
@@ -83,6 +84,36 @@ function regionLabel(slug: string): string {
     .join(" ");
 }
 
+// Explicit overlay states — a successful fetch always sets fetchedAt; failures
+// leave it null so analysts never read an empty layer as "zero live events".
+type LiveOverlayPanel =
+  | { kind: "loading" }
+  | { kind: "unavailable"; title: string; detail: string };
+
+function liveOverlayPanel(live: LiveuamapEventsResponse | undefined): LiveOverlayPanel | null {
+  if (!live) return { kind: "loading" };
+  if (!live.configured) {
+    return {
+      kind: "unavailable",
+      title: "Liveuamap overlay unavailable",
+      detail: "LIVEUAMAP_API_KEY is not configured. The curated incident map is unaffected.",
+    };
+  }
+  if (!live.fetchedAt) {
+    return {
+      kind: "unavailable",
+      title: "Liveuamap overlay unavailable",
+      detail:
+        "The server could not reach Liveuamap (often an egress IP block on paid API access). Incident markers still work. An operator should ask Liveuamap support to allowlist this deployment's public IP.",
+    };
+  }
+  return null;
+}
+
+function liveOverlayActive(live: LiveuamapEventsResponse | undefined): boolean {
+  return !!live?.configured && !!live.fetchedAt;
+}
+
 type Corroboration = {
   id: number;
   url: string;
@@ -146,6 +177,8 @@ export default function MapPage() {
       queryKey: getListLiveuamapEventsQueryKey(liveParams),
     },
   });
+  const livePanel = liveOn ? liveOverlayPanel(live) : null;
+  const liveMarkersOn = liveOn && liveOverlayActive(live);
 
   const availableCategories = useMemo<readonly string[]>(() => {
     if (view === "incidents") return INCIDENT_CATEGORIES;
@@ -294,9 +327,11 @@ export default function MapPage() {
               onClick={() => setLiveOn((on) => !on)}
               className={cn(
                 "px-4 py-2 text-xs uppercase tracking-wider font-serif font-medium border rounded-sm",
-                liveOn
-                  ? "bg-accent text-accent-foreground border-accent"
-                  : "bg-card hover:bg-muted border-border",
+                liveOn && livePanel?.kind === "unavailable"
+                  ? "bg-orange-100 text-orange-900 border-orange-200"
+                  : liveOn
+                    ? "bg-accent text-accent-foreground border-accent"
+                    : "bg-card hover:bg-muted border-border",
               )}
             >
               Live (Liveuamap)
@@ -320,13 +355,30 @@ export default function MapPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
         <div className="relative rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
-          {liveOn && live && (!live.configured || !live.fetchedAt) && (
+          {livePanel && (
             <div
-              className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 rounded-sm border border-border bg-card/95 text-[11px] font-sans text-muted-foreground shadow-none"
+              className={cn(
+                "absolute inset-0 z-[1000] flex pointer-events-none",
+                livePanel.kind === "unavailable"
+                  ? "items-center justify-center bg-background/55"
+                  : "items-start justify-center pt-3",
+              )}
+              aria-live="polite"
             >
-              {!live.configured
-                ? "Liveuamap overlay unavailable — not configured."
-                : "Liveuamap overlay unavailable — upstream unreachable."}
+              {livePanel.kind === "loading" ? (
+                <p className="rounded-sm border border-border bg-card/95 px-3 py-1.5 text-[11px] font-sans text-muted-foreground shadow-none">
+                  Checking Liveuamap overlay…
+                </p>
+              ) : (
+                <div className="pointer-events-auto mx-4 max-w-md rounded-sm border border-border bg-card px-5 py-4 text-center shadow-none">
+                  <p className="font-serif text-sm font-bold uppercase tracking-wide text-primary">
+                    {livePanel.title}
+                  </p>
+                  <p className="mt-2 text-[12px] font-sans leading-relaxed text-muted-foreground">
+                    {livePanel.detail}
+                  </p>
+                </div>
+              )}
             </div>
           )}
           <MapContainer
@@ -502,9 +554,8 @@ export default function MapPage() {
                 </CircleMarker>
               );
             })}
-            {liveOn &&
-              live?.configured &&
-              live.events.map((e) => (
+            {liveMarkersOn &&
+              live!.events.map((e) => (
                 <CircleMarker
                   key={`lua-${e.id}`}
                   center={[e.lat, e.lng]}
@@ -587,24 +638,16 @@ export default function MapPage() {
           {liveOn && (
             <div className="mt-4 pt-3 border-t border-border">
               <div className="font-serif font-bold uppercase text-primary text-sm tracking-wide mb-1">Liveuamap</div>
-              {!live ? (
-                <div className="text-[11px] font-sans text-muted-foreground">
-                  Checking live layer…
-                </div>
-              ) : !live.configured ? (
-                <div className="text-[11px] font-sans text-muted-foreground">
-                  Overlay unavailable — not configured. The incident map is unaffected.
-                </div>
-              ) : live.fetchedAt ? (
+              {livePanel?.kind === "loading" ? (
+                <div className="text-[11px] font-sans text-muted-foreground">Checking live layer…</div>
+              ) : livePanel?.kind === "unavailable" ? (
+                <div className="text-[11px] font-sans text-muted-foreground">{livePanel.detail}</div>
+              ) : live ? (
                 <div className="text-[11px] font-sans text-muted-foreground">
                   {live.events.length} live events · {regionLabel(liveRegion)}
                   {live.cached ? " · cached" : ""}
                 </div>
-              ) : (
-                <div className="text-[11px] font-sans text-muted-foreground">
-                  Overlay unavailable — upstream unreachable.
-                </div>
-              )}
+              ) : null}
             </div>
           )}
         </aside>
@@ -625,7 +668,7 @@ export default function MapPage() {
               {SEVERITY_LABELS[r]}
             </span>
           ))}
-          {liveOn && (
+          {liveMarkersOn && (
             <span className="inline-flex items-center gap-1.5">
               <span
                 className="w-2.5 h-2.5 rounded-full"
