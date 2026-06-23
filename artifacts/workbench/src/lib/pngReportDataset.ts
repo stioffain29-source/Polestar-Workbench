@@ -239,16 +239,6 @@ export interface PngReportItem {
   confidence: string;
 }
 
-export interface PngDiagnostics {
-  totalInWindow: number;
-  bySource: Array<{ source: string; count: number }>;
-  byConfidence: Array<{ confidence: string; count: number }>;
-  occurredEarlierCount: number;
-  watchlistGaps: string[];
-  thirtyDayCount: number;
-  ninetyDayCount: number;
-}
-
 export interface StructuredLocationBucket {
   key: string;
   label: string;
@@ -284,7 +274,6 @@ export interface PngReportDataset {
   businessImpactEmptyNote: string;
   businessImpact: string[];
   outlook: string;
-  diagnostics: PngDiagnostics;
   windowItems: PngReportItem[];
 }
 
@@ -420,7 +409,7 @@ function buildStructuredReportDataset(
   args: BuildArgs,
   config: StructuredTheatreConfig,
 ): PngReportDataset {
-  const { windowIncidents, thirtyDay, ninetyDay, baselineWatchlist, periodLabel } = args;
+  const { windowIncidents, baselineWatchlist, periodLabel } = args;
   const windowItems = dedupeByTitle(windowIncidents.map(toItem));
 
   // Headline highlights: the three most significant incidents this period.
@@ -523,41 +512,6 @@ function buildStructuredReportDataset(
     outlook = `Looking to the week ahead, ${provClause}${catClause}. Conditions can shift quickly around ${config.outlookVolatilityClause}, so treat any single quiet week as provisional.${watchClause}`;
   }
 
-  // --- Diagnostics (Source confidence & reporting gaps) ----------------------
-  const bySourceMap = new Map<string, number>();
-  for (const it of windowItems) {
-    const s = it.source || "Unattributed";
-    bySourceMap.set(s, (bySourceMap.get(s) ?? 0) + 1);
-  }
-  const bySource = Array.from(bySourceMap.entries())
-    .map(([source, count]) => ({ source, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const byConfMap = new Map<string, number>();
-  for (const it of windowItems) {
-    byConfMap.set(it.confidence, (byConfMap.get(it.confidence) ?? 0) + 1);
-  }
-  const byConfidence = Array.from(byConfMap.entries())
-    .map(([confidence, count]) => ({ confidence, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const coveredProvinces = new Set(windowItems.map((it) => it.province).filter(Boolean) as string[]);
-  const watchlistGaps = baselineWatchlist.filter((loc) => {
-    const prov = config.deriveProvince(loc, loc);
-    if (prov) return !coveredProvinces.has(prov);
-    return ![...coveredProvinces].some((p) => hasWord(loc, p.toLowerCase()));
-  });
-
-  const diagnostics: PngDiagnostics = {
-    totalInWindow: windowItems.length,
-    bySource,
-    byConfidence,
-    occurredEarlierCount: windowItems.filter((it) => it.occurredEarlier).length,
-    watchlistGaps,
-    thirtyDayCount: thirtyDay.length,
-    ninetyDayCount: ninetyDay.length,
-  };
-
   return {
     periodLabel,
     executiveSummary,
@@ -571,7 +525,6 @@ function buildStructuredReportDataset(
     businessImpactEmptyNote: config.businessImpactEmptyNote,
     businessImpact,
     outlook,
-    diagnostics,
     windowItems,
   };
 }
