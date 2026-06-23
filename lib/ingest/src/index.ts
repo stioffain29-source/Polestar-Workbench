@@ -149,6 +149,14 @@ export {
   isGdeltConfigured,
   isGdeltEnrichEnabled,
 } from "./gdeltEnrich";
+export {
+  GDELT_HEALTH_NAME,
+  GDELT_HEALTH_TOPIC,
+  GDELT_NOT_CONFIGURED_MESSAGE,
+  RELIEFWEB_CORROBORATION_HEALTH_NAME,
+  RELIEFWEB_REPORTS_HEALTH_NAME,
+  isOptionalIntegrationSource,
+} from "./optionalIntegrations";
 export type { GdeltEnrichSummary } from "./gdeltEnrich";
 export { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "./sourceHealth";
 export type { FeedHealth } from "./sourceHealth";

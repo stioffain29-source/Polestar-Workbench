@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { isOptionalIntegrationSource } from "@workspace/ingest";
 import { sourceStatusClass } from "./topics";
 
 // Single source of truth for how a `sources` row's status and timestamps
@@ -46,6 +47,7 @@ export function effectiveSourceStatus(s: {
 // its EFFECTIVE status is not operational.
 export function isSourceActionRequired(s: {
   status: string;
+  name?: string;
   lastSuccessAt?: string | Date | null;
   lastFailureAt?: string | Date | null;
 }): boolean {
@@ -53,7 +55,11 @@ export function isSourceActionRequired(s: {
   // "pending" is a configured-but-not-yet-validated optional integration
   // (awaiting approval / network validation), not an outage — it must stay out
   // of the Action Required panel, like "operational".
-  return eff !== "operational" && eff !== "pending";
+  if (eff === "operational" || eff === "pending") return false;
+  // Optional integrations that are intentionally off (no secret / appname yet)
+  // are documented on the Integrations panel — not operations incidents.
+  if (eff === "not_configured" && s.name && isOptionalIntegrationSource(s.name)) return false;
+  return true;
 }
 
 // Number of CONSECUTIVE failed ingest runs at which the ingest pipeline

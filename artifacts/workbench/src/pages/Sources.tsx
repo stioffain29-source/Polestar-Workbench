@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
 import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired, isSourceRetrying } from "@/lib/sourceHealth";
+import { isOptionalIntegrationSource } from "@workspace/ingest";
 import {
   adminBearerHeaders,
   adminMutationErrorMessage,
@@ -231,6 +232,12 @@ function MaritimeSourceHealthPanel() {
   );
 }
 
+function isHiddenOptionalIntegration(s: { name: string; status: string }): boolean {
+  if (!isOptionalIntegrationSource(s.name)) return false;
+  const eff = effectiveSourceStatus(s);
+  return eff === "not_configured" || eff === "pending";
+}
+
 export default function Sources() {
   const qc = useQueryClient();
   const [topic, setTopic] = useState("");
@@ -250,14 +257,16 @@ export default function Sources() {
 
   const sources = useMemo(
     () =>
-      allSources.filter(
-        (s) =>
-          (!topic || s.topic === topic) &&
-          (!status ||
-            (status === "retrying"
-              ? isSourceRetrying(s)
-              : effectiveSourceStatus(s) === status)),
-      ),
+      allSources
+        .filter((s) => !isHiddenOptionalIntegration(s))
+        .filter(
+          (s) =>
+            (!topic || s.topic === topic) &&
+            (!status ||
+              (status === "retrying"
+                ? isSourceRetrying(s)
+                : effectiveSourceStatus(s) === status)),
+        ),
     [allSources, topic, status],
   );
 

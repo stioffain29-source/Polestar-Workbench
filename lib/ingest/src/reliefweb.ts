@@ -588,10 +588,11 @@ async function registerHealth(opts: {
             name: "ReliefWeb (UN OCHA)",
             url: "https://reliefweb.int",
             ok: false,
-            error: "ReliefWeb corroboration query failed",
+            error:
+              "Awaiting appname approval and production network validation — ReliefWeb corroboration query failed",
           },
         ],
-        { sourceType: "api", reliability: 5, notes },
+        { sourceType: "api", reliability: 5, notes, pending: true },
       );
     } else if (opts.usableData) {
       await recordSourceHealth(

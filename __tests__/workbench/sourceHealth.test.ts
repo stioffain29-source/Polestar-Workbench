@@ -144,6 +144,36 @@ describe("action-required derivation", () => {
       isSourceActionRequired({ status: "operational", lastSuccessAt: later, lastFailureAt: null }),
     ).toBe(false);
   });
+
+  it("does not flag an intentionally off optional integration", () => {
+    expect(
+      isSourceActionRequired({
+        name: "ReliefWeb (UN OCHA)",
+        status: "not_configured",
+      }),
+    ).toBe(false);
+    expect(
+      isSourceActionRequired({
+        name: "GDELT Conflict Events",
+        status: "not_configured",
+      }),
+    ).toBe(false);
+    expect(
+      isSourceActionRequired({
+        name: "ReliefWeb Situational Reports (UN OCHA)",
+        status: "pending",
+      }),
+    ).toBe(false);
+  });
+
+  it("still flags a manually listed source that is not configured", () => {
+    expect(
+      isSourceActionRequired({
+        name: "Some future RSS feed",
+        status: "not_configured",
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("retrying derivation (early-warning, not action-required)", () => {

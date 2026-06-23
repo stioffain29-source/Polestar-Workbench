@@ -2,6 +2,12 @@ import { db, incidentsTable } from "@workspace/db";
 import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { maxSeverity, severityFromFatalities, type Severity } from "./severity";
 import type { IngestOptions } from "./types";
+import { recordSourceHealth } from "./sourceHealth";
+import {
+  GDELT_HEALTH_NAME,
+  GDELT_HEALTH_TOPIC,
+  GDELT_NOT_CONFIGURED_MESSAGE,
+} from "./optionalIntegrations";
 
 // ===========================================================================
 // GDELT precision-enrichment pass (ADDITIVE — never replaces the keyword feed).
@@ -397,6 +403,46 @@ function noop(reason: GdeltEnrichSummary["reason"], commit: boolean, logLines: s
   };
 }
 
+async function registerGdeltHealth(opts: {
+  configured: boolean;
+  disabled?: boolean;
+  feedOk?: boolean;
+  usableData?: boolean;
+}): Promise<void> {
+  const notes =
+    "GDELT Conflict Events — additive precision layer over flashpoint incidents (sub-national geo, confirmed fatalities, named actors). Auto-monitored each ingest run.";
+  const url = "https://gdeltcloud.com";
+  if (!opts.configured) {
+    const error = opts.disabled
+      ? "GDELT_ENRICH_ENABLED=false — enrichment switched off; the base flashpoint feed is unaffected."
+      : GDELT_NOT_CONFIGURED_MESSAGE;
+    await recordSourceHealth(
+      GDELT_HEALTH_TOPIC,
+      [{ name: GDELT_HEALTH_NAME, url, ok: false, error }],
+      { sourceType: "api", reliability: 4, notes, notConfigured: true },
+    );
+  } else if (!opts.feedOk) {
+    await recordSourceHealth(
+      GDELT_HEALTH_TOPIC,
+      [
+        {
+          name: GDELT_HEALTH_NAME,
+          url,
+          ok: false,
+          error: "GDELT upstream query failed — retrying on the next enrichment run",
+        },
+      ],
+      { sourceType: "api", reliability: 4, notes, pending: true },
+    );
+  } else if (opts.usableData) {
+    await recordSourceHealth(
+      GDELT_HEALTH_TOPIC,
+      [{ name: GDELT_HEALTH_NAME, url, ok: true, error: null }],
+      { sourceType: "api", reliability: 4, notes },
+    );
+  }
+}
+
 type Candidate = {
   id: number;
   country: string;
@@ -424,11 +470,13 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
 
   if (!enabled()) {
     log("GDELT_ENRICH_ENABLED=false — skipping (no QU spent).");
+    if (commit) await registerGdeltHealth({ configured: false, disabled: true });
     return noop("disabled", commit, logLines);
   }
   const apiKey = process.env["GDELT_CLOUD_API_KEY"];
   if (!apiKey) {
     log("GDELT_CLOUD_API_KEY not set — skipping (no QU spent).");
+    if (commit) await registerGdeltHealth({ configured: false });
     return noop("no-api-key", commit, logLines);
   }
 
@@ -674,6 +722,14 @@ export async function runGdeltEnrich(opts: IngestOptions = {}): Promise<GdeltEnr
       .where(inArray(incidentsTable.id, [...examinedIds]));
   }
   log(`Committed ${updates.length} enrichment update(s); stamped ${examinedIds.size} examined row(s).`);
+
+  if (commit) {
+    await registerGdeltHealth({
+      configured: true,
+      feedOk: fetchOk || matched > 0,
+      usableData: matched > 0,
+    });
+  }
 
   return {
     provider: "gdelt",

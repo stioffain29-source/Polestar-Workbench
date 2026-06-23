@@ -21,6 +21,8 @@ import {
   maxSeverity,
   SEVERITY_RANK,
   isReliefWebConfigured,
+  isGdeltConfigured,
+  GDELT_NOT_CONFIGURED_MESSAGE,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
   type Severity,
 } from "@workspace/ingest";
@@ -789,12 +791,31 @@ export async function runDataMigrations(): Promise<void> {
             consecutive_failures = 0,
             last_success_at = NULL,
             last_failure_at = NULL
-        WHERE name = 'ReliefWeb (UN OCHA)' AND status <> 'not_configured'
+        WHERE name IN ('ReliefWeb (UN OCHA)', 'ReliefWeb Situational Reports (UN OCHA)')
+          AND status <> 'not_configured'
       `);
       if ((relabel.rowCount ?? 0) > 0) {
         logger.info(
           { rows: relabel.rowCount ?? 0 },
           "runDataMigrations: relabelled unconfigured ReliefWeb source rows to not_configured",
+        );
+      }
+    }
+
+    if (!isGdeltConfigured()) {
+      const relabel = await db.execute(sql`
+        UPDATE sources
+        SET status = 'not_configured',
+            error_message = ${GDELT_NOT_CONFIGURED_MESSAGE},
+            consecutive_failures = 0,
+            last_success_at = NULL,
+            last_failure_at = NULL
+        WHERE name = 'GDELT Conflict Events' AND status <> 'not_configured'
+      `);
+      if ((relabel.rowCount ?? 0) > 0) {
+        logger.info(
+          { rows: relabel.rowCount ?? 0 },
+          "runDataMigrations: relabelled unconfigured GDELT source rows to not_configured",
         );
       }
     }

@@ -25,3 +25,16 @@ export function effectiveSourceStatusSql() {
     end
   )`;
 }
+
+// Optional integrations (GDELT, ReliefWeb) that are intentionally off or still
+// awaiting approval. These must not appear in dashboard source alerts.
+export function optionalIntegrationNoiseSql() {
+  return sql`(
+    ${sourcesTable.name} in (
+      'GDELT Conflict Events',
+      'ReliefWeb (UN OCHA)',
+      'ReliefWeb Situational Reports (UN OCHA)'
+    )
+    and ${sourcesTable.status} in ('not_configured', 'pending')
+  )`;
+}

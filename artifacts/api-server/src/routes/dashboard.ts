@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, incidentsTable, sourcesTable, reportsTable } from "@workspace/db";
 import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { defaultRelevanceCondition } from "../lib/relevanceFilter";
-import { effectiveSourceStatusSql } from "../lib/sourceHealthSql";
+import { effectiveSourceStatusSql, optionalIntegrationNoiseSql } from "../lib/sourceHealthSql";
 
 const router: IRouter = Router();
 
@@ -87,7 +87,12 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
   const sourceAlerts = await db
     .select()
     .from(sourcesTable)
-    .where(sql`${effStatus} <> 'operational'`)
+    .where(
+      and(
+        sql`${effStatus} <> 'operational'`,
+        sql`not ${optionalIntegrationNoiseSql()}`,
+      ),
+    )
     .orderBy(desc(sourcesTable.lastFailureAt))
     .limit(8);
 
