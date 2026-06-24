@@ -1,18 +1,38 @@
 ---
-name: Workbench admin-token gate (client/server contract)
-description: Why the workbench TokenGate must VALIDATE the operator token, not just store any string, once read endpoints are behind requireAdminToken.
+name: Workbench owner-only auth (Replit Auth) + admin-token contract
+description: The workbench is now PRIVATE to the owner via Replit Auth (OIDC); requireOwner gates all data routers; admin token still gates sources mutations. Read order matters; session is cookie-first.
 ---
 
-CURRENT STATE (decision): the workbench is intentionally PUBLIC — no login wall,
-anyone with the link can view AND edit. A security task once gated the READ
-endpoints (dashboard overview, reports, sources) plus most WRITES behind
-`requireAdminToken` and added a client login screen; the user explicitly
-reverted that ("like before"). Only `POST /api/admin/ingest` and the `sources`
-create/update/delete mutations remain token-gated (those predate that task). Do
-NOT re-introduce a login gate or token-gate the read/edit routes unless the user
-asks. This preference is also recorded in `replit.md`.
+CURRENT STATE (decision, supersedes the old "keep it public" note): the
+workbench is PRIVATE to the OWNER ONLY via "Sign in with Replit" (Replit Auth,
+OIDC+PKCE). The user explicitly asked for this, reversing the earlier public
+decision. Shape:
 
-The rest of this file is the lesson to apply IF auth is ever re-added.
+- `authMiddleware` runs before the router and hydrates `req.session`/`req.user`
+  from the session cookie. `requireOwner` gates ALL data routers (401 if not
+  signed in, 403 if signed in but not the owner).
+- Public/ungated routes, mounted BEFORE `requireOwner`: `GET /api/healthz`,
+  `GET /api/access` → `{authenticated, allowed}`, the `/api/auth/*`
+  login/callback/logout flow, and the pre-existing token-gated
+  `POST /api/admin/ingest` + backfill. Keep new public/admin-token-only routes
+  ahead of `requireOwner` or they become owner-only too.
+- Owner identity: `ensureOwnerClaim(userId)` (advisory-lock, first-login-wins)
+  sets `users.is_owner`; an `ALLOWED_USER_IDS` env allowlist overrides the claim.
+  `isAllowedUser` / `requireOwner` live in `lib/ownerAccess.ts`.
+- **Bearer/cookie collision (the trap):** the api-client sends the admin token as
+  `Authorization: Bearer`. `getSessionId` MUST read the cookie FIRST, then fall
+  back to Bearer — otherwise the admin token shadows the owner's session and the
+  owner is treated as anonymous. The owner edits by being logged in (cookie) AND
+  pasting the admin token; both travel together, cookie wins for the session.
+- `requireAdminToken` on `sources` mutations is UNCHANGED — those routes now sit
+  behind BOTH `requireOwner` and the token, which is fine because the owner is
+  always logged in when editing.
+
+Do NOT re-open the app to the public without the user asking. This is also in
+`replit.md` user preferences.
+
+The rest of this file is the older lesson, still useful IF the admin-token gate
+is ever changed.
 
 The gate is keyed on the single `INGEST_ADMIN_TOKEN` secret
 (`artifacts/api-server/src/lib/adminAuth.ts`); the browser client attaches it as

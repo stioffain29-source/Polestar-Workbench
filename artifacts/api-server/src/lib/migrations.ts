@@ -810,6 +810,37 @@ export async function runDataMigrations(): Promise<void> {
       )
     `);
 
+    // Schema: Replit Auth (OIDC) session + user store. The workbench is private
+    // to a single owner; these tables back the login session and the owner claim
+    // (users.is_owner). drizzle push only reaches dev, so the prod primary gains
+    // them here on boot. All idempotent (IF NOT EXISTS). is_owner is added via a
+    // separate ALTER so an existing users table (without the column) is upgraded.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS sessions (
+        sid varchar PRIMARY KEY,
+        sess jsonb NOT NULL,
+        expire timestamptz NOT NULL
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON sessions (expire)
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        email varchar UNIQUE,
+        first_name varchar,
+        last_name varchar,
+        profile_image_url varchar,
+        is_owner boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner boolean NOT NULL DEFAULT false`,
+    );
+
     // Relabel: when ReliefWeb has no APPROVED appname, its Source Health rows must
     // not read as "operational". Earlier builds registered the corroboration pass
     // as operational regardless of configuration, so existing prod rows can carry

@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
+import accessRouter from "./access";
 import incidentsRouter from "./incidents";
 import strikesRouter from "./strikes";
 import sourcesRouter from "./sources";
@@ -21,12 +23,25 @@ import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
 import cardsRouter from "./cards";
+import { requireOwner } from "../lib/ownerAccess";
 
 const router: IRouter = Router();
 
+// Public routes (no owner gate):
+//  - health: deployment health checks
+//  - auth: the login/callback/logout + session probe flow itself
+//  - access: lets the browser learn whether the session is the owner
+//  - admin/backfill: token-gated (requireAdminToken) for external schedulers
+//    and curl, which authenticate with INGEST_ADMIN_TOKEN, not a browser session
 router.use(healthRouter);
+router.use(authRouter);
+router.use(accessRouter);
 router.use(adminRouter);
 router.use(backfillRouter);
+
+// Everything below is private to the authenticated owner.
+router.use(requireOwner);
+
 router.use(incidentsRouter);
 router.use(strikesRouter);
 router.use(sourcesRouter);

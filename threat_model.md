@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Polestar Advisory Workbench is a public, browser-based intelligence workbench backed by an Express 5 API and PostgreSQL. The production-reachable surface is the React workbench in `artifacts/workbench/src` and the API mounted at `/api` from `artifacts/api-server/src`. The deployment is public, so every unauthenticated route is internet-reachable unless explicitly gated in server code.
+Polestar Advisory Workbench is a browser-based intelligence workbench backed by an Express 5 API and PostgreSQL, now PRIVATE to the owner via "Sign in with Replit" (Replit Auth, OIDC+PKCE). The production-reachable surface is the React workbench in `artifacts/workbench/src` and the API mounted at `/api` from `artifacts/api-server/src`. The deployment is internet-reachable, so every route is reachable by anonymous clients unless gated in server code: `requireOwner` gates all data routers, leaving only `GET /api/healthz`, `GET /api/access`, and the `/api/auth/*` login flow public.
 
 ## Assets
 
@@ -24,14 +24,14 @@ Polestar Advisory Workbench is a public, browser-based intelligence workbench ba
 
 - **Production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/routes/*`, `artifacts/workbench/src/App.tsx`
 - **Highest-risk code areas:** mutating API routes in `routes/incidents.ts`, `routes/reports.ts`, `routes/strikes.ts`, `routes/countries.ts`, `routes/baselines.ts`; operational aggregation in `routes/dashboard.ts`
-- **Privileged boundary:** `requireAdminToken` (backed by `INGEST_ADMIN_TOKEN`) gates admin ingest, source mutations, backfill, and all workbench write routes; read routes remain public
+- **Privileged boundaries:** `requireOwner` (backed by Replit Auth session + `users.is_owner` / `ALLOWED_USER_IDS`) gates ALL data routers — every read and write — so only the owner's signed-in session reaches them; `requireAdminToken` (backed by `INGEST_ADMIN_TOKEN`) additionally gates admin ingest, source mutations, and backfill. Only `GET /api/healthz`, `GET /api/access`, and `/api/auth/*` are public.
 - **Dev-only area to usually ignore:** `artifacts/mockup-sandbox`
 
 ## Threat Categories
 
 ### Spoofing / Broken Access Control
 
-The application currently exposes a public workbench with no user authentication layer in the browser and only selective token checks in the API. Any route that changes operational data or exposes internal-only workbench data must enforce server-side authorization. Possession of the public URL must never be treated as proof of authorization.
+The application requires a Replit Auth (OIDC) session and owner authorization (`requireOwner`) for every data route; the browser gate is a convenience only and is not the security boundary. Any route that reads or changes operational data must enforce server-side authorization. Possession of the URL — or merely holding a valid Replit session for a non-owner account — must never be treated as proof of authorization.
 
 ### Tampering
 
@@ -47,4 +47,4 @@ Operational routes that trigger ingestion or expensive broad queries must remain
 
 ### Elevation of Privilege
 
-The central privilege boundary is the difference between public read access, internal operational read access, and administrative write actions. The API must not allow anonymous users to cross from public viewer to operator or admin capabilities by calling endpoints directly.
+The central privilege boundary is the difference between an anonymous/non-owner caller and the authenticated owner, and between owner read access and administrative (token-gated) write actions. The API must not allow anonymous or non-owner users to cross into owner or admin capabilities by calling endpoints directly.

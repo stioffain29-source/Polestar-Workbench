@@ -17,3 +17,4 @@ export * from "./maritimeVesselSightings";
 export * from "./maritimeSecurityEvents";
 export * from "./socialWatchItems";
 export * from "./socialRaw";
+export * from "./auth";

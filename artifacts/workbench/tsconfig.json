@@ -21,6 +21,9 @@
     },
     {
       "path": "../../lib/strike-targets"
+    },
+    {
+      "path": "../../lib/replit-auth-web"
     }
   ]
 }
