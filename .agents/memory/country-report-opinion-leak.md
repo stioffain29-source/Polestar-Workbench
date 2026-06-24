@@ -47,3 +47,19 @@ deliberately NOT soft-signal words** — otherwise every support item rescues
 itself. Keep blotter excludes SUSPECT-anchored (`apprehend…suspect` /
 `suspect…rescued|held captive`), never a bare "rescued by police" (that would
 drop a real hostage rescue). Same frontend authority → no version bump.
+
+**Acronym-rescue trap (culture / peace / music / mourning classes):**
+`COUNTRY_HARD_SECURITY_RE` COUNTS the bare armed-group acronyms (`tpnpb`, `opm`),
+so any exclude gated on `!HARD_SECURITY` is silently rescued the moment a noise
+piece merely NAMES the group — which is exactly how a cultural op-ed, a "path of
+peace" surrender story, and a TPNPB mourning notice leaked. **Fix:** gate these
+new drop guards on a SEPARATE rescue set (`COUNTRY_CONCRETE_INCIDENT_RE` /
+`COUNTRY_FRESH_ATTACK_RE`) that OMITS the acronyms AND actor nouns AND bare
+"armed" (a surrender piece says "armed group laid down weapons"). Mourning /
+obituary drops use the FRESH-attack set (no death words — an obituary inherently
+names a death). Watch homonyms when enumerating incident verbs: `protest\w*`
+matches Bahasa `protestan` (the Protestant faith), `stab\w*` matches
+`stable/stability`, bare `march` is the calendar month — enumerate suffixes /
+qualify instead. **"OPM" is also a music homonym** (Original Pilipino Music) →
+an entertainment-feature drop (album/festival/orchestral/headline). Verify by
+replaying the REAL live rows through the actual `isCountryRelevant`.

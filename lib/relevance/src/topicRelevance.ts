@@ -1800,6 +1800,60 @@ const COUNTRY_HARD_SECURITY_RE = new RegExp(
   "i",
 );
 
+// Concrete INCIDENT signal used to RESCUE the culture / peace / entertainment
+// drops below. Mirrors the soft security lexicon but deliberately OMITS the bare
+// group acronyms (tpnpb / opm) and the bare actor words (militant / insurgent /
+// rebel / separatist): a peace, cultural or music story routinely NAMES the
+// group or genre without being a fresh incident, so the name alone must not
+// rescue it. That naming is exactly how this noise slipped past
+// COUNTRY_HARD_SECURITY_RE, which DOES count the acronyms.
+// NB: `protest(?:…)?` is enumerated, NOT `protest\w*`, so it cannot match
+// "protestan" (Bahasa for the Protestant faith — a religion named in a culture
+// piece, not a demonstration). `stab(?:…)?` likewise avoids "stable/stability",
+// and bare "march" is qualified (the calendar month must not rescue anything).
+const COUNTRY_CONCRETE_INCIDENT_RE =
+  // NB: bare "armed" is intentionally OMITTED — a peace/surrender piece routinely
+  // says "armed group laid down weapons", which must NOT rescue it; a real attack
+  // still carries shoot/clash/raid/ambush/etc.
+  /\b(attack\w*|gunm[ae]n|shoot|shot|shooting|gunfire|gunshot|opened fire|gunned down|firefight|gun battle|fighting|clash\w*|riot\w*|unrest|protest(?:s|er|ers|ing|ed|or|ors)?|demonstrat\w*|rally|rallies|marchers?|march(?:ing|ed)|(?:protest|street|mass|peaceful|wage|subsidy|fuel|workers'?|hunger|silent) march|march (?:on|against|over|through|to|for)|picket|walkout|blockade|roadblock|block access|ambush\w*|raid\w*|arson|explosion|blast|bomb\w*|grenade|ied|stab(?:s|bed|bing)?|machete|kidnap\w*|abduct\w*|hostage|loot\w*|killed|dead|fatal|wounded|injur\w*|casualt\w*|massacre|curfew|crackdown|displaced|evacuat\w*|theft|robber\w*|extort\w*|sabotage)\b/i;
+
+// FRESH-attack signal for the mourning-announcement drop ONLY. A mourning /
+// obituary piece inherently names a death, so "killed / dead / fatal / wounded"
+// must NOT rescue it — only an actual reported attack (the incident itself)
+// keeps it. Hence this is COUNTRY_CONCRETE_INCIDENT_RE minus the death words.
+const COUNTRY_FRESH_ATTACK_RE =
+  /\b(attack\w*|ambush\w*|shoot|shot|shooting|gunfire|gunshot|opened fire|gunned down|firefight|gun battle|clash\w*|raid\w*|arson|explosion|blast|bomb\w*|grenade|ied|stab(?:s|bed|bing)?|machete|kidnap\w*|abduct\w*|hostage|riot\w*|massacre|loot\w*)\b/i;
+
+// CULTURAL / heritage / spiritual FEATURE — a reflective piece on customary
+// spiritual values, adat (customary-law) revitalisation or cultural identity.
+// Not a security EVENT. Deliberately narrow PHRASES so a land-rights protest by
+// "customary landowners" (a real public-order incident) is NOT caught. English
+// and Bahasa Indonesia forms are both matched because the haystack carries the
+// record's RAW (untranslated) title/summary.
+const COUNTRY_CULTURE_FEATURE_RE =
+  /\b(?:nilai spiritual|spiritual values?|customary (?:spiritual|cultural)|adat dan budaya|budaya dan adat|revitalisasi adat|cultural (?:values|heritage|identity|revitali[sz]ation)|customary values|warisan budaya)\b/i;
+
+// PEACE / surrender / reconciliation STORY — insurgents "choose the path of
+// peace", lay down their arms, take a peace pledge, or are said to "inspire new
+// hope". A defection / reconciliation feature, not an incident. The bare group
+// acronyms (tpnpb / opm) must NOT rescue it (see COUNTRY_CONCRETE_INCIDENT_RE).
+const COUNTRY_PEACE_DEFECTION_RE =
+  /\b(?:path of peace|lay(?:s|ing)? down (?:their |its )?(?:arms|weapons)|laid down (?:their |its )?(?:arms|weapons)|menyerahkan diri|ikrar damai|peace (?:pledge|pact|deal|accord|agreement)|reconciliation|kembali ke (?:nkri|pangkuan)|turun gunung|inspires? new hope)\b/i;
+
+// ENTERTAINMENT / music coverage — an album, concert, orchestral festival or
+// film. "OPM" here is frequently "Original Pilipino Music", not the Free Papua
+// Movement, so a music story is mis-attributed to West Papua via the acronym;
+// the acronym must not rescue it (see COUNTRY_CONCRETE_INCIDENT_RE).
+const COUNTRY_ENTERTAINMENT_RE =
+  /\b(?:album|songs?|setlist|discograph\w*|concert|orchestral|symphony|reimagine[ds]? (?:their|its)|music festival|festival lineup|vocalist|chart[- ]?topping|billboard hot|box office|film festival|movie premiere|streaming series)\b/i;
+
+// MOURNING / condolence ANNOUNCEMENT — a group "announces national mourning",
+// an obituary or a memorial notice. Ceremonial, not a fresh incident. Requires
+// the ANNOUNCEMENT framing so a real "village mourns 5 killed in a raid" (which
+// carries a fresh-attack word) is NOT caught.
+const COUNTRY_MOURNING_ANNOUNCEMENT_RE =
+  /\b(?:announce\w*|umumkan|mengumumkan|declare[ds]?|menyatakan)\b.{0,30}\b(?:mourning|duka(?: nasional)?|berkabung)\b|\b(?:national mourning|duka nasional|hari (?:berkabung|duka)|berkabung nasional|belasungkawa|obituary|memorial service)\b/i;
+
 /**
  * Country reports allow any operational SECURITY record that mentions the
  * country context. They strip the shared general-news exclusions above and,
@@ -1873,6 +1927,32 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // apprehended, a captive rescued by police) unless a hard security signal is
   // present (so "police apprehend armed robbery gang" survives).
   if (COUNTRY_POLICE_PROCESS_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
+  }
+  // Drop CULTURAL / heritage / spiritual FEATURES (a reflective piece on
+  // customary spiritual values or adat revitalisation) unless a concrete
+  // incident signal is present — these are background, not events.
+  if (COUNTRY_CULTURE_FEATURE_RE.test(text) && !COUNTRY_CONCRETE_INCIDENT_RE.test(text)) {
+    return false;
+  }
+  // Drop PEACE / surrender / reconciliation STORIES (insurgents choose "the path
+  // of peace", lay down arms, a peace pledge) unless a concrete incident signal
+  // is present. Gated on COUNTRY_CONCRETE_INCIDENT_RE — NOT HARD_SECURITY — so
+  // the bare group acronym (tpnpb / opm) the story names cannot rescue it.
+  if (COUNTRY_PEACE_DEFECTION_RE.test(text) && !COUNTRY_CONCRETE_INCIDENT_RE.test(text)) {
+    return false;
+  }
+  // Drop ENTERTAINMENT / music coverage (an album, concert, orchestral festival)
+  // unless a concrete incident signal is present. "OPM" is often "Original
+  // Pilipino Music", so the acronym must not rescue it.
+  if (COUNTRY_ENTERTAINMENT_RE.test(text) && !COUNTRY_CONCRETE_INCIDENT_RE.test(text)) {
+    return false;
+  }
+  // Drop MOURNING / condolence ANNOUNCEMENTS (a group announces national
+  // mourning, an obituary, a memorial notice) unless a FRESH attack word is
+  // present. A mourning piece inherently names a death, so "killed / dead" must
+  // NOT rescue it — only a reported fresh attack (the incident) keeps it.
+  if (COUNTRY_MOURNING_ANNOUNCEMENT_RE.test(text) && !COUNTRY_FRESH_ATTACK_RE.test(text)) {
     return false;
   }
   return true;
