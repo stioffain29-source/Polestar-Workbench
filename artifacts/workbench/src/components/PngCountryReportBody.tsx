@@ -81,11 +81,12 @@ function SeverityChip({ item }: { item: PngReportItem }) {
       style={{
         background: color,
         color: "#fff",
-        // Caps sit on the baseline with no descenders, so a flex-centred line box
-        // leaves them optically high. Nudge the label down by ~half the cap height
-        // (extra top padding) so the uppercase text reads vertically centred. The
-        // PDF export resets chip padding to 0, so this never leaks into the export.
-        padding: "7px 10px 0",
+        // Keep lineHeight at 1 so flex align-items:center centres the actual
+        // glyph line box. (Setting lineHeight equal to the chip height instead
+        // centres the font em-box, which leaves the descender-less all-caps
+        // label sitting visibly high.) Vertical padding stays symmetric (0) so
+        // the centred line box is not pushed off-centre.
+        padding: "0 10px",
         minWidth: 72,
         height: 22,
         lineHeight: 1,
