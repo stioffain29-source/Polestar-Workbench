@@ -1707,6 +1707,19 @@ const COUNTRY_PR_EVENT_RE =
 const COUNTRY_EXPLAINER_NOISE_RE =
   /\b(explains?|explained|explainer|breaks? down|what (you )?need to know|here'?s what|fact[- ]?check|backgrounder|op[- ]?ed|opinion piece)\b.{0,40}\b(law|laws|history|culture|tradition|custom|system|policy|act|bill)\b|\b(law|laws|history|culture|tradition|custom|system|policy|act|bill)\b.{0,40}\b(explained|explainer)\b/i;
 
+// Rhetorical / advocacy OP-ED framing: a headline posed as a "for whose
+// benefit" policy question ("development for whom?", "untuk siapa?", "who
+// benefits?") is commentary, not a concrete security EVENT. A country security
+// aggregate lists incidents, not debate pieces — e.g. a student op-ed
+// questioning a spaceport and "militarisation" that only cites a HISTORICAL
+// massacre as collective memory is not this week's incident. The English and
+// Bahasa Indonesia ("untuk siapa") forms are both matched because the haystack
+// carries the record's RAW (untranslated) title/summary. Dropped UNLESS the
+// record also carries a hard security signal, so a genuine violent event framed
+// as a question ("gunmen kill five — justice for whom?") still survives.
+const COUNTRY_OPINION_DEBATE_RE =
+  /\b(for whom|untuk siapa|who benefits|whose benefits?|benefits? whom)\b/i;
+
 // Scraped-aggregator junk: a YouTube-style video-id signature "(vFetqxZnwf)"
 // left in a syndicated headline — a 9–14 char token from [A-Za-z0-9_-] with
 // an internal lower→UPPER transition inside parentheses. The length floor
@@ -1779,6 +1792,12 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // record carries a hard security signal — a security aggregate lists
   // EVENTS, not background pieces about laws or institutions.
   if (COUNTRY_EXPLAINER_NOISE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
+  }
+  // Drop rhetorical "for whose benefit" advocacy op-eds (a development/policy
+  // debate posed as a question) UNLESS the record carries a hard security
+  // signal — the aggregate lists incidents, not commentary.
+  if (COUNTRY_OPINION_DEBATE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
     return false;
   }
   // Drop unambiguous sports-SPECTACLE coverage (World Cup, Olympics) unless a
