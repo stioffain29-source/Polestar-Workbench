@@ -269,6 +269,31 @@ export function resolveActiveCountryWindow(
 }
 
 /**
+ * The 7-day window immediately BEFORE the current reporting window, drawn from
+ * the 30-day pull. Used by the structured brief's "What Changed This Week"
+ * delta so the report can compare this week against the prior week WITHOUT a
+ * second feed query. The current window is the rolling 7 days ending on the
+ * issue date (issueDate-6 .. issueDate); the previous window is the 7 days
+ * before that (issueDate-13 .. issueDate-7), end-of-day inclusive so a record
+ * stored with a real wall-clock time on the boundary day still counts.
+ * Returns the country-relevant records already partitioned into `thirtyDay`.
+ */
+export function resolvePreviousCountryWindow(
+  layers: CountryLayerBuckets,
+  issueDate: string,
+): CountryFastFactsIncident[] {
+  let end: Date;
+  try { end = parseISO(issueDate); } catch { end = new Date(); }
+  if (isNaN(end.getTime())) end = new Date();
+  const prevStartMs = subDays(end, 13).getTime();
+  const prevEndMs = endOfDay(subDays(end, 7)).getTime();
+  return layers.thirtyDay.filter((r) => {
+    const ms = msOrNull(r.occurredAt);
+    return ms !== null && ms >= prevStartMs && ms <= prevEndMs;
+  });
+}
+
+/**
  * For each watchlist entry on the country baseline, count how many
  * records in each bucket matched the entry's tokens. Matching is
  * case-insensitive substring match against incident.location, with

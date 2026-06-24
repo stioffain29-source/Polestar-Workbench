@@ -54,7 +54,7 @@ import {
 } from "@/lib/maritimeSecurity";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
+import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 
 // Brand palette (lowercase per brand spec).
@@ -453,6 +453,7 @@ export default function CountryReport() {
     if (!structuredTheatre) return null;
     const args = {
       windowIncidents: active.incidents as PngSourceIncident[],
+      previousWindowIncidents: resolvePreviousCountryWindow(layers, issueDate) as PngSourceIncident[],
       thirtyDay: layers.thirtyDay as PngSourceIncident[],
       ninetyDay: layers.ninetyDay as PngSourceIncident[],
       baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
@@ -461,7 +462,7 @@ export default function CountryReport() {
     return structuredTheatre === "westPapua"
       ? buildWestPapuaReportDataset(args)
       : buildPngReportDataset(args);
-  }, [structuredTheatre, active, layers, baseline]);
+  }, [structuredTheatre, active, layers, baseline, issueDate]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same

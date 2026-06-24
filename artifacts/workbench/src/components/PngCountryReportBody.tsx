@@ -1,8 +1,10 @@
 import { createContext, useContext } from "react";
 import { format } from "date-fns";
 import type {
+  LocationWatchlistEntry,
   PngReportDataset,
   PngReportItem,
+  ReportingConfidence,
   StructuredLocationAugmentation,
   StructuredLocationBucket,
 } from "@/lib/pngReportDataset";
@@ -78,6 +80,12 @@ function SeverityChip({ item }: { item: PngReportItem }) {
   const color = SEV_COLOR[item.severity] ?? "#999";
   return (
     <span
+      data-sev-chip="true"
+      data-sev-label={item.severityLabel}
+      data-sev-color={color}
+      data-sev-height="22"
+      data-sev-min-width="72"
+      data-sev-pad-x="10"
       style={{
         background: color,
         color: "#fff",
@@ -299,6 +307,94 @@ function StrandedLocationSection({
   );
 }
 
+// Location Watchlist — a branded three-column table (Location | Why it matters |
+// Recommended action). Plain text cells with content-box sizing and generous
+// padding, no line-clamp, so html2canvas rasterises every line cleanly (clamped
+// text renders shifted/clipped under html2canvas).
+function LocationWatchlistTable({ entries }: { entries: LocationWatchlistEntry[] }) {
+  if (entries.length === 0)
+    return <EmptyNote>No location currently carries fresh or standing watch signals for this period.</EmptyNote>;
+  const Cell = ({
+    text,
+    width,
+    head,
+    strong,
+  }: {
+    text: string;
+    width: string;
+    head?: boolean;
+    strong?: boolean;
+  }) => (
+    <div
+      style={{
+        width,
+        boxSizing: "border-box",
+        padding: "8px 10px 10px 10px",
+        fontFamily: ROBOTO,
+        fontSize: head ? 11 : 13,
+        fontWeight: head || strong ? 700 : 400,
+        lineHeight: 1.45,
+        color: head ? "#fff" : strong ? NAVY : DUSK,
+        textTransform: head ? "uppercase" : "none",
+        letterSpacing: head ? "0.05em" : "normal",
+      }}
+    >
+      {text}
+    </div>
+  );
+  return (
+    <div data-pdf-flow="true" style={{ border: `1px solid ${POLAR}` }}>
+      <div
+        style={{
+          display: "flex",
+          background: NAVY,
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
+        <Cell text="Location" width="24%" head />
+        <Cell text="Why it matters" width="38%" head />
+        <Cell text="Recommended action" width="38%" head />
+      </div>
+      {entries.map((e, i) => (
+        <div key={i} style={{ display: "flex", borderTop: i === 0 ? "none" : `1px solid ${POLAR}` }}>
+          <Cell text={e.location} width="24%" strong />
+          <Cell text={e.why} width="38%" />
+          <Cell text={e.action} width="38%" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Reporting-confidence pill. Neutral on-brand styling (POLAR fill, ELECTRIC
+// border, NAVY text) — deliberately NOT a severity colour, so it is never
+// confused with the five-tier risk ramp (and never touches the reserved
+// Extreme/Insignificant hues).
+function ConfidenceBadge({ level }: { level: ReportingConfidence["level"] }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        background: POLAR,
+        border: `1px solid ${ELECTRIC}`,
+        color: NAVY,
+        fontFamily: ROBOTO,
+        fontSize: 11,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        padding: "2px 10px",
+        borderRadius: 2,
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      }}
+    >
+      {level} confidence
+    </span>
+  );
+}
+
 export default function PngCountryReportBody({
   dataset,
   incidentSummaries = {},
@@ -309,9 +405,19 @@ export default function PngCountryReportBody({
   const d = dataset;
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
+      {/* 0. Bottom Line Up Front */}
+      <Section title="Bottom Line Up Front">
+        <Prose text={d.bluf} />
+      </Section>
+
       {/* 1. Executive Summary */}
       <Section title="Executive Summary">
         <Prose text={d.executiveSummary} />
+      </Section>
+
+      {/* 1b. What Changed This Week */}
+      <Section title="What Changed This Week">
+        <Prose text={d.whatChanged} />
       </Section>
 
       {/* 2. Top 3 Incidents This Week */}
@@ -359,6 +465,11 @@ export default function PngCountryReportBody({
         featuredNote={d.featuredAboveNote}
       />
 
+      {/* Location Watchlist */}
+      <Section title="Location Watchlist">
+        <LocationWatchlistTable entries={d.locationWatchlist} />
+      </Section>
+
       {/* Business Impact */}
       <Section title="Business Impact">
         {d.businessImpact.length === 0 ? (
@@ -380,6 +491,19 @@ export default function PngCountryReportBody({
       {/* 8. Outlook — Next Week */}
       <Section title="Outlook — Next Week">
         <Prose text={d.outlook} />
+      </Section>
+
+      {/* 9. Polestar View */}
+      <Section title="Polestar View">
+        <Prose text={d.polestarView} />
+      </Section>
+
+      {/* 10. Reporting Confidence */}
+      <Section title="Reporting Confidence">
+        <div style={{ marginBottom: 8 }}>
+          <ConfidenceBadge level={d.reportingConfidence.level} />
+        </div>
+        <Prose text={d.reportingConfidence.rationale} />
       </Section>
     </IncidentSummaryContext.Provider>
   );

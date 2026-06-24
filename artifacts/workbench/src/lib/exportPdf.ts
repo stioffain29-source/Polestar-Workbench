@@ -162,7 +162,15 @@ function applySeverityBadgeExportLayout(root: HTMLElement): void {
     const color =
       node.dataset.sevColor || node.style.background || node.style.backgroundColor;
     if (!label || !color) return;
-    node.replaceWith(sidebarSeverityChipCanvas(label, color));
+    const num = (v: string | undefined) =>
+      v != null && v !== "" ? Number(v) : undefined;
+    node.replaceWith(
+      sidebarSeverityChipCanvas(label, color, {
+        height: num(node.dataset.sevHeight),
+        minWidth: num(node.dataset.sevMinWidth),
+        padX: num(node.dataset.sevPadX),
+      }),
+    );
   });
 
   const labels = new Set(["EXTREME", "HIGH", "MODERATE", "LOW", "INSIGNIFICANT"]);
@@ -236,12 +244,16 @@ function severityChip(label: string, color: string, width = 92, height = 20): HT
 // the only deterministic way to keep the label centred. Sized/styled to match the
 // on-screen chip exactly (fontSize 10, letter-spacing 0.08em, padding 11px,
 // height 20px, 2px radius) so preview and PDF agree.
-function sidebarSeverityChipCanvas(label: string, color: string): HTMLCanvasElement {
+function sidebarSeverityChipCanvas(
+  label: string,
+  color: string,
+  opts: { height?: number; minWidth?: number; padX?: number } = {},
+): HTMLCanvasElement {
   const text = label.toUpperCase();
   const fontPx = 10;
   const letterSpacingPx = 0.08 * fontPx;
-  const padX = 11;
-  const height = 20;
+  const padX = opts.padX ?? 11;
+  const height = opts.height ?? 20;
   const radius = 2;
   const scale = 3;
   const canvas = document.createElement("canvas");
@@ -255,7 +267,8 @@ function sidebarSeverityChipCanvas(label: string, color: string): HTMLCanvasElem
     if ("letterSpacing" in ctx) ctx.letterSpacing = `${letterSpacingPx}px`;
     textW = ctx.measureText(text).width;
   }
-  const width = Math.round(textW + padX * 2);
+  let width = Math.round(textW + padX * 2);
+  if (opts.minWidth) width = Math.max(width, opts.minWidth);
 
   canvas.width = width * scale;
   canvas.height = height * scale;

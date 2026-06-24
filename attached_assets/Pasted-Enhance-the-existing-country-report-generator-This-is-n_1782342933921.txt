@@ -1,0 +1,167 @@
+Enhance the existing country report generator. This is not a rebuild.
+
+Problem:
+The current Papua country report lists incidents, business impact and an outlook, but it does not give enough assessed judgement. It needs an analytical spine so the reader understands what changed, what matters, where to watch and what action is required.
+
+Keep:
+1. Existing report layout and branding.
+2. Existing incident cards.
+3. Existing severity labels.
+4. Existing regional sections.
+5. Existing export flow.
+6. Existing data sources and scrape logic unless a specific bug is found.
+
+Add the following sections to the country report output:
+
+1. BLUF
+Add this near the top, before or immediately after the Executive Summary.
+
+Purpose:
+Give the reader the bottom line in one short paragraph.
+
+Logic:
+The BLUF should summarise:
+- whether the operating environment is stable, worsening, improving or unclear
+- the main security concern this week
+- the main business risk
+- whether any apparent quiet period should be treated as provisional
+
+Example style:
+"Papua remains a high friction operating environment, but current reporting does not indicate a single province wide escalation. The main business risk this week is localised disruption, movement exposure and short notice access constraints around Jayapura, Papua Tengah and resource linked flashpoints."
+
+2. What Changed This Week
+Add a short assessed section after the BLUF or Executive Summary.
+
+Purpose:
+Explain whether this week is different from the previous reporting period.
+
+Logic:
+Compare the current reporting period with the previous period where possible. Identify:
+- increase or decrease in incident count
+- change in severity mix
+- new hotspot
+- repeat hotspot
+- shift in incident type
+- quiet areas that may reflect reporting gaps, not necessarily reduced risk
+
+If there is not enough historical data, say:
+"Reporting this period remains fragmented, so trend confidence is limited."
+
+Avoid generic phrases like:
+- "monitor the situation"
+- "security relevant development"
+- "operational follow on"
+unless they are backed by a specific reason.
+
+3. Location Watchlist
+Add a clearly visible section before Business Impact.
+
+Purpose:
+Pull out the locations that matter most for business users.
+
+Logic:
+Select up to five locations based on:
+- incident volume
+- high severity incidents
+- repeat reporting
+- proximity to known business or movement corridors
+- protest, land dispute, resource project or security force activity
+
+Format:
+Location | Why it matters | Recommended action
+
+Example:
+Jayapura | protest, access disruption and institutional activity | avoid protest areas, check routes before movement
+Papua Tengah | security force activity and armed group reporting | tighten journey management and avoid discretionary travel outside main towns
+Timika / Freeport belt | resource linked flashpoints and labour or land sensitivity | review exposed site and contractor movement plans
+
+4. Polestar View
+Add a short assessed judgement section near the end, before Outlook or after Business Impact.
+
+Purpose:
+Make the report feel like Polestar analysis, not a scrape list.
+
+Logic:
+This should answer:
+- what the pattern means
+- what businesses should do differently this week
+- what would trigger a higher concern level
+- what should not be over interpreted
+
+Example style:
+"The current threat picture should be treated as persistent rather than acute. Businesses should not overreact to single incidents, but should maintain tight journey management, after hours movement controls and basic site security assurance. Any quiet week in Papua should be treated as provisional rather than a change in the underlying risk environment."
+
+5. Reporting Confidence
+Add a small line or box near the Outlook.
+
+Purpose:
+Show whether the picture is strong, partial or weak.
+
+Use:
+High confidence: multiple credible sources, good location detail, consistent reporting.
+Moderate confidence: several sources but uneven location or category detail.
+Low confidence: sparse reporting, single source, poor location detail or long gaps.
+
+Example:
+"Reporting confidence: Moderate. Open source coverage remains uneven, with stronger visibility around Jayapura and weaker visibility in remote areas."
+
+6. Replace generic Business Impact text
+The current business impact text is too generic. Generate business impact from the actual incident mix.
+
+Business impact should cover only what is relevant:
+- movement disruption
+- after hours exposure
+- site access
+- contractor movement
+- protest avoidance
+- road blockage risk
+- exposed asset protection
+- continuity impact
+
+Do not include every possible impact every week.
+
+Example:
+If the week includes protests and access disruption:
+"Business users should plan for localised road disruption, short notice access constraints and possible delays around protest or land dispute locations."
+
+If the week includes violent crime:
+"Review after hours movement, driver briefings and journey approval for exposed routes."
+
+If the week is quiet:
+"No major open source incident pattern was identified this period, but this should not be read as a material reduction in risk due to uneven reporting coverage."
+
+7. Outlook Next Week
+Tighten the existing Outlook section.
+
+It should include:
+- most likely scenario
+- key locations to watch
+- escalation triggers
+- what would reduce concern
+
+Example:
+"The most likely scenario next week is continued localised disruption rather than province wide escalation. Jayapura, Papua Tengah, Timika and Manokwari should remain under review. Escalation indicators include fresh security force operations, fatal incidents, protest mobilisation, land dispute action near public facilities, or disruption linked to strategic projects."
+
+Style rules:
+- Plain English.
+- British spelling.
+- No hype.
+- No vague filler.
+- No invented facts.
+- Do not state that an area is safe just because there were no fresh reports.
+- Do not call every incident significant.
+- Keep sections concise.
+- Use Polestar severity language: Insignificant, Low, Moderate, High, Extreme.
+- Keep Roboto styling and existing Polestar branding.
+- Do not change the PDF exporter unless required to render the new sections.
+- Do not change authentication, database schema or report editor unless absolutely necessary.
+
+Acceptance criteria:
+1. A generated Papua report includes BLUF, What Changed This Week, Location Watchlist, Polestar View and Reporting Confidence.
+2. The report still includes the existing incident sections.
+3. Business Impact is specific to the incidents in the reporting period.
+4. Outlook is forward looking and includes escalation triggers.
+5. The report does not use generic filler such as "monitor for operational follow on" unless tied to a specific action.
+6. Empty or quiet regional sections explain that no fresh open source reporting was identified, not that there is no risk.
+7. PDF export still works and preserves the existing Polestar layout.
+8. Apply the same enhancement to all country reports that use this template, including Papua, PNG, Indonesia, Philippines and Thailand where active.
