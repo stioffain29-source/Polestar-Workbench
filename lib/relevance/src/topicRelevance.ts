@@ -1720,6 +1720,39 @@ const COUNTRY_EXPLAINER_NOISE_RE =
 const COUNTRY_OPINION_DEBATE_RE =
   /\b(for whom|untuk siapa|who benefits|whose benefits?|benefits? whom)\b/i;
 
+// Official / diplomatic DIARY items — a leadership delegation arrival, state
+// visit, courtesy call, or framework / bilateral talks is a governance diary
+// entry, not a security incident (these were mis-filed under "Aviation /
+// airport" because a VIP arrival mentions travel). Dropped UNLESS the record
+// carries any security signal (so "gunmen attack the delegation" survives).
+const COUNTRY_OFFICIAL_VISIT_RE =
+  /\b(?:delegation|delegates)\b.{0,40}\b(?:arriv\w+|visit\w*|tour|talks?|meet\w*|welcom\w*|depart\w*|host\w*)\b|\b(?:arriv\w+|welcom\w*|host\w*|receiv\w+)\b.{0,40}\b(?:delegation|delegates)\b|\b(?:state visit|courtesy (?:call|visit)|bilateral (?:talks|meeting)|framework talks|official visit)\b/i;
+
+// Institutional ENDORSEMENT / support of a security agency — a council, MP, or
+// company "supports / backs / funds the police", hands over equipment, or
+// commends an agency. Governance / PR, not an incident. Dropped UNLESS a
+// security signal is present (so "police back operation after armed clash"
+// survives — "police" itself is deliberately NOT a security-signal word).
+const COUNTRY_AGENCY_SUPPORT_RE =
+  /\b(?:supports?|supporting|supported|backs?|backing|backed|funds?|funded|funding|boosts?|pledges?|hands? over|donat\w+|equips?|equipped|commends?|praises?|lauds?|thanks?)\b.{0,30}\b(?:police|constabulary|security forces?|defence force|correctional service)\b/i;
+
+// Governance / development FEATURE about security CAPACITY — "law-and-order
+// demands", "security infrastructure catching up", "policing capacity gaps". A
+// thematic development piece, not a dated incident. Dropped UNLESS a hard
+// security signal is present.
+const COUNTRY_SECURITY_CAPACITY_RE =
+  /\b(?:security infrastructure|law[-\s]and[-\s]order|policing capacity|police presence|security capacity)\b.{0,40}\b(?:demands?|needs?|gaps?|catching up|capacity|development|infrastructure|upgrade|boost|reform|funding|investment|shortfall|challenges?)\b|\b(?:demands?|needs?|gaps?|development|upgrade|reform|funding|investment|shortfall)\b.{0,40}\b(?:law[-\s]and[-\s]order|security infrastructure|policing capacity)\b/i;
+
+// Individual crime-blotter / policing PROCESS — a single suspect apprehended,
+// or a suspect held captive / rescued. Justice / process items, not
+// operational security incidents. Dropped UNLESS a hard security signal is
+// present (so "police apprehend armed robbery gang" / a kidnap-victim rescue
+// survive). Deliberately narrow and SUSPECT-anchored: a bare "rescued by
+// police" is NOT matched on its own, so "hostage rescued by police" and
+// "wanted man neutralised" (real ops in conflict zones) stay.
+const COUNTRY_POLICE_PROCESS_RE =
+  /\bapprehend\w*\b.{0,30}\bsuspect\b|\bsuspect\b.{0,30}\b(?:rescued|held captive|apprehend\w*)\b/i;
+
 // Scraped-aggregator junk: a YouTube-style video-id signature "(vFetqxZnwf)"
 // left in a syndicated headline — a 9–14 char token from [A-Za-z0-9_-] with
 // an internal lower→UPPER transition inside parentheses. The length floor
@@ -1818,6 +1851,28 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // Drop ceremonial / PR diary EVENTS (a breakfast, summit, signing ceremony)
   // unless the record carries any security signal — these are not incidents.
   if (COUNTRY_PR_EVENT_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    return false;
+  }
+  // Drop official / diplomatic DIARY items (a leadership delegation arrival,
+  // state visit, or framework talks) unless a security signal is present.
+  if (COUNTRY_OFFICIAL_VISIT_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    return false;
+  }
+  // Drop institutional ENDORSEMENT / support of a security agency ("council
+  // supports the police") unless a security signal is present.
+  if (COUNTRY_AGENCY_SUPPORT_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    return false;
+  }
+  // Drop governance / development FEATURES about security capacity ("law-and-
+  // order demands", "security infrastructure catching up") unless a hard
+  // security signal is present.
+  if (COUNTRY_SECURITY_CAPACITY_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
+  }
+  // Drop individual crime-blotter / policing PROCESS items (a single suspect
+  // apprehended, a captive rescued by police) unless a hard security signal is
+  // present (so "police apprehend armed robbery gang" survives).
+  if (COUNTRY_POLICE_PROCESS_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
     return false;
   }
   return true;

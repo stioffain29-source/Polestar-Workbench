@@ -25,7 +25,11 @@ Two things must BOTH hold or a headline ships untranslated:
    **How to apply:** when a topic shows untranslated foreign titles, replay the
    candidate `~*` query with new markers before assuming the LLM failed. Only add
    words that are distinctly the source language — never an English word — or you
-   will wrongly rewrite genuine English headlines.
+   will wrongly rewrite genuine English headlines. ALSO avoid place-name
+   collisions: "nilai" (Indonesian "value") is a Malaysian town, so it was
+   omitted — the West Papua culture headline was still caught by the unambiguous
+   "pergeseran" / "adat" / "budaya". Prefer several distinct words over one
+   ambiguous one.
 
 2. **The OpenAI integration must be provisioned.** The pass is a no-op (caught,
    logged, falls back to raw) unless `AI_INTEGRATIONS_OPENAI_*` env vars are set

@@ -33,3 +33,17 @@ real raw title+summary AND a few genuine incidents (ambush, armed clash, riot
 arrests) before shipping. A historical-atrocity reference ("Biak massacre" cited
 as collective memory) is NOT a current incident — "massacre" is intentionally
 absent from the hard-security set.
+
+**Non-incident classes beyond op-eds (governance/diplomatic/blotter):** the
+aggregate also leaks NON-events that aren't editorials — delegation arrivals /
+state visits, "council supports the police" endorsements, "law-and-order
+capacity" development features, and single-suspect crime-blotter / policing
+PROCESS items. Each has its own exclude in `isCountryRelevant`, guarded TWO
+ways: diary / PR / agency-support drop only when there is NO SOFT signal
+(`COUNTRY_SECURITY_SIGNAL_RE`); capacity / blotter drop only when there is NO
+HARD signal (`COUNTRY_HARD_SECURITY_RE`), so "police apprehend armed-robbery
+suspect" and a kidnap/hostage rescue survive. **"police" / "security forces" are
+deliberately NOT soft-signal words** — otherwise every support item rescues
+itself. Keep blotter excludes SUSPECT-anchored (`apprehend…suspect` /
+`suspect…rescued|held captive`), never a bare "rescued by police" (that would
+drop a real hostage rescue). Same frontend authority → no version bump.

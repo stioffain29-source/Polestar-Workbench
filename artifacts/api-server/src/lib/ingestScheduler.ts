@@ -54,7 +54,7 @@ const MOVEMENT_FRESH_DAYS = 14;
 // freshness, so a deploy that changes what the scrapers accept/reject takes
 // effect immediately. The marker is stored in app_migration_markers keyed by
 // version, so the forced run happens once per environment per version bump.
-const INGEST_FORCE_VERSION = 18;
+const INGEST_FORCE_VERSION = 19;
 
 /**
  * True when the current INGEST_FORCE_VERSION has not yet run in this

@@ -77,6 +77,16 @@ const INDONESIAN_MARKER_WORDS: readonly string[] = [
   "pasukan", "serangan", "penyerangan", "penembakan", "ditembak", "kekerasan",
   "pembunuhan", "menewaskan", "peneliti", "menjelaskan", "rekomendasikan",
   "situasi", "masyarakat", "dilaporkan", "anggota", "pernah",
+  // Papua culture / casualty / announcement vocabulary. Two live West Papua
+  // headlines ("Pergeseran Nilai ... Adat dan Budaya Papua" and "TPNPB Umumkan
+  // Duka Nasional atas Gugurnya ...") carried NONE of the words above, so the
+  // candidate query never selected them and raw Bahasa shipped to readers. Each
+  // word below is distinctly Indonesian (no English collision), so adding them
+  // cannot snag a genuine English headline. ("nilai" is omitted on purpose —
+  // it is also a Malaysian town name; the headline is still caught by the
+  // distinctly-Indonesian "pergeseran"/"adat"/"budaya".)
+  "pergeseran", "adat", "budaya", "umumkan", "mengumumkan",
+  "duka", "nasional", "gugur", "gugurnya",
 ];
 
 const NON_LATIN_RE = new RegExp(`[${NON_LATIN_CLASS}]`);
