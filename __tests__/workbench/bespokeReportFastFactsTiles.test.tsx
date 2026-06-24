@@ -288,10 +288,12 @@ describe("ConflictReportPreview Fast Facts tiles", () => {
 });
 
 // ---------------------------------------------------------------------------
-// PngCountryReportBody — dataset-driven. Its stat block is the Source
-// Confidence & Reporting Gaps diagnostics (per-source / per-confidence counts)
-// plus the severity chips on the Top 3 cards. Feed a representative dataset and
-// assert those carry real values.
+// PngCountryReportBody — dataset-driven narrative body (no Fast Facts tile
+// grid; the dataset's `diagnostics` block is computed but not rendered by this
+// component anywhere in the workbench). Its real stat-bearing output is the
+// incident cards: a severity chip, the title, and the source meta line. Feed a
+// representative dataset and assert those carry real values rather than a
+// hollow / empty-fallback block.
 // ---------------------------------------------------------------------------
 
 function makeItem(id: string, title: string): PngReportItem {
@@ -371,15 +373,15 @@ describe("PngCountryReportBody stat blocks", () => {
     expect(html).toContain(">High</span>");
   });
 
-  it("renders the diagnostics source breakdown with a real source and count", () => {
-    expect(html).toContain("Test Source — 3");
+  it("renders the Top 3 incident cards with their real titles", () => {
+    expect(html).toContain("Armed robbery reported in Port Moresby");
   });
 
-  it("renders the confidence distribution with a real count", () => {
-    expect(html).toContain("medium — 3");
+  it("renders the incident source on the card meta line", () => {
+    expect(html).toContain("Test Source");
   });
 
-  it("does not fall back to the empty 'no sources' note when sources exist", () => {
-    expect(html).not.toContain("No sources in the active window.");
+  it("does not show the empty-location fallback when incidents exist", () => {
+    expect(html).not.toContain("No fresh reporting captured this period.");
   });
 });

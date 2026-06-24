@@ -94,6 +94,18 @@ beforeAll(async () => {
   enableTestAdminToken();
   app = express();
   app.use(express.json());
+  // The real api-server attaches `req.log` via pino-http; this bare test app
+  // does not, so stub a no-op logger before the router (the generation-failure
+  // branch calls `req.log.warn`).
+  app.use((req, _res, next) => {
+    (req as unknown as { log: Record<string, () => void> }).log = {
+      info() {},
+      warn() {},
+      error() {},
+      debug() {},
+    };
+    next();
+  });
   app.use(proseRouter);
   server = app.listen(0);
   const { port } = server.address() as AddressInfo;

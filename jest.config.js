@@ -7,7 +7,13 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.ts?(x)", "**/?(*.)+(spec|test).ts?(x)"],
-  testPathIgnorePatterns: ["/node_modules/", "/__tests__/mocks/"],
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/__tests__/mocks/",
+    // Shared non-test helpers live next to the suites that import them; the
+    // broad `testMatch` glob would otherwise run them as (empty) suites.
+    "/__tests__/.*TestHelpers\\.ts$",
+  ],
   collectCoverage: process.env.CI === "true",
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
