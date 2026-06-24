@@ -10,7 +10,7 @@ import {
 // to deterministicIncidentSummary, which is grounded ONLY on the incident's own
 // fields (derived type, location, date, severity) — never on fabricated facts.
 
-// A cargo_watch record whose title routes cleanly to "Cargo theft / loss" via
+// A cargo_watch record whose title routes cleanly to "Cargo theft in transit" via
 // the shared classifier, so the asserted type label is stable.
 const CARGO: DeterministicSummaryInput & { id: number } = {
   id: 42,
@@ -27,40 +27,40 @@ const CARGO: DeterministicSummaryInput & { id: number } = {
 describe("deterministicIncidentSummary", () => {
   it("builds a one-line summary from the incident's own fields", () => {
     expect(deterministicIncidentSummary(CARGO)).toBe(
-      "Cargo theft / loss in Lae, reported 15 Mar 2026, assessed at High severity.",
+      "Cargo theft in transit in Lae, reported 15 Mar 2026, assessed at High severity.",
     );
   });
 
   it("omits the location clause when location is missing or empty", () => {
     expect(deterministicIncidentSummary({ ...CARGO, location: null })).toBe(
-      "Cargo theft / loss, reported 15 Mar 2026, assessed at High severity.",
+      "Cargo theft in transit, reported 15 Mar 2026, assessed at High severity.",
     );
     expect(deterministicIncidentSummary({ ...CARGO, location: "   " })).toBe(
-      "Cargo theft / loss, reported 15 Mar 2026, assessed at High severity.",
+      "Cargo theft in transit, reported 15 Mar 2026, assessed at High severity.",
     );
   });
 
   it("omits the severity clause when severity is missing or unrecognised", () => {
     expect(deterministicIncidentSummary({ ...CARGO, severity: null })).toBe(
-      "Cargo theft / loss in Lae, reported 15 Mar 2026.",
+      "Cargo theft in transit in Lae, reported 15 Mar 2026.",
     );
     expect(deterministicIncidentSummary({ ...CARGO, severity: "" })).toBe(
-      "Cargo theft / loss in Lae, reported 15 Mar 2026.",
+      "Cargo theft in transit in Lae, reported 15 Mar 2026.",
     );
     expect(deterministicIncidentSummary({ ...CARGO, severity: "catastrophic" })).toBe(
-      "Cargo theft / loss in Lae, reported 15 Mar 2026.",
+      "Cargo theft in transit in Lae, reported 15 Mar 2026.",
     );
   });
 
   it("normalises the severity label to the five-tier vocabulary regardless of case", () => {
     expect(deterministicIncidentSummary({ ...CARGO, severity: "EXTREME" })).toBe(
-      "Cargo theft / loss in Lae, reported 15 Mar 2026, assessed at Extreme severity.",
+      "Cargo theft in transit in Lae, reported 15 Mar 2026, assessed at Extreme severity.",
     );
   });
 
   it("leaves the date string raw when occurredAt cannot be parsed", () => {
     expect(deterministicIncidentSummary({ ...CARGO, occurredAt: "not-a-date" })).toBe(
-      "Cargo theft / loss in Lae, reported not-a-date, assessed at High severity.",
+      "Cargo theft in transit in Lae, reported not-a-date, assessed at High severity.",
     );
   });
 

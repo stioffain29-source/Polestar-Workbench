@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 // Dev-only bootstrap for operator secrets that Replit injects via userenv.shared
 // in the cloud but that are absent when running locally (e.g. on Windows). Never
@@ -10,8 +9,19 @@ import { fileURLToPath } from "node:url";
 //   1. .env.local at the workspace root (gitignored; copy from .env.local.example)
 //   2. [userenv.shared] in .replit (same source Replit uses in the Repl)
 
+// Resolve the workspace root by walking up from the current working directory
+// to the pnpm workspace marker. Deliberately avoids `import.meta.url` (ESM-only)
+// and `__dirname` (CJS-only) so this single source parses in every environment
+// that loads it: tsx/ESM in dev, the esbuild `.mjs` build, and ts-jest's
+// CommonJS test runtime (which rejects `import.meta` at parse time).
 function workspaceRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  let dir = process.cwd();
+  for (;;) {
+    if (existsSync(resolve(dir, "pnpm-workspace.yaml"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return process.cwd();
+    dir = parent;
+  }
 }
 
 function applyKeyValueLine(line: string): void {
