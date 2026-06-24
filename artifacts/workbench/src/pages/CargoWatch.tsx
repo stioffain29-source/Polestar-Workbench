@@ -99,7 +99,18 @@ function usdAxis(v: number): string {
 }
 
 export default function CargoWatch() {
-  const { data: incidents = [], isLoading } = useListIncidents({ topic: "cargo_watch" });
+  // includeIrrelevant=true: Cargo Watch MUST NOT inherit the server's persisted
+  // relevance verdict. That verdict is the general TOPIC classifier, which marks
+  // many genuine cargo thefts (a cigarette-distributor warehouse raid with a
+  // fatality, ship stowaways, a one-ton commodity haul, a clothing-warehouse
+  // robbery) as "irrelevant" and drops them before they ever reach the browser —
+  // leaving the 30-day view implausibly empty. This page already re-derives
+  // scope per row via classifyScope (the curated cargo gate), so we fetch raw
+  // and let that gate be the single source of truth. Mirrors CountryReport.
+  const { data: incidents = [], isLoading } = useListIncidents({
+    topic: "cargo_watch",
+    includeIrrelevant: true,
+  } as never);
   // Default to the full record set so the headline count and confirmed-loss
   // total reflect every in-scope cargo incident — matching the Dashboard card
   // (isCargoInScope, all-time) instead of hiding most incidents behind a
