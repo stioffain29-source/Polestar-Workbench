@@ -2,6 +2,7 @@ import {
   cargoScope,
   classifyScope,
   classifyRegion,
+  recoverCargoPortName,
   IN_SCOPE_COUNTRIES,
 } from "../../artifacts/workbench/src/lib/cargoAnalysis";
 
@@ -169,5 +170,64 @@ describe("classifyScope — analyst Needs Review override", () => {
 describe("IN_SCOPE_COUNTRIES — every picker option is a recognized in-scope region", () => {
   it.each(IN_SCOPE_COUNTRIES)("%s resolves to APAC or Middle East", (country) => {
     expect(["APAC", "Middle East"]).toContain(classifyRegion(country));
+  });
+});
+
+// Named Port Breakdown depends on a STRICT port extractor: it must name a port
+// only when the incident's OWN text (title/summary/location) names exactly one,
+// never from the source masthead, never from a bare city, and never when two
+// ports appear (that is an origin→destination route, attributing it would be a
+// guess).
+describe("recoverCargoPortName — strict, no-fabrication port extraction", () => {
+  it("names the single port in the title", () => {
+    expect(
+      recoverCargoPortName({ title: "Container theft ring busted at Port Klang", country: "Malaysia" }),
+    ).toEqual({ port: "Port Klang", country: "Malaysia" });
+  });
+
+  it("recovers a port named only in the summary", () => {
+    expect(
+      recoverCargoPortName({
+        title: "Cargo theft probe widens",
+        summary: "The stolen containers were lifted at Jebel Ali before transfer.",
+        country: "UAE",
+      }),
+    ).toEqual({ port: "Jebel Ali", country: "UAE" });
+  });
+
+  it("does NOT read a port from the source masthead", () => {
+    expect(
+      recoverCargoPortName({
+        title: "Warehouse theft suspect arrested",
+        source: "Port Klang Daily",
+        country: "Malaysia",
+      }),
+    ).toBeNull();
+  });
+
+  it("does NOT match a bare city without the port phrase", () => {
+    expect(
+      recoverCargoPortName({ title: "Jewellery theft reported in Mumbai", country: "India" }),
+    ).toBeNull();
+  });
+
+  it("returns null when two distinct ports are named (route story)", () => {
+    expect(
+      recoverCargoPortName({
+        title: "Containers stolen in transit from Port Klang to Singapore",
+        summary: "Goods left Port Klang bound for the Port of Singapore.",
+        country: "Malaysia",
+      }),
+    ).toBeNull();
+  });
+
+  it("collapses repeated mentions of the same port to a single match", () => {
+    expect(
+      recoverCargoPortName({
+        title: "Laem Chabang theft",
+        summary: "Police at Laem Chabang said the Laem Chabang depot was targeted.",
+        country: "Thailand",
+      }),
+    ).toEqual({ port: "Laem Chabang", country: "Thailand" });
   });
 });

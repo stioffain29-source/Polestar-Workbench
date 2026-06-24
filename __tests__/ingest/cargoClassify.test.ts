@@ -79,3 +79,32 @@ describe("cargo classify — North Korea must not be mis-tagged South Korea", ()
     expect(item.result.country).toBe("South Korea");
   });
 });
+
+describe("cargo classify — port-only headlines pass the title country gate", () => {
+  it("resolves UAE from a port name not in the base country aliases (Jebel Ali)", () => {
+    const item = classifyFeedItem("Cargo theft ring busted at Jebel Ali", "");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe("UAE");
+  });
+
+  it("resolves Oman from a port name not in the base country aliases (Sohar port)", () => {
+    const item = classifyFeedItem("Container theft uncovered at Sohar port", "");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe("Oman");
+  });
+
+  it("resolves Malaysia from Port Klang", () => {
+    const item = classifyFeedItem("Truck hijacking near Port Klang under investigation", "");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe("Malaysia");
+  });
+
+  it("does NOT leak a country from a port name sitting in the source masthead", () => {
+    // The masthead is stripped before the country gate, so "Jebel Ali" in the
+    // publisher name cannot satisfy the in-scope-country requirement.
+    const item = classifyFeedItem("Cargo theft probe widens - Jebel Ali News", "");
+    expect(item.sourceName).toBe("Jebel Ali News");
+    expect(item.result.kept).toBe(false);
+    expect(item.result.country).toBeNull();
+  });
+});

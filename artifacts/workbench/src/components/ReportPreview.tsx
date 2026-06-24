@@ -11,13 +11,16 @@ import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import {
   buildCargoSecurityRead,
   buildCargoWhatHappened,
+  buildCargoSituation,
   buildLogisticsHubRead,
   buildCargoWhatMatters,
   buildCargoImplications,
   buildCargoWatchNext,
   buildCargoPolestarView,
   buildCargoCountryBreakdown,
+  buildCargoPortBreakdown,
   type CargoCountryRow,
+  type CargoPortRow,
 } from "@/lib/cargoNarratives";
 import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
@@ -252,6 +255,75 @@ function ProducerActionsTable({ rows }: { rows: ProducerBuyerActionRow[] }) {
   );
 }
 
+function CargoPortTable({ rows }: { rows: CargoPortRow[] }) {
+  const th: React.CSSProperties = {
+    background: NAVY,
+    color: "#fff",
+    fontFamily: "Roboto, sans-serif",
+    fontWeight: 700,
+    fontSize: 10,
+    textAlign: "left",
+    padding: "8px 10px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  };
+  const td: React.CSSProperties = {
+    fontFamily: "Roboto, sans-serif",
+    fontSize: 12,
+    color: DUSK,
+    padding: "10px",
+    verticalAlign: "top",
+    borderBottom: `1px solid ${POLAR}`,
+    lineHeight: 1.45,
+  };
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${POLAR}` }}>
+      <thead>
+        <tr>
+          <th style={{ ...th, width: "22%" }}>Port</th>
+          <th style={{ ...th, width: "28%" }}>Current Pattern</th>
+          <th style={{ ...th, width: "16%" }}>Severity</th>
+          <th style={{ ...th, width: "34%" }}>Operational Read</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td style={{ ...td, color: NAVY, fontWeight: 700 }}>
+              {r.port}
+              <div style={{ fontSize: 10, fontWeight: 400, opacity: 0.75, marginTop: 3 }}>
+                {r.country} · {r.count} record{r.count === 1 ? "" : "s"}
+              </div>
+            </td>
+            <td style={td}>{r.pattern}</td>
+            <td style={td}>
+              <span
+                style={{
+                  ...severityBadgeStyle(r.severityKey),
+                  display: "inline-block",
+                  padding: "3px 8px",
+                  borderRadius: 2,
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  WebkitPrintColorAdjust: "exact",
+                  printColorAdjust: "exact",
+                }}
+              >
+                {r.severityLabel}
+              </span>
+            </td>
+            <td style={td}>{r.operationalRead}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function CargoCountryTable({ rows }: { rows: CargoCountryRow[] }) {
   const th: React.CSSProperties = {
     background: NAVY,
@@ -465,6 +537,7 @@ export default function ReportPreview({
       )
     : null;
   const cargoCountry = isCargo ? buildCargoCountryBreakdown(cargoWindow) : null;
+  const cargoPorts = isCargo ? buildCargoPortBreakdown(cargoWindow) : null;
   // Related Incidents table — shared selection (selectRelatedIncidents) so the
   // preview lists the SAME rows, in the same order, as the PDF's
   // drawRelatedIncidents (parity guarantee). The window here matches the PDF's
@@ -744,9 +817,28 @@ export default function ReportPreview({
                           )}
                         </>
                       )}
+                      {cargoPorts && (
+                        <Section title="Named Port Breakdown">
+                          {cargoPorts.rows.length > 0 ? (
+                            <CargoPortTable rows={cargoPorts.rows} />
+                          ) : (
+                            <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, margin: 0 }}>
+                              Not reported.
+                            </p>
+                          )}
+                          <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 10, color: DUSK, opacity: 0.7, margin: "6px 0 0" }}>
+                            {cargoPorts.coverageLabel}
+                          </p>
+                        </Section>
+                      )}
                     </>
                   )}
-                  <NarrativeSection title="Situation" text={report.situation} />
+                  <NarrativeSection
+                    title="Situation"
+                    text={isCargo
+                      ? pick(report.situation, buildCargoSituation(cargoWindow))
+                      : report.situation}
+                  />
                   <NarrativeSection
                     title="What Happened"
                     text={isCargo

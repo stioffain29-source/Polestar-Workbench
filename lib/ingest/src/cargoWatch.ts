@@ -19,7 +19,7 @@ import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 type Feed = {
   label: string;
   url: string;
-  group: "org" | "me" | "apac";
+  group: "org" | "me" | "apac" | "port";
 };
 
 const TERMS = [
@@ -183,6 +183,45 @@ const ORG_QUERIES: { label: string; q: string }[] = [
   { label: "IUMI cargo crime", q: `IUMI cargo (theft OR crime OR pilferage)` },
 ];
 
+// Port-targeted feeds. A port-only headline ("Container theft ring busted at
+// Port Klang") often never names the country, so the country-feed queries above
+// miss it. These query the busiest APAC + ME container ports by name so those
+// items surface. DELIBERATELY a curated MAJOR-port subset (~2 dozen): the cargo
+// ingest has historically timed out, and one Google-News feed per port across
+// the full ~80-port gazetteer would blow the budget. The alias map below covers
+// the WHOLE gazetteer so any port-named headline (from any feed) still resolves
+// to its country; only the per-port FETCH is capped.
+const PORT_FEED_TERMS: { term: string; country: string }[] = [
+  // APAC
+  { term: "Port of Singapore", country: "Singapore" },
+  { term: "Port Klang", country: "Malaysia" },
+  { term: "Tanjung Pelepas", country: "Malaysia" },
+  { term: "Tanjung Priok", country: "Indonesia" },
+  { term: "Laem Chabang", country: "Thailand" },
+  { term: "Cai Mep", country: "Vietnam" },
+  { term: "Manila port", country: "Philippines" },
+  { term: "Nhava Sheva", country: "India" },
+  { term: "Mundra port", country: "India" },
+  { term: "Karachi port", country: "Pakistan" },
+  { term: "Chittagong port", country: "Bangladesh" },
+  { term: "Colombo port", country: "Sri Lanka" },
+  { term: "Port of Shanghai", country: "China" },
+  { term: "Ningbo port", country: "China" },
+  { term: "Yantian port", country: "China" },
+  { term: "Hong Kong port", country: "China" },
+  { term: "Kaohsiung port", country: "Taiwan" },
+  { term: "Busan port", country: "South Korea" },
+  { term: "Port of Yokohama", country: "Japan" },
+  { term: "Port Botany", country: "Australia" },
+  // Middle East
+  { term: "Jebel Ali", country: "UAE" },
+  { term: "Jeddah Islamic Port", country: "Saudi Arabia" },
+  { term: "Hamad port", country: "Qatar" },
+  { term: "Sohar port", country: "Oman" },
+  { term: "Shahid Rajaee", country: "Iran" },
+  { term: "Umm Qasr", country: "Iraq" },
+];
+
 const FEEDS: Feed[] = [
   ...ORG_QUERIES.map((o): Feed => ({ label: o.label, url: gnews(o.q), group: "org" })),
   ...ME_COUNTRIES.map((c): Feed => ({
@@ -194,6 +233,11 @@ const FEEDS: Feed[] = [
     label: `APAC · ${c}`,
     url: gnews(`(${TERM_QUERY}) "${c}"`),
     group: "apac",
+  })),
+  ...PORT_FEED_TERMS.map((p): Feed => ({
+    label: `Port · ${p.term}`,
+    url: gnews(`(${TERM_QUERY}) "${p.term}"`),
+    group: "port",
   })),
 ];
 
@@ -233,6 +277,49 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Laos", aliases: ["laos", "vientiane"] },
   { canonical: "Myanmar", aliases: ["myanmar", "burma", "yangon"] },
   { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "lae"] },
+];
+
+// Port-name → canonical country. Lets a port-only headline (no country named)
+// still pass the title country gate. Every alias is a multi-word, word-bounded
+// PORT phrase (never a bare city/country token) so it cannot mis-tag a generic
+// "Mumbai burglary" story. MUST stay in sync with CARGO_PORT_GAZETTEER in
+// artifacts/workbench/src/lib/cargoAnalysis.ts (display side) — add ports to
+// BOTH or the monitor/report will name a port the ingest never gates on.
+const CARGO_PORT_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
+  // --- APAC ---
+  { canonical: "Singapore", aliases: ["port of singapore", "psa singapore", "tuas port", "pasir panjang terminal", "tanjong pagar terminal", "brani terminal", "keppel terminal"] },
+  { canonical: "Malaysia", aliases: ["port klang", "klang port", "port of klang", "tanjung pelepas", "port of tanjung pelepas", "penang port", "port of penang"] },
+  { canonical: "Indonesia", aliases: ["tanjung priok", "priok port", "port of tanjung priok", "tanjung perak", "port of tanjung perak", "belawan port", "port of belawan"] },
+  { canonical: "Thailand", aliases: ["laem chabang", "port of laem chabang", "bangkok port", "klong toey port", "khlong toei port"] },
+  { canonical: "Vietnam", aliases: ["cai mep", "port of cai mep", "cat lai port", "cat lai terminal", "hai phong port", "haiphong port", "port of haiphong", "port of hai phong"] },
+  { canonical: "Philippines", aliases: ["manila port", "port of manila", "manila south harbor", "manila international container terminal", "subic port", "port of subic", "subic bay port", "cebu port", "port of cebu"] },
+  { canonical: "Cambodia", aliases: ["sihanoukville port", "sihanoukville autonomous port", "port of sihanoukville"] },
+  { canonical: "Myanmar", aliases: ["yangon port", "port of yangon", "thilawa port"] },
+  { canonical: "India", aliases: ["nhava sheva", "jawaharlal nehru port", "jnpt", "mundra port", "port of mundra", "chennai port", "port of chennai", "visakhapatnam port", "vizag port", "port of visakhapatnam", "kolkata port", "port of kolkata", "haldia port", "mumbai port", "port of mumbai"] },
+  { canonical: "Pakistan", aliases: ["karachi port", "port of karachi", "port qasim", "bin qasim port", "port muhammad bin qasim", "gwadar port", "port of gwadar"] },
+  { canonical: "Bangladesh", aliases: ["chittagong port", "chattogram port", "port of chittagong", "port of chattogram", "mongla port", "port of mongla"] },
+  { canonical: "Sri Lanka", aliases: ["colombo port", "port of colombo", "hambantota port", "port of hambantota"] },
+  { canonical: "China", aliases: ["port of shanghai", "shanghai port", "yangshan port", "ningbo port", "ningbo-zhoushan", "port of ningbo", "zhoushan port", "shenzhen port", "yantian port", "port of shenzhen", "shekou port", "qingdao port", "port of qingdao", "guangzhou port", "nansha port", "port of guangzhou", "tianjin port", "port of tianjin", "xiamen port", "port of xiamen", "hong kong port", "kwai chung terminal", "kwai tsing terminal", "port of hong kong"] },
+  { canonical: "Taiwan", aliases: ["kaohsiung port", "port of kaohsiung", "keelung port", "port of keelung", "taichung port", "port of taichung"] },
+  { canonical: "South Korea", aliases: ["busan port", "port of busan", "pusan port", "incheon port", "port of incheon", "gwangyang port", "port of gwangyang"] },
+  { canonical: "Japan", aliases: ["port of yokohama", "yokohama port", "port of kobe", "kobe port", "port of nagoya", "nagoya port", "port of tokyo", "tokyo port", "port of osaka", "osaka port"] },
+  { canonical: "Australia", aliases: ["port botany", "port of melbourne", "melbourne port", "port of brisbane", "brisbane port", "fremantle port", "port of fremantle"] },
+  { canonical: "New Zealand", aliases: ["port of auckland", "ports of auckland", "port of tauranga", "tauranga port"] },
+  { canonical: "Papua New Guinea", aliases: ["lae port", "port of lae", "motukea"] },
+  // --- Middle East ---
+  { canonical: "UAE", aliases: ["jebel ali", "port of jebel ali", "jebel ali port", "khalifa port", "khalifa bin zayed port", "khor fakkan", "khorfakkan", "port rashid", "mina rashid"] },
+  { canonical: "Saudi Arabia", aliases: ["jeddah islamic port", "jeddah port", "port of jeddah", "king abdullah port", "dammam port", "king abdulaziz port", "port of dammam"] },
+  { canonical: "Qatar", aliases: ["hamad port", "port of hamad"] },
+  { canonical: "Oman", aliases: ["sohar port", "port of sohar", "salalah port", "port of salalah", "duqm port", "port of duqm"] },
+  { canonical: "Bahrain", aliases: ["khalifa bin salman port", "mina salman"] },
+  { canonical: "Kuwait", aliases: ["shuwaikh port", "shuaiba port"] },
+  { canonical: "Jordan", aliases: ["aqaba port", "port of aqaba"] },
+  { canonical: "Iran", aliases: ["shahid rajaee", "shahid rajaei", "bandar abbas port", "port of bandar abbas", "bushehr port", "port of bushehr", "chabahar port", "port of chabahar", "shahid beheshti port"] },
+  { canonical: "Iraq", aliases: ["umm qasr", "port of umm qasr", "khor al-zubair", "khor al zubair"] },
+  { canonical: "Yemen", aliases: ["hodeidah port", "hudaydah port", "port of hodeidah", "al hudaydah port", "aden port", "port of aden"] },
+  { canonical: "Israel", aliases: ["haifa port", "port of haifa", "ashdod port", "port of ashdod"] },
+  { canonical: "Lebanon", aliases: ["beirut port", "port of beirut"] },
+  { canonical: "Syria", aliases: ["latakia port", "port of latakia", "tartus port", "port of tartus"] },
 ];
 
 // Allowlist: at least one must hit in title+summary for the item to qualify.
@@ -354,7 +441,7 @@ function classify(title: string, summary: string): Classified {
 
   // Country must appear in TITLE (word-bounded) to count as an in-country
   // incident. Summary-only matches produce too many diaspora/byline misfires.
-  const countryMatch = COUNTRY_ALIASES.find((c) =>
+  const countryMatch = [...COUNTRY_ALIASES, ...CARGO_PORT_ALIASES].find((c) =>
     c.aliases.some((a) => hasWord(titleLc, a)),
   );
   if (!countryMatch) return { kept: false, reason: "no-country-in-title", country: null };

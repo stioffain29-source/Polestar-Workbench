@@ -24,6 +24,7 @@ import { isUnattributedCountry, splitAttributedCountries } from "./topicRelevanc
 import {
   classifyIncidentType,
   classifyLocationType,
+  recoverCargoPortName,
   type CargoIncidentLike,
 } from "./cargoAnalysis";
 
@@ -700,4 +701,83 @@ export function buildCargoCountryBreakdown(
     };
   });
   return { rows, regionalRead: buildRegionalRead(rows) };
+}
+
+export interface CargoPortRow {
+  /** Display port label, e.g. "Port Klang". */
+  port: string;
+  /** Canonical in-scope country the port sits in. */
+  country: string;
+  count: number;
+  /** Dominant theft pattern phrase (same source as the country table). */
+  pattern: string;
+  severityKey: string;
+  severityLabel: string;
+  lead: "route" | "hub" | "mixed";
+  operationalRead: string;
+}
+
+export interface CargoPortBreakdown {
+  rows: CargoPortRow[];
+  /** How many in-window records name exactly one specific port. */
+  namedPortCount: number;
+  /** Total in-window in-scope records considered. */
+  totalCount: number;
+  /** Caption stating port coverage — NEVER inlined into narrative prose. */
+  coverageLabel: string;
+}
+
+// Rank the named ports seeing cargo crime in this window. STRICT no-fabrication:
+// only records whose own text names exactly ONE port count (recoverCargoPortName
+// returns null for zero-port and ambiguous multi-port route stories), so a port
+// row reflects incidents actually reported at that port — never a guess. Rows
+// reuse the SAME pattern / severity / operational-read helpers as the country
+// table, so the two breakdowns read consistently. The coverage label is a
+// caption, not prose: it carries the only count, keeping report narrative free
+// of parenthetical record annotations.
+export function buildCargoPortBreakdown(
+  windowIncidents: CargoNarrativeIncident[],
+  maxRows = 8,
+): CargoPortBreakdown {
+  const totalCount = windowIncidents.length;
+  const groups = new Map<
+    string,
+    { country: string; rows: CargoNarrativeIncident[] }
+  >();
+  let namedPortCount = 0;
+  for (const i of windowIncidents) {
+    const match = recoverCargoPortName(i as unknown as CargoIncidentLike);
+    if (!match) continue;
+    namedPortCount += 1;
+    const g = groups.get(match.port) ?? { country: match.country, rows: [] };
+    g.rows.push(i);
+    groups.set(match.port, g);
+  }
+  const entries = [...groups.entries()]
+    .map(([port, { country, rows }]) => ({ port, country, rows }))
+    .sort((a, b) => b.rows.length - a.rows.length || a.port.localeCompare(b.port));
+  const chosen = entries.slice(0, maxRows);
+  const rows: CargoPortRow[] = chosen.map(({ port, country, rows }) => {
+    const sev = pickCountrySeverity(rows);
+    const routeSide = rows.filter((r) => CARGO_SECURITY_RE.test(incidentText(r))).length;
+    const hubSide = rows.filter((r) => LOGISTICS_HUB_RE.test(incidentText(r))).length;
+    let lead: "route" | "hub" | "mixed";
+    if (routeSide === 0 && hubSide === 0) lead = "mixed";
+    else if (routeSide > hubSide) lead = "route";
+    else if (hubSide > routeSide) lead = "hub";
+    else lead = "mixed";
+    return {
+      port,
+      country,
+      count: rows.length,
+      pattern: patternPhrase(rows),
+      severityKey: sev.key,
+      severityLabel: sev.label,
+      lead,
+      operationalRead: operationalReadFor(rows, lead, sev.key, rows.length),
+    };
+  });
+  const plural = totalCount === 1 ? "" : "s";
+  const coverageLabel = `${namedPortCount} of ${totalCount} in-scope record${plural} name a specific port`;
+  return { rows, namedPortCount, totalCount, coverageLabel };
 }

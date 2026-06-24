@@ -75,7 +75,9 @@ import {
   buildCargoPolestarView,
   buildCargoSituation,
   buildCargoCountryBreakdown,
+  buildCargoPortBreakdown,
   type CargoCountryRow,
+  type CargoPortBreakdown,
 } from "./cargoNarratives";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -406,6 +408,140 @@ function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
     ctx.y += rh;
   }
   ctx.y += 8;
+}
+
+// Named Port Breakdown table for the Cargo Watch report. Mirrors
+// drawCargoCountryTable but the first column is the port (with a "country ·
+// N records" subline) and the widths match CargoPortTable in ReportPreview so
+// the screen preview and this PDF never disagree. Always renders: an empty set
+// draws "Not reported." and the coverage caption (which carries the only count,
+// keeping the narrative free of parenthetical record annotations).
+function drawCargoPortTable(ctx: Ctx, breakdown: CargoPortBreakdown) {
+  const { pdf, MX, CW } = ctx;
+  const rows = breakdown.rows;
+  if (rows.length === 0) {
+    ensureSpace(ctx, 26);
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(9);
+    pdf.text("Not reported.", MX, ctx.y + 11);
+    ctx.y += 16;
+  } else {
+    const colPortW = Math.round(CW * 0.22);
+    const colPatternW = Math.round(CW * 0.28);
+    const colSevW = Math.round(CW * 0.16);
+    const colReadW = CW - colPortW - colPatternW - colSevW;
+    const headerH = 20;
+    const padX = 6;
+    const lineH = 11;
+
+    const drawHeader = () => {
+      setFill(pdf, NAVY);
+      pdf.rect(MX, ctx.y, CW, headerH, "F");
+      setText(pdf, WHITE);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(8);
+      pdf.text("PORT", MX + padX, ctx.y + 12);
+      pdf.text("CURRENT PATTERN", MX + colPortW + padX, ctx.y + 12);
+      pdf.text("SEVERITY", MX + colPortW + colPatternW + padX, ctx.y + 12);
+      pdf.text(
+        "OPERATIONAL READ",
+        MX + colPortW + colPatternW + colSevW + padX,
+        ctx.y + 12,
+      );
+      ctx.y += headerH;
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8);
+    };
+
+    ensureSpace(ctx, headerH + 30);
+    drawHeader();
+
+    for (const r of rows) {
+      const portText = `${r.port}\n${r.country} \u00b7 ${r.count} record${r.count === 1 ? "" : "s"}`;
+      const portLines: string[] = pdf.splitTextToSize(
+        sanitize(portText),
+        colPortW - padX * 2,
+      );
+      const patternLines: string[] = pdf.splitTextToSize(
+        sanitize(r.pattern),
+        colPatternW - padX * 2,
+      );
+      const readLines: string[] = pdf.splitTextToSize(
+        sanitize(r.operationalRead),
+        colReadW - padX * 2,
+      );
+      const maxLines = Math.max(
+        portLines.length,
+        patternLines.length,
+        readLines.length,
+        2,
+      );
+      const rh = Math.max(28, maxLines * lineH + 10);
+
+      if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+        newPage(ctx);
+        drawHeader();
+      }
+
+      setStroke(pdf, POLAR);
+      pdf.setLineWidth(0.3);
+      pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+      setText(pdf, NAVY);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(8);
+      // First port line bold; the "country · N records" line subdued regular.
+      pdf.text(portLines.slice(0, 1), MX + padX, ctx.y + 12);
+      if (portLines.length > 1) {
+        setText(pdf, DUSK);
+        setRoboto(pdf, "regular");
+        pdf.setFontSize(7);
+        pdf.text(portLines.slice(1), MX + padX, ctx.y + 12 + lineH);
+        pdf.setFontSize(8);
+      }
+
+      setText(pdf, DUSK);
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8);
+      pdf.text(patternLines, MX + colPortW + padX, ctx.y + 12);
+      pdf.text(
+        readLines,
+        MX + colPortW + colPatternW + colSevW + padX,
+        ctx.y + 12,
+      );
+
+      const sk = sevKey(r.severityKey);
+      const sevColor = SEV_COLOR[sk] ?? "#999999";
+      const chipX = MX + colPortW + colPatternW + padX;
+      const chipW = colSevW - padX * 2;
+      setFill(pdf, sevColor);
+      pdf.rect(chipX, ctx.y + 5, chipW, 12, "F");
+      setText(pdf, WHITE);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(6.5);
+      pdf.text(
+        sanitize(r.severityLabel.toUpperCase()),
+        chipX + chipW / 2,
+        ctx.y + 13,
+        { align: "center" },
+      );
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8);
+
+      ctx.y += rh;
+    }
+    ctx.y += 6;
+  }
+
+  // Coverage caption — subdued, italic, mirrors the preview's caption line.
+  ensureSpace(ctx, 16);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "italic");
+  pdf.setFontSize(7.5);
+  pdf.text(sanitize(breakdown.coverageLabel), MX, ctx.y + 8);
+  setRoboto(pdf, "regular");
+  ctx.y += 16;
 }
 
 function drawRelatedIncidents(
@@ -767,17 +903,44 @@ export async function exportTopicReportPdf(
 
       const cargoSecurity = buildCargoSecurityRead(windowIncidents);
       const cargoNode = buildLogisticsHubRead(windowIncidents);
-      // Editor text always wins on the four standard analyst sections;
-      // auto-prose fills in when the editor leaves a field blank so the
-      // cargo report reads at Fuel-Watch substance out of the box.
-      const proseSections: [string, string][] = [
+      // Cargo Security Read + Logistics Hub Read lead the analysis, in the same
+      // order the on-screen preview renders them.
+      for (const [label, body] of [
         ["Cargo Security Read", cargoSecurity],
         ["Logistics Hub Read", cargoNode],
+      ] as [string, string][]) {
+        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
+      }
+
+      // Country Risk Breakdown table + Regional Read, then the Named Port
+      // Breakdown — mirrors ReportPreview's cargo section order (between the
+      // Logistics Hub Read and the Situation) so screen and PDF never disagree.
+      const cargoCountry = buildCargoCountryBreakdown(windowIncidents);
+      if (cargoCountry.rows.length > 0) {
+        ensureSpace(ctx, 24 + 20 + 56);
+        drawSectionHeading(ctx, "Country Risk Breakdown");
+        drawCargoCountryTable(ctx, cargoCountry.rows);
+        if (cargoCountry.regionalRead && cargoCountry.regionalRead.trim()) {
+          drawSectionWithProse(ctx, "Regional Read", cargoCountry.regionalRead);
+        }
+      }
+      const cargoPorts = buildCargoPortBreakdown(windowIncidents);
+      ensureSpace(ctx, 24 + 20 + 40);
+      drawSectionHeading(ctx, "Named Port Breakdown");
+      drawCargoPortTable(ctx, cargoPorts);
+
+      // Editor text always wins on the standard analyst sections; auto-prose
+      // fills in when the editor leaves a field blank so the cargo report reads
+      // at Fuel-Watch substance out of the box.
+      const proseSections: [string, string][] = [
         [
           "Situation",
           pickProse(data.situation, buildCargoSituation(windowIncidents)),
         ],
-        ["What Happened", (data.whatHappened ?? "").trim()],
+        [
+          "What Happened",
+          pickProse(data.whatHappened, buildCargoWhatHappened(windowIncidents)),
+        ],
         [
           "What Matters",
           pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents)),

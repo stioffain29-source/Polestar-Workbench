@@ -224,6 +224,137 @@ export function recoverCargoCountryFromText(i: CargoIncidentLike): string | null
   return null;
 }
 
+// Curated APAC / Middle East seaport gazetteer used ONLY to recover a NAMED
+// port from an incident's own text (title + summary + location) — never the
+// source / feed label, which carries mastheads that would leak a city name
+// (e.g. "Taipei Times" → "Taipei"). Each alias is a word-bounded FULL port name
+// or an unambiguous port-area / facility name. Bare MAJOR-CITY and country
+// tokens ("singapore", "haifa", "busan", "colombo", "bandar abbas") are
+// DELIBERATELY excluded so a generic city story is never mis-attributed to a
+// port; only port-qualified forms ("haifa port", "port of colombo") or
+// port-specific place names ("tanjung priok", "jebel ali", "nhava sheva")
+// admit a match. Every port maps to its one canonical in-scope country.
+//
+// KEEP IN SYNC with the ingest port list in lib/ingest/src/cargoWatch.ts
+// (PORT_QUERIES feeds + the port aliases appended to COUNTRY_ALIASES). The
+// single source of truth for user-visible port counts is buildCargoPortBreakdown
+// in cargoNarratives.ts — the ingest feeds only widen what candidates arrive.
+export const CARGO_PORT_GAZETTEER: Array<{ port: string; country: string; re: RegExp }> = [
+  // --- APAC ---
+  { port: "Port of Singapore", country: "Singapore", re: /\b(port of singapore|psa singapore|tuas port|pasir panjang terminal|tanjong pagar terminal|brani terminal|keppel terminal)\b/i },
+  { port: "Port Klang", country: "Malaysia", re: /\b(port klang|klang port|port of klang)\b/i },
+  { port: "Tanjung Pelepas", country: "Malaysia", re: /\b(tanjung pelepas|port of tanjung pelepas)\b/i },
+  { port: "Penang Port", country: "Malaysia", re: /\b(penang port|port of penang)\b/i },
+  { port: "Tanjung Priok", country: "Indonesia", re: /\b(tanjung priok|priok port|port of tanjung priok)\b/i },
+  { port: "Tanjung Perak", country: "Indonesia", re: /\b(tanjung perak|port of tanjung perak)\b/i },
+  { port: "Belawan Port", country: "Indonesia", re: /\b(belawan port|port of belawan)\b/i },
+  { port: "Laem Chabang", country: "Thailand", re: /\b(laem chabang|port of laem chabang)\b/i },
+  { port: "Bangkok Port", country: "Thailand", re: /\b(bangkok port|klong toey port|khlong toei port)\b/i },
+  { port: "Cai Mep", country: "Vietnam", re: /\b(cai mep|port of cai mep)\b/i },
+  { port: "Cat Lai", country: "Vietnam", re: /\b(cat lai port|cat lai terminal)\b/i },
+  { port: "Hai Phong Port", country: "Vietnam", re: /\b(hai phong port|haiphong port|port of haiphong|port of hai phong)\b/i },
+  { port: "Manila Port", country: "Philippines", re: /\b(manila port|port of manila|manila south harbor|manila international container terminal)\b/i },
+  { port: "Subic Port", country: "Philippines", re: /\b(subic port|port of subic|subic bay port)\b/i },
+  { port: "Cebu Port", country: "Philippines", re: /\b(cebu port|port of cebu)\b/i },
+  { port: "Sihanoukville Port", country: "Cambodia", re: /\b(sihanoukville port|sihanoukville autonomous port|port of sihanoukville)\b/i },
+  { port: "Yangon Port", country: "Myanmar", re: /\b(yangon port|port of yangon|thilawa port)\b/i },
+  { port: "Nhava Sheva", country: "India", re: /\b(nhava sheva|jawaharlal nehru port|jnpt)\b/i },
+  { port: "Mundra Port", country: "India", re: /\b(mundra port|port of mundra)\b/i },
+  { port: "Chennai Port", country: "India", re: /\b(chennai port|port of chennai)\b/i },
+  { port: "Visakhapatnam Port", country: "India", re: /\b(visakhapatnam port|vizag port|port of visakhapatnam)\b/i },
+  { port: "Kolkata Port", country: "India", re: /\b(kolkata port|port of kolkata|haldia port)\b/i },
+  { port: "Mumbai Port", country: "India", re: /\b(mumbai port|port of mumbai)\b/i },
+  { port: "Karachi Port", country: "Pakistan", re: /\b(karachi port|port of karachi)\b/i },
+  { port: "Port Qasim", country: "Pakistan", re: /\b(port qasim|bin qasim port|port muhammad bin qasim)\b/i },
+  { port: "Gwadar Port", country: "Pakistan", re: /\b(gwadar port|port of gwadar)\b/i },
+  { port: "Chittagong Port", country: "Bangladesh", re: /\b(chittagong port|chattogram port|port of chittagong|port of chattogram)\b/i },
+  { port: "Mongla Port", country: "Bangladesh", re: /\b(mongla port|port of mongla)\b/i },
+  { port: "Colombo Port", country: "Sri Lanka", re: /\b(colombo port|port of colombo)\b/i },
+  { port: "Hambantota Port", country: "Sri Lanka", re: /\b(hambantota port|port of hambantota)\b/i },
+  { port: "Port of Shanghai", country: "China", re: /\b(port of shanghai|shanghai port|yangshan port)\b/i },
+  { port: "Ningbo-Zhoushan", country: "China", re: /\b(ningbo port|ningbo-zhoushan|port of ningbo|zhoushan port)\b/i },
+  { port: "Shenzhen Port", country: "China", re: /\b(shenzhen port|yantian port|port of shenzhen|shekou port)\b/i },
+  { port: "Qingdao Port", country: "China", re: /\b(qingdao port|port of qingdao)\b/i },
+  { port: "Guangzhou Port", country: "China", re: /\b(guangzhou port|nansha port|port of guangzhou)\b/i },
+  { port: "Tianjin Port", country: "China", re: /\b(tianjin port|port of tianjin)\b/i },
+  { port: "Xiamen Port", country: "China", re: /\b(xiamen port|port of xiamen)\b/i },
+  { port: "Hong Kong Port", country: "China", re: /\b(hong kong port|kwai chung terminal|kwai tsing terminal|port of hong kong)\b/i },
+  { port: "Kaohsiung Port", country: "Taiwan", re: /\b(kaohsiung port|port of kaohsiung)\b/i },
+  { port: "Keelung Port", country: "Taiwan", re: /\b(keelung port|port of keelung)\b/i },
+  { port: "Taichung Port", country: "Taiwan", re: /\b(taichung port|port of taichung)\b/i },
+  { port: "Busan Port", country: "South Korea", re: /\b(busan port|port of busan|pusan port)\b/i },
+  { port: "Incheon Port", country: "South Korea", re: /\b(incheon port|port of incheon)\b/i },
+  { port: "Gwangyang Port", country: "South Korea", re: /\b(gwangyang port|port of gwangyang)\b/i },
+  { port: "Port of Yokohama", country: "Japan", re: /\b(port of yokohama|yokohama port)\b/i },
+  { port: "Port of Kobe", country: "Japan", re: /\b(port of kobe|kobe port)\b/i },
+  { port: "Port of Nagoya", country: "Japan", re: /\b(port of nagoya|nagoya port)\b/i },
+  { port: "Port of Tokyo", country: "Japan", re: /\b(port of tokyo|tokyo port)\b/i },
+  { port: "Port of Osaka", country: "Japan", re: /\b(port of osaka|osaka port)\b/i },
+  { port: "Port Botany", country: "Australia", re: /\b(port botany)\b/i },
+  { port: "Port of Melbourne", country: "Australia", re: /\b(port of melbourne|melbourne port)\b/i },
+  { port: "Port of Brisbane", country: "Australia", re: /\b(port of brisbane|brisbane port)\b/i },
+  { port: "Fremantle Port", country: "Australia", re: /\b(fremantle port|port of fremantle)\b/i },
+  { port: "Port of Auckland", country: "New Zealand", re: /\b(port of auckland|ports of auckland)\b/i },
+  { port: "Port of Tauranga", country: "New Zealand", re: /\b(port of tauranga|tauranga port)\b/i },
+  { port: "Lae Port", country: "Papua New Guinea", re: /\b(lae port|port of lae|motukea)\b/i },
+  // --- Middle East ---
+  { port: "Jebel Ali", country: "UAE", re: /\b(jebel ali|port of jebel ali|jebel ali port)\b/i },
+  { port: "Khalifa Port", country: "UAE", re: /\b(khalifa port|khalifa bin zayed port)\b/i },
+  { port: "Khor Fakkan", country: "UAE", re: /\b(khor fakkan|khorfakkan)\b/i },
+  { port: "Port Rashid", country: "UAE", re: /\b(port rashid|mina rashid)\b/i },
+  { port: "Jeddah Islamic Port", country: "Saudi Arabia", re: /\b(jeddah islamic port|jeddah port|port of jeddah)\b/i },
+  { port: "King Abdullah Port", country: "Saudi Arabia", re: /\b(king abdullah port)\b/i },
+  { port: "Dammam Port", country: "Saudi Arabia", re: /\b(dammam port|king abdulaziz port|port of dammam)\b/i },
+  { port: "Hamad Port", country: "Qatar", re: /\b(hamad port|port of hamad)\b/i },
+  { port: "Sohar Port", country: "Oman", re: /\b(sohar port|port of sohar)\b/i },
+  { port: "Salalah Port", country: "Oman", re: /\b(salalah port|port of salalah)\b/i },
+  { port: "Duqm Port", country: "Oman", re: /\b(duqm port|port of duqm)\b/i },
+  { port: "Khalifa Bin Salman Port", country: "Bahrain", re: /\b(khalifa bin salman port|mina salman)\b/i },
+  { port: "Shuwaikh Port", country: "Kuwait", re: /\b(shuwaikh port|shuaiba port)\b/i },
+  { port: "Aqaba Port", country: "Jordan", re: /\b(aqaba port|port of aqaba)\b/i },
+  { port: "Shahid Rajaee", country: "Iran", re: /\b(shahid rajaee|shahid rajaei|bandar abbas port|port of bandar abbas)\b/i },
+  { port: "Bushehr Port", country: "Iran", re: /\b(bushehr port|port of bushehr)\b/i },
+  { port: "Chabahar Port", country: "Iran", re: /\b(chabahar port|port of chabahar|shahid beheshti port)\b/i },
+  { port: "Umm Qasr", country: "Iraq", re: /\b(umm qasr|port of umm qasr)\b/i },
+  { port: "Khor al-Zubair", country: "Iraq", re: /\b(khor al-zubair|khor al zubair)\b/i },
+  { port: "Hodeidah Port", country: "Yemen", re: /\b(hodeidah port|hudaydah port|port of hodeidah|al hudaydah port)\b/i },
+  { port: "Aden Port", country: "Yemen", re: /\b(aden port|port of aden)\b/i },
+  { port: "Haifa Port", country: "Israel", re: /\b(haifa port|port of haifa)\b/i },
+  { port: "Ashdod Port", country: "Israel", re: /\b(ashdod port|port of ashdod)\b/i },
+  { port: "Beirut Port", country: "Lebanon", re: /\b(beirut port|port of beirut)\b/i },
+  { port: "Latakia Port", country: "Syria", re: /\b(latakia port|port of latakia)\b/i },
+  { port: "Tartus Port", country: "Syria", re: /\b(tartus port|port of tartus)\b/i },
+];
+
+// All DISTINCT named ports referenced by an incident's own text (title +
+// summary + location, never the source masthead). Deduped by port label so an
+// article naming "Port Klang" and "Klang Port" counts the port once.
+export function recoverCargoPortMatches(
+  i: CargoIncidentLike,
+): Array<{ port: string; country: string }> {
+  const text = `${i.title} ${i.summary ?? ""} ${i.location ?? ""}`;
+  const seen = new Set<string>();
+  const out: Array<{ port: string; country: string }> = [];
+  for (const g of CARGO_PORT_GAZETTEER) {
+    if (g.re.test(text) && !seen.has(g.port)) {
+      seen.add(g.port);
+      out.push({ port: g.port, country: g.country });
+    }
+  }
+  return out;
+}
+
+// The single named port for an incident, or null. STRICT: returns a port only
+// when exactly ONE distinct port is named. Zero matches → null (no fabrication).
+// Two or more distinct ports → null too: that is an origin→destination route
+// story, and attributing the loss to either port would be a guess.
+export function recoverCargoPortName(
+  i: CargoIncidentLike,
+): { port: string; country: string } | null {
+  const matches = recoverCargoPortMatches(i);
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export type Scope = "in_scope" | "out_of_scope_geo" | "excluded_non_cargo" | "country_review";
 
 export function classifyScope(i: CargoIncidentLike, region: Region): Scope {

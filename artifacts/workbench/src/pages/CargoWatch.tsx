@@ -27,6 +27,7 @@ import {
   type Region,
 } from "@/lib/cargoAnalysis";
 import { dedupeMonitorRows } from "@/lib/monitorDedupe";
+import { buildCargoPortBreakdown } from "@/lib/cargoNarratives";
 
 // A named commercial entity, detected conservatively: a proper noun followed
 // by a corporate suffix. Police forces, ministries and generic words like
@@ -244,6 +245,12 @@ export default function CargoWatch() {
     enriched.forEach((i) => m.set(i.category, (m.get(i.category) ?? 0) + 1));
     return Array.from(m.entries()).map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
   }, [enriched]);
+
+  // Named Port Breakdown — ranks the ports named in this window's in-scope
+  // records. Same builder the report preview + PDF use, so all three surfaces
+  // stay byte-for-byte in sync. Strict no-fabrication: only records whose own
+  // text names exactly one port are counted; the rest stay uncounted.
+  const cargoPorts = useMemo(() => buildCargoPortBreakdown(enriched), [enriched]);
 
   // Captured Incidents by Country & Cargo — stacked bars (cargo categories
   // stacked per country), matching the requested layout.
@@ -536,6 +543,55 @@ export default function CargoWatch() {
               ))}
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Named Port Breakdown — same builder as report preview + PDF */}
+      <div className="bg-card border border-border rounded-sm">
+        <div className="p-3 border-b border-border bg-muted/50 flex items-baseline justify-between">
+          <span className="font-serif font-bold uppercase text-sm text-primary">Named Port Breakdown</span>
+          <span className="text-[11px] text-muted-foreground font-sans">{rangeText}</span>
+        </div>
+        {cargoPorts.rows.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Not reported.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2 font-sans font-medium w-[22%]">Port</th>
+                  <th className="text-left p-2 font-sans font-medium w-[28%]">Current Pattern</th>
+                  <th className="text-left p-2 font-sans font-medium w-[16%]">Severity</th>
+                  <th className="text-left p-2 font-sans font-medium w-[34%]">Operational Read</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cargoPorts.rows.map((r) => (
+                  <tr key={`${r.port}-${r.country}`} className="border-t border-border align-top">
+                    <td className="p-2">
+                      <div className="font-sans font-bold text-primary">{r.port}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {r.country} · {r.count} record{r.count === 1 ? "" : "s"}
+                      </div>
+                    </td>
+                    <td className="p-2 text-muted-foreground">{r.pattern}</td>
+                    <td className="p-2">
+                      <span
+                        className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm"
+                        style={severityBadgeStyle(r.severityKey)}
+                      >
+                        {r.severityLabel}
+                      </span>
+                    </td>
+                    <td className="p-2 text-muted-foreground">{r.operationalRead}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="px-3 py-2 text-[11px] text-muted-foreground border-t border-border italic">
+          {cargoPorts.coverageLabel}
         </div>
       </div>
 
