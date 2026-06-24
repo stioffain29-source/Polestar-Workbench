@@ -39,6 +39,14 @@ forces a boot catch-up when the newest row's provider ≠ the now-active provide
 - **How to apply:** any new movement provider must (a) write a distinguishable source_name and
   (b) be recognised by both helpers, or the switch won't trigger a refresh.
 
+The SAME dual-source OR-rule governs the public `ais_movement` row on `/api/integrations/status`
+(`aisMovementStatus` in `integrationStatus.ts`): its `configured`/`enabled`/`provider` must be
+derived as `isAisConfigured() || useDatalastic` (with `useDatalastic = registry configured +
+enabled + provider==="datalastic"`), NOT from `AIS_API_KEY` alone — a Datalastic-sourced
+deployment with no AIS key would otherwise misreport `not_configured` while the table is live.
+replit.md's "Datalastic = precision layer on top" framing is misleading: Datalastic is also a
+PRIMARY collection source that bypasses the aisstream gates.
+
 ## NULL-not-zero cargo-split honesty (NO-FABRICATION)
 
 `datalasticCargoClass(typeSpecific)` resolves bulk/container/lng-lpg ONLY from a SPECIFIC

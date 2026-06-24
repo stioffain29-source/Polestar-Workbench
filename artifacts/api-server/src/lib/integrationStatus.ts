@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
+  isAisConfigured,
   isGdeltConfigured,
   isGdeltEnrichEnabled,
   isReliefWebConfigured,
@@ -106,6 +107,8 @@ const OPENAI_DETAIL =
   "Powers AI country-report narratives and English translation of foreign-language incident headlines. Both degrade to deterministic non-AI fallbacks when absent.";
 const VESSEL_REGISTRY_DETAIL =
   "Additive precision layer over the AIS movement sample: looks up each cargo/tanker vessel by IMO/MMSI to split the chokepoint count into bulk / container / LNG-LPG. Never touches incidents; when absent those three columns simply stay NULL ('not reported').";
+const AIS_DETAIL =
+  "Live ship-movement sample for the tracked maritime chokepoints (vessel counts, inbound/outbound split, AIS-visible vs dark/gap). Stored in its own movement table as CONTEXT — never as incidents, so it never inflates any count. The vessel-registry layer sits on top to add the cargo-type breakdown.";
 
 async function gdeltStatus(): Promise<IntegrationStatusItem> {
   const envVars = ["GDELT_CLOUD_API_KEY", "GDELT_ENRICH_ENABLED", "GDELT_CLOUD_API_BASE"];
@@ -402,6 +405,97 @@ async function openaiStatus(): Promise<IntegrationStatusItem> {
       metric("AI narratives cached", proseRows),
     ],
     docsUrl: null,
+  };
+}
+
+function aisFalsey(raw: string | undefined): boolean {
+  const v = raw?.trim().toLowerCase();
+  return v === "false" || v === "0" || v === "off" || v === "no";
+}
+
+async function aisMovementStatus(): Promise<IntegrationStatusItem> {
+  const envVars = ["AIS_API_KEY", "AIS_ENABLED", "AIS_PROVIDER", "AIS_COLLECT_SECONDS"];
+  const docsUrl = "https://aisstream.io";
+
+  // The movement table is fed by ONE of two collection sources, mirroring
+  // runMaritimeMovementIngest: the free aisstream terrestrial stream (gated by
+  // AIS_API_KEY + AIS_ENABLED), or — when a PAID Datalastic registry key is the
+  // chosen provider — Datalastic's satellite area query, which DELIBERATELY
+  // bypasses the aisstream gates (VESSEL_REGISTRY_ENABLED is its kill-switch).
+  // So a Datalastic-sourced deployment with no AIS_API_KEY is still configured.
+  const registryCfg = readVesselRegistryConfig();
+  const useDatalastic =
+    registryCfg.configured && registryCfg.enabled && registryCfg.provider === "datalastic";
+  const aisProvider = process.env.AIS_PROVIDER?.trim().toLowerCase() || "aisstream";
+  const activeProvider = useDatalastic ? "datalastic" : aisProvider;
+  // The aisstream AIS_ENABLED gate only applies when Datalastic is NOT the source.
+  const enabled = useDatalastic ? true : !aisFalsey(process.env.AIS_ENABLED);
+  const configured = isAisConfigured() || useDatalastic;
+
+  // EVIDENCE: how many ship-movement snapshots are stored, across how many
+  // chokepoint theatres, and the most recent snapshot timestamp.
+  let rows = 0;
+  let latest: Date | null = null;
+  let theatres = 0;
+  try {
+    const [row] = await db
+      .select({
+        n: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})`,
+        theatres: sql<number>`count(distinct ${maritimeMovementTable.theatre})::int`,
+      })
+      .from(maritimeMovementTable);
+    rows = row?.n ?? 0;
+    latest = row?.latest ?? null;
+    theatres = row?.theatres ?? 0;
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "ais movement integration status query failed");
+    return unknownItem({
+      key: "ais_movement",
+      label: "AIS vessel movement",
+      configured,
+      envVars,
+      summary: "Status query failed.",
+      detail: AIS_DETAIL,
+      docsUrl,
+    });
+  }
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (!enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (AIS_ENABLED=false) — no live ship-movement sample is collected. Incident feeds and the incident map are unaffected.";
+  } else if (!configured) {
+    status = "not_configured";
+    summary =
+      "No collection source — neither an aisstream AIS_API_KEY nor a Datalastic registry key is set, so the maritime movement table stays empty. Incident feeds are unaffected.";
+  } else if (rows > 0) {
+    status = "working";
+    summary = `Holding ${rows} ship-movement snapshot(s) across ${theatres} chokepoint(s) as maritime context — never counted as incidents.`;
+  } else {
+    status = "no_data";
+    summary =
+      "Configured, but no ship-movement snapshots collected yet — awaiting the next AIS sample.";
+  }
+
+  return {
+    key: "ais_movement",
+    label: "AIS vessel movement",
+    status,
+    summary,
+    detail: AIS_DETAIL,
+    configured,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("Provider", activeProvider),
+      metric("Chokepoints tracked", theatres),
+      metric("Movement snapshots", rows),
+      metric("Last movement", fmtDate(latest)),
+    ],
+    docsUrl,
   };
 }
 
@@ -715,6 +809,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       reliefwebStatus(),
       reliefwebReportsStatus(),
       liveuamapStatus(),
+      aisMovementStatus(),
       vesselRegistryStatus(),
       openaiStatus(),
       socialInstagramStatus(),
