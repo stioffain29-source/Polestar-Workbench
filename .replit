@@ -43,6 +43,5 @@ channel = "stable-25_05"
 [userenv.shared]
 RELIEFWEB_APPNAME = "polestar-advisory-monitoring"
 AIS_COLLECT_SECONDS = "180"
-APIFY_TOKEN = "D5VRcCbsqaFprpRMM"
 
 [userenv.development]
