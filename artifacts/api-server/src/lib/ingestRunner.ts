@@ -451,6 +451,33 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ICC piracy ingest failed");
       iccPiracy = emptyIccPiracy(err);
     }
+    // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
+    // West Papua feeds) into clean English advisory titles. Runs EARLY — next to
+    // strikes and ICC piracy, BEFORE the multi-minute scraper chain — for the
+    // SAME reason those were moved first: on an autoscale deployment the instance
+    // can be torn down before a long chain finishes, and a late step is the most
+    // likely casualty (this pass used to run at the END and was repeatedly killed
+    // before it ran, leaving foreign headlines untranslated in prod). It is
+    // idempotent and converges across runs (it only selects rows whose
+    // display_title is still NULL), so running it first reliably drains the
+    // existing backlog; THIS run's freshly-scraped foreign rows are picked up on
+    // the next boot. Isolated in its own try so an LLM/network failure can never
+    // fail the incident ingest — it just leaves display_title null and the UI
+    // falls back to the original title.
+    try {
+      const titles = await runTitleTranslation({ commit: true });
+      logger.info(
+        {
+          translated: titles.translated,
+          candidates: titles.candidates,
+          failed: titles.failed,
+          skipped: titles.skipped,
+        },
+        "title translation pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "title translation pass failed");
+    }
     // Sequential: these share the same DB pool and dedupe against the incidents
     // table; running them one after another mirrors scrape:prod. Each is isolated
     // in its own try so a DB or unexpected failure in one topic can never abort
@@ -518,26 +545,6 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       );
     } catch (err) {
       logger.error({ err }, "West Papua per-incident extraction pass failed");
-    }
-    // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
-    // West Papua feeds) into clean English advisory titles AFTER the scrapers
-    // have written this run's rows. Isolated in its own try so an LLM/network
-    // failure can never fail the incident ingest — it just leaves display_title
-    // null and the UI falls back to the original title. Idempotent + bounded, so
-    // it converges across runs rather than re-translating settled rows.
-    try {
-      const titles = await runTitleTranslation({ commit: true });
-      logger.info(
-        {
-          translated: titles.translated,
-          candidates: titles.candidates,
-          failed: titles.failed,
-          skipped: titles.skipped,
-        },
-        "title translation pass complete",
-      );
-    } catch (err) {
-      logger.error({ err }, "title translation pass failed");
     }
     // Resolve Google News RSS redirect links (incidents.source_url) to their
     // real publisher URLs, stored additively on incidents.resolved_url. This
