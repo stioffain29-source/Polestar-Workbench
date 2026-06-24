@@ -25,6 +25,7 @@ import {
   classifyIncidentType,
   classifyLocationType,
   recoverCargoPortName,
+  CARGO_FLOOR_LABEL,
   type CargoIncidentLike,
 } from "./cargoAnalysis";
 
@@ -534,10 +535,10 @@ function patternPhrase(rows: CargoNarrativeIncident[]): string {
     const l = classifyLocationType(li);
     if (l && l !== "\u2014" && l !== "-") locCounts.set(l, (locCounts.get(l) ?? 0) + 1);
   }
-  // "Other land-based cargo theft" is the classifier's weak fallback bucket.
-  // Drop it from the pattern phrase whenever a stronger, named type exists so
-  // the column reads on modus operandi, not on the catch-all label.
-  const WEAK_TYPE = "Other land-based cargo theft";
+  // The cargo floor ("Other cargo security incident") is the taxonomy's weak
+  // fallback bucket. Drop it from the pattern phrase whenever a stronger, named
+  // type exists so the column reads on modus operandi, not the catch-all label.
+  const WEAK_TYPE = CARGO_FLOOR_LABEL;
   const typeEntries = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]);
   const strong = typeEntries.filter((e) => e[0] !== WEAK_TYPE);
   const ranked = strong.length > 0 ? strong : typeEntries;
@@ -573,7 +574,7 @@ function operationalReadFor(
     const t = classifyIncidentType(r as unknown as CargoIncidentLike);
     if (t && t !== "Other") typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
   }
-  const WEAK_TYPE = "Other land-based cargo theft";
+  const WEAK_TYPE = CARGO_FLOOR_LABEL;
   const ranked = [...typeCounts.entries()]
     .filter((e) => e[0] !== WEAK_TYPE)
     .sort((a, b) => b[1] - a[1]);

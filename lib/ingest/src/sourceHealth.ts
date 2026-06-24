@@ -33,6 +33,50 @@ export interface FeedHealth {
   /** True when the feed fetch succeeded (even if it returned zero items). */
   ok: boolean;
   error?: string | null;
+  // --- Optional per-run scrape-health telemetry (LAST-RUN snapshots) --------
+  // The funnel this run observed for the feed. Supplied only by engines that
+  // genuinely count it (e.g. cargo); when omitted the column is left untouched,
+  // so a feed that never reports telemetry reads "—" rather than a fake 0.
+  /** Items the feed returned this run (the raw "found" count). */
+  collected?: number;
+  /** Items retained as in-scope this run (the "accepted" count). */
+  retained?: number;
+  /** Items rejected as out-of-scope this run. */
+  rejected?: number;
+  /**
+   * Coarse failure CATEGORY (e.g. "timeout", "blocked_upstream", "fetch_error"),
+   * distinct from the raw `error` blob. Use categorizeFeedFailure() to derive it.
+   */
+  failureReason?: string | null;
+  // --- Optional per-feed registry metadata ---------------------------------
+  /** Source language (e.g. "English", "Indonesian"). Only when genuinely known. */
+  language?: string | null;
+  /** Geography the feed covers. Only when derived from an explicit feed group. */
+  locationCovered?: string | null;
+}
+
+// Map a raw feed-fetch error into a coarse, non-fabricating failure CATEGORY for
+// the Source Health registry. Returns null for an empty/absent error (nothing
+// failed). Never invents causality beyond what the error text states; an
+// unrecognised error falls back to the generic "fetch_error" (the fetch did
+// genuinely throw), with the raw text still surfaced separately in error_message.
+export function categorizeFeedFailure(
+  error: string | null | undefined,
+): string | null {
+  if (!error) return null;
+  const e = error.toLowerCase();
+  if (/timed out|timeout|etimedout/.test(e)) return "timeout";
+  if (/\b403\b|forbidden|blocked|captcha|cloudflare|access denied/.test(e))
+    return "blocked_upstream";
+  if (/\b401\b|unauthor|credential|api key|token/.test(e)) return "auth_error";
+  if (/\b404\b|not found|\b410\b|gone/.test(e)) return "not_found";
+  if (/\b5\d{2}\b|server error|bad gateway|unavailable/.test(e))
+    return "upstream_error";
+  if (/parse|invalid xml|malformed|unexpected token|syntax/.test(e))
+    return "parse_error";
+  if (/econn|enotfound|network|socket|dns|getaddrinfo|fetch failed/.test(e))
+    return "fetch_error";
+  return "fetch_error";
 }
 
 /**
@@ -77,6 +121,14 @@ export async function recordSourceHealth(
      * the feed has succeeded at least once, a later failure escalates normally.
      */
     pending?: boolean;
+    /**
+     * Call-wide registry metadata applied to every feed in this batch: how the
+     * feed is collected ("Google News RSS", "API", …) and how often. Written
+     * only when supplied; otherwise the column is left untouched so a prior
+     * analyst classification persists. Never fabricated.
+     */
+    scrapeMethod?: string;
+    scrapeFrequency?: string;
   } = {},
 ): Promise<void> {
   const now = new Date();
@@ -93,11 +145,42 @@ export async function recordSourceHealth(
         .from(sourcesTable)
         .where(and(eq(sourcesTable.name, f.name), eq(sourcesTable.topic, topic)));
 
-      // Analyst-facing metadata is only written when the caller supplies it.
+      // Analyst-facing metadata + registry descriptors are only written when the
+      // caller supplies them; an omitted field is left untouched so a prior
+      // analyst classification (or a value another run set) persists.
       const meta = {
         ...(opts.reliability !== undefined ? { reliability: opts.reliability } : {}),
         ...(opts.notes !== undefined ? { notes: opts.notes } : {}),
+        ...(opts.scrapeMethod !== undefined ? { scrapeMethod: opts.scrapeMethod } : {}),
+        ...(opts.scrapeFrequency !== undefined
+          ? { scrapeFrequency: opts.scrapeFrequency }
+          : {}),
+        ...(f.language !== undefined ? { language: f.language } : {}),
+        ...(f.locationCovered !== undefined
+          ? { locationCovered: f.locationCovered }
+          : {}),
       };
+
+      // LAST-RUN funnel counts, written only when the engine actually supplied
+      // them. Same for all status branches; an omitted count leaves the column
+      // untouched (reads "—") rather than writing a fake 0.
+      const runCounts = {
+        ...(f.collected !== undefined ? { itemsCollected: f.collected } : {}),
+        ...(f.retained !== undefined ? { itemsRetained: f.retained } : {}),
+        ...(f.rejected !== undefined ? { itemsRejected: f.rejected } : {}),
+      };
+
+      // Per-run telemetry that DOES depend on the outcome: a successful run that
+      // retained an in-scope item stamps last_relevant_item_at and clears the
+      // failure category; a failed run records the coarse failure category but
+      // never invents a relevant-item timestamp. Assigned per status branch.
+      let telemetry: {
+        itemsCollected?: number;
+        itemsRetained?: number;
+        itemsRejected?: number;
+        lastRelevantItemAt?: Date;
+        failureReason?: string | null;
+      } = {};
 
       let healthFields: {
         url: string;
@@ -134,6 +217,15 @@ export async function recordSourceHealth(
           consecutiveFailures: 0,
           lastSuccessAt: now,
         };
+        // Clear the coarse failure category and, ONLY when this run genuinely
+        // retained an in-scope item, stamp last_relevant_item_at. A successful
+        // run that retained nothing leaves the prior stamp untouched (the feed
+        // is healthy but had no relevant item this run — not a fabrication).
+        telemetry = {
+          ...runCounts,
+          failureReason: null,
+          ...((f.retained ?? 0) > 0 ? { lastRelevantItemAt: now } : {}),
+        };
       } else if (opts.pending && !existing?.lastSuccessAt) {
         // Configured but never validated end-to-end yet, and this run failed.
         // Record it as the non-alarming "pending" state (awaiting approval /
@@ -147,6 +239,12 @@ export async function recordSourceHealth(
           errorMessage: (f.error ?? "Awaiting validation").slice(0, 500),
           consecutiveFailures: 0,
           lastFailureAt: now,
+        };
+        // A failed run records its coarse failure category (when supplied) but
+        // never stamps a relevant-item timestamp.
+        telemetry = {
+          ...runCounts,
+          ...(f.failureReason !== undefined ? { failureReason: f.failureReason } : {}),
         };
       } else {
         const next = (existing?.consecutiveFailures ?? 0) + 1;
@@ -168,12 +266,18 @@ export async function recordSourceHealth(
           consecutiveFailures: next,
           lastFailureAt: now,
         };
+        // A failed run records its coarse failure category (when supplied) but
+        // never stamps a relevant-item timestamp.
+        telemetry = {
+          ...runCounts,
+          ...(f.failureReason !== undefined ? { failureReason: f.failureReason } : {}),
+        };
       }
 
       if (existing) {
         await db
           .update(sourcesTable)
-          .set({ ...healthFields, ...meta })
+          .set({ ...healthFields, ...meta, ...telemetry })
           .where(eq(sourcesTable.id, existing.id));
       } else {
         await db.insert(sourcesTable).values({
@@ -184,6 +288,7 @@ export async function recordSourceHealth(
           lastFailureAt: f.ok ? null : now,
           ...healthFields,
           ...meta,
+          ...telemetry,
         });
       }
     }

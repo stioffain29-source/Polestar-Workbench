@@ -108,3 +108,69 @@ describe("cargo classify — port-only headlines pass the title country gate", (
     expect(item.result.country).toBeNull();
   });
 });
+
+describe("cargo classify — widened PORT cargo-security scope is kept", () => {
+  const kept: Array<[string, string]> = [
+    ["Armed robbers boarded a bulk carrier at Singapore anchorage", "Singapore"],
+    ["Stowaways found in container at Tanjung Priok", "Indonesia"],
+    ["Cocaine in container seized at Port Klang", "Malaysia"],
+    ["Port robbery: thieves loot a depot at Colombo port", "Sri Lanka"],
+  ];
+  it.each(kept)("keeps a port cargo-security event: %s", (title, country) => {
+    const item = classifyFeedItem(title, "");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe(country);
+  });
+});
+
+describe("cargo classify — maritime / kinetic DENY is gated on cargo context", () => {
+  it("drops a pure under-way attack with no cargo/port context (routes to Shipping)", () => {
+    const item = classifyFeedItem("Houthi missile strikes tanker off Yemen coast", "");
+    expect(item.result.kept).toBe(false);
+  });
+
+  it("keeps a maritime-worded headline once cargo context is present", () => {
+    // 'tanker attack' is a MARITIME_DENY term, but the cargo-theft framing keeps
+    // it in Cargo Watch instead of dropping it to Shipping.
+    const item = classifyFeedItem("Cargo theft foiled after tanker attack alert at Colombo port", "");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe("Sri Lanka");
+  });
+});
+
+describe("cargo classify — unambiguous shipping-ops noise stays out", () => {
+  const dropped = [
+    "Port congestion snarls box terminal in Singapore",
+    "Freight rate surge squeezes Jebel Ali importers",
+    "Container rate hikes hit Colombo port shippers",
+  ];
+  it.each(dropped)("drops commercial / port-ops noise: %s", (title) => {
+    const item = classifyFeedItem(title, "");
+    expect(item.result.kept).toBe(false);
+  });
+});
+
+describe("cargo classify — security wins over ops/commercial noise (gated, not hard-denied)", () => {
+  const kept: Array<[string, string]> = [
+    // A genuine theft that merely MENTIONS an ops/commercial word must survive —
+    // the ops term is gated on absence of cargo/port context, so it is skipped.
+    ["Cargo theft probe at Port Klang amid record throughput", "Malaysia"],
+    ["Container theft ring busted at Tanjung Priok despite joint venture deal", "Indonesia"],
+    ["Cargo theft surges amid new tariff regime at Jebel Ali", "UAE"],
+    // Maritime-deny term + port/vessel context => kept (port-side cargo crime).
+    ["Theft from vessel reported at Singapore port after tanker attack scare", "Singapore"],
+  ];
+  it.each(kept)("keeps a security event that co-mentions ops/commercial/maritime noise: %s", (title, country) => {
+    const item = classifyFeedItem(title, "");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe(country);
+  });
+
+  it("still drops a pure under-way attack even though it names a vessel (ALLOW gate, no cargo crime)", () => {
+    // 'vessel'/'tanker' now count as context (so port-side crime survives), but
+    // with no cargo-security ALLOW phrase the headline fails the ALLOW gate and
+    // routes to Shipping — the security signal, not the noun, is what keeps it.
+    const item = classifyFeedItem("Missile strikes tanker off Yemen as vessel catches fire", "");
+    expect(item.result.kept).toBe(false);
+  });
+});

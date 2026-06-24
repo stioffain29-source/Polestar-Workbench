@@ -6,6 +6,11 @@ import {
   isSourceActionRequired,
   isSourceRetrying,
   RETRY_ESCALATION_THRESHOLD,
+  isSourceScrapeStale,
+  isSourceNoRelevantItem,
+  formatFunnelCount,
+  SCRAPE_STALE_DAYS,
+  NO_RELEVANT_ITEM_DAYS,
 } from "../../artifacts/workbench/src/lib/sourceHealth";
 import { SOURCE_STATUSES } from "../../artifacts/workbench/src/lib/topics";
 
@@ -216,5 +221,126 @@ describe("retrying derivation (early-warning, not action-required)", () => {
     const s = { status: "blocked", consecutiveFailures: 1 };
     expect(isSourceRetrying(s)).toBe(false);
     expect(isSourceActionRequired(s)).toBe(true);
+  });
+});
+
+describe("scrape-stale derivation (no successful scrape in the window)", () => {
+  const now = new Date("2026-06-24T12:00:00Z");
+  const fresh = "2026-06-23T12:00:00Z"; // 1 day ago
+  const stale = "2026-06-10T12:00:00Z"; // 14 days ago
+
+  it("flags an actively-collecting feed whose last success is older than the window", () => {
+    expect(
+      isSourceScrapeStale({ status: "operational", lastSuccessAt: stale }, now),
+    ).toBe(true);
+  });
+
+  it("does not flag a feed that scraped inside the window", () => {
+    expect(
+      isSourceScrapeStale({ status: "operational", lastSuccessAt: fresh }, now),
+    ).toBe(false);
+  });
+
+  it("never flags a feed that has never successfully run (not stale, just unstarted)", () => {
+    expect(
+      isSourceScrapeStale({ status: "operational", lastSuccessAt: null }, now),
+    ).toBe(false);
+  });
+
+  it("never flags an intentionally-off / pending source even if long idle", () => {
+    expect(isSourceScrapeStale({ status: "not_configured", lastSuccessAt: stale }, now)).toBe(false);
+    expect(isSourceScrapeStale({ status: "pending", lastSuccessAt: stale }, now)).toBe(false);
+    expect(isSourceScrapeStale({ status: "disabled", lastSuccessAt: stale }, now)).toBe(false);
+  });
+
+  it("uses the published staleness window boundary", () => {
+    const justInside = new Date(now.getTime() - (SCRAPE_STALE_DAYS - 1) * 86400000).toISOString();
+    const justOutside = new Date(now.getTime() - (SCRAPE_STALE_DAYS + 1) * 86400000).toISOString();
+    expect(isSourceScrapeStale({ status: "operational", lastSuccessAt: justInside }, now)).toBe(false);
+    expect(isSourceScrapeStale({ status: "operational", lastSuccessAt: justOutside }, now)).toBe(true);
+  });
+});
+
+describe("no-relevant-item derivation (collecting but nothing in-scope retained)", () => {
+  const now = new Date("2026-06-24T12:00:00Z");
+  const recentSuccess = "2026-06-23T12:00:00Z";
+  const oldRelevant = "2026-05-01T12:00:00Z"; // ~54 days ago
+  const recentRelevant = "2026-06-20T12:00:00Z";
+
+  it("flags a collecting feed whose last in-scope item is older than the relevance window", () => {
+    expect(
+      isSourceNoRelevantItem(
+        { status: "operational", lastSuccessAt: recentSuccess, lastRelevantItemAt: oldRelevant },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not flag a feed with a recent in-scope item", () => {
+    expect(
+      isSourceNoRelevantItem(
+        { status: "operational", lastSuccessAt: recentSuccess, lastRelevantItemAt: recentRelevant },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a NULL last-relevant timestamp as unknown, not a fabricated gap", () => {
+    expect(
+      isSourceNoRelevantItem(
+        { status: "operational", lastSuccessAt: recentSuccess, lastRelevantItemAt: null },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("never flags a feed that has never collected", () => {
+    expect(
+      isSourceNoRelevantItem(
+        { status: "operational", lastSuccessAt: null, lastRelevantItemAt: oldRelevant },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("never flags an intentionally-off / pending source", () => {
+    expect(
+      isSourceNoRelevantItem(
+        { status: "not_configured", lastSuccessAt: recentSuccess, lastRelevantItemAt: oldRelevant },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("uses the published relevance window boundary", () => {
+    const justInside = new Date(now.getTime() - (NO_RELEVANT_ITEM_DAYS - 1) * 86400000).toISOString();
+    const justOutside = new Date(now.getTime() - (NO_RELEVANT_ITEM_DAYS + 1) * 86400000).toISOString();
+    expect(
+      isSourceNoRelevantItem(
+        { status: "operational", lastSuccessAt: recentSuccess, lastRelevantItemAt: justInside },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isSourceNoRelevantItem(
+        { status: "operational", lastSuccessAt: recentSuccess, lastRelevantItemAt: justOutside },
+        now,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("funnel count formatting", () => {
+  it("renders an em dash for untracked (null / undefined) counts", () => {
+    expect(formatFunnelCount(null)).toBe("—");
+    expect(formatFunnelCount(undefined)).toBe("—");
+  });
+
+  it("renders a real zero as 0, never an em dash", () => {
+    expect(formatFunnelCount(0)).toBe("0");
+  });
+
+  it("renders a positive count verbatim", () => {
+    expect(formatFunnelCount(42)).toBe("42");
   });
 });

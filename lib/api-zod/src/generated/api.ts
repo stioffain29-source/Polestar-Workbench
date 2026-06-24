@@ -94,7 +94,16 @@ export const GetDashboardOverviewResponse = zod.object({
   "reliability": zod.number().min(getDashboardOverviewResponseSourceAlertsItemReliabilityMin).max(getDashboardOverviewResponseSourceAlertsItemReliabilityMax),
   "manualReviewRequired": zod.boolean(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "scrapeMethod": zod.string().nullish(),
+  "scrapeFrequency": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "locationCovered": zod.string().nullish(),
+  "lastRelevantItemAt": zod.coerce.date().nullish(),
+  "itemsCollected": zod.number().nullish(),
+  "itemsRetained": zod.number().nullish(),
+  "itemsRejected": zod.number().nullish(),
+  "failureReason": zod.string().nullish()
 })),
   "reportsPipeline": zod.array(zod.object({
   "id": zod.number(),
@@ -1126,7 +1135,16 @@ export const ListSourcesResponseItem = zod.object({
   "reliability": zod.number().min(listSourcesResponseReliabilityMin).max(listSourcesResponseReliabilityMax),
   "manualReviewRequired": zod.boolean(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "scrapeMethod": zod.string().nullish(),
+  "scrapeFrequency": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "locationCovered": zod.string().nullish(),
+  "lastRelevantItemAt": zod.coerce.date().nullish(),
+  "itemsCollected": zod.number().nullish(),
+  "itemsRetained": zod.number().nullish(),
+  "itemsRejected": zod.number().nullish(),
+  "failureReason": zod.string().nullish()
 })
 export const ListSourcesResponse = zod.array(ListSourcesResponseItem)
 
@@ -1147,7 +1165,11 @@ export const CreateSourceBody = zod.object({
   "errorMessage": zod.string().optional(),
   "reliability": zod.number().min(createSourceBodyReliabilityMin).max(createSourceBodyReliabilityMax),
   "manualReviewRequired": zod.boolean(),
-  "notes": zod.string().optional()
+  "notes": zod.string().optional(),
+  "scrapeMethod": zod.string().optional(),
+  "scrapeFrequency": zod.string().optional(),
+  "language": zod.string().optional(),
+  "locationCovered": zod.string().optional()
 })
 
 
@@ -1171,7 +1193,11 @@ export const UpdateSourceBody = zod.object({
   "errorMessage": zod.string().optional(),
   "reliability": zod.number().min(updateSourceBodyReliabilityMin).max(updateSourceBodyReliabilityMax).optional(),
   "manualReviewRequired": zod.boolean().optional(),
-  "notes": zod.string().optional()
+  "notes": zod.string().optional(),
+  "scrapeMethod": zod.string().optional(),
+  "scrapeFrequency": zod.string().optional(),
+  "language": zod.string().optional(),
+  "locationCovered": zod.string().optional()
 })
 
 export const updateSourceResponseConsecutiveFailuresMin = 0;
@@ -1195,7 +1221,16 @@ export const UpdateSourceResponse = zod.object({
   "reliability": zod.number().min(updateSourceResponseReliabilityMin).max(updateSourceResponseReliabilityMax),
   "manualReviewRequired": zod.boolean(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "scrapeMethod": zod.string().nullish(),
+  "scrapeFrequency": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "locationCovered": zod.string().nullish(),
+  "lastRelevantItemAt": zod.coerce.date().nullish(),
+  "itemsCollected": zod.number().nullish(),
+  "itemsRetained": zod.number().nullish(),
+  "itemsRejected": zod.number().nullish(),
+  "failureReason": zod.string().nullish()
 })
 
 

@@ -256,6 +256,45 @@ export async function runDataMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS consecutive_failures integer NOT NULL DEFAULT 0
     `);
 
+    // 0b) Schema: source registry + scrape-health telemetry on `sources`.
+    //     Same read-only-prod rationale as above — drizzle push only reaches dev,
+    //     so the writable prod primary gains these on boot. All nullable/additive:
+    //       - registry: scrape_method / scrape_frequency / language /
+    //         location_covered (analyst-classifiable descriptive metadata).
+    //       - telemetry: last_relevant_item_at + items_collected / items_retained /
+    //         items_rejected (LAST-RUN funnel snapshots, machine-written) +
+    //         failure_reason (coarse failure category, distinct from error_message).
+    //     A row with none set reads "—" on the Source Health registry; the
+    //     pipeline never fabricates coverage or counts it cannot verify. All
+    //     idempotent (IF NOT EXISTS).
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS scrape_method text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS scrape_frequency text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS language text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS location_covered text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS last_relevant_item_at timestamptz`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS items_collected integer`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS items_retained integer`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS items_rejected integer`,
+    );
+    await db.execute(
+      sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS failure_reason text`,
+    );
+
     // Schema: ReliefWeb (UN OCHA) incident corroboration. Same rationale as
     // above — drizzle push only reaches dev, so the prod primary gains the
     // column + child table here on boot. All idempotent (IF NOT EXISTS).

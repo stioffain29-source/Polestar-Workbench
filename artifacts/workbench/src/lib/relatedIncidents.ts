@@ -43,24 +43,31 @@ function isGenericCargoTitle(title: string): boolean {
   );
 }
 
-// Title-based dedupe: collapse syndicated / repeated rows so the table does not
-// list the same loss four times. Different places survive because their first
-// eight significant words differ.
-function titleKey(s: string): string {
-  const STOP = new Set([
-    "the", "a", "an", "of", "in", "on", "at", "to", "for", "and",
-    "as", "by", "off", "near", "after", "amid", "with", "from", "into", "over",
-    "says", "say", "said", "reports", "report",
-  ]);
+// The single significant-token authority for cargo title similarity. Lower-cases,
+// strips punctuation and drops common stop / attribution words. Both the Related
+// Incidents dedupe (titleKey) and the cargo clustering module consume THIS so the
+// two never tokenise differently.
+const TITLE_STOP = new Set([
+  "the", "a", "an", "of", "in", "on", "at", "to", "for", "and",
+  "as", "by", "off", "near", "after", "amid", "with", "from", "into", "over",
+  "says", "say", "said", "reports", "report",
+]);
+
+export function significantTitleTokens(s: string): string[] {
   return (s ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .split(" ")
-    .filter((w) => w && !STOP.has(w))
-    .slice(0, 8)
-    .join(" ");
+    .filter((w) => w && !TITLE_STOP.has(w));
+}
+
+// Title-based dedupe: collapse syndicated / repeated rows so the table does not
+// list the same loss four times. Different places survive because their first
+// eight significant words differ.
+function titleKey(s: string): string {
+  return significantTitleTokens(s).slice(0, 8).join(" ");
 }
 
 // Returns the ordered, deduped, capped rows for the Related Incidents table.

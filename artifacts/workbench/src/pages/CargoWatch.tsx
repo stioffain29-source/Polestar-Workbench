@@ -28,6 +28,16 @@ import {
 } from "@/lib/cargoAnalysis";
 import { dedupeMonitorRows } from "@/lib/monitorDedupe";
 import { buildCargoPortBreakdown } from "@/lib/cargoNarratives";
+import {
+  buildCargoGroupedDataset,
+  cargoClusterLocationLabel,
+  cargoClusterDetailLine,
+  cargoClusterSourceLabel,
+  cargoClusterSeverityKey,
+  type CargoGroupedDataset,
+  type CargoGroupedSection,
+} from "@/lib/cargoGroupedDataset";
+import { SEV_LABEL } from "@/lib/pdfChrome";
 
 // A named commercial entity, detected conservatively: a proper noun followed
 // by a corporate suffix. Police forces, ministries and generic words like
@@ -251,6 +261,30 @@ export default function CargoWatch() {
   // stay byte-for-byte in sync. Strict no-fabrication: only records whose own
   // text names exactly one port are counted; the rest stay uncounted.
   const cargoPorts = useMemo(() => buildCargoPortBreakdown(enriched), [enriched]);
+  // Cargo Incident Clusters — the SAME shared grouping module the report
+  // preview + PDF consume (buildCargoGroupedDataset). The monitor builds from
+  // its own windowed in-scope set and shows the full section list (incl. the
+  // New & Updated cross-cut); the report renders the fixed report subset. Same
+  // module, same clustering, same per-cluster text — so they cannot drift.
+  const cargoGrouped = useMemo(
+    () =>
+      buildCargoGroupedDataset(
+        enriched.map((i) => ({
+          id: i.id,
+          topic: i.topic,
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          sourceUrl: i.sourceUrl ?? null,
+          location: i.location ?? null,
+          country: i.displayCountry ?? i.country ?? null,
+          severity: i.severity ?? null,
+          occurredAt: i.occurredAt,
+        })),
+        { referenceDate: new Date().toISOString().slice(0, 10) },
+      ),
+    [enriched],
+  );
 
   // Captured Incidents by Country & Cargo — stacked bars (cargo categories
   // stacked per country), matching the requested layout.
@@ -595,6 +629,9 @@ export default function CargoWatch() {
         </div>
       </div>
 
+      {/* Cargo Incident Clusters — shared grouping module (== report preview + PDF) */}
+      <CargoClusterPanel grouped={cargoGrouped} rangeText={rangeText} />
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · ${rangeText}`} />
@@ -700,6 +737,93 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
     <div className="bg-card border border-border rounded-sm p-4">
       <h2 className="font-serif font-bold uppercase text-primary text-sm mb-3 tracking-wide">{title}</h2>
       <div className="h-72">{children}</div>
+    </div>
+  );
+}
+
+// Cargo Incident Clusters — consumes the SAME shared grouping module that drives
+// the report preview + PDF (buildCargoGroupedDataset). The monitor renders every
+// populated section (incl. the New & Updated cross-cut) plus the de-duped watch
+// items; the report renders the fixed report subset. Native monitor styling, but
+// the clusters, per-cluster text and severity all come from the shared module.
+function CargoClusterPanel({ grouped, rangeText }: { grouped: CargoGroupedDataset; rangeText: string }) {
+  const tableSections = grouped.sections.filter(
+    (s) => s.key !== "watch_items" && s.clusters.length > 0,
+  );
+  return (
+    <div className="bg-card border border-border rounded-sm">
+      <div className="p-3 border-b border-border bg-muted/50 flex items-baseline justify-between">
+        <span className="font-serif font-bold uppercase text-sm text-primary">Cargo Incident Clusters</span>
+        <span className="text-[11px] text-muted-foreground font-sans">{rangeText}</span>
+      </div>
+      {tableSections.length === 0 && grouped.watchItems.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">Not reported.</div>
+      ) : (
+        <>
+          <div className="divide-y divide-border">
+            {tableSections.map((section) => (
+              <CargoClusterSectionTable key={section.key} section={section} />
+            ))}
+          </div>
+          {grouped.watchItems.length > 0 && (
+            <div className="p-4 border-t border-border">
+              <div className="font-serif font-bold uppercase text-[13px] text-primary mb-2">Recommended Watch Items</div>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                {grouped.watchItems.map((w, idx) => (
+                  <li key={idx}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function CargoClusterSectionTable({ section }: { section: CargoGroupedSection }) {
+  return (
+    <div className="p-4">
+      <div className="font-serif font-bold uppercase text-[13px] text-primary mb-2">{section.title}</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="text-left p-2 font-sans font-medium w-[110px]">Date</th>
+              <th className="text-left p-2 font-sans font-medium w-[160px]">Category</th>
+              <th className="text-left p-2 font-sans font-medium">Incident</th>
+              <th className="text-left p-2 font-sans font-medium w-[110px]">Severity</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {section.clusters.map((c) => {
+              const sk = cargoClusterSeverityKey(c);
+              return (
+                <tr key={c.id} className="align-top">
+                  <td className="p-2 font-mono text-xs whitespace-nowrap">{format(new Date(c.latestOccurredAt), "yyyy-MM-dd")}</td>
+                  <td className="p-2 text-xs">{c.enrichment.category}</td>
+                  <td className="p-2">
+                    <div className="text-sm font-medium leading-snug text-primary">{c.title}</div>
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      {cargoClusterLocationLabel(c)} · Confidence: {c.enrichment.confidence} · Status: {c.enrichment.status}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{cargoClusterDetailLine(c)}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 italic">{cargoClusterSourceLabel(c)}</div>
+                  </td>
+                  <td className="p-2">
+                    <span
+                      className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm"
+                      style={severityBadgeStyle(sk)}
+                    >
+                      {SEV_LABEL[sk] ?? "—"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -25,4 +25,8 @@ export interface SourceInput {
   reliability: number;
   manualReviewRequired: boolean;
   notes?: string;
+  scrapeMethod?: string;
+  scrapeFrequency?: string;
+  language?: string;
+  locationCovered?: string;
 }

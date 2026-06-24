@@ -1,4 +1,8 @@
-import { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "../../lib/ingest/src/sourceHealth";
+import {
+  recordSourceHealth,
+  FAILURE_ESCALATION_THRESHOLD,
+  categorizeFeedFailure,
+} from "../../lib/ingest/src/sourceHealth";
 import { db, sourcesTable } from "@workspace/db";
 
 // Intercept drizzle's eq/and so we can assert what column/value the upsert is
@@ -209,5 +213,146 @@ describe("recordSourceHealth", () => {
     await expect(
       recordSourceHealth("shipping", [{ name: "Feed A", url: "http://a.test/rss", ok: true }]),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("recordSourceHealth — scrape-health telemetry", () => {
+  it("writes the last-run funnel and stamps last-relevant when a successful run retained an in-scope item", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("cargo_watch", [
+      { name: "Port feed", url: "http://p.test/rss", ok: true, collected: 12, retained: 3, rejected: 9 },
+    ]);
+
+    const row = cap.inserts[0];
+    expect(row.itemsCollected).toBe(12);
+    expect(row.itemsRetained).toBe(3);
+    expect(row.itemsRejected).toBe(9);
+    // Retained > 0 -> a genuine in-scope item this run -> stamp the timestamp.
+    expect(row.lastRelevantItemAt).toBeInstanceOf(Date);
+    // A successful run clears any prior failure category.
+    expect(row.failureReason).toBeNull();
+  });
+
+  it("records the funnel but does NOT stamp last-relevant when a successful run retained nothing", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("cargo_watch", [
+      { name: "Quiet port feed", url: "http://q.test/rss", ok: true, collected: 8, retained: 0, rejected: 8 },
+    ]);
+
+    const row = cap.inserts[0];
+    expect(row.itemsCollected).toBe(8);
+    expect(row.itemsRetained).toBe(0);
+    // No in-scope item this run -> never fabricate a relevant-item timestamp.
+    expect(row.lastRelevantItemAt).toBeUndefined();
+  });
+
+  it("leaves the funnel columns untouched (no fake 0) when the engine reports no counts", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("shipping", [{ name: "Feed A", url: "http://a.test/rss", ok: true }]);
+
+    const row = cap.inserts[0];
+    expect(row).not.toHaveProperty("itemsCollected");
+    expect(row).not.toHaveProperty("itemsRetained");
+    expect(row).not.toHaveProperty("itemsRejected");
+    expect(row).not.toHaveProperty("lastRelevantItemAt");
+  });
+
+  it("records the coarse failure category on a failed run and never stamps last-relevant", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("cargo_watch", [
+      {
+        name: "Blocked feed",
+        url: "http://b.test/rss",
+        ok: false,
+        error: "403 Forbidden",
+        failureReason: "blocked_upstream",
+        collected: 0,
+        retained: 0,
+        rejected: 0,
+      },
+    ]);
+
+    const row = cap.inserts[0];
+    expect(row.failureReason).toBe("blocked_upstream");
+    expect(row.lastRelevantItemAt).toBeUndefined();
+  });
+
+  it("writes registry metadata (scrapeMethod/frequency from opts, language/location from feed)", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth(
+      "cargo_watch",
+      [
+        {
+          name: "APAC port feed",
+          url: "http://r.test/rss",
+          ok: true,
+          retained: 1,
+          language: "English",
+          locationCovered: "APAC ports",
+        },
+      ],
+      { scrapeMethod: "Google News RSS", scrapeFrequency: "Every 12h (scheduled)" },
+    );
+
+    const row = cap.inserts[0];
+    expect(row.scrapeMethod).toBe("Google News RSS");
+    expect(row.scrapeFrequency).toBe("Every 12h (scheduled)");
+    expect(row.language).toBe("English");
+    expect(row.locationCovered).toBe("APAC ports");
+  });
+
+  it("does not write registry metadata when none is supplied (leaves prior analyst values intact)", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("shipping", [{ name: "Feed A", url: "http://a.test/rss", ok: true }]);
+
+    const row = cap.inserts[0];
+    expect(row).not.toHaveProperty("scrapeMethod");
+    expect(row).not.toHaveProperty("scrapeFrequency");
+    expect(row).not.toHaveProperty("language");
+    expect(row).not.toHaveProperty("locationCovered");
+  });
+
+  it("carries telemetry on the UPDATE path for an existing row", async () => {
+    const cap = setupDb({ existing: [{ id: 7, consecutiveFailures: 0 }] });
+
+    await recordSourceHealth("cargo_watch", [
+      { name: "Port feed", url: "http://p.test/rss", ok: true, collected: 5, retained: 2, rejected: 3 },
+    ]);
+
+    expect(cap.updates).toHaveLength(1);
+    const set = cap.updates[0].set;
+    expect(set.itemsCollected).toBe(5);
+    expect(set.itemsRetained).toBe(2);
+    expect(set.lastRelevantItemAt).toBeInstanceOf(Date);
+    expect(set.failureReason).toBeNull();
+  });
+});
+
+describe("categorizeFeedFailure", () => {
+  it("returns null for an absent error (nothing failed)", () => {
+    expect(categorizeFeedFailure(null)).toBeNull();
+    expect(categorizeFeedFailure(undefined)).toBeNull();
+    expect(categorizeFeedFailure("")).toBeNull();
+  });
+
+  it("maps recognised error text to its coarse category", () => {
+    expect(categorizeFeedFailure("timed out after 20000ms")).toBe("timeout");
+    expect(categorizeFeedFailure("403 Forbidden")).toBe("blocked_upstream");
+    expect(categorizeFeedFailure("Cloudflare challenge")).toBe("blocked_upstream");
+    expect(categorizeFeedFailure("401 Unauthorized: bad api key")).toBe("auth_error");
+    expect(categorizeFeedFailure("404 Not Found")).toBe("not_found");
+    expect(categorizeFeedFailure("502 Bad Gateway")).toBe("upstream_error");
+    expect(categorizeFeedFailure("invalid xml: malformed feed body")).toBe("parse_error");
+    expect(categorizeFeedFailure("ENOTFOUND getaddrinfo")).toBe("fetch_error");
+  });
+
+  it("falls back to fetch_error for an unrecognised error (the fetch still threw)", () => {
+    expect(categorizeFeedFailure("something weird happened")).toBe("fetch_error");
   });
 });

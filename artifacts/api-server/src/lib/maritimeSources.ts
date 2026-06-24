@@ -253,6 +253,19 @@ export async function getMaritimeSourceHealth(): Promise<MaritimeSourceHealthIte
     "No live IMB connector yet — slots into the confirmed-incidents table when the dedicated piracy source lands.",
     null,
   );
+  // ReCAAP ISC is the authoritative regional body for piracy / armed robbery
+  // against ships in Asia (and the cargo-theft-at-sea events Cargo Watch tracks).
+  // We have no direct connector to its incident database — those events reach us
+  // only as news echoes via the shipping / cargo feeds — so it reads
+  // "unavailable" (slots in when the dedicated authority source lands), never
+  // "failing": nothing is broken.
+  const recaap = item(
+    "recaap",
+    "ReCAAP ISC",
+    "unavailable",
+    "No direct ReCAAP ISC connector yet — Asia piracy / armed-robbery and cargo-theft-at-sea events arrive only as news echoes via the shipping and cargo feeds until the dedicated authority source lands.",
+    null,
+  );
 
-  return [ukmto, imb, news, ais, windward, manual];
+  return [ukmto, imb, recaap, news, ais, windward, manual];
 }

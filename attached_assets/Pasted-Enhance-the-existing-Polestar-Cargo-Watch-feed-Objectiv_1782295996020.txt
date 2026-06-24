@@ -1,0 +1,276 @@
+Enhance the existing Polestar Cargo Watch feed.
+
+Objective
+
+Enhance Cargo Watch so it captures cargo security and port related security incidents that may affect cargo movement, storage, handling, drivers, logistics facilities, port access routes and vessels at port or anchorage.
+
+Cargo Watch must remain a security incident feed. It must not become a general shipping news, port operations, freight market, port congestion or berth delay feed.
+
+Scope
+
+Cargo Watch should include two linked security sections:
+
+1. Cargo Security
+
+Capture:
+
+truck hijacking
+cargo theft
+container theft
+depot theft
+warehouse theft
+trailer theft
+rail cargo theft
+pilferage
+fictitious pickup
+fake carrier fraud
+cargo diversion
+driver collusion
+insider theft
+theft from logistics facilities
+attacks on cargo vehicles
+arrests linked to cargo crime
+
+2. Port Related Cargo Security
+
+Capture:
+
+armed robbery in port or anchorage
+attempted boarding
+theft from vessels
+theft from containers inside port areas
+intrusion into port facilities
+stowaway incidents
+smuggling linked to port or cargo security
+narcotics seizures linked to port or cargo movement
+weapons seizures linked to port or cargo movement
+sabotage or deliberate damage affecting port or cargo security
+suspicious vessel activity near port or anchorage
+protest activity blocking port access or cargo movement
+labour unrest where it creates a security risk to cargo, drivers, vessels or facilities
+crime around port gates, truck parks, access roads or logistics zones
+arrests of port workers, guards, drivers or organised groups linked to port or cargo crime
+
+Exclude:
+
+berth delays
+port congestion
+vessel waiting times
+freight rates
+throughput updates
+port development stories
+port expansion news
+commercial shipping news
+normal customs delays
+generic trade news
+generic supply chain commentary
+
+Incident categories
+
+Use these categories:
+
+CARGO_HIJACKING
+CARGO_THEFT
+CONTAINER_THEFT
+TRAILER_THEFT
+WAREHOUSE_THEFT
+DEPOT_THEFT
+RAIL_CARGO_THEFT
+PILFERAGE
+FAKE_CARRIER_FRAUD
+FICTITIOUS_PICKUP
+CARGO_DIVERSION
+DRIVER_COLLUSION
+INSIDER_CARGO_THEFT
+LOGISTICS_FACILITY_THEFT
+CARGO_VEHICLE_ATTACK
+PORT_ARMED_ROBBERY
+PORT_INTRUSION
+PORT_THEFT
+PORT_CONTAINER_THEFT
+PORT_STOWAWAY
+PORT_SMUGGLING
+PORT_WEAPONS_SEIZURE
+PORT_DRUG_SEIZURE
+PORT_SABOTAGE
+PORT_PROTEST_BLOCKADE
+PORT_LABOUR_SECURITY_RISK
+PORT_ACCESS_ROAD_CRIME
+ANCHORAGE_SECURITY
+SUSPICIOUS_VESSEL_ACTIVITY
+NOT_RELEVANT
+
+Security impact score
+
+Add a security impact score to every retained item:
+
+0 = not relevant
+1 = low level security concern
+2 = confirmed criminal or security incident
+3 = material security risk to cargo, vessel, driver, facility or route
+4 = severe incident involving violence, weapons, organised crime, repeated activity or major cargo loss
+
+Confidence levels
+
+Add a confidence level to every retained item:
+
+High = official source, police report, customs report, port authority notice, coast guard report, maritime authority report, court record, or two reliable independent sources.
+
+Medium = credible local media, logistics source, industry source or security provider source.
+
+Low = social media, single unverified claim, unclear location or weak source.
+
+Required incident fields
+
+Each retained incident must include:
+
+date
+time if available
+country
+city
+port, terminal, depot, road, warehouse, truck park or logistics location
+coordinates where available
+incident type
+cargo type if known
+vessel name if relevant
+company name if mentioned
+source name
+source URL
+short factual summary
+confidence level
+security impact score
+recommended watch item
+status: new, ongoing, updated, resolved or unconfirmed
+
+Additional scrape coverage
+
+Add additional scrape coverage specifically for cargo security and port related cargo security.
+
+Create or update a source registry table with:
+
+source name
+source URL
+source type
+country
+city, port or logistics zone covered
+topic covered
+language
+trust level
+scrape method
+scrape frequency
+last successful scrape
+last relevant item
+failure count
+notes
+
+Source types should include:
+
+police
+customs
+coast guard
+maritime authority
+port authority
+terminal operator
+cargo security body
+logistics association
+local media
+social media
+specialist maritime security source
+specialist cargo crime source
+
+Priority scrape targets
+
+Add scrape coverage for:
+
+police reports in port cities and cargo crime locations
+customs seizure reports
+coast guard and maritime authority notices
+port authority security notices
+terminal security advisories where public
+local newspapers covering port cities, logistics corridors and industrial zones
+logistics association updates
+trucker and haulier association updates
+public Facebook pages and groups where technically and legally accessible
+public X accounts for police, ports, customs, transport and logistics security
+maritime security sources such as IMB, ReCAAP and IMO where accessible
+cargo crime sources such as TAPA intelligence where access is available
+
+Deduplication
+
+Deduplicate incidents by:
+
+same location
+same port or logistics zone
+same date window
+same incident type
+same cargo type
+same company name
+same vessel name
+same source URL
+similar headline
+similar summary
+
+Where several sources refer to the same incident, create one incident cluster. Keep the strongest source as the primary source and attach the others as supporting sources.
+
+Stale source detection
+
+Mark a source as stale if:
+
+no successful scrape in seven days
+no relevant item in thirty days
+repeated scrape failures
+content has changed format and the parser is failing
+
+Scrape health
+
+Add a scrape health panel or log view showing:
+
+source name
+last scrape
+scrape status
+items collected
+items retained after classification
+items rejected as not relevant
+failure reason
+
+Cargo Watch output
+
+Only show retained security incidents.
+
+Do not show general shipping, freight, berth delay, port congestion or port operations stories.
+
+Group the Cargo Watch output by:
+
+1. Severe or high impact incidents
+2. Cargo Security
+3. Port Related Cargo Security
+4. Watch items
+5. Newly added or updated incident clusters
+
+Each item should be concise and operationally useful.
+
+Avoid vague wording.
+
+Avoid generic “monitor the situation” language.
+
+Acceptance criteria
+
+The existing Cargo Watch feed is enhanced.
+
+Cargo Watch captures land based cargo security incidents.
+
+Cargo Watch also captures port related security incidents where they may affect cargo, vessels, drivers, facilities, access routes or logistics operations.
+
+Berth delays, port congestion, freight rates and generic shipping stories are excluded unless directly linked to a security incident.
+
+Additional scrape sources can be added through the source registry.
+
+Scrape health is visible.
+
+Stale sources are flagged.
+
+Duplicate articles are clustered into one incident.
+
+Every retained incident has a confidence score and security impact score.
+
+The feed produces useful security incident reporting rather than generic shipping news.

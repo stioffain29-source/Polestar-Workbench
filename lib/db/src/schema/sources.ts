@@ -19,6 +19,29 @@ export const sourcesTable = pgTable("sources", {
   manualReviewRequired: boolean("manual_review_required").notNull().default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // --- Source registry (analyst-classifiable, descriptive metadata) ---------
+  // How the feed is collected (e.g. "Google News RSS", "API", "manual"),
+  // how often, the source language, and the geography it covers. All nullable
+  // and additive: a row with none set simply reads "—" on the registry — the
+  // pipeline never fabricates coverage it cannot verify.
+  scrapeMethod: text("scrape_method"),
+  scrapeFrequency: text("scrape_frequency"),
+  language: text("language"),
+  locationCovered: text("location_covered"),
+  // --- Scrape-health telemetry (machine-written, LAST-RUN snapshots) --------
+  // The funnel the most recent ingest run actually observed for this feed:
+  // items collected (found) -> retained (accepted in-scope) -> rejected. These
+  // are LAST-RUN counts, overwritten each run (never cumulative), so they stay
+  // honest and self-correcting. `lastRelevantItemAt` stamps the last run that
+  // genuinely retained an in-scope item (never set on a failed or zero-retained
+  // run). `failureReason` is a coarse failure category, distinct from the raw
+  // `errorMessage` blob. All nullable — a feed that never reported telemetry
+  // reads "—", not 0.
+  lastRelevantItemAt: timestamp("last_relevant_item_at", { withTimezone: true }),
+  itemsCollected: integer("items_collected"),
+  itemsRetained: integer("items_retained"),
+  itemsRejected: integer("items_rejected"),
+  failureReason: text("failure_reason"),
 });
 
 export type Source = typeof sourcesTable.$inferSelect;

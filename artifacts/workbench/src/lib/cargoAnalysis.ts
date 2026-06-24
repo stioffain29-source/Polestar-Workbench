@@ -86,7 +86,11 @@ const OOS_CONTEXT_RE = /\b(in Canada|in the US|in the United States|in Italy|in 
 const NATIONALITY_OFFSHORE_RE = /\b(Indian[- ]origin|Punjab[- ]origin|Pakistani[- ]origin|Filipino[- ]origin|Bangladeshi[- ]origin)\b/i;
 
 // Records that are clearly NOT cargo / logistics theft incidents.
-const NON_CARGO_RE = /\b(trailer.*film|heist film|movie review|HAM Berat|kekerasan|pemenuhan SDM|nakes|gubernur|pemprov|prioritaskan|infrastruktur|kabupaten|pemkot diminta|fasilitasi penyelesaian|consumer.*anti-theft|anti-theft feature|electricity theft|port congestion|freight rate|commercial partnership|payment dispute)\b/i;
+// NOTE: commercial-shipping / port-OPERATIONS terms (port congestion, freight
+// rate, throughput, etc.) are deliberately NOT listed here. They are handled by
+// the GATED SHIPPING_OPS_NOISE_RE in classifyScope so a genuine cargo-crime or
+// port-security record that merely mentions congestion is not dropped wholesale.
+const NON_CARGO_RE = /\b(trailer.*film|heist film|movie review|HAM Berat|kekerasan|pemenuhan SDM|nakes|gubernur|pemprov|prioritaskan|infrastruktur|kabupaten|pemkot diminta|fasilitasi penyelesaian|consumer.*anti-theft|anti-theft feature|electricity theft|commercial partnership|payment dispute)\b/i;
 
 // Required cargo / logistics incident vocabulary.
 const CARGO_INCIDENT_RE = /\b(cargo|freight|container|truck|lorry|hijack|warehouse|godown|depot|pilfer|seal[- ]?tamper|consignment|shipment|parcel|logistic|theft|stolen|stole|robbery|burglar|raid|loot|siphon|smuggl|fraud|busted)\b/i;
@@ -200,6 +204,59 @@ function isCargoNoise(text: string): boolean {
   if (NOISE_RESIDENTIAL_PARCEL_RE.test(text) && !hasLoad) return true;
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// Expanded scope: PORT-related cargo security
+// ---------------------------------------------------------------------------
+// Cargo Watch was widened beyond land cargo theft to also cover PORT-related
+// cargo-SECURITY events: armed robbery / theft at a port, terminal, wharf, dock,
+// quay, jetty or anchorage; robbery / theft / boarding of a vessel or its
+// containers alongside; port intrusion / trespass; stowaways; port-linked
+// smuggling and narcotics / weapons / contraband seizures in cargo or
+// containers; port sabotage / arson; truck-park and port access-road cargo
+// crime; and port-access blockades / dockworker unrest that disrupt cargo.
+//
+// These do NOT fit the land "crime verb + strong cargo noun / load" shape in
+// hasGenuineCargo (a stowaway report names no stolen freight), so they were
+// being dropped. PORT_CARGO_SECURITY_RE admits them — but ONLY when a concrete
+// port / vessel / container / cargo ANCHOR sits alongside the security signal,
+// so a bare "robbery in <port city>" is never mistaken for one.
+const PORT_CARGO_SECURITY_RE = new RegExp(
+  [
+    // Stowaways are inherently a port / cargo-security event.
+    /\bstowaways?\b/.source,
+    // Theft / robbery / intrusion / sabotage AT a port-side facility.
+    /\b(port|terminal|anchorage|wharf|dock|docks|quay|jetty|berth|harbou?r)\b[^.]{0,40}\b(theft|stolen|stole|robber|robbed|robbery|pilfer\w*|loot\w*|broke into|broken into|break[- ]?in|burglar\w*|raid\w*|intrusion|intruder|intruders|trespass\w*|sabotage|sabotaged|arson|seiz\w*)\b/.source,
+    /\b(theft|stolen|stole|robber|robbed|robbery|pilfer\w*|loot\w*|broke into|broken into|break[- ]?in|burglar\w*|raid\w*|intrusion|intruder|intruders|trespass\w*|sabotage|sabotaged|arson|seiz\w*)\b[^.]{0,40}\b(port|terminal|anchorage|wharf|dock|docks|quay|jetty|berth|harbou?r)\b/.source,
+    // Robbery / theft / boarding of a vessel or its stores alongside / at anchor.
+    /\b(vessel|ship|tanker|on board|aboard|bulk carrier|cargo ship|container ship)\b[^.]{0,30}\b(theft|stolen|stole|robber|robbed|robbery|pilfer\w*|boarded|boarding)\b/.source,
+    /\b(robbers?|pirates?|armed (?:men|gang|gunmen|robbers?|persons?))\b[^.]{0,25}\bboard(?:ed|ing)?\b/.source,
+    // Container / cargo at a port linked to smuggling, narcotics or contraband.
+    /\b(container|containers|cargo|consignment|shipment|freight)\b[^.]{0,45}\b(cocaine|heroin|methamphetamine|narcotics?|drugs?|cannabis|ketamine|opium|amphetamine|fentanyl|weapons?|firearms?|ammunition|explosives?|contraband|smuggl\w*|concealed|hidden|ivory|counterfeit\w*)\b/.source,
+    /\b(cocaine|heroin|methamphetamine|narcotics?|drugs?|cannabis|ketamine|opium|amphetamine|fentanyl|weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b[^.]{0,45}\b(container|containers|cargo|consignment|shipment|freight|port|terminal)\b/.source,
+    // Truck-park / container-yard / port access-road cargo crime.
+    /\b(truck (?:park|stop|stand|queue|holding area|terminal)|lorry park|container yard|access road|port road|approach road)\b[^.]{0,30}\b(robber|robbed|robbery|theft|stolen|stole|attack\w*|assault\w*|hijack\w*|raid\w*|crime|gang)\b/.source,
+    // Port-access blockade or dockworker unrest threatening cargo flow.
+    /\b(block(?:ad|ed|ing|ade)?|barricad\w*|protest\w*|demonstration|strike|walkout|stoppage)\b[^.]{0,30}\b(port (?:access|gate|gates|entrance|road|operations?)|access to (?:the )?port|terminal gate)\b/.source,
+    /\b(dock ?workers?|stevedores?|port workers?|longshore(?:men)?|wharf workers?)\b[^.]{0,25}\b(strike|strikes|striking|walkout|walk[- ]?out|stoppage|protest\w*|unrest|riot\w*|blockad\w*|down tools)\b/.source,
+  ].join("|"),
+  "i",
+);
+
+export function hasPortCargoSecurity(text: string): boolean {
+  return PORT_CARGO_SECURITY_RE.test(text);
+}
+
+// Commercial-shipping / port-OPERATIONS noise explicitly ruled OUT of Cargo
+// Watch: berth / anchorage congestion and waiting, port throughput / expansion /
+// development / automation / capacity, dwell time, demurrage, freight / box /
+// charter RATES, liner schedules and new-equipment orders. This is logistics-
+// OPERATIONS reporting, not cargo SECURITY. It is a GATED reject (see
+// classifyScope): a record is dropped for ops-noise only when it carries NEITHER
+// a genuine cargo-crime signal NOR a port-security signal, so "containers stolen
+// amid record port throughput" is still kept.
+const SHIPPING_OPS_NOISE_RE =
+  /\b(berth(?:ing)? (?:delay|delays|window|windows|availability|congestion|queue)|vessel waiting|waiting time|anchorage (?:congestion|waiting|queue)|port (?:congestion|delay|delays|throughput|expansion|development|redevelopment|upgrade|upgrades|modernisation|modernization|automation|automating|capacity|efficiency|productivity|tariff|tariffs|fee|fees|charges|dues)|terminal (?:expansion|development|upgrade|automation|capacity|operator)|dwell time|demurrage|detention charge|transshipment volume|throughput (?:rose|grew|fell|up|down|record|growth)|freight rate|freight rates|container rate|box rate|shipping rate|charter rate|spot rate|liner service|sailing schedule|quay crane (?:order|delivery|contract)|new (?:terminal|berth|crane|gantry|warehouse facility))\b/i;
 
 // Curated APAC / Middle East place gazetteer used ONLY to recover an in-scope
 // country for a record the source left unattributed (country null / "Unknown").
@@ -359,12 +416,26 @@ export type Scope = "in_scope" | "out_of_scope_geo" | "excluded_non_cargo" | "co
 
 export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   const text = `${i.title} ${i.summary ?? ""}`;
+  // A genuine PORT cargo-security event (stowaways, port/vessel robbery, a
+  // container narcotics seizure, etc.) is squarely in the widened scope even
+  // though it names no land freight noun. Compute it once and let it bypass the
+  // cargo-vocab / genuineness / generic-noise gates below — but NOT the hard
+  // non-cargo / fish rejects, nor the geography gates.
+  const portSec = hasPortCargoSecurity(text);
   // Reject non-cargo / civic / film / etc. content first.
   if (NON_CARGO_RE.test(text)) return "excluded_non_cargo";
   // Fish/lobster/oyster only counts as cargo if cargo verbs are also present.
   if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|warehouse|depot|consignment|shipment|logistic)\b/i.test(text)) {
     return "excluded_non_cargo";
   }
+  // Commercial-shipping / port-OPERATIONS noise (congestion, throughput, rates,
+  // expansion, dwell time) is dropped HERE, ahead of the analyst override, so it
+  // is treated like the other hard non-cargo rejects: an analyst "Add to lane"
+  // cannot promote pure ops-noise into a security incident. Still GATED — only
+  // dropped when the record is NEITHER a genuine cargo crime NOR a port
+  // cargo-security event, so "containers stolen amid record port throughput"
+  // (which carries a security signal) is kept.
+  if (SHIPPING_OPS_NOISE_RE.test(text) && !portSec && !hasGenuineCargo(text)) return "excluded_non_cargo";
   // Analyst override: an explicit human "Add to lane" decision on a Needs Review
   // row is authoritative for a recognized in-scope country. It promotes the row
   // past the heuristic cargo-vocab / genuineness gates below (the analyst read
@@ -375,8 +446,10 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   if (i.analystInScope === true && (region === "APAC" || region === "Middle East")) {
     return "in_scope";
   }
-  // Must reference cargo / logistics crime vocabulary at all (English or Bahasa).
-  if (!hasCargoVocab(text)) return "excluded_non_cargo";
+  // Must reference cargo / logistics crime vocabulary at all (English or Bahasa),
+  // OR carry a port cargo-security signal (which names no land freight noun yet
+  // is in scope).
+  if (!hasCargoVocab(text) && !portSec) return "excluded_non_cargo";
   // Foreign-location override: text says incident is in a non-scope country.
   if (OOS_CONTEXT_RE.test(text)) return "out_of_scope_geo";
   if (NATIONALITY_OFFSHORE_RE.test(text) && /\b(Canada|United States|USA|US|UK|Britain|Italy|Europe|Africa|Brazil|Mexico|Australia)\b/i.test(text) && region !== "APAC" && region !== "Middle East") {
@@ -386,11 +459,11 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   if (region === "Out of scope") return "out_of_scope_geo";
   if (region === "Country not identified") {
     // Recover only records that NAME an in-scope APAC/ME place in their text AND
-    // carry cargo-NOUN-anchored crime vocabulary (a bare "motorcycle theft in
-    // Penang" is not enough). Unattributed US/global commentary and generic
-    // local crime stay in the needs-review bucket.
+    // carry cargo-NOUN-anchored crime vocabulary OR a port cargo-security signal
+    // (a bare "motorcycle theft in Penang" is not enough). Unattributed
+    // US/global commentary and generic local crime stay in needs-review.
     const recovered = recoverCargoCountryFromText(i);
-    if (recovered && hasGenuineCargo(text) && !isCargoNoise(text)) {
+    if (recovered && (hasGenuineCargo(text) || portSec) && (!isCargoNoise(text) || portSec)) {
       const recRegion = classifyRegion(recovered);
       if (recRegion === "APAC" || recRegion === "Middle East") return "in_scope";
     }
@@ -399,13 +472,14 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   // Attributed APAC/ME row: clears the cargo-vocab gate on a bare cargo-ish
   // token, so drop generic-crime noise (safe burglary, cash-van robbery,
   // vehicle theft, arms dealing, doorstep parcel theft) that lacks any cargo /
-  // load context before admitting it as a cargo incident.
-  if (isCargoNoise(text)) return "excluded_non_cargo";
-  // Final gate: keep ONLY genuine cargo / goods incidents. A bare warehouse or
-  // truck burglary with no freight, shipment or named commodity (cash thefts,
-  // unspecified loot, the vehicle itself) is dropped here — the bulk of the
-  // generic Indonesian warehouse/truck noise the product owner asked to remove.
-  if (!hasGenuineCargo(text)) return "excluded_non_cargo";
+  // load context before admitting it as a cargo incident — unless it is a
+  // genuine port cargo-security event.
+  if (isCargoNoise(text) && !portSec) return "excluded_non_cargo";
+  // Final gate: keep ONLY genuine cargo / goods incidents OR port cargo-security.
+  // A bare warehouse or truck burglary with no freight, shipment or named
+  // commodity (cash thefts, unspecified loot, the vehicle itself) is dropped
+  // here — the bulk of the generic Indonesian warehouse/truck noise.
+  if (!hasGenuineCargo(text) && !portSec) return "excluded_non_cargo";
   return "in_scope";
 }
 
@@ -467,19 +541,134 @@ export function classifyLocationType(i: CargoIncidentLike): string {
   return "—";
 }
 
-// What kind of cargo crime — derived from incident text. Order matters.
+// What kind of cargo crime — the single 30-category taxonomy authority below
+// (classifyCargoCategory) drives this. Kept as a thin alias so existing callers
+// (the monitor table, cargoNarratives, the report builders) all read the SAME
+// brand-safe labels the reports do. In-scope rows never receive the "Not
+// relevant" sentinel; should it ever appear it maps to the cargo floor.
 export function classifyIncidentType(i: CargoIncidentLike): string {
+  const c = classifyCargoCategory(i);
+  return c === CARGO_NOT_RELEVANT ? CARGO_FLOOR_LABEL : c;
+}
+
+// ---------------------------------------------------------------------------
+// 30-category Cargo Watch security taxonomy
+// ---------------------------------------------------------------------------
+// Brand-safe, analyst-facing labels split into LAND-side cargo crime and
+// PORT-related cargo security, plus a single floor ("Other cargo security
+// incident") and a non-product sentinel ("Not relevant"). This is the ONE
+// authority; the monitor and every report derive their incident-type labels
+// from classifyCargoCategory, so they can never disagree.
+export type CargoCategoryGroup = "land" | "port" | "other";
+
+export interface CargoCategoryDef {
+  label: string;
+  group: CargoCategoryGroup;
+}
+
+// The cargo floor: a real cargo-security event we could not place in a finer
+// category. Matches relatedIncidents' weak-bucket regex (/^other\s.+incident$/i)
+// so it is correctly treated as the weakest bucket downstream.
+export const CARGO_FLOOR_LABEL = "Other cargo security incident";
+// Sentinel for records carrying NO cargo-security signal at all. In-scope rows
+// (which always clear classifyScope) never receive it; it exists so the taxonomy
+// can honestly report "this is not a cargo-security incident".
+export const CARGO_NOT_RELEVANT = "Not relevant";
+
+export const CARGO_CATEGORIES: CargoCategoryDef[] = [
+  // Land-side cargo crime (12).
+  { label: "Truck hijacking", group: "land" },
+  { label: "Attack on cargo vehicle / convoy", group: "land" },
+  { label: "Highway / road cargo robbery", group: "land" },
+  { label: "Warehouse theft", group: "land" },
+  { label: "Depot / yard theft", group: "land" },
+  { label: "Container theft (inland)", group: "land" },
+  { label: "Pilferage / seal tampering", group: "land" },
+  { label: "Fictitious pickup / fake carrier fraud", group: "land" },
+  { label: "Cargo diversion / misrouting", group: "land" },
+  { label: "Insider / driver collusion theft", group: "land" },
+  { label: "Cargo documentation fraud", group: "land" },
+  { label: "Cargo theft in transit", group: "land" },
+  // Port-related cargo security (16).
+  { label: "Port armed robbery", group: "port" },
+  { label: "Anchorage robbery / theft", group: "port" },
+  { label: "Vessel boarding (robbery)", group: "port" },
+  { label: "Theft from vessel at port", group: "port" },
+  { label: "Theft from container at port / terminal", group: "port" },
+  { label: "Port intrusion / trespass", group: "port" },
+  { label: "Stowaway incident", group: "port" },
+  { label: "Port-linked cargo smuggling", group: "port" },
+  { label: "Narcotics seizure (cargo / port)", group: "port" },
+  { label: "Weapons / contraband seizure (cargo / port)", group: "port" },
+  { label: "Port sabotage / arson", group: "port" },
+  { label: "Suspicious activity near port", group: "port" },
+  { label: "Port-access blockade (cargo disruption)", group: "port" },
+  { label: "Port labour unrest (cargo risk)", group: "port" },
+  { label: "Truck park / access-road crime", group: "port" },
+  { label: "Arrest of cargo crime group", group: "port" },
+  // Floor + sentinel.
+  { label: CARGO_FLOOR_LABEL, group: "other" },
+  { label: CARGO_NOT_RELEVANT, group: "other" },
+];
+
+// Ordered classification rules. PORT-specific rules run FIRST (a port armed
+// robbery must not be captured by the generic land robbery rule), then the
+// LAND rules from most specific to the generic "Cargo theft in transit" floor.
+const CARGO_CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
+  // ---- Port-related (checked first) ----
+  { label: "Stowaway incident", pattern: /\bstowaways?\b/i },
+  { label: "Narcotics seizure (cargo / port)", pattern: /\b(cocaine|heroin|methamphetamine|meth\b|narcotics?|cannabis|marijuana|ketamine|opium|amphetamine|fentanyl)\b[^.]{0,50}\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock|vessel|ship)\b|\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock|vessel|ship)\b[^.]{0,50}\b(cocaine|heroin|methamphetamine|narcotics?|cannabis|ketamine|opium|amphetamine|fentanyl)\b/i },
+  { label: "Weapons / contraband seizure (cargo / port)", pattern: /\b(weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b[^.]{0,50}\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock|vessel|ship)\b|\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock)\b[^.]{0,50}\b(weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b/i },
+  { label: "Port-linked cargo smuggling", pattern: /\bsmuggl\w*/i },
+  { label: "Port sabotage / arson", pattern: /\b(port|terminal|wharf|dock|docks|quay|jetty|harbou?r)\b[^.]{0,40}\b(sabotage|sabotaged|arson|set (?:on )?fire|torched|explos\w*|bomb\w*)\b|\b(sabotage|sabotaged|arson|torched)\b[^.]{0,40}\b(port|terminal|wharf|dock|quay|jetty)\b/i },
+  { label: "Port-access blockade (cargo disruption)", pattern: /\b(block(?:ad|ed|ing|ade)?|barricad\w*|blockad\w*)\b[^.]{0,30}\b(port (?:access|gate|gates|entrance|road|operations?)|access to (?:the )?port|terminal gate)\b/i },
+  { label: "Port labour unrest (cargo risk)", pattern: /\b(dock ?workers?|stevedores?|port workers?|longshore(?:men)?|wharf workers?)\b[^.]{0,25}\b(strike|strikes|striking|walkout|walk[- ]?out|stoppage|protest\w*|unrest|riot\w*|blockad\w*|down tools)\b/i },
+  { label: "Anchorage robbery / theft", pattern: /\banchorage\b[^.]{0,40}\b(robber|robbed|robbery|theft|stolen|stole|boarded|boarding|pilfer\w*|loot\w*)\b|\b(robber|robbed|robbery|theft|stolen|boarded|boarding)\b[^.]{0,40}\banchorage\b/i },
+  { label: "Vessel boarding (robbery)", pattern: /\b(robbers?|pirates?|armed (?:men|gang|gunmen|robbers?|persons?))\b[^.]{0,25}\bboard(?:ed|ing)?\b|\bboard(?:ed|ing)?\b[^.]{0,20}\b(vessel|ship|tanker|bulk carrier|cargo ship|container ship)\b[^.]{0,25}\b(robber|robbed|robbery|theft|stolen|stole)\b/i },
+  { label: "Theft from container at port / terminal", pattern: /\b(container|containers)\b[^.]{0,35}\b(theft|stolen|stole|pilfer\w*|broken into|broke into|tampered)\b[^.]{0,35}\b(port|terminal|wharf|dock|quay|yard)\b|\b(port|terminal|wharf|dock|quay)\b[^.]{0,35}\bcontainer\b[^.]{0,30}\b(theft|stolen|stole|pilfer\w*)\b/i },
+  { label: "Theft from vessel at port", pattern: /\b(vessel|ship|tanker|on board|aboard|bulk carrier|cargo ship|container ship)\b[^.]{0,30}\b(theft|stolen|stole|robber|robbed|robbery|pilfer\w*)\b/i },
+  { label: "Truck park / access-road crime", pattern: /\b(truck (?:park|stop|stand|queue|holding area|terminal)|lorry park|container yard|access road|port road|approach road)\b[^.]{0,30}\b(robber|robbed|robbery|theft|stolen|stole|attack\w*|assault\w*|hijack\w*|raid\w*|crime|gang)\b/i },
+  { label: "Port intrusion / trespass", pattern: /\b(port|terminal|wharf|dock|docks|quay|jetty|harbou?r)\b[^.]{0,35}\b(intrusion|intruder|intruders|trespass\w*|broke into|broken into|break[- ]?in|unauthori[sz]ed (?:access|entry))\b|\b(intrusion|intruder|intruders|trespass\w*)\b[^.]{0,35}\b(port|terminal|wharf|dock|quay|jetty)\b/i },
+  { label: "Port armed robbery", pattern: /\b(port|terminal|wharf|dock|docks|quay|jetty|harbou?r)\b[^.]{0,40}\b(theft|stolen|stole|robber|robbed|robbery|loot\w*|raid\w*|seiz\w*)\b|\b(theft|stolen|stole|robber|robbed|robbery|loot\w*|raid\w*)\b[^.]{0,40}\b(port|terminal|wharf|dock|docks|quay|jetty|harbou?r)\b/i },
+  { label: "Suspicious activity near port", pattern: /\b(suspicious|surveillance|drone|reconnaissance|loiter\w*)\b[^.]{0,35}\b(port|terminal|wharf|dock|quay|jetty|harbou?r|vessel|ship)\b/i },
+  { label: "Arrest of cargo crime group", pattern: /\b(arrest\w*|busted|detain\w*|nabbed|apprehend\w*|dismantl\w*)\b[^.]{0,40}\b(cargo|container|freight|warehouse|truck|hijack\w*|theft|smuggl\w*|syndicate|gang|ring)\b/i },
+  // ---- Land-side ----
+  { label: "Truck hijacking", pattern: /\bhijack\w*/i },
+  { label: "Attack on cargo vehicle / convoy", pattern: /\b(convoy|cargo (?:truck|vehicle|lorry)|goods (?:truck|vehicle)|freight (?:truck|vehicle)|haulage)\b[^.]{0,30}\b(attack\w*|ambush\w*|fired on|shot at|torched|set (?:on )?fire)\b|\b(attack\w*|ambush\w*)\b[^.]{0,30}\b(convoy|cargo truck|goods truck|freight truck)\b/i },
+  { label: "Warehouse theft", pattern: /\b(warehouse|godown|storage facility)\b[^.]{0,40}\b(theft|burglar\w*|robber|robbed|robbery|raid\w*|stolen|stole|loot\w*|broke into|broken into)\b|\b(theft|stolen|stole|raid\w*|burglar\w*|loot\w*)\b[^.]{0,40}\b(warehouse|godown)\b/i },
+  { label: "Depot / yard theft", pattern: /\b(depot|distribution cent(?:re|er)|inland container depot|icd|container yard|freight yard|goods yard)\b[^.]{0,40}\b(theft|stolen|stole|robber|robbed|robbery|raid\w*|loot\w*|broke into|broken into|pilfer\w*)\b/i },
+  { label: "Container theft (inland)", pattern: /\bcontainer\b[^.]{0,30}\b(theft|stolen|stole|loot\w*|broke into|broken into)\b|\b(theft|stolen|stole)\b[^.]{0,30}\bcontainer\b/i },
+  { label: "Pilferage / seal tampering", pattern: /\bpilfer\w*|\bseal[- ]?tamper\w*|\btamper\w*[^.]{0,20}\bseal\b/i },
+  { label: "Fictitious pickup / fake carrier fraud", pattern: /\b(fictitious pickup|fictitious pick[- ]?up|fake (?:carrier|trucker|driver|pickup)|impersonat\w*[^.]{0,20}(?:carrier|trucker|driver)|posed as (?:a )?(?:carrier|trucker|driver))\b/i },
+  { label: "Cargo diversion / misrouting", pattern: /\b(diverted|diversion|misrout\w*|rerout\w*|redirect\w*)\b[^.]{0,30}\b(cargo|consignment|shipment|container|load|goods|freight)\b|\b(cargo|consignment|shipment|load)\b[^.]{0,20}\b(diverted|misrout\w*)\b/i },
+  { label: "Insider / driver collusion theft", pattern: /\b(insider|inside job|driver|employee|staff|warehouse worker)\b[^.]{0,30}\b(collusion|colluded|complicit|aided|involved|stole|theft|connivance|conspir\w*)\b/i },
+  { label: "Cargo documentation fraud", pattern: /\b(documentation fraud|forged (?:documents?|bill of lading|waybill|invoice)|fake (?:documents?|bill of lading|waybill|invoice)|false (?:declaration|manifest)|bill of lading fraud)\b/i },
+  { label: "Cargo theft in transit", pattern: /\b(robbery|robbed|loot\w*|burglar\w*|raid\w*|stolen|stole|theft|hijack\w*)\b/i },
+];
+
+// Classify a cargo record into the 30-category taxonomy. Title + summary only —
+// never the source / feed label, which carries masthead words that would leak
+// (a "Taipei Times" byline must not score the record on "times"). Falls through
+// to the cargo floor when a cargo-security signal exists but no finer rule fired,
+// and to the "Not relevant" sentinel only when there is no cargo signal at all.
+export function classifyCargoCategory(i: CargoIncidentLike): string {
   const text = `${i.title} ${i.summary ?? ""}`;
-  if (/\b(truck|lorry|consignment|cargo|freight)\b[^.]*\bhijack/i.test(text) || /\bhijack[^.]*\b(truck|lorry|cargo|freight|consignment)\b/i.test(text)) return "Truck hijacking";
-  if (/\bhijack/i.test(text)) return "Hijacking";
-  if (/\bwarehouse\b[^.]*\b(theft|burglar|robber|raid|stolen|loot|broke)\b/i.test(text) || /\b(theft|stolen|raid|burglar|loot)\b[^.]*\bwarehouse\b/i.test(text)) return "Warehouse theft";
-  if (/\bcontainer\b[^.]*\b(theft|stolen|stole)\b/i.test(text) || /\b(theft|stolen|stole)\b[^.]*\bcontainer\b/i.test(text)) return "Container theft";
-  if (/\bpilfer/i.test(text)) return "Pilferage";
-  if (/\bseal[- ]?tamper/i.test(text)) return "Seal tampering";
-  if (/\bsmuggl/i.test(text)) return "Smuggling";
-  if (/\bfraud\b/i.test(text)) return "Cargo fraud";
-  if (/\b(robbery|robbed|loot|burglar|raid|stolen|stole|theft)\b/i.test(text)) return "Other land-based cargo theft";
-  return "Other";
+  for (const r of CARGO_CATEGORY_RULES) {
+    if (r.pattern.test(text)) return r.label;
+  }
+  if (hasCargoVocab(text) || hasPortCargoSecurity(text)) return CARGO_FLOOR_LABEL;
+  return CARGO_NOT_RELEVANT;
+}
+
+const CARGO_CATEGORY_GROUP_MAP = new Map<string, CargoCategoryGroup>(
+  CARGO_CATEGORIES.map((c) => [c.label, c.group]),
+);
+
+// The land / port / other group a taxonomy label belongs to. Used by the
+// regrouped monitor + report output (Phase 3) so both surfaces section
+// incidents identically.
+export function cargoCategoryGroup(label: string): CargoCategoryGroup {
+  return CARGO_CATEGORY_GROUP_MAP.get(label) ?? "other";
 }
 
 // Explicit monetary loss in USD only. Rupee / local-currency figures are NOT

@@ -9,6 +9,7 @@
 // existing topic (used only as a routing hint, never as a label).
 
 import { classifyConflictCategory } from "./conflictAnalysis";
+import { classifyCargoCategory, CARGO_FLOOR_LABEL, CARGO_NOT_RELEVANT } from "./cargoAnalysis";
 
 export interface ClassifiableIncident {
   topic: string;
@@ -32,18 +33,14 @@ function blob(i: ClassifiableIncident): string {
 const FALLBACK = "Other operational incident";
 
 // Cargo bucket --------------------------------------------------------------
-function classifyCargo(t: string): string {
-  if (/\btruck.*hijack|hijack.*truck|convoy hijack|lorry hijack\b/.test(t)) return "Truck hijack";
-  if (/\bhijack\b/.test(t)) return "Truck hijack";
-  if (/\bwarehouse (theft|raid|break)/.test(t)) return "Warehouse theft";
-  if (/\bdepot (theft|raid|break)/.test(t)) return "Depot theft";
-  if (/\bcontainer (theft|stolen|raid)/.test(t)) return "Container theft";
-  if (/\bpilferage|pilfer\b/.test(t)) return "Cargo pilferage";
-  if (/\bseal tamper|broken seal|seal break/.test(t)) return "Seal tampering";
-  if (/\binsider/.test(t)) return "Insider-enabled theft";
-  if (/\bcargo theft|stolen cargo|cargo (loss|stolen)/.test(t)) return "Cargo theft / loss";
-  if (/\blogistics crime\b/.test(t)) return "Logistics crime";
-  return "Other cargo incident";
+// Delegates to the single 30-category Cargo Watch taxonomy authority
+// (classifyCargoCategory) so reports, the monitor and country views all read
+// IDENTICAL brand-safe labels. Title + summary only — never the source /
+// masthead, which would leak feed words into the label. The "Not relevant"
+// sentinel (no cargo signal at all) folds into the cargo floor here.
+function classifyCargo(i: ClassifiableIncident): string {
+  const c = classifyCargoCategory({ title: i.title, summary: i.summary });
+  return c === CARGO_NOT_RELEVANT ? CARGO_FLOOR_LABEL : c;
 }
 
 // Shipping bucket -----------------------------------------------------------
@@ -179,7 +176,7 @@ export function classifyIncidentType(i: ClassifiableIncident): string {
   const t = blob(i);
   switch (i.topic) {
     case "cargo_watch":
-      return classifyCargo(t);
+      return classifyCargo(i);
     case "shipping":
       return classifyShipping(t);
     case "strikes":
@@ -204,7 +201,7 @@ export function classifyIncidentType(i: ClassifiableIncident): string {
       // Country reports and any other view: dispatch by keyword.
       if (/\b(missile|drone|rocket|projectile|interception)\b/.test(t)) return classifyStrike(t);
       if (/\b(vessel|tanker|maritime|chokepoint|port )\b/.test(t)) return classifyShipping(t);
-      if (/\b(hijack|warehouse|depot|container|pilferage|cargo)\b/.test(t)) return classifyCargo(t);
+      if (/\b(hijack|warehouse|depot|container|pilferage|cargo)\b/.test(t)) return classifyCargo(i);
       if (/\bfuel|petrol|diesel|refinery\b/.test(t)) return classifyFuel(t);
       if (/\bfertili[sz]er|urea|potash|dap\b/.test(t)) return classifyFertiliser(t);
       if (/\b(power|grid|blackout|load shedd|substation)\b/.test(t)) return classifyEnergy(t);

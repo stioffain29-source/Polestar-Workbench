@@ -34,4 +34,22 @@ export interface Source {
   /** @nullable */
   notes?: string | null;
   createdAt: Date;
+  /** @nullable */
+  scrapeMethod?: string | null;
+  /** @nullable */
+  scrapeFrequency?: string | null;
+  /** @nullable */
+  language?: string | null;
+  /** @nullable */
+  locationCovered?: string | null;
+  /** @nullable */
+  lastRelevantItemAt?: Date | null;
+  /** @nullable */
+  itemsCollected?: number | null;
+  /** @nullable */
+  itemsRetained?: number | null;
+  /** @nullable */
+  itemsRejected?: number | null;
+  /** @nullable */
+  failureReason?: string | null;
 }

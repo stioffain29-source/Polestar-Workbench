@@ -3,6 +3,11 @@ import {
   classifyScope,
   classifyRegion,
   recoverCargoPortName,
+  classifyCargoCategory,
+  cargoCategoryGroup,
+  hasPortCargoSecurity,
+  CARGO_FLOOR_LABEL,
+  CARGO_NOT_RELEVANT,
   IN_SCOPE_COUNTRIES,
 } from "../../artifacts/workbench/src/lib/cargoAnalysis";
 
@@ -229,5 +234,116 @@ describe("recoverCargoPortName — strict, no-fabrication port extraction", () =
         country: "Thailand",
       }),
     ).toEqual({ port: "Laem Chabang", country: "Thailand" });
+  });
+});
+
+// The display scope was widened from land-only cargo theft to also keep PORT
+// cargo-SECURITY events (stowaways, port/vessel robbery, container narcotics
+// seizures) while still dropping commercial-shipping / port-OPERATIONS noise
+// (congestion, throughput, freight rates). These tests lock that widening in.
+describe("classifyScope — widened to keep PORT cargo-security", () => {
+  it("keeps an armed vessel boarding at anchorage (names no land freight)", () => {
+    expect(
+      cargoScope({ title: "Armed robbers boarded a bulk carrier at Singapore anchorage", country: "Singapore" }),
+    ).toBe("in_scope");
+  });
+
+  it("keeps a stowaway-in-container report", () => {
+    expect(
+      cargoScope({ title: "Stowaways discovered inside a shipping container", country: "Malaysia" }),
+    ).toBe("in_scope");
+  });
+
+  it("keeps a container narcotics seizure at a port", () => {
+    expect(
+      cargoScope({ title: "Cocaine concealed in a cargo container seized at the port", country: "India" }),
+    ).toBe("in_scope");
+  });
+
+  it("recovers an unattributed port cargo-security event naming an in-scope place", () => {
+    expect(
+      classifyScope(
+        { title: "Stowaways found in a container at Tanjung Priok", country: null },
+        "Country not identified",
+      ),
+    ).toBe("in_scope");
+  });
+});
+
+describe("classifyScope — shipping-ops / commercial noise is dropped", () => {
+  it("drops port congestion even with cargo vocabulary present", () => {
+    expect(
+      cargoScope({ title: "Port congestion delays containers at Singapore", country: "Singapore" }),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("drops freight-rate commercial reporting", () => {
+    expect(
+      cargoScope({ title: "Container freight rates surge at Port Klang", country: "Malaysia" }),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("still keeps a genuine theft reported amid ops-noise wording (security wins)", () => {
+    expect(
+      cargoScope({ title: "Containers stolen amid record port throughput at Port Klang", country: "Malaysia" }),
+    ).toBe("in_scope");
+  });
+});
+
+// The 30-category taxonomy is the shared classification authority for the
+// regrouped monitor + report output. PORT rules must win over the generic land
+// rules (a port armed robbery is not a generic warehouse theft), the cargo floor
+// catches a real cargo-security event with no finer match, and the NOT_RELEVANT
+// sentinel is reserved for records with no cargo-security signal at all.
+describe("classifyCargoCategory — 30-category taxonomy", () => {
+  const cases: Array<[string, string]> = [
+    ["Stowaways found in a container at Tanjung Priok", "Stowaway incident"],
+    ["Cocaine seized in a cargo container at the port", "Narcotics seizure (cargo / port)"],
+    ["Truck hijacking on the highway near the depot", "Truck hijacking"],
+    ["Warehouse theft in Tokyo overnight", "Warehouse theft"],
+  ];
+  it.each(cases)("classifies %s as %s", (title, label) => {
+    expect(classifyCargoCategory({ title })).toBe(label);
+  });
+
+  it("falls through to the cargo floor for a real-but-unclassified cargo event", () => {
+    expect(classifyCargoCategory({ title: "New cargo security measures announced at the depot" })).toBe(
+      CARGO_FLOOR_LABEL,
+    );
+  });
+
+  it("returns the NOT_RELEVANT sentinel when no cargo-security signal exists", () => {
+    expect(classifyCargoCategory({ title: "City council debates a new park bylaw" })).toBe(
+      CARGO_NOT_RELEVANT,
+    );
+  });
+});
+
+describe("cargoCategoryGroup — land / port / other grouping", () => {
+  it("groups a land label as land", () => {
+    expect(cargoCategoryGroup("Truck hijacking")).toBe("land");
+  });
+  it("groups a port label as port", () => {
+    expect(cargoCategoryGroup("Port armed robbery")).toBe("port");
+    expect(cargoCategoryGroup("Stowaway incident")).toBe("port");
+  });
+  it("groups the floor and sentinel as other", () => {
+    expect(cargoCategoryGroup(CARGO_FLOOR_LABEL)).toBe("other");
+    expect(cargoCategoryGroup(CARGO_NOT_RELEVANT)).toBe("other");
+  });
+  it("defaults an unknown label to other", () => {
+    expect(cargoCategoryGroup("some unmapped label")).toBe("other");
+  });
+});
+
+describe("hasPortCargoSecurity — port-security anchor gate", () => {
+  it("matches a stowaway report", () => {
+    expect(hasPortCargoSecurity("Stowaways found at the terminal")).toBe(true);
+  });
+  it("matches port-side robbery", () => {
+    expect(hasPortCargoSecurity("Thieves robbed a depot at the port overnight")).toBe(true);
+  });
+  it("does not match a bare city robbery with no port/cargo anchor", () => {
+    expect(hasPortCargoSecurity("Robbery reported in the city centre")).toBe(false);
   });
 });

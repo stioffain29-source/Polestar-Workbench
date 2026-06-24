@@ -43,6 +43,15 @@ import {
 import { classifyIncidentType } from "./incidentClassifier";
 import { resolveIncidentSummary } from "./incidentSummary";
 import { selectRelatedIncidents } from "./relatedIncidents";
+import {
+  buildCargoGroupedDataset,
+  REPORT_CLUSTER_SECTION_KEYS,
+  cargoClusterLocationLabel,
+  cargoClusterDetailLine,
+  cargoClusterSourceLabel,
+  cargoClusterSeverityKey,
+  type CargoGroupedSection,
+} from "./cargoGroupedDataset";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
@@ -664,6 +673,169 @@ function drawRelatedIncidents(
   void reportCadence(topic);
 }
 
+// Render one partition's clusters as a table. Mirrors drawRelatedIncidents'
+// proven header/row/pagination shape so the on-screen CargoClustersSection can
+// match it line-for-line (preview == PDF).
+function drawCargoClusterTable(ctx: Ctx, section: CargoGroupedSection) {
+  const { pdf, MX, CW } = ctx;
+  ensureSpace(ctx, 34);
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(10);
+  pdf.text(sanitize(section.title), MX, ctx.y + 8);
+  ctx.y += 16;
+
+  const colDateW = 78;
+  const colCatW = 120;
+  const colSevW = 70;
+  const colMainW = CW - colDateW - colCatW - colSevW - 6;
+  const rowH = 18;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("DATE", MX + 6, ctx.y + 12);
+    pdf.text("CATEGORY", MX + colDateW + 6, ctx.y + 12);
+    pdf.text("INCIDENT", MX + colDateW + colCatW + 6, ctx.y + 12);
+    pdf.text("SEVERITY", MX + colDateW + colCatW + colMainW + 6, ctx.y + 12);
+    ctx.y += rowH;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(7);
+  };
+
+  ensureSpace(ctx, rowH + 4);
+  drawHeader();
+
+  for (const c of section.clusters) {
+    const titleLines: string[] = pdf.splitTextToSize(
+      sanitize(c.title),
+      colMainW - 8,
+    );
+    const catLines: string[] = pdf.splitTextToSize(
+      sanitize(c.enrichment.category),
+      colCatW - 8,
+    );
+    const meta = `${cargoClusterLocationLabel(c)} | Confidence: ${c.enrichment.confidence} | Status: ${c.enrichment.status}`;
+    pdf.setFontSize(6.5);
+    const metaLines: string[] = pdf.splitTextToSize(
+      sanitize(meta),
+      colMainW - 8,
+    );
+    const detailLines: string[] = pdf.splitTextToSize(
+      sanitize(cargoClusterDetailLine(c)),
+      colMainW - 8,
+    );
+    pdf.setFontSize(7);
+
+    const rh = Math.max(
+      rowH,
+      titleLines.length * 10 +
+        metaLines.length * 9 +
+        detailLines.length * 9 +
+        9 +
+        12,
+    );
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
+
+    setText(pdf, DUSK);
+    let dateStr = "";
+    try {
+      dateStr = format(parseISO(c.latestOccurredAt), "dd MMM yyyy");
+    } catch {
+      dateStr = c.latestOccurredAt;
+    }
+    pdf.text(dateStr, MX + 6, ctx.y + 12);
+    pdf.text(catLines, MX + colDateW + 6, ctx.y + 12);
+
+    const mainX = MX + colDateW + colCatW + 6;
+    setText(pdf, NAVY);
+    setRoboto(pdf, "medium");
+    pdf.text(titleLines, mainX, ctx.y + 12);
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.setFontSize(6.5);
+    let subY = ctx.y + 12 + titleLines.length * 10 + 2;
+    pdf.text(metaLines, mainX, subY);
+    subY += metaLines.length * 9;
+    pdf.text(detailLines, mainX, subY);
+    subY += detailLines.length * 9;
+    pdf.text(sanitize(cargoClusterSourceLabel(c)), mainX, subY);
+    pdf.setFontSize(7);
+
+    const sk = cargoClusterSeverityKey(c);
+    const sevText = sanitize((SEV_LABEL[sk] ?? "").toUpperCase());
+    setFill(pdf, SEV_COLOR[sk] ?? "#999999");
+    const chipX = MX + colDateW + colCatW + colMainW + 6;
+    const isSmall = sevText === "HIGH" || sevText === "LOW";
+    const chipW = isSmall ? 40 : 50;
+    pdf.rect(chipX, ctx.y + 3, chipW, 12, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6);
+    pdf.text(sevText, chipX + chipW / 2, ctx.y + 11.5, { align: "center" });
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(7);
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+}
+
+// "Cargo Incident Clusters" section (cargo report only). Consumes the shared
+// grouping module and renders the same partition tables + watch-item bullets the
+// on-screen preview does, in the same order, before Related Incidents.
+function drawCargoClusters(
+  ctx: Ctx,
+  windowIncidents: TopicReportIncident[],
+  referenceDate: string | undefined,
+) {
+  const grouped = buildCargoGroupedDataset(
+    windowIncidents.map((i) => ({
+      id: i.id,
+      topic: i.topic,
+      title: i.title,
+      summary: i.summary ?? null,
+      source: i.source ?? null,
+      sourceUrl: i.sourceUrl ?? null,
+      location: i.location ?? null,
+      country: i.country ?? null,
+      severity: i.severity ?? null,
+      occurredAt: i.occurredAt,
+    })),
+    { referenceDate: referenceDate ?? null },
+  );
+  const byKey = new Map(grouped.sections.map((s) => [s.key, s]));
+  const tables = REPORT_CLUSTER_SECTION_KEYS.map((k) => byKey.get(k)).filter(
+    (s): s is CargoGroupedSection => !!s && s.clusters.length > 0,
+  );
+  if (tables.length === 0 && grouped.watchItems.length === 0) return;
+
+  if (tables.length > 0) {
+    drawSectionHeading(ctx, "Cargo Incident Clusters");
+    for (const section of tables) drawCargoClusterTable(ctx, section);
+  }
+  if (grouped.watchItems.length > 0) {
+    const text = grouped.watchItems.map((w) => `- ${w}`).join("\n");
+    drawBulletSection(ctx, "Recommended Watch Items", text, 8);
+  }
+}
+
 export async function exportTopicReportPdf(
   data: TopicReportData,
   incidents: TopicReportIncident[],
@@ -993,6 +1165,17 @@ export async function exportTopicReportPdf(
   // PDF table can never disagree with the on-screen preview. Fuel uses a
   // bespoke price-led layout that intentionally carries no related table, so
   // the PDF omits it here too (matching the fuel preview branch).
+  // Cargo Incident Clusters — the regrouped, clustered view — sits directly
+  // before Related Incidents (cargo report only), built from the SAME windowed
+  // input the on-screen preview uses so the two surfaces cannot diverge.
+  if (data.topic === "cargo_watch") {
+    drawCargoClusters(
+      ctx,
+      filterTopicReportIncidents(incidents, data.topic, data.issueDate),
+      data.issueDate,
+    );
+  }
+
   if (data.topic !== "fuel") {
     drawRelatedIncidents(
       ctx,

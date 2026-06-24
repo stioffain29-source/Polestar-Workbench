@@ -351,6 +351,24 @@ export interface Source {
   /** @nullable */
   notes?: string | null;
   createdAt: string;
+  /** @nullable */
+  scrapeMethod?: string | null;
+  /** @nullable */
+  scrapeFrequency?: string | null;
+  /** @nullable */
+  language?: string | null;
+  /** @nullable */
+  locationCovered?: string | null;
+  /** @nullable */
+  lastRelevantItemAt?: string | null;
+  /** @nullable */
+  itemsCollected?: number | null;
+  /** @nullable */
+  itemsRetained?: number | null;
+  /** @nullable */
+  itemsRejected?: number | null;
+  /** @nullable */
+  failureReason?: string | null;
 }
 
 export interface SourceInput {
@@ -369,6 +387,10 @@ export interface SourceInput {
   reliability: number;
   manualReviewRequired: boolean;
   notes?: string;
+  scrapeMethod?: string;
+  scrapeFrequency?: string;
+  language?: string;
+  locationCovered?: string;
 }
 
 export interface SourceUpdate {
@@ -387,6 +409,10 @@ export interface SourceUpdate {
   reliability?: number;
   manualReviewRequired?: boolean;
   notes?: string;
+  scrapeMethod?: string;
+  scrapeFrequency?: string;
+  language?: string;
+  locationCovered?: string;
 }
 
 export interface SourceHealthBucket {

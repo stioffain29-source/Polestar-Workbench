@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SOURCE_TYPES, SOURCE_STATUSES } from "@/lib/topics";
-import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired, isSourceRetrying } from "@/lib/sourceHealth";
+import { sourceStatusBadgeClass, sourceStatusLabel, formatSourceTimestamp, effectiveSourceStatus, isSourceActionRequired, isSourceRetrying, isSourceScrapeStale, isSourceNoRelevantItem, formatFunnelCount, SCRAPE_STALE_DAYS, NO_RELEVANT_ITEM_DAYS } from "@/lib/sourceHealth";
 import { isOptionalIntegrationSource } from "@workspace/ingest/optionalIntegrations";
 import {
   adminBearerHeaders,
@@ -458,18 +458,26 @@ export default function Sources() {
         </Select>
       </div>
 
-      <div className="bg-card border border-border rounded-sm overflow-hidden">
-        <div className="grid grid-cols-[1.5fr_120px_100px_110px_90px_160px_160px_1fr_80px] text-[10px] font-sans uppercase tracking-widest text-muted-foreground bg-muted/50 border-b border-border">
+      <div className="bg-card border border-border rounded-sm overflow-x-auto">
+        <div className="min-w-[1180px]">
+        <div className="grid grid-cols-[1.4fr_100px_80px_120px_70px_180px_140px_140px_minmax(140px,1fr)_70px] text-[10px] font-sans uppercase tracking-widest text-muted-foreground bg-muted/50 border-b border-border">
           <div className="p-3">Name</div><div className="p-3">Topic</div><div className="p-3">Type</div><div className="p-3">Status</div>
-          <div className="p-3">Reliability</div><div className="p-3">Last Success</div><div className="p-3">Last Failure</div>
+          <div className="p-3">Reliability</div>
+          <div className="p-3" title="Last-run funnel: items found → retained (in-scope) → rejected. “—” means not yet tracked.">Collection (last run)</div>
+          <div className="p-3">Last Success</div><div className="p-3">Last Failure</div>
           <div className="p-3">Error</div><div className="p-3"></div>
         </div>
         {sources.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">No sources match.</div>
         ) : (
           <div className="divide-y divide-border">
-            {sources.map((s) => (
-              <div key={s.id} className="grid grid-cols-[1.5fr_120px_100px_110px_90px_160px_160px_1fr_80px] items-center text-sm hover:bg-muted/30">
+            {sources.map((s) => {
+              const scrapeStale = isSourceScrapeStale(s);
+              const noRelevant = isSourceNoRelevantItem(s);
+              const hasFunnel =
+                s.itemsCollected != null || s.itemsRetained != null || s.itemsRejected != null;
+              return (
+              <div key={s.id} className="grid grid-cols-[1.4fr_100px_80px_120px_70px_180px_140px_140px_minmax(140px,1fr)_70px] items-center text-sm hover:bg-muted/30">
                 <div className="p-3">
                   <div className="font-serif font-bold text-primary">{s.name}</div>
                   {s.manualReviewRequired && <div className="text-[10px] uppercase tracking-widest text-destructive mt-0.5">Manual review</div>}
@@ -486,9 +494,51 @@ export default function Sources() {
                   )}
                 </div>
                 <div className="p-3"><Dots filled={s.reliability} /></div>
+                <div className="p-3 text-xs">
+                  <div
+                    className="font-mono text-muted-foreground"
+                    title="Items found → retained (in-scope) → rejected, last ingest run."
+                  >
+                    {hasFunnel ? (
+                      <>
+                        {formatFunnelCount(s.itemsCollected)}
+                        <span className="text-muted-foreground/50"> → </span>
+                        <span className="text-foreground">{formatFunnelCount(s.itemsRetained)}</span>
+                        <span className="text-muted-foreground/50"> → </span>
+                        {formatFunnelCount(s.itemsRejected)}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    Relevant: {formatSourceTimestamp(s.lastRelevantItemAt)}
+                  </div>
+                  {(scrapeStale || noRelevant) && (
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      {scrapeStale && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-sans uppercase tracking-wider text-amber-600" title={`No successful scrape in over ${SCRAPE_STALE_DAYS} days`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          No scrape {SCRAPE_STALE_DAYS}d
+                        </span>
+                      )}
+                      {noRelevant && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-sans uppercase tracking-wider text-amber-600" title={`Collecting, but no in-scope item retained in over ${NO_RELEVANT_ITEM_DAYS} days`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          No relevant {NO_RELEVANT_ITEM_DAYS}d
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastSuccessAt)}</div>
                 <div className="p-3 text-xs font-mono text-muted-foreground">{formatSourceTimestamp(s.lastFailureAt)}</div>
-                <div className="p-3 text-xs text-muted-foreground truncate">{s.errorMessage ?? "—"}</div>
+                <div className="p-3 text-xs text-muted-foreground truncate" title={s.failureReason ?? undefined}>
+                  {s.errorMessage ?? "—"}
+                  {s.failureReason && (
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 mt-0.5">{s.failureReason}</div>
+                  )}
+                </div>
                 <div className="p-3 flex items-center gap-2">
                   <button onClick={() => setEditing(s)} className="text-muted-foreground hover:text-accent"><Pencil className="w-3.5 h-3.5" /></button>
                   <button
@@ -500,9 +550,11 @@ export default function Sources() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
+        </div>
       </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
@@ -564,6 +616,10 @@ function SourceForm({
     manualReviewRequired: initial?.manualReviewRequired ?? false,
     notes: initial?.notes ?? "",
     errorMessage: initial?.errorMessage ?? "",
+    scrapeMethod: initial?.scrapeMethod ?? "",
+    scrapeFrequency: initial?.scrapeFrequency ?? "",
+    language: initial?.language ?? "",
+    locationCovered: initial?.locationCovered ?? "",
   });
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const submit = async () => {
@@ -576,6 +632,10 @@ function SourceForm({
       url: form.url || undefined, status: form.status, reliability: form.reliability,
       manualReviewRequired: form.manualReviewRequired,
       notes: form.notes || undefined, errorMessage: form.errorMessage || undefined,
+      scrapeMethod: form.scrapeMethod || undefined,
+      scrapeFrequency: form.scrapeFrequency || undefined,
+      language: form.language || undefined,
+      locationCovered: form.locationCovered || undefined,
     };
     setSaving(true);
     onError(null);
@@ -625,6 +685,14 @@ function SourceForm({
         <Field label="Reliability (0-5)"><Input type="number" min={0} max={5} value={form.reliability} onChange={(e) => set("reliability", parseInt(e.target.value || "0"))} className="rounded-sm" /></Field>
       </div>
       <Field label="Error Message"><Input value={form.errorMessage} onChange={(e) => set("errorMessage", e.target.value)} className="rounded-sm" /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Scrape Method"><Input value={form.scrapeMethod} onChange={(e) => set("scrapeMethod", e.target.value)} placeholder="e.g. Google News RSS" className="rounded-sm" /></Field>
+        <Field label="Scrape Frequency"><Input value={form.scrapeFrequency} onChange={(e) => set("scrapeFrequency", e.target.value)} placeholder="e.g. Every 12h (scheduled)" className="rounded-sm" /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Language"><Input value={form.language} onChange={(e) => set("language", e.target.value)} placeholder="e.g. English" className="rounded-sm" /></Field>
+        <Field label="Location Covered"><Input value={form.locationCovered} onChange={(e) => set("locationCovered", e.target.value)} placeholder="e.g. APAC ports" className="rounded-sm" /></Field>
+      </div>
       <Field label="Notes"><Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} className="rounded-sm" /></Field>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={form.manualReviewRequired} onChange={(e) => set("manualReviewRequired", e.target.checked)} />

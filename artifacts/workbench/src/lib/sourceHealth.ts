@@ -96,3 +96,71 @@ export function formatSourceTimestamp(
   if (!value) return "—";
   return format(new Date(value), "dd MMM HH:mm");
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Staleness windows for the scrape-health flags. A feed that hasn't scraped in a
+// week, or hasn't retained a genuinely in-scope item in a month, is surfaced to
+// operators as a coverage gap.
+export const SCRAPE_STALE_DAYS = 7;
+export const NO_RELEVANT_ITEM_DAYS = 30;
+
+// A source is only ACTIVELY COLLECTING (and therefore eligible for the staleness
+// flags) when it has succeeded at least once and is not an intentionally-off /
+// not-yet-validated optional integration. A never-run or switched-off feed is
+// not "stale" — it simply hasn't started, so flagging it would be misleading.
+function isActivelyCollecting(s: {
+  status: string;
+  lastSuccessAt?: string | Date | null;
+  lastFailureAt?: string | Date | null;
+}): boolean {
+  const eff = effectiveSourceStatus(s);
+  if (eff === "not_configured" || eff === "pending" || eff === "disabled") {
+    return false;
+  }
+  return Boolean(s.lastSuccessAt);
+}
+
+// True when an actively-collecting feed's last successful scrape is older than
+// the staleness window — a silent collection gap worth an operator's attention.
+export function isSourceScrapeStale(
+  s: {
+    status: string;
+    lastSuccessAt?: string | Date | null;
+    lastFailureAt?: string | Date | null;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (!isActivelyCollecting(s)) return false;
+  return (
+    now.getTime() - new Date(s.lastSuccessAt as string | Date).getTime() >
+    SCRAPE_STALE_DAYS * DAY_MS
+  );
+}
+
+// True when an actively-collecting feed is scraping but hasn't retained an
+// in-scope item within the relevance window. A NULL last-relevant timestamp is
+// treated as "telemetry not yet recorded" (unknown), NOT a fabricated zero, so a
+// feed is only flagged once we have a real stale timestamp to point at.
+export function isSourceNoRelevantItem(
+  s: {
+    status: string;
+    lastSuccessAt?: string | Date | null;
+    lastFailureAt?: string | Date | null;
+    lastRelevantItemAt?: string | Date | null;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (!isActivelyCollecting(s)) return false;
+  if (!s.lastRelevantItemAt) return false;
+  return (
+    now.getTime() - new Date(s.lastRelevantItemAt).getTime() >
+    NO_RELEVANT_ITEM_DAYS * DAY_MS
+  );
+}
+
+// Display a LAST-RUN funnel count (collected / retained / rejected), falling
+// back to an em dash when the feed has never reported telemetry. "—" means "not
+// tracked", never a fabricated 0.
+export function formatFunnelCount(value: number | null | undefined): string {
+  return value === null || value === undefined ? "—" : String(value);
+}

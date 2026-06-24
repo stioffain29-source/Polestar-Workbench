@@ -7,7 +7,7 @@ import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { isLlmAvailable, screenBatch } from "./translateScreen";
-import { recordSourceHealth } from "./sourceHealth";
+import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
 // Cargo Watch ingest core.
@@ -31,6 +31,13 @@ const TERMS = [
   "depot theft",
   "pilferage",
   "seal tampering",
+  // Port-related cargo security (widened scope). Country-anchored in the ME /
+  // APAC / port feeds below, so these stay scoped to in-scope geography.
+  "port robbery",
+  "anchorage robbery",
+  "stowaway",
+  "vessel boarding",
+  "container smuggling",
 ];
 
 const TERM_QUERY = TERMS.map((t) => `"${t}"`).join(" OR ");
@@ -183,6 +190,20 @@ const ORG_QUERIES: { label: string; q: string }[] = [
   { label: "IUMI cargo crime", q: `IUMI cargo (theft OR crime OR pilferage)` },
 ];
 
+// Global PORT cargo-security feeds (widened scope). Deliberately NOT
+// country-anchored — they surface port / anchorage / vessel / container
+// security events worldwide, then the country-in-title gate in classify()
+// scopes them to APAC + Middle East. Kept to a small, bounded set so the
+// full ingest does not blow its time budget (per the per-port FETCH cap note).
+const PORT_SECURITY_QUERIES: { label: string; q: string }[] = [
+  { label: "Port · armed robbery", q: `"port" ("armed robbery" OR "robbery at port" OR "theft at port")` },
+  { label: "Port · anchorage robbery", q: `"anchorage" (robbery OR theft OR boarded)` },
+  { label: "Port · stowaway", q: `stowaway (container OR port OR vessel OR ship OR cargo)` },
+  { label: "Port · container smuggling", q: `(container OR cargo) (smuggling OR narcotics OR contraband OR "drugs seized")` },
+  { label: "Port · vessel boarding", q: `(vessel OR ship OR tanker) ("robbery on board" OR "theft on board" OR "robbers boarded")` },
+  { label: "Port · sabotage / intrusion", q: `"port" (sabotage OR arson OR intrusion OR trespass)` },
+];
+
 // Port-targeted feeds. A port-only headline ("Container theft ring busted at
 // Port Klang") often never names the country, so the country-feed queries above
 // miss it. These query the busiest APAC + ME container ports by name so those
@@ -224,6 +245,7 @@ const PORT_FEED_TERMS: { term: string; country: string }[] = [
 
 const FEEDS: Feed[] = [
   ...ORG_QUERIES.map((o): Feed => ({ label: o.label, url: gnews(o.q), group: "org" })),
+  ...PORT_SECURITY_QUERIES.map((p): Feed => ({ label: p.label, url: gnews(p.q), group: "port" })),
   ...ME_COUNTRIES.map((c): Feed => ({
     label: `ME · ${c}`,
     url: gnews(`(${TERM_QUERY}) "${c}"`),
@@ -361,34 +383,60 @@ const ALLOW = [
   "supply chain pilferage",
   "logistics theft",
   "logistics crime",
+  // --- Port / anchorage / vessel cargo-security (widened scope) ---
+  "port robbery",
+  "port theft",
+  "robbery at port",
+  "theft at port",
+  "robbery at the port",
+  "theft at the port",
+  "anchorage robbery",
+  "anchorage theft",
+  "robbery at anchorage",
+  "theft at anchorage",
+  "robbers boarded",
+  "pirates boarded",
+  "boarded the vessel",
+  "boarded the ship",
+  "theft from vessel",
+  "theft from ship",
+  "theft on board",
+  "robbery on board",
+  "stowaway",
+  "stowaways",
+  "port intrusion",
+  "port trespass",
+  "trespass at port",
+  "cargo smuggling",
+  "container smuggling",
+  "smuggling at port",
+  "port smuggling",
+  "narcotics in container",
+  "drugs in container",
+  "cocaine in container",
+  "container seizure",
+  "cargo seizure",
+  "port sabotage",
+  "sabotage at port",
+  "dockworker strike",
+  "dock workers strike",
+  "stevedore strike",
+  "port workers strike",
+  "port blockade",
+  "port access blockade",
+  "blockade at port",
+  "truck park robbery",
+  "lorry park robbery",
 ];
 
-// Denylist: if any hit, reject even if allowlist matched.
-const DENY = [
-  // Maritime / kinetic — handled in Shipping/Strikes, not Cargo Watch.
-  "houthi",
-  "missile",
-  "drone attack",
-  "ballistic",
-  "naval",
-  "warship",
-  "vessel attack",
-  "ship attack",
-  "tanker attack",
-  "tanker seizure",
-  "vessel seizure",
-  // Operational/commercial noise.
-  "port congestion",
-  "port delay",
-  "freight rate",
-  "shipping rate",
-  "container rate",
-  "joint venture",
-  "acquires",
-  "acquired by",
-  "tariff",
-  "trade deal",
-  // Non-cargo "pilferage" contexts that derail the India/Pakistan signal.
+// Hard denylist: ALWAYS reject, even with cargo/port context. These are
+// non-cargo "theft"/"pilferage" homonyms or finance/corruption framing — none
+// describe a cargo-security incident, so a cargo/port word nearby must not
+// rescue them. Pure shipping-ops / commercial noise is gated separately
+// (OPS_COMMERCIAL_DENY) so a real theft that merely mentions "throughput" or a
+// "tariff" row is still kept.
+const HARD_DENY = [
+  // Non-cargo "pilferage"/"theft" contexts that derail the India/Pakistan signal.
   "power pilferage",
   "power theft",
   "electricity pilferage",
@@ -409,6 +457,84 @@ const DENY = [
   "embezzlement",
   "ponzi",
   "money laundering",
+];
+
+// Maritime / kinetic denylist: reject ONLY when the headline carries NO
+// cargo/port-security context (see PORT_CARGO_CONTEXT). A pure under-way attack
+// (a Houthi missile on a tanker at sea) belongs in Shipping / Strikes; but a
+// port / anchorage robbery, a theft from a vessel, a container seizure, or a
+// stowaway found in a box is a Cargo Watch event and must NOT be blanket-dropped.
+const MARITIME_DENY = [
+  "houthi",
+  "missile",
+  "drone attack",
+  "ballistic",
+  "naval",
+  "warship",
+  "vessel attack",
+  "ship attack",
+  "tanker attack",
+  "tanker seizure",
+  "vessel seizure",
+];
+
+// Shipping-ops / commercial-business noise. Unlike HARD_DENY these are dropped
+// ONLY when the headline carries no cargo/port-security context, so a genuine
+// theft, robbery or seizure that merely mentions congestion, a freight rate, a
+// tariff row or an M&A deal is still kept (security wins). With cargo/port
+// context present we trust the ALLOW gate (security phrases only) instead.
+const OPS_COMMERCIAL_DENY = [
+  "port congestion",
+  "port delay",
+  "freight rate",
+  "shipping rate",
+  "container rate",
+  "throughput",
+  "joint venture",
+  "acquires",
+  "acquired by",
+  "tariff",
+  "trade deal",
+];
+
+// Cargo / port-security context. Its presence lets a MARITIME_DENY headline stay
+// in Cargo Watch (the event is a port/cargo-security incident, not an under-way
+// naval attack). It does NOT bypass HARD_DENY, and an ALLOW phrase is still
+// required afterwards, so this only widens — it never admits non-cargo noise.
+const PORT_CARGO_CONTEXT = [
+  "cargo",
+  "container",
+  "consignment",
+  "shipment",
+  "freight",
+  "warehouse",
+  "godown",
+  "depot",
+  "anchorage",
+  "stowaway",
+  "smuggl",
+  "contraband",
+  "narcotics",
+  "pilferage",
+  "bulk carrier",
+  "on board",
+  "aboard",
+  "stevedore",
+  "longshore",
+  "dockworker",
+  "seaport",
+];
+
+// Word-bounded port/vessel context. These tokens are matched on word boundaries
+// (NOT substring) so "port" can't fire on "reported"/"transport", "ship" can't
+// fire on "championship", and "dock"/"terminal" stay precise. Their presence —
+// e.g. "...at Singapore port" or "theft from a vessel" — is enough cargo/port
+// context to keep a MARITIME_DENY or OPS_COMMERCIAL_DENY headline for the ALLOW
+// gate to adjudicate.
+const PORT_CARGO_CONTEXT_WORDS = [
+  "port", "ports", "harbour", "harbor", "wharf", "dock", "docks",
+  "quay", "jetty", "berth", "terminal", "terminals",
+  "vessel", "vessels", "ship", "ships", "tanker", "tankers", "boat",
 ];
 
 type Classified = {
@@ -433,8 +559,24 @@ function classify(title: string, summary: string): Classified {
   const hay = `${title}\n${summary}`.toLowerCase();
   const titleLc = title.toLowerCase();
 
-  const denyHit = DENY.find((d) => hay.includes(d));
-  if (denyHit) return { kept: false, reason: `deny:${denyHit}`, country: null };
+  const hardDenyHit = HARD_DENY.find((d) => hay.includes(d));
+  if (hardDenyHit) return { kept: false, reason: `deny:${hardDenyHit}`, country: null };
+
+  // Maritime / kinetic terms and shipping-ops / commercial noise only reject
+  // when no cargo/port-security context is present, so a port/anchorage robbery,
+  // a theft from a vessel, or a container seizure is NOT dropped to Shipping —
+  // and a real theft that merely mentions "throughput" or a "tariff" row is NOT
+  // dropped as ops noise — while a pure under-way attack or a bare freight-rate
+  // story still is. Context is matched as substring stems OR word-bounded tokens.
+  const portCargoCtx =
+    PORT_CARGO_CONTEXT.some((c) => hay.includes(c)) ||
+    PORT_CARGO_CONTEXT_WORDS.some((w) => hasWord(hay, w));
+  if (!portCargoCtx) {
+    const maritimeDenyHit = MARITIME_DENY.find((d) => hay.includes(d));
+    if (maritimeDenyHit) return { kept: false, reason: `deny-maritime:${maritimeDenyHit}`, country: null };
+    const opsDenyHit = OPS_COMMERCIAL_DENY.find((d) => hay.includes(d));
+    if (opsDenyHit) return { kept: false, reason: `deny-ops:${opsDenyHit}`, country: null };
+  }
 
   const allowHit = ALLOW.find((a) => hay.includes(a));
   if (!allowHit) return { kept: false, reason: "no-allowlist-match", country: null };
@@ -845,18 +987,42 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   }
 
   if (commit) {
+    // Registry cadence is derived from the REAL scheduler config, never invented:
+    // when the boot scheduler is enabled the feeds are pulled every
+    // INGEST_INTERVAL_HOURS (default 12); otherwise collection is manual/on-demand.
+    const intervalHours = Number(process.env.INGEST_INTERVAL_HOURS) || 12;
+    const scheduleEnabled = process.env.INGEST_SCHEDULE_ENABLED !== "false";
+    const scrapeFrequency = scheduleEnabled
+      ? `Every ${intervalHours}h (scheduled)`
+      : "Manual / on-demand";
+
+    // Per-feed health carries the LAST-RUN funnel this run actually observed
+    // (found -> accepted -> rejected) plus the source language. English query
+    // feeds are tagged "English"; local-language editions carry their own lang.
+    // Counts come straight from the perFeed funnel — no fabrication.
     const healthFeeds = [
-      ...FEEDS.map((f) => ({ name: f.label, url: f.url })),
-      ...(llmReady ? LOCAL_FEEDS.map((f) => ({ name: f.label, url: f.url })) : []),
-    ].map((f) => ({
-      ...f,
-      ok: !perFeed[f.name]?.error,
-      error: perFeed[f.name]?.error ?? null,
-    }));
+      ...FEEDS.map((f) => ({ name: f.label, url: f.url, language: "English" })),
+      ...(llmReady
+        ? LOCAL_FEEDS.map((f) => ({ name: f.label, url: f.url, language: f.lang }))
+        : []),
+    ].map((f) => {
+      const stat = perFeed[f.name];
+      return {
+        ...f,
+        ok: !stat?.error,
+        error: stat?.error ?? null,
+        collected: stat?.found,
+        retained: stat?.accepted,
+        rejected: stat?.rejected,
+        failureReason: categorizeFeedFailure(stat?.error),
+      };
+    });
     await recordSourceHealth("cargo_watch", healthFeeds, {
       sourceType: "rss",
       reliability: 3,
       notes: "Live cargo-theft news feed — auto-monitored each ingest run.",
+      scrapeMethod: "Google News RSS",
+      scrapeFrequency,
     });
   }
 

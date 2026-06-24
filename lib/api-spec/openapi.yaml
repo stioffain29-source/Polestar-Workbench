@@ -1615,6 +1615,17 @@ components:
         manualReviewRequired: { type: boolean }
         notes: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+        # Source registry (analyst-classifiable descriptive metadata; nullable).
+        scrapeMethod: { type: ["string", "null"] }
+        scrapeFrequency: { type: ["string", "null"] }
+        language: { type: ["string", "null"] }
+        locationCovered: { type: ["string", "null"] }
+        # Scrape-health telemetry (machine-written LAST-RUN snapshots; nullable).
+        lastRelevantItemAt: { type: ["string", "null"], format: date-time }
+        itemsCollected: { type: ["integer", "null"] }
+        itemsRetained: { type: ["integer", "null"] }
+        itemsRejected: { type: ["integer", "null"] }
+        failureReason: { type: ["string", "null"] }
 
     SourceInput:
       type: object
@@ -1631,6 +1642,12 @@ components:
         reliability: { type: integer, minimum: 0, maximum: 5 }
         manualReviewRequired: { type: boolean }
         notes: { type: string }
+        # Registry metadata is analyst-classifiable; telemetry counters are
+        # machine-written only and intentionally excluded from create/update.
+        scrapeMethod: { type: string }
+        scrapeFrequency: { type: string }
+        language: { type: string }
+        locationCovered: { type: string }
 
     SourceUpdate:
       type: object
@@ -1646,6 +1663,12 @@ components:
         reliability: { type: integer, minimum: 0, maximum: 5 }
         manualReviewRequired: { type: boolean }
         notes: { type: string }
+        # Registry metadata is analyst-classifiable; telemetry counters are
+        # machine-written only and intentionally excluded from create/update.
+        scrapeMethod: { type: string }
+        scrapeFrequency: { type: string }
+        language: { type: string }
+        locationCovered: { type: string }
 
     SourceHealthBucket:
       type: object

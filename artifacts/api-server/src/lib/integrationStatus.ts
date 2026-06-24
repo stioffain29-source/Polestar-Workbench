@@ -777,6 +777,49 @@ async function socialTelegramStatus(): Promise<IntegrationStatusItem> {
   };
 }
 
+const TAPA_DETAIL =
+  "TAPA's Incident Information Service (IIS) is the authoritative members-only database of supply-chain cargo-theft incidents (land, warehouse, in-transit). There is no public API or connector — TAPA cargo-theft events currently reach Cargo Watch only as news echoes via the cargo feeds. Absence is a coverage gap, not an outage; the cargo feeds are unaffected.";
+const X_OSINT_DETAIL =
+  "X (Twitter) cargo-security OSINT would surface first-hand port / warehouse / in-transit theft and hijack reports as ADDITIVE context (never as incidents without an explicit operator promote, mirroring the Facebook OSINT pass). It needs paid X API access and a dedicated connector — neither is built yet, so nothing is collected. The cargo feeds are unaffected.";
+
+// Cargo-security AUTHORITY / OSINT sources that have no live connector yet.
+// They are surfaced here with a truthful "not_configured" state (a coverage gap
+// an operator can see at a glance) rather than being silently omitted — which
+// would falsely imply the live news-echo feeds are the complete picture. Neither
+// has a secret that would switch it on (the connector itself is unbuilt), so we
+// advertise no env vars and keep them out of any failing-source count.
+function tapaStatus(): IntegrationStatusItem {
+  return {
+    key: "tapa_iis",
+    label: "TAPA IIS (cargo-theft database)",
+    status: "not_configured",
+    summary:
+      "No direct TAPA IIS connector — TAPA's cargo-theft Incident Information Service is a paid members-only database with no public API, so those events arrive only as news echoes via the cargo feeds.",
+    detail: TAPA_DETAIL,
+    configured: false,
+    optional: true,
+    envVars: [],
+    metrics: [metric("Direct connector", "none"), metric("Coverage", "news echo only")],
+    docsUrl: "https://tapaemea.org",
+  };
+}
+
+function xOsintStatus(): IntegrationStatusItem {
+  return {
+    key: "x_cargo_osint",
+    label: "X / Twitter (cargo-security OSINT)",
+    status: "not_configured",
+    summary:
+      "No X (Twitter) cargo-security OSINT connector — first-hand theft / hijack reports would need paid X API access and a dedicated connector, neither of which is built yet, so nothing is collected.",
+    detail: X_OSINT_DETAIL,
+    configured: false,
+    optional: true,
+    envVars: [],
+    metrics: [metric("Direct connector", "none"), metric("Access", "paid API")],
+    docsUrl: "https://developer.x.com",
+  };
+}
+
 function adminControlsStatus(): IntegrationStatusItem {
   const configured = Boolean(process.env["INGEST_ADMIN_TOKEN"]?.trim());
   return {
@@ -814,6 +857,8 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       openaiStatus(),
       socialInstagramStatus(),
       socialTelegramStatus(),
+      Promise.resolve(tapaStatus()),
+      Promise.resolve(xOsintStatus()),
     ]),
     getMaritimeSourceHealth(),
   ]);

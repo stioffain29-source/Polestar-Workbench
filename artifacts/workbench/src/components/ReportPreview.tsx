@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
-import { DISCLAIMER_TEXT, SEV_COLOR, sevKey } from "@/lib/pdfChrome";
+import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
@@ -37,6 +37,16 @@ import {
   cargoUsdNote,
   cargoCommodityNote,
 } from "@/lib/cargoReportData";
+import {
+  buildCargoGroupedDataset,
+  REPORT_CLUSTER_SECTION_KEYS,
+  cargoClusterLocationLabel,
+  cargoClusterDetailLine,
+  cargoClusterSourceLabel,
+  cargoClusterSeverityKey,
+  type CargoGroupedDataset,
+  type CargoGroupedSection,
+} from "@/lib/cargoGroupedDataset";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 
 const NAVY = "#0b0a3d";
@@ -393,6 +403,128 @@ function CargoCountryTable({ rows }: { rows: CargoCountryRow[] }) {
   );
 }
 
+// Cargo Incident Clusters — the regrouped, clustered view. Renders the same
+// partition tables + watch-item bullets, in the same order, that the PDF's
+// drawCargoClusters draws (preview == PDF). Cargo report only.
+function CargoClustersSection({ grouped }: { grouped: CargoGroupedDataset }) {
+  const byKey = new Map(grouped.sections.map((s) => [s.key, s] as const));
+  const tables = REPORT_CLUSTER_SECTION_KEYS.map((k) => byKey.get(k)).filter(
+    (s): s is CargoGroupedSection => !!s && s.clusters.length > 0,
+  );
+  if (tables.length === 0 && grouped.watchItems.length === 0) return null;
+  const th: React.CSSProperties = {
+    background: NAVY,
+    color: "#fff",
+    fontFamily: "Roboto, sans-serif",
+    fontWeight: 700,
+    fontSize: 10,
+    textAlign: "left",
+    padding: "8px 10px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  };
+  const td: React.CSSProperties = {
+    fontFamily: "Roboto, sans-serif",
+    fontSize: 12,
+    color: DUSK,
+    padding: "10px",
+    verticalAlign: "top",
+    borderBottom: `1px solid ${POLAR}`,
+    lineHeight: 1.45,
+  };
+  const fmtDate = (s: string): string => {
+    try {
+      return format(parseISO(s), "dd MMM yyyy");
+    } catch {
+      return s;
+    }
+  };
+  return (
+    <>
+      {tables.length > 0 && (
+        <Section title="Cargo Incident Clusters">
+          {tables.map((section) => (
+            <div key={section.key} style={{ marginBottom: 18 }}>
+              <h3
+                style={{
+                  color: NAVY,
+                  fontFamily: "Roboto, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.03em",
+                  marginBottom: 8,
+                }}
+              >
+                {section.title}
+              </h3>
+              <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${POLAR}` }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, width: "14%" }}>Date</th>
+                    <th style={{ ...th, width: "20%" }}>Category</th>
+                    <th style={{ ...th, width: "53%" }}>Incident</th>
+                    <th style={{ ...th, width: "13%" }}>Severity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {section.clusters.map((c) => {
+                    const sk = cargoClusterSeverityKey(c);
+                    return (
+                      <tr key={c.id}>
+                        <td style={{ ...td, color: DUSK }}>{fmtDate(c.latestOccurredAt)}</td>
+                        <td style={td}>{c.enrichment.category}</td>
+                        <td style={{ ...td, color: NAVY }}>
+                          {c.title}
+                          <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
+                            {cargoClusterLocationLabel(c)} | Confidence: {c.enrichment.confidence} |
+                            Status: {c.enrichment.status}
+                          </div>
+                          <div style={{ fontSize: 11, color: DUSK, marginTop: 2, lineHeight: 1.4 }}>
+                            {cargoClusterDetailLine(c)}
+                          </div>
+                          <div style={{ fontSize: 10, fontStyle: "italic", opacity: 0.7, marginTop: 3 }}>
+                            {cargoClusterSourceLabel(c)}
+                          </div>
+                        </td>
+                        <td style={td}>
+                          <span
+                            style={{
+                              ...severityBadgeStyle(sk),
+                              display: "inline-block",
+                              padding: "3px 8px",
+                              borderRadius: 2,
+                              fontWeight: 700,
+                              fontSize: 10,
+                              letterSpacing: "0.04em",
+                              textTransform: "uppercase",
+                              WebkitPrintColorAdjust: "exact",
+                              printColorAdjust: "exact",
+                            }}
+                          >
+                            {SEV_LABEL[sk] ?? "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </Section>
+      )}
+      <BulletsSection
+        title="Recommended Watch Items"
+        text={grouped.watchItems.map((w) => "- " + w).join("\n")}
+        max={8}
+      />
+    </>
+  );
+}
+
 function RelatedIncidentsTable({ rows, summaries }: { rows: TopicFastFactsIncident[]; summaries: Record<string, string> }) {
   const th: React.CSSProperties = {
     background: NAVY,
@@ -538,6 +670,26 @@ export default function ReportPreview({
     : null;
   const cargoCountry = isCargo ? buildCargoCountryBreakdown(cargoWindow) : null;
   const cargoPorts = isCargo ? buildCargoPortBreakdown(cargoWindow) : null;
+  // Cargo Incident Clusters dataset — the regrouped/clustered view shared with
+  // the PDF (exportTopicReportPdf rebuilds it from the identical windowed set).
+  const cargoGrouped =
+    isCargo && report.issueDate
+      ? buildCargoGroupedDataset(
+          cargoWindow.map((i) => ({
+            id: i.id,
+            topic: i.topic,
+            title: i.title,
+            summary: i.summary ?? null,
+            source: i.source ?? null,
+            sourceUrl: i.sourceUrl ?? null,
+            location: i.location ?? null,
+            country: i.country ?? null,
+            severity: i.severity ?? null,
+            occurredAt: i.occurredAt,
+          })),
+          { referenceDate: report.issueDate },
+        )
+      : null;
   // Related Incidents table — shared selection (selectRelatedIncidents) so the
   // preview lists the SAME rows, in the same order, as the PDF's
   // drawRelatedIncidents (parity guarantee). The window here matches the PDF's
@@ -870,6 +1022,9 @@ export default function ReportPreview({
                       ? pick(report.polestarView, buildCargoPolestarView(cargoWindow))
                       : report.polestarView}
                   />
+                  {isCargo && cargoGrouped && (
+                    <CargoClustersSection grouped={cargoGrouped} />
+                  )}
                   {relatedRows.length > 0 && (
                     <Section title="Related Incidents">
                       <RelatedIncidentsTable rows={relatedRows} summaries={incidentSummaries} />

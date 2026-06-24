@@ -349,6 +349,7 @@ describe("getIntegrationStatuses envelope", () => {
     expect(keys).toEqual(
       [
         "admin_controls",
+        "ais_movement",
         "gdelt",
         "liveuamap",
         "openai",
@@ -356,7 +357,9 @@ describe("getIntegrationStatuses envelope", () => {
         "reliefweb_reports",
         "social_watch_instagram",
         "social_watch_telegram",
+        "tapa_iis",
         "vessel_registry",
+        "x_cargo_osint",
       ].sort(),
     );
     expect(Array.isArray(resp.maritimeSources)).toBe(true);
