@@ -1,0 +1,137 @@
+TASK: Improve the new Jakarta and Indonesia weekly report topics in Polestar Workbench.
+
+You are working on two new weekly report topics in the existing Polestar Workbench system. Treat this as an enhancement to the current report generation process, not a rebuild. Do not change the core report builder, report editor, authentication, database structure, PDF export process or overall Polestar branding unless a small change is directly required to complete this task.
+
+The two topics are:
+
+1. Jakarta Security Watch
+2. Indonesia Operating Risk Watch
+
+The current drafts have the right broad structure, but the output needs improvement before it is client ready. The main issues are weak filtering, repetitive language, overuse of generic categories, uneven location handling and some irrelevant content appearing in the Indonesia report. The aim is to make both reports read like business security analysis rather than scraped incident summaries.
+
+Jakarta Security Watch is a city level weekly report. It should only cover Jakarta and Greater Jakarta. The report should focus on Central Jakarta, South Jakarta, North Jakarta, East Jakarta, West Jakarta and Greater Jakarta / Jabodetabek. It should include incidents that affect staff movement, offices, hotels, warehouses, logistics, business continuity, public order, site security, crime exposure, fires, transport disruption, utilities disruption, protests, labour action or local government/security developments. It should exclude national Indonesia stories unless they have a clear Jakarta or Jabodetabek operational impact. It should also exclude random low level crime, general politics, lifestyle content and stories with no practical business relevance.
+
+Indonesia Operating Risk Watch is a national operating environment report. It should cover Indonesia, but it must exclude Papua because Papua has its own dedicated Polestar report. Do not include incidents from Papua, West Papua, Central Papua, Highland Papua, South Papua or Southwest Papua in the Indonesia report. If a Papua related incident is collected by the Indonesia scrape, route it to the Papua report topic instead and do not display it in the Indonesia Operating Risk Watch.
+
+The Indonesia Operating Risk Watch should use these regional buckets only:
+
+Greater Jakarta and West Java
+Central and East Java
+Sumatra
+Kalimantan
+Sulawesi
+Bali, Nusa Tenggara and Maluku
+
+Do not include a Papua regional bucket. Do not reference Papua in the Indonesia watchlist, priorities, outlook or Polestar View unless specifically requested by the user.
+
+For both reports, every incident should pass a relevance check before it is included. The system should validate that the country is Indonesia, that the location is known or reasonably inferable, that the source is credible enough for open source reporting and that the incident has operational relevance. Any foreign story, non Indonesia story, sport story, lifestyle article, random clickbait item or unrelated crime filler should be excluded.
+
+If the location is unknown, do not display “Location not specified” in the client facing report. Either exclude the item or include it only if it has clear national level operational relevance. Where location confidence is weak, downgrade the confidence of that incident or reflect the weakness in the reporting confidence section. Do not allow weak location data to make the report look sloppy.
+
+Improve the incident categories. Stop using “Other security” as a dumping ground. Use more precise categories wherever possible. The preferred categories are:
+
+Protest / civil unrest
+Labour action
+Crime / theft / robbery
+Armed robbery / violent crime
+Fire / explosion
+Natural hazard
+Transport disruption
+Utilities / infrastructure disruption
+Regulatory / corruption / governance
+Security force activity
+Community tension / land dispute
+
+Only use “Other security” where no better category exists.
+
+Replace the heading “Top 3 Incidents This Week” with “Priority Incidents This Week”. “Top 3” implies a precise ranking, while “Priority Incidents” is more suitable for business risk reporting. Priority incidents should be selected based on severity, operational relevance, location relevance, likelihood of business disruption and relevance to staff movement, sites, transport, logistics, public order, security posture or continuity.
+
+Reduce repeated generic wording. Current phrases such as “Security relevant development; monitor for operational follow on in the affected area” should be replaced with incident specific business language.
+
+Use guidance like this:
+
+For fires: “Check nearby site exposure, access disruption and continuity arrangements.”
+
+For protests: “Avoid protest locations, allow extra journey time and keep routes flexible.”
+
+For robbery, theft or violent crime: “Review movement routines, cash handling, parking and local premises security.”
+
+For utilities disruption: “Monitor power, water, telecoms or fuel disruption and check backup arrangements.”
+
+For corruption, governance or regulatory issues: “Monitor for regulatory, procurement or local authority follow on.”
+
+For transport disruption: “Check route exposure, allow additional journey time and confirm alternative access options.”
+
+The BLUF should be short, sharp and useful. It should be 3 to 4 lines only. It must answer four questions: is the risk picture improving, stable or deteriorating; what is driving it; where is the main exposure; and what should business users do this week.
+
+Example Jakarta BLUF:
+
+“The Jakarta operating picture was broadly stable this week, with reporting concentrated around fires, protest activity and utility related disruption. The main business exposure remains movement disruption in Central Jakarta and continuity issues around affected premises. Business users should maintain standard movement precautions, avoid protest areas and monitor localised fire or utility disruption.”
+
+Example Indonesia BLUF:
+
+“Indonesia’s operating picture deteriorated slightly this week, with higher severity reporting across civil unrest, violent crime, fire and localised disruption. Greater Jakarta, West Java, Central and East Java, and parts of Sumatra should remain priority watch areas. Business users should tighten movement planning, avoid protest or crowd locations and review exposed site continuity arrangements.”
+
+The Executive Summary should not simply repeat the BLUF. It should explain the main themes this week, the main geographic concentration, the main business impact and whether the reporting picture is broad, narrow, improving, stable or deteriorating.
+
+The “What Changed This Week” section must compare the current period against the previous week. It should cover whether incident volume increased, decreased or remained broadly stable; whether the highest severity increased, decreased or remained unchanged; whether the main category mix changed; and whether the geographic focus shifted. Avoid vague wording.
+
+The Location Watchlist must not duplicate locations. For Jakarta, each district or Greater Jakarta area should only appear once. For Indonesia, each region should only appear once. The columns should remain Location, Why It Matters and Recommended Action. The recommended action must be specific and operational, not generic.
+
+The “Priorities This Week” section should not simply repeat incident titles. It should turn the week’s reporting into short, action focused points.
+
+Examples:
+
+“Central Jakarta: Avoid protest areas around national institutions and allow additional journey time during planned demonstrations.”
+
+“Greater Jakarta: Monitor local fire and utility disruption near operating sites and confirm continuity arrangements.”
+
+“West Java: Review movement and robbery exposure where staff travel after dark or handle cash.”
+
+The “Outlook Next Week” section should include the most likely pattern, locations to watch, escalation triggers and de escalation indicators. Escalation triggers may include larger protest mobilisation, labour or student groups joining demonstrations, fuel, wage or subsidy announcements, major court or parliamentary dates, casualty bearing incidents, repeated fires affecting commercial areas and infrastructure or utility disruption.
+
+The “Polestar View” must be the strongest analytical section. It should give a clear judgement, explain the business relevance, identify where exposure is highest, say what would change the assessment and tell users what they should do now. Avoid generic wording such as “risk remains” unless it is supported by a clear explanation.
+
+Reporting Confidence should be based on the number of credible sources, source quality, location clarity, consistency across sources and whether reporting is complete or uneven. Use High Confidence, Moderate Confidence or Low Confidence. Do not mark the whole report Low Confidence unless the whole dataset is genuinely weak. If only some incidents are weak, downgrade those incidents rather than the entire report.
+
+Use the Polestar severity scale:
+
+Insignificant
+Low
+Moderate
+High
+Extreme
+
+High should be reserved for direct threat to staff or sites, serious violence, major disruption, significant protest or civil unrest, armed robbery or violent crime affecting operating areas, or major fire, transport, utility or infrastructure impact.
+
+Moderate should be used for localised disruption, limited protest activity, isolated crime with some business relevance or local utility disruption.
+
+Low should be used for minor incidents, limited operational relevance or incidents included only for local awareness.
+
+Acceptance criteria:
+
+The Jakarta report contains only Jakarta and Greater Jakarta relevant content.
+
+The Indonesia report contains only Indonesia relevant content and excludes Papua entirely.
+
+Papua, West Papua, Central Papua, Highland Papua, South Papua and Southwest Papua incidents are routed to the dedicated Papua report topic and do not appear in the Indonesia report.
+
+No foreign stories appear in either report.
+
+No sport, lifestyle, clickbait or irrelevant stories appear.
+
+No duplicate regions or districts appear in the Location Watchlist.
+
+“Other security” is no longer used as a dumping ground.
+
+“Priority Incidents This Week” replaces “Top 3 Incidents This Week”.
+
+Priority incidents are selected for operational relevance, not just because they were scraped.
+
+BLUF, Executive Summary, What Changed, Outlook and Polestar View read like business security analysis.
+
+Repeated generic phrases are removed.
+
+The existing PDF style, layout and Polestar branding are preserved.
+
+Do not rebuild the system. This is a filtering, categorisation and analysis quality upgrade for the two new report topics.
