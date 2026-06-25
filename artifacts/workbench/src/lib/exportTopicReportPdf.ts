@@ -58,6 +58,13 @@ import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant } from "./topicRelevance";
 import { buildCargoReportExtras } from "./cargoReportData";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import {
+  aiOr,
+  resolveSimpleProse,
+  stableDraftTopicReportProse,
+  toDraftableIncidents,
+  type TopicAiProse,
+} from "./topicProseResolution";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -112,6 +119,9 @@ export interface ExportTopicReportPdfOptions {
    *  deterministic fallback summary is rendered, so the table always shows a
    *  summary line under each title in parity with the on-screen preview. */
   incidentSummaries?: Record<string, string>;
+  /** Cached AI narrative for the report. Sits beneath any analyst edit
+   *  and above the deterministic draft, mirroring the on-screen preview. */
+  aiProse?: TopicAiProse | null;
 }
 
 export interface TopicReportData {
@@ -895,9 +905,26 @@ export async function exportTopicReportPdf(
   // Body pages start here, each with the gradient header band.
   beginBodyPages(ctx);
 
-  if (data.executiveSummary && data.executiveSummary.trim()) {
+  const aiProse = options.aiProse ?? null;
+  // Deterministic per-topic draft — the labelled fallback beneath the AI
+  // narrative and any analyst edit. Built from the SAME windowed incident
+  // set the on-screen preview uses so screen and PDF agree.
+  const proseDraft = stableDraftTopicReportProse({
+    topic: data.topic,
+    issueDate: data.issueDate,
+    incidents: toDraftableIncidents(
+      filterTopicReportIncidents(incidents, data.topic, data.issueDate),
+    ),
+  });
+
+  const execText = resolveSimpleProse(
+    data.executiveSummary,
+    aiProse?.executiveSummary,
+    proseDraft.executiveSummary,
+  );
+  if (execText.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
-    renderProse(ctx, data.executiveSummary);
+    renderProse(ctx, execText);
   }
 
   const rawWindow = filterIncidentsToWindow(
@@ -933,9 +960,13 @@ export async function exportTopicReportPdf(
         situation: data.situation,
         whatHappened: data.whatHappened,
         whatMatters: data.whatMatters,
-        implications: data.implications,
+        implications: resolveSimpleProse(
+          data.implications,
+          aiProse?.implications,
+          "",
+        ),
         polestarView: data.polestarView,
-        watchNext: data.watchNext,
+        watchNext: resolveSimpleProse(data.watchNext, aiProse?.watchNext, ""),
         hardNumbers: data.hardNumbers,
       },
       incidents,
@@ -1000,8 +1031,18 @@ export async function exportTopicReportPdf(
     };
 
     renderProseSection("Market Read", fuelData.marketData.marketRead);
-    renderProseSection("Situation", data.situation);
-    renderProseSection("What Happened", data.whatHappened);
+    renderProseSection(
+      "Situation",
+      resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
+    );
+    renderProseSection(
+      "What Happened",
+      resolveSimpleProse(
+        data.whatHappened,
+        aiProse?.whatHappened,
+        proseDraft.whatHappened,
+      ),
+    );
     renderProseSection(
       "Operational Read",
       fuelData.incidentData.operationalRead,
@@ -1021,14 +1062,32 @@ export async function exportTopicReportPdf(
         fuelData.incidentData.producerBuyerActions,
       );
     }
-    renderProseSection("What Matters", data.whatMatters);
-    if (data.implications && data.implications.trim()) {
-      drawBulletSection(ctx, "Implications for Business", data.implications);
-    }
-    if (data.watchNext && data.watchNext.trim()) {
-      drawBulletSection(ctx, "Watch Next", data.watchNext, 8);
-    }
-    renderProseSection("Polestar View", data.polestarView);
+    renderProseSection(
+      "What Matters",
+      resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters),
+    );
+    // Render from the canonical fuel narrative payload (analyst edit -> AI ->
+    // deterministic top-up), identical to the on-screen preview, so screen ==
+    // in-app PDF for these two bullet sections.
+    drawBulletSection(
+      ctx,
+      "Implications for Business",
+      fuelData.narrativeData.implications ?? "",
+    );
+    drawBulletSection(
+      ctx,
+      "Watch Next",
+      fuelData.narrativeData.watchNext ?? "",
+      8,
+    );
+    renderProseSection(
+      "Polestar View",
+      resolveSimpleProse(
+        data.polestarView,
+        aiProse?.polestarView,
+        proseDraft.polestarView,
+      ),
+    );
   } else {
     drawSectionHeading(ctx, "Fast Facts");
     drawFastFactsKpiCards(
@@ -1107,15 +1166,15 @@ export async function exportTopicReportPdf(
       const proseSections: [string, string][] = [
         [
           "Situation",
-          pickProse(data.situation, buildCargoSituation(windowIncidents)),
+          pickProse(data.situation, aiOr(aiProse?.situation, buildCargoSituation(windowIncidents))),
         ],
         [
           "What Happened",
-          pickProse(data.whatHappened, buildCargoWhatHappened(windowIncidents)),
+          pickProse(data.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(windowIncidents))),
         ],
         [
           "What Matters",
-          pickProse(data.whatMatters, buildCargoWhatMatters(windowIncidents)),
+          pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(windowIncidents))),
         ],
       ];
       for (const [label, body] of proseSections) {
@@ -1123,39 +1182,71 @@ export async function exportTopicReportPdf(
       }
       const implBody = pickProse(
         data.implications,
-        buildCargoImplications(windowIncidents),
+        aiOr(aiProse?.implications, buildCargoImplications(windowIncidents)),
       );
       if (implBody && implBody.trim())
         drawBulletSection(ctx, "Implications for Business", implBody);
       const wnBody = pickProse(
         data.watchNext,
-        buildCargoWatchNext(windowIncidents),
+        aiOr(aiProse?.watchNext, buildCargoWatchNext(windowIncidents)),
       );
       if (wnBody && wnBody.trim())
         drawBulletSection(ctx, "Watch Next", wnBody, 8);
       const psBody = pickProse(
         data.polestarView,
-        buildCargoPolestarView(windowIncidents),
+        aiOr(aiProse?.polestarView, buildCargoPolestarView(windowIncidents)),
       );
       if (psBody && psBody.trim())
         drawSectionWithProse(ctx, "Polestar View", psBody);
     } else {
-      const proseSections: [string, string | null | undefined][] = [
-        ["Situation", data.situation],
-        ["What Happened", data.whatHappened],
-        ["What Matters", data.whatMatters],
+      const proseSections: [string, string][] = [
+        [
+          "Situation",
+          resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
+        ],
+        [
+          "What Happened",
+          resolveSimpleProse(
+            data.whatHappened,
+            aiProse?.whatHappened,
+            proseDraft.whatHappened,
+          ),
+        ],
+        [
+          "What Matters",
+          resolveSimpleProse(
+            data.whatMatters,
+            aiProse?.whatMatters,
+            proseDraft.whatMatters,
+          ),
+        ],
       ];
       for (const [label, body] of proseSections) {
         if (body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
-      if (data.implications && data.implications.trim()) {
-        drawBulletSection(ctx, "Implications for Business", data.implications);
+      const implBody = resolveSimpleProse(
+        data.implications,
+        aiProse?.implications,
+        proseDraft.implications,
+      );
+      if (implBody.trim()) {
+        drawBulletSection(ctx, "Implications for Business", implBody);
       }
-      if (data.watchNext && data.watchNext.trim()) {
-        drawBulletSection(ctx, "Watch Next", data.watchNext, 8);
+      const wnBody = resolveSimpleProse(
+        data.watchNext,
+        aiProse?.watchNext,
+        proseDraft.watchNext,
+      );
+      if (wnBody.trim()) {
+        drawBulletSection(ctx, "Watch Next", wnBody, 8);
       }
-      if (data.polestarView && data.polestarView.trim()) {
-        drawSectionWithProse(ctx, "Polestar View", data.polestarView);
+      const psBody = resolveSimpleProse(
+        data.polestarView,
+        aiProse?.polestarView,
+        proseDraft.polestarView,
+      );
+      if (psBody.trim()) {
+        drawSectionWithProse(ctx, "Polestar View", psBody);
       }
     }
   }

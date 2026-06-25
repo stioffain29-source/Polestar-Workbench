@@ -1,0 +1,209 @@
+rief: Add source scraping for Jakarta Weekly and Indonesia Weekly reports
+
+We have added two new weekly reports:
+
+Jakarta Weekly
+Indonesia Weekly
+
+The task is to enhance the existing source scraping and incident collection so these reports are populated with relevant local news, official updates and public social/community signals.
+
+This is an enhancement to the existing reporting system, not a rebuild.
+
+Objective
+
+Add reliable source coverage for Jakarta and wider Indonesia so the weekly reports can identify and summarise:
+
+protests and demonstrations
+civil unrest
+crime and security incidents
+floods, fires, earthquakes and other disruption
+transport disruption
+police activity
+government restrictions or official warnings
+airport, port, road and city disruption
+operational issues relevant to business travellers, facilities and supply chain
+Jakarta Weekly source stack
+
+Prioritise these sources first:
+
+Official and high confidence sources
+ANTARA Metro
+Jakarta.go.id / JAKI News
+BPBD DKI Jakarta
+TMC Polda Metro Jaya
+Dishub DKI Jakarta
+Pemprov DKI Jakarta
+News sources
+Kompas Megapolitan
+Detik Jakarta / DetikNews Jakarta
+Tempo Metro
+CNN Indonesia Jakarta coverage
+Warta Kota
+Pos Kota
+Tribun Jakarta
+Public social/community signal sources
+
+Use only public pages or public posts. Do not scrape private groups or anything requiring login bypass.
+
+JKTInfo
+Info Kejadian Jakarta
+Jakarta traffic and incident pages where public
+Jakarta neighbourhood incident pages where public
+
+These social sources are early warning only. They should not be treated as confirmed unless supported by a credible news or official source.
+
+Indonesia Weekly source stack
+
+Prioritise these sources first:
+
+Official and high confidence sources
+ANTARA national and regional feeds
+BNPB
+BMKG
+Humas Polri
+Media Hub Polri
+Regional Polda updates where available
+Ministry or local government emergency updates where relevant
+National news sources
+Kompas Nasional
+Kompas Regional
+Tempo
+DetikNews
+CNN Indonesia
+Kumparan
+Tribun Network
+Specialist/regional sources
+Mongabay Indonesia for haze, fires, land conflict, mining, palm oil and environmental protest issues
+Jubi for Papua and West Papua coverage
+Suara Papua where useful
+Local provincial outlets where they produce useful incident reporting
+Keywords to monitor
+
+Use Bahasa Indonesia keywords first. English can be secondary.
+
+Jakarta keywords
+demo Jakarta
+unjuk rasa Jakarta
+aksi massa Jakarta
+DPR
+MPR
+Senayan
+Istana Negara
+Monas
+Bundaran HI
+GBK
+KPU
+Bawaslu
+macet
+rekayasa lalu lintas
+penutupan jalan
+pengalihan arus
+banjir Jakarta
+genangan
+kebakaran
+tawuran
+begal
+curanmor
+kecelakaan
+KRL
+MRT
+TransJakarta
+Bandara Soetta
+Soekarno Hatta
+Pelabuhan Tanjung Priok
+Indonesia wide keywords
+demo
+unjuk rasa
+aksi massa
+kerusuhan
+bentrok
+mogok
+buruh
+mahasiswa
+BEM SI
+blokade jalan
+penutupan jalan
+banjir
+longsor
+gempa
+tsunami
+erupsi
+kebakaran hutan
+kabut asap
+kecelakaan
+bandara
+pelabuhan
+jalan tol
+polda
+polres
+konflik lahan
+tambang
+sawit
+pengungsian
+evakuasi
+Required data fields
+
+Each collected item should include:
+
+title
+source name
+source URL
+published date and time
+country
+province
+city or district
+latitude and longitude if available or inferable
+incident category
+short summary
+operational impact
+confidence level
+duplicate status
+original language
+translated English summary where needed
+Categories
+
+Use the existing taxonomy where possible. Suggested categories:
+
+Protest / activism
+Civil unrest
+Crime
+Terrorism / militancy
+Natural hazard
+Fire
+Transport disruption
+Port / cargo disruption
+Aviation disruption
+Government / regulatory
+Labour action
+Environmental / haze
+Other security incident
+Confidence rules
+
+Use a simple confidence model:
+
+High confidence
+
+Official source, police source, emergency management source, or multiple credible media sources confirming the same incident.
+
+Medium confidence
+
+Single credible news source, or a local source with clear location and incident details.
+
+Low confidence
+
+Public social media or community report with no independent confirmation.
+
+Low confidence items can be collected, but should not automatically appear as confirmed report content unless verified.
+
+Deduplication
+
+Deduplicate by:
+
+same incident location
+same date
+similar title
+similar body text
+same source URL
+same event described by multiple sources
+
+Where multiple sources report the same incident, retain the best source as the primary item and attach the others as supporting sources.

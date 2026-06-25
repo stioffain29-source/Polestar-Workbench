@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { aiOr, type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildFlashpointReportDataset,
@@ -367,9 +368,11 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
 export default function FlashpointReportPreview({
   report,
   incidents,
+  aiProse,
 }: {
   report: FlashpointPreviewReport;
   incidents: FlashpointReportIncident[];
+  aiProse?: TopicAiProse | null;
 }) {
   const topic = report.topic ?? "flashpoint";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -385,7 +388,10 @@ export default function FlashpointReportPreview({
   // ds.autoExecutiveSummary unless the analyst has written a genuine
   // (non-generic) override. Previously the preview used a thin one-liner
   // fallback that never matched the PDF — a preview==PDF violation.
-  const execText = pickProse(report.executiveSummary, ds.autoExecutiveSummary);
+  const execText = pickProse(
+    report.executiveSummary,
+    aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary),
+  );
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -498,16 +504,16 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section title="What Matters">
-          <Paragraphs text={pickProse(report.whatMatters, ds.autoWhatMatters)} />
+          <Paragraphs text={pickProse(report.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters))} />
         </Section>
         <Section title="Implications for Business">
-          <Bullets text={pickProse(report.implications, ds.autoImplications)} />
+          <Bullets text={pickProse(report.implications, aiOr(aiProse?.implications, ds.autoImplications))} />
         </Section>
         <Section title="Watch Next">
-          <Bullets text={pickProse(report.watchNext, ds.autoWatchNext)} max={8} />
+          <Bullets text={pickProse(report.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext))} max={8} />
         </Section>
         <Section title="Polestar View">
-          <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
+          <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
         </Section>
 
         <Section title="Related Incidents">

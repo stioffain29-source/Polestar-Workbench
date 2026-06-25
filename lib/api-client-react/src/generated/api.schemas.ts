@@ -1049,6 +1049,8 @@ export interface CountryProseSections {
   implications: string[];
   watchNext: string[];
   polestarView: string;
+  bluf?: string;
+  whatChanged?: string;
   outlook?: string;
   incidentSummaries?: CountryProseSectionsIncidentSummaries;
 }
@@ -1107,6 +1109,40 @@ export interface ReportIncidentSummariesResult {
   fingerprint: string;
   summaries: ReportIncidentSummariesResultSummaries;
   edited?: ReportIncidentSummariesResultEdited;
+  model: string;
+  generatedAt: string;
+}
+
+export interface TopicProseSections {
+  executiveSummary: string;
+  situation: string;
+  whatHappened: string;
+  whatMatters: string;
+  implications: string;
+  watchNext: string;
+  polestarView: string;
+}
+
+export interface GenerateReportProseInput {
+  topic: string;
+  title?: string;
+  periodWord: string;
+  basisDays: number;
+  issueDate: string;
+  force?: boolean;
+  incidents: ProseIncidentInput[];
+}
+
+export interface EditReportProseInput {
+  fingerprint: string;
+  sections: TopicProseSections;
+}
+
+export interface ReportProseResult {
+  available: boolean;
+  fingerprint: string;
+  sections?: TopicProseSections | null;
+  edited?: TopicProseSections | null;
   model: string;
   generatedAt: string;
 }

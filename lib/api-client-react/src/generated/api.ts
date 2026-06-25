@@ -40,9 +40,11 @@ import type {
   DashboardOverview,
   EditCountryProseInput,
   EditReportIncidentSummariesInput,
+  EditReportProseInput,
   ErrorEnvelope,
   GenerateCountryProseInput,
   GenerateReportIncidentSummariesInput,
+  GenerateReportProseInput,
   GetIncidentCountsByTopicParams,
   GetRecentIncidentsParams,
   GetStrikeSummaryParams,
@@ -78,6 +80,7 @@ import type {
   Report,
   ReportIncidentSummariesResult,
   ReportInput,
+  ReportProseResult,
   ReportUpdate,
   SocialRawItem,
   SocialWatchItem,
@@ -4970,6 +4973,138 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getEditReportIncidentSummariesMutationOptions(options));
+    }
+
+export const getGenerateReportProseUrl = (id: number,) => {
+
+
+
+
+  return `/api/reports/${id}/prose`
+}
+
+export const generateReportProse = async (id: number,
+    generateReportProseInput: GenerateReportProseInput, options?: RequestInit): Promise<ReportProseResult> => {
+
+  return customFetch<ReportProseResult>(getGenerateReportProseUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateReportProseInput,)
+  }
+);}
+
+
+
+
+export const getGenerateReportProseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportProse>>, TError,{id: number;data: BodyType<GenerateReportProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateReportProse>>, TError,{id: number;data: BodyType<GenerateReportProseInput>}, TContext> => {
+
+const mutationKey = ['generateReportProse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateReportProse>>, {id: number;data: BodyType<GenerateReportProseInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  generateReportProse(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateReportProseMutationResult = NonNullable<Awaited<ReturnType<typeof generateReportProse>>>
+    export type GenerateReportProseMutationBody = BodyType<GenerateReportProseInput>
+    export type GenerateReportProseMutationError = ErrorType<void>
+
+    export const useGenerateReportProse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportProse>>, TError,{id: number;data: BodyType<GenerateReportProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateReportProse>>,
+        TError,
+        {id: number;data: BodyType<GenerateReportProseInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateReportProseMutationOptions(options));
+    }
+
+export const getEditReportProseUrl = (id: number,) => {
+
+
+
+
+  return `/api/reports/${id}/prose/edit`
+}
+
+export const editReportProse = async (id: number,
+    editReportProseInput: EditReportProseInput, options?: RequestInit): Promise<ReportProseResult> => {
+
+  return customFetch<ReportProseResult>(getEditReportProseUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      editReportProseInput,)
+  }
+);}
+
+
+
+
+export const getEditReportProseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editReportProse>>, TError,{id: number;data: BodyType<EditReportProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof editReportProse>>, TError,{id: number;data: BodyType<EditReportProseInput>}, TContext> => {
+
+const mutationKey = ['editReportProse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editReportProse>>, {id: number;data: BodyType<EditReportProseInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  editReportProse(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditReportProseMutationResult = NonNullable<Awaited<ReturnType<typeof editReportProse>>>
+    export type EditReportProseMutationBody = BodyType<EditReportProseInput>
+    export type EditReportProseMutationError = ErrorType<void>
+
+    export const useEditReportProse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editReportProse>>, TError,{id: number;data: BodyType<EditReportProseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof editReportProse>>,
+        TError,
+        {id: number;data: BodyType<EditReportProseInput>},
+        TContext
+      > => {
+      return useMutation(getEditReportProseMutationOptions(options));
     }
 
 export const getGetCurrentAuthUserUrl = () => {

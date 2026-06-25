@@ -27,7 +27,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated.
-export const PROSE_PROMPT_VERSION = "v5";
+export const PROSE_PROMPT_VERSION = "v6";
 
 // The model only ever sees this many incidents, and the cache fingerprint hashes
 // exactly the same capped set — so the cache key and the prompt input can never
@@ -92,7 +92,7 @@ export { isLlmAvailable };
 // change the prose. Summary, source, country and topic are included because the
 // prompt renders them, so a correction to any of them must flip the fingerprint
 // (otherwise cached prose could describe text the incident no longer holds).
-function incidentIdentity(i: ProseIncidentInput): string {
+export function incidentIdentity(i: ProseIncidentInput): string {
   const date = (i.occurredAt ?? "").slice(0, 10);
   const norm = (v?: string | null) => (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
   return [
@@ -115,7 +115,7 @@ function incidentIdentity(i: ProseIncidentInput): string {
 // first, then by title) and truncated to MAX_PROSE_INCIDENTS. BOTH the prompt and
 // the fingerprint derive from this exact list, so the cache key always matches
 // the input the model actually received.
-function canonicalIncidents(incidents: ProseIncidentInput[]): ProseIncidentInput[] {
+export function canonicalIncidents(incidents: ProseIncidentInput[]): ProseIncidentInput[] {
   return [...incidents]
     .sort((a, b) => {
       const da = (a.occurredAt ?? "").slice(0, 10);
@@ -199,13 +199,15 @@ Return STRICT JSON with EXACTLY these keys and no others:
 }
 Return ONLY the JSON object.`;
 
-// Structured brief variant: the deterministic builder already produces the
-// per-province and per-category breakdown, watchlist and Polestar assessment.
-// The model only writes the two free-prose paragraphs at the top and tail of the
-// brief. Country-aware so the SAME structured brief serves Papua New Guinea and
-// the Indonesian West Papua report without one being framed as the other.
+// Structured brief variant: the deterministic builder still owns the per-province
+// and per-category breakdown, watchlist and per-incident card scaffolding. The
+// model writes the brief's free-prose narrative sections (Bottom Line Up Front,
+// Executive Summary, What Changed, Outlook, Polestar View); each falls back to the
+// deterministic dataset paragraph when no AI prose exists. Country-aware so the
+// SAME structured brief serves Papua New Guinea and the Indonesian West Papua
+// report without one being framed as the other.
 function structuredSystemPrompt(countryName: string): string {
-  return `You are a senior security-intelligence analyst writing the ${countryName} country brief for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded for ${countryName} over a reporting window, plus verified standing background, and you produce TWO narrative paragraphs for the brief.
+  return `You are a senior security-intelligence analyst writing the ${countryName} country brief for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded for ${countryName} over a reporting window, plus verified standing background, and you produce the brief's narrative sections.
 
 GROUNDING — non-negotiable:
 - The brief is about ${countryName} and ONLY ${countryName}. Never describe, name or frame the brief around a DIFFERENT country, even one with a similar name. In particular, "Papua" (a province of Indonesia, also called West Papua) and "Papua New Guinea" (a separate sovereign state) are DIFFERENT places: a brief for one must never be framed as the other or adopt its risk profile, cities or institutions. For a cross-border incident, write it strictly from ${countryName}'s perspective.
@@ -214,7 +216,12 @@ GROUNDING — non-negotiable:
 - If the window has few or no incidents, say so plainly and lean on the standing background. A quiet window reflects limited reporting, not safety: never imply the country has become calm, and never fabricate activity to fill space.
 
 WRITING RULES:
-- The Executive Summary and the Outlook do DISTINCT jobs. The Executive Summary characterises what this window shows and what it means for operations now; the Outlook looks forward to the coming period. Do not repeat the same fact or sentence across the two.
+- The five narrative sections do DISTINCT jobs and must not repeat the same fact or sentence across one another:
+  - "bluf" (Bottom Line Up Front): the single most important takeaway for this window, stated first, in 1-2 sentences a busy reader could act on alone.
+  - "executiveSummary": characterises what this window shows — the dominant provinces and event types — and what it means for operations now.
+  - "whatChanged": how this window differs from the standing pattern; if little or nothing changed, say so plainly rather than manufacturing a shift.
+  - "outlook": the forward view for the coming period — what is likely to happen and where pressure is likely.
+  - "polestarView": the bottom-line analyst judgement and the recommended operating posture.
 - Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the brief.
 - Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
 - Write concrete, information-dense sentences. Name the actual provinces, actors and event types from the incidents. No filler, no hedging boilerplate, no generic risk-management truisms.
@@ -232,8 +239,11 @@ PER-INCIDENT SUMMARIES ("incidentSummaries"):
 
 Return STRICT JSON with EXACTLY these keys and no others:
 {
+  "bluf": string,              // 1-2 sentences: the single most important takeaway for this window, stated first.
   "executiveSummary": string,  // 3-4 sentences: the headline judgement for this window — the dominant provinces and event types — and what it means for operations now.
+  "whatChanged": string,       // 2-3 sentences: how this window differs from the standing pattern; if little changed, say so plainly.
   "outlook": string,           // 2-3 sentences: the forward view for the coming period, grounded in this window's pattern and the standing background; what to expect and where pressure is likely.
+  "polestarView": string,      // 2-3 sentences: the bottom-line analyst judgement and the recommended operating posture.
   "incidentSummaries": object  // Keys are the incident NUMBERS from the INCIDENTS list as strings ("1", "2", ...); each value is that incident's factual summary as described above. Include an entry for every numbered incident.
 }
 Return ONLY the JSON object.`;
@@ -261,7 +271,7 @@ function baselineBlock(b?: ProseBaselineContext | null): string {
   return parts.length ? parts.join("\n") : "none provided";
 }
 
-function incidentBlock(incidents: ProseIncidentInput[]): string {
+export function incidentBlock(incidents: ProseIncidentInput[]): string {
   if (incidents.length === 0) return "No incidents recorded in this window.";
   // Same canonical capped set the fingerprint hashes — prompt and cache key stay
   // in lockstep.
@@ -293,14 +303,37 @@ function buildUserPrompt(input: GenerateProseInput): string {
   ].join("\n");
 }
 
+// Defence-in-depth for the hard "no incident counts in prose" rule. The prompt
+// already forbids them, but the model occasionally slips a parenthetical record
+// count ("(2 records)", "(12 of 30 incidents)") into a sentence. Strip ONLY
+// parentheticals that carry both a digit AND a count noun, so legitimate
+// parentheticals (years, place names) survive. Newlines are preserved so the
+// bullet sections keep their line breaks; only intra-line spacing is tidied.
+const COUNT_ANNOTATION_RE =
+  /[ \t]*\((?=[^)]*\d)[^)]*\b(?:records?|incidents?|reports?|events?|cases?|entr(?:y|ies)|articles?|items?|data ?points?)\b[^)]*\)/gi;
+
+export function stripProseCountAnnotations(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(COUNT_ANNOTATION_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([.,;:])/g, "$1")
+    .replace(/[ \t]+$/gm, "")
+    .trim();
+}
+
 function coerceStr(v: unknown): string {
-  return typeof v === "string" ? v.trim() : "";
+  return typeof v === "string" ? stripProseCountAnnotations(v.trim()) : "";
 }
 
 function coerceList(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v
-    .map((x) => (typeof x === "string" ? x.trim().replace(/^[-*]\s*/, "") : ""))
+    .map((x) =>
+      typeof x === "string"
+        ? stripProseCountAnnotations(x.trim().replace(/^[-*]\s*/, ""))
+        : "",
+    )
     .filter(Boolean);
 }
 
@@ -359,16 +392,22 @@ function parseSections(
     // back to that incident's id to produce the id-keyed map the client renders.
     const incidentSummaries = mapIncidentSummaries(o.incidentSummaries, incidents);
     const sections: CountryProseSections = {
+      bluf: coerceStr(o.bluf),
       executiveSummary: coerceStr(o.executiveSummary),
+      whatChanged: coerceStr(o.whatChanged),
       outlook: coerceStr(o.outlook),
+      polestarView: coerceStr(o.polestarView),
       incidentSummaries,
+      // The structured builder still owns these sections; the brief never reads
+      // them for the png variant.
       situation: "",
       whatHappened: "",
       whatMatters: "",
       implications: [],
       watchNext: [],
-      polestarView: "",
     };
+    // Require the two anchor paragraphs; bluf/whatChanged/polestarView are
+    // best-effort and fall back to the deterministic dataset paragraph at render.
     if (!sections.executiveSummary || !sections.outlook) return null;
     return sections;
   }
@@ -461,7 +500,7 @@ const RETRYABLE = new Set(["timeout", "bad-json", "empty-content"]);
 // ...) is NOT retried — a retry cannot fix a malformed request or an auth
 // problem, so retrying only burns the model budget and delays the template
 // fallback. (A bare "http-" prefix check would wrongly retry all of these.)
-function isRetryableProseError(error: string): boolean {
+export function isRetryableProseError(error: string): boolean {
   if (RETRYABLE.has(error)) return true;
   // empty-content is emitted with the model's finish_reason appended
   // (e.g. "empty-content(stop)", "empty-content(length)"), so the bare set

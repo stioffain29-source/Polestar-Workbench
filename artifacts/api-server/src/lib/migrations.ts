@@ -756,6 +756,24 @@ export async function runDataMigrations(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now()
       )
     `);
+    // AI-generated narrative sections for TOPIC reports (shipping, conflict,
+    // fuel, cargo, energy, fertiliser, flashpoint/protests/strikes), keyed by
+    // report id. Without it the topic prose route degrades to the deterministic
+    // template and AI narratives / analyst edits never persist in the published
+    // app. Mirrors lib/db/src/schema/reportProse.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS report_prose (
+        id serial PRIMARY KEY,
+        report_id integer NOT NULL UNIQUE,
+        topic text NOT NULL,
+        fingerprint text NOT NULL,
+        sections jsonb NOT NULL,
+        edited jsonb,
+        model text NOT NULL,
+        generated_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS country_baselines (
         id serial PRIMARY KEY,

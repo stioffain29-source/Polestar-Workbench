@@ -15,6 +15,8 @@ export interface CountryProseSections {
   implications: string[];
   watchNext: string[];
   polestarView: string;
+  bluf?: string;
+  whatChanged?: string;
   outlook?: string;
   incidentSummaries?: CountryProseSectionsIncidentSummaries;
 }

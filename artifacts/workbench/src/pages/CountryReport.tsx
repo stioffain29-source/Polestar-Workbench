@@ -729,11 +729,13 @@ export default function CountryReport() {
     };
   }, [editing, proseDraft, proseResult, draftedProse]);
 
-  // PNG: overlay ONLY the AI Executive Summary onto the deterministic dataset
-  // (which supplies every other section — Outlook included, now a tightened
-  // deterministic field that is no longer AI/editor-overridable). While editing,
-  // the live draft drives the preview; otherwise prefer the server prose. When
-  // no AI prose exists, the deterministic text shows unchanged.
+  // PNG: overlay the AI narrative sections (Bottom Line Up Front, Executive
+  // Summary, What Changed, Outlook, Polestar View) onto the deterministic dataset,
+  // which still supplies every structured section (breakdown, watchlist, incident
+  // cards). Each section prefers the AI text and falls back to the deterministic
+  // paragraph when the AI text is absent or blank. While editing, the live draft
+  // drives the preview; otherwise prefer the server prose. PngCountryReportBody is
+  // DOM-rasterised into the PDF, so this single merge keeps preview == PDF.
   const pngEffectiveDataset = useMemo(() => {
     if (!pngDataset) return null;
     const src =
@@ -742,13 +744,19 @@ export default function CountryReport() {
         : proseResult
           ? (proseResult.edited ?? proseResult.sections)
           : null;
-    if (src && src.executiveSummary && src.executiveSummary.trim()) {
-      return {
-        ...pngDataset,
-        executiveSummary: src.executiveSummary,
-      };
-    }
-    return pngDataset;
+    if (!src) return pngDataset;
+    const prefer = (ai: string | undefined, fallback: string) => {
+      const t = (ai ?? "").trim();
+      return t ? t : fallback;
+    };
+    return {
+      ...pngDataset,
+      bluf: prefer(src.bluf, pngDataset.bluf),
+      executiveSummary: prefer(src.executiveSummary, pngDataset.executiveSummary),
+      whatChanged: prefer(src.whatChanged, pngDataset.whatChanged),
+      outlook: prefer(src.outlook, pngDataset.outlook),
+      polestarView: prefer(src.polestarView, pngDataset.polestarView),
+    };
   }, [pngDataset, editing, proseDraft, proseResult]);
 
   // Per-incident AI analyst summaries (keyed by incident id) from the same
@@ -1235,7 +1243,11 @@ export default function CountryReport() {
             AI-generated from this window's incidents. Edits are saved against the current data; if the
             data later changes, use Redraft to regenerate.
           </div>
+          <BaselineTextField label="Bottom Line Up Front" value={proseDraft.bluf ?? ""} onChange={(v) => setProseField("bluf", v)} />
           <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
+          <BaselineTextField label="What Changed" value={proseDraft.whatChanged ?? ""} onChange={(v) => setProseField("whatChanged", v)} />
+          <BaselineTextField label="Outlook" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
+          <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
           {pngDataset && pngDataset.windowItems.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 6 }}>

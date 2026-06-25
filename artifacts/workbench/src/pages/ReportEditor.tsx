@@ -10,11 +10,13 @@ import {
   useListReliefWebReports,
   useGenerateReportIncidentSummaries,
   useEditReportIncidentSummaries,
+  useGenerateReportProse,
   getListMaritimeMovementQueryKey,
   getGetReportQueryKey,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
   type ReportIncidentSummariesResult,
+  type ReportProseResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -51,7 +53,7 @@ import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate, utcYmd } from "@/lib/reportDataStatus";
-import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
+import { clampIssueDateToLatestRecord, reportCadence } from "@/lib/reportWindow";
 import { format, parseISO } from "date-fns";
 import {
   FUEL_MARKET_DATA_SAMPLE,
@@ -356,6 +358,129 @@ export default function ReportEditor() {
     return { ...gen, ...ed };
   }, [summaryRes, editedSummaries]);
 
+  // ---- AI report NARRATIVE (themes / drivers / operational meaning) ------
+  // EVERY narrative report type gets a genuine AI-written narrative grounded on
+  // the EXACT set the report renders. The AI sections occupy the fallback LAYER
+  // beneath any genuine analyst edit: conflict + flashpoint/protests resolve via
+  // pickProse(form.X, aiOr(ai, autoX)) (their editor fields are seeded with
+  // deterministic text, so a recognised generic seed is discarded); shipping +
+  // cargo_watch + fuel/energy/fertiliser resolve via resolveSimpleProse(form.X,
+  // ai, detX) (their editor fields are seeded SAVED-ONLY, so an empty field
+  // means unedited). Preview and PDF run the IDENTICAL chain, so they can never
+  // disagree; the deterministic template shows only when the AI engine is
+  // unavailable (labelled near the preview).
+  const proseEnabled =
+    form.topic === "conflict" ||
+    form.topic === "shipping" ||
+    form.topic === "cargo_watch" ||
+    form.topic === "fuel" ||
+    form.topic === "energy" ||
+    form.topic === "fertiliser" ||
+    form.topic === "flashpoint" ||
+    form.topic === "protests";
+
+  // Ground on the same set the report renders (parity with the cache
+  // fingerprint). Summaries-enabled topics (conflict/shipping/cargo_watch/
+  // energy/fertiliser) already build the EXACT rendered related set;
+  // flashpoint/protests/fuel carry no related table, so ground them on the
+  // windowed incident set the report actually renders.
+  const proseGrounding = useMemo(() => {
+    if (!proseEnabled) return [];
+    if (summariesEnabled) return relatedForSummaries;
+    return filterTopicReportIncidents(
+      incidentsForExport,
+      form.topic,
+      form.issueDate,
+    ).map((i) => ({
+      id: i.id != null ? String(i.id) : undefined,
+      topic: typeof i.topic === "string" ? i.topic : form.topic,
+      title: typeof i.title === "string" ? i.title : "",
+      summary: typeof i.summary === "string" ? i.summary : "",
+      location: typeof i.location === "string" ? i.location : "",
+      country: typeof i.country === "string" ? i.country : "",
+      severity: typeof i.severity === "string" ? i.severity : "",
+      occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
+      source: typeof i.source === "string" ? i.source : "",
+    }));
+  }, [
+    proseEnabled,
+    summariesEnabled,
+    relatedForSummaries,
+    incidentsForExport,
+    form.topic,
+    form.issueDate,
+  ]);
+  const proseBasisDays = reportCadence(form.topic) === "monthly" ? 30 : 7;
+  const prosePeriodWord =
+    reportCadence(form.topic) === "monthly" ? "this month" : "this week";
+
+  const [proseRes, setProseRes] = useState<ReportProseResult | null>(null);
+  const [proseUnavailable, setProseUnavailable] = useState(false);
+  const lastProseKey = useRef<string>("");
+  const generateProse = useGenerateReportProse();
+
+  useEffect(() => {
+    if (!id || !proseEnabled) {
+      if (lastProseKey.current !== "") {
+        lastProseKey.current = "";
+        setProseRes(null);
+        setProseUnavailable(false);
+      }
+      return;
+    }
+    // Wait for the incidents query to load so we ground on the real window and
+    // do not fire once on the empty set and again on the full set.
+    if (!incidents) return;
+    // Key on the EXACT grounding payload + window so the cache can never lag
+    // the data (mirrors the per-incident summaries fingerprint discipline).
+    const key = JSON.stringify({
+      topic: form.topic,
+      title: form.title,
+      issueDate: form.issueDate,
+      basisDays: proseBasisDays,
+      incidents: proseGrounding,
+    });
+    if (key === lastProseKey.current) return;
+    lastProseKey.current = key;
+    setProseUnavailable(false);
+    generateProse.mutate(
+      {
+        id,
+        data: {
+          topic: form.topic,
+          title: form.title,
+          periodWord: prosePeriodWord,
+          basisDays: proseBasisDays,
+          issueDate: form.issueDate,
+          incidents: proseGrounding,
+          force: false,
+        },
+      },
+      {
+        onSuccess: (res) => {
+          // 200 {available:false} (engine unconfigured / upstream failed) ->
+          // degrade to the deterministic template and show the hint.
+          if (!res.available) {
+            setProseRes(null);
+            setProseUnavailable(true);
+            return;
+          }
+          setProseRes(res);
+        },
+        onError: () => {
+          setProseRes(null);
+          setProseUnavailable(true);
+        },
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, proseEnabled, form.topic, form.title, form.issueDate, proseBasisDays, prosePeriodWord, proseGrounding, incidents]);
+
+  // AI narrative handed to the preview + PDF as the fallback layer. The full
+  // 7-section result is structurally compatible with the 4-field
+  // ConflictAiProse prop (extra keys are ignored).
+  const aiProseSections = proseRes?.edited ?? proseRes?.sections ?? null;
+
   const setIncidentSummary = (incidentId: string, text: string) =>
     setEditedSummaries((d) => ({ ...(d ?? {}), [incidentId]: text }));
 
@@ -450,6 +575,7 @@ export default function ReportEditor() {
           pdfPayload,
           incidentsForExport,
           filename,
+          aiProseSections,
         );
       } else if (form.topic === "shipping") {
         await exportShippingReportPdf(
@@ -460,6 +586,7 @@ export default function ReportEditor() {
           maritimeSecurityEvents,
           effectiveSummaries,
           redSeaFlow,
+          aiProseSections,
         );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
@@ -468,6 +595,7 @@ export default function ReportEditor() {
           filename,
           situationalReports,
           effectiveSummaries,
+          aiProseSections,
         );
       } else {
         const { exportTopicReportPdf } = await import("@/lib/exportTopicReportPdf");
@@ -482,6 +610,7 @@ export default function ReportEditor() {
           {
             allowMissingMarketData: allow,
             incidentSummaries: effectiveSummaries,
+            aiProse: aiProseSections,
           },
         );
       }
@@ -573,7 +702,25 @@ export default function ReportEditor() {
     const proseIsStale =
       draftAdvanced || computeStale(topic, issueDate) != null;
 
+    // Topics whose previews/PDFs resolve prose via resolveSimpleProse seed
+    // SAVED-ONLY: the AI narrative + deterministic auto occupy the fallback
+    // layer at RENDER time, so a blank field renders AI (else deterministic),
+    // and only a genuine saved analyst edit is seeded. Stale saved prose is
+    // dropped so the fresh fallback shows. Conflict + flashpoint/protests keep
+    // the deterministic draft seed (their pickProse discards a generic seed).
+    const savedOnlyProse =
+      topic === "shipping" ||
+      topic === "cargo_watch" ||
+      topic === "fuel" ||
+      topic === "energy" ||
+      topic === "fertiliser";
+
     const pick = (saved: string | null | undefined, drafted: string) => {
+      if (savedOnlyProse) {
+        if (proseIsStale) return "";
+        const s = (saved ?? "").trim();
+        return s ? (saved as string) : "";
+      }
       if (proseIsStale) return drafted;
       const s = (saved ?? "").trim();
       return s ? (saved as string) : drafted;
@@ -1638,6 +1785,17 @@ export default function ReportEditor() {
           </div>
         )}
 
+        {proseEnabled && proseUnavailable && (
+          <div
+            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            style={{ borderColor: "#303030", background: "#f4f4f4", color: "#303030" }}
+          >
+            <span style={{ fontWeight: 700 }}>AI narrative unavailable.</span>{" "}
+            Showing the deterministic template prose. Configure the OpenAI
+            integration to generate the analytical narrative.
+          </div>
+        )}
+
         <div
           ref={previewRef}
           className="bg-white border border-border rounded-sm overflow-hidden"
@@ -1650,11 +1808,13 @@ export default function ReportEditor() {
               redSeaFlow={redSeaFlow}
               maritimeSecurityEvents={maritimeSecurityEvents}
               incidentSummaries={effectiveSummaries}
+              aiProse={aiProseSections}
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview
               report={form}
               incidents={incidentsForExport}
+              aiProse={aiProseSections}
             />
           ) : form.topic === "conflict" ? (
             <ConflictReportPreview
@@ -1662,6 +1822,7 @@ export default function ReportEditor() {
               incidents={incidentsForExport}
               situationalReports={situationalReports}
               incidentSummaries={effectiveSummaries}
+              aiProse={aiProseSections}
             />
           ) : (
             <ReportPreview
@@ -1671,6 +1832,7 @@ export default function ReportEditor() {
               }}
               incidents={incidentsForExport}
               incidentSummaries={effectiveSummaries}
+              aiProse={aiProseSections}
             />
           )}
         </div>

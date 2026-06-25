@@ -70,6 +70,19 @@ export interface ConflictPreviewReport {
   polestarView?: string | null;
 }
 
+// AI-generated narrative for the four sections the conflict report actually
+// renders. When a field carries text it REPLACES the deterministic dataset
+// auto-prose as the fallback layer beneath any genuine analyst edit; when it
+// is empty/absent the deterministic auto-prose shows unchanged. Preview and
+// PDF resolve prose with the identical (aiOr -> pickProse) chain so they can
+// never disagree.
+export interface ConflictAiProse {
+  situation?: string | null;
+  whatMatters?: string | null;
+  watchNext?: string | null;
+  polestarView?: string | null;
+}
+
 function Paragraphs({ text }: { text?: string | null }) {
   if (!text) return null;
   const parts = text.split(/\n+/).filter(Boolean);
@@ -370,17 +383,25 @@ export default function ConflictReportPreview({
   incidents,
   situationalReports,
   incidentSummaries = {},
+  aiProse,
 }: {
   report: ConflictPreviewReport;
   incidents: ConflictReportIncident[];
   situationalReports?: ReliefWebReport[] | null;
   incidentSummaries?: Record<string, string>;
+  aiProse?: ConflictAiProse | null;
 }) {
   const topic = report.topic ?? "conflict";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
   const resolvedTitle = resolveReportTitle(topic, report.title);
   const coverUrl = TOPIC_COVER_URLS[topic];
 
+  // AI replaces the deterministic auto-prose as the fallback layer; a genuine
+  // analyst edit (via pickProse) still wins over both.
+  const aiOr = (ai: string | null | undefined, det: string) => {
+    const t = (ai ?? "").trim();
+    return t ? t : det;
+  };
   const ds = useMemo(
     () => buildConflictReportDataset(incidents, topic, issueDate),
     [incidents, topic, issueDate],
@@ -495,7 +516,7 @@ export default function ConflictReportPreview({
 
       <div className="px-10 py-10">
         <Section title="Situation">
-          <Paragraphs text={pickProse(report.situation, ds.autoSituation)} />
+          <Paragraphs text={pickProse(report.situation, aiOr(aiProse?.situation, ds.autoSituation))} />
         </Section>
 
         <Section title="Fast Facts">
@@ -527,15 +548,15 @@ export default function ConflictReportPreview({
         </Section>
 
         <Section title="What Matters for Business">
-          <Paragraphs text={pickProse(report.whatMatters, ds.autoWhatMatters)} />
+          <Paragraphs text={pickProse(report.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters))} />
         </Section>
 
         <Section title="Watch Next">
-          <Bullets text={pickProse(report.watchNext, ds.autoWatchNext)} max={8} />
+          <Bullets text={pickProse(report.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext))} max={8} />
         </Section>
 
         <Section title="Polestar View">
-          <Paragraphs text={pickProse(report.polestarView, ds.autoPolestarView)} />
+          <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
         </Section>
 
         <SituationalContextSection reports={situationalReports} max={6} />

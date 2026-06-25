@@ -35,6 +35,7 @@ import {
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import { aiOr, type TopicAiProse } from "./topicProseResolution";
 import {
   buildFlashpointReportDataset,
   type FlashpointReportIncident,
@@ -511,6 +512,7 @@ export async function exportFlashpointReportPdf(
   data: FlashpointReportData,
   incidents: FlashpointReportIncident[],
   filename: string,
+  aiProse?: TopicAiProse | null,
 ): Promise<void> {
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
@@ -556,7 +558,10 @@ export async function exportFlashpointReportPdf(
 
   drawSectionHeading(ctx, "Executive Summary");
   const execText = (data.executiveSummary ?? "").trim();
-  renderProse(ctx, execText || ds.autoExecutiveSummary);
+  renderProse(
+    ctx,
+    execText || aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary),
+  );
 
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, ds.fastFacts);
@@ -624,23 +629,23 @@ export async function exportFlashpointReportPdf(
   drawSectionWithProse(
     ctx,
     "What Matters",
-    pickProse(data.whatMatters, ds.autoWhatMatters),
+    pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
   );
   drawBulletSection(
     ctx,
     "Implications for Business",
-    pickProse(data.implications, ds.autoImplications),
+    pickProse(data.implications, aiOr(aiProse?.implications, ds.autoImplications)),
   );
   drawBulletSection(
     ctx,
     "Watch Next",
-    pickProse(data.watchNext, ds.autoWatchNext),
+    pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
     8,
   );
   drawSectionWithProse(
     ctx,
     "Polestar View",
-    pickProse(data.polestarView, ds.autoPolestarView),
+    pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
   );
 
   drawRelatedIncidents(ctx, ds.relatedIncidents);

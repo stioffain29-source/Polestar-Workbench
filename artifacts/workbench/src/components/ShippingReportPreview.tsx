@@ -4,6 +4,12 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import {
+  resolveSimpleProse,
+  stableDraftTopicReportProse,
+  toDraftableIncidents,
+  type TopicAiProse,
+} from "@/lib/topicProseResolution";
+import {
   buildShippingReportDataset,
   type ShippingReportIncident,
   type KpiCard,
@@ -651,6 +657,7 @@ export default function ShippingReportPreview({
   redSeaFlow,
   maritimeSecurityEvents = [],
   incidentSummaries = {},
+  aiProse,
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
@@ -658,6 +665,7 @@ export default function ShippingReportPreview({
   redSeaFlow?: GatewayFlowSeries[];
   maritimeSecurityEvents?: MaritimeSecurityEvent[];
   incidentSummaries?: Record<string, string>;
+  aiProse?: TopicAiProse | null;
 }) {
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -691,6 +699,24 @@ export default function ShippingReportPreview({
   // caller omits it, fall back to the latest movement snapshot so the panel
   // still renders honestly (one sample per gateway, or its empty state).
   const gateways = redSeaFlow ?? buildRedSeaDirectionalFlow(movement);
+
+  // Deterministic shipping draft for the Executive Summary (which has no
+  // dataset auto-prose). Stable incident order so the preview and the PDF
+  // build identical fallback text; the AI narrative sits in the layer above.
+  const proseDraft = useMemo(
+    () =>
+      stableDraftTopicReportProse({
+        topic,
+        issueDate,
+        incidents: toDraftableIncidents(incidents),
+      }),
+    [topic, issueDate, incidents],
+  );
+  const execText = resolveSimpleProse(
+    report.executiveSummary,
+    aiProse?.executiveSummary,
+    proseDraft.executiveSummary,
+  );
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -776,9 +802,9 @@ export default function ShippingReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        {report.executiveSummary && report.executiveSummary.trim() && (
+        {execText.trim() && (
           <Section title="Executive Summary">
-            <Paragraphs text={report.executiveSummary} />
+            <Paragraphs text={execText} />
           </Section>
         )}
 
@@ -933,16 +959,16 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section title="What Matters">
-          <Paragraphs text={(report.whatMatters ?? "").trim() || ds.autoWhatMatters} />
+          <Paragraphs text={resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters)} />
         </Section>
         <Section title="Implications for Business">
-          <Bullets text={(report.implications ?? "").trim() || ds.autoImplications} />
+          <Bullets text={resolveSimpleProse(report.implications, aiProse?.implications, ds.autoImplications)} />
         </Section>
         <Section title="Watch Next">
-          <Bullets text={(report.watchNext ?? "").trim() || ds.autoWatchNext} max={8} />
+          <Bullets text={resolveSimpleProse(report.watchNext, aiProse?.watchNext, ds.autoWatchNext)} max={8} />
         </Section>
         <Section title="Polestar View">
-          <Paragraphs text={(report.polestarView ?? "").trim() || ds.autoPolestarView} />
+          <Paragraphs text={resolveSimpleProse(report.polestarView, aiProse?.polestarView, ds.autoPolestarView)} />
         </Section>
 
         {ds.relatedIncidents.length > 0 && (

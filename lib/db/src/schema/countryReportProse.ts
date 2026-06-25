@@ -11,6 +11,12 @@ export interface CountryProseSections {
   implications: string[];
   watchNext: string[];
   polestarView: string;
+  // Bottom-line-up-front and "what changed" narrative paragraphs. Only the
+  // structured brief (variant "png") populates these; the generic country
+  // report leaves them undefined. Each prefers the AI text and falls back to
+  // the deterministic dataset paragraph when no AI prose exists.
+  bluf?: string;
+  whatChanged?: string;
   // Forward-looking outlook paragraph. Only the PNG country brief (variant
   // "png") populates this; the generic country report leaves it undefined.
   outlook?: string;

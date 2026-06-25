@@ -3022,6 +3022,8 @@ export const GenerateCountryProseResponse = zod.object({
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
   "polestarView": zod.string(),
+  "bluf": zod.string().optional(),
+  "whatChanged": zod.string().optional(),
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 }),
@@ -3033,6 +3035,8 @@ export const GenerateCountryProseResponse = zod.object({
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
   "polestarView": zod.string(),
+  "bluf": zod.string().optional(),
+  "whatChanged": zod.string().optional(),
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 }),zod.null()]).optional(),
@@ -3055,6 +3059,8 @@ export const EditCountryProseBody = zod.object({
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
   "polestarView": zod.string(),
+  "bluf": zod.string().optional(),
+  "whatChanged": zod.string().optional(),
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 })
@@ -3071,6 +3077,8 @@ export const EditCountryProseResponse = zod.object({
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
   "polestarView": zod.string(),
+  "bluf": zod.string().optional(),
+  "whatChanged": zod.string().optional(),
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 }),
@@ -3082,6 +3090,8 @@ export const EditCountryProseResponse = zod.object({
   "implications": zod.array(zod.string()),
   "watchNext": zod.array(zod.string()),
   "polestarView": zod.string(),
+  "bluf": zod.string().optional(),
+  "whatChanged": zod.string().optional(),
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 }),zod.null()]).optional(),
@@ -3133,6 +3143,99 @@ export const EditReportIncidentSummariesResponse = zod.object({
   "fingerprint": zod.string(),
   "summaries": zod.record(zod.string(), zod.string()),
   "edited": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional(),
+  "model": zod.string(),
+  "generatedAt": zod.coerce.date()
+})
+
+
+export const GenerateReportProseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GenerateReportProseBody = zod.object({
+  "topic": zod.string(),
+  "title": zod.string().optional(),
+  "periodWord": zod.string(),
+  "basisDays": zod.number(),
+  "issueDate": zod.string(),
+  "force": zod.boolean().optional(),
+  "incidents": zod.array(zod.object({
+  "id": zod.string().nullish(),
+  "topic": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "summary": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "occurredAt": zod.string().nullish(),
+  "source": zod.string().nullish()
+}))
+})
+
+export const GenerateReportProseResponse = zod.object({
+  "available": zod.boolean(),
+  "fingerprint": zod.string(),
+  "sections": zod.union([zod.object({
+  "executiveSummary": zod.string(),
+  "situation": zod.string(),
+  "whatHappened": zod.string(),
+  "whatMatters": zod.string(),
+  "implications": zod.string(),
+  "watchNext": zod.string(),
+  "polestarView": zod.string()
+}),zod.null()]).optional(),
+  "edited": zod.union([zod.object({
+  "executiveSummary": zod.string(),
+  "situation": zod.string(),
+  "whatHappened": zod.string(),
+  "whatMatters": zod.string(),
+  "implications": zod.string(),
+  "watchNext": zod.string(),
+  "polestarView": zod.string()
+}),zod.null()]).optional(),
+  "model": zod.string(),
+  "generatedAt": zod.coerce.date()
+})
+
+
+export const EditReportProseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EditReportProseBody = zod.object({
+  "fingerprint": zod.string(),
+  "sections": zod.object({
+  "executiveSummary": zod.string(),
+  "situation": zod.string(),
+  "whatHappened": zod.string(),
+  "whatMatters": zod.string(),
+  "implications": zod.string(),
+  "watchNext": zod.string(),
+  "polestarView": zod.string()
+})
+})
+
+export const EditReportProseResponse = zod.object({
+  "available": zod.boolean(),
+  "fingerprint": zod.string(),
+  "sections": zod.union([zod.object({
+  "executiveSummary": zod.string(),
+  "situation": zod.string(),
+  "whatHappened": zod.string(),
+  "whatMatters": zod.string(),
+  "implications": zod.string(),
+  "watchNext": zod.string(),
+  "polestarView": zod.string()
+}),zod.null()]).optional(),
+  "edited": zod.union([zod.object({
+  "executiveSummary": zod.string(),
+  "situation": zod.string(),
+  "whatHappened": zod.string(),
+  "whatMatters": zod.string(),
+  "implications": zod.string(),
+  "watchNext": zod.string(),
+  "polestarView": zod.string()
+}),zod.null()]).optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
 })

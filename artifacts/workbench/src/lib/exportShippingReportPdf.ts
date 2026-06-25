@@ -37,6 +37,12 @@ import {
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import {
+  resolveSimpleProse,
+  stableDraftTopicReportProse,
+  toDraftableIncidents,
+  type TopicAiProse,
+} from "./topicProseResolution";
 import { LOCATION_NOT_IDENTIFIED as _LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
 import {
   buildShippingReportDataset,
@@ -1076,6 +1082,7 @@ export async function exportShippingReportPdf(
   maritimeSecurityEvents: MaritimeSecurityEvent[] = [],
   incidentSummaries: Record<string, string> = {},
   redSeaFlow?: GatewayFlowSeries[],
+  aiProse?: TopicAiProse | null,
 ): Promise<void> {
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
@@ -1114,9 +1121,21 @@ export async function exportShippingReportPdf(
   void cadence;
   beginBodyPages(ctx);
 
-  if (data.executiveSummary && data.executiveSummary.trim()) {
+  // Executive Summary resolves through the SHARED chain (analyst edit -> AI ->
+  // deterministic draft) so the PDF matches the on-screen preview exactly.
+  const proseDraft = stableDraftTopicReportProse({
+    topic: data.topic,
+    issueDate: data.issueDate,
+    incidents: toDraftableIncidents(incidents),
+  });
+  const execText = resolveSimpleProse(
+    data.executiveSummary,
+    aiProse?.executiveSummary,
+    proseDraft.executiveSummary,
+  );
+  if (execText.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
-    renderProse(ctx, data.executiveSummary);
+    renderProse(ctx, execText);
   }
 
   // Maritime Intelligence — the one shared deterministic board, aligned to this
@@ -1220,45 +1239,37 @@ export async function exportShippingReportPdf(
     },
   );
 
-  // Editor-authored analyst sections. Editor text wins when supplied;
-  // otherwise the dataset's auto-prose fills in so the report reads at
-  // Fuel-Watch substance even before the analyst has written the form.
-  // Editor text wins only when it carries substance. Short stub text
-  // (legacy single-line entries, placeholders, " - " etc.) falls through
-  // to the dataset's auto-prose so the report reads at Fuel-Watch
-  // substance rather than printing a one-line section.
-  const pickProse = (
-    editor: string | null | undefined,
-    auto: string,
-  ): string => {
-    const t = (editor ?? "").trim();
-    if (t.length >= 240) return t;
-    if (t.length === 0) return auto;
-    // Treat a thin editor stub as a lead paragraph above the auto-prose
-    // rather than discarding either side. This keeps any analyst note
-    // visible while still delivering the full operational read below.
-    return `${t}\n\n${auto}`;
-  };
+  // Narrative sections resolve through the SHARED resolver so the PDF and the
+  // on-screen preview can never disagree: a genuine analyst edit wins, else the
+  // cached AI narrative, else the deterministic dataset auto-prose.
   drawSectionWithProse(
     ctx,
     "What Matters",
-    pickProse(data.whatMatters, ds.autoWhatMatters),
+    resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters),
   );
   drawBulletSection(
     ctx,
     "Implications for Business",
-    pickProse(data.implications, ds.autoImplications),
+    resolveSimpleProse(
+      data.implications,
+      aiProse?.implications,
+      ds.autoImplications,
+    ),
   );
   drawBulletSection(
     ctx,
     "Watch Next",
-    pickProse(data.watchNext, ds.autoWatchNext),
+    resolveSimpleProse(data.watchNext, aiProse?.watchNext, ds.autoWatchNext),
     8,
   );
   drawSectionWithProse(
     ctx,
     "Polestar View",
-    pickProse(data.polestarView, ds.autoPolestarView),
+    resolveSimpleProse(
+      data.polestarView,
+      aiProse?.polestarView,
+      ds.autoPolestarView,
+    ),
   );
 
   drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);

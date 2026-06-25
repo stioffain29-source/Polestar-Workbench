@@ -1292,6 +1292,56 @@ paths:
         "409":
           description: Fingerprint stale, regenerate first
 
+  /reports/{id}/prose:
+    post:
+      operationId: generateReportProse
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerateReportProseInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportProseResult" }
+        "400":
+          description: Invalid request
+        "404":
+          description: Report not found
+
+  /reports/{id}/prose/edit:
+    put:
+      operationId: editReportProse
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditReportProseInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportProseResult" }
+        "404":
+          description: No generated prose to edit
+        "409":
+          description: Fingerprint stale, regenerate first
+
   /auth/user:
     get:
       tags: [Auth]
@@ -2482,6 +2532,11 @@ components:
           type: array
           items: { type: string }
         polestarView: { type: string }
+        # Bottom-line-up-front and "what changed" paragraphs. Only the structured
+        # brief (variant "png") populates these; the generic country report omits
+        # them. Each prefers AI text and falls back to the deterministic dataset.
+        bluf: { type: string }
+        whatChanged: { type: string }
         # Forward-looking paragraph. Only the PNG brief (variant "png") populates
         # this; the generic country report omits it.
         outlook: { type: string }
@@ -2501,8 +2556,9 @@ components:
         issueDate: { type: string }
         force: { type: boolean }
         # "country" (default) = the generic seven-section brief; "png" = the
-        # bespoke Papua New Guinea brief that only wants Executive Summary +
-        # Outlook from the model.
+        # structured brief whose narrative sections (Bottom Line Up Front,
+        # Executive Summary, What Changed, Outlook, Polestar View) are AI-written
+        # over a deterministic dataset.
         variant: { type: string, enum: [country, png] }
         incidents:
           type: array
@@ -2564,6 +2620,57 @@ components:
           oneOf:
             - type: object
               additionalProperties: { type: string }
+            - { type: "null" }
+        model: { type: string }
+        generatedAt: { type: string, format: date-time }
+
+    TopicProseSections:
+      type: object
+      required:
+        [executiveSummary, situation, whatHappened, whatMatters, implications, watchNext, polestarView]
+      properties:
+        executiveSummary: { type: string }
+        situation: { type: string }
+        whatHappened: { type: string }
+        whatMatters: { type: string }
+        implications: { type: string }
+        watchNext: { type: string }
+        polestarView: { type: string }
+
+    GenerateReportProseInput:
+      type: object
+      required: [topic, periodWord, basisDays, issueDate, incidents]
+      properties:
+        topic: { type: string }
+        title: { type: string }
+        periodWord: { type: string }
+        basisDays: { type: integer }
+        issueDate: { type: string }
+        force: { type: boolean }
+        incidents:
+          type: array
+          items: { $ref: "#/components/schemas/ProseIncidentInput" }
+
+    EditReportProseInput:
+      type: object
+      required: [fingerprint, sections]
+      properties:
+        fingerprint: { type: string }
+        sections: { $ref: "#/components/schemas/TopicProseSections" }
+
+    ReportProseResult:
+      type: object
+      required: [available, fingerprint, model, generatedAt]
+      properties:
+        available: { type: boolean }
+        fingerprint: { type: string }
+        sections:
+          oneOf:
+            - { $ref: "#/components/schemas/TopicProseSections" }
+            - { type: "null" }
+        edited:
+          oneOf:
+            - { $ref: "#/components/schemas/TopicProseSections" }
             - { type: "null" }
         model: { type: string }
         generatedAt: { type: string, format: date-time }

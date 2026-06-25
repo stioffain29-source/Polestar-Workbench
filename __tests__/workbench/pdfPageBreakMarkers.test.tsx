@@ -98,6 +98,14 @@ function makePngDataset(): PngReportDataset {
     businessImpactEmptyNote: "No fresh incident-driven business impact.",
     businessImpact: ["Movement security around settlements.", "Premises protection after hours."],
     outlook: "Expect the standing risk pattern to persist into next week.",
+    reportingConfidence: {
+      level: "Moderate",
+      rationale: "Confirmed reporting from multiple sources during the period.",
+    },
+    bluf: "Bottom line up front for the period.",
+    whatChanged: "What changed since the previous reporting period.",
+    polestarView: "Polestar's standing assessment for the period.",
+    locationWatchlist: [],
     diagnostics: {
       totalInWindow: 4,
       bySource: [{ source: "Test Source", count: 4 }],

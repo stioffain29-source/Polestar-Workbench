@@ -126,11 +126,14 @@ function countryReply(over: Record<string, unknown> = {}): string {
   });
 }
 
-/** A well-formed two-paragraph "png" reply. */
+/** A well-formed structured "png" reply (five narrative sections). */
 function pngReply(over: Record<string, unknown> = {}): string {
   return JSON.stringify({
+    bluf: "Highland violence is the period's defining concern.",
     executiveSummary: "Enga dominated the window with an armed ambush.",
+    whatChanged: "Activity shifted from urban protest towards highland armed clashes.",
     outlook: "Highlands tension is likely to persist into the coming period.",
+    polestarView: "Maintain a cautious posture and constrain highland movement.",
     incidentSummaries: {
       "1": "A convoy was ambushed near the highland highway.",
       "2": "A demonstration formed outside the provincial office in Jayapura.",
@@ -271,23 +274,26 @@ describe("generateCountryProse — result mapping (country variant)", () => {
 });
 
 describe("generateCountryProse — request assembly + mapping (png variant)", () => {
-  it("sends the country-aware structured prompt asking for only two paragraphs", async () => {
+  it("sends the country-aware structured prompt asking for the narrative sections", async () => {
     mockModelReply(pngReply());
 
     await generateCountryProse(input({ variant: "png" }), 0);
 
     const [system] = calls[0].body.messages;
     expect(system.role).toBe("system");
-    // The structured prompt names the country and asks for exactly two paragraphs.
+    // The structured prompt names the country and asks for the brief's sections.
     expect(system.content).toMatch(/Papua New Guinea country brief/);
-    expect(system.content).toMatch(/TWO narrative paragraphs/);
+    expect(system.content).toMatch(/produce the brief's narrative sections/);
     expect(system.content).toMatch(/GROUNDING — non-negotiable/);
-    // The structured contract requests only executiveSummary + outlook (+ summaries).
+    // The structured contract requests all five narrative sections (+ summaries).
+    expect(system.content).toMatch(/"bluf"/);
+    expect(system.content).toMatch(/"executiveSummary"/);
+    expect(system.content).toMatch(/"whatChanged"/);
     expect(system.content).toMatch(/"outlook"/);
-    expect(system.content).not.toMatch(/"polestarView"/);
+    expect(system.content).toMatch(/"polestarView"/);
   });
 
-  it("maps a well-formed reply to executiveSummary + outlook with empty other sections", async () => {
+  it("maps a well-formed reply to the five narrative sections, builder sections empty", async () => {
     mockModelReply(pngReply());
 
     const out = await generateCountryProse(input({ variant: "png" }), 0);
@@ -295,13 +301,15 @@ describe("generateCountryProse — request assembly + mapping (png variant)", ()
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     const s = out.sections;
+    expect(s.bluf).toBe("Highland violence is the period's defining concern.");
     expect(s.executiveSummary).toBe("Enga dominated the window with an armed ambush.");
+    expect(s.whatChanged).toBe("Activity shifted from urban protest towards highland armed clashes.");
     expect(s.outlook).toBe("Highlands tension is likely to persist into the coming period.");
-    // The structured builder owns every other section, so they stay empty.
+    expect(s.polestarView).toBe("Maintain a cautious posture and constrain highland movement.");
+    // The structured builder still owns these sections, so they stay empty.
     expect(s.situation).toBe("");
     expect(s.whatHappened).toBe("");
     expect(s.whatMatters).toBe("");
-    expect(s.polestarView).toBe("");
     expect(s.implications).toEqual([]);
     expect(s.watchNext).toEqual([]);
     // Per-incident summaries still thread back to each incident's own id.

@@ -248,13 +248,30 @@ function drawRelatedIncidents(
 }
 
 // --- Exporter --------------------------------------------------------------
+// AI-generated narrative for the four sections the conflict report renders.
+// Mirrors ConflictReportPreview.ConflictAiProse so preview and PDF resolve prose
+// with the identical (aiOr -> pickProse) chain and can never disagree.
+export interface ConflictAiProse {
+  situation?: string | null;
+  whatMatters?: string | null;
+  watchNext?: string | null;
+  polestarView?: string | null;
+}
+
 export async function exportConflictReportPdf(
   data: ConflictReportData,
   incidents: ConflictReportIncident[],
   filename: string,
   situationalReports?: ReliefWebReport[] | null,
   incidentSummaries: Record<string, string> = {},
+  aiProse?: ConflictAiProse | null,
 ): Promise<void> {
+  // AI replaces the deterministic auto-prose as the fallback layer; a genuine
+  // analyst edit (via pickProse) still wins over both.
+  const aiOr = (ai: string | null | undefined, det: string): string => {
+    const t = (ai ?? "").trim();
+    return t ? t : det;
+  };
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const canon = canonicalTopic(data.topic);
   void canon;
@@ -296,7 +313,7 @@ export async function exportConflictReportPdf(
   drawSectionWithProse(
     ctx,
     "Situation",
-    pickProse(data.situation, ds.autoSituation),
+    pickProse(data.situation, aiOr(aiProse?.situation, ds.autoSituation)),
   );
 
   // 2. Fast Facts.
@@ -317,14 +334,14 @@ export async function exportConflictReportPdf(
   drawSectionWithProse(
     ctx,
     "What Matters for Business",
-    pickProse(data.whatMatters, ds.autoWhatMatters),
+    pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
   );
 
   // 6. Watch Next.
   drawBulletSection(
     ctx,
     "Watch Next",
-    pickProse(data.watchNext, ds.autoWatchNext),
+    pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
     8,
   );
 
@@ -332,7 +349,7 @@ export async function exportConflictReportPdf(
   drawSectionWithProse(
     ctx,
     "Polestar View",
-    pickProse(data.polestarView, ds.autoPolestarView),
+    pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
   );
 
   drawSituationalContextPdf(ctx, buildSituationalContext(situationalReports, { max: 6 }));
