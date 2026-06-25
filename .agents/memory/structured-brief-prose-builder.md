@@ -35,3 +35,23 @@ or you're looking at un-republished production, NOT a cache.
   "reads this period as". Use plain wording ("standing risks remain relevant", "from a high
   baseline").
 - House rules still apply: British English, no incident COUNTS in prose, no fabrication.
+
+## "Priorities This Week" section (was "Business Impact")
+
+The section a client called content-free word-salad was rebuilt: it is now event-led, not
+category-template. `watchLine(it)` renders one line per incident = `"<SeverityLabel>: <clean
+display headline> (<province>). <category action>"`, and the assembly takes the top-4
+`windowItems` sorted by severity-then-recency. The category action comes from `baseAction()`
+(shared with the Location Watchlist's `recommendedAction`, which just adds a "Treat as
+priority." prefix for High/Extreme).
+
+**Field-name trap:** the dataset array is still called `businessImpact` (and
+`businessImpactEmptyNote`) for compatibility, but it now powers the "Priorities This Week"
+heading. Do NOT assume the field name reflects the section title. Per-item `it.businessImpact`
+is a DIFFERENT thing (the generic per-incident impact phrase) and is still used as the
+Related Incidents body fallback — keep computing it in `toItem`.
+
+**Why event-led:** the old version looked up a generic per-category impact template, collapsed
+location to "the affected area", then deduped to near-identical generic lines — telling the
+reader nothing. Naming the real headline + real location + severity is the whole point; never
+revert to category-template impact lines.

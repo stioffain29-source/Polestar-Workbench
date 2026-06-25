@@ -411,6 +411,9 @@ export interface PngReportDataset {
   otherBucketLabel: string;
   emptyLocationFallback: string;
   featuredAboveNote: string;
+  // "Priorities This Week": the few most serious real events this period as
+  // readable, severity-ranked lines (what happened, where, what to do). The field
+  // name is retained for compatibility; content is built by watchLine().
   businessImpactEmptyNote: string;
   businessImpact: string[];
   // Locations to watch, ranked by this-period volume / severity / repeat
@@ -603,22 +606,41 @@ function categoryPhrase(label: string): string {
 }
 
 // Map a curated category (matched on keywords, mirroring strandForItem) to a
-// recommended action for the Location Watchlist / Polestar View. Severity-aware:
-// a high/extreme worst-case for the location prefixes a priority cue. Returns a
-// standing-precautions default so an entry is never left without an action.
-function recommendedAction(catLower: string, worstRank: number): string {
-  let base: string;
+// recommended action. Returns a standing-precautions default so a row is never
+// left without an action. Used by recommendedAction (Location Watchlist / Polestar
+// View) and watchLine (Priorities This Week).
+function baseAction(catLower: string): string {
   if (/(polic|arrest|detention|corrections|custody|operation|patrol)/.test(catLower))
-    base = "Expect security-force activity; confirm road and checkpoint status before movement.";
-  else if (/(protest|unrest|demonstration|riot|strike|blockad|march)/.test(catLower))
-    base = "Avoid gatherings and choke points; build in extra transit time and keep routes flexible.";
-  else if (/(tribal|communal|clash|violen|attack|arson|insurg|militant|armed|gun|shoot|ambush|kidnap)/.test(catLower))
-    base = "Hold non-essential movement to affected areas until conditions are confirmed stable.";
-  else if (/(robbery|hold-up|holdup|carjack|theft|break-in|burglar|crime|assault|hijack)/.test(catLower))
-    base = "Harden movement and premises security; vary routines and avoid predictable timings.";
-  else
-    base = "Maintain standard movement and continuity precautions; monitor for operational follow-on.";
+    return "Expect security-force activity; confirm road and checkpoint status before movement.";
+  if (/(protest|unrest|demonstration|riot|strike|blockad|march)/.test(catLower))
+    return "Avoid gatherings and choke points; build in extra transit time and keep routes flexible.";
+  if (/(tribal|communal|clash|violen|attack|arson|insurg|militant|armed|gun|shoot|ambush|kidnap)/.test(catLower))
+    return "Hold non-essential movement to affected areas until conditions are confirmed stable.";
+  if (/(robbery|hold-up|holdup|carjack|theft|break-in|burglar|crime|assault|hijack)/.test(catLower))
+    return "Harden movement and premises security; vary routines and avoid predictable timings.";
+  return "Maintain standard movement and continuity precautions; monitor for operational follow-on.";
+}
+
+// Severity-aware wrapper: a high/extreme worst-case prefixes a priority cue.
+function recommendedAction(catLower: string, worstRank: number): string {
+  const base = baseAction(catLower);
   return worstRank >= 4 ? `Treat as priority. ${base}` : base;
+}
+
+// One readable "Priorities This Week" line for a single incident: severity label,
+// the real event headline, where it happened, and the category-appropriate action.
+// Drawn entirely from the incident — no fabrication, no counts.
+function watchLine(it: PngReportItem): string {
+  const headline =
+    it.title.trim().replace(/\s+/g, " ").replace(/[.;,]+$/, "") || "Security-relevant incident reported";
+  const prov = it.province?.trim();
+  const loc = prov && !headline.toLowerCase().includes(prov.toLowerCase()) ? ` (${prov})` : "";
+  const label = it.severityLabel?.trim();
+  const lead = label ? `${label}: ` : "";
+  const head = `${headline}${loc}`;
+  // Preserve a question/exclamation headline rather than appending a stray period.
+  const sep = /[?!]$/.test(head) ? " " : ". ";
+  return `${lead}${head}${sep}${baseAction(it.category.toLowerCase())}`;
 }
 
 // A short "why it matters" line for a watchlist location, from its dominant
@@ -740,13 +762,18 @@ function buildStructuredReportDataset(
   }
 
   // --- Business impact (de-duplicated impact lines for the categories present)-
-  const seenImpacts = new Set<string>();
+  // Priorities This Week: the few most serious real events this period, ranked by
+  // severity then recency, each as a readable line (what happened, where, what to
+  // do). Quiet periods fall back to the standing-exposures empty note.
+  const seenWatch = new Set<string>();
   const businessImpact: string[] = [];
   for (const it of [...windowItems].sort(sortBySeverityThenRecency)) {
-    if (seenImpacts.has(it.businessImpact)) continue;
-    seenImpacts.add(it.businessImpact);
-    businessImpact.push(it.businessImpact);
-    if (businessImpact.length >= 6) break;
+    const line = watchLine(it);
+    const key = line.toLowerCase();
+    if (seenWatch.has(key)) continue;
+    seenWatch.add(key);
+    businessImpact.push(line);
+    if (businessImpact.length >= 4) break;
   }
 
   // --- Outlook (structured: most-likely scenario / key locations / escalation

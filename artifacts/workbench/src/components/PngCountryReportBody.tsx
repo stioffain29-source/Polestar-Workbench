@@ -470,8 +470,8 @@ export default function PngCountryReportBody({
         <LocationWatchlistTable entries={d.locationWatchlist} />
       </Section>
 
-      {/* Business Impact */}
-      <Section title="Business Impact">
+      {/* Priorities This Week */}
+      <Section title="Priorities This Week">
         {d.businessImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
         ) : (
