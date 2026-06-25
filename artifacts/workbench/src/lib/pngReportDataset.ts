@@ -570,7 +570,7 @@ function buildStructuredReportDataset(
     const provText = provs.length ? ` Reporting clustered around ${joinList(provs)}.` : "";
     const sevText =
       worst && worst.severityRank >= 4
-        ? ` The most serious entry reached ${worst.severityLabel.toLowerCase()} severity.`
+        ? ` The most serious entry reached ${worst.severityLabel} severity.`
         : "";
     const p1 = `Open-source reporting for ${config.countryName} this period was led by ${catText}.${provText}${sevText}`;
     const p2 = `The picture is operational rather than a single dramatic event: the priority for business users is movement security, premises protection and continuity at exposed sites while this picture holds.`;

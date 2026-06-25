@@ -704,10 +704,11 @@ export default function CountryReport() {
     };
   }, [editing, proseDraft, proseResult, draftedProse]);
 
-  // PNG: overlay the AI Executive Summary + Outlook onto the deterministic
-  // dataset (which supplies the other seven sections). While editing, the live
-  // draft drives the preview; otherwise prefer the server prose. When no AI
-  // prose exists, the deterministic template text shows unchanged.
+  // PNG: overlay ONLY the AI Executive Summary onto the deterministic dataset
+  // (which supplies every other section — Outlook included, now a tightened
+  // deterministic field that is no longer AI/editor-overridable). While editing,
+  // the live draft drives the preview; otherwise prefer the server prose. When
+  // no AI prose exists, the deterministic text shows unchanged.
   const pngEffectiveDataset = useMemo(() => {
     if (!pngDataset) return null;
     const src =
@@ -720,7 +721,6 @@ export default function CountryReport() {
       return {
         ...pngDataset,
         executiveSummary: src.executiveSummary,
-        outlook: src.outlook && src.outlook.trim() ? src.outlook : pngDataset.outlook,
       };
     }
     return pngDataset;
@@ -1211,7 +1211,6 @@ export default function CountryReport() {
             data later changes, use Redraft to regenerate.
           </div>
           <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
-          <BaselineTextField label="Outlook — Next Week" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
           {pngDataset && pngDataset.windowItems.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 6 }}>
