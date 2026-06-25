@@ -139,7 +139,13 @@ function dateLine(item: PngReportItem): string {
   return `Reported ${reported}`;
 }
 
-function ItemCard({ item }: { item: PngReportItem }) {
+function ItemCard({
+  item,
+  suppressEmptyLocation = false,
+}: {
+  item: PngReportItem;
+  suppressEmptyLocation?: boolean;
+}) {
   const color = SEV_COLOR[item.severity] ?? ELECTRIC;
   const summaries = useContext(IncidentSummaryContext);
   // AI per-incident analyst summary when available; otherwise the deterministic
@@ -179,7 +185,13 @@ function ItemCard({ item }: { item: PngReportItem }) {
         </div>
       </div>
       <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 6, letterSpacing: "0.02em", textAlign: "left" }}>
-        {[item.category, item.province ?? "Location not specified", dateLine(item)].join("  ·  ")}
+        {[
+          item.displayCategory,
+          item.province ?? (suppressEmptyLocation ? "" : "Location not specified"),
+          dateLine(item),
+        ]
+          .filter(Boolean)
+          .join("  ·  ")}
         {item.source ? `  ·  ${item.source}` : ""}
       </div>
       <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 6, lineHeight: 1.5, textAlign: "left" }}>
@@ -196,6 +208,7 @@ function LocationSection({
   hadFeatured,
   featuredNote,
   truncated = false,
+  suppressEmptyLocation = false,
 }: {
   title: string;
   items: PngReportItem[];
@@ -203,6 +216,7 @@ function LocationSection({
   hadFeatured: boolean;
   featuredNote: string;
   truncated?: boolean;
+  suppressEmptyLocation?: boolean;
 }) {
   return (
     <Section title={title}>
@@ -211,7 +225,7 @@ function LocationSection({
       ) : (
         <div>
           {items.map((it) => (
-            <ItemCard key={it.id} item={it} />
+            <ItemCard key={it.id} item={it} suppressEmptyLocation={suppressEmptyLocation} />
           ))}
           {truncated ? <MoreNote>{LOCATION_TRIM_NOTE}</MoreNote> : null}
         </div>
@@ -424,6 +438,7 @@ export default function PngCountryReportBody({
   incidentSummaries?: Record<string, string>;
 }) {
   const d = dataset;
+  const operatingRisk = d.proseVariant === "operating-risk";
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
       {/* 0. Bottom Line Up Front */}
@@ -441,14 +456,14 @@ export default function PngCountryReportBody({
         <Prose text={d.whatChanged} />
       </Section>
 
-      {/* 2. Top 3 Incidents This Week */}
-      <Section title="Top 3 Incidents This Week">
+      {/* 2. Priority / Top 3 Incidents This Week (heading is config-driven) */}
+      <Section title={d.topIncidentsHeading ?? "Top 3 Incidents This Week"}>
         {d.topThree.length === 0 ? (
           <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
         ) : (
           <div>
             {d.topThree.map((it) => (
-              <ItemCard key={it.id} item={it} />
+              <ItemCard key={it.id} item={it} suppressEmptyLocation={operatingRisk} />
             ))}
           </div>
         )}
@@ -477,6 +492,7 @@ export default function PngCountryReportBody({
             hadFeatured={b.hadFeatured}
             featuredNote={d.featuredAboveNote}
             truncated={b.truncated}
+            suppressEmptyLocation={operatingRisk}
           />
         ),
       )}
@@ -487,6 +503,7 @@ export default function PngCountryReportBody({
         hadFeatured={d.otherNationalHadFeatured}
         featuredNote={d.featuredAboveNote}
         truncated={d.otherNationalTruncated}
+        suppressEmptyLocation={operatingRisk}
       />
 
       {/* Location Watchlist */}

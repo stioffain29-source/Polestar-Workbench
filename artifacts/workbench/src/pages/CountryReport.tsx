@@ -45,6 +45,7 @@ import {
   acceptedCountryTokens,
   isIndonesianWestPapuaContext,
   isPapuaNewGuineaDominantContext,
+  isIndonesianPapuaTheatreContext,
   isCrossBorderPapuaPng,
   isForeignDominantContext,
 } from "@/lib/countryMatch";
@@ -249,6 +250,12 @@ export default function CountryReport() {
     // a citywide Jakarta token). Indonesian Papua records never carry "Indonesia"
     // alone, so they cannot leak into the capital brief.
     const isJakarta = tokens.includes("jakarta");
+    // The Indonesia Operating Risk Watch (national brief). Papua-related
+    // reporting (the highlands separatist conflict, OPM / TPNPB) is routed to
+    // the dedicated Indonesian Papua brief and never shown here, even when a
+    // mis-tag files it under "Indonesia".
+    const isIndonesia =
+      !isPng && !isPapua && !isJakarta && tokens.includes("indonesia");
     return (incidentsData ?? []).filter((i) => {
       if (isJakarta) {
         return (
@@ -274,6 +281,15 @@ export default function CountryReport() {
       if (isPapua && !isCrossBorderPapuaPng(i.country)) {
         const text = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
         if (isPapuaNewGuineaDominantContext(text)) return false;
+      }
+      // Indonesia Operating Risk Watch: route Papua-theatre reporting out to the
+      // dedicated West Papua brief. Genuine Papua New Guinea records (exempted
+      // inside the guard) and ordinary national-Indonesia stories are unaffected.
+      // Read the TITLE only — the summary/source carry the appended masthead, and
+      // national outlets like "Sabang Merauke NEWS" embed a Papua city name that
+      // would otherwise mis-route an unrelated national story (masthead pollution).
+      if (isIndonesia && isIndonesianPapuaTheatreContext(i.title)) {
+        return false;
       }
       // Drop geocoder mis-tags: a record whose TITLE is about a distant
       // foreign country (e.g. "Myanmar clashes ... near Thai border") with no
@@ -738,6 +754,15 @@ export default function CountryReport() {
   // DOM-rasterised into the PDF, so this single merge keeps preview == PDF.
   const pngEffectiveDataset = useMemo(() => {
     if (!pngDataset) return null;
+    // Operating-risk briefs (Indonesia / Jakarta) render the deterministic,
+    // business-language narrative authored by operatingRiskProse.ts. They are
+    // never overlaid by the generic AI prose: that prompt is not operating-risk
+    // aware and would bypass the no-fabrication controls, so the upgrade must
+    // stay authoritative in every environment (incl. production with AI keyed).
+    // PNG / West Papua keep the overlay below, byte-identical to before. The
+    // per-incident AI summaries are unaffected — they are derived separately and
+    // still populate each card.
+    if (pngDataset.proseVariant === "operating-risk") return pngDataset;
     const src =
       editing && proseDraft
         ? proseDraft

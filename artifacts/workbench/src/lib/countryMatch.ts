@@ -229,3 +229,25 @@ export function isCrossBorderPapuaPng(
     toks.some((t) => PAPUA_TOKEN_SET.has(t))
   );
 }
+
+/**
+ * True when a record's narrative is about the Indonesian Papua theatre (the
+ * Papua highlands separatist conflict, OPM / TPNPB, the Papuan provinces)
+ * rather than the wider Indonesian operating picture. The Indonesia Operating
+ * Risk Watch EXCLUDES these: Papua-related reporting belongs in the dedicated
+ * Indonesian Papua (West Papua) brief, never the national report. Genuine
+ * Papua New Guinea records (which also contain the "papua" substring inside
+ * "Papua New Guinea") are exempt and stay in the PNG report. Unlike
+ * {@link isIndonesianWestPapuaContext}, this never fires on the bare
+ * "indonesia" / "indonesian" / "tni" tokens — so it cannot strip an ordinary
+ * national-Indonesia story that merely names the state.
+ */
+export function isIndonesianPapuaTheatreContext(
+  text: string | null | undefined,
+): boolean {
+  const t = text ?? "";
+  if (PNG_CONTEXT_RE.test(t)) return false;
+  // "papua", "papuan", "papuans" (the adjective form is common in headlines:
+  // "Papuan separatists", "West Papuan rebels").
+  return /\bpapuan?s?\b/i.test(t) || PAPUA_STRICT_LOCAL_RE.test(t);
+}

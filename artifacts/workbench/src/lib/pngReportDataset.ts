@@ -30,6 +30,13 @@ import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakarta
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
+import {
+  operatingRiskDisplayCategory,
+  buildOperatingRiskBluf,
+  buildOperatingRiskExecutiveSummary,
+  buildOperatingRiskPolestarView,
+  buildOperatingRiskPriorities,
+} from "./operatingRiskProse";
 
 // ---------------------------------------------------------------------------
 // Input shape (permissive — the page passes CountryFastFactsIncident objects,
@@ -165,6 +172,14 @@ export interface StructuredTheatreConfig {
   // Optional, keyed by bucket key (e.g. "ncd"). Buckets without an entry render
   // the standard flat location list.
   locationAugmentations?: Record<string, StructuredLocationAugmentation>;
+  // Prose variant. When "operating-risk", the BLUF, Executive Summary,
+  // Priorities This Week and Polestar View are built by operatingRiskProse, and
+  // per-item categories are display-mapped to the eleven business labels. Unset
+  // → the default PNG / West Papua prose path (byte-identical).
+  proseVariant?: "operating-risk";
+  // Heading for the priority-incidents section. Falls back in the renderer to
+  // the default "Top 3 Incidents This Week" when unset.
+  topIncidentsHeading?: string;
 }
 
 export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -303,6 +318,8 @@ export const INDONESIA_REPORT_CONFIG: StructuredTheatreConfig = {
     "fuel-subsidy and minimum-wage decisions, student and labour mobilisation, election dates and natural-hazard episodes",
   deriveProvince: deriveIndonesiaProvince,
   extractItem: extractIndonesiaItem,
+  proseVariant: "operating-risk",
+  topIncidentsHeading: "Priority Incidents This Week",
 };
 
 export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -329,6 +346,8 @@ export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
     "wage and fuel-subsidy announcements, major court and parliamentary calendar dates, and large rallies around the presidential palace and parliament",
   deriveProvince: deriveJakartaArea,
   extractItem: extractJakartaItem,
+  proseVariant: "operating-risk",
+  topIncidentsHeading: "Priority Incidents This Week",
 };
 
 // ---------------------------------------------------------------------------
@@ -343,6 +362,10 @@ export interface PngReportItem {
   summary: string;
   province: string | null;
   category: PngCategory;
+  // Client-facing category label. For the operating-risk theatres (Indonesia /
+  // Jakarta) this is the display-mapped business label; for every other theatre
+  // it equals `category` (so PNG / West Papua rendering is unchanged).
+  displayCategory: string;
   businessImpact: string;
   severity: string;
   severityLabel: string;
@@ -428,6 +451,13 @@ export interface PngReportDataset {
   // reporting, backstopped by the curated baseline watchlist.
   locationWatchlist: LocationWatchlistEntry[];
   outlook: string;
+  // Optional heading override for the priority-incidents section (operating-risk
+  // theatres set "Priority Incidents This Week"; unset → renderer default).
+  topIncidentsHeading?: string;
+  // Prose variant, mirrored from the config so the renderer can gate display
+  // behaviour (e.g. suppressing the "Location not specified" label). Unset for
+  // PNG / West Papua.
+  proseVariant?: "operating-risk";
   // Polestar's assessed judgement: what the pattern means, the practical
   // adjustment for the week, and what would raise concern.
   polestarView: string;
@@ -490,6 +520,8 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
     summary: (i.summary ?? "").trim(),
     province,
     category,
+    displayCategory:
+      config.proseVariant === "operating-risk" ? operatingRiskDisplayCategory(category) : category,
     businessImpact: impact,
     severity: sev,
     severityLabel: SEV_LABEL[sev] ?? (i.severity ?? ""),
@@ -806,7 +838,7 @@ function buildStructuredReportDataset(
   // severity then recency, each as a readable line (what happened, where, what to
   // do). Quiet periods fall back to the standing-exposures empty note.
   const seenWatch = new Set<string>();
-  const businessImpact: string[] = [];
+  let businessImpact: string[] = [];
   for (const it of [...windowItems].sort(sortBySeverityThenRecency)) {
     const line = watchLine(it);
     const key = line.toLowerCase();
@@ -1012,6 +1044,62 @@ function buildStructuredReportDataset(
     polestarView = `${assessment}, with ${leadCatPhrase}${leadProvClause} leading the reporting. For the week ahead, ${action}. Concern would rise if ${escTrigger}. A single quiet week should not be read as an all-clear: open-source coverage here is uneven, and an absence of reporting is not an absence of risk.`;
   }
 
+  // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
+  // Override the BLUF, Executive Summary, Priorities This Week and Polestar View
+  // with the business-language operating-risk builders. Scoped behind the config
+  // flag, so the PNG / West Papua path above is left byte-identical. Categories
+  // use the display-mapped labels (it.displayCategory) here.
+  if (config.proseVariant === "operating-risk") {
+    const empty = windowItems.length === 0;
+    const leadDisplayCats = topLabels(windowItems, (it) => it.displayCategory, 3);
+    // Lead locations as friendly bucket labels, deduplicated (two provinces can
+    // share one bucket label, e.g. Kalimantan).
+    const seenLoc = new Set<string>();
+    const leadLocations: string[] = [];
+    for (const p of topProvs) {
+      const lbl = provinceLabel.get(p) ?? p;
+      const k = lbl.toLowerCase();
+      if (seenLoc.has(k)) continue;
+      seenLoc.add(k);
+      leadLocations.push(lbl);
+      if (leadLocations.length >= 4) break;
+    }
+    const orInput = {
+      countryName: config.countryName,
+      empty,
+      trajectory,
+      leadDisplayCats,
+      leadLocations,
+      worstRank: curWorstRank,
+    };
+    bluf = buildOperatingRiskBluf(orInput);
+    executiveSummary = buildOperatingRiskExecutiveSummary(orInput);
+    polestarView = buildOperatingRiskPolestarView({
+      ...orInput,
+      outlookVolatilityClause: config.outlookVolatilityClause,
+    });
+    if (!empty) {
+      const groups = scoredProvinces.map(({ prov, s, score }) => ({
+        location: provinceLabel.get(prov) ?? prov,
+        dominantDisplayCat: operatingRiskDisplayCategory(s.cat ?? ""),
+        score,
+      }));
+      const nationalItems = windowItems.filter((it) => !it.province);
+      if (nationalItems.length) {
+        const domRaw = topLabels(nationalItems, (it) => it.category, 1)[0] ?? "";
+        const worst = nationalItems.reduce((m, it) => Math.max(m, it.severityRank), 0);
+        groups.push({
+          location: "Nationally",
+          dominantDisplayCat: operatingRiskDisplayCategory(domRaw),
+          score: nationalItems.length + (worst >= 4 ? 3 : worst >= 3 ? 1 : 0),
+        });
+      }
+      groups.sort((a, b) => b.score - a.score);
+      const orPriorities = buildOperatingRiskPriorities(groups);
+      if (orPriorities.length) businessImpact = orPriorities;
+    }
+  }
+
   // --- Reporting Confidence --------------------------------------------------
   let reportingConfidence: ReportingConfidence;
   if (windowItems.length === 0) {
@@ -1061,6 +1149,8 @@ function buildStructuredReportDataset(
     businessImpact,
     locationWatchlist,
     outlook,
+    topIncidentsHeading: config.topIncidentsHeading,
+    proseVariant: config.proseVariant,
     polestarView,
     reportingConfidence,
     windowItems,

@@ -109,7 +109,11 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
   {
     // NEW (bilingual). Bound to fire-event phrases / "blaze" / Bahasa kebakaran,
     // never the bare word "fire" — the homicide rule above owns "opened fire".
-    re: /\b(wildfire|bush ?fire|forest fire|blaze|inferno|conflagration|kebakaran|karhutla|kobaran api|fire (?:broke out|breaks out|gutted|guts|razed|engulf\w*|destroyed|rips? through|tore through|ravaged))\b/i,
+    // Also catches NON-bomb gas/industrial explosions (gas-cylinder, fuel-depot,
+    // factory/pipeline blasts). The terrorism rule above runs first, so a bomb
+    // blast / IED stays Terrorism; only qualified gas/industrial phrases resolve
+    // here — a bare "explosion" is deliberately NOT matched (could be a bombing).
+    re: /\b(wildfire|bush ?fire|forest fire|blaze|inferno|conflagration|kebakaran|karhutla|kobaran api|fire (?:broke out|breaks out|gutted|guts|razed|engulf\w*|destroyed|rips? through|tore through|ravaged)|gas (?:explosion|blast)|gas cylinder (?:explosion|blast)|tabung gas meledak|ledakan gas|fuel (?:tank|depot|station) (?:explosion|blast|fire)|pipeline (?:explosion|blast)|factory (?:explosion|blast)|pabrik meledak|kilang meledak|boiler (?:explosion|blast)|transformer (?:explosion|blast))\b/i,
     category: "Fire",
     impact: "Property damage and possible business interruption from fire; verify site safety and continuity arrangements.",
   },
@@ -144,9 +148,32 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     impact: "Industrial action with potential operational and supply-chain disruption; review workforce and continuity contingencies.",
   },
   {
+    // NEW (bilingual). NON-violent land / agrarian / eviction tension. Placed
+    // AFTER the violent rules (tribal/communal, homicide, armed robbery) so a
+    // fatal or armed land clash keeps its violent classification, and AFTER the
+    // transport rule so a land-dispute roadblock stays Road/highway; only a pure
+    // land/eviction dispute resolves here. Mapped to the existing communal enum
+    // (no new enum member); for the operating-risk variant it displays as
+    // "Community tension / land dispute".
+    re: /\b(land (?:dispute|conflict|grab|grabbing|row|feud|rights protest)|customary land|agrarian (?:conflict|dispute)|forced eviction|evict(?:ion|ions|ed)|sengketa (?:lahan|tanah|agraria)|konflik (?:lahan|agraria|tanah)|perampasan (?:lahan|tanah)|penggusuran|gusur paksa|mafia tanah)\b/i,
+    category: "Tribal / communal violence",
+    impact: "Community tension over land or resources; potential for localised blockades, disruption and personnel-movement risk in the affected area.",
+  },
+  {
     re: /\b(protest|demonstration|rally|march|riot|unrest|looting|roadblock|road block|strike|walkout|stoppage|picket|public disorder|demonstrasi|unjuk rasa|kerusuhan|\brusuh\b|bentrok(?:an)?|aksi (?:massa|demo|unjuk rasa)|\bdemo\b|penjarahan|blokade(?: jalan)?|kericuhan|\bricuh\b)\b/i,
     category: "Civil unrest / protest",
     impact: "Potential road blockages, business closures and movement restrictions in the affected area.",
+  },
+  {
+    // NEW (bilingual). Corruption / graft / regulatory-integrity events. Placed
+    // AFTER civil unrest (so "demo tolak korupsi" / an anti-corruption rally
+    // stays a protest) but BEFORE theft and policing (so "KPK arrests official
+    // for graft" resolves here, not as a generic policing/theft item). Mapped to
+    // the existing Government stability enum; the operating-risk variant displays
+    // it as "Regulatory / corruption / governance".
+    re: /\b(corrupt(?:ion)?|graft|bribe(?:ry|s)?|bribed|kickback|embezzl\w*|misappropriat\w*|money laundering|slush fund|korupsi|suap|menyuap|gratifikasi|pungli|pungutan liar|pencucian uang|\bkpk\b|tipikor|operasi tangkap tangan)\b/i,
+    category: "Government stability",
+    impact: "Governance and integrity risk; monitor for regulatory, procurement and local-authority follow-on.",
   },
   {
     re: /\b(theft|stolen|burglary|break[- ]?in|looting|robbery|robbed|pencurian|pembobolan|\bmaling\b|jambret|penjambretan|pencopetan|\bcuranmor\b|pencurian kendaraan)\b/i,
