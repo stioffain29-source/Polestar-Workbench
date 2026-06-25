@@ -626,7 +626,7 @@ function recommendedAction(catLower: string, worstRank: number): string {
 // deliberately omitted (user preference) — direction and severity LABELS only.
 function whyForLocation(dominantCatLower: string | null, worstRank: number, fresh: boolean): string {
   if (!fresh)
-    return "Standing watch location; no fresh open-source reporting this period, so the standing baseline applies.";
+    return "Standing watch location; no fresh open-source reporting this period, so standing risks remain relevant.";
   const sev =
     worstRank >= 5 ? "extreme-severity " : worstRank >= 4 ? "high-severity " : "";
   const cat = dominantCatLower ? categoryPhrase(dominantCatLower) : "security-relevant activity";
@@ -813,7 +813,7 @@ function buildStructuredReportDataset(
       curWorstRank >= 4
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
         : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
-    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: the lead security concern is ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}. Treat any quiet stretch as provisional rather than a confirmed improvement, as open-source coverage is uneven.`;
+    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: reporting centres on ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}. Treat any quiet stretch as provisional rather than a confirmed improvement, as open-source coverage is uneven.`;
   }
 
   // --- What Changed This Week (week-on-week delta, qualitative) --------------
