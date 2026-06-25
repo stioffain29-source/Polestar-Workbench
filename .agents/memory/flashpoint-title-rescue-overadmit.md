@@ -179,6 +179,16 @@ bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
   verdict that actually SPARKS protests/clashes keeps. The monitor's highest-
   severity-country Fast Fact reads the relevance-filtered set, so dropping the row
   from relevance fixes the headline number directly — no UI change needed.
+  - RECURRENCE (same SK martial-law case, reworded): "Ex-justice minister GETS 25
+    YEARS JAIL for martial law role" slipped the drop — NO institutional court
+    word, and the year branch was singular `\d+[- ]year (jail|prison)` so plural
+    "25 years jail" missed. Broadened to `\d+[- ]years? (in )?(jail|prison|
+    imprisonment|behind bars)`. In LOCKSTEP the keep-guard path (c) gained
+    `jail\w*|imprison\w*` outcomes, else "protesters clash AFTER X jailed"
+    false-drops (no verdict/sentence word). The monitor re-derives via
+    isTopicRelevant so it self-heals at render once redeployed; persisted prod
+    rows additionally need the RELEVANCE_RULE_VERSION bump + boot backfill.
+    Whenever you touch the court drop, widen the drop AND the keep-guard together.
 
 **Keep-guard \b trap (cost me a test cycle, TWICE):** event keep-guards MUST use
 leading-\b STEMS (`protest`, `clash`, `kill`), never a trailing-\b literal —

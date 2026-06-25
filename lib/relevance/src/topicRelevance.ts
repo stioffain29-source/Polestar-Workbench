@@ -661,7 +661,7 @@ const FP_SCHOOL_ADMISSION_RE =
 // severity on the protest monitor. Kept only when real unrest accompanies it
 // (verdict that sparks protests / clashes / a rally), via the companion guard.
 const FP_COURT_PROCESS_RE =
-  /\b(court|tribunal|judge|judiciary|prosecutor\w*|prosecution|the bench)\b[^.]{0,45}\b(sentenc\w*|jail\w*|imprison\w*|convict\w*|acquit\w*|verdict|ruling|rules?|ruled|indict\w*|on trial|found guilty|guilty)\b|\bsentenc\w*\b[^.]{0,30}\b(to|jail|prison|year|years|life)\b|\b(jail|prison) term\b|\bjailed (for|over)\b|\b\d+[- ]year (jail|prison)\b/i;
+  /\b(court|tribunal|judge|judiciary|prosecutor\w*|prosecution|the bench)\b[^.]{0,45}\b(sentenc\w*|jail\w*|imprison\w*|convict\w*|acquit\w*|verdict|ruling|rules?|ruled|indict\w*|on trial|found guilty|guilty)\b|\bsentenc\w*\b[^.]{0,30}\b(to|jail|prison|year|years|life)\b|\b(jail|prison) term\b|\bjailed (for|over)\b|\b\d+[- ]years?\s+(?:in\s+)?(?:jail|prison|imprisonment|behind bars)\b/i;
 // Keep-guard for the court drop: only a LIVE unrest reaction TO THE OUTCOME
 // rescues a court/legal-process record — not the bare appearance of a protest
 // word describing the PAST event the case concerns ("union rally death",
@@ -686,7 +686,7 @@ const FP_COURT_UNREST_KEEP_RE = new RegExp(
     //     every phrasing the drop catches can also be rescued.
     /\b(?:(?:verdict|ruling|sentenc\w*|conviction|acquitt\w*|judg(?:e)?ment|court (?:decision|order|ruling|verdict))|(?:court|tribunal|judge|judiciary)\b[^.]{0,30}\b(?:jail\w*|imprison\w*|convict\w*|sentenc\w*|verdict|ruled|rules?|found guilty|guilty))\b[^.]{0,40}\b(spark\w*|trigger\w*|ignit\w*|prompt\w*|sets? off|setting off|unleash\w*|provok\w*|touch\w* off|led to|lead\w* to|fuel\w*|erupt\w*|flar\w*)\b[^.]{0,45}\b(protest|demonstrat|rall(?:y|ies|ied)|riot|clash|unrest|uprising|walkout|strike)/.source,
     // (c) protests/clashes break out AFTER / OVER / AGAINST the outcome
-    /\b(protest|demonstrat|rall(?:y|ies|ied)|riot|clash|unrest|uprising|sit-?in|picket|walkout|strike)\w*\b[^.]{0,45}\b(after|over|against|following|amid|amidst|in response to|in reaction to|denounc\w*|reject\w*|condemn\w*|outrag\w*)\b[^.]{0,30}\b(verdict|ruling|sentenc\w*|conviction|acquitt\w*|court|judg(?:e)?ment|decision)/.source,
+    /\b(protest|demonstrat|rall(?:y|ies|ied)|riot|clash|unrest|uprising|sit-?in|picket|walkout|strike)\w*\b[^.]{0,45}\b(after|over|against|following|amid|amidst|in response to|in reaction to|denounc\w*|reject\w*|condemn\w*|outrag\w*)\b[^.]{0,48}\b(verdict|ruling|sentenc\w*|conviction|acquitt\w*|court|judg(?:e)?ment|decision|jail\w*|imprison\w*|prison\w*|behind bars)/.source,
     // (d) an unrest verb directly governing the COURT outcome — "Hundreds
     //     protest court ruling", "demonstrators storm court over verdict".
     //     Requires the institutional "court" word AS THE OBJECT (not a bare

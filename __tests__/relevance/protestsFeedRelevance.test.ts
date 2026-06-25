@@ -612,6 +612,24 @@ const FIXTURES: Fixture[] = [
     title: "Court jails opposition leader, sparking mass protests and clashes nationwide",
     verdict: "KEEP",
   },
+  // The leaked variant — "gets N years jail", no institutional "court" word and
+  // plural "years" — must also DROP (it crowned South Korea highest-severity).
+  {
+    title: "South Korea: Ex-justice minister gets 25 years jail for martial law role",
+    verdict: "DROP",
+    reason: "court/judicial process",
+  },
+  // Live unrest reacting to a jailing (no "verdict"/"sentence" word) must KEEP.
+  {
+    title: "Protesters clash with police after opposition figure jailed for five years",
+    verdict: "KEEP",
+  },
+  // Same reaction, "in prison" phrasing — the drop branch matches "prison"/"behind
+  // bars" too, so the keep-guard must rescue these variants in lockstep.
+  {
+    title: "Protesters clash after opposition figure gets 25 years in prison",
+    verdict: "KEEP",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {
