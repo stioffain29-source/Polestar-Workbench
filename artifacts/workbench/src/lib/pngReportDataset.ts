@@ -571,6 +571,37 @@ function capitaliseFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Raw category bucket labels ("Other security", "Civil unrest / protest") read
+// as word salad when spliced into a sentence. Map each to a natural, lowercase
+// prose noun phrase; unlisted labels fall back to a slash → "and" rewrite.
+const CATEGORY_PHRASE: Record<string, string> = {
+  "terrorism / militancy": "terrorism and militancy",
+  "armed robbery / hold-up": "armed robbery",
+  "tribal / communal violence": "tribal and communal violence",
+  "homicide / violent crime": "violent crime",
+  "theft / break-in": "theft and break-ins",
+  "civil unrest / protest": "protest and civil unrest",
+  "labour action": "labour action",
+  "policing operation": "policing operations",
+  "community policing": "community policing",
+  "intelligence / training": "intelligence and training activity",
+  "corrections / detention": "corrections and detention",
+  "aviation / airport": "aviation and airport disruption",
+  "maritime / port": "maritime and port disruption",
+  "road / highway": "road and highway disruption",
+  "natural hazard": "natural hazards",
+  fire: "fires",
+  "environmental / haze": "haze and environmental incidents",
+  "power / utilities": "power and utility disruption",
+  "telecoms / connectivity": "telecoms and connectivity disruption",
+  "government stability": "government-stability concerns",
+  "other security": "other security-relevant incidents",
+};
+function categoryPhrase(label: string): string {
+  const k = label.toLowerCase();
+  return CATEGORY_PHRASE[k] ?? k.replace(/\s*\/\s*/g, " and ");
+}
+
 // Map a curated category (matched on keywords, mirroring strandForItem) to a
 // recommended action for the Location Watchlist / Polestar View. Severity-aware:
 // a high/extreme worst-case for the location prefixes a priority cue. Returns a
@@ -598,8 +629,8 @@ function whyForLocation(dominantCatLower: string | null, worstRank: number, fres
     return "Standing watch location; no fresh open-source reporting this period, so the standing baseline applies.";
   const sev =
     worstRank >= 5 ? "extreme-severity " : worstRank >= 4 ? "high-severity " : "";
-  const cat = dominantCatLower || "security-relevant activity";
-  return `Fresh ${sev}${cat} reporting this period.`;
+  const cat = dominantCatLower ? categoryPhrase(dominantCatLower) : "security-relevant activity";
+  return `Fresh ${sev}reporting of ${cat} this period.`;
 }
 
 // Generic config-driven builder. The PNG and West Papua entry points below are
@@ -624,6 +655,9 @@ function buildStructuredReportDataset(
   const curWorstLabel = SEV_LABEL[Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === curWorstRank) ?? ""] ?? "";
   const prevWorstLabel = SEV_LABEL[Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === prevWorstRank) ?? ""] ?? "";
   const topCats = topLabels(windowItems, (it) => it.category, 3).map((c) => c.toLowerCase());
+  // Natural-prose forms of the same categories. Raw bucket labels read as word
+  // salad in a sentence, so every narrative section uses these instead.
+  const topCatPhrases = topCats.map(categoryPhrase);
   const topProvs = topLabels(windowItems.filter((it) => it.province), (it) => it.province as string, 3);
   const prevTopProv = topLabels(previousWindowItems.filter((it) => it.province), (it) => it.province as string, 1)[0] ?? null;
   const prevTopCat = (topLabels(previousWindowItems, (it) => it.category, 1)[0] ?? "").toLowerCase() || null;
@@ -694,7 +728,7 @@ function buildStructuredReportDataset(
       3,
     );
     const worst = [...windowItems].sort((a, b) => b.severityRank - a.severityRank)[0];
-    const catText = cats.length ? joinList(cats) : "security-relevant activity";
+    const catText = cats.length ? joinList(cats.map(categoryPhrase)) : "security-relevant activity";
     const provText = provs.length ? ` Reporting clustered around ${joinList(provs)}.` : "";
     const sevText =
       worst && worst.severityRank >= 4
@@ -722,10 +756,7 @@ function buildStructuredReportDataset(
     outlook = config.emptyOutlook;
   } else {
     const recurringProv = topProvs.slice(0, 2);
-    const recurringCat = topCats.slice(0, 2);
-    const catClause = recurringCat.length
-      ? `${joinList(recurringCat)} the most likely repeat pattern`
-      : "the established pattern most likely to repeat";
+    const recurringCat = topCatPhrases.slice(0, 2);
     const keyLocs = recurringProv.length
       ? joinList(recurringProv)
       : baselineWatchlist.length
@@ -735,7 +766,12 @@ function buildStructuredReportDataset(
       curWorstRank >= 4
         ? "a spread of high-severity or casualty-bearing incidents beyond the locations above"
         : "any move to high-severity or casualty-bearing incidents, or a spread to new districts";
-    const mostLikely = `Most likely, the coming week sustains the current pattern, with ${catClause}.`;
+    const mostLikely =
+      recurringCat.length >= 2
+        ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]}, with ${recurringCat[1]} also likely to recur.`
+        : recurringCat.length === 1
+          ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]}.`
+          : "The coming week most likely follows the established pattern.";
     const locLine = `Key locations to watch: ${keyLocs}.`;
     const escLine = `Escalation triggers: ${escClause}, and flashpoints around ${config.outlookVolatilityClause}.`;
     const reduceLine = `Concern would ease with a sustained, well-sourced quiet stretch — but, given uneven open-source coverage, treat any single quiet week as provisional rather than a confirmed improvement.`;
@@ -759,6 +795,7 @@ function buildStructuredReportDataset(
               ? "easing"
               : "stable";
   const leadCat = topCats[0] ?? "security-relevant activity";
+  const leadCatPhrase = topCatPhrases[0] ?? "security-relevant incidents";
   const leadProvClause = topProvs.length ? ` concentrated around ${joinList(topProvs.slice(0, 2))}` : "";
 
   // --- BLUF (Bottom Line Up Front) ------------------------------------------
@@ -770,13 +807,13 @@ function buildStructuredReportDataset(
       trajectory === "worsening"
         ? "looks to be deteriorating"
         : trajectory === "easing"
-          ? "looks to be easing, against a high standing baseline"
+          ? "looks to be easing, though from a high baseline"
           : "holds to the standing pattern";
     const bizRisk =
       curWorstRank >= 4
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
         : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
-    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: the lead security concern is ${leadCat}${leadProvClause}. For business users, ${bizRisk}. Treat any quiet stretch as provisional rather than a confirmed improvement, as open-source coverage is uneven.`;
+    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: the lead security concern is ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}. Treat any quiet stretch as provisional rather than a confirmed improvement, as open-source coverage is uneven.`;
   }
 
   // --- What Changed This Week (week-on-week delta, qualitative) --------------
@@ -813,7 +850,7 @@ function buildStructuredReportDataset(
             : "";
     const typeClause =
       leadCat && prevTopCat && leadCat !== prevTopCat
-        ? ` ${capitaliseFirst(leadCat)} featured more prominently than in the previous week.`
+        ? ` ${capitaliseFirst(leadCatPhrase)} featured more prominently than in the previous week.`
         : "";
     const prevProvs = topLabels(
       previousWindowItems.filter((it) => it.province),
@@ -892,20 +929,20 @@ function buildStructuredReportDataset(
   if (windowItems.length === 0) {
     polestarView = `With no fresh reporting this period, Polestar holds the standing assessment for ${config.countryName}: the established risk pattern persists and the quiet period is read as a coverage signal, not an improvement. Maintain current precautions, and treat any return of reporting — particularly higher-severity or casualty-bearing incidents — as the trigger to reassess. Do not read the absence of reporting as confirmed calm.`;
   } else {
-    const meaning =
+    const assessment =
       trajectory === "worsening"
-        ? "a step up in operational risk"
+        ? "Risk stepped up this period"
         : trajectory === "easing"
-          ? "some easing, against a high standing baseline"
-          : "continuity of the standing risk pattern";
+          ? "Risk eased a little this period, though from a high baseline"
+          : "Risk held to its usual pattern this period";
     const action =
       curWorstRank >= 4
-        ? "tighten movement security and site protection at the exposed locations above"
-        : "maintain current precautions and keep movement routines unpredictable";
+        ? "tighten movement security and site protection at the exposed locations listed above"
+        : "keep current precautions in place and vary movement routines";
     const escTrigger = topProvs[0]
-      ? `incidents spread beyond ${topProvs[0]} or higher-severity, casualty-bearing violence is confirmed`
-      : "higher-severity, casualty-bearing violence is confirmed or reporting spreads to new districts";
-    polestarView = `Polestar reads this period as ${meaning}: ${leadCat}${leadProvClause} continues to set the operating tempo. The practical adjustment for the week is to ${action}. Concern would rise if ${escTrigger}. Avoid over-reading a single quiet week as an all-clear — open-source coverage here is uneven, and absence of reporting is not absence of risk.`;
+      ? `incidents spread beyond ${topProvs[0]}, or higher-severity, casualty-bearing violence is confirmed`
+      : "higher-severity, casualty-bearing violence is confirmed, or reporting spreads to new districts";
+    polestarView = `${assessment}, with ${leadCatPhrase}${leadProvClause} leading the reporting. For the week ahead, ${action}. Concern would rise if ${escTrigger}. A single quiet week should not be read as an all-clear: open-source coverage here is uneven, and an absence of reporting is not an absence of risk.`;
   }
 
   // --- Reporting Confidence --------------------------------------------------
