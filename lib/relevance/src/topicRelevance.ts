@@ -1700,8 +1700,17 @@ const COUNTRY_SECURITY_SIGNAL_RE =
 const COUNTRY_ECONOMIC_NOISE_RE =
   /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?|completes? (the )?migration|migrat(ion|es|ed|ing) (of|to) (its )?[a-z]+ (system|platform)|system (migration|upgrade)|prepaid metering|go[- ]live|new (it|billing|payment|digital) platform|boost|grants?|funding|funded|donations?|donat(?:es|ed)|sponsor(?:s|ed|ship)?)\b/i;
 
+// Sports / match coverage. A country security report never leads on a fixture,
+// a match preview or a tactical write-up. Extended beyond the bare sport nouns
+// to the match-report IDIOMS that leak in without one ("tactical analysis Japan
+// vs Sweden", "semi-final clash", Bahasa "laga persahabatan"): a team-versus
+// "clash"/"battle"/"showdown" is sports jargon, NOT public disorder. Bahasa
+// roles (kiper/gelandang/wasit) and tournament words (timnas/liga/piala) are
+// added because the Indonesia/Jakarta briefs read RAW Bahasa headlines. Still
+// gated on !COUNTRY_HARD_SECURITY_RE below, so a genuine venue incident ("bomb
+// at the stadium", "fans riot, police arrest 40") is always rescued.
 const COUNTRY_SPORTS_NOISE_RE =
-  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|athletics|rugby|netball|cricket|grand final|test match|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?)\b/i;
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|badminton|athletics|rugby|netball|cricket|grand final|cup final|league title|test match|friendly match|international friendly|match (?:preview|report|day|recap|highlights?|winner)|matchday|tactical (?:analysis|preview|breakdown|masterclass|battle)|group stage|knockout (?:stage|round)|quarter[- ]?finals?|semi[- ]?finals?|round of \d+|kick[- ]?off|half[- ]?time|full[- ]?time|extra time|stoppage time|man of the match|clean sheet|own goal|penalty shoot[- ]?out|goalkeep\w*|midfield\w*|hat[- ]?trick|top scorer|starting (?:xi|line[- ]?up)|head[- ]?to[- ]?head|\bderby\b|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?|sepak ?bola|futsal|bulu ?tangkis|bola voli|bola basket|\btimnas\b|\bliga\b|\bpiala\b|\bpertandingan\b|laga (?:persahabatan|uji coba|kandang|tandang|perdana|pamungkas|hidup mati)|adu penalti|\bkiper\b|\bgelandang\b|\bwasit\b|babak (?:penyisihan|grup|gugur|kualifikasi|pertama|kedua))\b/i;
 
 // Unambiguous sports-SPECTACLE phrases. A country security report never leads on
 // the World Cup or the Olympics, and these mega-events routinely carry

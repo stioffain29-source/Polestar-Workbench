@@ -48,6 +48,23 @@ itself. Keep blotter excludes SUSPECT-anchored (`apprehend…suspect` /
 `suspect…rescued|held captive`), never a bare "rescued by police" (that would
 drop a real hostage rescue). Same frontend authority → no version bump.
 
+**Sports leak past bare-noun gate:** `COUNTRY_SPORTS_NOISE_RE` originally matched
+only explicit sport NOUNS (soccer/tournament/league). A match write-up that
+carries none of them still leaks — "Tactical analysis Japan vs Sweden: clash of
+Asian discipline and Scandinavian physicality" classified as Civil unrest /
+protest (the word "clash"/team-vs framing), HIGH severity, generic impact line.
+**Fix:** extend the gate with match-report IDIOMS (tactical analysis/preview,
+semi-final/quarter-final, kick-off, matchday, man of the match, goalkeeper,
+starting XI) AND Bahasa sport vocab (timnas, liga, piala, pertandingan, laga
+persahabatan, adu penalti, kiper, gelandang, wasit, babak penyisihan/grup) —
+the briefs read RAW Bahasa headlines. Still gated on `!COUNTRY_HARD_SECURITY_RE`
+so a venue incident ("bomb at the stadium", "fans riot, police arrest 40")
+survives; "clash" is deliberately NOT a hard-security rescue word. Frontend
+authority → no version bump, takes effect at render after a republish (cleans
+existing prod rows, no re-ingest). Avoid bare homonyms (no plain `vs`/`lineup`/
+`striker`/`penyerang`/`pelatih` — they collide with land-dispute "villagers vs
+firm", "cabinet line-up", crime "penyerang menikam", "pelatih militer").
+
 **Acronym-rescue trap (culture / peace / music / mourning classes):**
 `COUNTRY_HARD_SECURITY_RE` COUNTS the bare armed-group acronyms (`tpnpb`, `opm`),
 so any exclude gated on `!HARD_SECURITY` is silently rescued the moment a noise
