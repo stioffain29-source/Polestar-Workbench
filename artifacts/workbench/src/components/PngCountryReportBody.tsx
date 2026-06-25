@@ -76,6 +76,20 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK, fontStyle: "italic" }}>{children}</div>;
 }
 
+// Count-free transparency note shown when a location section is capped to the
+// most serious few incidents — tells the reader this is a curated selection, not
+// the full incident list, without ever stating a number (house rule: no counts).
+const LOCATION_TRIM_NOTE =
+  "Showing the most significant incidents only; additional lower-priority reporting this period informs the wider assessment.";
+
+function MoreNote({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, fontStyle: "italic", marginTop: 4 }}>
+      {children}
+    </div>
+  );
+}
+
 function SeverityChip({ item }: { item: PngReportItem }) {
   const color = SEV_COLOR[item.severity] ?? "#999";
   return (
@@ -181,12 +195,14 @@ function LocationSection({
   emptyFallback,
   hadFeatured,
   featuredNote,
+  truncated = false,
 }: {
   title: string;
   items: PngReportItem[];
   emptyFallback: string;
   hadFeatured: boolean;
   featuredNote: string;
+  truncated?: boolean;
 }) {
   return (
     <Section title={title}>
@@ -197,6 +213,7 @@ function LocationSection({
           {items.map((it) => (
             <ItemCard key={it.id} item={it} />
           ))}
+          {truncated ? <MoreNote>{LOCATION_TRIM_NOTE}</MoreNote> : null}
         </div>
       )}
     </Section>
@@ -255,12 +272,14 @@ function StrandedLocationSection({
   augmentation,
   hadFeatured,
   featuredNote,
+  truncated = false,
 }: {
   title: string;
   strands: NonNullable<StructuredLocationBucket["strands"]>;
   augmentation: StructuredLocationAugmentation;
   hadFeatured: boolean;
   featuredNote: string;
+  truncated?: boolean;
 }) {
   return (
     <Section title={title}>
@@ -300,6 +319,8 @@ function StrandedLocationSection({
       ) : (
         <EmptyNote>No additional crime-trend signals were reported this period.</EmptyNote>
       )}
+
+      {truncated ? <MoreNote>{LOCATION_TRIM_NOTE}</MoreNote> : null}
 
       <StrandLabel>Standing Operating Risk</StrandLabel>
       <Prose text={augmentation.standingOperatingRisk} />
@@ -445,6 +466,7 @@ export default function PngCountryReportBody({
             augmentation={b.augmentation}
             hadFeatured={b.hadFeatured}
             featuredNote={d.featuredAboveNote}
+            truncated={b.truncated}
           />
         ) : (
           <LocationSection
@@ -454,6 +476,7 @@ export default function PngCountryReportBody({
             emptyFallback={d.emptyLocationFallback}
             hadFeatured={b.hadFeatured}
             featuredNote={d.featuredAboveNote}
+            truncated={b.truncated}
           />
         ),
       )}
@@ -463,6 +486,7 @@ export default function PngCountryReportBody({
         emptyFallback={d.emptyLocationFallback}
         hadFeatured={d.otherNationalHadFeatured}
         featuredNote={d.featuredAboveNote}
+        truncated={d.otherNationalTruncated}
       />
 
       {/* Location Watchlist */}

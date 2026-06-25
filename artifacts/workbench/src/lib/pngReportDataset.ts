@@ -363,6 +363,11 @@ export interface StructuredLocationBucket {
   // into Top 3 above, so the section shows a "featured above" note rather than a
   // false "no fresh reporting" fallback.
   hadFeatured: boolean;
+  // True when this location had MORE incidents this period than the few shown
+  // here — the section is capped to the most serious so it reads as a brief, not
+  // an exhaustive incident list. The renderer then shows a count-free "more
+  // reporting" note. Aggregate prose/watchlist still draw on the full set.
+  truncated: boolean;
   // Present only for buckets with a config locationAugmentation (PNG NCD). When
   // set, the renderer shows the strand layout + standing-risk block.
   augmentation?: StructuredLocationAugmentation;
@@ -408,6 +413,9 @@ export interface PngReportDataset {
   // True when the "Other" catch-all had incident(s) this period but all were
   // promoted into Top 3 above (see StructuredLocationBucket.hadFeatured).
   otherNationalHadFeatured: boolean;
+  // True when the "Other" catch-all had more incidents than the few shown (capped
+  // like the location buckets). Drives the same count-free "more reporting" note.
+  otherNationalTruncated: boolean;
   otherBucketLabel: string;
   emptyLocationFallback: string;
   featuredAboveNote: string;
@@ -704,6 +712,16 @@ function buildStructuredReportDataset(
   const topThreeIds = new Set(topThree.map((it) => it.id));
   const bucketableItems = windowItems.filter((it) => !topThreeIds.has(it.id));
 
+  // Cap the per-location incident cards: each location section (and the "Other"
+  // catch-all) shows only the most serious few, sorted severity-then-recency, so
+  // the brief never reads as an exhaustive incident list. Aggregate sections
+  // (Executive Summary, Watchlist, Priorities, Outlook) still use all windowItems.
+  const MAX_LOCATION_ITEMS = 3;
+  // Police-activity and crime-trend strands are secondary CONTEXT in the
+  // augmented (district) sections, so they get a tighter cap than the primary
+  // confirmed-incidents list to keep those sections brief too.
+  const MAX_SECONDARY_STRAND_ITEMS = 2;
+
   // Location buckets from the theatre config; each bucket owns one or more
   // provinces (no overlap). "Other" captures everything not in any bucket.
   const bucketProvinces = new Set<string>();
@@ -711,29 +729,51 @@ function buildStructuredReportDataset(
   const buckets: StructuredLocationBucket[] = config.buckets.map((b) => {
     const provSet = new Set(b.provinces);
     const inBucket = (it: PngReportItem) => it.province != null && provSet.has(it.province);
-    const items = bucketableItems.filter(inBucket).sort(sortBySeverityThenRecency);
+    const sorted = bucketableItems.filter(inBucket).sort(sortBySeverityThenRecency);
     const augmentation = config.locationAugmentations?.[b.key];
     let strands: StructuredLocationBucket["strands"];
+    let truncated: boolean;
     if (augmentation) {
       const grouped = {
         confirmed: [] as PngReportItem[],
         police: [] as PngReportItem[],
         trend: [] as PngReportItem[],
       };
-      for (const it of items) grouped[strandForItem(it)].push(it);
-      strands = grouped;
+      for (const it of sorted) grouped[strandForItem(it)].push(it);
+      // Cap EACH strand independently (deliberately NOT an overall cap then
+      // re-grouped): a strand is shown empty ONLY when it genuinely had zero
+      // items, so the "no police activity reported" / "no crime-trend signals"
+      // notes can never become false (no-fabrication). Confirmed incidents are
+      // the primary list; police/arrests and crime-trend signals are secondary
+      // context with a tighter cap, so the section stays brief, not exhaustive.
+      strands = {
+        confirmed: grouped.confirmed.slice(0, MAX_LOCATION_ITEMS),
+        police: grouped.police.slice(0, MAX_SECONDARY_STRAND_ITEMS),
+        trend: grouped.trend.slice(0, MAX_SECONDARY_STRAND_ITEMS),
+      };
+      truncated =
+        grouped.confirmed.length > strands.confirmed.length ||
+        grouped.police.length > strands.police.length ||
+        grouped.trend.length > strands.trend.length;
+    } else {
+      truncated = sorted.length > MAX_LOCATION_ITEMS;
     }
     return {
       key: b.key,
       label: b.label,
-      items,
+      // Capped to the most serious few so the section reads as a brief, not a
+      // full incident list (aggregate sections still use the full windowItems).
+      items: sorted.slice(0, MAX_LOCATION_ITEMS),
       hadFeatured: windowItems.some((it) => topThreeIds.has(it.id) && inBucket(it)),
+      truncated,
       augmentation,
       strands,
     };
   });
   const inOther = (it: PngReportItem) => !it.province || !bucketProvinces.has(it.province);
-  const otherNational = bucketableItems.filter(inOther).sort(sortBySeverityThenRecency);
+  const otherSorted = bucketableItems.filter(inOther).sort(sortBySeverityThenRecency);
+  const otherNational = otherSorted.slice(0, MAX_LOCATION_ITEMS);
+  const otherNationalTruncated = otherSorted.length > MAX_LOCATION_ITEMS;
   const otherNationalHadFeatured = windowItems.some(
     (it) => topThreeIds.has(it.id) && inOther(it),
   );
@@ -1013,6 +1053,7 @@ function buildStructuredReportDataset(
     buckets,
     otherNational,
     otherNationalHadFeatured,
+    otherNationalTruncated,
     otherBucketLabel: config.otherBucketLabel,
     emptyLocationFallback: config.emptyLocationFallback,
     featuredAboveNote: PNG_FEATURED_ABOVE_NOTE,
