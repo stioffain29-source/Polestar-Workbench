@@ -108,6 +108,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       energyInserted: result.energy.inserted,
       fertiliserInserted: result.fertiliser.inserted,
       fuelInserted: result.fuel.inserted,
+      indonesiaLocalInserted: result.indonesiaLocal.inserted,
       strikesInserted: result.strikes.inserted,
       durationMs: result.durationMs,
       ingestFailures: failures,
@@ -129,6 +130,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
         result.energy.inserted +
         result.fertiliser.inserted +
         result.fuel.inserted +
+        result.indonesiaLocal.inserted +
         result.strikes.inserted,
       flashpoint: trimmedSummary(result.flashpoint),
       cargoWatch: trimmedSummary(result.cargoWatch),
@@ -136,6 +138,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       energy: trimmedSummary(result.energy),
       fertiliser: trimmedSummary(result.fertiliser),
       fuel: trimmedSummary(result.fuel),
+      indonesiaLocal: trimmedSummary(result.indonesiaLocal),
       strikes: {
         mode: result.strikes.mode,
         sourcesFetched: result.strikes.sourcesFetched,

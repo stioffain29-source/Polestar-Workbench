@@ -52,6 +52,13 @@ export type NewsTopicConfig = {
   deny: string[];
   /** Alias → canonical country map. Order matters (specific before broad). */
   countryAliases: CountryAlias[];
+  /**
+   * Optional source-based confidence tiering. When set, each inserted row's
+   * confidence is derived from its publisher name; when omitted the row keeps
+   * the conservative "low" default unchanged. OPT-IN so existing commodity
+   * topics (energy / fertiliser / fuel) are not affected.
+   */
+  classifyConfidence?: (source: string) => "low" | "medium" | "high";
 };
 
 export function gnews(
@@ -473,7 +480,7 @@ export async function runNewsTopicIngest(
       longitude: geo?.longitude ?? null,
       occurredAt: a.occurredAt,
       severity: classifySeverity(a.title, a.summary, topic),
-      confidence: "low",
+      confidence: cfg.classifyConfidence ? cfg.classifyConfidence(a.source) : "low",
       source: a.source,
       sourceUrl: a.sourceUrl,
       analystNotes: `auto-scraped:${a.feedLabel}`,

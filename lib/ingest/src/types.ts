@@ -5,7 +5,8 @@ export type IngestTopic =
   | "energy"
   | "fertiliser"
   | "fuel"
-  | "conflict";
+  | "conflict"
+  | "indonesia_local";
 
 export type FeedStat = {
   name: string;

@@ -4,7 +4,9 @@ export { runFlashpointUnknownReattribute } from "./flashpointUnknownReattribute"
 export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
-export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest } from "./topicConfigs";
+export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest, runIndonesiaLocalIngest } from "./topicConfigs";
+export { classifyNewsConfidence } from "./newsConfidence";
+export type { Confidence } from "./newsConfidence";
 export { runNewsTopicIngest } from "./newsTopic";
 export type { NewsTopicConfig, TopicFeed, CountryAlias } from "./newsTopic";
 export { runMarketPricesIngest } from "./marketPrices";

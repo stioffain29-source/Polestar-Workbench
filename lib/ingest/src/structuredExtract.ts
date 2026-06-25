@@ -19,11 +19,13 @@
 import { hasWord } from "./text";
 
 export type IncidentCategory =
+  | "Terrorism / militancy"
   | "Armed robbery / hold-up"
   | "Tribal / communal violence"
   | "Homicide / violent crime"
   | "Theft / break-in"
   | "Civil unrest / protest"
+  | "Labour action"
   | "Policing operation"
   | "Community policing"
   | "Intelligence / training"
@@ -31,6 +33,9 @@ export type IncidentCategory =
   | "Aviation / airport"
   | "Maritime / port"
   | "Road / highway"
+  | "Natural hazard"
+  | "Fire"
+  | "Environmental / haze"
   | "Power / utilities"
   | "Telecoms / connectivity"
   | "Government stability"
@@ -39,17 +44,26 @@ export type IncidentCategory =
 // Ordered most-specific-first. The first regex to match wins.
 const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: string }> = [
   {
-    re: /\b(armed robbery|hold[- ]?up|carjack(?:ing|ed)?|stick[- ]?up|heist|raskol|rascal gang|gang robbery|armed hold[- ]?up)\b/i,
+    // Bilingual (English + Bahasa Indonesia). Placed first so a lethal terror
+    // event ("bom bunuh diri tewaskan ...") classifies as terrorism, not as a
+    // generic homicide. PNG/WP English text rarely carries this vocab, so the
+    // existing Pacific-brief classification is unaffected.
+    re: /\b(terroris\w*|terror (?:attack|cell|plot|suspect|network)|suicide bomb\w*|bomb blast|car bomb|truck bomb|letter bomb|pipe bomb|improvised explosive(?: device)?|roadside bomb|jihadist|extremist (?:attack|cell|network)|teroris\w*|bom bunuh diri|ledakan bom|serangan bom|bom rakitan|densus 88|jaringan teroris)\b/i,
+    category: "Terrorism / militancy",
+    impact: "Terrorism-related security threat; review physical security, access control and emergency procedures at exposed sites.",
+  },
+  {
+    re: /\b(armed robbery|hold[- ]?up|carjack(?:ing|ed)?|stick[- ]?up|heist|raskol|rascal gang|gang robbery|armed hold[- ]?up|begal|pembegalan|perampokan bersenjata|rampok bersenjata)\b/i,
     category: "Armed robbery / hold-up",
     impact: "Direct threat to staff, cash-in-transit and premises in the affected area; review movement and security cover.",
   },
   {
-    re: /\b(tribal (?:fight|clash|war|warfare|violence|conflict)|payback (?:killing|attack)|inter[- ]?clan|clan (?:fight|war|clash)|communal (?:violence|clash))\b/i,
+    re: /\b(tribal (?:fight|clash|war|warfare|violence|conflict)|payback (?:killing|attack)|inter[- ]?clan|clan (?:fight|war|clash)|communal (?:violence|clash)|tawuran|bentrok(?:an)? antar\w*|bentrok warga|konflik komunal|perang suku)\b/i,
     category: "Tribal / communal violence",
     impact: "Road closures, supply-chain disruption and personnel-movement risk across the affected district.",
   },
   {
-    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed|shooting|opened fire)\b/i,
+    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed|shooting|opened fire|pembunuhan|penembakan|penikaman|ditembak(?: mati| tewas)?|ditikam|tewas dibunuh|dibunuh|mutilasi|pengeroyokan)\b/i,
     category: "Homicide / violent crime",
     impact: "Heightened personal-security risk locally; review after-hours exposure and movement protocols.",
   },
@@ -64,52 +78,83 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     impact: "Security capacity-building; no direct operational disruption expected.",
   },
   {
-    re: /\b(correctional (?:service|institution|facility|officers?)|warders?|prison (?:break|escape|riot|unrest|officers?|inmates?)|jail ?break|inmates? escape|cell block)\b/i,
+    re: /\b(correctional (?:service|institution|facility|officers?)|warders?|prison (?:break|escape|riot|unrest|officers?|inmates?)|jail ?break|inmates? escape|cell block|lapas|rutan|narapidana|\bnapi\b|sipir|napi (?:kabur|melarikan))\b/i,
     category: "Corrections / detention",
     impact: "Localised security-force activity; limited direct commercial impact unless escapees are at large.",
   },
   {
-    re: /\b(airport|airstrip|airfield|runway|aviation|air ?services|flights?|aircraft)\b/i,
+    re: /\b(airport|airstrip|airfield|runway|aviation|air ?services|flights?|aircraft|bandara|pesawat|penerbangan|pesawat (?:jatuh|tergelincir)|maskapai)\b/i,
     category: "Aviation / airport",
     impact: "Possible flight-schedule and airport-access disruption affecting travel and air freight.",
   },
   {
-    re: /\b(wharf|jetty|port (?:closure|shut|disrupt\w*|congestion|operations?|security)|harbou?r|shipping|maritime|vessel|ferry)\b/i,
+    re: /\b(wharf|jetty|port (?:closure|shut|disrupt\w*|congestion|operations?|security)|harbou?r|shipping|maritime|vessel|ferry|pelabuhan|kapal(?: tenggelam| karam| nelayan)?|perahu|feri|kecelakaan kapal)\b/i,
     category: "Maritime / port",
     impact: "Possible cargo-handling and port-access disruption affecting sea freight.",
   },
   {
-    re: /\b(highway|road (?:closed|cut|block\w*|landslip|landslide|washed|sealed)|bridge (?:collapse|washed|down|out)|landslip|landslide blocks?)\b/i,
+    re: /\b(highway|road (?:closed|cut|block\w*|landslip|landslide|washed|sealed)|bridge (?:collapse|washed|down|out)|landslip|landslide blocks?|kecelakaan lalu lintas|kecelakaan (?:bus|maut|beruntun)|tabrakan(?: beruntun)?|jalan tol|jalan (?:amblas|putus|tertutup))\b/i,
     category: "Road / highway",
     impact: "Overland freight and personnel-movement disruption on the affected corridor.",
   },
   {
-    re: /\b(power (?:outage|blackout|cut|failure|shortage|rationing|crisis)|electricity (?:outage|blackout|cut|crisis)|grid (?:failure|down)|png power|fuel (?:shortage|crisis|outage|ran out|rationing|supply))\b/i,
+    // NEW (bilingual). Placed AFTER Road/highway so "road blocked by landslide"
+    // stays a transport-disruption row; a bare "landslide" / Bahasa hazard term
+    // resolves here. English-only PNG/WP text uses these terms only for genuine
+    // natural-hazard events, so Pacific briefs gain accuracy, not noise.
+    re: /\b(flood(?:s|ing|ed|waters)?|flash flood|inundat\w*|banjir(?: bandang)?|landslide|mudslide|tanah longsor|longsor|earthquake|quake|tremor|gempa(?: bumi)?|tsunami|volcan(?:o|ic|oes)|erupt(?:ion|ed|s|ing)?|gunung (?:meletus|berapi)|letusan|lahar|cyclone|typhoon|tornado|puting beliung|angin (?:kencang|topan)|tanah bergerak)\b/i,
+    category: "Natural hazard",
+    impact: "Disruption to access, infrastructure and operations from the natural hazard; check site safety, continuity and staff welfare.",
+  },
+  {
+    // NEW (bilingual). Bound to fire-event phrases / "blaze" / Bahasa kebakaran,
+    // never the bare word "fire" — the homicide rule above owns "opened fire".
+    re: /\b(wildfire|bush ?fire|forest fire|blaze|inferno|conflagration|kebakaran|karhutla|kobaran api|fire (?:broke out|breaks out|gutted|guts|razed|engulf\w*|destroyed|rips? through|tore through|ravaged))\b/i,
+    category: "Fire",
+    impact: "Property damage and possible business interruption from fire; verify site safety and continuity arrangements.",
+  },
+  {
+    // NEW (bilingual). Air-quality / pollution / spill context.
+    re: /\b(haze|smog|air pollution|air quality|toxic (?:waste|spill|smoke|fumes)|oil spill|chemical spill|hazardous waste|kabut asap|polusi udara|pencemaran(?: udara| lingkungan| air)?|limbah (?:beracun|industri|b3)|tumpahan minyak)\b/i,
+    category: "Environmental / haze",
+    impact: "Environmental and public-health disruption; monitor air-quality advisories and outdoor-work exposure.",
+  },
+  {
+    re: /\b(power (?:outage|blackout|cut|failure|shortage|rationing|crisis)|electricity (?:outage|blackout|cut|crisis)|grid (?:failure|down)|png power|fuel (?:shortage|crisis|outage|ran out|rationing|supply)|pemadaman(?: listrik| bergilir)?|mati lampu|krisis listrik|byar pet)\b/i,
     category: "Power / utilities",
     impact: "Operational disruption from power/fuel interruption; check site continuity and backup supply.",
   },
   {
-    re: /\b(telecom\w*|telecommunication\w*|internet (?:outage|down|disrupt\w*|cut)|network (?:outage|down|disrupt\w*)|mobile (?:network|service) (?:down|outage|disrupt\w*)|digicel|connectivity)\b/i,
+    re: /\b(telecom\w*|telecommunication\w*|internet (?:outage|down|disrupt\w*|cut)|network (?:outage|down|disrupt\w*)|mobile (?:network|service) (?:down|outage|disrupt\w*)|digicel|connectivity|gangguan (?:internet|jaringan)|jaringan (?:down|terganggu)|akses internet)\b/i,
     category: "Telecoms / connectivity",
     impact: "Connectivity disruption; verify communications redundancy at affected sites.",
   },
   {
-    re: /\b(vote of no confidence|government (?:shutdown|instability|stability|crisis|standoff)|political (?:crisis|instability|standoff)|public servants? strike|cabinet (?:reshuffle|crisis)|parliament\w* (?:standoff|deadlock|impasse))\b/i,
+    re: /\b(vote of no confidence|government (?:shutdown|instability|stability|crisis|standoff)|political (?:crisis|instability|standoff)|public servants? strike|cabinet (?:reshuffle|crisis)|parliament\w* (?:standoff|deadlock|impasse)|krisis politik|mosi tidak percaya|pemakzulan|reshuffle kabinet|krisis pemerintahan|impeach\w*)\b/i,
     category: "Government stability",
     impact: "Political-risk signal; monitor for downstream policy and security effects.",
   },
   {
-    re: /\b(protest|demonstration|rally|march|riot|unrest|looting|roadblock|road block|strike|walkout|stoppage|picket|public disorder)\b/i,
+    // NEW (bilingual). Placed BEFORE civil unrest so an explicit labour action
+    // ("mogok kerja buruh") buckets here; a generic protest still falls through
+    // to civil unrest below. "public servants strike" stays Government stability
+    // (matched above), so this does not poach political-sector strikes.
+    re: /\b(mogok kerja|aksi (?:buruh|mogok)|unjuk rasa buruh|demo buruh|serikat (?:buruh|pekerja)|\bburuh\b|upah minimum|pemutusan hubungan kerja|\bphk\b|labou?r (?:strike|union|dispute|action|protest)|workers'? (?:strike|protest|rally)|trade union|industrial action|general strike|mass layoffs?|laid off|retrenchment)\b/i,
+    category: "Labour action",
+    impact: "Industrial action with potential operational and supply-chain disruption; review workforce and continuity contingencies.",
+  },
+  {
+    re: /\b(protest|demonstration|rally|march|riot|unrest|looting|roadblock|road block|strike|walkout|stoppage|picket|public disorder|demonstrasi|unjuk rasa|kerusuhan|\brusuh\b|bentrok(?:an)?|aksi (?:massa|demo|unjuk rasa)|\bdemo\b|penjarahan|blokade(?: jalan)?|kericuhan|\bricuh\b)\b/i,
     category: "Civil unrest / protest",
     impact: "Potential road blockages, business closures and movement restrictions in the affected area.",
   },
   {
-    re: /\b(theft|stolen|burglary|break[- ]?in|looting|robbery|robbed)\b/i,
+    re: /\b(theft|stolen|burglary|break[- ]?in|looting|robbery|robbed|pencurian|pembobolan|\bmaling\b|jambret|penjambretan|pencopetan|\bcuranmor\b|pencurian kendaraan)\b/i,
     category: "Theft / break-in",
     impact: "Property and asset-security risk; review premises security in the affected area.",
   },
   {
-    re: /\b(police (?:operation|raid|swoop|patrol|deployment|crackdown)|joint (?:operation|patrol|task ?force)|raid(?:ed|s)?|swoop|manhunt|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|wanted (?:man|men|criminal|suspect|fugitive))\b/i,
+    re: /\b(police (?:operation|raid|swoop|patrol|deployment|crackdown)|joint (?:operation|patrol|task ?force)|raid(?:ed|s)?|swoop|manhunt|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|wanted (?:man|men|criminal|suspect|fugitive)|penggerebekan|digerebek|razia|penangkapan|ditangkap|diamankan polisi|\bburon\b)\b/i,
     category: "Policing operation",
     impact: "Localised disruption and checkpoints; short-term access constraints possible.",
   },

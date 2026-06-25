@@ -7,6 +7,7 @@ import {
   runFertiliserIngest,
   runFuelIngest,
   runConflictIngest,
+  runIndonesiaLocalIngest,
   runMarketPricesIngest,
   runMarketSnapshotIngest,
   runMaritimeMovementIngest,
@@ -66,6 +67,7 @@ export type IngestRunResult =
       fertiliser: IngestSummary;
       fuel: IngestSummary;
       conflict: IngestSummary;
+      indonesiaLocal: IngestSummary;
       marketPrices: MarketPriceSummary;
       marketSnapshot: MarketSnapshotSummary;
       maritimeMovement: MaritimeMovementSummary;
@@ -505,6 +507,13 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const conflict = await runIncidentIngest("conflict", () =>
       runConflictIngest({ commit: true }),
     );
+    // Broad Bahasa-first local coverage for the Indonesia + Jakarta country
+    // briefs (unrest, crime, natural hazard, fire, haze, transport, government,
+    // labour, terrorism). Runs BEFORE the West Papua extract backfill below so
+    // any rows this pass diverts to "West Papua" get structured this same run.
+    const indonesiaLocal = await runIncidentIngest("indonesia_local", () =>
+      runIndonesiaLocalIngest({ commit: true }),
+    );
     // PNG per-incident structured extraction. The PNG country brief reads
     // province / category / business_impact / incident_date STRAIGHT from the
     // incidents API (the client no longer recomputes them), but only the
@@ -749,6 +758,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       fertiliser,
       fuel,
       conflict,
+      indonesiaLocal,
       marketPrices,
       marketSnapshot,
       maritimeMovement,

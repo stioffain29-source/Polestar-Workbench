@@ -59,7 +59,8 @@ export type SeverityTopic =
   | "energy"
   | "fertiliser"
   | "fuel"
-  | "conflict";
+  | "conflict"
+  | "indonesia_local";
 
 // Present-tense fatal headlines. News writes fatal attacks in the present tense
 // ("airstrike kills seven civilians", "gunmen kill 24 construction workers",
@@ -356,8 +357,12 @@ export function classifySeverity(
   // its own row. Scoped to flashpoint/conflict because in commodity / maritime
   // topics a reaction-framed deadly attack is far more likely to be the only
   // record of a genuine kinetic event, so their escalation stays intact.
+  // indonesia_local is a broad civil/local feed (protest, crime, hazard) where
+  // reaction-led headlines ("warga tuntut keadilan", "group demands justice over
+  // death") are common, so it shares the flashpoint/conflict guard.
   const reactionLed =
-    (topic === "flashpoint" || topic === "conflict") && REACTION_LEAD_RE.test(title);
+    (topic === "flashpoint" || topic === "conflict" || topic === "indonesia_local") &&
+    REACTION_LEAD_RE.test(title);
 
   // Natural-cause guard. A lightning / flood / earthquake / drowning death with
   // no security or crowd-crush signal is not a security event, so it must not

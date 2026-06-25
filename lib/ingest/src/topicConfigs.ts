@@ -1,4 +1,5 @@
 import { runNewsTopicIngest, type CountryAlias, type NewsTopicConfig, type TopicFeed } from "./newsTopic";
+import { classifyNewsConfidence } from "./newsConfidence";
 import type { IngestOptions, IngestSummary } from "./types";
 
 // Live feed configs for the previously import-only land topics: energy,
@@ -520,6 +521,155 @@ const CONFLICT_CONFIG: NewsTopicConfig = {
   countryAliases: CONFLICT_ALIASES,
 };
 
+// ---------------------------------------------------------------------------
+// indonesia_local — broad Bahasa-first local coverage for the Indonesia Weekly
+// and Jakarta Weekly country reports. Unlike the commodity topics this feed is
+// deliberately wide (unrest, crime, natural hazard, fire, haze, transport,
+// government stability, labour, terrorism). The country reports already read by
+// COUNTRY, so rows stamped country="Indonesia" flow into the Indonesia report
+// and Jakarta-scoped rows into the Jakarta report automatically; flashpoint is
+// left untouched (unrest-only).
+//
+// Feeds use the Indonesian-language Google News edition (gl=ID, hl=id,
+// ceid=ID:id) so the breadth of local reporting is captured; the title-
+// translation pass renders display_title in English for the reports. A separate
+// English ID-edition feed picks up Indonesia's English-language outlets.
+// ---------------------------------------------------------------------------
+
+// Indonesian-language Google News edition.
+const ID_BAHASA = { gl: "ID", hl: "id", ceid: "ID:id" } as const;
+// English Indonesia edition (Jakarta Post / Jakarta Globe etc.).
+const ID_ENGLISH = { gl: "ID", hl: "en-ID", ceid: "ID:en" } as const;
+
+// Country routing for indonesia_local. West Papua is listed FIRST (with the
+// bare "papua" token and the full Papua-provinces gazetteer) so any Papua story
+// is diverted to its own "West Papua" report and NEVER mis-stamped "Indonesia"
+// — preserving the standing West Papua separation invariant. SE-Asian
+// neighbours are listed before the broad Indonesia gazetteer so a cross-
+// syndicated neighbour story resolves to the neighbour (and falls out of the
+// Indonesia report) rather than being blind-stamped Indonesia by the per-feed
+// default. Indonesia is the broad catch-all, checked last.
+const INDONESIA_LOCAL_ALIASES: CountryAlias[] = [
+  {
+    canonical: "West Papua",
+    aliases: [
+      "papua", "west papua", "papua barat", "papua tengah", "papua pegunungan",
+      "papua selatan", "papua barat daya", "tembagapura", "grasberg", "freeport",
+      "timika", "mimika", "intan jaya", "puncak jaya", "nduga", "ilaga", "sugapa",
+      "paniai", "enarotali", "yahukimo", "dekai", "oksibil", "beoga", "kenyam",
+      "wamena", "jayawijaya", "nabire", "jayapura", "merauke", "manokwari",
+      "sorong", "biak", "fakfak", "kaimana", "asmat", "keerom", "sarmi",
+      "waropen", "raja ampat", "maybrat", "tpnpb",
+    ],
+  },
+  { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "bougainville"] },
+  { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak", "johor"] },
+  { canonical: "Singapore", aliases: ["singapore", "singapura"] },
+  { canonical: "Philippines", aliases: ["philippines", "filipina", "manila", "mindanao"] },
+  { canonical: "Thailand", aliases: ["thailand", "bangkok"] },
+  { canonical: "Timor-Leste", aliases: ["timor-leste", "timor leste", "east timor", "timor timur", "dili"] },
+  { canonical: "Brunei", aliases: ["brunei"] },
+  {
+    canonical: "Indonesia",
+    aliases: [
+      "indonesia", "indonesian", "jakarta", "jabodetabek", "java", "jawa",
+      "jawa barat", "jawa timur", "jawa tengah", "sumatra", "sumatera",
+      "sumatera utara", "sumatera barat", "sumatera selatan", "sulawesi",
+      "sulawesi selatan", "sulawesi utara", "sulawesi tengah", "sulawesi tenggara",
+      "sulawesi barat", "kalimantan", "kalimantan timur", "kalimantan barat",
+      "kalimantan selatan", "kalimantan tengah", "kalimantan utara", "borneo",
+      "bali", "lombok", "nusa tenggara", "ntt", "ntb", "maluku", "aceh", "medan",
+      "surabaya", "bandung", "semarang", "makassar", "palembang", "yogyakarta",
+      "jogja", "solo", "bekasi", "depok", "tangerang", "bogor", "batam",
+      "pekanbaru", "padang", "banjarmasin", "pontianak", "samarinda", "balikpapan",
+      "manado", "denpasar", "mataram", "kupang", "ambon", "jambi", "lampung",
+      "bengkulu", "banten", "cirebon", "malang", "kediri", "tegal", "sukabumi",
+      "garut", "tasikmalaya", "banyuwangi", "jember", "gresik", "sidoarjo", "riau",
+      "gorontalo", "kepulauan riau", "bangka belitung", "ternate", "palu",
+      "kendari", "mamuju", "sorong selatan",
+    ],
+  },
+];
+
+// Bahasa-first per-family feeds. defaultCountry="Indonesia" so an unmatched
+// hyperlocal regency story resolves to Indonesia; the Papua-first aliases above
+// divert genuine Papua items to West Papua before that fallback applies.
+const INDONESIA_LOCAL_FEEDS: TopicFeed[] = [
+  { label: "Unrest / protest (ID)", q: `(demonstrasi OR "unjuk rasa" OR "aksi unjuk rasa" OR kerusuhan OR rusuh OR bentrok OR bentrokan OR "aksi massa")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Crime (ID)", q: `(pembunuhan OR penembakan OR perampokan OR begal OR pencurian OR penikaman OR penculikan OR "tindak kriminal")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Natural hazard (ID)", q: `(banjir OR "banjir bandang" OR "tanah longsor" OR longsor OR "gempa bumi" OR gempa OR tsunami OR "gunung meletus" OR erupsi OR "letusan gunung")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Fire (ID)", q: `(kebakaran OR "kebakaran hutan" OR karhutla OR "kebakaran pabrik" OR "kebakaran pasar" OR "kebakaran permukiman")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Haze / environment (ID)", q: `("kabut asap" OR karhutla OR "polusi udara" OR "pencemaran lingkungan" OR "limbah beracun")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Transport / aviation / port (ID)", q: `("kecelakaan lalu lintas" OR "kecelakaan pesawat" OR "pesawat jatuh" OR "kapal tenggelam" OR "kapal karam" OR "kecelakaan kapal" OR "kecelakaan bus" OR "kecelakaan kereta")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Government stability (ID)", q: `("krisis politik" OR pemakzulan OR "mosi tidak percaya" OR "reshuffle kabinet" OR "demo mahasiswa" OR "unjuk rasa mahasiswa" OR korupsi)`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Labour action (ID)", q: `("mogok kerja" OR "aksi buruh" OR "demo buruh" OR "unjuk rasa buruh" OR "serikat buruh" OR "pemutusan hubungan kerja" OR PHK OR "upah minimum")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Terrorism / militancy (ID)", q: `(teroris OR terorisme OR "bom bunuh diri" OR "serangan bom" OR "ledakan bom" OR "densus 88" OR "jaringan teroris")`, defaultCountry: "Indonesia", ...ID_BAHASA },
+  { label: "Indonesia security (EN)", q: `Indonesia (protest OR unrest OR riot OR clash OR shooting OR stabbing OR robbery OR flood OR earthquake OR landslide OR eruption OR wildfire OR haze OR "plane crash" OR "boat sinks" OR ferry OR terror OR bomb OR strike OR layoffs OR corruption)`, defaultCountry: "Indonesia", ...ID_ENGLISH },
+];
+
+const INDONESIA_LOCAL_CONFIG: NewsTopicConfig = {
+  topic: "indonesia_local",
+  feeds: INDONESIA_LOCAL_FEEDS,
+  // Bilingual allow-list. The ingest gate substring-matches the RAW (Bahasa)
+  // title+summary, so the Bahasa terms are required for Bahasa-edition items to
+  // survive; the English terms keep the English ID-edition feed and any already-
+  // English wire copy. Multi-word Bahasa phrases are preferred to avoid the
+  // substring false positives a bare short token (e.g. "demo" inside
+  // "demokrasi", "protes" inside "protestan") would cause.
+  allow: [
+    // unrest / protest
+    "demonstrasi", "unjuk rasa", "kerusuhan", "bentrok", "rusuh", "aksi massa",
+    "protest", "riot", "unrest", "clash", "demonstration", "rally",
+    // crime
+    "pembunuhan", "penembakan", "perampokan", "begal", "pencurian", "penikaman",
+    "penculikan", "tindak kriminal", "kriminal",
+    "murder", "shooting", "robbery", "theft", "stabbing", "kidnap", "homicide", "assault",
+    // natural hazard
+    "banjir", "longsor", "gempa", "tsunami", "erupsi", "gunung meletus", "letusan",
+    "flood", "landslide", "earthquake", "quake", "eruption", "volcano",
+    // fire
+    "kebakaran", "karhutla",
+    "fire", "blaze", "wildfire", "forest fire",
+    // haze / environment
+    "kabut asap", "polusi udara", "pencemaran", "limbah",
+    "haze", "smog", "pollution", "air quality",
+    // transport / aviation / port
+    "kecelakaan", "kapal tenggelam", "kapal karam", "pesawat jatuh", "tabrakan",
+    "bandara", "pelabuhan",
+    "accident", "plane crash", "boat sinks", "ferry", "capsize", "airport", "collision", "derail",
+    // government stability
+    "korupsi", "pemakzulan", "mosi tidak percaya", "krisis politik", "reshuffle",
+    "corruption", "impeachment", "no-confidence", "political crisis", "cabinet reshuffle",
+    // labour
+    "mogok kerja", "aksi buruh", "serikat buruh", "buruh", "upah minimum",
+    "pemutusan hubungan kerja",
+    "strike", "walkout", "layoffs", "labour union", "labor union", "minimum wage",
+    // terrorism
+    "teroris", "terorisme", "bom bunuh diri", "serangan bom", "ledakan bom",
+    "densus 88", "jaringan teroris", "ledakan",
+    "terror", "terrorist", "suicide bomb", "bomb blast", "explosion",
+  ],
+  deny: [
+    ...COMMON_DENY,
+    // sport
+    "sepak bola", "pertandingan", "klasemen", "timnas", "piala dunia", "liga 1",
+    "skor akhir", "esports", "mobile legends", "badminton", "motogp",
+    // entertainment / lifestyle
+    "sinetron", "konser", "selebriti", "box office", "trailer", "drakor",
+    "resep", "wisata", "kuliner", "zodiak", "ramalan bintang", "horoskop",
+    "giveaway", "diskon", "promo",
+    // markets / finance / jobs
+    "saham", "ihsg", "bursa", "kripto", "emiten", "dividen", "lowongan kerja",
+    "harga emas", "harga hp",
+    // product demos (the "demo" homonym)
+    "demo produk", "demo masak", "demo memasak",
+  ],
+  countryAliases: INDONESIA_LOCAL_ALIASES,
+  // Broad local feed spanning official agencies, major wires and small regional
+  // outlets, so a source-based confidence tier is meaningful here (opt-in).
+  classifyConfidence: classifyNewsConfidence,
+};
+
 export function runEnergyIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(ENERGY_CONFIG, opts);
 }
@@ -534,4 +684,8 @@ export function runFertiliserIngest(opts: IngestOptions = {}): Promise<IngestSum
 
 export function runFuelIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(FUEL_CONFIG, opts);
+}
+
+export function runIndonesiaLocalIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
+  return runNewsTopicIngest(INDONESIA_LOCAL_CONFIG, opts);
 }

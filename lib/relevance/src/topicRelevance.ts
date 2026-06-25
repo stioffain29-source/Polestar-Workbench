@@ -564,6 +564,15 @@ const FP_APAC_ANCHOR_RE =
 const FP_OFFSHORE_THEATRE_RE =
   /\b(?:bolivia|bolivian|bolivians|la paz|venezuela|venezuelan|venezuelans|caracas|maduro|peru|peruvian|peruvians|lima|brazil|brasil|brazilian|brazilians|brasilia|argentina|argentine|argentinian|argentinians|buenos aires|mexico|mexican|mexicans|chile|chilean|chileans|santiago|colombia|colombian|colombians|bogota|ecuador|ecuadorian|ecuadorians|quito|nicaragua|nicaraguan|nicaraguans|honduras|honduran|hondurans|guatemala|guatemalan|guatemalans|panama|panamanian|panamanians|uruguay|paraguay|haiti|haitian|haitians|iran|iranian|iranians|tehran|iraq|iraqi|iraqis|baghdad|israel|israeli|israelis|gaza|palestine|palestinian|palestinians|lebanon|lebanese|beirut|syria|syrian|syrians|damascus|yemen|yemeni|yemenis|houthi|houthis|saudi|saudis|riyadh|jordan|jordanian|jordanians|amman|qatar|qatari|doha|bahrain|bahraini|kuwait|kuwaiti|oman|omani|dubai|abu dhabi|egypt|egyptian|egyptians|cairo|kenya|kenyan|kenyans|nairobi|nigeria|nigerian|nigerians|niger|lagos|abuja|ethiopia|ethiopian|ethiopians|addis ababa|sudan|sudanese|khartoum|somalia|somali|somalis|mogadishu|south africa|south african|johannesburg|pretoria|congo|congolese|kinshasa|ghana|ghanaian|ghanaians|accra|uganda|ugandan|ugandans|kampala|zimbabwe|zimbabwean|zimbabweans|harare|tanzania|tanzanian|tanzanians|morocco|moroccan|moroccans|algeria|algerian|algerians|tunisia|tunisian|tunisians|libya|libyan|libyans|tripoli|senegal|senegalese|cameroon|cameroonian|cameroonians|zambia|zambian|zambians|malawi|malawian|malawians|mozambique|mozambican|mozambicans|rwanda|rwandan|rwandans|ivory coast|turkey|turkish|ankara|istanbul|albania|albanian|albanians|tirana|greece|greek|athens|serbia|serbian|serbians|belgrade|ukraine|ukrainian|ukrainians|kyiv|kiev|russia|russian|russians|moscow|belarus|belarusian|belarusians|minsk|poland|warsaw|hungary|hungarian|hungarians|budapest|romania|romanian|romanians|bucharest|bulgaria|bulgarian|bulgarians|czech|slovakia|slovak|croatia|croatian|croatians|bosnia|bosnian|bosnians|kosovo|kosovar|moldova|moldovan|moldovans|armenia|armenian|armenians|yerevan|azerbaijan|azerbaijani|azerbaijanis|baku|trump|maga|washington|g7|g-7|g20|g-20|davos)\b/i;
 
+// In-region anchor for the `indonesia_local` broad-coverage feed — Indonesia
+// (country, demonyms, islands, provinces, major cities), the West Papua
+// gazetteer, and a few unambiguous national institutions. Used ONLY to RESCUE
+// an Indonesia story that ALSO names an offshore foreign theatre ("Indonesia
+// condemns Gaza strike"); it is never a standalone required gate, so a genuine
+// hyperlocal item whose only cue is a regency name is left untouched.
+const INDONESIA_ANCHOR_RE =
+  /\b(?:indonesia|indonesian|indonesians|jakarta|jabodetabek|jawa|java|sumatra|sumatera|sulawesi|kalimantan|borneo|aceh|bali|lombok|maluku|nusa tenggara|papua|papua barat|west papua|jayapura|wamena|timika|nabire|merauke|manokwari|sorong|biak|surabaya|bandung|semarang|makassar|palembang|yogyakarta|jogja|bekasi|depok|tangerang|bogor|batam|pekanbaru|padang|banjarmasin|pontianak|samarinda|balikpapan|manado|denpasar|mataram|kupang|ambon|jambi|lampung|bengkulu|banten|cirebon|malang|gorontalo|ternate|palu|kendari|riau|polri|tni|bnpb|bmkg|basarnas|densus 88|jokowi|prabowo)\b/i;
+
 // Masthead-stripped GEO text — mirrors geoHaystack() in @workspace/ingest so the
 // APAC-anchor gate sees exactly the text the country resolver saw. Google News
 // appends the publisher to BOTH the title (after a trailing " - " / " | ") and,
@@ -1371,6 +1380,27 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     if (FP_OFFSHORE_THEATRE_RE.test(geo) && !FP_APAC_ANCHOR_RE.test(geo)) {
       return { relevant: false, reason: "excluded: out-of-region theatre (foreign syndication, no APAC anchor)" };
     }
+  }
+
+  if (topic === "indonesia_local") {
+    // Broad local-coverage feed for the Indonesia + Jakarta country briefs:
+    // unrest, crime, natural hazard, fire, haze, transport, government, labour,
+    // terrorism. The families are deliberately wide, so there is NO required
+    // incident vocabulary — the only gate is geographic. Drop a story that
+    // POSITIVELY names a non-regional theatre (the Americas / Middle East /
+    // Africa / non-APAC Europe-Eurasia) and carries no Indonesian anchor: that
+    // is foreign wire copy an Indonesian edition merely re-ran. Mirrors the
+    // conflict off-region gate; keyed on a positive foreign place (never a
+    // missing anchor) so a genuine hyperlocal item is always kept. New topic —
+    // no existing rows re-evaluate, so this needs no RELEVANCE_RULE_VERSION bump.
+    const geo = mastheadStrippedGeoText(i);
+    if (FP_OFFSHORE_THEATRE_RE.test(geo) && !INDONESIA_ANCHOR_RE.test(geo)) {
+      return {
+        relevant: false,
+        reason: "excluded: indonesia_local out-of-region (foreign syndication, no Indonesia anchor)",
+      };
+    }
+    return { relevant: true, reason: "kept: indonesia_local in-region local coverage" };
   }
 
   if (topic === "flashpoint" || topic === "protests") {

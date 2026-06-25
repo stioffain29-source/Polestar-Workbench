@@ -87,6 +87,42 @@ const INDONESIAN_MARKER_WORDS: readonly string[] = [
   // distinctly-Indonesian "pergeseran"/"adat"/"budaya".)
   "pergeseran", "adat", "budaya", "umumkan", "mengumumkan",
   "duka", "nasional", "gugur", "gugurnya",
+  // Broad Indonesian local-coverage vocabulary (the `indonesia_local` topic
+  // feeds Jakarta + Indonesia country reports from Bahasa-first sources across
+  // many families). Without these, the bulk of Bahasa headlines — protest,
+  // hazard, fire, haze, labour, terrorism, crime, transport and corruption —
+  // carried none of the function words above and shipped raw (measured ~56% of
+  // live rows). Every word below is distinctly Indonesian (no English spelling
+  // collision), so adding them cannot snag a genuine English headline.
+  // protest / civil unrest
+  "demonstrasi", "unjuk", "kerusuhan", "bentrok", "rusuh", "ricuh",
+  "kericuhan", "mahasiswa", "menuntut", "tuntut", "penghasutan",
+  "menggeruduk", "geruduk",
+  // fire
+  "kebakaran", "terbakar", "karhutla", "hangus", "kobaran",
+  // natural hazard (flood / quake / landslide / eruption)
+  "banjir", "bandang", "gempa", "longsor", "bencana", "mengungsi",
+  "pengungsi", "erupsi", "letusan",
+  // environmental / haze ("asap" is omitted on purpose — it collides with the
+  // English "ASAP"; "kabut"/"karhutla" already catch every haze headline)
+  "kabut", "polusi", "pencemaran", "limbah",
+  // labour
+  "mogok", "buruh", "pekerja", "upah", "serikat", "pesangon", "pemecatan",
+  // terrorism / militancy
+  "teroris", "ledakan", "peledakan", "densus", "bunuh",
+  // crime
+  "pencurian", "perampokan", "begal", "pembegalan", "maling", "penipuan",
+  "narkoba", "tersangka", "pelaku", "penganiayaan", "pencabulan",
+  // transport / aviation / port ("kapal" can sit inside an English place name
+  // such as "Bulak Kapal" — a rare, harmless false select that the translator
+  // returns unchanged)
+  "kecelakaan", "tabrakan", "tergelincir", "pelabuhan", "bandara",
+  "pesawat", "kapal",
+  // government / legal process / corruption + high-coverage Indonesian tokens
+  "menteri", "pejabat", "presiden", "kabinet", "korupsi", "pencegahan",
+  "sidang", "penjara", "vonis", "terdakwa", "kasus", "dugaan", "suap",
+  "perkara", "penahanan", "geledah", "hakim", "kejaksaan", "penyidik",
+  "saksi", "tahun", "miliar", "rupiah",
 ];
 
 const NON_LATIN_RE = new RegExp(`[${NON_LATIN_CLASS}]`);
