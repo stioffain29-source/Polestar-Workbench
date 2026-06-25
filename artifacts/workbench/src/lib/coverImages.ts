@@ -10,6 +10,8 @@ import conflictCoverUrl from "@assets/conflict_watch_cover.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import papuaNewGuineaCoverUrl from "@assets/image_1779624991006.png";
 import papuaCoverUrl from "@assets/image_1779625036503.png";
+import jakartaCoverUrl from "@assets/pexels-ceharabbani-35498205_1782396454908.jpg";
+import indonesiaCoverUrl from "@assets/fikri-rasyid-IBb_Y65z5ZU-unsplash_(1)_1782396477715.jpg";
 
 export const TOPIC_COVER_URLS: Record<string, string> = {
   shipping: shippingCoverUrl,
@@ -27,6 +29,8 @@ export const TOPIC_COVER_URLS: Record<string, string> = {
 export const COUNTRY_COVER_URLS: Record<string, string> = {
   "papua new guinea": papuaNewGuineaCoverUrl,
   "papua": papuaCoverUrl,
+  "jakarta": jakartaCoverUrl,
+  "indonesia": indonesiaCoverUrl,
 };
 
 export function topicCoverUrl(topic?: string | null): string | undefined {
