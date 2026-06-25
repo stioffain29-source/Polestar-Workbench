@@ -2052,6 +2052,39 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3z) Seed the structured country-report rows that the workbench renders
+    //     as full nine-section briefs (Indonesia national + Jakarta city),
+    //     alongside the pre-existing PNG / West Papua pair. These rows must
+    //     exist before the baseline loop below, which resolves each baseline
+    //     to a country report by case-insensitive name match. Idempotent:
+    //     insert only when the slug is missing, so an analyst rename / edit
+    //     is never overwritten on restart, and the rows are re-created if
+    //     ever deleted. Reaches the read-only prod DB via the deployment boot.
+    const STRUCTURED_COUNTRY_REPORTS: Array<{
+      slug: string;
+      name: string;
+      region: string;
+    }> = [
+      { slug: "indonesia", name: "Indonesia", region: "APAC" },
+      { slug: "jakarta", name: "Jakarta", region: "APAC" },
+    ];
+    for (const seed of STRUCTURED_COUNTRY_REPORTS) {
+      try {
+        const [existing] = await db
+          .select({ id: countryReportsTable.id })
+          .from(countryReportsTable)
+          .where(eq(countryReportsTable.slug, seed.slug));
+        if (existing) continue;
+        await db
+          .insert(countryReportsTable)
+          .values({ slug: seed.slug, name: seed.name, region: seed.region })
+          .onConflictDoNothing({ target: countryReportsTable.slug });
+        logger.info({ slug: seed.slug }, "Seeded structured country report");
+      } catch (crErr) {
+        logger.error({ err: crErr, slug: seed.slug }, "Failed to seed structured country report");
+      }
+    }
+
     // 4) Seed country baselines once. Maps each seed to a country
     //    report by case-insensitive name match. Skips any seed whose
     //    target slug already has a baseline so editor edits are never

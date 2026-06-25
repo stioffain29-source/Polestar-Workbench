@@ -8,6 +8,8 @@
     "./structuredExtract": "./src/structuredExtract.ts",
     "./pngExtract": "./src/pngExtract.ts",
     "./westPapuaExtract": "./src/westPapuaExtract.ts",
+    "./indonesiaExtract": "./src/indonesiaExtract.ts",
+    "./jakartaExtract": "./src/jakartaExtract.ts",
     "./optionalIntegrations": "./src/optionalIntegrations.ts"
   },
   "dependencies": {

@@ -35,8 +35,11 @@ import PngCountryReportBody from "@/components/PngCountryReportBody";
 import {
   buildPngReportDataset,
   buildWestPapuaReportDataset,
+  buildIndonesiaReportDataset,
+  buildJakartaReportDataset,
   type PngSourceIncident,
 } from "@/lib/pngReportDataset";
+import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 import {
   incidentMatchesCountry,
   acceptedCountryTokens,
@@ -241,7 +244,18 @@ export default function CountryReport() {
     const isPng = tokens.includes("papua new guinea");
     // The Indonesian Papua report (own token "papua", never the PNG group).
     const isPapua = !isPng && tokens.includes("papua");
+    // The Jakarta city brief is a sub-view of Indonesia-tagged records: match on
+    // Indonesia, then keep only Jakarta-scoped items (a district gazetteer hit or
+    // a citywide Jakarta token). Indonesian Papua records never carry "Indonesia"
+    // alone, so they cannot leak into the capital brief.
+    const isJakarta = tokens.includes("jakarta");
     return (incidentsData ?? []).filter((i) => {
+      if (isJakarta) {
+        return (
+          incidentMatchesCountry(i.country, "Indonesia") &&
+          isJakartaScoped(i.title, i.summary, i.location)
+        );
+      }
       if (!incidentMatchesCountry(i.country, name)) return false;
       // Standing rule: Indonesian Papua / West Papua records must not
       // populate the PNG report unless they are explicitly cross-border
@@ -350,10 +364,14 @@ export default function CountryReport() {
   // PNG group). Both render the same PngCountryReportBody from a config-driven
   // dataset; everything below keys off `isStructured` rather than `isPng` so the
   // West Papua brief reaches parity. Any other country keeps the generic brief.
-  const structuredTheatre = useMemo<"png" | "westPapua" | null>(() => {
+  const structuredTheatre = useMemo<
+    "png" | "westPapua" | "indonesia" | "jakarta" | null
+  >(() => {
     const tokens = acceptedCountryTokens(country?.name ?? "");
     if (tokens.includes("papua new guinea")) return "png";
     if (tokens.includes("papua")) return "westPapua";
+    if (tokens.includes("indonesia")) return "indonesia";
+    if (tokens.includes("jakarta")) return "jakarta";
     return null;
   }, [country]);
   const isStructured = structuredTheatre !== null;
@@ -459,9 +477,16 @@ export default function CountryReport() {
       baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
       periodLabel: active.basisLabel,
     };
-    return structuredTheatre === "westPapua"
-      ? buildWestPapuaReportDataset(args)
-      : buildPngReportDataset(args);
+    switch (structuredTheatre) {
+      case "westPapua":
+        return buildWestPapuaReportDataset(args);
+      case "indonesia":
+        return buildIndonesiaReportDataset(args);
+      case "jakarta":
+        return buildJakartaReportDataset(args);
+      default:
+        return buildPngReportDataset(args);
+    }
   }, [structuredTheatre, active, layers, baseline, issueDate]);
 
   // --- AI-generated prose -------------------------------------------------

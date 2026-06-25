@@ -54,6 +54,8 @@ export default function Layout({ children }: LayoutProps) {
       items: [
         { label: "PNG", href: "/countries/papua-new-guinea", icon: Flag },
         { label: "Papua", href: "/countries/papua", icon: Flag },
+        { label: "Indonesia", href: "/countries/indonesia", icon: Flag },
+        { label: "Jakarta", href: "/countries/jakarta", icon: Flag },
         { label: "All Countries", href: "/countries", icon: Database },
       ]
     },

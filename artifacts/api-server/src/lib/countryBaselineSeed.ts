@@ -159,7 +159,47 @@ const INDONESIA: CountryBaselineSeed = {
     { label: "Volcanic / seismic belt", note: "Merapi, Semeru, Sinabung, Anak Krakatau, Lewotobi", match: ["merapi", "semeru", "sinabung", "krakatau", "lewotobi"] },
   ],
   };
-  
+
+const JAKARTA: CountryBaselineSeed = {
+    countryNames: ["jakarta", "dki jakarta", "greater jakarta", "jabodetabek"],
+    operatingEnvironment:
+      "Jakarta (DKI Jakarta) is Indonesia's capital and primary commercial centre, organised into five administrative cities — Central, North, South, East and West Jakarta — plus the Thousand Islands. With the surrounding Bogor, Depok, Tangerang and Bekasi regencies it forms the Jabodetabek conurbation of roughly 30 million people. Day-to-day operating risk is dominated by severe traffic congestion, opportunistic urban crime, recurring mass demonstrations in the central government district, and standing monsoon-flood exposure across low-lying northern and eastern areas.",
+    securityContext:
+      "Polda Metro Jaya leads public-order management across the capital, with heavy deployments around the Presidential Palace (Istana Merdeka), the Patung Kuda / Monas area, the DPR/MPR parliamentary complex in Senayan, and major embassies. Protest cycles cluster around fuel-subsidy and minimum-wage decisions, omnibus-law and labour-reform legislation, student-union calls (BEM SI), and electoral / inauguration dates. Counter-terrorism is handled by Densus 88; the standing posture concentrates on high-footfall venues, places of worship and the diplomatic quarter.",
+    knownRiskAreas: [
+    "Central Jakarta — Patung Kuda, Monas, Istana Merdeka, DPR/MPR (Senayan): the capital's principal protest corridor, with periodic road closures and crowd-control operations.",
+    "North Jakarta — Tanjung Priok port and the Pluit / Penjaringan lowlands: cargo-crime exposure and recurring tidal and monsoon flooding.",
+    "South Jakarta — Kuningan / SCBD / Sudirman business and embassy district: high-value-target footfall, episodic protest spillover around the diplomatic quarter.",
+    "East Jakarta — Cakung / Pulogadung industrial estates: labour mobilisation around wage cycles and goods-movement disruption.",
+    "West Jakarta — Grogol / Tambora dense urban quarters: opportunistic street crime and flood-prone kampungs.",
+    "Greater Jakarta (Jabodetabek) — Bekasi, Tangerang, Depok, Bogor commuter ring: industrial labour action, commuter-corridor disruption and flash flooding.",
+  ],
+    keyCitiesProvinces: [
+    "Central Jakarta (Jakarta Pusat)",
+    "North Jakarta (Jakarta Utara)",
+    "South Jakarta (Jakarta Selatan)",
+    "East Jakarta (Jakarta Timur)",
+    "West Jakarta (Jakarta Barat)",
+    "Greater Jakarta (Jabodetabek)",
+  ],
+    movementConstraints:
+      "Surface movement is heavily congested and degrades sharply on protest days around Monas / Istana / DPR and around major-match football fixtures. TransJakarta, the MRT and KRL commuter rail are the practical norm for cross-city movement. Soekarno-Hatta International (CGK) in Tangerang and Halim Perdanakusuma (HLP) are the principal gateways; the airport toll road and inner-ring tollways are the most exposed corridors during disruption. Monsoon flooding (Nov-Apr) routinely cuts northern and eastern arterials and underpasses.",
+    infrastructureLimits:
+      "Power and telecoms are reliable across the capital; the principal continuity risks are flooding of substations and basements in low-lying districts and gridlock following heavy rain. Tanjung Priok is the dominant port chokepoint for the national supply chain. Land subsidence across North Jakarta compounds tidal-flood exposure. Fuel logistics are Pertamina-dominated; subsidised-fuel adjustments are recurring protest triggers.",
+    medicalEvac:
+      "Jakarta offers internationally-accredited private hospitals (RS Pondok Indah, Siloam, Mayapada, RS Premier) providing the highest tier-1 capability in Indonesia. Serious cases requiring overseas care typically route to Singapore by fixed-wing medevac. Dengue is year-round with seasonal spikes after the monsoon; respiratory exposure rises during high-pollution episodes.",
+    resourceSectorExposure:
+      "Jakarta's exposure is corporate and financial rather than extractive: regional headquarters, banking, the Indonesia Stock Exchange (SCBD), embassies and the seat of national government. Operating risk to business is driven by protest proximity to the central business and government districts, commuter-corridor disruption, and flood interruption to offices and logistics rather than by resource-sector friction.",
+    locationWatchlist: [
+    { label: "Central Jakarta", note: "Patung Kuda / Monas / Istana / DPR protest corridor", match: ["central jakarta", "jakarta pusat", "monas", "istana", "patung kuda", "thamrin", "sudirman", "tanah abang", "menteng"] },
+    { label: "South Jakarta", note: "SCBD / Kuningan business and embassy district", match: ["south jakarta", "jakarta selatan", "kuningan", "scbd", "senayan", "blok m", "kebayoran", "gbk"] },
+    { label: "North Jakarta", note: "Tanjung Priok port, tidal-flood lowlands", match: ["north jakarta", "jakarta utara", "tanjung priok", "ancol", "kelapa gading", "pluit", "penjaringan"] },
+    { label: "East Jakarta", note: "Cakung / Pulogadung industrial estates", match: ["east jakarta", "jakarta timur", "cakung", "pulogadung", "pulo gadung", "jatinegara", "cawang"] },
+    { label: "West Jakarta", note: "Grogol / Tambora dense urban quarters", match: ["west jakarta", "jakarta barat", "grogol", "tambora", "cengkareng", "kebon jeruk", "palmerah"] },
+    { label: "Greater Jakarta (Jabodetabek)", note: "Bekasi / Tangerang / Depok / Bogor commuter ring", match: ["jabodetabek", "greater jakarta", "bekasi", "tangerang", "depok", "bogor", "cikarang", "serpong", "bsd"] },
+  ],
+  };
+
 const PHILIPPINES: CountryBaselineSeed = {
     countryNames: ["philippines", "the philippines", "republic of the philippines"],
     operatingEnvironment:
@@ -1343,6 +1383,7 @@ export const COUNTRY_BASELINE_SEEDS: CountryBaselineSeed[] = [
     PAPUA,
     PAPUA_NEW_GUINEA,
     INDONESIA,
+    JAKARTA,
   PHILIPPINES,
   THAILAND,
   MALAYSIA,

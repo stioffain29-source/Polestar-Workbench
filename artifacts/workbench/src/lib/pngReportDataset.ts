@@ -23,8 +23,10 @@
 // to map curated watchlist LABELS to provinces for the coverage-gap check, which
 // is not per-incident recomputation.
 
-import { derivePngProvince } from "@workspace/ingest/pngExtract";
-import { deriveWestPapuaProvince } from "@workspace/ingest/westPapuaExtract";
+import { derivePngProvince, extractPngItem } from "@workspace/ingest/pngExtract";
+import { deriveWestPapuaProvince, extractWestPapuaItem } from "@workspace/ingest/westPapuaExtract";
+import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest/indonesiaExtract";
+import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
@@ -150,6 +152,16 @@ export interface StructuredTheatreConfig {
   // single quiet week as provisional."
   outlookVolatilityClause: string;
   deriveProvince: (location: string | null | undefined, text: string) => string | null;
+  // Optional client-side per-item extraction fallback. Used ONLY when the
+  // incidents API has not populated the server-extracted province / category /
+  // business-impact columns (the Indonesia + Jakarta theatres are not
+  // backfilled server-side). PNG / West Papua rows always carry the columns, so
+  // their entry stays inert. Mirrors the shared structuredExtract output.
+  extractItem?: (
+    title: string,
+    summary: string,
+    location: string | null | undefined,
+  ) => { province: string | null; category: PngCategory; businessImpact: string };
   // Optional, keyed by bucket key (e.g. "ncd"). Buckets without an entry render
   // the standard flat location list.
   locationAugmentations?: Record<string, StructuredLocationAugmentation>;
@@ -170,6 +182,7 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
     "With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic crime in urban centres, periodic tribal and communal flare-ups in the Highlands, and intermittent road, power and connectivity disruption. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
   outlookVolatilityClause: "paydays, court rulings, election cycles and tribal-payback events",
   deriveProvince: derivePngProvince,
+  extractItem: extractPngItem,
   locationAugmentations: {
     ncd: {
       sparseCaveat:
@@ -213,6 +226,109 @@ export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
   outlookVolatilityClause:
     "security-force operations, separatist anniversaries, student mobilisation and flashpoints around resource projects",
   deriveProvince: deriveWestPapuaProvince,
+  extractItem: extractWestPapuaItem,
+};
+
+export const INDONESIA_REPORT_CONFIG: StructuredTheatreConfig = {
+  countryName: "Indonesia",
+  buckets: [
+    {
+      key: "greaterJakartaWestJava",
+      label: "Greater Jakarta & West Java",
+      provinces: ["DKI Jakarta", "West Java", "Banten"],
+    },
+    {
+      key: "centralEastJava",
+      label: "Central & East Java",
+      provinces: ["Central Java", "Yogyakarta", "East Java"],
+    },
+    {
+      key: "sumatra",
+      label: "Sumatra",
+      provinces: [
+        "Aceh",
+        "North Sumatra",
+        "West Sumatra",
+        "Riau",
+        "Riau Islands",
+        "Jambi",
+        "South Sumatra",
+        "Bengkulu",
+        "Lampung",
+        "Bangka Belitung",
+      ],
+    },
+    {
+      key: "kalimantan",
+      label: "Kalimantan (Borneo)",
+      provinces: [
+        "West Kalimantan",
+        "Central Kalimantan",
+        "South Kalimantan",
+        "East Kalimantan",
+        "North Kalimantan",
+      ],
+    },
+    {
+      key: "sulawesi",
+      label: "Sulawesi",
+      provinces: [
+        "North Sulawesi",
+        "Central Sulawesi",
+        "South Sulawesi",
+        "Southeast Sulawesi",
+        "West Sulawesi",
+        "Gorontalo",
+      ],
+    },
+    {
+      key: "baliNusaMaluku",
+      label: "Bali, Nusa Tenggara & Maluku",
+      provinces: [
+        "Bali",
+        "West Nusa Tenggara",
+        "East Nusa Tenggara",
+        "Maluku",
+        "North Maluku",
+      ],
+    },
+  ],
+  otherBucketLabel: "Other National Security-Relevant Activity",
+  emptyLocationFallback: PNG_EMPTY_LOCATION_FALLBACK,
+  businessImpactEmptyNote:
+    "No fresh incident-driven business impact was identified this period. Standing exposures — urban crime in the major cities, periodic mass demonstrations around fuel, wage and political flashpoints, localised communal and sectarian tension, and recurrent natural-hazard disruption — continue to apply.",
+  emptyOutlook:
+    "With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic and organised urban crime, episodic large-scale protest around economic and political triggers, localised communal tension, and natural-hazard disruption to transport and operations. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
+  outlookVolatilityClause:
+    "fuel-subsidy and minimum-wage decisions, student and labour mobilisation, election dates and natural-hazard episodes",
+  deriveProvince: deriveIndonesiaProvince,
+  extractItem: extractIndonesiaItem,
+};
+
+export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
+  countryName: "Jakarta",
+  buckets: [
+    { key: "centralJakarta", label: "Central Jakarta", provinces: ["Central Jakarta"] },
+    { key: "southJakarta", label: "South Jakarta", provinces: ["South Jakarta"] },
+    { key: "northJakarta", label: "North Jakarta", provinces: ["North Jakarta"] },
+    { key: "eastJakarta", label: "East Jakarta", provinces: ["East Jakarta"] },
+    { key: "westJakarta", label: "West Jakarta", provinces: ["West Jakarta"] },
+    {
+      key: "greaterJakarta",
+      label: "Greater Jakarta (Jabodetabek)",
+      provinces: ["Greater Jakarta (Jabodetabek)"],
+    },
+  ],
+  otherBucketLabel: "Other Jakarta-Area Activity",
+  emptyLocationFallback: PNG_EMPTY_LOCATION_FALLBACK,
+  businessImpactEmptyNote:
+    "No fresh incident-driven business impact was identified this period. Standing exposures — petty and organised urban crime, large demonstrations around the presidential palace, parliament and major thoroughfares, traffic and transport disruption, and seasonal flooding — continue to apply across the capital.",
+  emptyOutlook:
+    "With no fresh reporting this period, expect the standing risk pattern to persist across Greater Jakarta: opportunistic street crime, episodic mass protest in the central business and government districts, recurrent traffic and transport disruption, and seasonal flooding. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
+  outlookVolatilityClause:
+    "wage and fuel-subsidy announcements, major court and parliamentary calendar dates, and large rallies around the presidential palace and parliament",
+  deriveProvince: deriveJakartaArea,
+  extractItem: extractJakartaItem,
 };
 
 // ---------------------------------------------------------------------------
@@ -330,16 +446,28 @@ const DEFAULT_CATEGORY: PngCategory = "Other security";
 const DEFAULT_BUSINESS_IMPACT =
   "Security-relevant development; monitor for operational follow-on in the affected area.";
 
-function toItem(i: PngSourceIncident): PngReportItem {
+function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngReportItem {
   // Read the per-incident enrichment STRAIGHT from the incidents API. The
   // columns are populated server-side (ingest + backfill + onlyNull enrichment
-  // pass) for every tagged row, so the client no longer recomputes them.
-  // category + businessImpact are written together by the ingest rulebook, so
-  // they are present or absent as a pair.
-  const province = i.province ?? null;
+  // pass) for every PNG / West Papua tagged row, so the client does not
+  // recompute them. For theatres whose rows are NOT backfilled server-side
+  // (Indonesia, Jakarta) the columns are null, so fall back to the theatre's
+  // client-side rulebook via config.extractItem. category + businessImpact are
+  // written together by the rulebook, so they are present or absent as a pair.
+  const needsExtract = !i.province || !(i.category && i.businessImpact);
+  const ext =
+    needsExtract && config.extractItem
+      ? config.extractItem(i.title ?? "", i.summary ?? "", i.location)
+      : null;
+  const province = i.province ?? ext?.province ?? null;
   const category: PngCategory =
-    i.category && i.businessImpact ? (i.category as PngCategory) : DEFAULT_CATEGORY;
-  const impact = i.category && i.businessImpact ? i.businessImpact : DEFAULT_BUSINESS_IMPACT;
+    i.category && i.businessImpact
+      ? (i.category as PngCategory)
+      : ext?.category ?? DEFAULT_CATEGORY;
+  const impact =
+    i.category && i.businessImpact
+      ? i.businessImpact
+      : ext?.businessImpact ?? DEFAULT_BUSINESS_IMPACT;
   const sev = (i.severity ?? "").toLowerCase();
   const reportedDate = new Date(i.occurredAt);
   const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
@@ -481,10 +609,10 @@ function buildStructuredReportDataset(
   config: StructuredTheatreConfig,
 ): PngReportDataset {
   const { windowIncidents, previousWindowIncidents, baselineWatchlist, periodLabel } = args;
-  const windowItems = dedupeByTitle(windowIncidents.map(toItem));
+  const windowItems = dedupeByTitle(windowIncidents.map((i) => toItem(i, config)));
   // Prior 7-day window, deduped the same way, for the week-on-week delta. Empty
   // when the caller supplies none (delta degrades to a "limited history" note).
-  const previousWindowItems = dedupeByTitle((previousWindowIncidents ?? []).map(toItem));
+  const previousWindowItems = dedupeByTitle((previousWindowIncidents ?? []).map((i) => toItem(i, config)));
   // Distinguish "no previous window supplied at all" (week-on-week comparison
   // impossible — never assert a trend) from "previous window supplied but quiet"
   // (a valid comparison against a calm prior week).
@@ -706,7 +834,7 @@ function buildStructuredReportDataset(
   // reporting (also seen in the prior week or the 30-day context). Provinces are
   // shown under their friendly bucket label. Backstop with the curated baseline
   // watchlist so the section is never empty when the feed is thin. Cap at 5.
-  const thirtyDayItems = dedupeByTitle((args.thirtyDay ?? []).map(toItem));
+  const thirtyDayItems = dedupeByTitle((args.thirtyDay ?? []).map((i) => toItem(i, config)));
   const provinceLabel = new Map<string, string>();
   for (const b of config.buckets) for (const p of b.provinces) provinceLabel.set(p, b.label);
   const provStats = new Map<string, { count: number; worstRank: number; cat: string | null }>();
@@ -840,4 +968,12 @@ export function buildPngReportDataset(args: BuildArgs): PngReportDataset {
 
 export function buildWestPapuaReportDataset(args: BuildArgs): PngReportDataset {
   return buildStructuredReportDataset(args, WEST_PAPUA_REPORT_CONFIG);
+}
+
+export function buildIndonesiaReportDataset(args: BuildArgs): PngReportDataset {
+  return buildStructuredReportDataset(args, INDONESIA_REPORT_CONFIG);
+}
+
+export function buildJakartaReportDataset(args: BuildArgs): PngReportDataset {
+  return buildStructuredReportDataset(args, JAKARTA_REPORT_CONFIG);
 }
