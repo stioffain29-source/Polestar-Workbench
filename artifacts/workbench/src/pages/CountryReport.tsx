@@ -49,6 +49,7 @@ import {
   isIndonesianPapuaTheatreContext,
   isCrossBorderPapuaPng,
   isForeignDominantContext,
+  isForeignTheatreContext,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import SituationalContextSection from "@/components/SituationalContextSection";
@@ -300,6 +301,22 @@ export default function CountryReport() {
       // local incident regardless of its stored country tag.
       const fullText = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
       if (isForeignDominantContext(i.title, fullText, i.country, name)) return false;
+      // Aggressive cross-country filter: a record anchored to a named foreign
+      // maritime/conflict theatre this country is not a member of (e.g. a
+      // South-Korean-flagged tanker attacked in the Strait of Hormuz, tagged
+      // "South Korea; Iran") happened in that theatre, not here, and is only
+      // cross-tagged onto a nationality it names. Strip it from the non-member
+      // report; the theatre's littoral states (Iran, the UAE, ...) keep it.
+      // Read the narrative only — the appended masthead/URL never names a Gulf
+      // choke-point, so this avoids masthead pollution. Cross-border Papua/PNG
+      // records are exempt (they never name a foreign maritime theatre anyway).
+      const narrative = `${i.title ?? ""} ${i.summary ?? ""}`;
+      if (
+        !isCrossBorderPapuaPng(i.country) &&
+        isForeignTheatreContext(narrative, name)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [incidentsData, country]);

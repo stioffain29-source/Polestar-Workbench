@@ -210,6 +210,90 @@ export function isForeignDominantContext(
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Foreign maritime / conflict theatre guard
+// ---------------------------------------------------------------------------
+//
+// The incidents feed cross-tags a single regional event onto EVERY nationality
+// it names. The live example is the Strait of Hormuz / Persian Gulf war: a
+// South-Korean-flagged tanker attacked in Hormuz is tagged "South Korea; Iran",
+// India's diplomatic response to a Fujairah strike is tagged "India; Iran", and
+// so on. Such a record did NOT happen in — and is not primarily about — the
+// peripheral country; it happened in the Gulf. Under the aggressive country
+// filter the report must show only incidents that happened in / are primarily
+// about that country, so these belong only to the theatre's own littoral states
+// (Iran, the UAE, Oman, ...), never South Korea / India / Japan / China.
+//
+// Mention-count and tag-order both FAIL here: the peripheral country is named
+// most ("South Korea", "Korean vessel", "Seoul's stance") and is listed first,
+// because the story is framed around its reaction. The reliable signal is
+// GEOGRAPHY — the named theatre — so we strip a record from a report whose
+// country is not a member of any theatre the record names.
+type ForeignTheatre = { re: RegExp; members: ReadonlySet<string> };
+
+const FOREIGN_THEATRES: readonly ForeignTheatre[] = [
+  {
+    // Persian Gulf / Strait of Hormuz / Gulf of Oman maritime theatre plus the
+    // adjoining Bab-el-Mandeb / Gulf of Aden choke-points, and their named
+    // ports and pipeline terminals. `members` must list EVERY littoral state of
+    // any marker in `re` — otherwise that state's report wrongly drops its own
+    // local incident. Persian Gulf / Hormuz littorals: Iran, Oman, the UAE,
+    // Saudi Arabia, Qatar, Bahrain, Kuwait, Iraq. Bab-el-Mandeb / Gulf of Aden
+    // littorals: Yemen, Djibouti, Somalia, Eritrea.
+    re: /\b(strait of hormuz|hormuz|gulf of oman|persian gulf|arabian gulf|fujairah|habshan|bandar abbas|bab[- ]?el[- ]?mandeb|gulf of aden)\b/i,
+    members: new Set([
+      "iran",
+      "oman",
+      "united arab emirates",
+      "uae",
+      "saudi arabia",
+      "qatar",
+      "bahrain",
+      "kuwait",
+      "iraq",
+      "yemen",
+      "djibouti",
+      "somalia",
+      "eritrea",
+    ]),
+  },
+];
+
+/**
+ * True when a record is anchored to a named foreign maritime / conflict theatre
+ * that the report's country is NOT a member of. Such a record happened in that
+ * theatre (e.g. the Strait of Hormuz), not in the report's country, and is only
+ * cross-tagged onto a nationality it mentions — so it must be stripped from the
+ * non-member country's report. The theatre's own littoral states (Iran, the
+ * UAE, Oman, ...) keep it. Records that name no foreign theatre are unaffected,
+ * so a genuinely domestic story is never dropped (no-fabrication: only strip
+ * when the narrative positively places the event in a foreign theatre).
+ */
+export function isForeignTheatreContext(
+  text: string | null | undefined,
+  reportName: string,
+): boolean {
+  const t = text ?? "";
+  if (!t) return false;
+  const own = new Set(acceptedCountryTokens(reportName));
+  // The report name may be an alias absent from the accepted-token set
+  // (e.g. "UAE" vs "United Arab Emirates"); fold the raw key in too.
+  const key = (reportName ?? "").trim().toLowerCase();
+  if (key) own.add(key);
+  for (const theatre of FOREIGN_THEATRES) {
+    if (!theatre.re.test(t)) continue;
+    let isMember = false;
+    for (const tok of own) {
+      if (theatre.members.has(tok)) {
+        isMember = true;
+        break;
+      }
+    }
+    if (!isMember) return true;
+  }
+  return false;
+}
+
 const PNG_TOKEN_SET = new Set(COUNTRY_GROUPS["papua new guinea"]);
 const PAPUA_TOKEN_SET = new Set(COUNTRY_GROUPS["papua"]);
 
