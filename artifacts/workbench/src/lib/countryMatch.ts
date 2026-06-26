@@ -211,6 +211,47 @@ export function isForeignDominantContext(
 }
 
 // ---------------------------------------------------------------------------
+// Indonesia operating-risk foreign-subject guard
+// ---------------------------------------------------------------------------
+// The `indonesia_local` topic is fed by Bahasa-first Indonesian outlets that
+// also cover OVERSEAS events (foreign earthquakes, foreign sport, foreign
+// politics). The classifier files every such record under country="Indonesia",
+// so the national / Jakarta operating-risk brief otherwise fills with foreign
+// "slop": a flood of Japan/Venezuela/California earthquakes, a New York sports
+// riot, a Japan-vs-Sweden match. These are only detectable in the ENGLISH
+// translation (`ln`); the stored Bahasa title hides the foreign subject from
+// the English excludes that run upstream.
+const INDO_FOREIGN_SUBJECT_RE =
+  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|france|french|spain|spanish|italy|italian|portugal|netherlands|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|canada|canadian|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|haiti)\b/i;
+
+// Indonesian domestic geography / nationality anchors. Their presence shows the
+// record is genuinely about Indonesia even when a foreign country is also named
+// (e.g. a foreign national involved in an Indonesian incident). Papua-theatre
+// place names are DELIBERATELY absent — those records are routed to the
+// dedicated West Papua brief by isIndonesianPapuaTheatreContext upstream.
+const INDO_LOCAL_ANCHOR_RE =
+  /\b(indonesia|indonesian|jakarta|surabaya|bandung|medan|semarang|makassar|palembang|depok|tangerang|bekasi|bogor|batam|pekanbaru|padang|malang|denpasar|bali|lombok|sumatra|sumatera|java|jawa|sulawesi|kalimantan|borneo|aceh|riau|lampung|yogyakarta|jogja|maluku|banten|cirebon|surakarta|manado|balikpapan|samarinda|pontianak|banjarmasin|jambi|bengkulu|gorontalo|kupang|mataram|ambon|ternate)\b/i;
+
+/**
+ * True when an Indonesia-filed record is dominated by a FOREIGN subject and so
+ * must not populate the Indonesia / Jakarta operating-risk brief. Pass the
+ * ENGLISH text (translated `ln` + original title + summary): the foreign
+ * subject is only visible once translated. A foreign nationality named in
+ * passing must NOT drop a genuine domestic story, so — exactly like the
+ * PNG / West Papua guard above — we decide by SIGNAL DOMINANCE: drop only when
+ * foreign-country cue matches OUTNUMBER Indonesian-place cue matches across the
+ * text (the same occurrence-count basis the PNG/Papua guard uses).
+ */
+export function isForeignSubjectForIndonesia(
+  text: string | null | undefined,
+): boolean {
+  const t = text ?? "";
+  const foreignCount = countMatches(INDO_FOREIGN_SUBJECT_RE, t);
+  if (foreignCount === 0) return false;
+  return foreignCount > countMatches(INDO_LOCAL_ANCHOR_RE, t);
+}
+
+// ---------------------------------------------------------------------------
 // Foreign maritime / conflict theatre guard
 // ---------------------------------------------------------------------------
 //

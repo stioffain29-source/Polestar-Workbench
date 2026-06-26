@@ -50,6 +50,7 @@ import {
   isCrossBorderPapuaPng,
   isForeignDominantContext,
   isForeignTheatreContext,
+  isForeignSubjectForIndonesia,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import SituationalContextSection from "@/components/SituationalContextSection";
@@ -261,10 +262,14 @@ export default function CountryReport() {
       !isPng && !isPapua && !isJakarta && tokens.includes("indonesia");
     return (incidentsData ?? []).filter((i) => {
       if (isJakarta) {
-        return (
-          incidentMatchesCountry(i.country, "Indonesia") &&
-          isJakartaScoped(i.title, i.summary, i.location)
-        );
+        if (!incidentMatchesCountry(i.country, "Indonesia")) return false;
+        if (!isJakartaScoped(i.title, i.summary, i.location)) return false;
+        // Indonesian outlets also report OVERSEAS events under a domestic
+        // country tag; drop foreign-subject "slop" using the English text.
+        const tr = i as { ln?: string | null; displayTitle?: string | null };
+        const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`;
+        if (isForeignSubjectForIndonesia(en)) return false;
+        return true;
       }
       if (!incidentMatchesCountry(i.country, name)) return false;
       // Standing rule: Indonesian Papua / West Papua records must not
@@ -293,6 +298,17 @@ export default function CountryReport() {
       // would otherwise mis-route an unrelated national story (masthead pollution).
       if (isIndonesia && isIndonesianPapuaTheatreContext(i.title)) {
         return false;
+      }
+      // Indonesia operating-risk brief: the indonesia_local topic is fed by
+      // Bahasa-first outlets that also report OVERSEAS events (foreign quakes,
+      // foreign sport, foreign politics) under a domestic country tag. These are
+      // only detectable once translated, so test the English `ln` translation;
+      // Indonesian-place cues rescue a genuine domestic story that merely names
+      // a foreign nationality.
+      if (isIndonesia) {
+        const tr = i as { ln?: string | null; displayTitle?: string | null };
+        const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`;
+        if (isForeignSubjectForIndonesia(en)) return false;
       }
       // Drop geocoder mis-tags: a record whose TITLE is about a distant
       // foreign country (e.g. "Myanmar clashes ... near Thai border") with no
