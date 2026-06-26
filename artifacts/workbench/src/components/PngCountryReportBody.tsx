@@ -388,7 +388,7 @@ function KeyDevelopmentGroupSection({
   );
 }
 
-// Location Watchlist — a branded three-column table (Location | Why it matters |
+// Location Watchlist — a branded three-column table (Location | Main concern |
 // Recommended action). Plain text cells with content-box sizing and generous
 // padding, no line-clamp, so html2canvas rasterises every line cleanly (clamped
 // text renders shifted/clipped under html2canvas).
@@ -434,7 +434,7 @@ function LocationWatchlistTable({ entries }: { entries: LocationWatchlistEntry[]
         }}
       >
         <Cell text="Location" width="24%" head />
-        <Cell text="Why it matters" width="38%" head />
+        <Cell text="Main concern" width="38%" head />
         <Cell text="Recommended action" width="38%" head />
       </div>
       {entries.map((e, i) => (
