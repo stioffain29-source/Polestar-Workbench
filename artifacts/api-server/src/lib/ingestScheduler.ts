@@ -10,6 +10,7 @@ import {
   runMarketPricesOnce,
   runMovementOnce,
   runStrikesOnce,
+  runTitleTranslationOnce,
 } from "./ingestRunner";
 import { logger } from "./logger";
 
@@ -621,6 +622,42 @@ export function startIngestScheduler(): void {
           logger.error(
             { err },
             "boot movement: early movement-only ingest failed",
+          );
+        }
+
+        // EARLY, translation-only run, SEQUENCED after movement so the three
+        // early sub-runs never contend for the shared advisory lock. Foreign
+        // (Bahasa / non-Latin) headlines get an English display_title here; the
+        // pass otherwise runs only inside the full incident chain, which an
+        // autoscale instance routinely tears down before reaching it — so in
+        // prod foreign headlines shipped untranslated and reports rendered the
+        // raw original title (no title-translate log line ever appeared in
+        // prod). This fast early run lands the translation inside the cold-start
+        // warm window. The pass is idempotent, commits per row and converges, so
+        // a torn-down run still persists what it finished and the next boot
+        // drains the rest; it self-skips when no OpenAI key is configured.
+        try {
+          const result = await runTitleTranslationOnce();
+          if (!result.ran) {
+            logger.info(
+              "boot translate: skipped (full ingest already running)",
+            );
+          } else {
+            logger.info(
+              {
+                candidates: result.titleTranslation.candidates,
+                translated: result.titleTranslation.translated,
+                failed: result.titleTranslation.failed,
+                skipped: result.titleTranslation.skipped,
+                durationMs: result.durationMs,
+              },
+              "boot translate: early title-translation run finished",
+            );
+          }
+        } catch (err) {
+          logger.error(
+            { err },
+            "boot translate: early title-translation run failed",
           );
         }
       })(),

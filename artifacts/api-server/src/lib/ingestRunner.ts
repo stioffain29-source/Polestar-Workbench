@@ -35,6 +35,7 @@ import {
   type SocialWatchSummary,
   type FacebookOsintSummary,
   type GdeltEnrichSummary,
+  type TitleTranslationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 
@@ -128,6 +129,16 @@ export type MovementRunResult =
       finishedAt: Date;
       durationMs: number;
       maritimeMovement: MaritimeMovementSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type TitleTranslationRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      titleTranslation: TitleTranslationSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -921,6 +932,53 @@ export async function runMovementOnce(): Promise<MovementRunResult> {
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       maritimeMovement,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the foreign-headline title-translation pass, committing to the
+ * database.
+ *
+ * Translation (display_title) also runs inside the full incident chain, but
+ * only AFTER the strikes and ICC-piracy passes — on an autoscale deployment the
+ * instance is routinely torn down before the chain reaches it, so foreign
+ * (Bahasa / non-Latin) headlines never get an English display_title in prod and
+ * reports render the raw original title (observed: prod had no title-translate
+ * log line at all). Mirroring the proven strikes/movement pattern, this gives
+ * translation its OWN fast, early boot run that lands inside the cold-start warm
+ * window. The pass is idempotent and converges (each committed row leaves the
+ * candidate set) and commits per row, so a torn-down run still persists what it
+ * finished and the next boot drains the rest. It self-skips when no OpenAI key
+ * is configured. Shares the same advisory lock so it can never collide with a
+ * full run.
+ */
+export async function runTitleTranslationOnce(): Promise<TitleTranslationRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let titleTranslation: TitleTranslationSummary;
+    try {
+      titleTranslation = await runTitleTranslation({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "title translation failed");
+      titleTranslation = {
+        candidates: 0,
+        translated: 0,
+        failed: 0,
+        skipped: false,
+        logLines: [
+          `title-translate failed: ${err instanceof Error ? err.message : String(err)}`,
+        ],
+      };
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      titleTranslation,
     };
   });
   if (!res.ran) return res;
