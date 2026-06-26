@@ -14,7 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, FileText, FileType, FileDown, ShieldCheck, Trash2, X, KeyRound } from "lucide-react";
+import { ArrowLeft, FileText, FileType, FileDown, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,11 +41,6 @@ import {
   type QualityResult,
 } from "@/lib/spotReport";
 import { downloadSpotReportDocx, downloadSpotReportText } from "@/lib/spotReportExport";
-import {
-  getStoredAdminToken,
-  setStoredAdminToken,
-  adminMutationErrorMessage,
-} from "@/lib/adminToken";
 import SpotReportPreview from "@/components/SpotReportPreview";
 import { useToast } from "@/hooks/use-toast";
 
@@ -193,7 +188,6 @@ export default function SpotReportEditor() {
     result: QualityResult;
   }>({ open: false, format: null, result: { errors: [], warnings: [] } });
   const [incidentSearch, setIncidentSearch] = useState("");
-  const [adminToken, setAdminToken] = useState(getStoredAdminToken);
 
   const previewRef = useRef<HTMLDivElement | null>(null);
   const initId = useRef<number | null>(null);
@@ -431,15 +425,6 @@ export default function SpotReportEditor() {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
-    if (!adminToken.trim()) {
-      toast({
-        title: "Admin token required",
-        description:
-          "Enter the admin token above to create, edit, or delete spot reports.",
-        variant: "destructive",
-      });
-      return;
-    }
     if (isNew) {
       create.mutate(
         { data: buildData(true) as never },
@@ -450,9 +435,12 @@ export default function SpotReportEditor() {
             setLocation(`/spot-reports/${(created as SpotReport).id}`);
           },
           onError: (err) => {
-            const httpStatus = (err as { status?: number })?.status;
+            const status = (err as { status?: number })?.status;
             toast({
-              title: adminMutationErrorMessage(httpStatus) ?? "Failed to create",
+              title:
+                status === 401
+                  ? "Session expired — please reload and sign in"
+                  : "Failed to create",
               variant: "destructive",
             });
           },
@@ -468,9 +456,12 @@ export default function SpotReportEditor() {
             toast({ title: "Saved" });
           },
           onError: (err) => {
-            const httpStatus = (err as { status?: number })?.status;
+            const status = (err as { status?: number })?.status;
             toast({
-              title: adminMutationErrorMessage(httpStatus) ?? "Failed to save",
+              title:
+                status === 401
+                  ? "Session expired — please reload and sign in"
+                  : "Failed to save",
               variant: "destructive",
             });
           },
@@ -632,21 +623,6 @@ export default function SpotReportEditor() {
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
-          <div className="relative w-40">
-            <KeyRound className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="password"
-              value={adminToken}
-              onChange={(e) => {
-                setAdminToken(e.target.value);
-                setStoredAdminToken(e.target.value);
-              }}
-              autoComplete="off"
-              placeholder="Admin token"
-              title="INGEST_ADMIN_TOKEN — required to create, edit, or delete"
-              className="h-9 rounded-sm pl-9 text-sm font-mono"
-            />
-          </div>
           <Button
             onClick={handleSave}
             disabled={saving}
@@ -656,12 +632,6 @@ export default function SpotReportEditor() {
           </Button>
         </div>
       </div>
-
-      {!adminToken.trim() && (
-        <div className="no-print bg-destructive/5 border border-destructive/30 rounded-sm px-4 py-2 text-sm text-destructive">
-          Enter the admin token above to create, edit, or delete spot reports — without it, saving will fail with an authorisation error.
-        </div>
-      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {/* Builder form */}

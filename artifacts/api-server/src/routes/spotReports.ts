@@ -8,7 +8,6 @@ import {
   ListSpotReportsQueryParams,
   AppendSpotReportExportBody,
 } from "@workspace/api-zod";
-import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -45,7 +44,7 @@ router.get("/spot-reports/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.post("/spot-reports", requireAdminToken, async (req, res): Promise<void> => {
+router.post("/spot-reports", async (req, res): Promise<void> => {
   const parsed = CreateSpotReportBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -60,7 +59,7 @@ router.post("/spot-reports", requireAdminToken, async (req, res): Promise<void> 
   res.status(201).json(row);
 });
 
-router.patch("/spot-reports/:id", requireAdminToken, async (req, res): Promise<void> => {
+router.patch("/spot-reports/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateSpotReportBody.safeParse(req.body);
   if (!parsed.success) {
@@ -83,14 +82,14 @@ router.patch("/spot-reports/:id", requireAdminToken, async (req, res): Promise<v
   res.json(row);
 });
 
-router.delete("/spot-reports/:id", requireAdminToken, async (req, res): Promise<void> => {
+router.delete("/spot-reports/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(spotReportsTable).where(eq(spotReportsTable.id, id));
   res.status(204).end();
 });
 
 // Append an export-history entry (one per PDF / Word / plain-text export).
-router.post("/spot-reports/:id/exports", requireAdminToken, async (req, res): Promise<void> => {
+router.post("/spot-reports/:id/exports", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = AppendSpotReportExportBody.safeParse(req.body);
   if (!parsed.success) {
