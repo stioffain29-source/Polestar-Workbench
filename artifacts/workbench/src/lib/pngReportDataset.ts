@@ -32,6 +32,8 @@ export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
 import {
   operatingRiskDisplayCategory,
+  operatingRiskCategoryPhrase,
+  operatingRiskAction,
   buildOperatingRiskBluf,
   buildOperatingRiskExecutiveSummary,
   buildOperatingRiskPolestarView,
@@ -421,12 +423,31 @@ export interface ReportingConfidence {
   rationale: string;
 }
 
+// One themed "Key Development" group: the period's incidents grouped by their
+// client-facing display category (e.g. "Protest / civil unrest"). Carries the
+// tile/severity cards for that theme and a deterministic business-impact line.
+export interface KeyDevelopmentGroup {
+  key: string;
+  heading: string;
+  items: PngReportItem[];
+  businessImpact: string;
+}
+
 export interface PngReportDataset {
   periodLabel: string;
   // Bottom Line Up Front — a single short paragraph at the very top giving the
   // week's trajectory, the lead concern and the principal business risk.
   bluf: string;
   executiveSummary: string;
+  // "What Matters This Week" framing bullets — the dominant risk themes this
+  // period as short, count-free lines. Empty-window → a single standing caveat.
+  whatMattersBullets: string[];
+  // Themed developments (incidents grouped by display category, severity-ranked),
+  // each closing with a business-impact line. Drives the operating-risk layout.
+  keyDevelopments: KeyDevelopmentGroup[];
+  // "Escalation indicators" for the Outlook: what would raise concern in the
+  // coming week. Deterministic, derived from the period's categories/severity.
+  escalationIndicators: string[];
   // Week-on-week delta (volume / severity / focus / type / quiet areas),
   // described qualitatively against the previous 7-day window.
   whatChanged: string;
@@ -465,7 +486,7 @@ export interface PngReportDataset {
   windowItems: PngReportItem[];
 }
 
-interface BuildArgs {
+export interface BuildArgs {
   windowIncidents: PngSourceIncident[];
   // The 7-day window immediately before `windowIncidents`. Optional so any
   // caller that cannot supply it still builds (week-on-week delta degrades to a
@@ -697,7 +718,7 @@ function whyForLocation(dominantCatLower: string | null, worstRank: number, fres
 
 // Generic config-driven builder. The PNG and West Papua entry points below are
 // thin wrappers that pass their theatre config.
-function buildStructuredReportDataset(
+export function buildStructuredReportDataset(
   args: BuildArgs,
   config: StructuredTheatreConfig,
 ): PngReportDataset {
@@ -1132,10 +1153,102 @@ function buildStructuredReportDataset(
     reportingConfidence = { level, rationale: `${capitaliseFirst(sourceBit)}, and ${locBit}.` };
   }
 
+  // --- Key Developments (themed groups) --------------------------------------
+  // Group the period's incidents by their client-facing DISPLAY category so the
+  // brief reads as themed developments rather than a flat list. Works for every
+  // theatre: operatingRiskDisplayCategory maps the granular categories onto the
+  // business labels (and passes unmapped labels through unchanged). Each theme
+  // keeps the tile/severity cards and closes with a deterministic business line.
+  const kdGroupMap = new Map<string, PngReportItem[]>();
+  for (const it of windowItems) {
+    const label = operatingRiskDisplayCategory(it.category);
+    const arr = kdGroupMap.get(label) ?? [];
+    arr.push(it);
+    kdGroupMap.set(label, arr);
+  }
+  const kdScored = Array.from(kdGroupMap.entries()).map(([label, items]) => {
+    const worst = items.reduce((m, it) => Math.max(m, it.severityRank), 0);
+    return {
+      label,
+      items: [...items].sort(sortBySeverityThenRecency),
+      worst,
+      score: items.length + (worst >= 4 ? 4 : worst >= 3 ? 1 : 0),
+    };
+  });
+  kdScored.sort((a, b) => b.score - a.score);
+  const keyDevelopments: KeyDevelopmentGroup[] = kdScored.slice(0, 5).map((g) => ({
+    key: g.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "other",
+    heading: g.label,
+    // Cap per theme so the section reads as a brief, not an exhaustive list.
+    items: g.items.slice(0, 4),
+    businessImpact: operatingRiskAction(g.label),
+  }));
+
+  // --- What Matters This Week (framing bullets) ------------------------------
+  // One short, count-free line per dominant theme: the theme phrase, where it
+  // clustered, and a qualitative severity flag. Empty window → standing caveat.
+  const whatMattersBullets: string[] = [];
+  if (windowItems.length === 0) {
+    whatMattersBullets.push(
+      "No fresh open-source reporting was identified this period; standing exposures continue to apply and the quiet stretch is read as a coverage signal, not an improvement.",
+    );
+  } else {
+    for (const g of kdScored.slice(0, 4)) {
+      const phrase = capitaliseFirst(operatingRiskCategoryPhrase(g.label));
+      const locs = topLabels(
+        g.items.filter((it) => it.province),
+        (it) => provinceLabel.get(it.province as string) ?? (it.province as string),
+        2,
+      );
+      const locBit = locs.length ? `, centred on ${joinList(locs)}` : "";
+      const sevBit =
+        g.worst >= 5
+          ? ", including extreme-severity reporting"
+          : g.worst >= 4
+            ? ", including high-severity reporting"
+            : "";
+      whatMattersBullets.push(`${phrase}${locBit}${sevBit}.`);
+    }
+  }
+
+  // --- Escalation indicators (Outlook) ---------------------------------------
+  // What would raise concern in the coming week — deterministic, drawn from the
+  // period's categories, worst severity and lead locations. No counts.
+  const escalationIndicators: string[] = [];
+  if (windowItems.length === 0) {
+    escalationIndicators.push(
+      "Any return of open-source reporting, particularly higher-severity or casualty-bearing incidents",
+      `A confirmed cluster of incidents around ${config.outlookVolatilityClause}`,
+    );
+  } else {
+    const escLeadLocs = topProvs.slice(0, 2).map((p) => provinceLabel.get(p) ?? p);
+    const displayCatSet = new Set(
+      windowItems.map((it) => operatingRiskDisplayCategory(it.category).toLowerCase()),
+    );
+    if (displayCatSet.has("protest / civil unrest") || displayCatSet.has("labour action"))
+      escalationIndicators.push(
+        "Larger or coordinated protest mobilisation, or labour action spreading to key sites and corridors",
+      );
+    escalationIndicators.push(
+      curWorstRank >= 4
+        ? "Further casualty-bearing or higher-severity violence at or near operating sites"
+        : "Any move to casualty-bearing or higher-severity incidents",
+    );
+    escalationIndicators.push(
+      escLeadLocs.length
+        ? `Spread of incidents beyond ${joinList(escLeadLocs)} into new districts`
+        : "A spread of incidents into new districts, or a single dominant centre emerging",
+    );
+    escalationIndicators.push(`Flashpoints around ${config.outlookVolatilityClause}`);
+  }
+
   return {
     periodLabel,
     bluf,
     executiveSummary,
+    whatMattersBullets,
+    keyDevelopments,
+    escalationIndicators,
     whatChanged,
     topThree,
     buckets,

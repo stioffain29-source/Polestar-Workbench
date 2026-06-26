@@ -39,6 +39,7 @@ import {
   buildJakartaReportDataset,
   type PngSourceIncident,
 } from "@/lib/pngReportDataset";
+import { buildCountryOperatingRiskDataset } from "@/lib/countryOperatingRiskDataset";
 import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 import {
   incidentMatchesCountry,
@@ -51,6 +52,7 @@ import {
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import SituationalContextSection from "@/components/SituationalContextSection";
+import CountryReportVisuals from "@/components/CountryReportVisuals";
 import {
   buildMaritimeSecuritySummary,
   maritimeTypeColor,
@@ -484,7 +486,7 @@ export default function CountryReport() {
   // prose path below can ground its Executive Summary + Outlook on the SAME
   // deduped window items the brief renders.
   const pngDataset = useMemo(() => {
-    if (!structuredTheatre) return null;
+    if (!country) return null;
     const args = {
       windowIncidents: active.incidents as PngSourceIncident[],
       previousWindowIncidents: resolvePreviousCountryWindow(layers, issueDate) as PngSourceIncident[],
@@ -500,10 +502,15 @@ export default function CountryReport() {
         return buildIndonesiaReportDataset(args);
       case "jakarta":
         return buildJakartaReportDataset(args);
-      default:
+      case "png":
         return buildPngReportDataset(args);
+      // Every other country renders the same operating-risk brief, built from a
+      // generic config (shared rulebook for themes, incident location for the
+      // watchlist).
+      default:
+        return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, active, layers, baseline, issueDate]);
+  }, [structuredTheatre, active, layers, baseline, issueDate, country]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -1262,17 +1269,31 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {editing && proseDraft && isStructured && (
+      {editing && proseDraft && (
         <Section title="Narrative (editable)">
-          <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
-            AI-generated from this window's incidents. Edits are saved against the current data; if the
-            data later changes, use Redraft to regenerate.
-          </div>
-          <BaselineTextField label="Bottom Line Up Front" value={proseDraft.bluf ?? ""} onChange={(v) => setProseField("bluf", v)} />
-          <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
-          <BaselineTextField label="What Changed" value={proseDraft.whatChanged ?? ""} onChange={(v) => setProseField("whatChanged", v)} />
-          <BaselineTextField label="Outlook" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
-          <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
+          {pngDataset && pngDataset.proseVariant === "operating-risk" ? (
+            // Operating-risk briefs (Indonesia / Jakarta / every generic country)
+            // render a deterministic, business-language narrative from the live
+            // window — the section prose is intentionally NOT editable so it can
+            // never drift from the data or persist as stale hidden prose. Only the
+            // per-incident analyst summary on each card is editable.
+            <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
+              The written brief is generated deterministically from this window's incidents and is not
+              directly editable. Refine the one-line analyst summary shown on each incident card below.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
+                AI-generated from this window's incidents. Edits are saved against the current data; if the
+                data later changes, use Redraft to regenerate.
+              </div>
+              <BaselineTextField label="Bottom Line Up Front" value={proseDraft.bluf ?? ""} onChange={(v) => setProseField("bluf", v)} />
+              <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
+              <BaselineTextField label="What Changed" value={proseDraft.whatChanged ?? ""} onChange={(v) => setProseField("whatChanged", v)} />
+              <BaselineTextField label="Outlook" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
+              <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
+            </>
+          )}
           {pngDataset && pngDataset.windowItems.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 6 }}>
@@ -1294,279 +1315,28 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {editing && proseDraft && !isStructured && (
-        <Section title="Narrative (editable)">
-          <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
-            AI-generated from this window's incidents. Edits are saved against the current data; if the
-            data later changes, use Redraft to regenerate.
-          </div>
-          <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
-          <BaselineTextField label="Situation" value={proseDraft.situation} onChange={(v) => setProseField("situation", v)} />
-          <BaselineTextField label="What Happened" value={proseDraft.whatHappened} onChange={(v) => setProseField("whatHappened", v)} />
-          <BaselineTextField label="What Matters" value={proseDraft.whatMatters} onChange={(v) => setProseField("whatMatters", v)} />
-          <BaselineListField label="Implications for Business" items={proseDraft.implications} onChange={(v) => setProseField("implications", v)} placeholder="One implication per line" />
-          <BaselineListField label="Watch Next" items={proseDraft.watchNext} onChange={(v) => setProseField("watchNext", v)} placeholder="One indicator per line" />
-          <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
-          {dedupedWindowIncidents.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontFamily: ROBOTO, fontSize: 12, fontWeight: 600, color: NAVY, marginBottom: 6 }}>
-                Incident Summaries
-              </div>
-              <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
-                One analyst summary per incident, grounded on its own reporting. Shown in the Related Incidents table.
-              </div>
-              {dedupedWindowIncidents.map((it) => {
-                const iid = String(it.id);
-                return (
-                  <BaselineTextField
-                    key={iid}
-                    label={cleanIncidentTitle(it.title, it.source)}
-                    value={proseDraft.incidentSummaries?.[iid] ?? ""}
-                    onChange={(v) => setIncidentSummary(iid, v)}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </Section>
-      )}
-
-      {isStructured && pngEffectiveDataset && (
+      {/* Every country — structured theatre or generic — renders the same
+          deterministic operating-risk brief from PngCountryReportBody. */}
+      {pngEffectiveDataset && (
         <PngCountryReportBody dataset={pngEffectiveDataset} incidentSummaries={incidentSummaries} />
       )}
 
-      {!isStructured && (
-      <>
-      <Section title="Executive Summary">
-        <Prose text={displayProse.executiveSummary} />
-      </Section>
-
-      {/* 2. Fast Facts */}
-      <Section title="Fast Facts">
-        <FastFactsGrid cards={facts.cards} />
-      </Section>
-
-      {/* Sections 3-6 are all auto-derived from the window-aware drafted
-          prose (draftReportProse). They are intentionally NOT editable or
-          stored: persisted overview / trend_summary / implications rows
-          previously went stale and implied fresh activity even when
-          the headline window was empty. Driving every narrative section from
-          the live dataset keeps the on-screen report, the captured PDF and
-          both the dev and prod environments in agreement regardless of any
-          legacy stored text. */}
-
-      {/* 3. Situation (auto — window-aware) */}
-      <Section title="Situation">
-        <Prose text={displayProse.situation} />
-      </Section>
-
-      {/* 4. What Happened (auto — window-aware) */}
-      <Section title="What Happened">
-        <Prose text={displayProse.whatHappened} />
-      </Section>
-
-      {/* 5. What Matters (auto) */}
-      <Section title="What Matters">
-        <Prose text={displayProse.whatMatters} />
-      </Section>
-
-      {/* 6. Implications for Business (auto — window-aware) */}
-      <Section title="Implications for Business">
-        <Prose text={displayProse.implications} />
-      </Section>
-
-      {/* 6b. Location Watchlist — read-only breakdown derived from the
-          curated location list, shown when one is available. */}
-      {!editing && baseline && watchlist.length > 0 && (
-        <Section title="Location Watchlist">
-          <WatchlistTable rows={watchlist} />
-        </Section>
-      )}
-
-      {/* 6c. 30-Day Context */}
-      <Section title="30-Day Context">
-        <Prose text={lookback.thirtyDay} />
-      </Section>
-
-      {/* 6d. Background Operating Picture (90-day) — always rendered so
-          the report carries the deeper backdrop even in busy cycles. */}
-      <Section title="Background Operating Picture">
-        <Prose text={lookback.ninetyDay} />
-      </Section>
-
-      {/* 7. Map */}
-      <Section title="Map">
-        <div>
-          <CountryReportMap incidents={windowIncidents as CountryFastFactsIncident[]} domId="country-report-map" countryName={effective.name} />
-        </div>
-        <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, fontStyle: "italic", marginTop: 6 }}>
-          Where coordinates are available, the map plots incidents from the active reporting window ({active.incidents.length} record{active.incidents.length === 1 ? "" : "s"} in the {active.basisLabel} window). If coordinates are unavailable, the map shows country operating context only.
-        </div>
-      </Section>
-
-      {/* 8. Severity Distribution */}
-      <Section title="Severity Distribution">
-        {severityTotal === 0 ? (
-          <EmptyNote>No incidents in the active window to chart.</EmptyNote>
-        ) : (
-          <div className="space-y-1.5">
-            {SEV_ORDER.map((k) => {
-              const n = facts.severityCounts[k];
-              const w = severityTotal === 0 ? 0 : (n / severityTotal) * 100;
-              return (
-                <div key={k} className="grid items-center" style={{ gridTemplateColumns: "140px 1fr 40px", gap: 8 }}>
-                  <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>{SEV_LABEL[k]}</div>
-                  <div style={{ background: CHART_TRACK, height: 18, borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: n === 0 ? "0%" : `${Math.max(w, 3)}%`, height: "100%", background: SEV_COLOR[k], borderRadius: 2 }} />
-                  </div>
-                  <div style={{ fontFamily: ROBOTO, fontSize: 13, fontWeight: 700, color: NAVY, textAlign: "right" }}>{n}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Section>
-
-      {/* 9. Incident Breakdown by Type */}
-      <Section title="Incident Breakdown by Type">
-        {typeChartData.length === 0 ? (
-          <EmptyNote>No classifiable incident types in the active window.</EmptyNote>
-        ) : (
-          <div className="space-y-1.5">
-            {typeChartData.map((d) => {
-              const w = typeChartMax === 0 ? 0 : (d.n / typeChartMax) * 100;
-              return (
-                <div key={d.label} className="grid items-center" style={{ gridTemplateColumns: "180px 1fr 40px", gap: 8 }}>
-                  <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>{d.label}</div>
-                  <div style={{ background: CHART_TRACK, height: 18, borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: d.n === 0 ? "0%" : `${Math.max(w, 3)}%`, height: "100%", background: ELECTRIC, borderRadius: 2 }} />
-                  </div>
-                  <div style={{ fontFamily: ROBOTO, fontSize: 13, fontWeight: 700, color: NAVY, textAlign: "right" }}>{d.n}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Section>
-
-      {/* Watch Next (auto) */}
-      <Section title="Watch Next">
-        <Prose text={displayProse.watchNext} />
-      </Section>
-
-      {/* Polestar View (auto) */}
-      <Section title="Polestar View">
-        <Prose text={displayProse.polestarView} />
-      </Section>
-
-      {/* Situational Context (UN OCHA ReliefWeb supporting layer — not counted) */}
-      <SituationalContextSection
-        reports={situationalReports}
-        country={effective.name}
-        max={6}
+      {/* Shared analytics block — rendered below the written brief for EVERY
+          country (structured and generic). Map leads, then the severity and
+          incident-type charts, then the Situational Context and Maritime
+          Security reference layers. */}
+      <CountryReportVisuals
+        windowIncidents={windowIncidents as CountryFastFactsIncident[]}
+        countryName={effective.name}
+        severityCounts={facts.severityCounts}
+        severityTotal={severityTotal}
+        typeChartData={typeChartData}
+        typeChartMax={typeChartMax}
+        situationalReports={situationalReports}
+        maritimeSummary={maritimeSummary}
+        activeIncidentCount={active.incidents.length}
+        activeBasisLabel={active.basisLabel}
       />
-
-      {/* Maritime Security (ICC CCS / IMB standalone layer — never an incident,
-          never added to any count). Hidden entirely when the coastal state has
-          no reported activity in the current year. */}
-      {maritimeSummary.total > 0 && (
-        <Section title="Maritime Security">
-          <Prose text={maritimeSummary.read} />
-          <div className="flex flex-wrap gap-2" style={{ margin: "10px 0 12px" }}>
-            {maritimeSummary.byType.map((t) => (
-              <span
-                key={t.type}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontFamily: ROBOTO,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: DUSK,
-                  border: `1px solid ${POLAR}`,
-                  borderRadius: 2,
-                  padding: "3px 8px",
-                  background: "#fff",
-                }}
-              >
-                <span style={{ width: 10, height: 10, background: t.color, borderRadius: 2, display: "inline-block" }} />
-                {t.type}: {t.count}
-              </span>
-            ))}
-          </div>
-          <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
-            <div className="grid" style={{ gridTemplateColumns: "120px 150px minmax(0, 1fr) 160px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              <div className="p-2.5">Date</div>
-              <div className="p-2.5">Type</div>
-              <div className="p-2.5">Location</div>
-              <div className="p-2.5">Coastal State</div>
-            </div>
-            {maritimeSummary.rows.map((r) => (
-              <div key={r.id} className="grid items-center" style={{ gridTemplateColumns: "120px 150px minmax(0, 1fr) 160px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
-                <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{r.date ? format(r.date, "dd MMM yyyy") : "—"}</div>
-                <div className="p-2.5" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 9, height: 9, background: maritimeTypeColor(r.type), borderRadius: 2, display: "inline-block", flexShrink: 0 }} />
-                  {r.type}
-                </div>
-                <div className="p-2.5" style={{ fontWeight: 500, color: NAVY }}>{r.location ?? "—"}</div>
-                <div className="p-2.5">{r.country ?? "—"}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontFamily: ROBOTO, fontSize: 10, color: DUSK, opacity: 0.7, marginTop: 6 }}>
-            Source: {MARITIME_SECURITY_SOURCE_LABEL}. Standalone reference layer — not an incident and not included in any incident total.
-          </div>
-        </Section>
-      )}
-
-      {/* 10. Related Incidents */}
-      <Section title="Related Incidents">
-        {totalInWindow === 0 ? (
-          <EmptyNote>No related incidents recorded for {effective.name} in the active window.</EmptyNote>
-        ) : (
-          <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
-            <div className="grid" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              <div className="p-2.5">Date</div>
-              <div className="p-2.5">Type</div>
-              <div className="p-2.5">Title</div>
-              <div className="p-2.5">Severity</div>
-            </div>
-            {[...windowIncidents].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).map((i) => {
-              const sk = (i.severity ?? "").toLowerCase();
-              const sevColor = SEV_COLOR[sk] ?? "#999";
-              const summaryText = incidentSummaries[String(i.id)]?.trim() || deterministicIncidentSummary(i);
-              return (
-                <div key={i.id} className="grid items-start" style={{ gridTemplateColumns: "160px 130px minmax(0, 1fr) 150px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
-                  <div className="p-2.5" style={{ fontFamily: ROBOTO, fontSize: 11 }}>{format(new Date(i.occurredAt), "dd MMM yyyy HH:mm")}</div>
-                  <div className="p-2.5">{classifyIncidentType(i)}</div>
-                  <div className="p-2.5">
-                    <div style={{ fontWeight: 500, color: NAVY }}>{(i.displayTitle && i.displayTitle.trim()) ? i.displayTitle.trim() : cleanIncidentTitle(i.title, i.source)}</div>
-                    {summaryText && (
-                      <div style={{ fontWeight: 400, color: DUSK, fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>{summaryText}</div>
-                    )}
-                  </div>
-                  <div className="p-2.5">
-                    <span
-                      style={{
-                        background: sevColor, color: "#fff", padding: "0 10px",
-                        minWidth: 72, height: 24, lineHeight: "24px",
-                        fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                        textTransform: "uppercase", borderRadius: 2, display: "inline-flex",
-                        alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", boxSizing: "border-box",
-                      }}
-                    >
-                      {SEV_LABEL[sk] ?? i.severity}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Section>
-      </>
-      )}
 
       {/* Internal Source Coverage — screen-only, never in the PDF.
           Surfaces the layer counts and any thin-data signal for the

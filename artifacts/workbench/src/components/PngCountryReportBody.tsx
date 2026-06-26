@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { format } from "date-fns";
 import type {
+  KeyDevelopmentGroup,
   LocationWatchlistEntry,
   PngReportDataset,
   PngReportItem,
@@ -342,6 +343,51 @@ function StrandedLocationSection({
   );
 }
 
+// A plain count-free bullet list (What Matters This Week, Priorities for Clients,
+// Escalation Indicators). data-pdf-flow lets the DOM-rasterise PDF break it at
+// the line level rather than pushing the whole block to a new page.
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <ul
+      data-pdf-flow="true"
+      style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}
+    >
+      {items.map((line, i) => (
+        <li key={i} style={{ marginBottom: 6 }}>
+          {line}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// One themed "Key Development" group: a theme sub-heading, the theme's incident
+// tile cards, then a single deterministic "Business impact:" line. Used for the
+// operating-risk theatres (the example's themed Key Developments layout).
+function KeyDevelopmentGroupSection({
+  group,
+  suppressEmptyLocation = false,
+}: {
+  group: KeyDevelopmentGroup;
+  suppressEmptyLocation?: boolean;
+}) {
+  return (
+    <div data-pdf-row="true" style={{ marginBottom: 18 }}>
+      <StrandLabel>{group.heading}</StrandLabel>
+      {group.items.map((it) => (
+        <ItemCard key={it.id} item={it} suppressEmptyLocation={suppressEmptyLocation} />
+      ))}
+      <div
+        data-pdf-flow="true"
+        style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.5, color: DUSK, marginTop: 4 }}
+      >
+        <span style={{ fontWeight: 700, color: NAVY }}>Business impact: </span>
+        {group.businessImpact}
+      </div>
+    </div>
+  );
+}
+
 // Location Watchlist — a branded three-column table (Location | Why it matters |
 // Recommended action). Plain text cells with content-box sizing and generous
 // padding, no line-clamp, so html2canvas rasterises every line cleanly (clamped
@@ -441,105 +487,113 @@ export default function PngCountryReportBody({
   const operatingRisk = d.proseVariant === "operating-risk";
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
-      {/* 0. Bottom Line Up Front */}
+      {/* 1. Bottom Line Up Front */}
       <Section title="Bottom Line Up Front">
         <Prose text={d.bluf} />
       </Section>
 
-      {/* 1. Executive Summary */}
-      <Section title="Executive Summary">
+      {/* 2. What Matters This Week — framing paragraph + dominant-theme bullets */}
+      <Section title="What Matters This Week">
         <Prose text={d.executiveSummary} />
-      </Section>
-
-      {/* 1b. What Changed This Week */}
-      <Section title="What Changed This Week">
-        <Prose text={d.whatChanged} />
-      </Section>
-
-      {/* 2. Priority / Top 3 Incidents This Week (heading is config-driven) */}
-      <Section title={d.topIncidentsHeading ?? "Top 3 Incidents This Week"}>
-        {d.topThree.length === 0 ? (
-          <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
-        ) : (
-          <div>
-            {d.topThree.map((it) => (
-              <ItemCard key={it.id} item={it} suppressEmptyLocation={operatingRisk} />
-            ))}
+        {d.whatMattersBullets.length > 0 ? (
+          <div style={{ marginTop: 10 }}>
+            <BulletList items={d.whatMattersBullets} />
           </div>
-        )}
+        ) : null}
       </Section>
 
-      {/* 3-N. Location buckets (config-driven) + catch-all. Buckets with a
-          locationAugmentation (PNG NCD) render the strand layout + standing
-          operating-risk block; the rest render the flat location list. */}
-      {d.buckets.map((b) =>
-        b.augmentation && b.strands ? (
-          <StrandedLocationSection
-            key={b.key}
-            title={b.label}
-            strands={b.strands}
-            augmentation={b.augmentation}
-            hadFeatured={b.hadFeatured}
-            featuredNote={d.featuredAboveNote}
-            truncated={b.truncated}
-          />
-        ) : (
+      {/* 3. Key Developments. Operating-risk theatres render themed groups
+          (tile cards + "Business impact:" line). PNG / West Papua keep their
+          Top-3 + location-bucket layout (with the NCD strand sections), so their
+          bespoke per-district detail is preserved within Key Developments. */}
+      {operatingRisk ? (
+        <Section title="Key Developments">
+          {d.keyDevelopments.length === 0 ? (
+            <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
+          ) : (
+            d.keyDevelopments.map((g) => (
+              <KeyDevelopmentGroupSection key={g.key} group={g} suppressEmptyLocation />
+            ))
+          )}
+        </Section>
+      ) : (
+        <>
+          <Section title={d.topIncidentsHeading ?? "Key Developments"}>
+            {d.topThree.length === 0 ? (
+              <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
+            ) : (
+              <div>
+                {d.topThree.map((it) => (
+                  <ItemCard key={it.id} item={it} />
+                ))}
+              </div>
+            )}
+          </Section>
+          {d.buckets.map((b) =>
+            b.augmentation && b.strands ? (
+              <StrandedLocationSection
+                key={b.key}
+                title={b.label}
+                strands={b.strands}
+                augmentation={b.augmentation}
+                hadFeatured={b.hadFeatured}
+                featuredNote={d.featuredAboveNote}
+                truncated={b.truncated}
+              />
+            ) : (
+              <LocationSection
+                key={b.key}
+                title={b.label}
+                items={b.items}
+                emptyFallback={d.emptyLocationFallback}
+                hadFeatured={b.hadFeatured}
+                featuredNote={d.featuredAboveNote}
+                truncated={b.truncated}
+              />
+            ),
+          )}
           <LocationSection
-            key={b.key}
-            title={b.label}
-            items={b.items}
+            title={d.otherBucketLabel}
+            items={d.otherNational}
             emptyFallback={d.emptyLocationFallback}
-            hadFeatured={b.hadFeatured}
+            hadFeatured={d.otherNationalHadFeatured}
             featuredNote={d.featuredAboveNote}
-            truncated={b.truncated}
-            suppressEmptyLocation={operatingRisk}
+            truncated={d.otherNationalTruncated}
           />
-        ),
+        </>
       )}
-      <LocationSection
-        title={d.otherBucketLabel}
-        items={d.otherNational}
-        emptyFallback={d.emptyLocationFallback}
-        hadFeatured={d.otherNationalHadFeatured}
-        featuredNote={d.featuredAboveNote}
-        truncated={d.otherNationalTruncated}
-        suppressEmptyLocation={operatingRisk}
-      />
 
-      {/* Location Watchlist */}
+      {/* 4. Location Watchlist */}
       <Section title="Location Watchlist">
         <LocationWatchlistTable entries={d.locationWatchlist} />
       </Section>
 
-      {/* Priorities This Week */}
-      <Section title="Priorities This Week">
+      {/* 5. Priorities for Clients This Week */}
+      <Section title="Priorities for Clients This Week">
         {d.businessImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
         ) : (
-          <ul
-            data-pdf-flow="true"
-            style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}
-          >
-            {d.businessImpact.map((line, i) => (
-              <li key={i} style={{ marginBottom: 6 }}>
-                {line}
-              </li>
-            ))}
-          </ul>
+          <BulletList items={d.businessImpact} />
         )}
       </Section>
 
-      {/* 8. Outlook — Next Week */}
-      <Section title="Outlook — Next Week">
+      {/* 6. Outlook: Next Seven Days — most-likely scenario + escalation indicators */}
+      <Section title="Outlook: Next Seven Days">
         <Prose text={d.outlook} />
+        {d.escalationIndicators.length > 0 ? (
+          <div style={{ marginTop: 10 }}>
+            <StrandLabel>Escalation Indicators</StrandLabel>
+            <BulletList items={d.escalationIndicators} />
+          </div>
+        ) : null}
       </Section>
 
-      {/* 9. Polestar View */}
+      {/* 7. Polestar View */}
       <Section title="Polestar View">
         <Prose text={d.polestarView} />
       </Section>
 
-      {/* 10. Reporting Confidence */}
+      {/* Reporting Confidence — closes the written brief */}
       <Section title="Reporting Confidence">
         <div style={{ marginBottom: 8 }}>
           <ConfidenceBadge level={d.reportingConfidence.level} />

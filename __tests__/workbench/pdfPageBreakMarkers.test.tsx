@@ -106,6 +106,9 @@ function makePngDataset(): PngReportDataset {
     whatChanged: "What changed since the previous reporting period.",
     polestarView: "Polestar's standing assessment for the period.",
     locationWatchlist: [],
+    whatMattersBullets: ["Urban crime remains the dominant exposure this week."],
+    keyDevelopments: [],
+    escalationIndicators: ["A sustained rise in armed robberies around Port Moresby."],
     diagnostics: {
       totalInWindow: 4,
       bySource: [{ source: "Test Source", count: 4 }],
