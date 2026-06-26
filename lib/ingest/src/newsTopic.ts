@@ -153,8 +153,11 @@ const OUT_OF_REGION: { token: string; canonical: string }[] = [
 
 // Source-domain fragments that betray a foreign publisher even when the text
 // names no country. Substring-matched against the source name + host because a
-// masthead like "libyaupdate.com" has no word boundary around "libya".
-const OUT_OF_REGION_DOMAIN = [".uk", ".eg", ".ly", ".ng", ".za"];
+// masthead like "libyaupdate.com" has no word boundary around "libya". ".vn" is
+// the Vietnamese state portal (source "Vietnam.vn") cross-syndicating Bahasa
+// world/forest-fire stories into the indonesia_local feed; gated on !detected so
+// a vietnam.vn item genuinely naming a tracked country is still kept.
+const OUT_OF_REGION_DOMAIN = [".uk", ".eg", ".ly", ".ng", ".za", ".vn"];
 
 function detectOutOfRegion(textHay: string, sourceHay: string): string | null {
   for (const { token, canonical } of OUT_OF_REGION) {

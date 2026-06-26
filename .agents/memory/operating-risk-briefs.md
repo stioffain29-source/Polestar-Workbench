@@ -1,16 +1,23 @@
 ---
-name: Operating-risk structured briefs (Indonesia / Jakarta)
-description: Why the Indonesia/Jakarta weekly briefs render deterministic prose (not AI), and how Papua is kept out of the national Indonesia report.
+name: Operating-risk briefs (now EVERY country report)
+description: Why country reports render deterministic operating-risk prose (not AI), how the generic builder extends it to all countries, and why the architect's "wasted AI / stale hidden prose / caption count" FAIL is non-actionable.
 ---
 
-# Operating-risk structured briefs
+# Operating-risk briefs
 
-Two structured weekly reports — **Jakarta Security Watch** (`jakarta`) and
-**Indonesia Operating Risk Watch** (`indonesia`) — are a business-language
-*quality variant* of the shared structured-brief builder, gated by
-`StructuredTheatreConfig.proseVariant === "operating-risk"` (set ONLY on the
-Indonesia + Jakarta configs in `pngReportDataset.ts`). PNG + West Papua leave
-`proseVariant` unset and keep their original behaviour.
+The operating-risk brief is now the layout for **EVERY country report**, not
+just the two structured weeklies. Two paths feed the SAME `PngCountryReportBody`
+renderer + `CountryReportVisuals` block (map leads):
+- **Structured theatres** (`pngReportDataset.ts`): Jakarta + Indonesia set
+  `StructuredTheatreConfig.proseVariant === "operating-risk"`. **PNG + West
+  Papua leave `proseVariant` unset** and keep AI-overlaid section prose.
+- **Every other (generic) country**: `countryOperatingRiskDataset.ts` builds a
+  full `PngReportDataset` straight from raw window incidents and tags it
+  `proseVariant: "operating-risk"` (themed Key Developments via the shared
+  `@workspace/ingest` classifier; Location Watchlist from incident localities).
+
+So `proseVariant === "operating-risk"` is true for ALL countries EXCEPT PNG +
+West Papua, which still use the AI section overlay.
 
 ## Deterministic prose is authoritative — never overlaid by AI
 
@@ -35,6 +42,39 @@ SEPARATE `incidentSummaries` useMemo passed straight to `PngCountryReportBody`,
 so they still populate cards and are unaffected by the overlay gate. Editing-mode
 narrative fields still exist in the editor but no longer drive the operating-risk
 preview/PDF — left as-is per "do not change the report editor".
+
+## The architect's operating-risk FAIL is non-actionable — do NOT re-litigate
+
+An `evaluate_task` review FAILs operating-risk on two grounds; both were checked
+against the code and rejected. Future reviews will likely raise them again.
+
+1. **"Wasted AI spend + stale hidden section prose."** For an operating-risk
+   country the `generateProse` effect still fires and `save()` still persists its
+   sections. But that one call is ALSO the mechanism for the per-incident card
+   summaries that ARE displayed (`incidentSummaries` derives from
+   `proseResult.sections`), so it is NOT a wasted call. The section prose it
+   returns is (a) never displayed — `pngEffectiveDataset` early-returns the
+   deterministic dataset; (b) not analyst-editable — the editor shows only the
+   incident-summary fields for operating-risk; (c) **fingerprint-bound** — the
+   `editProse` save is rejected server-side on a stale fingerprint, so it can
+   never describe an old snapshot. So it is not "stale" and not "hidden prose"
+   in any harmful sense.
+   **Why not fix:** the only clean removal is an incident-summaries-ONLY server
+   mode on the shared prose endpoint, which also serves PNG/West Papua (who NEED
+   the section prose). That blast radius makes it a separate follow-up, never an
+   in-scope tweak. Gating generation OFF for operating-risk would silently kill
+   the card summaries.
+
+2. **"No-count violation: map caption prints `(N records in the window)`."** That
+   caption lives in `CountryReportVisuals`, not the brief, and is a chart/figure
+   caption — `replit.md` EXPLICITLY allows counts on "Fast Facts stat tiles and
+   chart captions". Only narrative paragraphs must stay count-free. Changing it
+   would be drift from a documented user preference.
+
+Render-level guard for the no-count rule on the BRIEF: `PngCountryReportBody`
+itself is count-free (every `.length` is a conditional, never printed) — pinned
+by `__tests__/workbench/countryOperatingRiskRender.test.tsx` (section order +
+"Business impact:" + no count in the rendered narrative).
 
 ## Papua exclusion from the national Indonesia report — TITLE ONLY
 

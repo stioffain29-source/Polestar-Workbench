@@ -1,156 +1,223 @@
-import { buildCountryOperatingRiskDataset } from "../../artifacts/workbench/src/lib/countryOperatingRiskDataset";
+import {
+  buildCountryOperatingRiskDataset,
+} from "../../artifacts/workbench/src/lib/countryOperatingRiskDataset";
 import type {
-  BuildArgs,
   PngSourceIncident,
+  PngReportDataset,
 } from "../../artifacts/workbench/src/lib/pngReportDataset";
 
-// The generic operating-risk builder produces the SAME PngReportDataset every
-// non-curated country renders (PngCountryReportBody → DOM-rasterised PDF). These
-// tests guard the four things the wiring depends on:
-//   1. It classifies raw window incidents into themed Key Developments groups,
-//      each carrying a business-impact line (the tile-card contract).
-//   2. It tags the dataset as the operating-risk variant so CountryReport skips
-//      the AI prose overlay (deterministic, no-fabrication).
-//   3. It derives the Location Watchlist from each incident's own location.
-//   4. The no-count invariant holds: NO narrative string carries a parenthetical
-//      record/incident count annotation or a bare "N incidents" tally.
-//   5. An empty window builds without throwing and degrades to standing caveats.
+// Guards the GENERIC operating-risk builder that gives every country WITHOUT a
+// curated structured-theatre config (i.e. all slugs other than PNG / West Papua
+// / Indonesia / Jakarta) the same deterministic, business-voice brief the
+// structured theatres render. PngCountryReportBody renders straight off this
+// dataset, so the grouping, section fields and prose hygiene proven here are
+// exactly what the screen and the DOM-rasterised PDF show.
+//
+// Three invariants are pinned:
+//  - Key Developments GROUPING: incidents are themed by their client-facing
+//    display category — same theme co-locates, distinct themes split, and the
+//    grouping partitions the window.
+//  - NO-COUNT prose: no narrative section carries a record/incident count
+//    annotation (replit.md: counts belong only on Fast Facts / chart captions).
+//  - HEADING / RENDER invariants: the dataset exposes every section field the
+//    shared renderer consumes, tagged operating-risk, with strict 5-tier
+//    severity vocabulary and honest empty-window caveats (no fabrication).
 
-function inc(over: Partial<PngSourceIncident> & { title: string }): PngSourceIncident {
+const PERIOD = "23–29 June 2026";
+
+function inc(
+  over: Partial<PngSourceIncident> & {
+    id: number | string;
+    title: string;
+    severity: string;
+  },
+): PngSourceIncident {
   return {
-    id: over.id ?? Math.random().toString(36).slice(2),
-    severity: over.severity ?? "moderate",
-    occurredAt: over.occurredAt ?? "2026-06-14T08:00:00+00:00",
-    country: over.country ?? "Philippines",
+    occurredAt: "2026-06-27T08:00:00+00:00",
+    summary: null,
+    source: "Test Wire",
+    sourceUrl: `https://example.test/${over.id}`,
+    country: "Philippines",
+    location: null,
     ...over,
   };
 }
 
-function makeArgs(windowIncidents: PngSourceIncident[]): BuildArgs {
-  return {
-    windowIncidents,
-    previousWindowIncidents: [],
-    thirtyDay: windowIncidents,
-    ninetyDay: windowIncidents,
-    baselineWatchlist: ["Metro Manila"],
-    periodLabel: "Week of 09–15 Jun 2026",
-  };
+function build(
+  incidents: PngSourceIncident[],
+  country = "Philippines",
+): PngReportDataset {
+  return buildCountryOperatingRiskDataset(
+    {
+      windowIncidents: incidents,
+      thirtyDay: incidents,
+      ninetyDay: incidents,
+      baselineWatchlist: [],
+      periodLabel: PERIOD,
+    },
+    country,
+  );
 }
 
-// Count-annotation patterns the brand spec bans from prose: "(2 records)",
-// "(12 of 30 incidents)", "3 incidents", "5 records". Years (2026) and the
-// period label are NOT prose and are excluded from this scan.
-const COUNT_PATTERNS: RegExp[] = [
-  /\(\s*\d+\s*(?:records?|incidents?)/i,
-  /\b\d+\s+of\s+\d+\b/i,
-  /\b\d+\s+(?:records?|incidents?|reports?|events?)\b/i,
-];
+// Titles chosen so the shared @workspace/ingest classifier resolves three
+// distinct display themes: two protests (one theme), one labour action, one
+// power/utilities disruption. Each title carries an unambiguous category cue.
+const PROTEST_A = inc({
+  id: "p1",
+  title: "Thousands join a street protest in Manila over fuel price rises",
+  severity: "Moderate",
+  location: "Manila",
+});
+const PROTEST_B = inc({
+  id: "p2",
+  title: "Police disperse a large demonstration and rally in Cebu",
+  severity: "Low",
+  location: "Cebu",
+});
+const LABOUR = inc({
+  id: "l1",
+  title: "Factory workers strike as the trade union calls industrial action in Davao",
+  severity: "Moderate",
+  location: "Davao",
+});
+const POWER = inc({
+  id: "u1",
+  title: "A power blackout hits Quezon City after a grid failure",
+  severity: "High",
+  location: "Quezon City",
+});
 
-function assertNoCounts(label: string, text: string) {
-  for (const re of COUNT_PATTERNS) {
-    expect({ label, text, matched: re.test(text) }).toEqual({
-      label,
-      text,
-      matched: false,
+const POPULATED = [PROTEST_A, PROTEST_B, LABOUR, POWER];
+
+const FIVE_TIER = new Set([
+  "Insignificant",
+  "Low",
+  "Moderate",
+  "High",
+  "Extreme",
+]);
+
+// Every narrative string the renderer prints, in one flat list.
+function narrativeOf(ds: PngReportDataset): string[] {
+  return [
+    ds.bluf,
+    ds.executiveSummary,
+    ds.outlook,
+    ds.polestarView,
+    ds.reportingConfidence.rationale,
+    ...ds.whatMattersBullets,
+    ...ds.escalationIndicators,
+    ...ds.businessImpact,
+    ...ds.keyDevelopments.map((g) => g.heading),
+    ...ds.keyDevelopments.map((g) => g.businessImpact),
+    ...ds.locationWatchlist.flatMap((w) => [w.location, w.why, w.action]),
+  ];
+}
+
+describe("buildCountryOperatingRiskDataset — Key Developments grouping", () => {
+  const ds = build(POPULATED);
+
+  it("themes the window into distinct Key Development groups", () => {
+    // Two protests + one labour + one power → three distinct display themes.
+    expect(ds.keyDevelopments).toHaveLength(3);
+    const headings = ds.keyDevelopments.map((g) => g.heading);
+    expect(new Set(headings).size).toBe(3); // all distinct
+    for (const g of ds.keyDevelopments) {
+      expect(g.heading.trim().length).toBeGreaterThan(0);
+      expect(g.businessImpact.trim().length).toBeGreaterThan(0);
+      expect(g.key.trim().length).toBeGreaterThan(0);
+      expect(g.items.length).toBeGreaterThan(0);
+    }
+    // Group keys are unique too (renderer uses them as React keys).
+    expect(new Set(ds.keyDevelopments.map((g) => g.key)).size).toBe(3);
+  });
+
+  it("co-locates same-theme incidents and partitions the window", () => {
+    // The grouping must not drop or duplicate an incident: the four window
+    // items land across the three groups (the two protests share one group).
+    const total = ds.keyDevelopments.reduce((n, g) => n + g.items.length, 0);
+    expect(total).toBe(POPULATED.length);
+    const twoItemGroups = ds.keyDevelopments.filter((g) => g.items.length === 2);
+    expect(twoItemGroups).toHaveLength(1);
+    const ids = twoItemGroups[0]!.items.map((it) => it.id).sort();
+    expect(ids).toEqual(["p1", "p2"]); // both protests, same theme
+  });
+});
+
+describe("buildCountryOperatingRiskDataset — no-count prose", () => {
+  // Populated AND quiet windows; neither may leak a count into narrative prose.
+  for (const [label, ds] of [
+    ["populated window", build(POPULATED)],
+    ["quiet window", build([])],
+  ] as Array<[string, PngReportDataset]>) {
+    it(`carries no record/incident count annotation — ${label}`, () => {
+      for (const text of narrativeOf(ds)) {
+        // No parenthesised number, e.g. "(3)" or "(2 of 5 incidents)".
+        expect(text).not.toMatch(/\(\s*\d/);
+        // No "<n> incidents/records/events" phrasing inline.
+        expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
+      }
     });
   }
-}
+});
 
-describe("buildCountryOperatingRiskDataset — generic operating-risk brief", () => {
-  const incidents = [
-    inc({
-      id: "a1",
-      title: "Armed robbery and carjacking reported in Quezon City",
-      summary: "Gunmen robbed a convoy and seized a vehicle overnight.",
-      severity: "high",
-      location: "Quezon City",
-      source: "Test Wire",
-    }),
-    inc({
-      id: "a2",
-      title: "Second armed robbery hits a depot in Quezon City",
-      summary: "A storage depot was raided by an armed group.",
-      severity: "moderate",
-      location: "Quezon City",
-      source: "Test Wire",
-    }),
-    inc({
-      id: "a3",
-      title: "Clashes between security forces and militants in Mindanao",
-      summary: "An exchange of fire was reported during an operation.",
-      severity: "high",
-      location: "Mindanao",
-      source: "Test Wire",
-    }),
-    inc({
-      id: "a4",
-      title: "Workers stage a protest over a wage dispute in Cebu",
-      summary: "A demonstration gathered outside a government office.",
-      severity: "low",
-      location: "Cebu",
-      source: "Test Wire",
-    }),
-  ];
+describe("buildCountryOperatingRiskDataset — heading / render invariants", () => {
+  const ds = build(POPULATED);
 
-  const dataset = buildCountryOperatingRiskDataset(makeArgs(incidents), "Philippines");
-
-  it("tags the dataset as the operating-risk variant", () => {
-    expect(dataset.proseVariant).toBe("operating-risk");
+  it("is tagged operating-risk so the shared renderer takes the brief layout", () => {
+    expect(ds.proseVariant).toBe("operating-risk");
   });
 
-  it("ingests every window incident into windowItems", () => {
-    expect(dataset.windowItems.length).toBe(incidents.length);
+  it("exposes every section field the renderer consumes, populated", () => {
+    expect(ds.bluf.trim().length).toBeGreaterThan(0);
+    expect(ds.outlook.trim().length).toBeGreaterThan(0);
+    expect(ds.polestarView.trim().length).toBeGreaterThan(0);
+    expect(ds.whatMattersBullets.length).toBeGreaterThan(0);
+    expect(ds.keyDevelopments.length).toBeGreaterThan(0);
+    expect(ds.escalationIndicators.length).toBeGreaterThan(0);
+    expect(ds.businessImpact.length).toBeGreaterThan(0);
+    expect(ds.locationWatchlist.length).toBeGreaterThan(0);
   });
 
-  it("groups incidents into themed Key Developments, each with a business impact", () => {
-    expect(dataset.keyDevelopments.length).toBeGreaterThanOrEqual(1);
-    for (const group of dataset.keyDevelopments) {
-      expect(group.heading.trim().length).toBeGreaterThan(0);
-      expect(group.items.length).toBeGreaterThanOrEqual(1);
-      expect(group.businessImpact.trim().length).toBeGreaterThan(0);
+  it("labels severity with the 5-tier vocabulary only", () => {
+    expect(["High", "Moderate", "Low"]).toContain(
+      ds.reportingConfidence.level,
+    );
+    for (const it of ds.windowItems) {
+      expect(FIVE_TIER.has(it.severityLabel)).toBe(true);
     }
   });
 
-  it("derives the Location Watchlist from incident locations", () => {
-    const labels = dataset.locationWatchlist.map((w) => w.location.toLowerCase());
-    expect(labels.some((l) => l.includes("quezon"))).toBe(true);
-    for (const entry of dataset.locationWatchlist) {
-      expect(entry.why.trim().length).toBeGreaterThan(0);
-      expect(entry.action.trim().length).toBeGreaterThan(0);
-    }
-  });
-
-  it("populates What Matters bullets and Escalation indicators", () => {
-    expect(dataset.whatMattersBullets.length).toBeGreaterThanOrEqual(1);
-    expect(dataset.escalationIndicators.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("carries no incident-count annotations in any narrative field", () => {
-    assertNoCounts("bluf", dataset.bluf);
-    assertNoCounts("executiveSummary", dataset.executiveSummary);
-    assertNoCounts("whatChanged", dataset.whatChanged);
-    assertNoCounts("outlook", dataset.outlook);
-    assertNoCounts("polestarView", dataset.polestarView);
-    dataset.whatMattersBullets.forEach((b, i) => assertNoCounts(`whatMatters[${i}]`, b));
-    dataset.escalationIndicators.forEach((b, i) => assertNoCounts(`escalation[${i}]`, b));
-    dataset.businessImpact.forEach((b, i) => assertNoCounts(`priority[${i}]`, b));
-    dataset.keyDevelopments.forEach((g, i) =>
-      assertNoCounts(`keyDev[${i}].businessImpact`, g.businessImpact),
+  it("derives the Location Watchlist from each incident's locality", () => {
+    const locs = ds.locationWatchlist.map((w) => w.location);
+    // The country itself is never a sub-national watchlist row.
+    expect(locs).not.toContain("Philippines");
+    expect(locs.some((l) => ["Manila", "Cebu", "Davao", "Quezon City"].includes(l))).toBe(
+      true,
     );
   });
 });
 
-describe("buildCountryOperatingRiskDataset — empty window", () => {
-  it("builds standing-caveat sections without throwing", () => {
-    const dataset = buildCountryOperatingRiskDataset(makeArgs([]), "Philippines");
-    expect(dataset.windowItems.length).toBe(0);
-    expect(dataset.keyDevelopments.length).toBe(0);
-    // Standing caveats still populate the brief rather than leaving it blank.
-    expect(dataset.bluf.trim().length).toBeGreaterThan(0);
-    expect(dataset.outlook.trim().length).toBeGreaterThan(0);
-    expect(dataset.polestarView.trim().length).toBeGreaterThan(0);
-    expect(dataset.whatMattersBullets.length).toBeGreaterThanOrEqual(1);
-    // The curated baseline watchlist still backstops the section.
-    expect(dataset.locationWatchlist.length).toBeGreaterThanOrEqual(1);
+describe("buildCountryOperatingRiskDataset — empty window (no fabrication)", () => {
+  const ds = build([]);
+
+  it("yields no themed developments and a standing caveat", () => {
+    expect(ds.keyDevelopments).toHaveLength(0);
+    expect(ds.windowItems).toHaveLength(0);
+    expect(ds.whatMattersBullets).toHaveLength(1);
+    expect(ds.whatMattersBullets[0]).toMatch(/no fresh open-source reporting/i);
+  });
+
+  it("flags low reporting confidence and an honest quiet-period outlook", () => {
+    expect(ds.reportingConfidence.level).toBe("Low");
+    expect(ds.outlook).toMatch(/no fresh reporting/i);
+    expect(ds.escalationIndicators.length).toBeGreaterThan(0);
+    expect(ds.escalationIndicators.join(" ")).toMatch(
+      /return of open-source reporting/i,
+    );
+  });
+
+  it("stays operating-risk even when quiet", () => {
+    expect(ds.proseVariant).toBe("operating-risk");
   });
 });

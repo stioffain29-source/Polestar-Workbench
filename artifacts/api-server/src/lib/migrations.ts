@@ -1280,6 +1280,46 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-1a-ii) ONE-TIME relocation of vietnam.vn rows mis-tagged Indonesia.
+    //     The Vietnamese state portal (source "Vietnam.vn") cross-syndicates
+    //     Bahasa world / forest-fire stories into the indonesia_local feed; the
+    //     old gate blind-stamped them with the feed defaultCountry='Indonesia',
+    //     polluting the client-facing Indonesia brief with Vietnamese and world
+    //     news. The ingest now rejects ".vn" sources (OUT_OF_REGION_DOMAIN); this
+    //     repairs rows already stored. SOURCE-scoped so a genuine Indonesia story
+    //     that merely MENTIONS Vietnam (a different outlet) is never moved. These
+    //     are real records, so RELOCATE to 'Vietnam' (a non-reported country, so
+    //     they drop out of the Indonesia report) rather than delete. Marker-gated.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "indonesia_vietnam_source_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          UPDATE incidents
+          SET country = 'Vietnam'
+          WHERE topic = 'indonesia_local'
+            AND country = 'Indonesia'
+            AND source = 'Vietnam.vn'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time relocation of vietnam.vn rows mis-tagged Indonesia (cross-syndication cleanup)",
+        );
+      }
+    }
+
     // 3d-1b) ONE-TIME backfill of 'Unknown'-country energy rows.
     //
     //        The region energy feeds (load-shedding / brownout / grid-attack)
