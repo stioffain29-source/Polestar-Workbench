@@ -660,8 +660,13 @@ const FP_SCHOOL_ADMISSION_RE =
 // ex-President Yoon to 30-year jail term"). It must NOT count toward a country's
 // severity on the protest monitor. Kept only when real unrest accompanies it
 // (verdict that sparks protests / clashes / a rally), via the companion guard.
+// The final two branches are SHAPE-based sentence pronouncements ("gets/handed/
+// given/to serve/receives + N years | life", "life imprisonment/sentence") so a
+// new phrasing of a custodial sentence is caught by structure, not by adding one
+// literal at a time. Pure judicial rows (no unrest stem) drop; genuine unrest
+// reacting to a sentence is still rescued by FP_COURT_UNREST_KEEP_RE.
 const FP_COURT_PROCESS_RE =
-  /\b(court|tribunal|judge|judiciary|prosecutor\w*|prosecution|the bench)\b[^.]{0,45}\b(sentenc\w*|jail\w*|imprison\w*|convict\w*|acquit\w*|verdict|ruling|rules?|ruled|indict\w*|on trial|found guilty|guilty)\b|\bsentenc\w*\b[^.]{0,30}\b(to|jail|prison|year|years|life)\b|\b(jail|prison) term\b|\bjailed (for|over)\b|\b\d+[- ]years?\s+(?:in\s+)?(?:jail|prison|imprisonment|behind bars)\b/i;
+  /\b(court|tribunal|judge|judiciary|prosecutor\w*|prosecution|the bench)\b[^.]{0,45}\b(sentenc\w*|jail\w*|imprison\w*|convict\w*|acquit\w*|verdict|ruling|rules?|ruled|indict\w*|on trial|found guilty|guilty)\b|\bsentenc\w*\b[^.]{0,30}\b(to|jail|prison|year|years|life)\b|\b(jail|prison) term\b|\bjailed (for|over)\b|\b\d+[- ]years?\s+(?:in\s+)?(?:jail|prison|imprisonment|behind bars)\b|\b(?:gets?|got|given|handed|hands|to serve|slapped with|receives?)\s+(?:a\s+)?(?:life|\d+[- ]?years?)\b|\blife (?:imprisonment|sentence|in (?:jail|prison)|behind bars|term)\b/i;
 // Keep-guard for the court drop: only a LIVE unrest reaction TO THE OUTCOME
 // rescues a court/legal-process record — not the bare appearance of a protest
 // word describing the PAST event the case concerns ("union rally death",

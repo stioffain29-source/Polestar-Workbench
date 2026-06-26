@@ -630,6 +630,29 @@ const FIXTURES: Fixture[] = [
     title: "Protesters clash after opposition figure gets 25 years in prison",
     verdict: "KEEP",
   },
+  // ---- Shape-based sentence pronouncements (no "court"/"sentence" word): DROP
+  // These are the future phrasings the enumerated rules used to miss; the
+  // SHAPE branch ("handed/to serve/sentenced + N years | life") catches them.
+  {
+    title: "Opposition leader handed 15-year jail term over corruption charges",
+    verdict: "DROP",
+    reason: "court/judicial process",
+  },
+  {
+    title: "Former president to serve life in prison after conviction",
+    verdict: "DROP",
+    reason: "court/judicial process",
+  },
+  {
+    title: "Activist sentenced to life imprisonment by military tribunal",
+    verdict: "DROP",
+    reason: "court/judicial process",
+  },
+  // ...but genuine unrest reacting to such a sentence is still rescued.
+  {
+    title: "Mass protests erupt after activist handed life sentence",
+    verdict: "KEEP",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {

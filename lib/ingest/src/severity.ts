@@ -216,9 +216,26 @@ const MASS_COUNT_FATAL_RE = new RegExp(
 // (>= MASS_FATALITY_THRESHOLD), a massacre / mass-casualty wording, or emergency
 // rule — so a counter-insurgency "encounter" that kills a few militants or a
 // single-fatality ambush no longer reads Extreme.
+// Emergency-rule declaration — martial law / state of emergency. A reserved-
+// tier signal when it is a LIVE declaration, but the SAME phrase appears in a
+// retrospective COURT story ("ex-minister gets 25 years jail for his martial
+// law role"), which the judicial-process guard below cancels (see
+// isJudicialProcess / classifySeverity). Defined once and reused in EXTREME so
+// the trigger and the guard can never drift apart.
+const EMERGENCY_RULE_RE = /\b(martial law|state of emergency|emergency declared)\b/i;
+
+// A LIVE emergency declaration — the emergency phrase sitting next to a
+// declaration / imposition verb ("declares martial law", "state of emergency
+// imposed", "extends the state of emergency", "martial law in force"). When this
+// is present the story IS the emergency, so the judicial-process guard below must
+// NEVER suppress its Extreme rating even if the same row also references a
+// related trial or sentence. This is the false-suppression backstop.
+const ACTIVE_EMERGENCY_RE =
+  /\b(?:declar\w*|impos\w*|announc\w*|reimpos\w*|extend\w*|order\w*|enforc\w*|invok\w*)\s+(?:\w+\s+){0,3}?(?:martial law|state of emergency|emergency rule)\b|\b(?:martial law|state of emergency|emergency rule)\s+(?:\w+\s+){0,3}?(?:declared|imposed|announced|reimposed|extended|enforced|invoked|in (?:force|effect))\b/i;
+
 const EXTREME: RegExp[] = [
   /\bmassacre\b/i,
-  /\b(martial law|state of emergency|emergency declared)\b/i,
+  EMERGENCY_RULE_RE,
   /\b(dozens|scores|hundreds|mass) (killed|dead|feared dead|slain|fatalities)\b/i,
   /\b(mass casualt|multiple (deaths|fatalities|killings)|many (?:killed|dead))\b/i,
   MASS_FATAL_VERB_COUNT_RE,
@@ -330,6 +347,31 @@ export function isJudicialDeath(title: string, summary: string): boolean {
   return !EXTREME.some((re) => re.test(stripped));
 }
 
+// Judicial-PROCESS frame — a sentencing / conviction / trial / jail-term story.
+// The reserved EMERGENCY_RULE_RE Extreme trigger fires on ANY mention of martial
+// law / a state of emergency, but a COURT story merely REFERRING to a past
+// emergency ("ex-minister gets 25 years jail for his martial law role",
+// "general convicted over the martial law decree") is a legal outcome, not a
+// live emergency, so it must not occupy the reserved Extreme tier. Mirrors the
+// judicial-death guard. Shape-based (custodial-sentence verbs / "N years jail" /
+// "gets|handed|to serve + life|N years") so new phrasings are caught
+// structurally, not one literal at a time — and kept in lockstep with the
+// relevance layer's FP_COURT_PROCESS_RE sentence-pronouncement branches. Bare
+// "verdict" / "prosecutor" are deliberately EXCLUDED — they collide with
+// election/result verdicts, and the cost of wrongly suppressing a genuine
+// emergency Extreme is higher than missing a rare phrasing.
+const JUDICIAL_PROCESS_RE =
+  /\b(sentenc\w*|convict\w*|acquit\w*|indict\w*|imprison\w*|jailed|jail term|prison term|on trial|stands? trial|goes? on trial|found guilty|guilty verdict|\d+[- ]?years?\s+(?:in\s+)?(?:jail|prison|imprisonment|behind bars))\b|\b(?:gets?|got|given|handed|hands|to serve|slapped with|receives?)\s+(?:a\s+)?(?:life|\d+[- ]?years?)\b/i;
+
+/**
+ * True if the headline is a judicial-process story (a sentence, conviction,
+ * trial or jail term). Exported so the severity heal can scope its downgrade of
+ * mis-rated emergency-rule rows to exactly this class.
+ */
+export function isJudicialProcess(title: string, summary: string): boolean {
+  return JUDICIAL_PROCESS_RE.test(`${title}\n${summary}`);
+}
+
 /**
  * Rate an incident's severity from its text.
  *
@@ -381,11 +423,27 @@ export function classifySeverity(
   // its own security signal so this never fires on a real attack.
   const biographicalDeath = isBiographicalOrIllnessDeath(title, summary);
 
+  // Judicial-emergency guard. EMERGENCY_RULE_RE (martial law / state of
+  // emergency) is a reserved-Extreme trigger, but inside a JUDICIAL frame (a
+  // sentence / conviction / trial referring to a PAST emergency) it is a court
+  // outcome, not a live emergency. Strip the emergency phrase and re-test: only
+  // suppress when it was the SOLE Extreme signal, so a genuine "martial law
+  // declared after dozens killed" keeps its mass-casualty Extreme. This is the
+  // defence-in-depth layer for the recurring "court sentencing crowns a country
+  // as highest-severity" failure — even if relevance ever lets a court row
+  // through, it can no longer reach the reserved tier.
+  const judicialEmergency =
+    isJudicialProcess(title, summary) &&
+    EMERGENCY_RULE_RE.test(hay) &&
+    !ACTIVE_EMERGENCY_RE.test(hay) &&
+    !EXTREME.some((re) => re.test(hay.replace(new RegExp(EMERGENCY_RULE_RE.source, "gi"), " ")));
+
   if (
     !reactionLed &&
     !naturalCauseDeath &&
     !judicialDeath &&
     !biographicalDeath &&
+    !judicialEmergency &&
     EXTREME.some((re) => re.test(hay))
   )
     return "extreme";

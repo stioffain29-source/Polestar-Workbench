@@ -135,4 +135,79 @@ describe("classifySeverity", () => {
       ),
     ).toBe("extreme");
   });
+
+  // Judicial-emergency guard. The reported recurring failure: a court sentencing
+  // that merely MENTIONS "martial law" hit the reserved-Extreme emergency
+  // trigger and crowned South Korea as highest-severity. A judicial frame must
+  // cancel the emergency Extreme so a sentencing can never reach the reserved
+  // tier — defence in depth, independent of the relevance filter.
+  it("does not rate a court sentencing about a past martial-law role as extreme", () => {
+    expect(
+      classifySeverity(
+        "Ex-justice minister gets 25 years jail for martial law role",
+        "",
+        "flashpoint",
+      ),
+    ).not.toBe("extreme");
+  });
+
+  it("does not rate a conviction over a martial-law decree as extreme", () => {
+    expect(
+      classifySeverity("General convicted over the martial law decree", "", "conflict"),
+    ).not.toBe("extreme");
+  });
+
+  // A GENUINE live emergency declaration must still read Extreme — the guard only
+  // fires inside a judicial frame, so it must never soften a real declaration.
+  it("still rates a genuine martial-law declaration as extreme", () => {
+    expect(classifySeverity("President declares martial law nationwide", "", "flashpoint")).toBe(
+      "extreme",
+    );
+  });
+
+  it("still rates a genuine state-of-emergency declaration as extreme", () => {
+    expect(classifySeverity("Government declares state of emergency", "", "flashpoint")).toBe(
+      "extreme",
+    );
+  });
+
+  // Judicial frame + a real mass-casualty toll: the casualty signal survives the
+  // emergency-strip, so the row keeps its Extreme — the guard only suppresses
+  // when the emergency phrase was the SOLE Extreme trigger.
+  it("keeps a judicial martial-law headline Extreme when a mass toll is present", () => {
+    expect(
+      classifySeverity(
+        "Ex-general convicted as martial law crackdown leaves hundreds killed",
+        "",
+        "conflict",
+      ),
+    ).toBe("extreme");
+  });
+
+  // The custodial-sentence SHAPE must also cancel the emergency Extreme even
+  // without the word "jail" — mirrors the relevance layer so the two never drift.
+  it("does not rate 'handed life for martial law role' as extreme", () => {
+    expect(
+      classifySeverity("Ex-minister handed life for martial law role", "", "flashpoint"),
+    ).not.toBe("extreme");
+  });
+
+  it("does not rate 'gets 25 years for martial law role' as extreme", () => {
+    expect(
+      classifySeverity("Former general gets 25 years for martial law role", "", "conflict"),
+    ).not.toBe("extreme");
+  });
+
+  // Active-declaration backstop: a GENUINE live emergency declaration whose
+  // SUMMARY also mentions a related indictment must stay Extreme — the judicial
+  // guard must never suppress a story that IS the emergency.
+  it("keeps a live emergency declaration Extreme even when the summary mentions a trial", () => {
+    expect(
+      classifySeverity(
+        "Government declares state of emergency",
+        "Separately, a former minister was indicted this week.",
+        "flashpoint",
+      ),
+    ).toBe("extreme");
+  });
 });

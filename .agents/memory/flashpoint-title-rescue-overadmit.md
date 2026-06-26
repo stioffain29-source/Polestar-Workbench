@@ -189,6 +189,23 @@ bump backfill reverts). Bump `RELEVANCE_RULE_VERSION`.
     isTopicRelevant so it self-heals at render once redeployed; persisted prod
     rows additionally need the RELEVANCE_RULE_VERSION bump + boot backfill.
     Whenever you touch the court drop, widen the drop AND the keep-guard together.
+  - RECURRENCE #2 — ROOT CAUSE was TWO INDEPENDENT LAYERS, only relevance ever
+    guarded. The crowning needs BOTH a relevance miss AND a high severity. Severity
+    (`lib/ingest/src/severity.ts`) rated the row Extreme because the reserved EXTREME
+    tier's `martial law|state of emergency` trigger fires on ANY mention — even a
+    retrospective court reference ("...for martial law role"). Defence-in-depth fix:
+    a judicial-process guard mirroring `isJudicialDeath` — strip the emergency phrase
+    and re-test EXTREME, suppressing Extreme ONLY when the emergency phrase was the
+    SOLE extreme signal AND the frame is judicial (`isJudicialProcess`: custodial-
+    sentence shapes; bare "verdict"/"prosecutor" EXCLUDED — election-verdict
+    collision). GATED by an active-declaration backstop (`ACTIVE_EMERGENCY_RE`:
+    declares/imposes/extends/... emergency, either order) so a GENUINE live
+    declaration — even one whose summary also mentions a trial — stays Extreme.
+    **Invariant:** keep severity `JUDICIAL_PROCESS_RE` sentence-pronouncement shapes
+    in lockstep with relevance `FP_COURT_PROCESS_RE` ("gets/handed/to serve + life|N
+    years"), or the two layers drift and the class re-opens. Historical stored rows
+    re-rate via the marker-gated `runSeverityBackfill` (bump the migrations marker)
+    AND the RELEVANCE_RULE_VERSION bump; prod only after a republish.
 
 **Keep-guard \b trap (cost me a test cycle, TWICE):** event keep-guards MUST use
 leading-\b STEMS (`protest`, `clash`, `kill`), never a trailing-\b literal —
