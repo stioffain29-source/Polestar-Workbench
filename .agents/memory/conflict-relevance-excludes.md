@@ -45,6 +45,27 @@ rows. Lock both the drops and the protected keeps into
 - **Why:** word-order is not semantics; a one-directional adjacency regex
   silently loses half the real state-violence-against-civilians stories.
 
+## Off-region theatre gate needs foreign ACTORS, not just country names
+- The shared off-region gate (`FP_OFFSHORE_THEATRE_RE` matches AND no
+  `FP_APAC_ANCHOR_RE` rescue) drops foreign-syndicated stories the geocoder
+  misfiles under a default APAC country. It originally listed COUNTRY names +
+  demonyms only.
+- Levant land-conflict headlines name the FORCE or the VILLAGE, not the country
+  ("IDF seals Hezbollah tunnel system in Tebnit"). With no country token and no
+  APAC anchor the gate never fired, and a kinetic REQUIRED keyword ("hostage")
+  then KEPT the row in Conflict Watch (stored country had defaulted to Bangladesh).
+- Fix = add the unambiguous foreign actors (idf, hezbollah + spellings
+  hizbollah/hizbullah/hezballah, hamas) to `FP_OFFSHORE_THEATRE_RE`; bump
+  `RELEVANCE_RULE_VERSION` so the boot backfill re-marks stored rows irrelevant.
+- **Why safe across the shared users (flashpoint/protests/indonesia_local):** the
+  APAC-anchor rescue still keeps a genuine local story that merely references the
+  actor ("Gaza solidarity rally in Jakarta"); only rows with NO in-region place
+  drop. India-tagged Hezbollah syndication drops too — correct (foreign).
+- **Scope:** relevance-layer only, so it fixes the conflict MONITOR and the
+  conflict REPORT (both honour the default gate). Country reports fetch
+  `includeIrrelevant` and are NOT affected — do not add a speculative
+  country-report guard unless that surface is flagged.
+
 ## Exam-name excludes must be verb/context-bound, never the bare exam name
 - A bare exam-name exclude (e.g. "neet") meant to kill exam-logistics human-
   interest ("what's it like getting to a NEET centre") ALSO eats genuine exam-
