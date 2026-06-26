@@ -31,6 +31,26 @@ decision. Shape:
 Do NOT re-open the app to the public without the user asking. This is also in
 `replit.md` user preferences.
 
+**Verification trap (two-layer gate):** privileged mutations (sources, spot
+reports, reports) sit behind `requireOwner` THEN `requireAdminToken`. An
+anonymous shell curl/probe ALWAYS gets 401 from `requireOwner` FIRST — and both
+gates return the IDENTICAL `{"error":"unauthorized"}` body — so you can never
+reach/exercise the admin-token gate or do a create+update round-trip from the
+shell without an owner OIDC session cookie (browser-only). Verify admin-gate
+behaviour via jest/bare-express, NOT curl; a "valid token still 401s" probe is
+almost always `requireOwner` blocking, not a wrong token.
+
+**Editor admin-token UX rule:** any page that fires an admin-token-gated
+mutation must (a) surface a token-entry field that is NOT hidden on narrow
+viewports — the global header `AdminTokenField` is `hidden lg:block`, invisible
+below 1024px, so editors need their own always-visible field persisting to
+sessionStorage `workbench_admin_token` — and (b) map the response status through
+`adminMutationErrorMessage` (401 → wrong/missing token, 503 → token
+unconfigured) instead of a generic "Failed to save", or the operator can't tell
+an auth failure from a real error. `SpotReportEditor.tsx` follows this; the
+global getter in `main.tsx` attaches the stored token as Bearer automatically,
+so persisting it is enough (no explicit headers on the orval mutations).
+
 The rest of this file is the older lesson, still useful IF the admin-token gate
 is ever changed.
 
