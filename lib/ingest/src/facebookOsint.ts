@@ -478,6 +478,23 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
       );
     }
   }
+  // Facebook groups/posts scrapers emit photos under `attachments[]` as
+  // { thumbnail, photo_image: { uri }, ... }. Prefer the CDN image fields;
+  // the attachment's own `url` is a facebook.com/photo page, not an image.
+  if (Array.isArray(r.attachments)) {
+    for (const a of r.attachments) {
+      if (a && typeof a === "object") {
+        const ao = a as Record<string, unknown>;
+        const photo = ao.photo_image as Record<string, unknown> | undefined;
+        pushImg(
+          asString(ao.thumbnail) ||
+            asString(photo?.uri) ||
+            asString(ao.image) ||
+            asString(ao.media),
+        );
+      }
+    }
+  }
 
   const postedAt =
     parseTimestamp(r.time) ??
@@ -523,7 +540,10 @@ export function normaliseFacebookPost(raw: unknown): RawFacebookPost | null {
       asString(r.pageUrl) ||
         asString(r.groupUrl) ||
         asString(pageObj?.url) ||
-        asString(groupObj?.url),
+        asString(groupObj?.url) ||
+        // `inputUrl` is the scraper's INPUT url = the source group/page the post
+        // was collected from (reliable in both the groups + posts scrapers).
+        asString(r.inputUrl),
     ) || null;
   const pageName =
     asString(r.pageName) ||
@@ -696,6 +716,51 @@ export async function fetchApifyDatasetItems(
     offset += arr.length;
   }
   return hardCap === Infinity ? items : items.slice(0, hardCap);
+}
+
+/**
+ * Resolve the dataset id of the most recent SUCCEEDED run of an Apify
+ * actor-TASK (GET /v2/actor-tasks/{id}/runs?status=SUCCEEDED&desc=1&limit=1).
+ * Lets the manual importer pull a task's latest output by task id without
+ * starting a new (paid) run. The token rides as a query param ONLY and is
+ * scrubbed from every thrown error. Returns null when the task has no
+ * successful run yet (the list endpoint returns an empty array, not an error).
+ */
+export async function resolveApifyTaskLatestDataset(
+  token: string,
+  taskId: string,
+  opts: { apiBase?: string; log?: (s: string) => void } = {},
+): Promise<string | null> {
+  const apiBase = opts.apiBase ?? DEFAULT_API_BASE;
+  const log = opts.log ?? (() => {});
+  const url =
+    `${apiBase}/v2/actor-tasks/${encodeURIComponent(taskId)}/runs` +
+    `?status=SUCCEEDED&desc=1&limit=1&token=${encodeURIComponent(token)}`;
+  let json: unknown;
+  try {
+    json = await apifyGetJson(url);
+  } catch (err) {
+    throw new Error(
+      redactToken(err instanceof Error ? err.message : String(err), token),
+    );
+  }
+  const data =
+    json && typeof json === "object"
+      ? ((json as Record<string, unknown>).data as
+          | Record<string, unknown>
+          | undefined)
+      : undefined;
+  const items = Array.isArray(data?.items) ? (data!.items as unknown[]) : [];
+  const run = items.length > 0 && items[0] && typeof items[0] === "object"
+    ? (items[0] as Record<string, unknown>)
+    : null;
+  const datasetId = run ? asString(run.defaultDatasetId) : "";
+  if (!datasetId) {
+    log(`  apify task ${taskId}: no SUCCEEDED run with a dataset found`);
+    return null;
+  }
+  log(`  apify task ${taskId}: latest SUCCEEDED run dataset ${datasetId}`);
+  return datasetId;
 }
 
 /** Extract + normalise the post array out of any Apify dataset shape. */
@@ -902,19 +967,26 @@ export interface FbClassification {
   securityRelevant: boolean;
   detectedKeywords: string[];
   dedupKey: string;
+  /**
+   * True when the post resolved to a tracked theatre (PNG / Indonesian Papua).
+   * Always true for {@link classifyPost} (it rejects out-of-scope). The BROAD
+   * importer ({@link classifyPostBroad}) keeps out-of-scope posts as multi-
+   * country CONTEXT with `inScope: false` — those rows are never security-
+   * relevant, never review-flagged, and never promotable.
+   */
+  inScope: boolean;
 }
 
 /**
- * Classify a sanitised post: resolve scope (or reject), derive category /
- * province / business impact / incident date from the shared theatre extractors,
- * and detect credible outbound-link domains. Returns null when out of scope.
+ * Build the full in-scope classification for a resolved theatre: derive
+ * category / province / business impact / incident date from the shared theatre
+ * extractors, and detect credible outbound-link domains.
  */
-export function classifyPost(post: RawFacebookPost): FbClassification | null {
-  const caption = sanitiseCaption(post.caption);
-  if (!caption) return null;
-  const scope = resolveScope(caption);
-  if (!scope.inScope) return null;
-
+function classifyInScope(
+  post: RawFacebookPost,
+  caption: string,
+  scope: ScopeResolution,
+): FbClassification {
   const isPng = scope.country === "Papua New Guinea";
   const extraction = isPng
     ? extractPngItem(caption, "", null)
@@ -943,6 +1015,49 @@ export function classifyPost(post: RawFacebookPost): FbClassification | null {
     securityRelevant: category !== "Other security",
     detectedKeywords: detectKeywords(caption),
     dedupKey: makeFacebookDedupKey(caption, post.imageUrls),
+    inScope: true,
+  };
+}
+
+export function classifyPost(post: RawFacebookPost): FbClassification | null {
+  const caption = sanitiseCaption(post.caption);
+  if (!caption) return null;
+  const scope = resolveScope(caption);
+  if (!scope.inScope) return null;
+  return classifyInScope(post, caption, scope);
+}
+
+/**
+ * BROAD classification for the manual multi-country importer. Identical to
+ * {@link classifyPost} for in-scope (PNG / Indonesian-Papua) posts, but instead
+ * of REJECTING an out-of-scope post it KEEPS it as multi-country CONTEXT:
+ * country "Unknown", category "Other security", `inScope: false` — so it is
+ * never security-relevant, never review-flagged and (via deriveEligibility)
+ * never promotable. Still text-gated: an empty / sanitised-away caption is
+ * dropped (returns null) so media-only or token-only posts are not stored.
+ */
+export function classifyPostBroad(
+  post: RawFacebookPost,
+): FbClassification | null {
+  const caption = sanitiseCaption(post.caption);
+  if (!caption) return null;
+  const scope = resolveScope(caption);
+  if (scope.inScope) return classifyInScope(post, caption, scope);
+
+  return {
+    caption,
+    country: "Unknown",
+    province: null,
+    location: null,
+    category: "Other security",
+    businessImpact: "",
+    incidentDate: null,
+    credibleDomains: detectCredibleDomains(post.outboundLinks),
+    promotionTopic: "flashpoint",
+    securityRelevant: false,
+    detectedKeywords: detectKeywords(caption),
+    dedupKey: makeFacebookDedupKey(caption, post.imageUrls),
+    inScope: false,
   };
 }
 
@@ -1097,6 +1212,13 @@ async function findCorroboration(
 export interface PersistFacebookOptions {
   /** Write rows when true; otherwise dry-run (classify/dedup/score only). */
   commit?: boolean;
+  /**
+   * Classification scope. "scoped" (default) keeps ONLY in-theatre (PNG /
+   * Indonesian-Papua) posts — the live ingest engine. "broad" additionally
+   * stores out-of-scope posts as multi-country CONTEXT (country "Unknown",
+   * never security-relevant / promotable) — the manual multi-group importer.
+   */
+  mode?: "scoped" | "broad";
   /** Credibility tier for posts lacking per-source metadata (default "osint"). */
   defaultSourceTier?: SourceTier;
   /** Page handle for posts lacking per-source metadata. */
@@ -1145,6 +1267,8 @@ export async function persistFacebookPosts(
   const commit = opts.commit ?? false;
   const log = opts.log ?? (() => {});
   const defaultTier: SourceTier = opts.defaultSourceTier ?? "osint";
+  const classify =
+    opts.mode === "broad" ? classifyPostBroad : classifyPost;
   const result: PersistFacebookResult = {
     inScope: 0,
     securityRelevant: 0,
@@ -1166,11 +1290,13 @@ export async function persistFacebookPosts(
   }
   const candidates: Candidate[] = [];
   for (const post of posts) {
-    const cls = classifyPost(post);
+    const cls = classify(post);
     if (!cls) continue;
     candidates.push({ post, cls });
   }
-  result.inScope = candidates.length;
+  // `inScope` is the genuinely in-theatre count (the only meaningful figure in
+  // broad mode, where out-of-scope context rows are also kept).
+  result.inScope = candidates.filter((c) => c.cls.inScope).length;
   result.securityRelevant = candidates.filter(
     (c) => c.cls.securityRelevant,
   ).length;
@@ -1238,13 +1364,13 @@ export async function persistFacebookPosts(
       corroborationReason: corroboration?.reason ?? null,
     });
     const review = deriveReview({
-      inScope: true,
+      inScope: cls.inScope,
       securityRelevant: eligibility.securityRelevant,
       promotable: eligibility.promotable,
       category: cls.category,
     });
     const confidence = computeConfidence({
-      inScope: true,
+      inScope: cls.inScope,
       localityPrecise: cls.province != null,
       securityRelevant: eligibility.securityRelevant,
       credible: eligibility.credible,
@@ -1274,7 +1400,7 @@ export async function persistFacebookPosts(
       province: cls.province,
       location: cls.location,
       category: cls.category,
-      businessImpact: cls.businessImpact,
+      businessImpact: cls.businessImpact || null,
       securityRelevant: eligibility.securityRelevant,
       credible: eligibility.credible,
       credibilityReason: eligibility.credibilityReason,

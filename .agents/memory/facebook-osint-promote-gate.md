@@ -40,16 +40,41 @@ clean and no token-bearing / signed (`oh=`/`oe=`/`fbclid`) URL is stored.
 
 **Two distinct, separately-keyed feeders share ONE persist seam.** The LIVE
 scheduled ingest is keyed by `FACEBOOK_API_KEY`; a SEPARATE MANUAL importer
-(`scripts import:apify-facebook --datasetId X [--commit]`) is keyed by
-`APIFY_TOKEN` and pulls a one-off Apify dataset. Both normalise into
-`RawFacebookPost` and call the SHARED `persistFacebookPosts(posts, {commit})`,
-so dedup/scope/insert behave identically regardless of source. Do NOT conflate
-the two env vars. Apify dataset items use aliases the normaliser must keep:
-`permalink`→url, `groupUrl`→pageUrl, `createdAt`→postedAt, `likesCount`/
-`commentsCount`→engagement.
+(`scripts import:apify-facebook (--datasetId X | --taskId Y) [--broad] [--commit]`)
+is keyed by `APIFY_TOKEN`. Both normalise into `RawFacebookPost` and call the
+SHARED `persistFacebookPosts(posts, {commit, mode})`, so dedup/insert behave
+identically regardless of source. Do NOT conflate the two env vars. Apify
+dataset items use aliases the normaliser must keep: `permalink`/`url`→url,
+`groupUrl`/`facebookUrl`/`inputUrl`→pageUrl, `time`/`createdAt`→postedAt,
+`groupTitle`→pageName, `likesCount`/`commentsCount`/`sharesCount`→engagement,
+`attachments[].thumbnail`/`photo_image.uri`→imageUrls. NEVER store `user` /
+`topComments` (commenter identities).
 **Why:** the importer was added to backfill from Apify runs without standing up
 a live key; one persist seam guarantees a manual import can never behave
 differently (e.g. skip the isolation/dedup invariants) from the live feed.
+
+**Two classification SCOPES via the `mode` option (default "scoped").**
+"scoped" = `classifyPost` keeps ONLY in-theatre (PNG / Indonesian-Papua) posts —
+the live engine ALWAYS uses this. "broad" (`--broad`, importer only) =
+`classifyPostBroad` additionally keeps out-of-scope posts as multi-country
+CONTEXT: country "Unknown", category "Other security", `businessImpact` null,
+`securityRelevant`/`inScope` false. Broad rows are STRUCTURALLY non-promotable
+(deriveEligibility needs a real security category) so the isolation invariant
+holds even with a wide raw feed. `FbClassification.inScope` carries this; persist
+counts `result.inScope` as the genuinely-in-theatre subset only. Both classifiers
+still text-gate (empty sanitised caption → dropped), so media-only posts never
+land. **Why:** the owner wanted EVERY group's text posts archived as context,
+not just the two theatres — broad mode does that without ever risking promotion.
+
+**`--taskId` resolves a task's latest SUCCEEDED run dataset** via
+`resolveApifyTaskLatestDataset` (GET `/v2/actor-tasks/{id}/runs?status=SUCCEEDED&desc=1&limit=1`
+→ `data.items[0].defaultDatasetId`); returns null when the task has no successful
+run. NOTE: an actor run started directly (not through the task) has `taskId=None`
+and does NOT appear under that task's runs — those must be imported by their
+`--datasetId`. Triggering a fresh PAID task run (POST `/v2/actor-tasks/{id}/runs`)
+can 402 `not-enough-usage-to-run-paid-actor` when the Apify account balance is
+exhausted — an owner-only billing fix, not a code bug; importing an existing
+already-paid dataset is free.
 
 **Unkeyed install = inactive.** Neither key set → the relevant pass no-ops,
 Source Health reads `not_configured`, the panel shows its empty-state; never

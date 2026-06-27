@@ -10,9 +10,15 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-// Facebook OSINT monitoring items for the Papua New Guinea + Indonesian Papua
-// theatres — a CONTEXT source, modelled exactly on social_watch_items /
-// reliefweb_reports / maritime_movement.
+// Facebook OSINT monitoring items — a CONTEXT source, modelled exactly on
+// social_watch_items / reliefweb_reports / maritime_movement.
+//
+// SCOPE: the live ingest engine keeps only in-theatre (Papua New Guinea +
+// Indonesian Papua) posts. The manual multi-group importer can additionally
+// store every other text post as BROAD multi-country context (country
+// "Unknown", category "Other security", never security-relevant / promotable),
+// so the table can hold a wider raw monitoring feed without any of it ever
+// reaching incidents.
 //
 // CRITICAL PRODUCT RULE: a social_raw item is NEVER an incident. It lives in its
 // own table precisely so a Facebook post can never inflate any incident count

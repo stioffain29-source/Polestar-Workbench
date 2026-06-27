@@ -16,6 +16,7 @@ import {
   resolveScope,
   normaliseFacebookPost,
   classifyPost,
+  classifyPostBroad,
   persistFacebookPosts,
   makeFacebookDedupKey,
   isFacebookOsintActive,
@@ -194,6 +195,56 @@ describe("classifyPost", () => {
     expect(c!.dedupKey).toMatch(/^fb_/);
     expect(["flashpoint", "conflict"]).toContain(c!.promotionTopic);
     expect(typeof c!.securityRelevant).toBe("boolean");
+  });
+});
+
+describe("classifyPostBroad keeps out-of-scope posts as non-promotable context", () => {
+  const base: RawFacebookPost = {
+    externalId: "fb_b1",
+    url: "https://www.facebook.com/p/b1",
+    caption: "",
+    imageUrls: [],
+    outboundLinks: [],
+    postedAt: new Date("2026-06-20T00:00:00Z"),
+  };
+
+  it("keeps an out-of-scope post (which classifyPost rejects) as Unknown-country context", () => {
+    const caption = "Festival in Bali draws big crowds";
+    expect(classifyPost({ ...base, caption })).toBeNull();
+    const c = classifyPostBroad({ ...base, caption });
+    expect(c).not.toBeNull();
+    expect(c!.inScope).toBe(false);
+    expect(c!.country).toBe("Unknown");
+    expect(c!.category).toBe("Other security");
+    expect(c!.securityRelevant).toBe(false);
+    expect(c!.businessImpact).toBe("");
+  });
+
+  it("a broad Unknown context row is structurally non-promotable", () => {
+    const c = classifyPostBroad({
+      ...base,
+      caption: "Festival in Bali draws big crowds",
+    })!;
+    const e = deriveEligibility({
+      category: c.category,
+      sourceTier: "official",
+      credibleDomainLabels: ["Reuters"],
+      corroborated: true,
+    });
+    expect(e.promotable).toBe(false);
+  });
+
+  it("still drops an empty / media-only caption", () => {
+    expect(classifyPostBroad({ ...base, caption: "   " })).toBeNull();
+  });
+
+  it("classifies an in-scope post identically to classifyPost", () => {
+    const caption =
+      "Armed robbery and shooting at a store in Port Moresby, Papua New Guinea";
+    const c = classifyPostBroad({ ...base, caption });
+    expect(c).not.toBeNull();
+    expect(c!.inScope).toBe(true);
+    expect(c!.country).toBe("Papua New Guinea");
   });
 });
 
