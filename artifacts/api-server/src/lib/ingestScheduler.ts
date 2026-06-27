@@ -1,4 +1,5 @@
 import { db } from "@workspace/db";
+import { resolveAisKey } from "@workspace/ingest";
 import { sql } from "drizzle-orm";
 import {
   summarizeIngestFailures,
@@ -180,7 +181,7 @@ async function hoursSinceNewestStrike(): Promise<number | null> {
  * lib/maritimeSources.ts (key present AND not falsey).
  */
 function aisMovementActive(): boolean {
-  const keyed = (process.env["AIS_API_KEY"]?.trim().length ?? 0) > 0;
+  const keyed = resolveAisKey().length > 0;
   const v = process.env["AIS_ENABLED"]?.trim().toLowerCase();
   const off = v === "false" || v === "0" || v === "off" || v === "no";
   return keyed && !off;

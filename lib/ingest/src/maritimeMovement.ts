@@ -828,7 +828,7 @@ export async function runMaritimeMovementIngest(
 ): Promise<MaritimeMovementSummary> {
   const mode: "commit" | "dry-run" = opts.commit ? "commit" : "dry-run";
   const aisProvider = (process.env.AIS_PROVIDER?.trim() || "aisstream").toLowerCase();
-  const apiKey = process.env.AIS_API_KEY?.trim() ?? "";
+  const apiKey = resolveAisKey();
   const enabled = !isFalsey(process.env.AIS_ENABLED);
 
   // PRIMARY collection-source selection. The free aisstream terrestrial feed
@@ -1385,7 +1385,18 @@ export async function runMaritimeMovementIngest(
   };
 }
 
+/**
+ * Resolve the aisstream.io credential. The free provider's key may be supplied
+ * either under the generic AIS_API_KEY or under the provider-specific
+ * AISSTREAM_API_KEY (the name the credential was first provisioned under).
+ * Accepting both means the free feed runs from the already-configured secret
+ * without forcing a duplicate AIS_API_KEY entry.
+ */
+export function resolveAisKey(): string {
+  return process.env.AIS_API_KEY?.trim() || process.env.AISSTREAM_API_KEY?.trim() || "";
+}
+
 /** True when an AIS credential is present (the provider could run). */
 export function isAisConfigured(): boolean {
-  return (process.env.AIS_API_KEY?.trim().length ?? 0) > 0;
+  return resolveAisKey().length > 0;
 }

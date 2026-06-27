@@ -11,6 +11,7 @@ import {
   runMarketPricesIngest,
   runMarketSnapshotIngest,
   runMaritimeMovementIngest,
+  resolveAisKey,
   runStrikesIngest,
   runTitleTranslation,
   runResolveGoogleNewsUrls,
@@ -326,7 +327,7 @@ function emptyMaritimeMovement(err: unknown): MaritimeMovementSummary {
   return {
     provider: (process.env.AIS_PROVIDER?.trim() || "aisstream").toLowerCase(),
     mode: "commit",
-    configured: !!process.env.AIS_API_KEY?.trim(),
+    configured: resolveAisKey().length > 0,
     enabled: true,
     ran: false,
     reason: "fetch_failed",

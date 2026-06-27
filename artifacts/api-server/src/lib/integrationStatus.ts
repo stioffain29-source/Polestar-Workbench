@@ -414,7 +414,13 @@ function aisFalsey(raw: string | undefined): boolean {
 }
 
 async function aisMovementStatus(): Promise<IntegrationStatusItem> {
-  const envVars = ["AIS_API_KEY", "AIS_ENABLED", "AIS_PROVIDER", "AIS_COLLECT_SECONDS"];
+  const envVars = [
+    "AIS_API_KEY",
+    "AISSTREAM_API_KEY",
+    "AIS_ENABLED",
+    "AIS_PROVIDER",
+    "AIS_COLLECT_SECONDS",
+  ];
   const docsUrl = "https://aisstream.io";
 
   // The movement table is fed by ONE of two collection sources, mirroring

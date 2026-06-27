@@ -43,5 +43,7 @@ channel = "stable-25_05"
 [userenv.shared]
 RELIEFWEB_APPNAME = "polestar-advisory-monitoring"
 AIS_COLLECT_SECONDS = "180"
+VESSEL_REGISTRY_ENABLED = "false"
+AIS_PROVIDER = "aisstream"
 
 [userenv.development]

@@ -16,6 +16,7 @@ export type { MarketSnapshotSummary } from "./marketSnapshot";
 export {
   runMaritimeMovementIngest,
   isAisConfigured,
+  resolveAisKey,
   AIS_THEATRES,
   computeDarkByTheatre,
   isLoitering,

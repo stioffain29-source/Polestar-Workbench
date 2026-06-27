@@ -1,4 +1,5 @@
 import { db, maritimeMovementTable, sourcesTable } from "@workspace/db";
+import { resolveAisKey } from "@workspace/ingest";
 import { eq, ilike, sql } from "drizzle-orm";
 import type {
   MaritimeSourceHealthItem,
@@ -53,7 +54,7 @@ interface ProviderEnv {
 }
 
 function aisEnv(): ProviderEnv {
-  const key = process.env.AIS_API_KEY?.trim();
+  const key = resolveAisKey();
   return { configured: !!key, disabled: isFalsey(process.env.AIS_ENABLED) };
 }
 
