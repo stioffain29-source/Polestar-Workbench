@@ -7,7 +7,12 @@ import type { AuthUser } from "@workspace/api-zod";
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
-export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
+// 30-day rolling session. The owner stays signed in through normal work and is
+// logged out only by an explicit logout or 30 days of total inactivity. The
+// session lifetime is governed by THIS app session (cookie + DB row), never by
+// the short-lived OIDC access token (see authMiddleware: token-refresh failure
+// is non-fatal because the access token is not used for authorization).
+export const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 
 export interface SessionData {
   user: AuthUser;
@@ -65,6 +70,15 @@ export async function updateSession(
     .where(eq(sessionsTable.sid, sid));
 }
 
+// Slide an existing session's expiry forward without rewriting its payload.
+// Used by the rolling-session middleware so active use never expires.
+export async function extendSession(sid: string): Promise<void> {
+  await db
+    .update(sessionsTable)
+    .set({ expire: new Date(Date.now() + SESSION_TTL) })
+    .where(eq(sessionsTable.sid, sid));
+}
+
 export async function deleteSession(sid: string): Promise<void> {
   await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
 }
@@ -75,6 +89,16 @@ export async function clearSession(
 ): Promise<void> {
   if (sid) await deleteSession(sid);
   res.clearCookie(SESSION_COOKIE, { path: "/" });
+}
+
+export function setSessionCookie(res: Response, sid: string): void {
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL,
+  });
 }
 
 export function getSessionId(req: Request): string | undefined {

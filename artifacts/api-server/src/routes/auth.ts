@@ -13,8 +13,7 @@ import {
   getSessionId,
   createSession,
   deleteSession,
-  SESSION_COOKIE,
-  SESSION_TTL,
+  setSessionCookie,
   ISSUER_URL,
   type SessionData,
 } from "../lib/auth";
@@ -29,16 +28,6 @@ function getOrigin(req: Request): string {
   const host =
     req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
   return `${proto}://${host}`;
-}
-
-function setSessionCookie(res: Response, sid: string) {
-  res.cookie(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_TTL,
-  });
 }
 
 function setOidcCookie(res: Response, name: string, value: string) {

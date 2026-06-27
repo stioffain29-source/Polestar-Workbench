@@ -35,6 +35,30 @@ decision. Shape:
 Do NOT re-open the app to the public without the user asking. This is also in
 `replit.md` user preferences.
 
+**SESSION LIFETIME (rolling, token-decoupled) — the "logged out mid-work" fix.**
+The owner stays signed in via a 30-day ROLLING DB-backed session (the `sid`
+cookie + the `sessions` row); `authMiddleware` slides BOTH forward on active use,
+throttled to once/hour per sid. Session validity is governed SOLELY by the cookie
++ DB row — never by the OIDC access token.
+
+The OIDC access/refresh tokens are stored on the session but are NOT read for
+authorization or any downstream call after login (authz is `requireOwner` →
+`users.is_owner` via the session `user.id`). Therefore the access-token refresh in
+`authMiddleware` is BEST-EFFORT and NON-FATAL: it must NEVER `clearSession` on a
+refresh failure, and concurrent refreshes are deduped per-sid via an in-flight
+Promise map.
+
+**Why:** the owner was logged out mid-work ("session has expired"). Cause: the old
+middleware tore down the session whenever the ~1h access token expired and refresh
+failed. Replit refresh tokens ROTATE (single-use), so the dashboard's many
+concurrent requests raced the refresh — the first rotated+succeeded, the rest
+failed — and the failure path called `clearSession`. The cookie/DB TTL was
+irrelevant because the token teardown fired first.
+
+**How to apply:** never reintroduce a token-expiry → logout path. If a future
+feature needs a live access token for a Replit API call, handle a stale token AT
+THE CALL SITE; do not log the owner out. Reaches prod only after a republish.
+
 **Verification trap (two-layer gate):** most privileged mutations (sources,
 reports, incidents, strikes, countries, cards, baselines, prose, social) sit
 behind `requireOwner` THEN `requireAdminToken`. SPOT-REPORTS are the deliberate
