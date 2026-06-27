@@ -131,6 +131,7 @@ export * from './spotReportExportEntryFormat';
 export * from './spotReportExportInput';
 export * from './spotReportExportInputFormat';
 export * from './spotReportInput';
+export * from './spotReportPhoto';
 export * from './spotReportStatus';
 export * from './spotReportUpdate';
 export * from './spotReportUpdateConfidenceLevel';

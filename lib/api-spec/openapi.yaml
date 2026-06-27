@@ -2135,6 +2135,9 @@ components:
         mapPoints:
           type: array
           items: { $ref: "#/components/schemas/SpotMapPoint" }
+        photos:
+          type: array
+          items: { $ref: "#/components/schemas/SpotReportPhoto" }
         createdBy: { type: ["string", "null"] }
         exportHistory:
           type: array
@@ -2176,6 +2179,9 @@ components:
         mapPoints:
           type: array
           items: { $ref: "#/components/schemas/SpotMapPoint" }
+        photos:
+          type: array
+          items: { $ref: "#/components/schemas/SpotReportPhoto" }
         createdBy: { type: string }
 
     SpotReportUpdate:
@@ -2211,6 +2217,9 @@ components:
         mapPoints:
           type: array
           items: { $ref: "#/components/schemas/SpotMapPoint" }
+        photos:
+          type: array
+          items: { $ref: "#/components/schemas/SpotReportPhoto" }
         createdBy: { type: string }
 
     SpotReportExportInput:
@@ -2228,6 +2237,13 @@ components:
         lng: { type: number }
         label: { type: string }
         severity: { type: string }
+
+    SpotReportPhoto:
+      type: object
+      required: [dataUrl]
+      properties:
+        dataUrl: { type: string }
+        caption: { type: string }
 
     CardTemplateKey:
       type: string

@@ -58,13 +58,17 @@ in an unrelated field re-fit the bounds and jerked the viewport.
   rows with missing/NaN coords are filtered out, blank label/severity omitted, so the
   stored shape stays clean.
 
-**Why no boot-time DDL for the new column:** the first cut added an
-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` at the top of `runDataMigrations()` on the
-false premise that "prod doesn't run drizzle push". WRONG — Publish introspects dev+prod
-and applies the schema diff automatically, and startup-time DDL to self-heal prod is
-explicitly forbidden (see the database skill's migrations-on-publish reference). Make
-the schema change in the Drizzle source of truth, push to dev, and re-publish; never
-self-heal prod from the app entrypoint.
+**New `spot_reports` columns DO need boot-time DDL.** (Supersedes an earlier note here
+that claimed boot DDL was forbidden — that was wrong for this repo.) The drift guard
+`__tests__/db/schemaBootMigrationDrift.test.ts` is AUTHORITATIVE: every NEW column added
+to the Drizzle schema must ALSO get an idempotent `ALTER TABLE ... ADD COLUMN IF NOT
+EXISTS` in api-server `runDataMigrations()`, and must NOT be added to the test's frozen
+BASELINE (the baseline is the set of columns that predate the boot-migration regime).
+This matches the repo-wide convention in `prod-schema-via-migrations.md` (prod
+`DATABASE_URL` is read-only from the workspace, so drizzle push only touches dev; the
+boot ALTER is what brings prod into line on republish). Workflow for a new column:
+Drizzle schema + boot ALTER + `pnpm --filter @workspace/db run push` (dev) + codegen if
+it's in the API contract; the drift test must stay green.
 
 ## Section naming & order
 
@@ -76,9 +80,20 @@ self-heal prod from the app entrypoint.
   separately at position 4 — after Bottom Line Up Front, before Incident Details
   (split BLUF from the rest, render BLUF → map → rest). Text/.docx exports omit it.
 - Required render order: Header, metadata, BLUF, Incident Map, Incident Details,
-  Current Situation, Operational Impact, Polestar View, Outlook (24–72h),
-  Recommended Actions, Disclaimer (Reference Incidents / Sources are pre-existing
-  supplements before the disclaimer).
+  **Imagery (photos)**, Current Situation, Operational Impact, Polestar View, Outlook
+  (24–72h), Recommended Actions, Disclaimer (Reference Incidents / Sources are
+  pre-existing supplements before the disclaimer).
+
+## Photos / Imagery (`photos` jsonb)
+
+- `photos` is a `jsonb` array of `{dataUrl, caption?}` — base64 image data URLs the
+  analyst attaches; render position is RIGHT AFTER Incident Details, falling back to
+  after the map when there are no incident-details fields. Multiple photos, reorderable
+  (move up/down swaps array order; render and storage are array-order, so reorder needs
+  no extra field). Editor resizes on add (canvas, longest edge ≤1600, jpeg ~0.82, white
+  bg) to keep the data URL small enough for jsonb + DOM-rasterise. Preview is the single
+  render surface (screen==PDF); .docx / plain-text exports OMIT photos, mirroring the
+  map omission.
 
 ## Title block & PDF masthead
 

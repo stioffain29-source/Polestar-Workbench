@@ -245,6 +245,15 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS executive_summary text`,
     );
 
+    // Schema: analyst-attached photographs on spot reports (resized data URLs +
+    // optional captions), rendered after Incident Details on screen and in the
+    // DOM-rasterised PDF. drizzle push only reaches dev, so the writable prod
+    // primary gains the column here on boot. Idempotent — IF NOT EXISTS; the
+    // NOT NULL DEFAULT '[]' backfills any pre-existing rows.
+    await db.execute(
+      sql`ALTER TABLE spot_reports ADD COLUMN IF NOT EXISTS photos jsonb NOT NULL DEFAULT '[]'::jsonb`,
+    );
+
     // 0a) Schema: per-feed consecutive-failure counter on `sources`.
     //     drizzle `push` adds this in dev, but the writable prod DB is reached
     //     only from the deployment runtime, so add it idempotently on boot too.

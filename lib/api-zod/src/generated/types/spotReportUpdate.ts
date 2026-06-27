@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SpotMapPoint } from './spotMapPoint';
+import type { SpotReportPhoto } from './spotReportPhoto';
 import type { SpotReportStatus } from './spotReportStatus';
 import type { SpotReportUpdateConfidenceLevel } from './spotReportUpdateConfidenceLevel';
 import type { SpotReportUpdateSeverity } from './spotReportUpdateSeverity';
@@ -44,5 +45,6 @@ export interface SpotReportUpdate {
   /** @nullable */
   affectedRadiusKm?: number | null;
   mapPoints?: SpotMapPoint[];
+  photos?: SpotReportPhoto[];
   createdBy?: string;
 }

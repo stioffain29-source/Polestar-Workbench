@@ -42,6 +42,18 @@ export interface SpotMapMarker {
   severity?: string;
 }
 
+/**
+ * One analyst-attached photograph on a spot report. Stored as a resized data
+ * URL (no object storage configured) so it rasterises reliably into the
+ * DOM-rendered PDF with no CORS. Array order is the display order; each photo
+ * carries an optional caption. Rendered after the Incident Details section on
+ * screen and in the PDF; omitted from the .docx / plain-text exports.
+ */
+export interface SpotReportPhoto {
+  dataUrl: string;
+  caption?: string;
+}
+
 export const spotReportsTable = pgTable("spot_reports", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -94,6 +106,13 @@ export const spotReportsTable = pgTable("spot_reports", {
   // incidents — each its own coordinate with an optional label and severity.
   mapPoints: jsonb("map_points")
     .$type<SpotMapMarker[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+
+  // Analyst-attached photographs (resized data URLs + optional captions),
+  // rendered after the Incident Details section on screen and in the PDF.
+  photos: jsonb("photos")
+    .$type<SpotReportPhoto[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
 

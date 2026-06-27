@@ -2050,6 +2050,10 @@ export const ListSpotReportsResponseItem = zod.object({
   "label": zod.string().optional(),
   "severity": zod.string().optional()
 })).optional(),
+  "photos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -2097,6 +2101,10 @@ export const CreateSpotReportBody = zod.object({
   "label": zod.string().optional(),
   "severity": zod.string().optional()
 })).optional(),
+  "photos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().optional()
 })
 
@@ -2137,6 +2145,10 @@ export const GetSpotReportResponse = zod.object({
   "lng": zod.number(),
   "label": zod.string().optional(),
   "severity": zod.string().optional()
+})).optional(),
+  "photos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional()
 })).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
@@ -2188,6 +2200,10 @@ export const UpdateSpotReportBody = zod.object({
   "label": zod.string().optional(),
   "severity": zod.string().optional()
 })).optional(),
+  "photos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().optional()
 })
 
@@ -2223,6 +2239,10 @@ export const UpdateSpotReportResponse = zod.object({
   "lng": zod.number(),
   "label": zod.string().optional(),
   "severity": zod.string().optional()
+})).optional(),
+  "photos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional()
 })).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
@@ -2281,6 +2301,10 @@ export const AppendSpotReportExportResponse = zod.object({
   "lng": zod.number(),
   "label": zod.string().optional(),
   "severity": zod.string().optional()
+})).optional(),
+  "photos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional()
 })).optional(),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({

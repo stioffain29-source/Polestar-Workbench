@@ -14,7 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, FileText, FileType, FileDown, ShieldCheck, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ArrowDown, FileText, FileType, FileDown, ImagePlus, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +53,11 @@ interface MapPointForm {
   severity: string;
 }
 
+interface PhotoForm {
+  dataUrl: string;
+  caption: string;
+}
+
 interface FormState {
   title: string;
   status: string;
@@ -80,6 +85,7 @@ interface FormState {
   mapEnabled: boolean;
   affectedRadiusKm: string;
   mapPoints: MapPointForm[];
+  photos: PhotoForm[];
   createdBy: string;
 }
 
@@ -89,6 +95,49 @@ function toLocalInput(iso?: string | null): string {
     return format(new Date(iso), "yyyy-MM-dd'T'HH:mm");
   } catch {
     return "";
+  }
+}
+
+// Photo ceilings — kept in step with the api-server spot-reports route so a
+// save never trips the server-side 400. Bytes measured on the data URL string.
+const MAX_PHOTOS = 24;
+const MAX_PHOTO_DATAURL_BYTES = 4 * 1024 * 1024;
+const MAX_PHOTOS_TOTAL_BYTES = 28 * 1024 * 1024;
+
+/**
+ * Read an image file and return a resized JPEG data URL. Downscales so the
+ * longest edge is <= maxDim and flattens onto white (so transparent PNGs don't
+ * rasterise black), keeping the stored payload small enough to live in the
+ * report's jsonb and render straight into the DOM-rasterised PDF.
+ */
+async function fileToPhotoDataUrl(
+  file: File,
+  maxDim = 1600,
+  quality = 0.82,
+): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error("Could not read image"));
+      im.src = objectUrl;
+    });
+    const longest = Math.max(img.width, img.height) || 1;
+    const scale = Math.min(1, maxDim / longest);
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
   }
 }
 
@@ -120,6 +169,7 @@ function emptyForm(): FormState {
     mapEnabled: false,
     affectedRadiusKm: "",
     mapPoints: [],
+    photos: [],
     createdBy: "",
   };
 }
@@ -157,6 +207,10 @@ function formFromReport(r: SpotReport): FormState {
       label: m.label ?? "",
       severity: m.severity ?? "",
     })),
+    photos: (r.photos ?? []).map((p) => ({
+      dataUrl: p.dataUrl,
+      caption: p.caption ?? "",
+    })),
     createdBy: r.createdBy ?? "",
   };
 }
@@ -190,6 +244,7 @@ export default function SpotReportEditor() {
   const [incidentSearch, setIncidentSearch] = useState("");
 
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const initId = useRef<number | null>(null);
   const prefilled = useRef(false);
 
@@ -301,6 +356,12 @@ export default function SpotReportEditor() {
           ...(m.label ? { label: m.label } : {}),
           ...(m.severity ? { severity: m.severity } : {}),
         })),
+      photos: form.photos
+        .filter((p) => p.dataUrl)
+        .map((p) => ({
+          dataUrl: p.dataUrl,
+          ...(p.caption.trim() ? { caption: p.caption.trim() } : {}),
+        })),
       createdBy: form.createdBy || null,
       exportHistory: report?.exportHistory ?? [],
       createdAt: report?.createdAt ?? new Date().toISOString(),
@@ -328,6 +389,74 @@ export default function SpotReportEditor() {
 
   function removeMapPoint(idx: number) {
     setForm((f) => ({ ...f, mapPoints: f.mapPoints.filter((_, i) => i !== idx) }));
+  }
+
+  async function addPhotos(files: FileList | null) {
+    const list = files
+      ? Array.from(files).filter((f) => f.type.startsWith("image/"))
+      : [];
+    if (list.length === 0) return;
+    if (form.photos.length + list.length > MAX_PHOTOS) {
+      toast({
+        title: "Too many photos",
+        description: `A spot report can hold at most ${MAX_PHOTOS} photos.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const dataUrls = await Promise.all(list.map((f) => fileToPhotoDataUrl(f)));
+      const existingBytes = form.photos.reduce(
+        (n, p) => n + p.dataUrl.length,
+        0,
+      );
+      const addedBytes = dataUrls.reduce((n, d) => n + d.length, 0);
+      if (
+        dataUrls.some((d) => d.length > MAX_PHOTO_DATAURL_BYTES) ||
+        existingBytes + addedBytes > MAX_PHOTOS_TOTAL_BYTES
+      ) {
+        toast({
+          title: "Photo too large",
+          description: "Please use smaller images or remove some photos.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        photos: [
+          ...f.photos,
+          ...dataUrls.map((dataUrl) => ({ dataUrl, caption: "" })),
+        ],
+      }));
+    } catch {
+      toast({
+        title: "Could not add photo",
+        description: "One of the selected files could not be read as an image.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function updatePhotoCaption(idx: number, caption: string) {
+    setForm((f) => ({
+      ...f,
+      photos: f.photos.map((p, i) => (i === idx ? { ...p, caption } : p)),
+    }));
+  }
+
+  function movePhoto(idx: number, dir: -1 | 1) {
+    setForm((f) => {
+      const next = [...f.photos];
+      const j = idx + dir;
+      if (j < 0 || j >= next.length) return f;
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return { ...f, photos: next };
+    });
+  }
+
+  function removePhoto(idx: number) {
+    setForm((f) => ({ ...f, photos: f.photos.filter((_, i) => i !== idx) }));
   }
 
   function buildData(forCreate: boolean): Record<string, unknown> {
@@ -416,6 +545,14 @@ export default function SpotReportEditor() {
         lng: m.lng as number,
         ...(m.label ? { label: m.label } : {}),
         ...(m.severity ? { severity: m.severity } : {}),
+      }));
+    // Photos always travel as a (possibly empty) array on both create and
+    // update; blank captions are omitted so the stored shape stays clean.
+    out.photos = form.photos
+      .filter((p) => p.dataUrl)
+      .map((p) => ({
+        dataUrl: p.dataUrl,
+        ...(p.caption.trim() ? { caption: p.caption.trim() } : {}),
       }));
     return out;
   }
@@ -783,6 +920,89 @@ export default function SpotReportEditor() {
               className="rounded-sm"
             >
               Add point
+            </Button>
+          </Card>
+
+          <Card title="Photos / Imagery">
+            <p className="text-xs text-muted-foreground mb-3">
+              Attach photographs — they appear after Incident Details on screen
+              and in the PDF. Add several, reorder them as you wish, and give each
+              an optional caption.
+            </p>
+            {form.photos.length > 0 && (
+              <div className="space-y-3 mb-3">
+                {form.photos.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className="flex gap-3 items-start border border-border rounded-sm p-2"
+                  >
+                    <img
+                      src={p.dataUrl}
+                      alt=""
+                      className="w-24 h-24 object-cover rounded-sm border border-border shrink-0"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        value={p.caption}
+                        onChange={(e) => updatePhotoCaption(idx, e.target.value)}
+                        placeholder="Caption (optional)"
+                        className="rounded-sm"
+                      />
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => movePhoto(idx, -1)}
+                          disabled={idx === 0}
+                          className="rounded-sm h-8 px-2"
+                          aria-label="Move photo up"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => movePhoto(idx, 1)}
+                          disabled={idx === form.photos.length - 1}
+                          className="rounded-sm h-8 px-2"
+                          aria-label="Move photo down"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => removePhoto(idx)}
+                          className="rounded-sm h-8 px-2 text-muted-foreground hover:text-destructive"
+                          aria-label="Remove photo"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void addPhotos(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => photoInputRef.current?.click()}
+              className="rounded-sm"
+            >
+              <ImagePlus className="w-4 h-4 mr-2" />
+              Add photos
             </Button>
           </Card>
 

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { format } from "date-fns";
 import type { Incident, SpotReport } from "@workspace/api-client-react";
 import IncidentMap from "@/components/IncidentMap";
@@ -118,6 +119,53 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
   // and before Incident Details — so split BLUF from the remaining sections.
   const blufSection = sections.find((s) => s.heading === "Bottom Line Up Front");
   const otherSections = sections.filter((s) => s !== blufSection);
+  // Analyst-attached photographs render immediately AFTER the Incident Details
+  // section. If that section is absent (empty), they fall right after the map.
+  const photos = (report.photos ?? []).filter((p) => p && p.dataUrl);
+  const hasIncidentDetails = otherSections.some(
+    (s) => s.heading === "Incident Details",
+  );
+  const imagery =
+    photos.length > 0 ? (
+      <Section title="Imagery">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: photos.length > 1 ? "1fr 1fr" : "1fr",
+            gap: 16,
+          }}
+        >
+          {photos.map((p, i) => (
+            <figure key={i} style={{ margin: 0 }}>
+              <img
+                src={p.dataUrl}
+                alt={p.caption || `Figure ${i + 1}`}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  border: `1px solid ${POLAR}`,
+                }}
+              />
+              {p.caption ? (
+                <figcaption
+                  style={{
+                    marginTop: 6,
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    color: DUSK,
+                    fontFamily: ROBOTO,
+                    fontWeight: 300,
+                  }}
+                >
+                  {p.caption}
+                </figcaption>
+              ) : null}
+            </figure>
+          ))}
+        </div>
+      </Section>
+    ) : null;
 
   return (
     <div
@@ -195,10 +243,17 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
           </Section>
         )}
 
+        {/* Photos fall here (right after the map) only when there is no
+            Incident Details section to anchor them to. */}
+        {!hasIncidentDetails && imagery}
+
         {otherSections.map((s) => (
-          <Section key={s.heading} title={s.heading}>
-            {s.bullets ? <Bullets text={s.body} /> : <Paragraphs text={s.body} />}
-          </Section>
+          <Fragment key={s.heading}>
+            <Section title={s.heading}>
+              {s.bullets ? <Bullets text={s.body} /> : <Paragraphs text={s.body} />}
+            </Section>
+            {s.heading === "Incident Details" && imagery}
+          </Fragment>
         ))}
 
         {incidents.length > 0 && (

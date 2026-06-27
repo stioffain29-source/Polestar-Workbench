@@ -29,8 +29,11 @@ app.use(
 );
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Spot reports embed photographs as base64 data URLs inside the JSON body, so
+// the default 100 KB limit would 413 a normal multi-photo save. The per-photo
+// and total-size ceilings are enforced in the spot-reports route.
+app.use(express.json({ limit: "32mb" }));
+app.use(express.urlencoded({ extended: true, limit: "32mb" }));
 app.use(authMiddleware);
 
 app.use("/api", router);

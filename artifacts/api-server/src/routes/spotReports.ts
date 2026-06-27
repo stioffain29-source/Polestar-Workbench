@@ -11,6 +11,45 @@ import {
 
 const router: IRouter = Router();
 
+// Photo ceilings. Photos are base64 image data URLs stored in jsonb and
+// rasterised into the DOM/PDF, so cap count and bytes to keep rows, requests
+// and PDF rendering bounded. Mirrored by the editor's client-side guard.
+const MAX_PHOTOS = 24;
+const MAX_PHOTO_DATAURL_BYTES = 4 * 1024 * 1024;
+const MAX_PHOTOS_TOTAL_BYTES = 28 * 1024 * 1024;
+const PHOTO_DATAURL_RE = /^data:image\/(jpeg|png|webp|gif);base64,/;
+
+type PhotoLike = { dataUrl?: unknown };
+
+/**
+ * Validate a photos payload. Returns an error message, or null when valid or
+ * absent (PATCH may omit photos). Keeps oversized/non-image data URLs out of
+ * the jsonb column even though express.json now accepts large bodies.
+ */
+function validatePhotos(photos: unknown): string | null {
+  if (photos === undefined) return null;
+  if (!Array.isArray(photos)) return "photos must be an array";
+  if (photos.length > MAX_PHOTOS) {
+    return `Too many photos (max ${MAX_PHOTOS}).`;
+  }
+  let total = 0;
+  for (const p of photos as PhotoLike[]) {
+    const dataUrl = p?.dataUrl;
+    if (typeof dataUrl !== "string" || !PHOTO_DATAURL_RE.test(dataUrl)) {
+      return "Each photo must be an image data URL (jpeg, png, webp or gif).";
+    }
+    const bytes = Buffer.byteLength(dataUrl, "utf8");
+    if (bytes > MAX_PHOTO_DATAURL_BYTES) {
+      return "A photo is too large; please use a smaller image.";
+    }
+    total += bytes;
+  }
+  if (total > MAX_PHOTOS_TOTAL_BYTES) {
+    return "Photos exceed the total size limit; please remove or shrink some.";
+  }
+  return null;
+}
+
 function parseId(raw: string | string[] | undefined): number {
   const v = Array.isArray(raw) ? raw[0] : raw;
   const n = parseInt(v ?? "", 10);
@@ -50,6 +89,11 @@ router.post("/spot-reports", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const photoError = validatePhotos((parsed.data as { photos?: unknown }).photos);
+  if (photoError) {
+    res.status(400).json({ error: photoError });
+    return;
+  }
   // reportDate/incidentDate arrive as Date instances (orval `useDates`); the
   // Drizzle timestamp columns accept Date directly. Undefined fields are
   // skipped by Drizzle, so column defaults (status, reportDate, [] arrays)
@@ -64,6 +108,11 @@ router.patch("/spot-reports/:id", async (req, res): Promise<void> => {
   const parsed = UpdateSpotReportBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const photoError = validatePhotos((parsed.data as { photos?: unknown }).photos);
+  if (photoError) {
+    res.status(400).json({ error: photoError });
     return;
   }
   const updateData = {
