@@ -98,6 +98,71 @@ function toLocalInput(iso?: string | null): string {
   }
 }
 
+/** Parse a local "yyyy-MM-dd'T'HH:mm" value to ISO, or null if blank/invalid. */
+function toIsoOrNull(local: string): string | null {
+  if (!local) return null;
+  const d = new Date(local);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** Normalise free-typed digits into 24-hour HH:mm (auto-colon, range-clamped). */
+function formatTime24(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length === 0) return "";
+  let hh = digits.slice(0, 2);
+  if (hh.length === 2 && Number(hh) > 23) hh = "23";
+  if (digits.length <= 2) return hh;
+  let mm = digits.slice(2);
+  if (mm.length === 2 && Number(mm) > 59) mm = "59";
+  return `${hh}:${mm}`;
+}
+
+/**
+ * 24-hour date + time control. Replaces the native datetime-local input, whose
+ * presentation is browser-locale driven (am/pm in 12-hour locales and NOT
+ * forceable to 24h via any attribute). The date keeps a native picker; the time
+ * is a plain text field constrained to 24-hour HH:mm so it reads the same on
+ * every machine. Emits/consumes the same "yyyy-MM-dd'T'HH:mm" form string.
+ */
+function DateTime24({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const [datePart, timePart] = value.includes("T")
+    ? (value.split("T") as [string, string])
+    : [value, ""];
+  const commit = (d: string, t: string) => {
+    if (!d) {
+      onChange("");
+      return;
+    }
+    onChange(t ? `${d}T${t}` : `${d}T00:00`);
+  };
+  return (
+    <div className="flex gap-2">
+      <Input
+        type="date"
+        value={datePart}
+        onChange={(e) => commit(e.target.value, timePart)}
+        className="rounded-sm"
+      />
+      <Input
+        type="text"
+        inputMode="numeric"
+        placeholder="HH:MM"
+        aria-label="Time (24-hour)"
+        maxLength={5}
+        value={timePart}
+        onChange={(e) => commit(datePart, formatTime24(e.target.value))}
+        className="rounded-sm w-24 tabular-nums"
+      />
+    </div>
+  );
+}
+
 // Photo ceilings — kept in step with the api-server spot-reports route so a
 // save never trips the server-side 400. Bytes measured on the data URL string.
 const MAX_PHOTOS = 24;
@@ -317,10 +382,8 @@ export default function SpotReportEditor() {
       id: report?.id ?? 0,
       title: form.title,
       status: form.status as SpotReport["status"],
-      reportDate: form.reportDate
-        ? new Date(form.reportDate).toISOString()
-        : new Date().toISOString(),
-      incidentDate: form.incidentDate ? new Date(form.incidentDate).toISOString() : null,
+      reportDate: toIsoOrNull(form.reportDate) ?? new Date().toISOString(),
+      incidentDate: toIsoOrNull(form.incidentDate),
       country: form.country || null,
       province: form.province || null,
       city: form.city || null,
@@ -467,9 +530,7 @@ export default function SpotReportEditor() {
     const out: Record<string, unknown> = {
       title: form.title.trim(),
       status: form.status,
-      reportDate: form.reportDate
-        ? new Date(form.reportDate).toISOString()
-        : new Date().toISOString(),
+      reportDate: toIsoOrNull(form.reportDate) ?? new Date().toISOString(),
       showSourcesInExport: form.showSourcesInExport,
       mapEnabled: form.mapEnabled,
       linkedIncidentIds: form.linkedIncidentIds,
@@ -511,9 +572,7 @@ export default function SpotReportEditor() {
       out.confidenceLevel = form.confidenceLevel ? form.confidenceLevel : null;
     }
 
-    const incidentDate = form.incidentDate
-      ? new Date(form.incidentDate).toISOString()
-      : null;
+    const incidentDate = toIsoOrNull(form.incidentDate);
     const lat = num(form.latitude);
     const lng = num(form.longitude);
     const rad = num(form.affectedRadiusKm);
@@ -810,10 +869,10 @@ export default function SpotReportEditor() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Report Date">
-                <Input type="datetime-local" value={form.reportDate} onChange={(e) => set("reportDate", e.target.value)} className="rounded-sm" />
+                <DateTime24 value={form.reportDate} onChange={(v) => set("reportDate", v)} />
               </Field>
               <Field label="Incident Date">
-                <Input type="datetime-local" value={form.incidentDate} onChange={(e) => set("incidentDate", e.target.value)} className="rounded-sm" />
+                <DateTime24 value={form.incidentDate} onChange={(v) => set("incidentDate", v)} />
               </Field>
             </div>
           </Card>

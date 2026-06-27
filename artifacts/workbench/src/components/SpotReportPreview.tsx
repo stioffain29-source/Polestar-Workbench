@@ -237,7 +237,6 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
               points={mapPoints}
               affectedRadiusKm={report.affectedRadiusKm}
               showLabels
-              locationLabel={location}
               height={420}
             />
           </Section>

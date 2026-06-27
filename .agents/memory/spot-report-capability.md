@@ -133,3 +133,18 @@ it's in the API contract; the drift test must stay green.
   and never clashes with the in-map location label. Because of that,
   `applyMapExportLayout` must be called with `appendAttribution=false` for
   `spot-report-map` (else the PDF shows it twice); the country map still appends.
+
+## Editor 24-hour date entry & on-map title decoupling
+
+- The editor's Report/Incident date fields use a custom `DateTime24` control
+  (native date picker + a text field constrained to 24-hour `HH:mm`), NOT
+  `<input type="datetime-local">`. **Why:** native datetime-local renders in the
+  browser's locale (am/pm in 12-hour locales) and there is NO attribute to force
+  24h — the user explicitly demanded 24-hour notation. Do NOT revert to
+  datetime-local. The control still emits/consumes the same `yyyy-MM-dd'T'HH:mm`
+  form string; `toIsoOrNull` guards save/preview against a partially-typed time.
+- The spot report map does NOT draw the location/country as an on-map title. The
+  preview's `IncidentMap` is called WITHOUT `locationLabel` (only `showLabels`, so
+  analyst-typed manual point captions still render). **Why:** the user asked to
+  decouple the country title from the map ("still tied to the map"). The country
+  still shows in the report header Location meta — keep the on-map label off.
