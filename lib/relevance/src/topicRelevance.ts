@@ -227,6 +227,18 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\b(strike|strikes|struck|striking) .{0,30}(provinces?|districts?|villages?|towns?|cities|coast|region) .{0,40}(rain|thunder|lightning|storm|cyclone|typhoon|hurricane|monsoon|flood)/,
   /\brain and thunder\b/,
 
+  // Property-crime "strike" homonym. "Copper/metal/cable thieves strike <site>",
+  // "burglars strike again", "robbers strike a store" — a THEFT (the verb "to
+  // strike" = to hit), not a labour stoppage. Without this the crime-verb
+  // "strike" is wrongly admitted by FLASHPOINT_INDUSTRIAL_ACTION_RE (copper/
+  // metal/rail are industrial anchors). The actor+"strike" pattern covers the
+  // bug; the first pattern catches the metal-theft CRIME-ACTOR phrasing ("copper
+  // thieves", "metal thief"). Both are bound to a crime ACTOR (thief/thieves/
+  // burglar/robber…), NOT the bare noun "theft", so a genuine "workers strike
+  // over copper/fuel theft" — or a strike at the copper mine — is untouched.
+  /\b(copper|metal|cable|wire|scrap|catalytic[- ]?converter|fuel|ore|aluminium|aluminum|brass) (thie(?:f|ves))\b/,
+  /\b(thie(?:f|ves)|burglars?|robbers?|raiders?|crooks?|shoplifters?) (?:[a-z'-]+ ){0,3}(strike|strikes|striking|struck)\b/,
+
   // Natural-disaster headlines. An earthquake / tsunami / volcanic
   // eruption / landslide / flood story is a hazard report, not civil
   // unrest, even when it shares the ambiguous "strike(s)" token
