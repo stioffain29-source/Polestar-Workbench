@@ -141,9 +141,12 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
                 src={p.dataUrl}
                 alt={p.caption || `Figure ${i + 1}`}
                 style={{
-                  width: "100%",
+                  maxWidth: "100%",
+                  maxHeight: photos.length > 1 ? 240 : 360,
+                  width: "auto",
                   height: "auto",
                   display: "block",
+                  margin: "0 auto",
                   border: `1px solid ${POLAR}`,
                 }}
               />

@@ -148,3 +148,10 @@ it's in the API contract; the drift test must stay green.
   analyst-typed manual point captions still render). **Why:** the user asked to
   decouple the country title from the map ("still tied to the map"). The country
   still shows in the report header Location meta — keep the on-map label off.
+- Analyst photos (`report.photos`) MUST cap `maxHeight` (single 360 / 2-up 240)
+  with `width/height:auto`, NOT `width:100%`+`height:auto`. **Why:** a full-res
+  portrait photo at 100% width expands to a huge height, and because the in-app
+  PDF rasterises this DOM, each oversized image broke onto its own near-empty page
+  (a one-incident report ran to 4 pages). The cap keeps aspect ratio, centres the
+  image, and makes the border hug it. Same single-page-fit lever family as the
+  220px locator map.
