@@ -1,0 +1,56 @@
+NEW ITEM: Improve the current Country Report Builder across all country reports, including Indonesia, Jakarta, PNG and Papua.
+
+Objective:
+Improve the report layout so country reports read more like Polestar advisory products and less like long incident lists.
+
+Required changes:
+
+Replace the long incident list with a “Top 3 Developments This Week” section.
+Keep the existing tile/card style because client feedback on the tiles has been positive.
+Only show the top three incidents or developments in tile format.
+Select the top three using severity, operational relevance, recency, proximity to business locations, movement impact, site impact, staff safety, supply chain exposure and client relevance.
+Do not list every scraped incident in the main report body.
+Summarise remaining incidents by theme in short narrative sections, for example:
+Protest and civil unrest
+Crime, theft and robbery
+Natural hazards
+Governance and regulatory issues
+Fire and explosion
+Other operational disruption
+The report should follow a similar logic to the Spot Report format:
+BLUF
+Top 3 Developments
+Incident Details
+Current Situation
+Operational Impact
+Recommended Actions
+Outlook
+Polestar View
+Reporting Confidence
+Disclaimer
+Remove Maritime Security from the Country Report Builder. Maritime security should not appear in Indonesia, PNG, Papua or any other country report unless added later as a separate product.
+Add user controlled placement for maps and photos. The user should be able to decide where these appear in the report.
+Map placement options:
+No map
+After BLUF
+After Top 3 Developments
+After Incident Details
+Before Outlook
+Before Polestar View
+End of report
+Photo placement options:
+No photo
+Cover photo only
+After BLUF
+After Top 3 Developments
+Inside Incident Details
+Before Polestar View
+Photos should support:
+Caption
+Source
+Credit
+Short context line
+This is an improvement to the existing Country Report Builder only. Do not rebuild the platform. Do not change the Spot Report Builder. Do not change PDF export logic beyond what is needed for this report layout improvement.
+
+Acceptance criteria:
+Country reports for Indonesia, Jakarta, PNG and Papua generate with no long incident list, no Maritime Security section, a maximum of three incident/development tiles, narrative theme summaries, and user controlled map/photo placement.
