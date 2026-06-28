@@ -9,20 +9,36 @@ description: One renderer for ALL country reports (PNG/West Papua/Indonesia/Jaka
 structured theatres AND generic countries — driven by a `PngReportDataset`.
 
 ## Fixed section order (all theatres)
-Bottom Line Up Front → Top 3 Developments (≤3 tiles) → Incident Details (PRESENT-ONLY
-themed narrative groups) → Current Situation → Operational Impact → Recommended Actions →
-Outlook → Polestar View → Reporting Confidence → Disclaimer.
+Bottom Line Up Front → Top 3 Developments (≤3 tiles) → Incident Details (PRESENT-ONLY,
+MEANINGFUL themed paragraphs) → Current Situation (≤2 paras) → Operational Impact (≤5
+bullets) → Recommended Actions → Outlook (1 para + ≤3 escalation indicators) → Polestar
+View. The body CLOSES on Polestar View; the Disclaimer is PAGE-appended by
+`CountryReport.tsx` below the body, never emitted by the body itself.
+**Reporting Confidence and Customer Relevance were REMOVED from the country brief** in the
+wall-of-text trim. Their dataset fields (`reportingConfidence`, `customerRelevance`,
+`whatMattersBullets`) are still computed/typed in `pngReportDataset.ts` but are NO LONGER
+RENDERED — left in place deliberately to avoid a fixture cascade; do not re-render them
+without the user asking.
 
-## Incident Details themes (PRESENT-ONLY, not a fixed six)
+## Incident Details themes (PRESENT-ONLY + MEANINGFUL, one paragraph each)
 `buildCountryIncidentThemes` (`lib/countryIncidentThemes.ts`) emits a group ONLY for
-themes present in `incidentDetailsItems` this window — absent themes are OMITTED, never
-padded with "Not reported this period." (the old always-on six-theme scaffold was
-removed). Each present theme reads What happened / Where / Why it matters / What could be
-affected. `themeForCategory` is still an EXHAUSTIVE `Record<PngCategory, theme>` (adding a
-PngCategory forces a theme assignment, compile error otherwise). `incidentDetailsItems`
-is windowItems MINUS the Top-3 cluster members. Narrative is COUNT-FREE (brand rule: no
-"(N records)" in prose). Severity is described adjectivally ("High-severity reporting
-featured") — house style across all report builders, NOT a tier-label substitution.
+themes present in `incidentDetailsItems` this window AND meaningful — a theme is kept only
+if it recurs (≥2 items) OR reaches Moderate severity+ (worstSeverityIndex≥2); single
+Low/Insignificant themes are dropped. Absent themes are OMITTED, never padded with "Not
+reported this period." (the old always-on six-theme scaffold was removed). Each kept theme
+now renders as ONE short, count-free analytical `paragraph` (the legacy four-part What
+happened / Where / Why / What-affected fields still exist internally but are NOT rendered).
+`themeForCategory` stays an EXHAUSTIVE `Record<PngCategory, theme>` (adding a PngCategory
+forces a theme assignment, compile error otherwise). `incidentDetailsItems` is windowItems
+MINUS the Top-3 cluster members. Narrative is COUNT-FREE (brand rule: no "(N records)" in
+prose). Severity is described adjectivally ("High-severity reporting featured") — house
+style, NOT a tier-label substitution.
+**No-fabrication empty note:** when no meaningful theme forms, the section distinguishes
+three cases — empty window → `emptyLocationFallback`; window had items but NO leftover
+(all promoted to Top 3) → "No further incident reporting beyond the developments…";
+leftover existed but failed the meaningfulness gate → "Remaining reporting … was limited
+to isolated, lower-severity incidents that did not warrant separate detail." Never claim
+"no further reporting" when sub-threshold leftover items actually exist.
 
 ## Maritime Security REMOVED from country reports
 Country reports no longer render the ICC/IMB maritime-security block or its

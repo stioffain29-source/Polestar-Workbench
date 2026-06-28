@@ -65,7 +65,7 @@ const POPULATED: PngSourceIncident[] = [
   inc({
     id: "p2",
     title: "Police disperse a large demonstration and rally in Cebu",
-    severity: "Low",
+    severity: "Moderate",
     location: "Cebu",
   }),
   inc({
@@ -260,6 +260,66 @@ describe("PngCountryReportBody — country brief render, quiet window", () => {
     expect(text).toMatch(/no fresh open-source reporting/i);
     // A quiet week must not invent counts either.
     expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
+  });
+});
+
+// No-fabrication guard for the Incident Details empty note. When the only
+// non-Top-3 leftover is a single low-severity incident, no theme clears the
+// meaningfulness gate, so Incident Details renders no themed paragraph. The
+// brief must NOT then falsely claim there was "no further incident reporting"
+// (a leftover DID exist) — it must say honestly that the remaining reporting
+// was immaterial. Three High incidents fill the Top 3; the lone Low break-in is
+// the leftover that fails the gate.
+describe("PngCountryReportBody — immaterial leftover incidents", () => {
+  const LOW_LEFTOVER: PngSourceIncident[] = [
+    inc({
+      id: "h1",
+      title: "Armed robbery wounds a security guard in Manila",
+      severity: "High",
+      location: "Manila",
+    }),
+    inc({
+      id: "h2",
+      title: "A power blackout hits Quezon City after a grid failure",
+      severity: "High",
+      location: "Quezon City",
+    }),
+    inc({
+      id: "h3",
+      title: "Thousands join a street protest in Davao over fuel price rises",
+      severity: "High",
+      location: "Davao",
+    }),
+    inc({
+      id: "x1",
+      title: "Police log a minor break-in at a warehouse in Baguio",
+      severity: "Low",
+      location: "Baguio",
+    }),
+  ];
+  const dataset = build(LOW_LEFTOVER);
+  const html = renderToStaticMarkup(<PngCountryReportBody dataset={dataset} />);
+
+  it("states the leftover was immaterial rather than claiming no further reporting", () => {
+    // Precondition: a leftover incident exists but no meaningful theme forms.
+    expect(dataset.incidentDetailsItems.length).toBeGreaterThan(0);
+    expect(
+      buildCountryIncidentThemes(dataset.incidentDetailsItems).length,
+    ).toBe(0);
+    // Scope to the Incident Details section.
+    const detailsStart = html.indexOf("Incident Details");
+    const detailsEnd = html.indexOf("Current Situation");
+    const section = html.slice(detailsStart, detailsEnd);
+    // The brief must NOT falsely claim there was no further reporting...
+    expect(section).not.toContain(
+      "No further incident reporting beyond the developments",
+    );
+    // ...it states the remaining reporting was immaterial instead.
+    expect(section).toContain("did not warrant separate detail");
+    // Count-free even in the honest fallback.
+    expect(textOf(section)).not.toMatch(
+      /\b\d+\s+(records?|incidents?|events?)\b/i,
+    );
   });
 });
 

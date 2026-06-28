@@ -1,0 +1,110 @@
+Use this as the target example for the revised country report output.
+
+This is the style and length I want. Do not expand it into a wall of text. Do not add Reporting Confidence. Do not add sections just because data exists.
+
+EXAMPLE COUNTRY REPORT: PAPUA
+
+BOTTOM LINE UP FRONT
+
+Papua’s security picture remains unsettled, with risk concentrated around the Central Highlands, Papua Tengah, Papua Barat Daya and selected coastal areas. The main concern for business users is not a single major incident, but recurring armed crime, security force activity, fire events and local disruption that can affect movement, site access and staff confidence.
+
+TOP 3 DEVELOPMENTS
+
+1. Intan Jaya security operation highlights continuing armed group risk
+   Location: Intan Jaya, Papua Tengah
+   Severity: High
+   Why it matters: The arrest of a suspected armed group member linked to a police shooting keeps Intan Jaya in the higher risk category for movement planning, government activity and localised security force operations.
+
+2. Papua police performance questioned over delayed student shooting case
+   Location: Papua
+   Severity: Moderate
+   Why it matters: The stalled case points to public confidence and rule of law concerns. This is more relevant to reputational and community risk than immediate operational disruption.
+
+3. Fire and local disruption reported in western Papua areas
+   Location: Papua Barat and Papua Barat Daya
+   Severity: Moderate
+   Why it matters: Fire and infrastructure disruption can affect site access, local movement and short notice evacuation planning, especially where response capacity is limited.
+
+INCIDENT DETAILS
+
+Crime and armed violence remained the most relevant security theme this period, with reporting centred on Papua Tengah and Papua Barat Daya. The main operational concern is exposure during road movement, site visits and after hours travel.
+
+Security force activity continued around known armed group areas. This may create local movement restrictions, checkpoints, delays and short notice changes to journey plans.
+
+Fire and local disruption were also reported. These incidents are generally localised, but they can still affect access, utilities, local staff movement and emergency response times.
+
+CURRENT SITUATION
+
+The reporting picture does not point to a province wide deterioration, but it does show continued instability in known risk areas. Intan Jaya and the wider Central Highlands remain the main concern for security force activity and armed group related risk.
+
+For business users, the practical issue is movement discipline. Travel should remain route based, time restricted where required, and supported by local checks before departure.
+
+OPERATIONAL IMPACT
+
+Movement: Higher caution required for travel through Central Highlands and affected Papua Tengah areas.
+
+Site security: Review access control, guard briefings and escalation procedures at exposed locations.
+
+Staff safety: Avoid unnecessary after hours movement in higher risk areas.
+
+Logistics: Build time buffers into road movement where local disruption or security activity is reported.
+
+Management oversight: Ensure local teams report changes quickly rather than waiting for formal alerts.
+
+RECOMMENDED ACTIONS
+
+1. Confirm local conditions before travel to affected districts.
+
+2. Restrict non essential after hours movement in higher risk areas.
+
+3. Brief drivers and travellers on route changes, checkpoints and escalation contacts.
+
+4. Review guard posture and access control at exposed sites.
+
+5. Keep local staff comms active, especially during security operations or fire events.
+
+6. Escalate any casualty bearing incident, road closure, protest, armed group activity or disruption near a company site.
+
+OUTLOOK: NEXT SEVEN DAYS
+
+The most likely scenario is continued localised disruption rather than a major province wide escalation. Intan Jaya and the wider Central Highlands remain the main watch areas, while Papua Barat and Papua Barat Daya should be monitored for fire, infrastructure and local security incidents.
+
+Escalation indicators:
+
+1. Further casualty bearing incidents involving armed groups or security forces.
+
+2. Disruption spreading from known high risk areas into main towns or commercial corridors.
+
+3. Protests, road blocks or community mobilisation linked to policing, land, mining or local grievances.
+
+POLESTAR VIEW
+
+Papua remains a managed but uneven operating environment. The risk is not uniform across the province, so the report should avoid broad alarmist language. The priority for business users is disciplined movement planning, local verification before travel, and stronger reporting from exposed sites. A quiet week should not be read as a clear improvement unless it is supported by several weeks of reduced incident reporting.
+
+MAP STANDARD FOR THIS REPORT
+
+Do not use raw incident dots.
+
+Use a risk area or numbered callout map.
+
+Suggested map callouts:
+
+1. Central Highlands: armed group and security force activity
+
+2. Papua Tengah: Intan Jaya and related movement risk
+
+3. Papua Barat Daya: crime, fire and local disruption
+
+4. Jayapura and North Coast: urban and access route monitoring
+
+5. Bird’s Head: fire, infrastructure and local disruption monitoring
+
+The map must be readable in the exported PDF. If the labels or points cannot be read, remove the map rather than exporting a poor one.
+
+CHART STANDARD FOR THIS REPORT
+
+Only include a chart if it supports the written assessment.
+
+Remove any off type categories such as fertiliser from country security reports.
+
+Do not include Reporting Confidence.

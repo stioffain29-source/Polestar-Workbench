@@ -379,11 +379,12 @@ describe("PngCountryReportBody charts & tables", () => {
 
   it("renders themed Incident Details with a count-free location narrative", () => {
     // The rebuilt renderer drops location buckets; the remaining (non-Top-3)
-    // incidents become PRESENT-ONLY analytical theme groups. The "Other security"
-    // item maps to "Other operational disruption" and its deterministic narrative
-    // cites the province focus and severity emphasis — never a count.
+    // incidents become PRESENT-ONLY analytical theme groups, each rendered as one
+    // short, count-free paragraph. The "Other security" item maps to "Other
+    // operational disruption" and its deterministic paragraph cites the province
+    // focus and severity emphasis — never a count.
     expect(html).toContain("Other operational disruption");
-    expect(html).toContain("Concentrated in National Capital District");
+    expect(html).toContain("It concentrated in National Capital District.");
     // No record/incident/event counts leak into the narrative prose.
     expect(html).not.toMatch(/\b\d+\s+(incidents?|records?|events?)\b/);
     // Present-only standard: absent themes are omitted, with no fabricated

@@ -327,13 +327,18 @@ export default function PngCountryReportBody({
           not already shown as Top 3 developments. Each theme is ONE short,
           count-free analytical paragraph (no four-part sub-template). Trivial
           single low-severity themes are filtered upstream; absent themes are
-          omitted rather than padded with "not reported" filler. */}
+          omitted rather than padded with "not reported" filler. The empty note
+          is no-fabrication-safe: it only claims "no further reporting" when there
+          truly are no leftover incidents; when leftover incidents existed but all
+          fell below the meaningfulness gate it says so honestly instead. */}
       <Section title="Incident Details">
         {incidentThemes.length === 0 ? (
           <EmptyNote>
             {d.windowItems.length === 0
               ? d.emptyLocationFallback
-              : "No further incident reporting beyond the developments above this period."}
+              : d.incidentDetailsItems.length === 0
+                ? "No further incident reporting beyond the developments above this period."
+                : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
           </EmptyNote>
         ) : (
           incidentThemes.map((g) => (
