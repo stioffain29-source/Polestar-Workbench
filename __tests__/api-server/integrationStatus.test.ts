@@ -419,59 +419,6 @@ describe("social-watch instagram integration status (freshness honesty)", () => 
   });
 });
 
-describe("social-watch telegram integration status (freshness honesty)", () => {
-  function configureTg(): void {
-    delete process.env.SOCIAL_WATCH_ENABLED;
-    delete process.env.TELEGRAM_ENABLED;
-    process.env.KAMMI_TELEGRAM_CHANNEL = "kammipusat";
-  }
-  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
-
-  it("reports working when the newest post is inside the freshness window", async () => {
-    configureTg();
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 6, latest: daysAgo(10) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_telegram");
-    expect(item.status).toBe("working");
-    expect(item.configured).toBe(true);
-    expect(item.summary).toContain("6 KAMMI Telegram post");
-  });
-
-  it("reports dormant with an N-day-old summary when the newest post is past the window", async () => {
-    configureTg();
-    // Mirrors the real-world KAMMI channel, last active in 2016.
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 3, latest: daysAgo(365) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_telegram");
-    expect(item.status).toBe("dormant");
-    expect(item.summary).toContain("dormant");
-    expect(item.summary).toMatch(/\d+ day\(s\) old/);
-    expect(item.summary).toContain("30-day freshness window");
-  });
-
-  it("reports no_data when configured but the table is empty", async () => {
-    configureTg();
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 0, latest: null }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_telegram");
-    expect(item.status).toBe("no_data");
-  });
-
-  it("keeps disabled when the telegram source is switched off, even with a stale row present", async () => {
-    delete process.env.SOCIAL_WATCH_ENABLED;
-    process.env.TELEGRAM_ENABLED = "false";
-    process.env.KAMMI_TELEGRAM_CHANNEL = "kammipusat";
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_telegram");
-    expect(item.status).toBe("disabled");
-  });
-});
-
 describe("getIntegrationStatuses envelope", () => {
   it("returns every integration plus a generation timestamp", async () => {
     (isLlmAvailable as jest.Mock).mockReturnValue(false);
@@ -488,7 +435,6 @@ describe("getIntegrationStatuses envelope", () => {
         "reliefweb",
         "reliefweb_reports",
         "social_watch_instagram",
-        "social_watch_telegram",
         "tapa_iis",
         "vessel_registry",
         "x_cargo_osint",

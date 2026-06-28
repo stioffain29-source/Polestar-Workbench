@@ -3,8 +3,11 @@
  */
 import {
   JAKARTA_CORRIDOR_AREAS,
+  JAKARTA_EXPOSURE_RANK,
   corridorIndexForIncident,
   buildJakartaCorridorStatuses,
+  severityToExposure,
+  maxExposure,
 } from "../../artifacts/workbench/src/lib/jakartaCorridors";
 import type { CountryFastFactsIncident } from "../../artifacts/workbench/src/lib/countryFastFacts";
 
@@ -98,6 +101,50 @@ describe("corridorIndexForIncident — attribution", () => {
   });
 });
 
+describe("severityToExposure / maxExposure — exposure model", () => {
+  it("maps severities to exposure levels (live only ever raises)", () => {
+    expect(severityToExposure("extreme")).toBe("high");
+    expect(severityToExposure("high")).toBe("high");
+    expect(severityToExposure("moderate")).toBe("elevated");
+    expect(severityToExposure("low")).toBe("monitored");
+    expect(severityToExposure("insignificant")).toBe("low");
+    expect(severityToExposure("")).toBeNull();
+    expect(severityToExposure("nonsense")).toBeNull();
+  });
+
+  it("returns the higher-ranked exposure level", () => {
+    expect(maxExposure("monitored", "high")).toBe("high");
+    expect(maxExposure("elevated", "monitored")).toBe("elevated");
+    expect(maxExposure("low", "not-assessed")).toBe("low");
+    expect(maxExposure("high", "high")).toBe("high");
+  });
+
+  it("ranks levels high > elevated > monitored > low > not-assessed", () => {
+    expect(JAKARTA_EXPOSURE_RANK.high).toBeGreaterThan(
+      JAKARTA_EXPOSURE_RANK.elevated,
+    );
+    expect(JAKARTA_EXPOSURE_RANK.elevated).toBeGreaterThan(
+      JAKARTA_EXPOSURE_RANK.monitored,
+    );
+    expect(JAKARTA_EXPOSURE_RANK.monitored).toBeGreaterThan(
+      JAKARTA_EXPOSURE_RANK.low,
+    );
+    expect(JAKARTA_EXPOSURE_RANK.low).toBeGreaterThan(
+      JAKARTA_EXPOSURE_RANK["not-assessed"],
+    );
+  });
+});
+
+describe("jakartaCorridors — area baselines", () => {
+  it("gives every area a standing baseline exposure", () => {
+    for (const a of JAKARTA_CORRIDOR_AREAS) {
+      expect(JAKARTA_EXPOSURE_RANK[a.baselineExposure]).toBeGreaterThanOrEqual(
+        0,
+      );
+    }
+  });
+});
+
 describe("buildJakartaCorridorStatuses — this-week elevation", () => {
   it("returns all six areas standing/monitored for an empty window", () => {
     const { statuses, unattributed } = buildJakartaCorridorStatuses([]);
@@ -107,6 +154,9 @@ describe("buildJakartaCorridorStatuses — this-week elevation", () => {
       expect(s.count).toBe(0);
       expect(s.elevated).toBe(false);
       expect(s.worstKey).toBe("");
+      // No live reporting: live is null, display falls back to baseline.
+      expect(s.liveExposure).toBeNull();
+      expect(s.displayExposure).toBe(s.baselineExposure);
     }
     expect(statuses.map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6]);
   });
@@ -120,8 +170,28 @@ describe("buildJakartaCorridorStatuses — this-week elevation", () => {
     expect(central.count).toBe(2);
     expect(central.elevated).toBe(true);
     expect(central.worstKey).toBe("high");
-    // Other areas stay standing.
+    // A high record raises the live exposure to "high"; display = max(baseline, live).
+    expect(central.liveExposure).toBe("high");
+    expect(central.displayExposure).toBe("high");
+    // Other areas stay standing (display == baseline, no live).
     expect(statuses[COMMUTER_IDX].elevated).toBe(false);
+    expect(statuses[COMMUTER_IDX].liveExposure).toBeNull();
+    expect(statuses[COMMUTER_IDX].displayExposure).toBe(
+      statuses[COMMUTER_IDX].baselineExposure,
+    );
+  });
+
+  it("never lowers the displayed level below the standing baseline", () => {
+    // An insignificant record maps to live="low"; central baseline is "elevated",
+    // so display must stay at the higher baseline, not drop to "low".
+    const { statuses } = buildJakartaCorridorStatuses([
+      incident({ location: "Menteng", severity: "insignificant" }),
+    ]);
+    const central = statuses[CENTRAL_IDX];
+    expect(central.elevated).toBe(true);
+    expect(central.liveExposure).toBe("low");
+    expect(central.baselineExposure).toBe("elevated");
+    expect(central.displayExposure).toBe("elevated");
   });
 
   it("counts records that match no area as unattributed", () => {

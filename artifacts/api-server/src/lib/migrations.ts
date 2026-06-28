@@ -498,7 +498,7 @@ export async function runDataMigrations(): Promise<void> {
         ON reliefweb_reports (published_at)
     `);
 
-    // Schema: KAMMI Pusat Instagram + Telegram public social-media protest WATCH
+    // Schema: KAMMI Pusat Instagram public social-media protest WATCH
     // items. A CONTEXT source modelled on reliefweb_reports / maritime_movement:
     // a social item is NEVER an incident and lives in its OWN table precisely so
     // a mobilisation / "planned protest" post can never inflate any incident
@@ -2855,6 +2855,41 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (sevErr) {
       logger.error({ err: sevErr }, "Severity re-rate failed");
+    }
+
+    // ONE-TIME removal of the retired KAMMI Telegram social-watch feed. The
+    // Telegram channel was dead (last active 2016) and has been removed from the
+    // ingest; only the Instagram feed remains. Purge any stored Telegram rows
+    // from the isolated social_watch_items table so the public Source Health and
+    // Protests context surfaces no longer show a feed that can never refresh.
+    // These rows are CONTEXT only (never incidents), so deleting them cannot
+    // touch any incident count. Marker-gated so it runs once.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "delete_telegram_social_watch_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM social_watch_items WHERE platform = 'telegram'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time removal of retired KAMMI Telegram social-watch rows",
+        );
+      }
+    } catch (tgErr) {
+      logger.error({ err: tgErr }, "Telegram social-watch purge failed");
     }
 
     try {

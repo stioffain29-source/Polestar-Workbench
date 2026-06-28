@@ -85,10 +85,8 @@ export {
   extractEventDateTime,
   detectAlertReasons,
   makeDedupKey,
-  parseTelegramHtml,
   SOCIAL_WATCH_STATUSES,
   SOCIAL_WATCH_IG_HEALTH_NAME,
-  SOCIAL_WATCH_TG_HEALTH_NAME,
 } from "./socialWatch";
 export type {
   SocialWatchSummary,

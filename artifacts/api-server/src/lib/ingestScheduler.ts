@@ -288,10 +288,10 @@ async function hoursSinceNewestMaritimeSecurity(): Promise<number | null> {
 }
 
 /**
- * True when the KAMMI social-watch ingest is active — i.e. at least one platform
- * is both configured (key/handle present) and not switched off. Mirrors
+ * True when the KAMMI social-watch ingest is active — i.e. the Instagram feed is
+ * both configured (key present) and not switched off. Mirrors
  * isSocialWatchActive() in lib/ingest/src/socialWatch.ts so the scheduler gates
- * on the SAME condition the collector uses: when no platform is active the
+ * on the SAME condition the collector uses: when it is inactive the
  * social_watch_items table is empty by design, so gating on its freshness would
  * force a needless scrape on every cold start.
  */
@@ -304,9 +304,7 @@ function socialWatchActive(): boolean {
   };
   const igKeyed = (process.env["INSTAGRAM_API_KEY"]?.trim().length ?? 0) > 0;
   const igActive = igKeyed && !off(process.env["INSTAGRAM_ENABLED"]);
-  // Telegram uses the free public web view: active unless explicitly disabled.
-  const tgActive = !off(process.env["TELEGRAM_ENABLED"]);
-  return igActive || tgActive;
+  return igActive;
 }
 
 /**
@@ -749,11 +747,10 @@ export function startIngestScheduler(): void {
           const maritimeSecurityStale =
             maritimeSecurityAge !== null && maritimeSecurityAge >= hours;
           // KAMMI social-watch context also refreshes ONLY inside a full ingest.
-          // Treat a stale table as a reason to run, but ONLY when a platform is
-          // active — otherwise the table is empty by design and gating on it
-          // would force a needless scrape on every cold start. An empty table
-          // while active IS a trigger (initial population) since the free
-          // Telegram web view is normally reachable.
+          // Treat a stale table as a reason to run, but ONLY when the Instagram
+          // feed is active — otherwise the table is empty by design and gating
+          // on it would force a needless scrape on every cold start. An empty
+          // table while active IS a trigger (initial population).
           const socialActive = socialWatchActive();
           const socialWatchAge = socialActive
             ? await hoursSinceNewestSocialWatch()

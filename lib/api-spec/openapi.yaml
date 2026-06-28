@@ -209,7 +209,7 @@ paths:
       operationId: listSocialWatchItems
       tags: [social-watch]
       summary: >-
-        KAMMI Pusat public Instagram + Telegram protest-watch items, stored as
+        KAMMI Pusat public Instagram protest-watch items, stored as
         supporting CONTEXT (never as incidents, so they never inflate any count).
         The only path into incidents is the explicit promote action.
       parameters:
@@ -219,8 +219,8 @@ paths:
           schema: { $ref: "#/components/schemas/SocialWatchStatus" }
         - name: platform
           in: query
-          description: Filter to one platform (instagram | telegram)
-          schema: { type: string, enum: [instagram, telegram] }
+          description: Filter to one platform (instagram)
+          schema: { type: string, enum: [instagram] }
         - name: promotable
           in: query
           description: Limit to items eligible for promotion to an incident
@@ -2903,7 +2903,7 @@ components:
     SocialWatchItem:
       type: object
       description: >-
-        A KAMMI Pusat public Instagram / Telegram protest-watch item stored as
+        A KAMMI Pusat public Instagram protest-watch item stored as
         supporting CONTEXT. NOT an incident: these rows live in their own table
         and never feed any incident count. The only path into incidents is the
         explicit promote action, which sets promotedIncidentId.

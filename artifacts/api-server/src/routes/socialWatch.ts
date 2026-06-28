@@ -11,7 +11,7 @@ import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
-// KAMMI Pusat public Instagram + Telegram protest-watch items, stored as
+// KAMMI Pusat public Instagram protest-watch items, stored as
 // supporting CONTEXT.
 //
 // CRITICAL PRODUCT RULE: these rows are NOT incidents — they live in their own
@@ -136,7 +136,7 @@ router.post("/social-watch/:id/promote", requireAdminToken, async (req, res): Pr
         occurredAt,
         severity: "Low",
         confidence: item.confidence,
-        source: `KAMMI ${item.platform === "telegram" ? "Telegram" : "Instagram"} (Social Watch)`,
+        source: "KAMMI Instagram (Social Watch)",
         sourceUrl,
         analystNotes: `Promoted from KAMMI social-watch item #${item.id} (${item.status}).`,
         relevanceStatus: rel.status,

@@ -1,14 +1,23 @@
 ---
 name: KAMMI social-media protest watch
-description: Instagram+Telegram social monitoring as additive context (own table, never incidents) with promote-to-incident; where the wiring lives and the invariants.
+description: Instagram social monitoring as additive context (own table, never incidents) with promote-to-incident; where the wiring lives and the invariants. Telegram was retired (dead channel).
 ---
 
 # KAMMI / Indonesia Social Watch
 
-Public KAMMI Pusat Instagram + Telegram protest monitoring. Posts are ADDITIVE
-CONTEXT in their own `social_watch_items` table — they NEVER become incidents and
-never inflate any incident count. The ONLY path into the incidents table is the
+Public KAMMI Pusat Instagram protest monitoring. Posts are ADDITIVE CONTEXT in
+their own `social_watch_items` table — they NEVER become incidents and never
+inflate any incident count. The ONLY path into the incidents table is the
 explicit operator promote action.
+
+**Telegram retired:** the KAMMI Telegram channel was dead (last active 2016) and
+no active KAMMI Telegram channel exists anywhere, so it was removed entirely —
+ingest parser (`parseTelegramHtml`), Source Health entry
+(`social_watch_telegram` / `SOCIAL_WATCH_TG_HEALTH_NAME`), scheduler activity
+check, and the `platform` enum (now `[instagram]` only). A marker-gated boot
+migration (`delete_telegram_social_watch_v1`) purges any stored
+`platform='telegram'` rows. Do NOT re-add Telegram without the user asking.
+Instagram is the sole live path.
 
 **Invariants (do not break):**
 - Social posts live in their own table; incident counts must be unchanged by the
@@ -32,25 +41,20 @@ extra paid run; non-auth errors (5xx/429/network/timeout) do NOT advance. For
 this to be prompt, `fetchJson` must fail fast on non-transient 4xx (it used to
 retry every error 3× with backoff — fixed). Plus
 `INSTAGRAM_PROVIDER`(apify)/`INSTAGRAM_ENABLED`/`INSTAGRAM_API_BASE`/`INSTAGRAM_ACTOR`/
-`KAMMI_INSTAGRAM_HANDLE`(@kammi.pusat); Telegram = FREE public web view
-(`t.me/s/<channel>`) via `KAMMI_TELEGRAM_CHANNEL` + `TELEGRAM_ENABLED`,
-needs no key. `SOCIAL_WATCH_MAX_ITEMS` per-platform cap.
+`KAMMI_INSTAGRAM_HANDLE`(@kammi.pusat). `SOCIAL_WATCH_MAX_ITEMS` per-platform cap.
 
-**Data-source reality:** the confirmed Telegram channel's most recent posts are
-from 2016 — the channel is inactive, so the board shows old context. This is NOT
-a parse bug (`parseTelegramHtml` + `slice(-maxItems)` correctly takes the NEWEST
-posts; t.me/s/ returns oldest-first in HTML order). The channel handle is
-env-overridable; Instagram (the primary, paid feed) is the live path.
+**Data-source reality:** Instagram (the primary, paid Apify feed) is the live
+path — it needs a real `apify_api_` token. Without one, the feed no-ops cleanly.
 
 **Boot freshness gate:** the pass runs inside `runIngestOnce`; the scheduler's
-boot catch-up gates on `socialWatchStale` ONLY when a platform is active
-(`socialWatchActive()`), scoped to this table — same pattern as the other
-context layers (AIS movement, ICC piracy). An empty table while active IS a
-trigger (initial population) since the free Telegram view is normally reachable.
+boot catch-up gates on `socialWatchStale` ONLY when Instagram is active
+(`socialWatchActive()` → `igActive()`), scoped to this table — same pattern as
+the other context layers (AIS movement, ICC piracy). An empty table while active
+IS a trigger (initial population).
 
-**Source Health:** two 7-state entries (`social_watch_instagram`,
-`social_watch_telegram`) in `integrationStatus.ts`; health names exported as
-`SOCIAL_WATCH_IG_HEALTH_NAME` / `SOCIAL_WATCH_TG_HEALTH_NAME` (topic=flashpoint).
+**Source Health:** one 7-state entry (`social_watch_instagram`) in
+`integrationStatus.ts`; health name exported as `SOCIAL_WATCH_IG_HEALTH_NAME`
+(topic=flashpoint).
 
 **Board:** Protests.tsx last section "KAMMI / Indonesia Social Watch" — KPIs +
 planned/active/other group tables, Promote button (hooks

@@ -469,7 +469,7 @@ describe("same-screen mutation buttons refresh the visible list", () => {
     socialWatch = [
       {
         id: 1,
-        platform: "telegram",
+        platform: "instagram",
         status: "active",
         caption: "Test mobilisation caption",
         url: null,

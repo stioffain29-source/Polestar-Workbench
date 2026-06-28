@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-// Public social-media protest WATCH items (KAMMI Pusat Instagram + Telegram) —
+// Public social-media protest WATCH items (KAMMI Pusat Instagram) —
 // a CONTEXT source, modelled exactly on reliefweb_reports / maritime_movement.
 //
 // CRITICAL PRODUCT RULE: a social-watch item is NEVER an incident. It lives in
@@ -23,12 +23,11 @@ import {
 //
 // PRIVACY: only PUBLIC posts are ever fetched. The ingest sanitises the stored
 // caption and never persists phone numbers, personal-account identifiers,
-// WhatsApp content or member-level data. No private Telegram groups.
+// WhatsApp content or member-level data. No private groups.
 //
-// Dedup: reposts (the same Instagram graphic, the same Telegram repost, the
-// same post re-fetched, or the same content across both platforms) collapse to
-// a single row via the UNIQUE `dedup_key` (a content/image fingerprint). The
-// ingest also de-duplicates within a run before writing.
+// Dedup: reposts (the same Instagram graphic, or the same post re-fetched)
+// collapse to a single row via the UNIQUE `dedup_key` (a content/image
+// fingerprint). The ingest also de-duplicates within a run before writing.
 export const socialWatchItemsTable = pgTable(
   "social_watch_items",
   {
@@ -36,7 +35,7 @@ export const socialWatchItemsTable = pgTable(
     // Constant adapter source key ("social_watch"); part of the external-id
     // dedup so a future provider can share the table without id collisions.
     sourceName: text("source_name").notNull().default("social_watch"),
-    // Platform the post came from: "instagram" | "telegram".
+    // Platform the post came from: "instagram".
     platform: text("platform").notNull(),
     // Channel / account handle the post was read from, e.g. "kammi.pusat".
     channel: text("channel").notNull(),

@@ -989,7 +989,10 @@ export default function CountryReport() {
   // instead of the numbered incident-dot map; all other theatres are unchanged.
   const isJakarta = effective.name.trim().toLowerCase() === "jakarta";
   const mapNode = isJakarta ? (
-    <JakartaCorridorMap incidents={windowIncidents as CountryFastFactsIncident[]} />
+    <JakartaCorridorMap
+      incidents={windowIncidents as CountryFastFactsIncident[]}
+      issueDate={issueDate}
+    />
   ) : (
     <CountryReportMap
       incidents={windowIncidents as CountryFastFactsIncident[]}

@@ -850,7 +850,7 @@ export const getListSocialWatchItemsUrl = (params?: ListSocialWatchItemsParams,)
 }
 
 /**
- * @summary KAMMI Pusat public Instagram + Telegram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
+ * @summary KAMMI Pusat public Instagram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
  */
 export const listSocialWatchItems = async (params?: ListSocialWatchItemsParams, options?: RequestInit): Promise<SocialWatchItem[]> => {
 
@@ -897,7 +897,7 @@ export type ListSocialWatchItemsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary KAMMI Pusat public Instagram + Telegram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
+ * @summary KAMMI Pusat public Instagram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
  */
 
 export function useListSocialWatchItems<TData = Awaited<ReturnType<typeof listSocialWatchItems>>, TError = ErrorType<unknown>>(

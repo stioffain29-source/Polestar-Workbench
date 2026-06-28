@@ -687,12 +687,12 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ReliefWeb situational reports pass failed");
       reliefwebReports = emptyReliefWebReports(err);
     }
-    // KAMMI Pusat public social-media protest watch (Instagram + Telegram).
+    // KAMMI Pusat public social-media protest watch (Instagram).
     // Writes ONLY the isolated social_watch_items store — CONTEXT ONLY, these
     // rows are NEVER incidents and can never inflate any incident count (the
     // only path into incidents is the explicit, gated promote action). No-ops
-    // cleanly when no platform is configured/enabled. Isolated in its own try so
-    // a scraper/network failure can never fail the wider ingest.
+    // cleanly when Instagram is not configured/enabled. Isolated in its own try
+    // so a scraper/network failure can never fail the wider ingest.
     let socialWatch: SocialWatchSummary;
     try {
       socialWatch = await runSocialWatchIngest({ commit: true });

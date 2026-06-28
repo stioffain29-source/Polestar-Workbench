@@ -721,7 +721,7 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
   if (items.length === 0) {
     return (
       <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground">
-        No KAMMI social-media posts collected yet. Instagram requires a paid scraper key; the Telegram public channel is read free. These posts are supporting context only — they are never counted as incidents. See Source Health for the live configuration state.
+        No KAMMI social-media posts collected yet. Instagram requires a paid scraper key. These posts are supporting context only — they are never counted as incidents. See Source Health for the live configuration state.
       </div>
     );
   }
@@ -736,7 +736,7 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
       </div>
 
       <p className="text-[11px] text-muted-foreground font-sans leading-snug">
-        Public KAMMI Pusat Instagram and Telegram posts, monitored as ADDITIVE
+        Public KAMMI Pusat Instagram posts, monitored as ADDITIVE
         context — never incidents, so they never affect any incident count. Only a
         confirmed-active item can be promoted to a flashpoint incident (Indonesia),
         which links the new incident back to the source post. Captions are

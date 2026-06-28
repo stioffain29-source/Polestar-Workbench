@@ -20,7 +20,6 @@ import {
   REGISTRY_HEALTH_NAME,
   readSocialWatchConfig,
   SOCIAL_WATCH_IG_HEALTH_NAME,
-  SOCIAL_WATCH_TG_HEALTH_NAME,
 } from "@workspace/ingest";
 import { socialWatchItemsTable } from "@workspace/db";
 import type {
@@ -55,10 +54,10 @@ import { logger } from "./logger";
 //                    freshness window (e.g. a channel that stopped posting)
 // ===========================================================================
 
-// Freshness window for the free Telegram social-watch feed, mirroring the AIS
-// movement FRESH_DAYS gate. A channel whose newest post is older than this is
-// reported as "dormant" rather than green "working", so a years-stale channel
-// (e.g. the KAMMI channel, last active 2016) never reads as a live feed.
+// Freshness window for the KAMMI social-watch feed, mirroring the AIS movement
+// FRESH_DAYS gate. A feed whose newest post is older than this is reported as
+// "dormant" rather than green "working", so a years-stale account never reads
+// as a live feed.
 const SOCIAL_WATCH_FRESH_DAYS = 30;
 
 function ageInDays(date: Date | null): number | null {
@@ -617,11 +616,9 @@ async function vesselRegistryStatus(): Promise<IntegrationStatusItem> {
 
 const SOCIAL_WATCH_IG_DETAIL =
   "Monitors the KAMMI Pusat public Instagram account for planned/active protest mobilisation as ADDITIVE context. Posts are stored in their own table — never as incidents, so they never inflate any count. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
-const SOCIAL_WATCH_TG_DETAIL =
-  "Reads the KAMMI public Telegram channel from the free public web view (no login) for planned/active protest mobilisation as ADDITIVE context. Posts are stored in their own table — never as incidents. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
 
 async function socialWatchPlatformCounts(
-  platform: "instagram" | "telegram",
+  platform: "instagram",
 ): Promise<{ total: number; latest: Date | null }> {
   const [row] = await db
     .select({
@@ -692,7 +689,7 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
   } else if (!configured) {
     status = "not_configured";
     summary =
-      "No Instagram credential (INSTAGRAM_API_KEY or APIFY_TOKEN) — the paid Instagram scraper is disabled, so no Instagram posts are collected. The Telegram social-watch source and all incident feeds are unaffected.";
+      "No Instagram credential (INSTAGRAM_API_KEY or APIFY_TOKEN) — the paid Instagram scraper is disabled, so no Instagram posts are collected. All incident feeds are unaffected.";
   } else if (feedStatus === "failing") {
     status = "failing_upstream";
     summary =
@@ -724,86 +721,6 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
     metrics: [
       metric("Account", `@${ig.handle}`),
       metric("Provider", ig.provider),
-      metric("Posts stored", total),
-      metric("Latest post", fmtDate(latest)),
-    ],
-    docsUrl,
-  };
-}
-
-async function socialTelegramStatus(): Promise<IntegrationStatusItem> {
-  const envVars = ["KAMMI_TELEGRAM_CHANNEL", "TELEGRAM_ENABLED", "SOCIAL_WATCH_ENABLED"];
-  const cfg = readSocialWatchConfig();
-  const tg = cfg.telegram;
-  const configured = tg.configured;
-  const docsUrl = `https://t.me/s/${tg.channel}`;
-
-  let total = 0;
-  let latest: Date | null = null;
-  let feedStatus: string | null = null;
-  try {
-    const counts = await socialWatchPlatformCounts("telegram");
-    total = counts.total;
-    latest = counts.latest;
-    feedStatus = await socialFeedStatus(SOCIAL_WATCH_TG_HEALTH_NAME);
-  } catch (err) {
-    logger.warn({ err: msg(err) }, "social watch telegram status query failed");
-    return unknownItem({
-      key: "social_watch_telegram",
-      label: "KAMMI Telegram (Social Watch)",
-      configured,
-      envVars,
-      summary: "Status query failed.",
-      detail: SOCIAL_WATCH_TG_DETAIL,
-      docsUrl,
-    });
-  }
-
-  let status: IntegrationStatusState;
-  let summary: string;
-  if (!cfg.enabled) {
-    status = "disabled";
-    summary =
-      "Switched off (SOCIAL_WATCH_ENABLED=false) — social-media protest monitoring is disabled. Incident feeds are unaffected.";
-  } else if (!tg.enabled) {
-    status = "disabled";
-    summary =
-      "Switched off (TELEGRAM_ENABLED=false) — the Telegram social-watch source is disabled.";
-  } else if (!configured) {
-    status = "not_configured";
-    summary =
-      "No KAMMI_TELEGRAM_CHANNEL set — the free Telegram public-web reader is disabled.";
-  } else if (feedStatus === "failing") {
-    status = "failing_upstream";
-    summary =
-      "Configured, but the Telegram public web view is currently unreachable — no posts are being collected.";
-  } else if (total > 0) {
-    const age = ageInDays(latest);
-    if (age !== null && age > SOCIAL_WATCH_FRESH_DAYS) {
-      status = "dormant";
-      summary = `Channel appears dormant — newest of ${total} stored KAMMI Telegram post(s) is ${age} day(s) old (past the ${SOCIAL_WATCH_FRESH_DAYS}-day freshness window). Stored as protest-monitoring context only, never counted as incidents.`;
-    } else {
-      status = "working";
-      summary = `Holding ${total} KAMMI Telegram post(s) as protest-monitoring context — never counted as incidents.`;
-    }
-  } else {
-    status = "no_data";
-    summary =
-      "Configured and reachable, but no protest-relevant Telegram posts collected yet.";
-  }
-
-  return {
-    key: "social_watch_telegram",
-    label: "KAMMI Telegram (Social Watch)",
-    status,
-    summary,
-    detail: SOCIAL_WATCH_TG_DETAIL,
-    configured,
-    optional: true,
-    envVars,
-    metrics: [
-      metric("Channel", tg.channel),
-      metric("Access", "free public web view"),
       metric("Posts stored", total),
       metric("Latest post", fmtDate(latest)),
     ],
@@ -890,7 +807,6 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       vesselRegistryStatus(),
       openaiStatus(),
       socialInstagramStatus(),
-      socialTelegramStatus(),
       Promise.resolve(tapaStatus()),
       Promise.resolve(xOsintStatus()),
     ]),

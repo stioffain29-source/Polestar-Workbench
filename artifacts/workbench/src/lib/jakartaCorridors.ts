@@ -27,6 +27,49 @@ export type JakartaExposureIcon =
   | "port" // logistics / port
   | "building"; // commercial / offices
 
+// Operating-exposure scale for the Jakarta exposure map. This is the user's
+// explicit scale for THIS graphic — it is an OPERATING-EXPOSURE axis (how badly
+// movement / access / business could be disrupted), distinct from the report's
+// incident-severity vocabulary {Insignificant, Low, Moderate, High, Extreme}.
+// "not-assessed" is reserved for surrounding context geography that we do not
+// profile as a business-exposure area (the regencies and the airport landmass).
+export type JakartaExposureLevel =
+  | "high"
+  | "elevated"
+  | "monitored"
+  | "low"
+  | "not-assessed";
+
+export const JAKARTA_EXPOSURE_RANK: Record<JakartaExposureLevel, number> = {
+  high: 4,
+  elevated: 3,
+  monitored: 2,
+  low: 1,
+  "not-assessed": 0,
+};
+
+// Live incident severity → operating-exposure mapping. A live record only ever
+// RAISES an area's standing baseline; it never invents an exposure where the
+// standing profile is lower than nothing.
+const SEVERITY_TO_EXPOSURE: Record<string, JakartaExposureLevel> = {
+  extreme: "high",
+  high: "high",
+  moderate: "elevated",
+  low: "monitored",
+  insignificant: "low",
+};
+
+export function severityToExposure(sevKey: string): JakartaExposureLevel | null {
+  return SEVERITY_TO_EXPOSURE[(sevKey || "").toLowerCase()] ?? null;
+}
+
+export function maxExposure(
+  a: JakartaExposureLevel,
+  b: JakartaExposureLevel,
+): JakartaExposureLevel {
+  return JAKARTA_EXPOSURE_RANK[a] >= JAKARTA_EXPOSURE_RANK[b] ? a : b;
+}
+
 export interface JakartaCorridorArea {
   /** Stable id (used as React key and in tests). */
   id: string;
@@ -42,6 +85,10 @@ export interface JakartaCorridorArea {
   relevance: string;
   /** Practical standing action for the area. */
   action: string;
+  /** Standing operating-exposure level for the area (its inherent profile,
+   *  safe to state regardless of the live window). Live reporting can only
+   *  RAISE the displayed level above this baseline, never invent below it. */
+  baselineExposure: JakartaExposureLevel;
   /** Rough geographic position on the schematic, as a percentage of the box. */
   pos: { x: number; y: number };
   /** Lower-cased keywords that attribute an incident to this area. */
@@ -67,6 +114,7 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
       "Demonstrations and police lines around government buildings and main thoroughfares can close roads and slow access at short notice.",
     action:
       "Check protest activity before travelling into the government district; keep alternative routes ready.",
+    baselineExposure: "elevated",
     pos: { x: 48, y: 45 },
     keywords: [
       "central jakarta", "jakarta pusat", "menteng", "tanah abang", "gambir",
@@ -85,6 +133,7 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
       "Concentrates offices, hotels and client sites; incidents here bear directly on staff, meetings and visitor movement.",
     action:
       "Maintain caution around after-hours movement near offices, hotels and exposed public areas; confirm venues before meetings.",
+    baselineExposure: "monitored",
     pos: { x: 51, y: 63 },
     keywords: [
       "south jakarta", "jakarta selatan", "scbd", "sudirman", "kuningan",
@@ -104,6 +153,7 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
       "Transfers between the city and Soekarno-Hatta run through congested, flood-sensitive toll routes; disruption lengthens airport runs.",
     action:
       "Allow additional buffer on airport transfers; confirm the toll-route status before departure.",
+    baselineExposure: "monitored",
     pos: { x: 13, y: 39 },
     airportPrePass: true,
     keywords: [
@@ -121,6 +171,7 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
       "Port, warehousing and low-lying access roads here drive logistics timings and are exposed to tidal and rain flooding.",
     action:
       "Confirm port-area access and flood status before logistics movements; build slack into delivery windows.",
+    baselineExposure: "elevated",
     pos: { x: 64, y: 16 },
     keywords: [
       "north jakarta", "jakarta utara", "tanjung priok", "priok",
@@ -139,6 +190,7 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
       "Heavy rain and flooding across Jabodetabek lengthen commuting and site access for staff living outside the centre.",
     action:
       "Check flood-affected routes before staff travel on heavy-rain days; allow extra commuting time.",
+    baselineExposure: "monitored",
     pos: { x: 30, y: 85 },
     keywords: [
       "greater jakarta", "jabodetabek", "bekasi", "depok", "tangerang",
@@ -156,6 +208,7 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
       "Congestion on the main toll roads and arterials is a daily planning constraint on meetings, deliveries and transfers.",
     action:
       "Build time buffers into cross-city movement; brief drivers on the day's congestion and closure points.",
+    baselineExposure: "monitored",
     pos: { x: 80, y: 60 },
     keywords: [
       "toll", "tol road", "jagorawi", "jorr", "inner ring", "outer ring",
@@ -225,6 +278,13 @@ export interface JakartaCorridorStatus {
   worstKey: string;
   /** True when the area carried live reporting this period. */
   elevated: boolean;
+  /** The area's standing operating-exposure profile (window-independent). */
+  baselineExposure: JakartaExposureLevel;
+  /** Operating-exposure derived from this period's worst severity, or null
+   *  when the area carried no live reporting. */
+  liveExposure: JakartaExposureLevel | null;
+  /** Displayed level = the higher of baseline and live. Live can only raise. */
+  displayExposure: JakartaExposureLevel;
 }
 
 // Build the per-area this-week status from the live window plus the count of
@@ -252,12 +312,21 @@ export function buildJakartaCorridorStatuses(
   }
   const statuses = areas.map((area, idx) => {
     const c = counts[idx];
+    const baselineExposure = area.baselineExposure;
+    const liveExposure =
+      c.count > 0 ? severityToExposure(c.worstKey) : null;
+    const displayExposure = liveExposure
+      ? maxExposure(baselineExposure, liveExposure)
+      : baselineExposure;
     return {
       area,
       number: idx + 1,
       count: c.count,
       worstKey: c.count > 0 ? c.worstKey : "",
       elevated: c.count > 0,
+      baselineExposure,
+      liveExposure,
+      displayExposure,
     };
   });
   return { statuses, unattributed };

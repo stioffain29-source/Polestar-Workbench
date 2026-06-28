@@ -1411,7 +1411,7 @@ export const SocialWatchStatus = {
 } as const;
 
 /**
- * A KAMMI Pusat public Instagram / Telegram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.
+ * A KAMMI Pusat public Instagram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.
  */
 export interface SocialWatchItem {
   id: number;
@@ -1810,7 +1810,7 @@ export type ListSocialWatchItemsParams = {
  */
 status?: SocialWatchStatus;
 /**
- * Filter to one platform (instagram | telegram)
+ * Filter to one platform (instagram)
  */
 platform?: ListSocialWatchItemsPlatform;
 /**
@@ -1830,7 +1830,6 @@ export type ListSocialWatchItemsPlatform = typeof ListSocialWatchItemsPlatform[k
 
 export const ListSocialWatchItemsPlatform = {
   instagram: 'instagram',
-  telegram: 'telegram',
 } as const;
 
 export type ListSocialRawItemsParams = {

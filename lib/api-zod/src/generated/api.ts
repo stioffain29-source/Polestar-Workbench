@@ -490,7 +490,7 @@ export const ListReliefWebReportsResponse = zod.array(ListReliefWebReportsRespon
 
 
 /**
- * @summary KAMMI Pusat public Instagram + Telegram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
+ * @summary KAMMI Pusat public Instagram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
  */
 export const listSocialWatchItemsQueryLimitMax = 200;
 
@@ -498,7 +498,7 @@ export const listSocialWatchItemsQueryLimitMax = 200;
 
 export const ListSocialWatchItemsQueryParams = zod.object({
   "status": zod.enum(['planned', 'active', 'dispersed', 'cancelled', 'unclear']).optional().describe('Filter to one derived status'),
-  "platform": zod.enum(['instagram', 'telegram']).optional().describe('Filter to one platform (instagram | telegram)'),
+  "platform": zod.enum(['instagram']).optional().describe('Filter to one platform (instagram)'),
   "promotable": zod.coerce.boolean().optional().describe('Limit to items eligible for promotion to an incident'),
   "limit": zod.coerce.number().min(1).max(listSocialWatchItemsQueryLimitMax).optional().describe('Max number of most-recent items to return (1-200)')
 })
@@ -529,7 +529,7 @@ export const ListSocialWatchItemsResponseItem = zod.object({
   "promotedIncidentId": zod.number().nullish(),
   "promotedAt": zod.coerce.date().nullish(),
   "postedAtDisplay": zod.string().nullish()
-}).describe('A KAMMI Pusat public Instagram \/ Telegram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.')
+}).describe('A KAMMI Pusat public Instagram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.')
 export const ListSocialWatchItemsResponse = zod.array(ListSocialWatchItemsResponseItem)
 
 

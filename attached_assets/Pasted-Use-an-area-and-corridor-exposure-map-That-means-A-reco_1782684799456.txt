@@ -1,0 +1,86 @@
+Use an area and corridor exposure map.
+
+That means:
+
+A recognisable outline of Jakarta and the surrounding Greater Jakarta area
+Clear district or zone boundaries
+Shaded or outlined exposure areas
+Key movement corridors shown as route bands or arrows
+Short labels or callouts explaining why each area matters
+
+WHAT THE MAP MUST SHOW
+
+The map should show these business relevant areas:
+
+Central Jakarta government district
+Protest and policing disruption
+Main commercial and hotel areas
+Office, client meeting and visitor exposure
+Soekarno Hatta airport corridor
+Airport transfer disruption
+North Jakarta and port area
+Logistics, flooding and access exposure
+Greater Jakarta commuter belt
+Rain, congestion and staff commute exposure
+Main cross city movement routes
+Delays affecting meetings, site visits and deliveries
+
+HOW TO SHOW IT
+
+Use a proper map base, then overlay:
+
+Shaded polygons or outlined zones for exposure areas
+Route bands or arrows for airport corridor and cross city movement
+Short callout labels for each area
+Simple legend showing status such as monitored, elevated or high
+
+PREFERRED VISUAL APPROACH
+
+This should look like a clean report map.
+
+Use:
+
+pale grey base map
+thin district boundaries
+Polestar colours for exposure overlays
+clear labels
+no clutter
+
+Do not use:
+
+raw incident dots
+tiny numbered markers as the main method
+abstract dashed lines
+decorative icons floating in space
+cloud icons
+web map controls
+map attribution clutter
+a diagram that stops looking like Jakarta
+
+LABEL STYLE
+
+Each area should be labelled directly on or next to the map, for example:
+
+Central Jakarta government district
+Protest and policing disruption
+
+North Jakarta and port
+Logistics, flooding and access exposure
+
+Soekarno Hatta airport corridor
+Airport transfer disruption
+
+Greater Jakarta commuter belt
+Rain, congestion and staff commute exposure
+
+COMMERCIAL AREAS
+
+If possible, identify the main commercial/business zone clearly rather than using a vague label. If South Jakarta is the main office and embassy concentration, show that. If the commercial core spans more than one district, label it accordingly.
+
+WHAT THE MAP IS FOR
+
+The map must answer this question:
+
+Where in Jakarta could movement, access, logistics or business activity be disrupted this week?
+
+If the map does not answer that clearly, it is not the right map.

@@ -8,7 +8,7 @@
 import type { SocialWatchStatus } from './socialWatchStatus';
 
 /**
- * A KAMMI Pusat public Instagram / Telegram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.
+ * A KAMMI Pusat public Instagram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.
  */
 export interface SocialWatchItem {
   id: number;
