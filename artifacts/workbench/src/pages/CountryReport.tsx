@@ -1444,6 +1444,17 @@ export default function CountryReport() {
       )}
 
       {editing && (
+        <Section title="Country Baseline">
+          <BaselineEditor
+            baseline={baselineDraft}
+            setField={setBaselineField}
+            onClear={clearBaseline}
+            clearing={deleteBaseline.isPending}
+          />
+        </Section>
+      )}
+
+      {editing && (
         <Section title="Report Layout">
           <div className="grid md:grid-cols-2 gap-3">
             <label style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "block" }}>

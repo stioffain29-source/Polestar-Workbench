@@ -39,6 +39,7 @@ module.exports = {
       "<rootDir>/__tests__/mocks/component.tsx",
     "^@/components/CargoTrendChart$": "<rootDir>/__tests__/mocks/component.tsx",
     "^@/components/IncidentMap$": "<rootDir>/__tests__/mocks/component.tsx",
+    "^@/components/CountryReportMap$": "<rootDir>/__tests__/mocks/component.tsx",
     "^@/components/SituationalContextSection$":
       "<rootDir>/__tests__/mocks/component.tsx",
     // Workbench `@/` path alias (mirrors vite.config.ts / tsconfig paths).

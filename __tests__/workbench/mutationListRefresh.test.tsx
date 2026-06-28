@@ -35,7 +35,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 jest.mock("wouter", () => ({
   __esModule: true,
   useLocation: () => ["/", () => {}],
-  useRoute: () => [false, null],
+  // Pattern-aware so the CountryReport page (`useRoute("/countries/:slug")`)
+  // resolves a slug; every other page's `useRoute` call still gets no match.
+  useRoute: (pattern: string) =>
+    pattern === "/countries/:slug" ? [true, { slug: "testlandia" }] : [false, null],
   Link: ({ children, href }: { children: React.ReactNode; href?: string }) => (
     <a href={href}>{children}</a>
   ),
@@ -63,11 +66,22 @@ jest.mock("react-leaflet", () => {
   );
 });
 
+// CountryReport pulls in PDF chrome (`jspdf`), which touches `TextEncoder` at
+// import time — absent in jsdom and irrelevant to a refresh-after-action test.
+// Stub jspdf (covers every transitive importer) and the exportPdf helper.
+jest.mock("jspdf", () => ({ __esModule: true, jsPDF: class {} }));
+jest.mock("@/lib/exportPdf", () => ({
+  __esModule: true,
+  exportElementToPdf: jest.fn(async () => {}),
+  slugifyForFilename: (s: string) => s,
+}));
+
 import Incidents from "@/pages/Incidents";
 import SpotReports from "@/pages/SpotReports";
 import Reports from "@/pages/Reports";
 import StrikesBackfill from "@/pages/StrikesBackfill";
 import Protests from "@/pages/Protests";
+import CountryReport from "@/pages/CountryReport";
 
 // ---------------------------------------------------------------------------
 // In-memory store backing the mocked network layer.
@@ -81,6 +95,12 @@ let strikes: Row[] = [];
 let socialWatch: Row[] = [];
 let socialRaw: Row[] = [];
 let nextId = 1;
+// CountryReport baseline-retire flow: the curated baseline (null once retired)
+// and a counter of how many times the baseline GET is hit — the counter rising
+// after the DELETE proves the retire handler invalidated the baseline query and
+// it refetched (the regression being guarded).
+let countryBaseline: Row | null = null;
+let baselineGetCount = 0;
 
 function jsonResponse(body: unknown, status = 200) {
   const text = body === undefined || body === null ? "" : JSON.stringify(body);
@@ -192,6 +212,42 @@ function installFetch() {
         return jsonResponse({ incidentId });
       }
 
+      // CountryReport page: report + baseline + supporting reads, and the
+      // baseline DELETE behind the "Retire curated baseline" button.
+      if (path === "/api/countries/testlandia" && method === "GET") {
+        return jsonResponse({
+          slug: "testlandia",
+          name: "Testlandia",
+          region: "Test Region",
+          overview: "",
+          trendSummary: "",
+          implications: "",
+          mapPlacement: "none",
+          photoPlacement: "none",
+          reportPhotos: [],
+        });
+      }
+      if (path === "/api/countries/testlandia/baseline" && method === "GET") {
+        baselineGetCount += 1;
+        if (!countryBaseline) return jsonResponse({ error: "not found" }, 404);
+        return jsonResponse(countryBaseline);
+      }
+      if (path === "/api/countries/testlandia/baseline" && method === "DELETE") {
+        countryBaseline = null;
+        return jsonResponse(null, 204);
+      }
+      if (path === "/api/countries/testlandia/prose" && method === "POST") {
+        // Keep the AI-prose effect deterministic: report the engine as
+        // unavailable so the page uses its template draft (no flakiness).
+        return jsonResponse({ available: false });
+      }
+      if (path === "/api/sources" && method === "GET") {
+        return jsonResponse([]);
+      }
+      if (path === "/api/reliefweb-reports" && method === "GET") {
+        return jsonResponse([]);
+      }
+
       return jsonResponse({ error: `unhandled ${method} ${path}` }, 404);
     },
   );
@@ -251,6 +307,8 @@ beforeEach(() => {
   strikes = [];
   socialWatch = [];
   socialRaw = [];
+  countryBaseline = null;
+  baselineGetCount = 0;
   nextId = 1;
   installFetch();
   // The delete buttons gate on a `confirm()` prompt — auto-accept it.
@@ -407,5 +465,46 @@ describe("same-screen mutation buttons refresh the visible list", () => {
       expect(screen.queryByRole("button", { name: /^promote$/i })).toBeNull(),
     );
     expect(socialWatch[0].promotedIncidentId).not.toBeNull();
+  });
+
+  it("/countries/:slug — retiring a curated baseline refetches the baseline so the report falls back to live data without a reload", async () => {
+    // Seed a curated baseline carrying a distinctive watchlist label so we can
+    // see it surface in the editor and then disappear once retired.
+    const watchLabel = `Testograd Province ${Date.now()}`;
+    countryBaseline = {
+      operatingEnvironment: "Curated operating note.",
+      securityContext: "Curated security context.",
+      knownRiskAreas: [],
+      keyCitiesProvinces: [],
+      movementConstraints: "",
+      infrastructureLimits: "",
+      medicalEvac: "",
+      resourceSectorExposure: "",
+      locationWatchlist: [{ label: watchLabel, note: "Seeded watch entry", match: ["testograd"] }],
+    };
+
+    renderWithClient(<CountryReport />);
+
+    // Enter edit mode — the "Country Baseline" editor (with the Retire button)
+    // only renders while editing.
+    fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
+
+    // The seeded baseline loaded and its watchlist label shows in the editor.
+    expect(await screen.findByDisplayValue(watchLabel)).toBeTruthy();
+    const callsBeforeRetire = baselineGetCount;
+    expect(callsBeforeRetire).toBeGreaterThan(0);
+
+    // Click "Retire curated baseline" (the confirm() prompt is auto-accepted).
+    fireEvent.click(screen.getByRole("button", { name: /retire curated baseline/i }));
+
+    // The DELETE must fire AND the baseline GET must refetch (invalidateQueries
+    // on getGetCountryBaselineQueryKey) — without that refetch the report would
+    // keep serving the stale curated baseline until a manual reload.
+    await waitFor(() => expect(baselineGetCount).toBeGreaterThan(callsBeforeRetire));
+    expect(countryBaseline).toBeNull();
+
+    // The report reflects the cleared baseline: the curated watchlist label is
+    // gone from the screen.
+    await waitFor(() => expect(screen.queryByDisplayValue(watchLabel)).toBeNull());
   });
 });
