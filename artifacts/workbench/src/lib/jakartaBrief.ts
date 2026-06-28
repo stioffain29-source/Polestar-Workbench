@@ -23,6 +23,7 @@ import type { PolestarViewParts } from "./countryPolestarView";
 export type JakartaTheme =
   | "protest"
   | "flooding"
+  | "fire"
   | "crime"
   | "traffic"
   | "airport"
@@ -31,6 +32,7 @@ export type JakartaTheme =
 export const JAKARTA_THEME_ORDER: JakartaTheme[] = [
   "protest",
   "flooding",
+  "fire",
   "crime",
   "traffic",
   "airport",
@@ -40,6 +42,7 @@ export const JAKARTA_THEME_ORDER: JakartaTheme[] = [
 const JAKARTA_THEME_HEADING: Record<JakartaTheme, string> = {
   protest: "Protests and demonstrations",
   flooding: "Flooding and weather disruption",
+  fire: "Fire incidents",
   crime: "Crime and public safety",
   traffic: "Traffic and movement disruption",
   airport: "Airport corridor",
@@ -51,6 +54,7 @@ const JAKARTA_THEME_HEADING: Record<JakartaTheme, string> = {
 const JAKARTA_THEME_PHRASE: Record<JakartaTheme, string> = {
   protest: "protest activity",
   flooding: "flooding and heavy rain",
+  fire: "fire incidents",
   crime: "opportunistic crime",
   traffic: "traffic disruption",
   airport: "airport-corridor disruption",
@@ -64,6 +68,7 @@ const JAKARTA_THEME_PHRASE: Record<JakartaTheme, string> = {
 const JAKARTA_THEME_LEAD: Record<JakartaTheme, string> = {
   protest: "Protest activity",
   flooding: "Flooding and weather disruption",
+  fire: "Fire incident",
   crime: "Crime and public-safety incident",
   traffic: "Traffic and movement disruption",
   airport: "Airport-corridor disruption",
@@ -77,6 +82,8 @@ const JAKARTA_THEME_RELEVANCE: Record<JakartaTheme, string> = {
     "Demonstrations here can close roads and slow access around government buildings and central business districts; confirm routes and timings before travel.",
   flooding:
     "Standing water on this corridor can lengthen commuting, site access and airport-transfer times; check affected routes before staff move.",
+  fire:
+    "A fire in Jakarta's dense commercial and residential districts can force road closures and evacuations and disrupt access to nearby offices, malls, hotels, warehouses and client sites along commuter routes; confirm the status of affected areas before movement.",
   crime:
     "Reporting supports continued caution around after-hours movement and exposed public areas near offices, hotels and transport hubs.",
   traffic:
@@ -93,7 +100,6 @@ const CATEGORY_JAKARTA_THEME: Record<PngCategory, JakartaTheme> = {
   "Tribal / communal violence": "crime",
   "Homicide / violent crime": "crime",
   "Theft / break-in": "crime",
-  Fire: "crime",
   "Civil unrest / protest": "protest",
   "Labour action": "protest",
   "Policing operation": "governance",
@@ -108,6 +114,7 @@ const CATEGORY_JAKARTA_THEME: Record<PngCategory, JakartaTheme> = {
   "Telecoms / connectivity": "traffic",
   "Natural hazard": "flooding",
   "Environmental / haze": "flooding",
+  Fire: "fire",
   "Other security": "crime",
 };
 
@@ -196,17 +203,22 @@ function themeParagraph(p: ThemePresence): string {
       return `Demonstration activity was reported ${whereIn(
         areas,
         "around the central government and business districts",
-      )}. Protests in the capital typically gather around the presidential palace, parliament and the main thoroughfares of the central districts, where they can close roads and slow movement at short notice.${sev}`;
+      )}. For Jakarta operations this matters most around the presidential palace, parliament and the main thoroughfares of Central Jakarta, where marches can close roads and slow access to nearby offices and government buildings at short notice.${sev}`;
     case "flooding":
       return `Flooding and heavy-rain disruption was reported ${whereIn(
         areas,
         "across low-lying parts of the capital",
-      )}. Seasonal rainfall regularly affects low-lying parts of Greater Jakarta, where standing water closes roads, slows commuting and lengthens airport-transfer times.${sev}`;
+      )}. For Jakarta operations this matters most across Greater Jakarta — low-lying access roads, airport-transfer routes, office districts, logistics routes and staff commuting corridors — where standing water lengthens journeys and delays site access and airport runs.${sev}`;
+    case "fire":
+      return `Fire incidents were reported ${whereIn(
+        areas,
+        "in the capital's dense commercial and residential districts",
+      )}. For Jakarta operations this matters where a blaze forces road closures or evacuations near offices, malls, hotels, warehouses or client sites, disrupting access along the surrounding commuter routes; confirm the status of affected areas before movement.${sev}`;
     case "crime":
       return `Crime and public-safety incidents were reported ${whereIn(
         areas,
         "across the capital",
-      )}. Opportunistic street crime and after-hours theft remain the most common risks to staff and visitors, particularly around crowded transport, market and entertainment areas.${sev}`;
+      )}. For Jakarta operations this matters most for after-hours staff movement around offices, hotels and transport hubs and the busier commercial and entertainment areas of South and West Jakarta, where opportunistic street crime and theft are the most common risks.${sev}`;
     case "traffic":
       return `Traffic and movement disruption was reported ${whereIn(
         areas,
@@ -242,41 +254,18 @@ export function buildJakartaIncidentThemes(
 
 // --- Operational Impact bullets --------------------------------------------
 
-// Present-gated Jakarta operational-impact bullets. Each present theme adds its
-// sharp, Jakarta-specific line; a route-confirmation close is always added. An
-// empty window yields [] (the renderer then shows the standing-exposure note).
-export function buildJakartaOperationalImpact(windowItems: PngReportItem[]): string[] {
-  const themes = new Set(presentThemes(windowItems).map((p) => p.theme));
-  if (themes.size === 0) return [];
-  const bullets: string[] = [];
-  if (themes.has("protest"))
-    bullets.push(
-      "Protest activity in the central districts can disrupt access around government buildings and major roads at short notice.",
-    );
-  if (themes.has("flooding"))
-    bullets.push(
-      "Flooding and heavy rain can lengthen commuting times, slow site access and extend airport transfers.",
-    );
-  if (themes.has("crime"))
-    bullets.push(
-      "Crime reporting supports continued caution around after-hours movement and exposed public areas.",
-    );
-  if (themes.has("traffic"))
-    bullets.push(
-      "Traffic congestion remains a planning constraint for meetings, deliveries and airport transfers.",
-    );
-  if (themes.has("airport"))
-    bullets.push(
-      "Disruption on the airport corridor can extend transfer times between the city and Soekarno-Hatta.",
-    );
-  if (themes.has("governance"))
-    bullets.push(
-      "Security-force activity can briefly restrict access around affected sites in the central districts.",
-    );
-  bullets.push(
-    "Local teams should confirm routes before movement on heavy-rain or protest days.",
-  );
-  return bullets;
+// The Jakarta operational-impact bullets (spec §4): five fixed, location-led
+// lines of standing operational guidance. These are conditional advice ("rain
+// and flooding CAN affect…"), not claims that events occurred this period, so
+// they apply every week and the section never reads empty.
+export function buildJakartaOperationalImpact(): string[] {
+  return [
+    "Central Jakarta: protest disruption around government buildings and main roads.",
+    "Greater Jakarta: rain and flooding can affect commuting and airport transfers.",
+    "Office and hotel areas: maintain caution around after hours movement and exposed public areas.",
+    "Cross city movement: allow extra time for meetings, site visits and logistics.",
+    "Local teams: check routes before movement on protest or heavy rain days.",
+  ];
 }
 
 // --- Recommended Actions ---------------------------------------------------
@@ -317,16 +306,22 @@ export function buildJakartaBluf(windowItems: PngReportItem[]): string {
 }
 
 export function buildJakartaCurrentSituation(windowItems: PngReportItem[]): string {
-  if (windowItems.length === 0) {
-    return "With no fresh reporting this period, Jakarta holds to its standing pattern: episodic protest in the central districts, recurrent traffic congestion, seasonal flooding and opportunistic street crime. The practical effect remains on movement planning rather than on the viability of operating in the capital.";
-  }
+  // The structured Jakarta operating picture (spec §3): a short present-active
+  // lead, then four standing operating-picture statements. The four statements
+  // describe Jakarta's standing exposure (not event claims), so they are safe to
+  // state regardless of the window; the lead reflects what was actually reported.
   const phrases = leadThemePhrases(windowItems);
   const areas = presentAreas(windowItems, 2);
   const whereTail = areas.length ? ` in ${joinList(areas)}` : "";
-  const strands = phrases.length
-    ? `The most active strands were ${joinList(phrases)}${whereTail}.`
-    : "Reporting was limited to isolated, lower-level disruption across the capital.";
-  return `The week's picture in Jakarta is one of localised, manageable disruption rather than a broad deterioration in security. ${strands}\nFor business users, the practical effect falls mainly on movement — route choices, journey timings and airport transfers — rather than on the viability of operating in the capital.`;
+  const lead =
+    windowItems.length === 0
+      ? "With no fresh open-source reporting this period, Jakarta holds to its standing operating picture."
+      : phrases.length
+        ? `This week's reporting centred on ${joinList(phrases)}${whereTail}, with the main effect on movement and timings.`
+        : "Reporting this week was limited to isolated, lower-level disruption across the capital.";
+  const picture =
+    "Central Jakarta remains the main protest and government-district exposure. Across Greater Jakarta, weather and flooding remain the main movement-disruption issue. Crime remains a localised staff-safety and after-hours movement concern. The overall picture is manageable but disruption-prone.";
+  return `${lead}\n${picture}`;
 }
 
 export function buildJakartaOutlook(): string {
@@ -338,7 +333,7 @@ export function buildJakartaOutlook(): string {
 // The spec's strongest-paragraph Polestar View, near-verbatim, in British
 // English. A standing assessed judgement of the capital, not a count summary.
 export const JAKARTA_POLESTAR_PARAGRAPH =
-  "Jakarta remains a manageable but disruption-prone operating environment. The main issue is not a single high-impact threat but the combined effect of protests, congestion, flooding and opportunistic crime on movement planning. Business users should focus on route checks, flexible timings and local verification rather than broad travel restrictions.";
+  "Jakarta remains a manageable but disruption-prone operating environment. The main issue is not a single high-impact threat but the combined effect of protests, congestion, flooding and opportunistic crime on movement planning. Business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.";
 
 export function buildJakartaPolestarView(): PolestarViewParts {
   return {
@@ -354,7 +349,7 @@ export function buildJakartaPolestarView(): PolestarViewParts {
     whatWouldChange:
       "The assessment would change if large-scale unrest, severe flooding or a major security incident disrupted the capital city-wide.",
     practicalJudgement:
-      "For now, business users should focus on route checks, flexible timings and local verification rather than broad travel restrictions.",
+      "For now, business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.",
     paragraph: JAKARTA_POLESTAR_PARAGRAPH,
   };
 }
@@ -427,7 +422,7 @@ export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrid
     polestarView: parts.paragraph,
     polestarViewParts: parts,
     recommendedActions: buildJakartaRecommendedActions(),
-    operationalImpact: buildJakartaOperationalImpact(input.windowItems),
+    operationalImpact: buildJakartaOperationalImpact(),
     incidentThemes: buildJakartaIncidentThemes(input.incidentDetailsItems),
     topThree: applyJakartaTopThree(input.topThree),
   };

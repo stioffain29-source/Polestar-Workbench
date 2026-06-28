@@ -89,6 +89,12 @@ interface RiskZoneDef {
   // Exact geocoder centroid "lat,lng" strings that belong to this zone, used as
   // a fallback when the location text is empty.
   coords?: string[];
+  // When true, this zone is ALWAYS shown on the map (even with zero records this
+  // period) as a fixed-numbered, neutral-grey marker with no severity label.
+  // Used by the Jakarta callout map so its six business areas always appear in a
+  // stable 1–6 order; other theatres leave it unset and keep the active-only
+  // (count>0) behaviour, so their maps are unchanged.
+  alwaysShow?: boolean;
 }
 
 // Indonesian Papua (West Papua) risk zones, in display order. Shared by the
@@ -265,6 +271,7 @@ export const JAKARTA_ZONES: RiskZoneDef[] = [
     name: "Central Jakarta",
     description: "Protest and government-district disruption.",
     center: [-6.18, 106.83],
+    alwaysShow: true,
     places: [
       "central jakarta", "jakarta pusat", "menteng", "tanah abang", "gambir",
       "senen", "cempaka putih", "kemayoran", "johar baru", "sawah besar",
@@ -274,6 +281,7 @@ export const JAKARTA_ZONES: RiskZoneDef[] = [
     name: "South Jakarta",
     description: "Office, embassy and commercial-area exposure.",
     center: [-6.28, 106.81],
+    alwaysShow: true,
     places: [
       "south jakarta", "jakarta selatan", "kebayoran", "tebet", "setiabudi",
       "mampang", "pancoran", "cilandak", "pasar minggu", "jagakarsa",
@@ -284,6 +292,7 @@ export const JAKARTA_ZONES: RiskZoneDef[] = [
     name: "West Jakarta",
     description: "Congestion, crime and access disruption.",
     center: [-6.16, 106.76],
+    alwaysShow: true,
     places: [
       "west jakarta", "jakarta barat", "grogol", "kembangan", "palmerah",
       "taman sari", "tambora", "kebon jeruk", "kalideres",
@@ -293,6 +302,7 @@ export const JAKARTA_ZONES: RiskZoneDef[] = [
     name: "North Jakarta",
     description: "Port, flooding and logistics exposure.",
     center: [-6.12, 106.87],
+    alwaysShow: true,
     places: [
       "north jakarta", "jakarta utara", "tanjung priok", "kelapa gading",
       "penjaringan", "koja", "cilincing", "pademangan", "ancol", "sunter",
@@ -302,6 +312,7 @@ export const JAKARTA_ZONES: RiskZoneDef[] = [
     name: "East Jakarta",
     description: "Road movement and residential disruption.",
     center: [-6.23, 106.90],
+    alwaysShow: true,
     places: [
       "east jakarta", "jakarta timur", "cakung", "jatinegara", "duren sawit",
       "pulo gadung", "matraman", "kramat jati", "makasar", "ciracas",
@@ -312,6 +323,7 @@ export const JAKARTA_ZONES: RiskZoneDef[] = [
     name: "Soekarno-Hatta Airport Corridor",
     description: "Airport-transfer disruption.",
     center: [-6.1256, 106.6558],
+    alwaysShow: true,
     places: [
       "soekarno-hatta", "soekarno hatta", "soetta", "cgk",
       "bandara soekarno", "cengkareng", "airport corridor",
@@ -402,8 +414,9 @@ interface ActiveZone {
 }
 
 // Aggregate the window into active zones (count + worst severity each, numbered
-// in config order) plus the count of records that matched no zone.
-function aggregateZones(
+// in config order) plus the count of records that matched no zone. Exported for
+// the Jakarta map-zone tests, which pin the alwaysShow fixed-numbering contract.
+export function aggregateZones(
   incidents: CountryFastFactsIncident[],
   zones: RiskZoneDef[],
 ): { active: ActiveZone[]; unattributed: number } {
@@ -424,16 +437,23 @@ function aggregateZones(
       c.worstKey = k;
     }
   }
+  // Build the numbered active list. alwaysShow zones (the Jakarta callout areas)
+  // appear in fixed config order even at zero count — rendered as neutral-grey
+  // markers with no severity — so the six business areas keep a stable 1–6
+  // numbering. Other zones (and theatres with no alwaysShow flag at all) are
+  // included only when they carry records, appended after any fixed zones, so
+  // their maps are unchanged. Numbering follows inclusion order: fixed zones own
+  // 1..k and a populated fallback (e.g. Greater Jakarta) takes the next number.
   const active: ActiveZone[] = [];
   zones.forEach((def, idx) => {
-    if (counts[idx].count > 0) {
-      active.push({
-        def,
-        number: active.length + 1,
-        count: counts[idx].count,
-        worstKey: counts[idx].worstKey,
-      });
-    }
+    const c = counts[idx];
+    if (!def.alwaysShow && c.count === 0) return;
+    active.push({
+      def,
+      number: active.length + 1,
+      count: c.count,
+      worstKey: c.count > 0 ? c.worstKey : "",
+    });
   });
   return { active, unattributed };
 }
@@ -470,6 +490,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
 
   const zonesDef = resolveRiskZones(countryName);
   const zoneMode = zonesDef !== null;
+  const isJakarta = (countryName ?? "").trim().toLowerCase() === "jakarta";
 
   // A record is plotted as a PRECISE marker only when it carries a coordinate
   // AND the title/location text shows we actually know where it happened below
@@ -565,7 +586,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       const latLngs: L.LatLngExpression[] = [];
       for (const z of active) {
         const [lat, lng] = z.def.center;
-        const color = SEV_COLOR[z.worstKey] ?? "#999999";
+        // Zero-count alwaysShow zones (worstKey "") draw a neutral grey marker.
+        const color = z.count > 0 ? (SEV_COLOR[z.worstKey] ?? "#999999") : "#999999";
         const size = 28;
         const half = size / 2;
 
@@ -591,7 +613,10 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.paddingBottom = "2px";
         marker.style.pointerEvents = "auto";
         marker.textContent = String(z.number);
-        marker.title = `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey} (${z.count})`;
+        marker.title =
+          z.count > 0
+            ? `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey} (${z.count})`
+            : `${z.number}. ${z.def.name} — no records this period`;
 
         overlay.appendChild(marker);
         dotsRef.current.push({ el: marker, lat, lng, half });
@@ -786,8 +811,13 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
                     {z.number}
                   </span>
                   <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK }}>
-                    <span style={{ fontWeight: 700, color: "#0b0a3d" }}>{z.def.name}</span>{" "}
-                    — {SEV_LABEL[z.worstKey] ?? z.worstKey} ({z.count})
+                    <span style={{ fontWeight: 700, color: "#0b0a3d" }}>{z.def.name}</span>
+                    {z.count > 0 ? (
+                      <>
+                        {" "}
+                        — {SEV_LABEL[z.worstKey] ?? z.worstKey} ({z.count})
+                      </>
+                    ) : null}
                     {z.def.description ? (
                       <span style={{ color: DUSK, opacity: 0.75 }}> · {z.def.description}</span>
                     ) : null}
@@ -796,12 +826,30 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
               ))}
             </div>
             <div
-              style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontSize: isJakarta ? 10.5 : 11,
+                color: DUSK,
+                marginTop: 8,
+                fontStyle: "italic",
+              }}
             >
-              Each marker shows a risk area, numbered and coloured by the highest severity recorded there this period.
-              {zoneAgg.unattributed > 0
-                ? ` ${zoneAgg.unattributed} record${zoneAgg.unattributed === 1 ? "" : "s"} could not be tied to a specific area and ${zoneAgg.unattributed === 1 ? "is" : "are"} included in totals and tables but not plotted.`
-                : ""}
+              {isJakarta ? (
+                <>
+                  Each marker is a numbered Jakarta business area, coloured by the highest severity
+                  recorded there this period; grey marks an area with no records this period.
+                  {zoneAgg.unattributed > 0
+                    ? " Some records were retained in the assessment but not plotted due to insufficient location detail."
+                    : ""}
+                </>
+              ) : (
+                <>
+                  Each marker shows a risk area, numbered and coloured by the highest severity recorded there this period.
+                  {zoneAgg.unattributed > 0
+                    ? ` ${zoneAgg.unattributed} record${zoneAgg.unattributed === 1 ? "" : "s"} could not be tied to a specific area and ${zoneAgg.unattributed === 1 ? "is" : "are"} included in totals and tables but not plotted.`
+                    : ""}
+                </>
+              )}
             </div>
           </>
         ) : (

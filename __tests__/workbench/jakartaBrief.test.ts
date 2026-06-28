@@ -88,7 +88,7 @@ describe("jakartaThemeForCategory", () => {
     expect(jakartaThemeForCategory("Natural hazard")).toBe("flooding");
     expect(jakartaThemeForCategory("Environmental / haze")).toBe("flooding");
     expect(jakartaThemeForCategory("Theft / break-in")).toBe("crime");
-    expect(jakartaThemeForCategory("Fire")).toBe("crime");
+    expect(jakartaThemeForCategory("Fire")).toBe("fire");
     expect(jakartaThemeForCategory("Road / highway")).toBe("traffic");
     expect(jakartaThemeForCategory("Aviation / airport")).toBe("airport");
     expect(jakartaThemeForCategory("Policing operation")).toBe("governance");
@@ -140,22 +140,20 @@ describe("buildJakartaIncidentThemes", () => {
 });
 
 describe("buildJakartaOperationalImpact", () => {
-  it("returns an empty list for an empty window", () => {
-    expect(buildJakartaOperationalImpact([])).toEqual([]);
-  });
-
-  it("emits a present-gated, count-free bullet set with a route-confirmation close", () => {
-    const bullets = buildJakartaOperationalImpact([
-      item({ category: "Civil unrest / protest" }),
-      item({ category: "Natural hazard" }),
-    ]);
-    expect(bullets.some((b) => /protest/i.test(b))).toBe(true);
+  // Spec §4: five FIXED, location-led standing bullets (no-arg). These are
+  // conditional standing guidance, not event claims, so the set is constant and
+  // the section never reads empty regardless of the window.
+  it("returns the five fixed, location-led, count-free bullets", () => {
+    const bullets = buildJakartaOperationalImpact();
+    expect(bullets).toHaveLength(5);
+    // Each bullet leads with a location/role label before a colon.
+    for (const b of bullets) {
+      expect(b).toMatch(/^[^:]+:\s\S/);
+      expect(b).not.toMatch(/\d/);
+    }
+    expect(bullets[0]).toMatch(/^Central Jakarta:/);
+    expect(bullets.some((b) => /^Greater Jakarta:/.test(b))).toBe(true);
     expect(bullets.some((b) => /flood/i.test(b))).toBe(true);
-    // Absent themes do not appear.
-    expect(bullets.some((b) => /airport corridor/i.test(b))).toBe(false);
-    // Always closes on route confirmation.
-    expect(bullets[bullets.length - 1]).toMatch(/confirm routes/i);
-    for (const b of bullets) expect(b).not.toMatch(/\d/);
   });
 });
 
@@ -177,8 +175,10 @@ describe("BLUF / Current Situation / Outlook", () => {
     expect(live).toContain("Central Jakarta");
   });
 
-  it("Current Situation holds the standing pattern when empty", () => {
-    expect(buildJakartaCurrentSituation([])).toMatch(/standing pattern/i);
+  it("Current Situation holds the standing operating picture when empty", () => {
+    const cs = buildJakartaCurrentSituation([]);
+    expect(cs).toMatch(/standing operating picture/i);
+    expect(cs).toMatch(/manageable but disruption-prone/i);
   });
 
   it("Outlook is a next-seven-days most-likely scenario", () => {

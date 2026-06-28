@@ -4,6 +4,7 @@
 import {
   JAKARTA_ZONES,
   zoneIndexForIncident,
+  aggregateZones,
 } from "../../artifacts/workbench/src/components/CountryReportMap";
 import type { CountryFastFactsIncident } from "../../artifacts/workbench/src/lib/countryFastFacts";
 
@@ -92,5 +93,71 @@ describe("Jakarta map zones — airport-corridor pre-pass", () => {
       JAKARTA_ZONES,
     );
     expect(idx).toBeNull();
+  });
+});
+
+// Pins the Jakarta clean-callout-map contract (spec §6): the six base business
+// areas ALWAYS show, in fixed 1–6 config order, even with zero records this
+// period (rendered as a neutral-grey marker with no severity — worstKey "").
+// The Greater Jakarta fallback is appended as zone 7 only when it carries
+// records. Other theatres (no alwaysShow flag) keep the active-only behaviour.
+describe("aggregateZones — Jakarta alwaysShow callout map", () => {
+  const BASE_NAMES = [
+    "Central Jakarta",
+    "South Jakarta",
+    "West Jakarta",
+    "North Jakarta",
+    "East Jakarta",
+    "Soekarno-Hatta Airport Corridor",
+  ];
+
+  it("always shows the six base zones, fixed-numbered 1–6, for an empty window", () => {
+    const { active } = aggregateZones([], JAKARTA_ZONES);
+    expect(active.map((z) => z.def.name)).toEqual(BASE_NAMES);
+    expect(active.map((z) => z.number)).toEqual([1, 2, 3, 4, 5, 6]);
+    for (const z of active) {
+      expect(z.count).toBe(0);
+      expect(z.worstKey).toBe(""); // no severity → neutral grey marker
+    }
+  });
+
+  it("keeps fixed 1–6 numbering when only some base zones have records", () => {
+    const { active } = aggregateZones(
+      [incident({ location: "Menteng, Central Jakarta", severity: "high" })],
+      JAKARTA_ZONES,
+    );
+    expect(active.map((z) => z.def.name)).toEqual(BASE_NAMES);
+    expect(active.map((z) => z.number)).toEqual([1, 2, 3, 4, 5, 6]);
+    const central = active.find((z) => z.def.name === "Central Jakarta")!;
+    expect(central.count).toBe(1);
+    expect(central.worstKey).toBe("high");
+    const south = active.find((z) => z.def.name === "South Jakarta")!;
+    expect(south.count).toBe(0);
+    expect(south.worstKey).toBe("");
+  });
+
+  it("appends the Greater Jakarta fallback as zone 7 only when it has records", () => {
+    const none = aggregateZones([], JAKARTA_ZONES).active;
+    expect(none.some((z) => z.def.name.startsWith("Greater Jakarta"))).toBe(false);
+    const withGtr = aggregateZones(
+      [incident({ location: "Bekasi", severity: "moderate" })],
+      JAKARTA_ZONES,
+    ).active;
+    const gtr = withGtr.find((z) => z.def.name.startsWith("Greater Jakarta"));
+    expect(gtr).toBeDefined();
+    expect(gtr!.number).toBe(7);
+  });
+
+  it("regression: zones without alwaysShow omit zero-count zones (other theatres unchanged)", () => {
+    const plain = [
+      { name: "Alpha", center: [0, 0] as [number, number], places: ["alpha"] },
+      { name: "Beta", center: [1, 1] as [number, number], places: ["beta"] },
+    ];
+    const { active } = aggregateZones(
+      [incident({ location: "alpha town", severity: "low" })],
+      plain,
+    );
+    expect(active.map((z) => z.def.name)).toEqual(["Alpha"]);
+    expect(active[0].number).toBe(1);
   });
 });

@@ -1,0 +1,97 @@
+This Jakarta report is improved, but it is still not ready.
+
+Do another pass using the points below.
+
+1. Top 3 Developments
+
+The Top 3 is still weak.
+
+Do not include two separate fire items unless both are genuinely operationally relevant.
+
+If a fire is included, explain the Jakarta business relevance: road closures, evacuation, access disruption, dense commercial or residential exposure, utilities, warehouses, malls, hotels, client sites or commuter routes.
+
+Do not let all Top 3 items default to Low. If the item is genuinely only Low, question whether it belongs in the Top 3.
+
+Top 3 should show the most operationally relevant developments, not just available records.
+
+2. Incident Details
+
+The writing is better, but still generic in places.
+
+Do not explain categories. Explain Jakarta relevance.
+
+For example, do not say flooding can slow commuting. Say where this matters: Greater Jakarta, airport transfer routes, low lying access roads, office districts, logistics routes or staff commuting corridors.
+
+Same for fire, crime and protest activity.
+
+3. Current Situation
+
+Make this more useful.
+
+The current situation should explain the Jakarta operating picture this week:
+
+Central Jakarta remains the main protest and government district exposure.
+Greater Jakarta weather and flooding remain the main movement disruption issue.
+Crime remains a localised staff safety and after hours movement concern.
+The overall picture is manageable, but disruption prone.
+
+4. Operational Impact
+
+This section is acceptable, but can be sharper.
+
+Keep it Jakarta specific:
+
+Central Jakarta: protest disruption around government buildings and main roads.
+Greater Jakarta: rain and flooding can affect commuting and airport transfers.
+Office and hotel areas: maintain caution around after hours movement and exposed public areas.
+Cross city movement: allow extra time for meetings, site visits and logistics.
+Local teams: check routes before movement on protest or heavy rain days.
+
+5. Polestar View
+
+Fix the page break.
+
+Do not split Polestar View awkwardly across two pages.
+
+Polestar View should be a complete assessment paragraph and must be visually readable.
+
+Use this style:
+
+Jakarta remains a manageable but disruption prone operating environment. The main issue is not a single high impact threat, but the combined effect of protests, congestion, flooding and opportunistic crime on movement planning. Business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.
+
+6. Map
+
+The map is better than the previous raw dot map, but it still needs work.
+
+It should not look like a web map screenshot.
+
+Remove zoom controls and web map clutter if possible.
+
+Use a clean numbered callout map.
+
+The Jakarta map should include these callouts:
+
+1. Central Jakarta: protest and government district disruption
+2. South Jakarta: office, embassy and commercial area exposure
+3. West Jakarta: congestion, crime and access disruption
+4. North Jakarta: port, flooding and logistics exposure
+5. East Jakarta: road movement and residential disruption
+6. Soekarno Hatta airport corridor: airport transfer disruption
+
+Do not leave out North Jakarta, West Jakarta or the airport corridor if the report is meant to support business movement planning.
+
+7. Missing records note
+
+The note saying many records could not be tied to a specific area is useful, but it should be smaller and cleaner.
+
+Do not let it weaken the map. Phrase it clearly:
+
+“Some records were retained in the assessment but not plotted due to insufficient location detail.”
+
+8. Disclaimer and layout
+
+The disclaimer is fine, but the report should not end feeling empty or broken.
+
+Improve pagination so sections do not split badly.
+
+Final output should feel like a polished Jakarta business security brief, not a lightly cleaned database export.

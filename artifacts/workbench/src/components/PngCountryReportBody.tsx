@@ -79,14 +79,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Prose({ text }: { text: string }) {
+function Prose({ text, keepTogether }: { text: string; keepTogether?: boolean }) {
   if (!text) return <EmptyNote>Not populated.</EmptyNote>;
   return (
     <div>
       {text.split(/\n+/).map((p, i) => (
         <p
           key={i}
-          data-pdf-flow="true"
+          // keepTogether omits data-pdf-flow so the DOM-rasterise PDF can only
+          // break this block at its section top — the whole paragraph moves to
+          // the next page rather than splitting mid-paragraph (spec §5).
+          {...(keepTogether ? {} : { "data-pdf-flow": "true" })}
           style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "0 0 10px 0" }}
         >
           {p}
@@ -405,7 +408,7 @@ export default function PngCountryReportBody({
 
       {/* 8. Polestar View — closes the written brief */}
       <Section title="Polestar View">
-        <Prose text={d.polestarView} />
+        <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
       </Section>
     </IncidentSummaryContext.Provider>
   );

@@ -31,7 +31,7 @@ import { clusterSameStoryRows, incidentTypeKey, type SameStoryRow } from "./coun
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import { scoreClusterValue } from "./countryTopValue";
-import { buildJakartaBrief } from "./jakartaBrief";
+import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme } from "./jakartaBrief";
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
@@ -570,6 +570,10 @@ export interface PngReportDataset {
   // rendering byte-identical.
   incidentThemesOverride?: { key: string; heading: string; paragraph: string }[];
   operationalImpactOverride?: string[];
+  // Jakarta-only layout hint: render the closing Polestar View keep-together so
+  // the complete assessment paragraph never splits across a page boundary
+  // (spec §5). Unset for every other theatre — no markup change.
+  keepPolestarTogether?: boolean;
 }
 
 export interface BuildArgs {
@@ -648,6 +652,68 @@ function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
   const da = (a.incidentDate ?? a.reportedDate).getTime();
   const db = (b.incidentDate ?? b.reportedDate).getTime();
   return db - da;
+}
+
+// Jakarta-only Top-3 selection (gated by config.jakartaProse; the generic path
+// just takes the three highest analyst-value clusters). The input clusters are
+// already value-sorted. On top of that value ordering we (a) enforce Jakarta-
+// theme diversity so two same-theme developments — most visibly two separate
+// fires — never both lead unless the window is too quiet to fill three distinct
+// themes, and (b) apply an all-Low guard so the Top 3 never defaults to three
+// Low items when a credible Moderate-or-worse development exists. Pure; returns
+// the existing cluster arrays (never mutates members).
+function selectJakartaTopClusters(clusters: PngReportItem[][]): PngReportItem[][] {
+  if (clusters.length <= 1) return clusters.slice(0, 3);
+  // (a) Greedy theme-diverse pick over the value-sorted clusters.
+  const picked: PngReportItem[][] = [];
+  const usedThemes = new Set<JakartaTheme>();
+  for (const c of clusters) {
+    if (picked.length >= 3) break;
+    const theme = jakartaThemeForCategory(c[0].category);
+    if (usedThemes.has(theme)) continue;
+    usedThemes.add(theme);
+    picked.push(c);
+  }
+  // Fill any remaining slots (window too quiet for three distinct themes) with
+  // the next best clusters regardless of theme.
+  if (picked.length < 3) {
+    for (const c of clusters) {
+      if (picked.length >= 3) break;
+      if (!picked.includes(c)) picked.push(c);
+    }
+  }
+  // (b) All-Low guard: if every chosen development is Low-or-below but a
+  // Moderate-or-worse cluster exists, swap the weakest chosen Low for the most
+  // serious available candidate (preferring a swap that keeps theme diversity).
+  const isLowOrBelow = (c: PngReportItem[]) => c[0].severityRank <= 2;
+  if (picked.length > 0 && picked.every(isLowOrBelow)) {
+    const candidate = clusters
+      .filter((c) => !picked.includes(c) && c[0].severityRank >= 3)
+      .sort((a, b) => {
+        if (b[0].severityRank !== a[0].severityRank) return b[0].severityRank - a[0].severityRank;
+        return scoreClusterValue(b) - scoreClusterValue(a);
+      })[0];
+    if (candidate) {
+      const candTheme = jakartaThemeForCategory(candidate[0].category);
+      // Prefer replacing a same-theme pick (keeps diversity); otherwise replace
+      // the lowest-value Low, which is last in the value-sorted picks.
+      let replaceIdx = picked.length - 1;
+      for (let i = picked.length - 1; i >= 0; i--) {
+        if (jakartaThemeForCategory(picked[i]![0].category) === candTheme) {
+          replaceIdx = i;
+          break;
+        }
+      }
+      picked[replaceIdx] = candidate;
+    }
+  }
+  // Display strongest analyst value first (severity-then-recency breaks ties),
+  // matching the generic path's ordering intent.
+  return picked.sort((a, b) => {
+    const v = scoreClusterValue(b) - scoreClusterValue(a);
+    if (v !== 0) return v;
+    return sortBySeverityThenRecency(a[0], b[0]);
+  });
 }
 
 // Strand assignment for an augmented location section (currently PNG NCD).
@@ -975,7 +1041,9 @@ export function buildStructuredReportDataset(
     if (vb !== va) return vb - va;
     return sortBySeverityThenRecency(a[0], b[0]);
   });
-  const topClusters = storyClusters.slice(0, 3);
+  const topClusters = config.jakartaProse
+    ? selectJakartaTopClusters(storyClusters)
+    : storyClusters.slice(0, 3);
   let topThree = topClusters.map((c) => c[0]);
   const topThreeMemberIds = new Set(topClusters.flatMap((c) => c.map((it) => it.id)));
   const bucketableItems = windowItems.filter((it) => !topThreeMemberIds.has(it.id));
@@ -1279,6 +1347,7 @@ export function buildStructuredReportDataset(
   // undefined for every other theatre so the renderer uses its generic path).
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
   let operationalImpactOverride: string[] | undefined;
+  let keepPolestarTogether = false;
 
   // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
   // Override the BLUF, Executive Summary, Priorities This Week and Polestar View
@@ -1414,6 +1483,7 @@ export function buildStructuredReportDataset(
     operationalImpactOverride = jakarta.operationalImpact;
     incidentThemesOverride = jakarta.incidentThemes;
     topThree = jakarta.topThree;
+    keepPolestarTogether = true;
   }
 
   // --- Reporting Confidence --------------------------------------------------
@@ -1608,6 +1678,7 @@ export function buildStructuredReportDataset(
     recommendedActions,
     incidentThemesOverride,
     operationalImpactOverride,
+    keepPolestarTogether,
   };
 }
 
