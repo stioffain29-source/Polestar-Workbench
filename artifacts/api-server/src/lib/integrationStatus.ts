@@ -697,8 +697,14 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
     summary =
       "Configured, but the Instagram scraper upstream is returning errors on consecutive runs — no posts are being collected.";
   } else if (total > 0) {
-    status = "working";
-    summary = `Holding ${total} KAMMI Instagram post(s) as protest-monitoring context — never counted as incidents.`;
+    const age = ageInDays(latest);
+    if (age !== null && age > SOCIAL_WATCH_FRESH_DAYS) {
+      status = "dormant";
+      summary = `Feed appears dormant — newest of ${total} stored KAMMI Instagram post(s) is ${age} day(s) old (past the ${SOCIAL_WATCH_FRESH_DAYS}-day freshness window). Stored as protest-monitoring context only, never counted as incidents.`;
+    } else {
+      status = "working";
+      summary = `Holding ${total} KAMMI Instagram post(s) as protest-monitoring context — never counted as incidents.`;
+    }
   } else {
     status = "no_data";
     summary =
