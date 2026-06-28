@@ -1,8 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 
 import PngCountryReportBody from "../../artifacts/workbench/src/components/PngCountryReportBody";
+import ShippingReportPreview from "../../artifacts/workbench/src/components/ShippingReportPreview";
 import { buildCountryOperatingRiskDataset } from "../../artifacts/workbench/src/lib/countryOperatingRiskDataset";
 import { COUNTRY_INCIDENT_THEMES } from "../../artifacts/workbench/src/lib/countryIncidentThemes";
+import { DISCLAIMER_TEXT } from "../../artifacts/workbench/src/lib/pdfChrome";
 import type {
   PngSourceIncident,
   PngReportDataset,
@@ -158,6 +160,16 @@ describe("PngCountryReportBody — country brief render", () => {
     ).toBe(true);
   });
 
+  it("caps Top 3 Developments at three tiles even with more incidents", () => {
+    // Only the Top 3 tile cards carry a severity chip (the Incident Details
+    // themed groups render prose, no chips), so the chip count is the tile
+    // count. The window here has four incidents; the section must still show at
+    // most three tiles (the remainder flows into the themed Incident Details).
+    const chips = (html.match(/data-sev-chip="true"/g) ?? []).length;
+    expect(chips).toBeGreaterThan(0);
+    expect(chips).toBeLessThanOrEqual(3);
+  });
+
   it("leaks no record/incident/event count into the narrative brief", () => {
     const text = textOf(html);
     expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
@@ -225,5 +237,63 @@ describe("PngCountryReportBody — country brief render, quiet window", () => {
     expect(text).toMatch(/no fresh open-source reporting/i);
     // A quiet week must not invent counts either.
     expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
+  });
+});
+
+// The Disclaimer is the brief's final section, but it is appended by the PAGE
+// (CountryReport.tsx) below the body + analytics block — NOT by this body
+// component. The fixed brief order this body owns therefore closes on Reporting
+// Confidence, and the body must never emit a Disclaimer of its own (which would
+// reorder it into the brief). These guards pin that contract without needing the
+// data-fetching, owner-gated page to render.
+describe("PngCountryReportBody — Disclaimer is page-appended, not in the body", () => {
+  const html = renderToStaticMarkup(
+    <PngCountryReportBody dataset={build(POPULATED)} />,
+  );
+
+  it("closes the body on Reporting Confidence and omits the Disclaimer", () => {
+    expect(html).toContain("Reporting Confidence");
+    expect(html).not.toContain("Disclaimer");
+    // Reporting Confidence is the last brief section the body emits.
+    const last = SECTION_ORDER[SECTION_ORDER.length - 1];
+    expect(last).toBe("Reporting Confidence");
+    for (const title of SECTION_ORDER.slice(0, -1)) {
+      expect(html.indexOf(title)).toBeLessThan(html.indexOf(last));
+    }
+  });
+
+  it("the page-level Disclaimer text the page appends last stays non-empty", () => {
+    expect(typeof DISCLAIMER_TEXT).toBe("string");
+    expect(DISCLAIMER_TEXT.trim().length).toBeGreaterThan(0);
+  });
+});
+
+// The "no Maritime Security on country reports" assertion above is only a
+// meaningful guard if that section genuinely STILL exists on the shipping/topic
+// reports — i.e. it was removed from country briefs deliberately, not deleted
+// everywhere. Pin both halves of that contract here.
+describe("Maritime Security — absent on country, present on shipping reports", () => {
+  it("country report body never renders a Maritime Security section", () => {
+    const html = renderToStaticMarkup(
+      <PngCountryReportBody dataset={build(POPULATED)} />,
+    );
+    expect(html).not.toContain("Maritime Security");
+  });
+
+  it("shipping report preview still renders its Maritime Security section", () => {
+    const html = renderToStaticMarkup(
+      <ShippingReportPreview
+        report={
+          {
+            id: 1,
+            title: "Shipping Watch",
+            topic: "shipping",
+            issueDate: "2026-06-29",
+          } as never
+        }
+        incidents={[]}
+      />,
+    );
+    expect(html).toContain("Maritime Security");
   });
 });
