@@ -607,6 +607,76 @@ describe("Long Topic PDF — editor-requested ids match the drawn rows", () => {
   });
 });
 
+describe("Long Conflict PDF — editor-requested ids match the drawn rows", () => {
+  // Distinct in their first significant title tokens — the per-row index sits
+  // INSIDE the first eight significant words so selectRelatedIncidents' title
+  // dedupe keeps them separate — and unambiguously conflict-relevant (kinetic,
+  // casualty-bearing) so none drops to the weak bucket.
+  const LONG_CONFLICT_INCIDENTS: ConflictReportIncident[] = Array.from(
+    { length: POOL_SIZE },
+    (_, i) =>
+      confInc({
+        id: `tc${i}`,
+        country: "Philippines",
+        severity: i % 2 === 0 ? "high" : "moderate",
+        title: `Armed clash ${i} kills militants and troops near an outpost`,
+        occurredAt: `2026-06-${windowDay(i)}T08:00:00+00:00`,
+        summary: `Militants and troops clashed near an outpost, case ${i}.`,
+      }),
+  );
+
+  // The exact set the editor requests summaries for: ReportEditor's
+  // relatedForSummaries for conflict is buildConflictReportDataset(...)
+  // .relatedIncidents — the SAME builder the exporter draws from.
+  function editorRequestedRows() {
+    return buildConflictReportDataset(
+      LONG_CONFLICT_INCIDENTS,
+      "conflict",
+      ISSUE_DATE,
+    ).relatedIncidents;
+  }
+
+  it("pool exceeds the generation cap and the rendered set is parity-locked", async () => {
+    expect(LONG_CONFLICT_INCIDENTS.length).toBeGreaterThanOrEqual(60);
+    const requested = editorRequestedRows();
+    const requestedIds = new Set(requested.map((r) => String(r.id)));
+    expect(requestedIds.size).toBeGreaterThan(0);
+
+    // PROTECTIVE INVARIANT (see the shipping/topic tests): from a >60 input
+    // pool the editor still requests at most the server generation cap, so the
+    // server's canonical 60-cap can never silently drop a RENDERED conflict
+    // row's summary.
+    expect(requestedIds.size).toBeLessThanOrEqual(SERVER_GENERATION_CAP);
+
+    const summaries: Record<string, string> = {};
+    for (const inc of LONG_CONFLICT_INCIDENTS)
+      summaries[String(inc.id)] = aiSentinel(String(inc.id));
+
+    const text = await textAfter(() =>
+      exportConflictReportPdf(
+        CONFLICT_DATA,
+        LONG_CONFLICT_INCIDENTS,
+        "conflict.pdf",
+        null,
+        summaries,
+      ),
+    );
+
+    const drawnIds = drawnIdsFrom(
+      text,
+      LONG_CONFLICT_INCIDENTS.map((i) => String(i.id)),
+    );
+    // The drawn rows are EXACTLY the rows the editor requested summaries for.
+    expectSameIdSet(drawnIds, requestedIds);
+
+    // No rendered row silently fell back to its deterministic line.
+    for (const row of requested) {
+      expect(text).not.toContain(deterministicIncidentSummary(row));
+      expect(text).toContain(aiSentinel(String(row.id)));
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Generation-cap truncation boundary (the failure mode the invariant guards).
 //
