@@ -75,6 +75,12 @@ function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: numbe
 // ---------------------------------------------------------------------------
 interface RiskZoneDef {
   name: string;
+  // Standing risk characterisation of the area — what it is known for. Shown as
+  // a muted note in the area-risk legend. Optional: only the Papua zones carry
+  // one; other countries' zones read from data alone. This describes the zone's
+  // established profile, not this reporting period's incidents, so it adds
+  // analyst context without fabricating anything about the current window.
+  description?: string;
   // Where the numbered marker is dropped.
   center: L.LatLngTuple;
   // Lower-cased place keywords (regencies, towns, provinces) that place an
@@ -91,6 +97,7 @@ interface RiskZoneDef {
 const PAPUA_ZONES: RiskZoneDef[] = [
   {
     name: "Central Highlands",
+    description: "Armed-group and security-force activity.",
     center: [-3.9, 138.6],
     places: [
       "central highlands",
@@ -116,6 +123,7 @@ const PAPUA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Jayapura & North Coast",
+    description: "Urban and access-route monitoring.",
     center: [-2.2, 140.2],
     places: [
       "jayapura",
@@ -131,6 +139,7 @@ const PAPUA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Bird's Head",
+    description: "Infrastructure, fire and local disruption monitoring.",
     center: [-1.3, 133.6],
     places: [
       "bird's head",
@@ -148,6 +157,7 @@ const PAPUA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Papua Tengah",
+    description: "Intan Jaya movement and security risk.",
     center: [-3.9, 136.1],
     places: [
       "papua tengah",
@@ -164,6 +174,7 @@ const PAPUA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Papua Barat Daya",
+    description: "Crime, fire and disruption monitoring.",
     center: [-1.1, 132.0],
     places: [
       "papua barat daya",
@@ -461,9 +472,15 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     if (!containerRef.current) return;
 
     if (!mapRef.current) {
+      // No zoom buttons or attribution overlay: the country-report map is a
+      // clean report graphic, captured into the PDF via html2canvas. Leaflet
+      // controls render as floating widgets that look like UI clutter in an
+      // exported document, so both controls are disabled at construction. With
+      // attributionControl off the tile layer's attribution string below is
+      // never drawn, so no control container is created at all.
       mapRef.current = L.map(containerRef.current, {
-        zoomControl: true,
-        attributionControl: true,
+        zoomControl: false,
+        attributionControl: false,
       });
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
@@ -712,14 +729,15 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
             {/* Numbered risk-zone legend: "n. Zone — Severity (count)". The
                 numbered markers above are HTML <div> overlays, so they appear
                 in BOTH the on-screen view and the rasterised PDF. */}
-            <div className="mt-3" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <div className="mt-3" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {active.map((z) => (
-                <div key={z.def.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div key={z.def.name} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                   <span
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      flex: "0 0 auto",
                       width: 18,
                       height: 18,
                       borderRadius: "50%",
@@ -730,12 +748,17 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
                       fontWeight: 700,
                       lineHeight: 1,
                       border: `1px solid ${POLAR}`,
+                      marginTop: 1,
                     }}
                   >
                     {z.number}
                   </span>
                   <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK }}>
-                    {z.def.name} — {SEV_LABEL[z.worstKey] ?? z.worstKey} ({z.count})
+                    <span style={{ fontWeight: 700, color: "#0b0a3d" }}>{z.def.name}</span>{" "}
+                    — {SEV_LABEL[z.worstKey] ?? z.worstKey} ({z.count})
+                    {z.def.description ? (
+                      <span style={{ color: DUSK, opacity: 0.75 }}> · {z.def.description}</span>
+                    ) : null}
                   </span>
                 </div>
               ))}

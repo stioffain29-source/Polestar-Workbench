@@ -1124,7 +1124,7 @@ export function buildStructuredReportDataset(
   // --- BLUF (Bottom Line Up Front) ------------------------------------------
   let bluf: string;
   if (windowItems.length === 0) {
-    bluf = `The picture for ${config.countryName} is unclear this period: no fresh open-source reporting was identified, which is read as a coverage signal rather than an improvement in conditions. Standing exposures continue to apply, so maintain existing movement and continuity precautions and treat the quiet period as provisional.`;
+    bluf = `No fresh open-source reporting emerged for ${config.countryName} this period, so the picture is best read as a gap in coverage rather than a genuine improvement; standing exposures are unchanged. Risk stays concentrated where it has historically sat, and the trajectory is steady rather than easing. For business users this means existing movement and continuity precautions remain appropriate, with a fresh review warranted as soon as reporting resumes.`;
   } else {
     const trendWord =
       trajectory === "worsening"

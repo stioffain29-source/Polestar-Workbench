@@ -69,8 +69,6 @@ const POLAR = "#e2e2e2";
 const ROBOTO = "Roboto, sans-serif";
 const BRAND_GRADIENT = "linear-gradient(to right, #0b0a3d 0%, #465bff 100%)";
 
-const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
-
 interface Draft {
   name: string;
   region: string;
@@ -984,55 +982,6 @@ export default function CountryReport() {
   if (!country || !effective) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Country report not found.</div>;
 
   const windowIncidents = facts.windowIncidents;
-  const severityTotal = SEV_ORDER.reduce((s, k) => s + facts.severityCounts[k], 0);
-
-  // Incident-breakdown chart taxonomy. For structured reports (PNG / West Papua
-  // / Indonesia / Jakarta) the bars use the report's OWN client-facing taxonomy
-  // (item.displayCategory) so the chart matches the categories the brief and the
-  // incident cards already use — not the raw incidentClassifier buckets, which
-  // leak database artefacts the standard forbids. Generic country reports keep
-  // the classifier-derived counts.
-  const typeChartData = (() => {
-    if (pngEffectiveDataset && pngEffectiveDataset.windowItems.length > 0) {
-      const counts = new Map<string, number>();
-      // Count over SAME-STORY-CONSOLIDATED items so the bars honour the
-      // "deduplicated incidents" caption and match the severity chart's
-      // authority (which already runs through consolidateCountryStories). Without
-      // this a single named-premises event reported under several headlines would
-      // be counted multiple times here. Only the chart's counting is
-      // consolidated; the brief's narrative / Top-3 pipeline is untouched.
-      const consolidatedItems = consolidateCountryStories(
-        pngEffectiveDataset.windowItems.map((it) => ({
-          ...it,
-          occurredAt: (it.incidentDate ?? it.reportedDate).toISOString(),
-        })),
-      );
-      for (const it of consolidatedItems) {
-        const label = (it.displayCategory ?? "").trim();
-        if (!label) continue;
-        counts.set(label, (counts.get(label) ?? 0) + 1);
-      }
-      return Array.from(counts.entries())
-        .map(([label, n]) => ({ label, n }))
-        .sort((a, b) => b.n - a.n)
-        .slice(0, 8);
-    }
-    return Array.from(facts.typeCounts.entries())
-      .map(([label, n]) => ({ label, n }))
-      .sort((a, b) => b.n - a.n)
-      .slice(0, 8);
-  })();
-  const typeChartMax = typeChartData.length > 0 ? Math.max(...typeChartData.map((d) => d.n)) : 0;
-
-  // Severity-distribution chart earns its place only when it actually helps
-  // explain the risk picture: show it when at least two severity bands are
-  // present, or when any High/Extreme record is present (so a single serious
-  // band is never hidden). A flat, all-one-low-band window adds no narrative
-  // value, so the chart is omitted — per the standard, charts must support the
-  // narrative, not appear merely because the data exists.
-  const severityBandsPresent = SEV_ORDER.filter((k) => facts.severityCounts[k] > 0).length;
-  const showSeverityChart = severityTotal > 0
-    && (severityBandsPresent >= 2 || facts.severityCounts.high > 0 || facts.severityCounts.extreme > 0);
 
   // Analyst-placed incident map node, rendered at the chosen placement slot.
   const mapNode = (
@@ -1340,7 +1289,7 @@ export default function CountryReport() {
                 <option value="after-incident-details">After Incident Details</option>
                 <option value="before-outlook">Before Outlook</option>
                 <option value="before-polestar">Before Polestar View</option>
-                <option value="end">At end (above charts)</option>
+                <option value="end">At end (above supporting context)</option>
               </select>
             </label>
             <label style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "block" }}>
@@ -1506,16 +1455,12 @@ export default function CountryReport() {
           shared analytics block, when the analyst leaves it at the default. */}
       {mapPlacement === "end" && mapNode}
 
-      {/* Shared analytics block — rendered below the written brief for EVERY
-          country (structured and generic). Severity and incident-type charts,
-          then the Situational Context reference layer. */}
+      {/* Situational Context reference layer — rendered below the written brief
+          for EVERY country (structured and generic). Per the reworked country
+          standard the Severity Distribution and Incident Breakdown by Type
+          charts are no longer shown by default. */}
       <CountryReportVisuals
         countryName={effective.name}
-        severityCounts={facts.severityCounts}
-        severityTotal={severityTotal}
-        showSeverityChart={showSeverityChart}
-        typeChartData={typeChartData}
-        typeChartMax={typeChartMax}
         situationalReports={situationalReports}
       />
 

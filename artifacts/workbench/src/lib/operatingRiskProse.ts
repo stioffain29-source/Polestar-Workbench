@@ -165,7 +165,7 @@ function blufActions(leadDisplayCats: string[], worstRank: number): string {
 // business users do this week.
 export function buildOperatingRiskBluf(i: OperatingRiskProseInput): string {
   if (i.empty) {
-    return `The ${i.countryName} operating picture is unclear this week: no fresh open-source reporting was identified, which is read as a coverage gap rather than a genuine improvement. Standing exposures continue to apply. Business users should maintain existing movement and continuity precautions and treat the quiet period as provisional.`;
+    return `No fresh open-source reporting was identified for ${i.countryName} this week, so the operating picture is best read as a gap in coverage rather than a genuine improvement; standing exposures are unchanged. Risk remains concentrated where it has historically sat, and the trajectory is steady rather than easing. Business users should keep existing movement and continuity precautions in place and reassess as soon as reporting resumes.`;
   }
   const trend =
     i.trajectory === "worsening"
@@ -195,7 +195,7 @@ export function buildOperatingRiskExecutiveSummary(i: OperatingRiskProseInput): 
   }
   const cats = i.leadDisplayCats.map(operatingRiskCategoryPhrase);
   const themes = cats.length
-    ? `The week's reporting was led by ${joinList(cats)}`
+    ? `Activity this week concentrated on ${joinList(cats)}`
     : "Fresh reporting this week was limited";
   const geo = i.leadLocations.length
     ? `, concentrated around ${joinList(i.leadLocations)}`

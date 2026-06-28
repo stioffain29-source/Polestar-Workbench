@@ -1,0 +1,197 @@
+TASK: Rework the country report output standard from scratch.
+
+Apply this to all country reports, starting with Papua as the pilot, then roll it out to PNG, Thailand, Philippines and Indonesia.
+
+The goal is to produce a polished analyst country report, not a database export.
+
+Do not assume any previous instruction. Use the standard below.
+
+COUNTRY REPORT PURPOSE
+
+Each country report should give a business user a clear view of the current security picture, what changed during the reporting period, where the main risks are, and what practical actions or monitoring points matter.
+
+The report should feel complete and credible. Do not simply cut it down until it looks empty. Papua and PNG in particular may need enough context to avoid looking sparse. The issue is not length by itself. The issue is whether the content is useful, readable and analyst led.
+
+FINAL REPORT STRUCTURE
+
+Use this structure only:
+
+1. Bottom Line Up Front
+2. Top 3 Developments
+3. Incident Details
+4. Current Situation
+5. Operational Impact
+6. Recommended Actions
+7. Outlook: Next Seven Days
+8. Polestar View
+9. Map or chart only where useful
+
+Do not include Reporting Confidence.
+
+Do not include confidence labels, confidence badges or confidence wording.
+
+BOTTOM LINE UP FRONT
+
+One strong paragraph.
+
+It must explain:
+
+What changed this reporting period
+Where risk is concentrated
+Whether the picture is stable, improving or deteriorating
+Why it matters for business users
+
+Do not use generic filler.
+
+Do not write:
+
+“Reported this period, centred on...”
+“Open-source reporting was led by...”
+“Treat quiet stretches as provisional...”
+
+TOP 3 DEVELOPMENTS
+
+This must be curated by analyst judgement.
+
+Do not simply pull the first three database records.
+
+Do not include duplicate versions of the same incident.
+
+If several articles describe the same event, merge them into one development.
+
+Each development should include:
+
+A rewritten title
+Location
+Severity
+Why it matters
+
+Severity must reflect operational impact. Do not default everything to Low or High.
+
+INCIDENT DETAILS
+
+This section should explain the main relevant themes.
+
+Do not use a repeated template under every category.
+
+Do not write repeated blocks like:
+
+What happened
+Where
+Why it matters
+What could be affected
+
+Instead, write short analyst paragraphs.
+
+Only include categories that actually matter for the reporting period.
+
+Remove irrelevant taxonomy leakage. For example, fertiliser categories must never appear in a country security report.
+
+CURRENT SITUATION
+
+Two focused paragraphs.
+
+Explain the current operating picture, not just a list of incidents.
+
+Mention main areas of concern, any change from the previous period if available, and what this means for movement, site access, staff safety or local operations.
+
+OPERATIONAL IMPACT
+
+Use up to five concise bullets.
+
+Focus on practical effects such as:
+
+Movement
+Site access
+Staff safety
+Logistics
+Protests or disruption
+Security force activity
+Local monitoring
+
+Do not over explain.
+
+RECOMMENDED ACTIONS
+
+Use four to six grouped actions.
+
+Actions should be practical and relevant.
+
+Avoid repeating the same action under several incidents.
+
+OUTLOOK: NEXT SEVEN DAYS
+
+Use one short paragraph plus three escalation indicators.
+
+The outlook should explain the most likely next seven day picture.
+
+It should not repeat the current situation.
+
+POLESTAR VIEW
+
+This is the assessment section.
+
+Use one concise paragraph.
+
+It should give judgement on whether risk is rising, falling or stable, what is driving the risk, and what business users should watch next.
+
+MAP STANDARD
+
+Do not export raw Leaflet maps with tiny incident dots.
+
+Do not show zoom buttons, map controls or unreadable attribution clutter in the PDF.
+
+The map must look like a clean report graphic.
+
+Use one of these formats:
+
+Risk area map
+Province level shaded map
+Numbered callout map
+
+Only use exact incident dots when coordinates are reliable and the map is readable.
+
+For Papua, use risk areas or numbered callouts such as:
+
+1. Central Highlands: armed group and security force activity
+2. Papua Tengah: Intan Jaya movement and security risk
+3. Papua Barat Daya: crime, fire and disruption monitoring
+4. Jayapura and North Coast: urban and access route monitoring
+5. Bird’s Head: infrastructure, fire and local disruption monitoring
+
+If the map cannot be rendered cleanly, remove it rather than exporting a bad map.
+
+CHART STANDARD
+
+Charts are optional.
+
+Do not include Severity Distribution or Incident Breakdown by Type by default.
+
+Only include a chart where it supports the written assessment.
+
+Do not include raw database categories.
+
+Do not include off-topic categories.
+
+SOURCE DISPLAY
+
+Do not add a large ugly source dump at the end.
+
+If sources are shown, keep them small, clean and useful.
+
+ACCEPTANCE CRITERIA
+
+Before export, each country report must pass these checks:
+
+No Reporting Confidence section
+No duplicate Top 3 incidents
+No irrelevant categories
+No raw database wording
+No repeated template blocks
+No raw Leaflet dot map
+No unreadable map controls
+No charts unless they add value
+BLUF gives a clear operational judgement
+Polestar View gives an actual assessment
+Report feels complete, but not padded
+Report reads like it has been reviewed by an analyst
