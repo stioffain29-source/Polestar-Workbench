@@ -55,7 +55,7 @@ const JAKARTA_THEME_PHRASE: Record<JakartaTheme, string> = {
   protest: "protest activity",
   flooding: "flooding and heavy rain",
   fire: "fire incidents",
-  crime: "opportunistic crime",
+  crime: "local crime",
   traffic: "traffic disruption",
   airport: "airport-corridor disruption",
   governance: "policing activity",
@@ -196,47 +196,200 @@ function severityTail(worstRank: number): string {
 }
 
 // --- Incident Details theme paragraphs -------------------------------------
+//
+// Each paragraph is built from the ACTUAL reported incidents in the window, not
+// from a generic category template. For every present theme we extract only the
+// concrete facts the source text actually carries — the real area (province),
+// the site/setting type, the crime type, the policing action and any reported
+// operational effect — and compose from those alone. When the source is too
+// thin we say less or drop the theme; we never pad with invented specifics
+// (no "presidential palace", no "official measures", no unconditioned commuting
+// claims) and we never assert a fire's cause.
 
-function whereIn(areas: string[], fallback: string): string {
-  return areas.length ? `in ${joinList(areas)}` : fallback;
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function themeParagraph(p: ThemePresence): string {
+// Full-word match (no stems): the token must be bounded by non-letters, so
+// "office" never fires on "officer" and "port" never fires on "airport". This
+// mirrors the corridor matcher; Bahasa Indonesia is ASCII, so the same boundary
+// works for Indonesian tokens.
+function hasToken(hay: string, token: string): boolean {
+  return new RegExp(`(^|[^a-z])${escapeRegExp(token)}([^a-z]|$)`, "i").test(hay);
+}
+
+// Per-item evidence text: the cleaned English headline (or the original title)
+// as PRIMARY evidence, with the reported summary as SECONDARY. Lower-cased once.
+function itemEvidence(it: PngReportItem): string {
+  const head = ((it.displayTitle && it.displayTitle.trim()) || it.title || "").toLowerCase();
+  const summ = (it.summary ?? "").toLowerCase();
+  return `${head} ${summ}`;
+}
+
+interface TokenGroup {
+  label: string;
+  tokens: string[];
+}
+
+// Distinct friendly labels evidenced by a set of items, in group order, capped
+// so the prose stays tight. A label is only emitted when at least one item's
+// evidence text carries one of its full-word tokens (no fabrication).
+function extractLabels(items: PngReportItem[], groups: TokenGroup[], cap = 3): string[] {
+  const out: string[] = [];
+  for (const g of groups) {
+    if (items.some((it) => { const hay = itemEvidence(it); return g.tokens.some((t) => hasToken(hay, t)); })) {
+      out.push(g.label);
+      if (out.length >= cap) break;
+    }
+  }
+  return out;
+}
+
+// Site / setting types. Friendly category labels (no internal "and", so they
+// join cleanly) mapped to the full-word tokens that evidence them. Deliberately
+// EXCLUDES over-generic words (bare street/road/house) and the verb-ambiguous
+// "plant", so a stray match never invents a setting.
+const SETTING_GROUPS: TokenGroup[] = [
+  { label: "markets", tokens: ["market", "markets", "pasar"] },
+  { label: "shopping malls", tokens: ["mall", "malls", "shopping centre", "shopping center", "plaza", "supermarket", "minimarket"] },
+  { label: "factories", tokens: ["factory", "factories", "pabrik"] },
+  { label: "warehouses", tokens: ["warehouse", "warehouses", "gudang"] },
+  { label: "residential blocks", tokens: ["apartment", "apartments", "apartemen", "perumahan", "rusun", "kampung"] },
+  { label: "office areas", tokens: ["office", "offices", "kantor"] },
+  { label: "hotels", tokens: ["hotel", "hotels"] },
+  { label: "schools", tokens: ["school", "schools", "sekolah", "campus", "kampus", "university", "universitas"] },
+  { label: "hospitals", tokens: ["hospital", "hospitals", "clinic", "puskesmas", "rumah sakit"] },
+  { label: "transport hubs", tokens: ["station", "stations", "stasiun", "terminal", "halte"] },
+  { label: "toll roads", tokens: ["toll", "tol", "jalan tol"] },
+  { label: "port areas", tokens: ["port", "pelabuhan", "priok"] },
+];
+
+// Crime types (crime theme). Bare "drug"/"drugs" omitted (drugstore etc.) in
+// favour of the unambiguous narcotics tokens.
+const CRIME_GROUPS: TokenGroup[] = [
+  { label: "theft", tokens: ["theft", "thefts", "stolen", "pencurian", "mencuri", "copet", "pickpocket", "pickpocketing"] },
+  { label: "robbery", tokens: ["robbery", "robberies", "robbed", "perampokan", "rampok", "begal"] },
+  { label: "burglary", tokens: ["burglary", "burglaries", "break-in", "pembobolan"] },
+  { label: "assault", tokens: ["assault", "assaults", "stabbing", "stabbed", "penganiayaan", "penikaman"] },
+  { label: "shootings", tokens: ["shooting", "shootings", "shot", "penembakan"] },
+  { label: "violent attacks", tokens: ["murder", "homicide", "killing", "pembunuhan"] },
+  { label: "public disorder", tokens: ["brawl", "brawls", "clash", "clashes", "riot", "riots", "tawuran", "ricuh", "kericuhan"] },
+  { label: "drug-related crime", tokens: ["narcotics", "narkoba", "sabu"] },
+  { label: "kidnapping", tokens: ["kidnap", "kidnapping", "abduction", "penculikan"] },
+  { label: "extortion", tokens: ["extortion", "pungli", "pemerasan", "premanisme"] },
+];
+
+// Policing / authority actions (governance theme). Specific actions only — used
+// in place of the banned vague "official measures".
+const ACTION_GROUPS: TokenGroup[] = [
+  { label: "arrests", tokens: ["arrest", "arrested", "arrests", "ditangkap", "penangkapan", "menangkap"] },
+  { label: "a police raid", tokens: ["raid", "raids", "raided", "razia", "gerebek", "penggerebekan"] },
+  { label: "patrols and deployments", tokens: ["patrol", "patrols", "patroli", "deployed", "dikerahkan"] },
+  { label: "checkpoints", tokens: ["checkpoint", "checkpoints", "roadblock", "roadblocks"] },
+  { label: "evictions or demolitions", tokens: ["eviction", "evictions", "evicted", "demolition", "demolished", "penggusuran", "penertiban", "pembongkaran"] },
+  { label: "seizures", tokens: ["seizure", "seizures", "seized", "disita", "penyitaan"] },
+];
+
+// Reported operational effects (any theme). Stated as fact ONLY when evidenced;
+// otherwise the effect is phrased conditionally per theme.
+const EFFECT_GROUPS: TokenGroup[] = [
+  { label: "evacuation", tokens: ["evacuated", "evacuate", "evacuation", "evacuees", "evakuasi", "dievakuasi", "mengungsi"] },
+  { label: "road closures", tokens: ["road closed", "road closure", "roads closed", "penutupan jalan", "jalan ditutup"] },
+  { label: "traffic delays", tokens: ["congestion", "gridlock", "macet", "kemacetan", "traffic jam"] },
+  { label: "power or utility disruption", tokens: ["power outage", "blackout", "listrik padam", "pemadaman listrik"] },
+];
+
+// One honest, non-padding line for a high-severity leftover we cannot place.
+const NO_ANCHOR_NOTE =
+  "Reporting in this category did not identify a specific Jakarta district or site, so no wider operating conclusion is drawn this period.";
+
+// Graceful degradation: emit `primary` when there is something concrete to say;
+// otherwise emit a single non-padding note ONLY for a high-severity leftover,
+// and drop the theme entirely below that. severityTail is appended either way.
+function compose(worstRank: number, primary: string): string | null {
+  const sev = severityTail(worstRank);
+  if (primary) return `${primary}${sev}`;
+  if (worstRank >= 4) return `${NO_ANCHOR_NOTE}${sev}`;
+  return null;
+}
+
+function themeParagraph(p: ThemePresence): string | null {
   const areas = presentAreas(p.items);
-  const sev = severityTail(p.worstRank);
+  const area = joinList(areas);
+  const settings = extractLabels(p.items, SETTING_GROUPS);
+  const effects = extractLabels(p.items, EFFECT_GROUPS, 2);
+
   switch (p.theme) {
-    case "protest":
-      return `Demonstration activity was reported ${whereIn(
-        areas,
-        "around the central government and business districts",
-      )}. The operational concern is less the protest itself than its effect on movement: marches and police lines around the presidential palace, parliament and the main Central Jakarta thoroughfares can close roads and slow access to nearby offices and government buildings at short notice.${sev}`;
-    case "flooding":
-      return `Flooding and heavy-rain disruption was reported ${whereIn(
-        areas,
-        "across low-lying parts of the capital",
-      )}. The concern is movement rather than the weather alone: standing water on low-lying access roads, airport-transfer routes and staff commuting corridors across Greater Jakarta lengthens journeys and delays site access and airport runs.${sev}`;
-    case "fire":
-      return `Fire incidents were reported ${whereIn(
-        areas,
-        "in the capital's dense commercial and residential districts",
-      )}. In these dense commercial and residential areas the operational concern is not the fire alone but the knock-on effect: short-notice road closures, local evacuation, utility disruption and access problems around offices, malls, warehouses, hotels or client sites.${sev}`;
-    case "crime":
-      return `Crime and public-safety incidents were reported ${whereIn(
-        areas,
-        "across the capital",
-      )}. The concern is staff exposure rather than any city-wide threat: opportunistic street crime and theft cluster around after hours movement near offices, hotels and transport hubs, and in the busier commercial and entertainment areas of South and West Jakarta.${sev}`;
-    case "traffic":
-      return `Traffic and movement disruption was reported ${whereIn(
-        areas,
-        "on the capital's main corridors",
-      )}. Congestion is a daily constraint on meetings, deliveries and airport transfers, and worsens with rain, roadworks and protest activity, so journey times can move with little warning.${sev}`;
-    case "airport":
-      return `Disruption affecting the Soekarno-Hatta airport corridor was reported. Transfers between the city and the airport run through congested toll routes that are sensitive to flooding and incidents, so transfer times can lengthen with little warning.${sev}`;
-    case "governance":
-      return `Policing and regulatory activity was reported ${whereIn(
-        areas,
-        "across the capital",
-      )}, including security-force deployments and official measures. The practical concern is short-notice restriction: such activity can briefly close roads and limit access around the affected area until it clears.${sev}`;
+    case "protest": {
+      let primary = "";
+      if (area) {
+        const central = areas.some((a) => a.toLowerCase().includes("central jakarta"));
+        primary = central
+          ? "Demonstration reporting centred on the Central Jakarta government district, where activity around government buildings and main routes can close roads and slow access at short notice. The practical concern is short-notice road closure and delayed movement, not a wider city-wide security deterioration."
+          : `Demonstration reporting centred on ${area}, where protest activity can close roads and slow access to surrounding areas and main routes at short notice. The practical concern is short-notice road closure and delayed movement, not a wider city-wide deterioration.`;
+      }
+      return compose(p.worstRank, primary);
+    }
+    case "flooding": {
+      let primary = "";
+      if (area || settings.length) {
+        const where = joinList([area, ...settings].filter(Boolean));
+        const logistics = settings.includes("toll roads") || settings.includes("port areas");
+        const effTail = effects.length ? ` Reported effects include ${joinList(effects)}.` : "";
+        primary = `Flooding and heavy-rain reporting affected ${where}, where standing water on low-lying roads can lengthen journeys and delay site access${logistics ? ", logistics movements and airport-transfer routes" : " and staff commuting"}.${effTail} Confirm affected routes before staff travel in these areas.`;
+      }
+      return compose(p.worstRank, primary);
+    }
+    case "fire": {
+      let primary = "";
+      if (area || settings.length) {
+        const where = joinList([area, ...settings].filter(Boolean));
+        const eff = effects.length
+          ? `Reported effects include ${joinList(effects)}.`
+          : "The operational concern is the knock-on effect — possible road closures, local evacuation and restricted access around the site — rather than the fire itself.";
+        primary = `Fire reporting this period centred on ${where}. ${eff} Confirm the status of the affected area before movement nearby.`;
+      }
+      return compose(p.worstRank, primary);
+    }
+    case "crime": {
+      const crimeTypes = extractLabels(p.items, CRIME_GROUPS);
+      let primary = "";
+      if (crimeTypes.length || settings.length) {
+        const what = crimeTypes.length ? joinList(crimeTypes) : "crime and public-safety incidents";
+        const loc = area ? ` in ${area}` : "";
+        const settingPart = settings.length ? ` Exposure concentrated around ${joinList(settings)}.` : "";
+        primary = `Crime reporting${loc} involved ${what}.${settingPart} The practical concern is staff exposure around after hours movement near offices, hotels and transport hubs rather than a city-wide threat.`;
+      } else if (area) {
+        primary = `Crime and public-safety reporting was limited to ${area}, with the main concern staff exposure around after hours movement near offices, hotels and transport hubs.`;
+      }
+      return compose(p.worstRank, primary);
+    }
+    case "traffic": {
+      const corridor = settings.filter((s) => s === "toll roads" || s === "transport hubs" || s === "port areas");
+      let primary = "";
+      if (area || corridor.length || effects.length) {
+        const where = joinList([area, ...corridor].filter(Boolean));
+        const effTail = effects.length ? ` Reported effects include ${joinList(effects)}.` : "";
+        primary = `Traffic and movement disruption was reported ${where ? `around ${where}` : "on the capital's main corridors"}.${effTail} Congestion here is a daily planning constraint on meetings, deliveries and airport transfers, and can worsen at short notice with rain or roadworks.`;
+      }
+      return compose(p.worstRank, primary);
+    }
+    case "airport": {
+      const effTail = effects.length ? ` Reported effects include ${joinList(effects)}.` : "";
+      const primary = `Reporting affected the Soekarno-Hatta airport corridor.${effTail} Transfers between the city and the airport run through congested, flood-sensitive toll routes, so transfer times can lengthen at short notice; allow additional buffer and confirm the toll-route status before departure.`;
+      return compose(p.worstRank, primary);
+    }
+    case "governance": {
+      const actions = extractLabels(p.items, ACTION_GROUPS);
+      let primary = "";
+      if (actions.length) {
+        const loc = area ? ` in ${area}` : " in the capital";
+        primary = `Policing and regulatory reporting${loc} involved ${joinList(actions)}. The practical concern is short-notice restriction — such activity can briefly close roads and limit access around the affected area until it clears; verify locally before travel.`;
+      } else if (area) {
+        primary = `Policing and regulatory activity was reported in ${area}. Such activity can briefly restrict movement and access around the affected area at short notice; verify locally before travel.`;
+      }
+      return compose(p.worstRank, primary);
+    }
   }
 }
 
@@ -251,11 +404,14 @@ export interface JakartaIncidentTheme {
 export function buildJakartaIncidentThemes(
   incidentDetailsItems: PngReportItem[],
 ): JakartaIncidentTheme[] {
-  return presentThemes(incidentDetailsItems).map((p) => ({
-    key: p.theme,
-    heading: JAKARTA_THEME_HEADING[p.theme],
-    paragraph: themeParagraph(p),
-  }));
+  const out: JakartaIncidentTheme[] = [];
+  for (const p of presentThemes(incidentDetailsItems)) {
+    const paragraph = themeParagraph(p);
+    // A theme too thin to say anything concrete is dropped, not padded.
+    if (!paragraph) continue;
+    out.push({ key: p.theme, heading: JAKARTA_THEME_HEADING[p.theme], paragraph });
+  }
+  return out;
 }
 
 // --- Operational Impact bullets --------------------------------------------
@@ -300,7 +456,7 @@ function leadThemePhrases(windowItems: PngReportItem[], cap = 3): string[] {
 
 export function buildJakartaBluf(windowItems: PngReportItem[]): string {
   if (windowItems.length === 0) {
-    return "Jakarta remains a manageable but disruption-prone operating environment. No fresh open-source reporting was identified this period; the capital's standing pattern of protest, congestion, flooding and opportunistic crime continues to shape movement planning.";
+    return "Jakarta remains a manageable but disruption-prone operating environment. No fresh open-source reporting was identified this period; the capital's standing pattern of protest, congestion, flooding and local crime continues to shape movement planning.";
   }
   const phrases = leadThemePhrases(windowItems);
   const areas = presentAreas(windowItems, 2);
@@ -331,7 +487,7 @@ export function buildJakartaCurrentSituation(windowItems: PngReportItem[]): stri
 }
 
 export function buildJakartaOutlook(): string {
-  return "Over the next seven days, the most likely picture is localised disruption from protest activity, traffic, heavy rain and opportunistic crime rather than a city-wide deterioration. Movement planning — route checks, flexible timings and local verification — remains the main mitigation.";
+  return "Over the next seven days, the most likely picture is localised disruption from protest activity, traffic, heavy rain and local crime rather than a city-wide deterioration. Movement planning — route checks, flexible timings and local verification — remains the main mitigation.";
 }
 
 // Jakarta-specific escalation indicators for the Outlook (spec §5): the standing
@@ -350,19 +506,19 @@ export function buildJakartaEscalationIndicators(): string[] {
 // The spec's strongest-paragraph Polestar View, near-verbatim, in British
 // English. A standing assessed judgement of the capital, not a count summary.
 export const JAKARTA_POLESTAR_PARAGRAPH =
-  "Jakarta remains a manageable but disruption-prone operating environment. The main issue is not a single high-impact threat but the combined effect of protests, congestion, flooding and opportunistic crime on movement planning. Business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.";
+  "Jakarta remains a manageable but disruption-prone operating environment. The main issue is not a single high-impact threat but the combined effect of protests, congestion, flooding and local crime on movement planning. Business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.";
 
 export function buildJakartaPolestarView(): PolestarViewParts {
   return {
     direction: "Operating risk in Jakarta is broadly stable but disruption-prone.",
     driver:
-      "The main driver is the combined effect of protests, congestion, flooding and opportunistic crime, rather than any single high-impact threat.",
+      "The main driver is the combined effect of protests, congestion, flooding and local crime, rather than any single high-impact threat.",
     exposedGeography:
       "Exposure concentrates in the central government and business districts, the main commuting corridors and the Soekarno-Hatta airport corridor.",
     exposedActivity:
       "The main business exposure is staff movement, journey timings and airport transfers.",
     likelyDisruption:
-      "The most likely disruption over the next seven days is localised interruption to movement from protest activity, traffic, heavy rain and opportunistic crime.",
+      "The most likely disruption over the next seven days is localised interruption to movement from protest activity, traffic, heavy rain and local crime.",
     whatWouldChange:
       "The assessment would change if large-scale unrest, severe flooding or a major security incident disrupted the capital city-wide.",
     practicalJudgement:

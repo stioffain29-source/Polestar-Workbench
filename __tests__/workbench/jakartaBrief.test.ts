@@ -105,9 +105,9 @@ describe("buildJakartaIncidentThemes", () => {
 
   it("emits only present themes, in fixed Jakarta order", () => {
     const groups = buildJakartaIncidentThemes([
-      item({ category: "Policing operation" }),
-      item({ category: "Civil unrest / protest" }),
-      item({ category: "Natural hazard" }),
+      item({ category: "Policing operation", province: "South Jakarta" }),
+      item({ category: "Civil unrest / protest", province: "Central Jakarta" }),
+      item({ category: "Natural hazard", province: "North Jakarta" }),
     ]);
     expect(groups.map((g) => g.key)).toEqual(["protest", "flooding", "governance"]);
     // Order matches the declared JAKARTA_THEME_ORDER.

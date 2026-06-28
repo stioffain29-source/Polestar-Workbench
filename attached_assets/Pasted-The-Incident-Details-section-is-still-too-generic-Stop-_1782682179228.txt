@@ -1,0 +1,43 @@
+The Incident Details section is still too generic.
+
+Stop writing category summaries. This section must be built from the actual reported incidents in the source set.
+
+Do not write:
+
+“Demonstration activity was reported in Central Jakarta.”
+“Flooding and heavy rain disruption was reported in Central Jakarta.”
+“Fire incidents were reported in Greater Jakarta.”
+“Crime and public safety incidents were reported…”
+
+That is still generic and could apply to any week.
+
+For each category, use the actual incident detail available:
+
+What was reported?
+Where exactly was it reported?
+Which district, road, building type, transport node, commercial area or public site was affected?
+What was the likely operational effect?
+Why does it matter this week?
+
+If the source data does not contain enough detail to answer those questions, do not pad the section with generic wording. Either keep the paragraph very short or remove the category.
+
+Rewrite Incident Details in this style:
+
+PROTESTS AND DEMONSTRATIONS
+Use the actual protest subject, location and likely disruption point. For example: “Demonstration reporting centred on the Central Jakarta government district, where activity near national institutions can disrupt access to surrounding office areas and main routes. The concern for business users is short notice road closure and delayed movement, not a wider city security deterioration.”
+
+FLOODING AND WEATHER DISRUPTION
+Use actual affected routes, districts or commuter areas where available. Do not say flooding slows commuting unless the report identifies where. Explain whether it affects airport transfer routes, staff commuting corridors, site access or logistics.
+
+FIRE INCIDENTS
+Name the actual area or type of site where possible, such as factory, warehouse, market, residential block, mall, office area or roadside location. Explain the knock on effect: evacuation, road closure, utility disruption, access restriction or local traffic delay. Do not make claims about cause unless the source confirms it.
+
+CRIME AND PUBLIC SAFETY
+Use the actual crime type and setting. Avoid vague phrases such as “opportunistic crime”. Say whether the concern is theft, robbery, assault, disorder, transport hub exposure, hotel area exposure, mall area exposure or after hours staff movement.
+
+POLICING AND REGULATORY ACTIVITY
+Explain what the police or authorities did and where. Do not say “official measures” unless the source says what they were. Explain whether it affects checkpoints, road closures, protest control, enforcement activity or access restrictions.
+
+The Incident Details section should read like Jakarta analysis from the week’s reporting, not like a category template.
+
+If the data is too thin, say less. Do not fill gaps with generic explanation.
