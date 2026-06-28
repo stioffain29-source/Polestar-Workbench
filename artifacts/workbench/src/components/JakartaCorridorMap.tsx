@@ -55,14 +55,16 @@ const PANEL_BG = "#F3F5F8";
 
 // ---- Single full-canvas graphic --------------------------------------------
 // The entire figure (base map, exposure fills, boundaries, routes, icons,
-// leader-line callouts, legend, footer, logo) is rendered into ONE high-DPI
+// leader-line callouts, legend and footer) is rendered into ONE high-DPI
 // canvas and emitted as a single data-URL <img>. This guarantees the on-screen
 // preview and the DOM-rasterised PDF are pixel-identical, and sidesteps
 // html2canvas (which mangles inline SVG and will not copy a live <canvas>
 // bitmap on clone, but copies an <img> data URL faithfully).
 const LOGICAL_W = 1120;
 const LOGICAL_H = 760;
-const RENDER_SCALE = 3;
+// High render scale so the single rasterised <img> stays crisp after the
+// report's html2canvas PDF/PNG capture re-samples it at report size.
+const RENDER_SCALE = 4;
 
 // Map panel (geography is expressed as 0..100 percentages inside this rect).
 const PANEL = { x: 24, y: 84, w: 796, h: 604 };
@@ -412,29 +414,6 @@ function centredLabel(
   ctx.textAlign = "left";
 }
 
-function drawStar(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  r: number,
-  color: string,
-): void {
-  const spikes = 4;
-  const inner = r * 0.36;
-  ctx.beginPath();
-  for (let i = 0; i < spikes * 2; i++) {
-    const rad = i % 2 === 0 ? r : inner;
-    const a = (Math.PI / spikes) * i - Math.PI / 2;
-    const x = cx + Math.cos(a) * rad;
-    const y = cy + Math.sin(a) * rad;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
 // ---- Geometry --------------------------------------------------------------
 const DKI = {
   north: [
@@ -546,12 +525,12 @@ function weeklyRangeLabel(issueDate?: string): string {
   const sy = start.getUTCFullYear();
   const ey = end.getUTCFullYear();
   if (sy === ey && sm === em) {
-    return `${sd} – ${ed} ${MONTHS[em]} ${ey}`;
+    return `${sd} to ${ed} ${MONTHS[em]} ${ey}`;
   }
   if (sy === ey) {
-    return `${sd} ${MONTHS[sm]} – ${ed} ${MONTHS[em]} ${ey}`;
+    return `${sd} ${MONTHS[sm]} to ${ed} ${MONTHS[em]} ${ey}`;
   }
-  return `${sd} ${MONTHS[sm]} ${sy} – ${ed} ${MONTHS[em]} ${ey}`;
+  return `${sd} ${MONTHS[sm]} ${sy} to ${ed} ${MONTHS[em]} ${ey}`;
 }
 
 // ---- Main render -----------------------------------------------------------
@@ -655,14 +634,14 @@ function renderExposureMap(
   ctx.textAlign = "left";
 
   // District + regency labels.
-  centredLabel(ctx, ["NORTH JAKARTA"], 41, 20, 12, NAVY, 700);
-  centredLabel(ctx, ["WEST", "JAKARTA"], 33, 40, 12, NAVY, 700);
-  centredLabel(ctx, ["CENTRAL", "JAKARTA"], 51, 44, 11, NAVY, 700);
-  centredLabel(ctx, ["EAST", "JAKARTA"], 67, 40, 12, NAVY, 700);
-  centredLabel(ctx, ["SOUTH JAKARTA"], 46, 69, 12, NAVY, 700);
-  centredLabel(ctx, ["TANGERANG", "REGENCY"], 9, 34, 10.5, "#7E848D", 600);
-  centredLabel(ctx, ["BEKASI", "REGENCY"], 91, 34, 10.5, "#7E848D", 600);
-  centredLabel(ctx, ["BOGOR REGENCY"], 50, 90, 10.5, "#7E848D", 600);
+  centredLabel(ctx, ["NORTH JAKARTA"], 41, 20, 14.5, NAVY, 700);
+  centredLabel(ctx, ["WEST", "JAKARTA"], 33, 40, 14, NAVY, 700);
+  centredLabel(ctx, ["CENTRAL", "JAKARTA"], 51, 44, 13, NAVY, 700);
+  centredLabel(ctx, ["EAST", "JAKARTA"], 67, 40, 14, NAVY, 700);
+  centredLabel(ctx, ["SOUTH JAKARTA"], 46, 69, 14.5, NAVY, 700);
+  centredLabel(ctx, ["TANGERANG", "REGENCY"], 9, 34, 10.5, "#8A9099", 600);
+  centredLabel(ctx, ["BEKASI", "REGENCY"], 91, 34, 10.5, "#8A9099", 600);
+  centredLabel(ctx, ["BOGOR REGENCY"], 50, 90, 10.5, "#8A9099", 600);
 
   // Callouts.
   const callouts: CalloutDef[] = [
@@ -765,19 +744,19 @@ function renderExposureMap(
     const conn = connectionPoint(rect, a);
     const accent = EXPOSURE_ACCENT[c.level];
     ctx.strokeStyle = accent;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
     ctx.moveTo(conn.x, conn.y);
     ctx.lineTo(a.x, a.y);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(a.x, a.y, 3.4, 0, Math.PI * 2);
+    ctx.arc(a.x, a.y, 3, 0, Math.PI * 2);
     ctx.fillStyle = accent;
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(a.x, a.y, 6, 0, Math.PI * 2);
+    ctx.arc(a.x, a.y, 5.5, 0, Math.PI * 2);
     ctx.strokeStyle = accent;
-    ctx.lineWidth = 1.1;
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 
@@ -842,13 +821,19 @@ function legendHeader(
   text: string,
   y: number,
 ): number {
+  const H = 22;
+  // Light header band — keeps the sidebar airy rather than a heavy navy block.
+  ctx.fillStyle = "#EEF1F5";
+  ctx.fillRect(LEGEND.x, y, LEGEND.w, H);
   ctx.fillStyle = NAVY;
-  ctx.fillRect(LEGEND.x, y, LEGEND.w, 22);
+  ctx.fillRect(LEGEND.x, y, 3, H);
+  ctx.fillStyle = "#D5DBE3";
+  ctx.fillRect(LEGEND.x, y + H - 1, LEGEND.w, 1);
   setFont(ctx, 700, 11.5, true);
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = NAVY;
   ctx.textBaseline = "middle";
-  ctx.fillText(text, LEGEND.x + 9, y + 12);
-  return y + 22;
+  ctx.fillText(text, LEGEND.x + 12, y + H / 2 + 0.5);
+  return y + H;
 }
 
 function drawLegend(ctx: CanvasRenderingContext2D): void {
@@ -923,39 +908,32 @@ function drawLegend(ctx: CanvasRenderingContext2D): void {
 }
 
 function drawFooter(ctx: CanvasRenderingContext2D, rangeLabel: string): void {
-  const y = 720;
-  setFont(ctx, 400, 10, false, true);
-  ctx.fillStyle = DUSK;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(
-    "Sources: open-source reporting, local media and field monitoring this period.",
-    24,
-    y,
-  );
+  const x = 24;
 
-  setFont(ctx, 700, 12, true);
-  ctx.fillStyle = NAVY;
-  ctx.textAlign = "center";
-  ctx.fillText(`JAKARTA REPORT  •  ${rangeLabel.toUpperCase()}`, 690, y);
-  ctx.textAlign = "left";
+  // Hairline divider tying the footer to the figure above.
+  ctx.strokeStyle = "#D5DBE3";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, 701);
+  ctx.lineTo(LEGEND.x + LEGEND.w, 701);
+  ctx.stroke();
 
-  // Polestar logo block.
-  const lw = 152;
-  const lh = 42;
-  const lx = LOGICAL_W - 24 - lw;
-  const ly = y - lh / 2;
-  roundRectPath(ctx, lx, ly, lw, lh, 4);
-  ctx.fillStyle = NAVY;
-  ctx.fill();
-  drawStar(ctx, lx + 22, ly + lh / 2, 11, "#4655FF");
-  setFont(ctx, 700, 13, true);
-  ctx.fillStyle = "#FFFFFF";
+  // Report period — primary footer line. No in-map Polestar mark: the figure
+  // already sits inside a branded Polestar report.
+  ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("POLESTAR", lx + 42, ly + 20);
-  setFont(ctx, 500, 8, true);
-  ctx.fillStyle = "#AEB3D6";
-  ctx.fillText("ADVISORY", lx + 42, ly + 32);
+  setFont(ctx, 700, 14, true);
+  ctx.fillStyle = NAVY;
+  ctx.fillText(`JAKARTA REPORT   •   ${rangeLabel.toUpperCase()}`, x, 723);
+
+  // Sources — secondary line.
+  setFont(ctx, 400, 11, false, true);
+  ctx.fillStyle = DUSK;
+  ctx.fillText(
+    "Sources: open source reporting, local media and field monitoring this period.",
+    x,
+    741,
+  );
 }
 
 // ---- Component -------------------------------------------------------------
@@ -974,7 +952,7 @@ export interface JakartaCorridorMapProps {
  * regencies, the airport landmass and the commuter belt), shades each profiled
  * area by an operating-exposure level, draws the main movement routes, and
  * carries leader-line callouts, a legend (exposure / map key / notes), a
- * sources line, the weekly date range and the Polestar mark.
+ * sources line and the weekly date range.
  *
  * Exposure levels are honest: each area carries a standing profile that live
  * reporting can only RAISE, never invent. The supporting table below repeats
@@ -1063,11 +1041,9 @@ export default function JakartaCorridorMap({
           fontStyle: "italic",
         }}
       >
-        Operating-exposure map: areas and routes shaded by how badly movement,
-        access, logistics or business activity could be disrupted this week.
-        Levels combine each area's standing profile with this period's reporting;
-        the regencies are shown as context and not assessed as business-exposure
-        areas.
+        Operational exposure by area and route — not a live incident map. Levels
+        combine each area's standing profile with this period's reporting; the
+        regencies are shown as context and not assessed.
         {unattributed > 0
           ? " Some records were retained in the assessment but not tied to a specific area."
           : ""}

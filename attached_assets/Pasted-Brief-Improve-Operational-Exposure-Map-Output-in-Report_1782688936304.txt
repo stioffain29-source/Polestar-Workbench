@@ -1,0 +1,170 @@
+Brief: Improve Operational Exposure Map Output in Report Builder
+
+Objective
+
+Sharpen the Operational Exposure Map template inside the report builder so it produces a cleaner, more professional report page. This is not an image redesign. The fix needs to be made in the actual report builder template, layout, CSS and export settings.
+
+The map already sits inside a branded Polestar report, so it does not need a separate Polestar logo block inside the map page.
+
+Required Changes
+
+1. Remove duplicate branding
+
+Remove the Polestar logo block from the Operational Exposure Map template.
+
+The map is already part of a Polestar report, so the logo is unnecessary and makes the page look crowded.
+
+Use the freed space to improve the notes section, footer spacing, map balance or overall layout.
+
+2. Sharpen the visual output
+
+The current map output looks soft and unfinished. Improve the final PDF and PNG export so the page looks crisp at report size.
+
+Check export resolution, scaling, font rendering, icon rendering and line sharpness.
+
+The final output should look professional when viewed as part of the report and when downloaded.
+
+3. Improve layout discipline
+
+Tighten the whole page layout.
+
+Fix spacing, alignment and visual hierarchy.
+
+Reduce clutter around the map.
+
+Make sure callout boxes do not fight the map or overlap awkwardly with lines and labels.
+
+The page should feel like a polished commercial report, not a draft graphic.
+
+4. Improve callout boxes
+
+Standardise the callout boxes.
+
+Use consistent sizing, padding, title style, body text size and icon placement.
+
+Keep text short and readable.
+
+Make the box hierarchy clear:
+
+Area name first.
+
+Operational issue second.
+
+Impact on movement, access, logistics or business activity third.
+
+5. Clean up leader lines
+
+The leader lines need to be tidier.
+
+They should be thinner, cleaner and consistently styled.
+
+Avoid lines crossing over major labels where possible.
+
+Each line should clearly connect a callout to the correct district, route or exposure area.
+
+6. Improve map readability
+
+Make the district labels larger and easier to read.
+
+Keep the colour coding, but make it cleaner and more restrained.
+
+The map should clearly show:
+
+North Jakarta and port area.
+
+Central Jakarta government district.
+
+East Jakarta.
+
+West Jakarta.
+
+South Jakarta.
+
+Soekarno Hatta Airport corridor.
+
+Greater Jakarta commuter belt.
+
+Cross city movement routes.
+
+Main commercial and hotel areas.
+
+Do not over label the map.
+
+The map should explain operational exposure, not plot every incident.
+
+7. Simplify the right hand sidebar
+
+Keep the sidebar, but make it lighter and more useful.
+
+It should include:
+
+Exposure level.
+
+Map key.
+
+Notes.
+
+Avoid making the sidebar too dark or visually heavy.
+
+The notes should explain that the map shows operational exposure by area and route, not exact incident locations.
+
+8. Fix footer treatment
+
+The footer text is currently too small and difficult to read.
+
+Keep the report period visible.
+
+Remove unnecessary tiny explanatory text if it weakens the page.
+
+Suggested footer:
+
+JAKARTA REPORT
+22 to 28 JUNE 2026
+
+Sources: open source reporting, local media and field monitoring this period.
+
+9. Keep the purpose clear
+
+This template is for operational exposure mapping.
+
+It should show where movement, access, logistics or business activity could be disrupted during the reporting period.
+
+It is not a live incident map.
+
+It is not a decorative graphic.
+
+It is not a brand splash page.
+
+10. Acceptance Criteria
+
+The updated Operational Exposure Map should:
+
+Export cleanly to PDF and PNG.
+
+Be readable at A4 report size.
+
+Have no duplicate Polestar logo inside the map page.
+
+Have clearer district labels.
+
+Have cleaner callout boxes.
+
+Have tidier leader lines.
+
+Have a lighter and more useful sidebar.
+
+Have a cleaner footer.
+
+Look commercially presentable inside the Polestar report builder.
+
+Scope Control
+
+Do not rebuild the report builder.
+
+Do not create a separate image based map.
+
+Do not change the wider Polestar report branding.
+
+Do not change the report structure unless needed to improve this map template.
+
+Focus only on sharpening the existing Operational Exposure Map output in the report builder.
