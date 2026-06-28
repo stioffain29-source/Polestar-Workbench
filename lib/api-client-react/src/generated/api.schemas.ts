@@ -1639,6 +1639,7 @@ export const IntegrationStatusState = {
   disabled: 'disabled',
   unknown: 'unknown',
   pending: 'pending',
+  dormant: 'dormant',
 } as const;
 
 export interface IntegrationStatusMetric {

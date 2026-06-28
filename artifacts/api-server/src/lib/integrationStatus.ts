@@ -51,7 +51,22 @@ import { logger } from "./logger";
 //   no_data          configured + reachable but nothing useful produced yet
 //   disabled         explicitly switched off via an env flag
 //   unknown          status could not be determined (e.g. a DB probe failed)
+//   dormant          configured + reachable, holds only data far past the
+//                    freshness window (e.g. a channel that stopped posting)
 // ===========================================================================
+
+// Freshness window for the free Telegram social-watch feed, mirroring the AIS
+// movement FRESH_DAYS gate. A channel whose newest post is older than this is
+// reported as "dormant" rather than green "working", so a years-stale channel
+// (e.g. the KAMMI channel, last active 2016) never reads as a live feed.
+const SOCIAL_WATCH_FRESH_DAYS = 30;
+
+function ageInDays(date: Date | null): number | null {
+  if (!date) return null;
+  const ms = date.getTime();
+  if (Number.isNaN(ms)) return null;
+  return Math.floor((Date.now() - ms) / 86_400_000);
+}
 
 function msg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -756,8 +771,14 @@ async function socialTelegramStatus(): Promise<IntegrationStatusItem> {
     summary =
       "Configured, but the Telegram public web view is currently unreachable — no posts are being collected.";
   } else if (total > 0) {
-    status = "working";
-    summary = `Holding ${total} KAMMI Telegram post(s) as protest-monitoring context — never counted as incidents.`;
+    const age = ageInDays(latest);
+    if (age !== null && age > SOCIAL_WATCH_FRESH_DAYS) {
+      status = "dormant";
+      summary = `Channel appears dormant — newest of ${total} stored KAMMI Telegram post(s) is ${age} day(s) old (past the ${SOCIAL_WATCH_FRESH_DAYS}-day freshness window). Stored as protest-monitoring context only, never counted as incidents.`;
+    } else {
+      status = "working";
+      summary = `Holding ${total} KAMMI Telegram post(s) as protest-monitoring context — never counted as incidents.`;
+    }
   } else {
     status = "no_data";
     summary =
