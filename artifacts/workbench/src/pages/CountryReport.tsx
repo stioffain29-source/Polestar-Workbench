@@ -50,6 +50,7 @@ import {
   isForeignSubjectForIndonesia,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
+import JakartaCorridorMap from "@/components/JakartaCorridorMap";
 import CountryReportVisuals from "@/components/CountryReportVisuals";
 import type {
   CountryMapPlacement,
@@ -984,7 +985,12 @@ export default function CountryReport() {
   const windowIncidents = facts.windowIncidents;
 
   // Analyst-placed incident map node, rendered at the chosen placement slot.
-  const mapNode = (
+  // Jakarta uses a corridor & access schematic (operating-exposure graphic)
+  // instead of the numbered incident-dot map; all other theatres are unchanged.
+  const isJakarta = effective.name.trim().toLowerCase() === "jakarta";
+  const mapNode = isJakarta ? (
+    <JakartaCorridorMap incidents={windowIncidents as CountryFastFactsIncident[]} />
+  ) : (
     <CountryReportMap
       incidents={windowIncidents as CountryFastFactsIncident[]}
       countryName={effective.name}

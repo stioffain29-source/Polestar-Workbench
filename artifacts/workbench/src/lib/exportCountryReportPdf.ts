@@ -50,6 +50,10 @@ import {
 } from "./countryReportLayers";
 import { buildSituationalContext } from "./situationalContext";
 import { drawSituationalContextPdf } from "./situationalContextPdf";
+import {
+  buildJakartaCorridorStatuses,
+  type JakartaCorridorStatus,
+} from "./jakartaCorridors";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 
 export interface PdfIncident {
@@ -188,6 +192,89 @@ function drawTypeChart(ctx: Ctx, facts: CountryFactsBreakdown) {
   ctx.y += chartH + 18;
 }
 
+// Jakarta corridor & access exposure table — the headless counterpart to the
+// on-screen JakartaCorridorMap detail table, so the map section stays consistent
+// with what the screen shows when no rasterised graphic is supplied.
+function drawJakartaExposureTable(ctx: Ctx, statuses: JakartaCorridorStatus[]) {
+  const { pdf, MX, CW } = ctx;
+  const colAreaW = 150;
+  const colExpW = 120;
+  const restW = CW - colAreaW - colExpW;
+  const colRelW = Math.round(restW / 2);
+  const colActW = restW - colRelW;
+  const rowH = 20;
+
+  const header = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("AREA", MX + 6, ctx.y + 13);
+    pdf.text("MAIN EXPOSURE", MX + colAreaW + 6, ctx.y + 13);
+    pdf.text("OPERATIONAL RELEVANCE", MX + colAreaW + colExpW + 6, ctx.y + 13);
+    pdf.text("ACTION", MX + colAreaW + colExpW + colRelW + 6, ctx.y + 13);
+    ctx.y += rowH;
+  };
+
+  ensureSpace(ctx, rowH * 3);
+  header();
+
+  for (const s of statuses) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+    const areaLines: string[] = pdf.splitTextToSize(
+      sanitize(`${s.number}. ${s.area.name}`),
+      colAreaW - 8,
+    );
+    const expLines: string[] = pdf.splitTextToSize(sanitize(s.area.exposure), colExpW - 8);
+    const relLines: string[] = pdf.splitTextToSize(sanitize(s.area.relevance), colRelW - 8);
+    const actLines: string[] = pdf.splitTextToSize(sanitize(s.area.action), colActW - 8);
+    const statusLabel = s.elevated
+      ? `Elevated · ${(SEV_LABEL[s.worstKey] ?? s.worstKey).toUpperCase()}`
+      : "Monitored";
+    const rh = Math.max(
+      rowH,
+      areaLines.length * 12 + 22,
+      expLines.length * 12 + 10,
+      relLines.length * 12 + 10,
+      actLines.length * 12 + 10,
+    );
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      header();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    const textOpts = { lineHeightFactor: 1.4 };
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.text(areaLines, MX + 6, ctx.y + 14, textOpts);
+    const statusColor = s.elevated ? SEV_COLOR[s.worstKey] ?? "#999999" : DUSK;
+    setText(pdf, statusColor);
+    pdf.setFontSize(6.5);
+    pdf.text(
+      sanitize(statusLabel.toUpperCase()),
+      MX + 6,
+      ctx.y + 14 + areaLines.length * 12 + 4,
+    );
+    pdf.setFontSize(8.5);
+
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.text(expLines, MX + colAreaW + 6, ctx.y + 14, textOpts);
+    pdf.text(relLines, MX + colAreaW + colExpW + 6, ctx.y + 14, textOpts);
+    pdf.text(actLines, MX + colAreaW + colExpW + colRelW + 6, ctx.y + 14, textOpts);
+
+    ctx.y += rh;
+  }
+  ctx.y += 4;
+}
+
 function drawMapSection(
   ctx: Ctx,
   opts: {
@@ -195,6 +282,7 @@ function drawMapSection(
     plottedCount: number;
     totalInWindow: number;
     basisShort: string;
+    jakartaExposure?: JakartaCorridorStatus[];
   },
 ) {
   ensureSpace(ctx, opts.mapImage ? 192 : 88);
@@ -223,6 +311,8 @@ function drawMapSection(
     } catch (err) {
       console.warn("[exportCountryReportPdf] embedding map image failed", err);
     }
+  } else if (opts.jakartaExposure && opts.jakartaExposure.length > 0) {
+    drawJakartaExposureTable(ctx, opts.jakartaExposure);
   } else {
     renderProse(
       ctx,
@@ -700,12 +790,20 @@ export async function exportCountryReportPdf(
     `No 90-day lookback computed for ${country.name}.`,
   );
 
-  // 7. Map
+  // 7. Map — Jakarta swaps the incident-dot map for the corridor & access
+  // exposure table (no rasterised graphic available headless), all others use
+  // the standard map image / preview note.
+  const isJakarta = country.name.trim().toLowerCase() === "jakarta";
   drawMapSection(ctx, {
-    mapImage: extras.mapImage,
+    mapImage: isJakarta ? undefined : extras.mapImage,
     plottedCount,
     totalInWindow: windowIncidents.length,
     basisShort: active.basisShort,
+    jakartaExposure: isJakarta
+      ? buildJakartaCorridorStatuses(
+          windowIncidents as unknown as CountryFastFactsIncident[],
+        ).statuses
+      : undefined,
   });
   // Honest caption so the map is never read as the full risk picture.
   {
