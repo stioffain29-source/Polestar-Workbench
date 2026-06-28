@@ -70,12 +70,17 @@ export function themeForCategory(category: PngCategory): CountryIncidentTheme {
   return CATEGORY_THEME[category] ?? "other";
 }
 
-// One PRESENT Incident Details theme, rendered as a four-part analytical group.
-// Each field is deterministic, count-free and in British English; a theme only
-// appears when at least one remaining incident fell into it.
+// One PRESENT, MEANINGFUL Incident Details theme. The renderer shows the single
+// `paragraph` (one short, count-free analytical paragraph — no four-part
+// sub-template). The structured four parts are retained for any caller that
+// still needs them. Deterministic, count-free, British English; a theme only
+// appears when a remaining incident fell into it AND it clears the
+// meaningfulness gate (recurs, or reaches Moderate severity).
 export interface CountryIncidentThemeGroup {
   key: CountryIncidentTheme;
   heading: string;
+  // One short count-free paragraph — what the renderer displays.
+  paragraph: string;
   // What happened — the kind of activity reported, with the specific categories.
   whatHappened: string;
   // Where — the provinces/areas it concentrated in.
@@ -209,9 +214,10 @@ function worstSeverityIndex(items: PngReportItem[]): number {
 }
 
 // Build the Incident Details groups from the REMAINING incidents (those not
-// already shown as Top 3 above). PRESENT themes only, in fixed order; each is a
-// four-part analytical group (what happened / where / why it matters / what
-// could be affected). Deterministic and COUNT-FREE. Empty input → [].
+// already shown as Top 3 above). PRESENT, MEANINGFUL themes only, in fixed
+// order; each renders as ONE short, count-free analytical paragraph. The
+// structured four parts are kept on the group for any caller that needs them.
+// Deterministic and COUNT-FREE. Empty input → [].
 export function buildCountryIncidentThemes(
   remaining: PngReportItem[],
 ): CountryIncidentThemeGroup[] {
@@ -222,9 +228,16 @@ export function buildCountryIncidentThemes(
     arr.push(it);
     byTheme.set(key, arr);
   }
-  return COUNTRY_INCIDENT_THEMES.filter(
-    (def) => (byTheme.get(def.key)?.length ?? 0) > 0,
-  ).map((def) => {
+  return COUNTRY_INCIDENT_THEMES.filter((def) => {
+    const items = byTheme.get(def.key);
+    if (!items || items.length === 0) return false;
+    // "Meaningful category" gate (sharper, shorter briefs): a category carried
+    // by a single Low/Insignificant item with no analytical weight is dropped
+    // from the narrative — it still counts in the totals, charts and map, it
+    // simply does not earn its own Incident Details paragraph. Kept once it
+    // recurs (two or more items) OR reaches Moderate severity or above.
+    return items.length >= 2 || worstSeverityIndex(items) >= 2;
+  }).map((def) => {
     const items = byTheme.get(def.key)!;
     const provs = topProvinces(items);
     const cats = topCategories(items).map(readableCategory);
@@ -242,14 +255,25 @@ export function buildCountryIncidentThemes(
           ? "High-severity reporting featured. "
           : "";
     const whyItMatters = `${sevPrefix}${THEME_SIGNIFICANCE[def.key]}`;
+    const causeNote = def.key === "fire" ? buildFireCauseNote(items) : undefined;
+    // The renderer shows ONE short, count-free paragraph per theme. Compose it
+    // from the same stems: what happened (+ the main categories), where it
+    // concentrated, then the operational significance and, for fires only, the
+    // no-fabrication cause note.
+    const catClause = cats.length ? `, including ${joinList(cats)}` : "";
+    const whereClause = provs.length ? ` It concentrated in ${joinList(provs)}.` : "";
+    const paragraph = `${THEME_WHAT[def.key]}${catClause}.${whereClause} ${sevPrefix}${THEME_SIGNIFICANCE[def.key]}${causeNote ? ` ${causeNote}` : ""}`
+      .replace(/\s+/g, " ")
+      .trim();
     return {
       key: def.key,
       heading: def.heading,
+      paragraph,
       whatHappened,
       where,
       whyItMatters,
       whatCouldBeAffected: THEME_AFFECTED[def.key],
-      causeNote: def.key === "fire" ? buildFireCauseNote(items) : undefined,
+      causeNote,
     };
   });
 }

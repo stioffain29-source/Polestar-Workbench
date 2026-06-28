@@ -18,6 +18,11 @@ const SLOP = [
   "Strong earthquake hits Venezuela, buildings damaged in Caracas",
   "Wildfires spread across California as thousands evacuate",
   "Nepal protests turn violent in Kathmandu",
+  // Foreign CITIES with no country word named — these previously leaked because
+  // the guard listed countries/nationalities but no overseas city names.
+  "Pilot killed and several injured in a plane crash near Beijing",
+  "Building collapse in Saigon traps construction workers",
+  "Deadly bus crash on a motorway outside Bangkok",
 ];
 
 // Genuine Indonesian security incidents — including one that names a foreign
@@ -29,6 +34,9 @@ const GENUINE = [
   "Chinese investor robbed at gunpoint in Surabaya hotel",
   "Bom meledak di gereja Makassar, beberapa orang terluka",
   "KKB serang pos di Papua",
+  // Names a foreign city in passing but is anchored to TWO Indonesian places, so
+  // the local cue count dominates and the record is RETAINED.
+  "Garuda flight from Jakarta to Tokyo diverted back to Surabaya",
 ];
 
 describe("isForeignSubjectForIndonesia", () => {

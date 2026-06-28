@@ -180,9 +180,129 @@ const PAPUA_ZONES: RiskZoneDef[] = [
   },
 ];
 
+// National Indonesia risk zones, mirroring the six regional buckets the
+// Indonesia operating-risk brief groups incidents into (Papua is routed to the
+// dedicated West Papua brief upstream, so it has no zone here). Province names
+// and major city names are the place keywords; "java" alone is deliberately
+// absent so West Java and Central/East Java never collide.
+const INDONESIA_ZONES: RiskZoneDef[] = [
+  {
+    name: "Greater Jakarta & West Java",
+    center: [-6.5, 107.2],
+    places: [
+      "jakarta", "dki jakarta", "jabodetabek", "bekasi", "depok",
+      "tangerang", "bogor", "banten", "serang", "cilegon",
+      "west java", "jawa barat", "bandung", "sukabumi", "cirebon",
+      "garut", "tasikmalaya", "karawang", "cianjur", "cimahi",
+    ],
+  },
+  {
+    name: "Central & East Java",
+    center: [-7.5, 111.6],
+    places: [
+      "central java", "jawa tengah", "semarang", "solo", "surakarta",
+      "yogyakarta", "jogja", "magelang", "tegal", "purwokerto", "pekalongan",
+      "east java", "jawa timur", "surabaya", "malang", "sidoarjo",
+      "gresik", "kediri", "madura", "banyuwangi", "jember", "mojokerto", "madiun",
+    ],
+  },
+  {
+    name: "Sumatra",
+    center: [-0.5, 101.5],
+    places: [
+      "sumatra", "sumatera", "medan", "north sumatra", "west sumatra",
+      "padang", "palembang", "south sumatra", "riau", "pekanbaru",
+      "batam", "lampung", "bandar lampung", "aceh", "banda aceh",
+      "jambi", "bengkulu", "bangka", "belitung", "pangkalpinang", "dumai", "binjai",
+    ],
+  },
+  {
+    name: "Kalimantan (Borneo)",
+    center: [0.0, 114.0],
+    places: [
+      "kalimantan", "borneo", "pontianak", "banjarmasin", "balikpapan",
+      "samarinda", "palangkaraya", "palangka raya", "tarakan", "singkawang", "banjarbaru",
+    ],
+  },
+  {
+    name: "Sulawesi",
+    center: [-2.0, 120.5],
+    places: [
+      "sulawesi", "makassar", "manado", "palu", "kendari", "gorontalo",
+      "mamuju", "parepare", "bitung", "kotamobagu", "palopo",
+    ],
+  },
+  {
+    name: "Bali, Nusa Tenggara & Maluku",
+    center: [-7.5, 119.5],
+    places: [
+      "bali", "denpasar", "nusa tenggara", "lombok", "mataram", "kupang",
+      "flores", "sumbawa", "bima", "maluku", "ambon", "ternate", "tidore", "north maluku",
+    ],
+  },
+];
+
+// Jakarta-area risk zones (the five administrative cities plus the Jabodetabek
+// fringe), mirroring the Jakarta brief's buckets. The fringe is listed LAST so a
+// Bekasi/Depok record lands there rather than in a city zone.
+const JAKARTA_ZONES: RiskZoneDef[] = [
+  {
+    name: "Central Jakarta",
+    center: [-6.18, 106.83],
+    places: [
+      "central jakarta", "jakarta pusat", "menteng", "tanah abang", "gambir",
+      "senen", "cempaka putih", "kemayoran", "johar baru", "sawah besar",
+    ],
+  },
+  {
+    name: "South Jakarta",
+    center: [-6.28, 106.81],
+    places: [
+      "south jakarta", "jakarta selatan", "kebayoran", "tebet", "setiabudi",
+      "mampang", "pancoran", "cilandak", "pasar minggu", "jagakarsa",
+      "pesanggrahan", "sudirman", "kuningan", "scbd", "senayan",
+    ],
+  },
+  {
+    name: "North Jakarta",
+    center: [-6.12, 106.87],
+    places: [
+      "north jakarta", "jakarta utara", "tanjung priok", "kelapa gading",
+      "penjaringan", "koja", "cilincing", "pademangan", "ancol", "sunter",
+    ],
+  },
+  {
+    name: "East Jakarta",
+    center: [-6.23, 106.90],
+    places: [
+      "east jakarta", "jakarta timur", "cakung", "jatinegara", "duren sawit",
+      "pulo gadung", "matraman", "kramat jati", "makasar", "ciracas",
+      "cipayung", "pasar rebo", "rawamangun",
+    ],
+  },
+  {
+    name: "West Jakarta",
+    center: [-6.16, 106.76],
+    places: [
+      "west jakarta", "jakarta barat", "grogol", "kembangan", "palmerah",
+      "cengkareng", "taman sari", "tambora", "kebon jeruk", "kalideres",
+    ],
+  },
+  {
+    name: "Greater Jakarta (Jabodetabek)",
+    center: [-6.4, 106.85],
+    places: [
+      "greater jakarta", "jabodetabek", "bekasi", "depok", "tangerang",
+      "bogor", "south tangerang", "tangsel", "cikarang", "serpong", "bsd",
+    ],
+  },
+];
+
 const RISK_MAP_ZONES: Record<string, RiskZoneDef[]> = {
   papua: PAPUA_ZONES,
   "west papua": PAPUA_ZONES,
+  indonesia: INDONESIA_ZONES,
+  jakarta: JAKARTA_ZONES,
 };
 
 function resolveRiskZones(name?: string): RiskZoneDef[] | null {

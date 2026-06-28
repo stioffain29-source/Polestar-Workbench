@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import type {
   PngReportDataset,
   PngReportItem,
-  ReportingConfidence,
 } from "@/lib/pngReportDataset";
 import {
   buildCountryIncidentThemes,
@@ -248,21 +247,6 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
-// One labelled line of a four-part Incident Details theme analysis (What
-// happened / Where / Why it matters / What could be affected). data-pdf-flow
-// lets the DOM-rasterise PDF break the paragraph at the line level.
-function ThemePart({ label, text }: { label: string; text: string }) {
-  return (
-    <p
-      data-pdf-flow="true"
-      style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "0 0 6px 0" }}
-    >
-      <span style={{ fontWeight: 700, color: NAVY }}>{label}: </span>
-      {text}
-    </p>
-  );
-}
-
 // One grouped Recommended Actions block: an ELECTRIC sub-heading over a
 // count-free bullet list of that group's actions.
 function ActionGroup({ heading, actions }: { heading: string; actions: string[] }) {
@@ -274,41 +258,13 @@ function ActionGroup({ heading, actions }: { heading: string; actions: string[] 
   );
 }
 
-// Reporting-confidence pill. Neutral on-brand styling (POLAR fill, ELECTRIC
-// border, NAVY text) — deliberately NOT a severity colour, so it is never
-// confused with the five-tier risk ramp (and never touches the reserved
-// Extreme/Insignificant hues).
-function ConfidenceBadge({ level }: { level: ReportingConfidence["level"] }) {
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        background: POLAR,
-        border: `1px solid ${ELECTRIC}`,
-        color: NAVY,
-        fontFamily: ROBOTO,
-        fontSize: 11,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        padding: "2px 10px",
-        borderRadius: 2,
-        WebkitPrintColorAdjust: "exact",
-        printColorAdjust: "exact",
-      }}
-    >
-      {level} confidence
-    </span>
-  );
-}
-
 // The shared country-brief body. Renders the SAME section order for every
 // theatre (PNG, West Papua, Indonesia, Jakarta and all generic countries):
-// Bottom Line Up Front; Top 3 Developments; Incident Details (themed narrative
-// groups); Current Situation; Operational Impact; Recommended Actions; Outlook;
-// Polestar View; Reporting Confidence. The page appends its analytics block and
-// the Disclaimer below. The analyst-placed map and photo blocks are injected at
-// the chosen inline placements.
+// Bottom Line Up Front; Top 3 Developments; Incident Details (one short
+// paragraph per meaningful theme); Current Situation; Operational Impact;
+// Recommended Actions; Outlook; Polestar View. The page appends its analytics
+// block and the Disclaimer below. The analyst-placed map and photo blocks are
+// injected at the chosen inline placements.
 export default function PngCountryReportBody({
   dataset,
   incidentSummaries = {},
@@ -332,7 +288,10 @@ export default function PngCountryReportBody({
   // here). Operational Impact still draws on the full window.
   const topThree = d.topThree.slice(0, 3);
   const incidentThemes = buildCountryIncidentThemes(d.incidentDetailsItems);
-  const operationalImpact = buildOperationalImpactBullets(d.windowItems);
+  // Cap the Operational Impact list (≤5) and the Outlook escalation indicators
+  // (≤3) so the trimmed brief stays sharp.
+  const operationalImpact = buildOperationalImpactBullets(d.windowItems).slice(0, 5);
+  const escalationIndicators = d.escalationIndicators.slice(0, 3);
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
   const mapAt = (slot: CountryMapPlacement) =>
@@ -364,10 +323,10 @@ export default function PngCountryReportBody({
       {mapAt("after-top3")}
       {photoAt("after-top3")}
 
-      {/* 3. Incident Details — PRESENT-ONLY analytical theme groups of the
-          incidents not already shown as Top 3 developments. Each present theme
-          is a four-part analysis (What happened / Where / Why it matters / What
-          could be affected). No fabrication, count-free; absent themes are
+      {/* 3. Incident Details — PRESENT, MEANINGFUL theme groups of the incidents
+          not already shown as Top 3 developments. Each theme is ONE short,
+          count-free analytical paragraph (no four-part sub-template). Trivial
+          single low-severity themes are filtered upstream; absent themes are
           omitted rather than padded with "not reported" filler. */}
       <Section title="Incident Details">
         {incidentThemes.length === 0 ? (
@@ -378,13 +337,9 @@ export default function PngCountryReportBody({
           </EmptyNote>
         ) : (
           incidentThemes.map((g) => (
-            <div key={g.key} data-pdf-row="true" style={{ marginBottom: 14 }}>
+            <div key={g.key} data-pdf-row="true" style={{ marginBottom: 12 }}>
               <StrandLabel>{g.heading}</StrandLabel>
-              <ThemePart label="What happened" text={g.whatHappened} />
-              <ThemePart label="Where" text={g.where} />
-              <ThemePart label="Why it matters" text={g.whyItMatters} />
-              <ThemePart label="What could be affected" text={g.whatCouldBeAffected} />
-              {g.causeNote ? <ThemePart label="Cause" text={g.causeNote} /> : null}
+              <Prose text={g.paragraph} />
             </div>
           ))
         )}
@@ -392,14 +347,9 @@ export default function PngCountryReportBody({
       </Section>
       {mapAt("after-incident-details")}
 
-      {/* 4. Current Situation — framing paragraph + dominant-theme bullets */}
+      {/* 4. Current Situation — concise framing, two short paragraphs maximum. */}
       <Section title="Current Situation">
         <Prose text={d.executiveSummary} />
-        {d.whatMattersBullets.length > 0 ? (
-          <div style={{ marginTop: 10 }}>
-            <BulletList items={d.whatMattersBullets} />
-          </div>
-        ) : null}
       </Section>
 
       {/* 5. Operational Impact — per-theme impact lines for the themes present
@@ -411,15 +361,6 @@ export default function PngCountryReportBody({
           <BulletList items={operationalImpact} />
         )}
       </Section>
-
-      {/* Customer Relevance — who the brief matters to plus the period's main
-          issues, derived from the incident mix. Shown before Recommended
-          Actions for both standard and operating-risk variants. */}
-      {d.customerRelevance && d.customerRelevance.trim().length > 0 ? (
-        <Section title="Customer Relevance">
-          <Prose text={d.customerRelevance} />
-        </Section>
-      ) : null}
 
       {/* 6. Recommended Actions — grouped client priorities (Movement security,
           Site security, …), emitting only the groups this period's incident mix
@@ -446,27 +387,19 @@ export default function PngCountryReportBody({
           indicators */}
       <Section title="Outlook: Next Seven Days">
         <Prose text={d.outlook} />
-        {d.escalationIndicators.length > 0 ? (
+        {escalationIndicators.length > 0 ? (
           <div style={{ marginTop: 10 }}>
             <StrandLabel>Escalation Indicators</StrandLabel>
-            <BulletList items={d.escalationIndicators} />
+            <BulletList items={escalationIndicators} />
           </div>
         ) : null}
       </Section>
       {mapAt("before-polestar")}
       {photoAt("before-polestar")}
 
-      {/* 8. Polestar View */}
+      {/* 8. Polestar View — closes the written brief */}
       <Section title="Polestar View">
         <Prose text={d.polestarView} />
-      </Section>
-
-      {/* 9. Reporting Confidence — closes the written brief */}
-      <Section title="Reporting Confidence">
-        <div style={{ marginBottom: 8 }}>
-          <ConfidenceBadge level={d.reportingConfidence.level} />
-        </div>
-        <Prose text={d.reportingConfidence.rationale} />
       </Section>
     </IncidentSummaryContext.Provider>
   );

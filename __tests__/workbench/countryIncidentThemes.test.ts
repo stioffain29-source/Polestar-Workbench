@@ -125,6 +125,37 @@ describe("buildCountryIncidentThemes", () => {
     const protest = groups.find((g) => g.key === "protest")!;
     expect(protest.where).toContain("Port Moresby and Lae");
   });
+
+  it("drops a single low-severity theme as not meaningful, keeps it once it recurs", () => {
+    // One Low theft item alone carries no analytical weight → omitted from the
+    // narrative (it still counts in totals/charts/map elsewhere).
+    expect(
+      buildCountryIncidentThemes([
+        item({ category: "Theft / break-in", severity: "low" }),
+      ]),
+    ).toEqual([]);
+    // Two of them clear the count gate.
+    const two = buildCountryIncidentThemes([
+      item({ category: "Theft / break-in", severity: "low" }),
+      item({ category: "Theft / break-in", severity: "low" }),
+    ]);
+    expect(two.map((g) => g.key)).toEqual(["crime"]);
+    // A single Moderate item clears the severity gate on its own.
+    const one = buildCountryIncidentThemes([
+      item({ category: "Theft / break-in", severity: "moderate" }),
+    ]);
+    expect(one.map((g) => g.key)).toEqual(["crime"]);
+  });
+
+  it("emits one short count-free paragraph per theme", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Civil unrest / protest", province: "Jakarta" }),
+    ]);
+    const protest = groups.find((g) => g.key === "protest")!;
+    expect(protest.paragraph.length).toBeGreaterThan(0);
+    expect(protest.paragraph).toContain("Jakarta");
+    for (const g of groups) expect(g.paragraph).not.toMatch(/\d/);
+  });
 });
 
 describe("buildOperationalImpactBullets", () => {

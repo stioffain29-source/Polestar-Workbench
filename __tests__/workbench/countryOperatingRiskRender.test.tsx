@@ -22,7 +22,8 @@ import type {
 //
 // Pins the rebuilt render contract (one renderer for every country):
 //  - SECTION ORDER: the brief sections render in the fixed order, opening with
-//    Bottom Line Up Front and closing with Reporting Confidence.
+//    Bottom Line Up Front and closing with Polestar View. (The Reporting
+//    Confidence and Customer Relevance sections were removed in the trim.)
 //  - INCIDENT DETAILS: only the themes actually present in the window render, in
 //    the fixed theme order; absent themes are OMITTED entirely (present-only
 //    analytical groups, no fabricated "Not reported this period." filler theme).
@@ -105,7 +106,7 @@ function textOf(html: string): string {
     .trim();
 }
 
-// The rebuilt brief sections, in fixed render order; Reporting Confidence closes.
+// The trimmed brief sections, in fixed render order; Polestar View closes.
 // (The Disclaimer + analytics block are appended by the page, not this body.)
 const SECTION_ORDER = [
   "Bottom Line Up Front",
@@ -116,7 +117,6 @@ const SECTION_ORDER = [
   "Recommended Actions",
   "Outlook: Next Seven Days",
   "Polestar View",
-  "Reporting Confidence",
 ];
 
 describe("PngCountryReportBody — country brief render", () => {
@@ -265,8 +265,8 @@ describe("PngCountryReportBody — country brief render, quiet window", () => {
 
 // The Disclaimer is the brief's final section, but it is appended by the PAGE
 // (CountryReport.tsx) below the body + analytics block — NOT by this body
-// component. The fixed brief order this body owns therefore closes on Reporting
-// Confidence, and the body must never emit a Disclaimer of its own (which would
+// component. The fixed brief order this body owns therefore closes on Polestar
+// View, and the body must never emit a Disclaimer of its own (which would
 // reorder it into the brief). These guards pin that contract without needing the
 // data-fetching, owner-gated page to render.
 describe("PngCountryReportBody — Disclaimer is page-appended, not in the body", () => {
@@ -274,12 +274,15 @@ describe("PngCountryReportBody — Disclaimer is page-appended, not in the body"
     <PngCountryReportBody dataset={build(POPULATED)} />,
   );
 
-  it("closes the body on Reporting Confidence and omits the Disclaimer", () => {
-    expect(html).toContain("Reporting Confidence");
+  it("closes the body on Polestar View and omits the Disclaimer", () => {
+    expect(html).toContain("Polestar View");
     expect(html).not.toContain("Disclaimer");
-    // Reporting Confidence is the last brief section the body emits.
+    // The trim removed these two sections from every country brief.
+    expect(html).not.toContain("Reporting Confidence");
+    expect(html).not.toContain("Customer Relevance");
+    // Polestar View is the last brief section the body emits.
     const last = SECTION_ORDER[SECTION_ORDER.length - 1];
-    expect(last).toBe("Reporting Confidence");
+    expect(last).toBe("Polestar View");
     for (const title of SECTION_ORDER.slice(0, -1)) {
       expect(html.indexOf(title)).toBeLessThan(html.indexOf(last));
     }
