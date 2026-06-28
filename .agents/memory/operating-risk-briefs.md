@@ -11,6 +11,26 @@ renderer + `CountryReportVisuals` block (map leads):
 - **Structured theatres** (`pngReportDataset.ts`): Jakarta + Indonesia set
   `StructuredTheatreConfig.proseVariant === "operating-risk"`. **PNG + West
   Papua leave `proseVariant` unset** and keep AI-overlaid section prose.
+
+> **Jakarta has SINCE diverged onto its own bespoke builder.** Do NOT assume
+> Jakarta == Indonesia. Jakarta additionally sets `config.jakartaProse` (set ONLY
+> on `JAKARTA_REPORT_CONFIG`); when true, `buildStructuredReportDataset` layers
+> Jakarta-specific section overrides from `jakartaBrief.ts` ON TOP of the shared
+> operating-risk dataset (BLUF/Exec Summary/Outlook/Polestar/Recommended Actions
+> + new optional dataset fields `incidentThemesOverride`,
+> `operationalImpactOverride`, and per-item `developmentTitle`). The renderer
+> prefers those overrides via `?? generic`, so a missing override silently falls
+> back — Indonesia/PNG/West Papua are untouched because the flag and the override
+> fields are absent for them. Adding a new Jakarta section means: builder in
+> `jakartaBrief.ts` + override field on the dataset + a `?? generic` consumer in
+> `PngCountryReportBody` + the `jakartaProse` gate, or it regresses other
+> theatres or silently no-ops. Builders pinned by `jakartaBrief.test.ts`; the
+> renderer-consumes-overrides contract by `jakartaReportRender.test.tsx`. Live
+> screenshot is impossible (owner-auth login wall, no dev bypass) so those render
+> tests ARE the visual proof. Jakarta map zones scan in numbered-callout DISPLAY
+> order, so an airport-specific token (`cengkareng`) loses to the earlier generic
+> `west jakarta` district — fixed by an airport-token PRE-PASS (not a reorder, to
+> keep the legend numbering), pinned by `jakartaMapZones.test.ts`.
 - **Every other (generic) country**: `countryOperatingRiskDataset.ts` builds a
   full `PngReportDataset` straight from raw window incidents and tags it
   `proseVariant: "operating-risk"` (themed Key Developments via the shared

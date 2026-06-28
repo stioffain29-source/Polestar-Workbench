@@ -253,12 +253,17 @@ const INDONESIA_ZONES: RiskZoneDef[] = [
   },
 ];
 
-// Jakarta-area risk zones (the five administrative cities plus the Jabodetabek
-// fringe), mirroring the Jakarta brief's buckets. The fringe is listed LAST so a
-// Bekasi/Depok record lands there rather than in a city zone.
-const JAKARTA_ZONES: RiskZoneDef[] = [
+// Jakarta risk zones, in the spec's numbered-callout order (Central, South,
+// West, North, East, airport corridor) with a Greater-Jakarta fallback. Each
+// carries a standing-profile description shown muted in the legend. The airport
+// corridor is matched on airport-specific tokens ONLY (so a generic West-Jakarta
+// item never grabs it); "cengkareng" lives here, not in West Jakarta, because in
+// Jakarta reporting it overwhelmingly denotes the Soekarno-Hatta corridor. It
+// sits before the Greater-Jakarta fallback so an airport item resolves to it.
+export const JAKARTA_ZONES: RiskZoneDef[] = [
   {
     name: "Central Jakarta",
+    description: "Protest and government-district disruption.",
     center: [-6.18, 106.83],
     places: [
       "central jakarta", "jakarta pusat", "menteng", "tanah abang", "gambir",
@@ -267,6 +272,7 @@ const JAKARTA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "South Jakarta",
+    description: "Office, embassy and commercial-area exposure.",
     center: [-6.28, 106.81],
     places: [
       "south jakarta", "jakarta selatan", "kebayoran", "tebet", "setiabudi",
@@ -275,7 +281,17 @@ const JAKARTA_ZONES: RiskZoneDef[] = [
     ],
   },
   {
+    name: "West Jakarta",
+    description: "Congestion, crime and access disruption.",
+    center: [-6.16, 106.76],
+    places: [
+      "west jakarta", "jakarta barat", "grogol", "kembangan", "palmerah",
+      "taman sari", "tambora", "kebon jeruk", "kalideres",
+    ],
+  },
+  {
     name: "North Jakarta",
+    description: "Port, flooding and logistics exposure.",
     center: [-6.12, 106.87],
     places: [
       "north jakarta", "jakarta utara", "tanjung priok", "kelapa gading",
@@ -284,6 +300,7 @@ const JAKARTA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "East Jakarta",
+    description: "Road movement and residential disruption.",
     center: [-6.23, 106.90],
     places: [
       "east jakarta", "jakarta timur", "cakung", "jatinegara", "duren sawit",
@@ -292,15 +309,17 @@ const JAKARTA_ZONES: RiskZoneDef[] = [
     ],
   },
   {
-    name: "West Jakarta",
-    center: [-6.16, 106.76],
+    name: "Soekarno-Hatta Airport Corridor",
+    description: "Airport-transfer disruption.",
+    center: [-6.1256, 106.6558],
     places: [
-      "west jakarta", "jakarta barat", "grogol", "kembangan", "palmerah",
-      "cengkareng", "taman sari", "tambora", "kebon jeruk", "kalideres",
+      "soekarno-hatta", "soekarno hatta", "soetta", "cgk",
+      "bandara soekarno", "cengkareng", "airport corridor",
     ],
   },
   {
     name: "Greater Jakarta (Jabodetabek)",
+    description: "Wider Jabodetabek commuter belt.",
     center: [-6.4, 106.85],
     places: [
       "greater jakarta", "jabodetabek", "bekasi", "depok", "tangerang",
@@ -336,16 +355,29 @@ function stripMasthead(title: string): string {
 // Which zone (by index) an incident belongs to: place-keyword match over its
 // location text and headline first, then an exact geocoder-centroid match.
 // Returns null when the record matches no configured zone.
-function zoneIndexForIncident(i: CountryFastFactsIncident, zones: RiskZoneDef[]): number | null {
+export function zoneIndexForIncident(i: CountryFastFactsIncident, zones: RiskZoneDef[]): number | null {
   const loc = (i.location ?? "").toLowerCase();
   const title = stripMasthead(
     ((i.displayTitle && i.displayTitle.trim()) || i.title || "").trim(),
   ).toLowerCase();
   const hay = `${loc} ${title}`;
+  const matches = (p: string) =>
+    new RegExp(`(^|[^a-z])${escapeRegExp(p)}([^a-z]|$)`, "i").test(hay);
+  // Airport-corridor pre-pass: airport-specific tokens must win over a generic
+  // district token. "Cengkareng, West Jakarta" denotes the Soekarno-Hatta
+  // corridor, but West Jakarta sits earlier in display order and would grab it
+  // first. Checking the airport zone's tokens before the in-order scan keeps the
+  // spec's numbered-callout order intact without mis-bucketing. No-op for
+  // theatres with no airport zone (findIndex → -1), so other maps are unchanged.
+  const airportIdx = zones.findIndex(
+    (z) => z.name === "Soekarno-Hatta Airport Corridor",
+  );
+  if (airportIdx >= 0 && zones[airportIdx].places.some(matches)) {
+    return airportIdx;
+  }
   for (let z = 0; z < zones.length; z++) {
     for (const p of zones[z].places) {
-      const re = new RegExp(`(^|[^a-z])${escapeRegExp(p)}([^a-z]|$)`, "i");
-      if (re.test(hay)) return z;
+      if (matches(p)) return z;
     }
   }
   if (

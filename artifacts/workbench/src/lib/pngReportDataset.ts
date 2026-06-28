@@ -31,6 +31,7 @@ import { clusterSameStoryRows, incidentTypeKey, type SameStoryRow } from "./coun
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import { scoreClusterValue } from "./countryTopValue";
+import { buildJakartaBrief } from "./jakartaBrief";
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
@@ -198,6 +199,11 @@ export interface StructuredTheatreConfig {
   // per-item categories are display-mapped to the eleven business labels. Unset
   // → the default PNG / West Papua prose path (byte-identical).
   proseVariant?: "operating-risk";
+  // Jakarta-only switch. When true, buildStructuredReportDataset replaces the
+  // generic operating-risk sections with the Jakarta analyst-brief builders
+  // (jakartaBrief.ts) after the operating-risk + polestar blocks. Set ONLY on
+  // JAKARTA_REPORT_CONFIG, so every other theatre is byte-identical.
+  jakartaProse?: boolean;
   // Heading for the priority-incidents section. Falls back in the renderer to
   // the default "Top 3 Incidents This Week" when unset.
   topIncidentsHeading?: string;
@@ -388,6 +394,7 @@ export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
   deriveProvince: deriveJakartaArea,
   extractItem: extractJakartaItem,
   proseVariant: "operating-risk",
+  jakartaProse: true,
   topIncidentsHeading: "Priority Incidents This Week",
 };
 
@@ -397,6 +404,11 @@ export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
 export interface PngReportItem {
   id: string;
   title: string;
+  // Jakarta-only: an analyst-rewritten Top-3 development title (theme + area
+  // lead) that replaces the raw headline on the card. Set behind
+  // config.jakartaProse; unset for every other theatre, so ItemCard falls back
+  // to `title` and PNG / West Papua / Indonesia rendering is unchanged.
+  developmentTitle?: string;
   // The incident's own reported summary text. Carried through so the AI
   // per-incident analyst summary can be grounded on title + summary, and used as
   // the fingerprint/grounding input for the prose engine.
@@ -552,6 +564,12 @@ export interface PngReportDataset {
   // Grouped recommended actions (Movement security, Site security, …), built
   // from this period's incident mix and the location watchlist.
   recommendedActions: RecommendedActionGroup[];
+  // Jakarta-only overrides (set behind config.jakartaProse). When present the
+  // renderer prefers these over the generic Incident-Details theme groups and
+  // Operational-Impact bullets; unset for every other theatre, leaving their
+  // rendering byte-identical.
+  incidentThemesOverride?: { key: string; heading: string; paragraph: string }[];
+  operationalImpactOverride?: string[];
 }
 
 export interface BuildArgs {
@@ -958,7 +976,7 @@ export function buildStructuredReportDataset(
     return sortBySeverityThenRecency(a[0], b[0]);
   });
   const topClusters = storyClusters.slice(0, 3);
-  const topThree = topClusters.map((c) => c[0]);
+  let topThree = topClusters.map((c) => c[0]);
   const topThreeMemberIds = new Set(topClusters.flatMap((c) => c.map((it) => it.id)));
   const bucketableItems = windowItems.filter((it) => !topThreeMemberIds.has(it.id));
   // Incident Details analyses every remaining (non-Top-3) incident.
@@ -1257,6 +1275,10 @@ export function buildStructuredReportDataset(
   let polestarView = "";
   let polestarViewParts: PolestarViewParts | undefined;
   let customerRelevance: string | undefined;
+  // Jakarta-only section overrides (assigned in the Jakarta block below; left
+  // undefined for every other theatre so the renderer uses its generic path).
+  let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
+  let operationalImpactOverride: string[] | undefined;
 
   // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
   // Override the BLUF, Executive Summary, Priorities This Week and Polestar View
@@ -1372,6 +1394,26 @@ export function buildStructuredReportDataset(
       config.audienceProfile?.audience ??
       `organisations with staff, sites, travel and supply exposure in ${config.countryName}`;
     customerRelevance = buildCustomerRelevance({ audience, presentThemeKeys, empty });
+  }
+
+  // --- Jakarta analyst-brief overrides ---------------------------------------
+  // Replace the generic operating-risk sections with Jakarta-specific,
+  // operationally-framed prose. Gated behind config.jakartaProse (set ONLY on
+  // JAKARTA_REPORT_CONFIG) so Indonesia / PNG / West Papua are untouched. Pure,
+  // deterministic, count-free, present-theme-gated (no fabrication). Runs AFTER
+  // the operating-risk + polestar blocks so it has the final say on the sections
+  // it owns; polestarViewParts is kept consistent with the overridden paragraph.
+  if (config.jakartaProse) {
+    const jakarta = buildJakartaBrief({ windowItems, incidentDetailsItems, topThree });
+    bluf = jakarta.bluf;
+    executiveSummary = jakarta.executiveSummary;
+    outlook = jakarta.outlook;
+    businessImpact = jakarta.recommendedActions;
+    polestarView = jakarta.polestarView;
+    polestarViewParts = jakarta.polestarViewParts;
+    operationalImpactOverride = jakarta.operationalImpact;
+    incidentThemesOverride = jakarta.incidentThemes;
+    topThree = jakarta.topThree;
   }
 
   // --- Reporting Confidence --------------------------------------------------
@@ -1564,6 +1606,8 @@ export function buildStructuredReportDataset(
     windowItems,
     incidentDetailsItems,
     recommendedActions,
+    incidentThemesOverride,
+    operationalImpactOverride,
   };
 }
 

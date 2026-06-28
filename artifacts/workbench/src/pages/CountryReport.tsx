@@ -1470,16 +1470,17 @@ export default function CountryReport() {
           to dispatch a stringer or widen the source set on the Sources
           page. Not for the client-facing report. */}
       <div className="no-print" style={{
-        marginTop: 12,
-        border: `1px dashed ${POLAR}`,
-        background: "#fafafa",
-        padding: "12px 14px",
-        borderRadius: 2,
+        marginTop: 10,
+        borderTop: `1px solid ${POLAR}`,
+        background: "transparent",
+        padding: "8px 0 0",
+        borderRadius: 0,
+        opacity: 0.85,
       }}>
-        <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
+        <div style={{ fontFamily: ROBOTO, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
           Internal · Source coverage (not in PDF)
         </div>
-        <ul style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, margin: "8px 0 0 18px", padding: 0 }}>
+        <ul style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, margin: "6px 0 0 16px", padding: 0, lineHeight: 1.5 }}>
           <li>Active reporting basis: <strong>{active.basisLabel}</strong></li>
           <li>Current 7-day window: <strong>{layers.current.length}</strong> record{layers.current.length === 1 ? "" : "s"}</li>
           <li>30-day context window: <strong>{layers.thirtyDay.length}</strong> record{layers.thirtyDay.length === 1 ? "" : "s"}</li>

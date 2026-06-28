@@ -1,0 +1,125 @@
+Jakarta pilot is closer, but it still needs another pass.
+
+Do not treat this as complete.
+
+Required fixes:
+
+1. Top 3 Developments
+
+The Top 3 cannot all be Low unless the week is genuinely quiet.
+
+If an item is important enough to be in the Top 3, explain why it matters operationally. If it has no movement, safety, site access, protest, crime, disruption or business relevance, replace it with a stronger item.
+
+Rewrite the Top 3 titles as analyst developments, not article headlines.
+
+2. Remove generic phrasing
+
+Remove wording such as:
+
+“Commercial and business districts remain important”
+“Monitor localised flooding”
+“Maintain awareness”
+“Business users should maintain standard movement precautions”
+
+This reads too generic. Make it Jakarta specific.
+
+3. Incident Details
+
+This section is better, but still too formulaic.
+
+Use fewer category labels and stronger paragraphs.
+
+Focus on the actual Jakarta operating picture:
+
+Protests around Central Jakarta and government areas
+Flooding and weather disruption
+Crime and public safety
+Traffic and movement disruption
+Airport corridor impact
+Commercial district exposure
+
+Remove anything that feels like it was generated from a category list.
+
+4. Operational Impact
+
+Make this sharper and more Jakarta specific.
+
+Use bullets like:
+
+Central Jakarta protests can disrupt access around government buildings and major roads.
+Flooding can affect commuting, site access and airport transfer times.
+Crime reporting supports continued caution around after hours movement and exposed public areas.
+Traffic congestion remains a planning issue for meetings, deliveries and airport transfers.
+Local teams should confirm routes before movement during heavy rain or protest days.
+
+5. Recommended Actions
+
+Make these practical and location based.
+
+Use actions such as:
+
+Check protest activity before travel to Central Jakarta.
+Build time buffers into airport transfers and cross city movement.
+Avoid unnecessary after hours movement in poorly monitored areas.
+Confirm flood affected routes before staff travel.
+Keep local staff and drivers briefed on disruption points.
+Escalate incidents near offices, hotels, client sites or main routes.
+
+6. Outlook
+
+Keep the Outlook focused on the next seven days.
+
+Mention the most likely scenario, not a generic risk list.
+
+For Jakarta, the likely scenario is localised disruption from protest activity, traffic, heavy rain and crime rather than a city wide deterioration.
+
+7. Polestar View
+
+This should be the strongest paragraph in the report.
+
+It should say something like:
+
+Jakarta remains a manageable but disruption prone operating environment. The main issue is not a single high impact threat, but the combined effect of protests, congestion, flooding and opportunistic crime on movement planning. Business users should focus on route checks, flexible timings and local verification rather than broad travel restrictions.
+
+8. Map
+
+The map is improved because it uses numbered points, but it still looks like a Leaflet/web map screenshot.
+
+Remove:
+
+Zoom buttons
+Web map controls
+Attribution clutter where possible
+Tiny unreadable labels
+
+Make it look like a clean report graphic.
+
+For Jakarta, use a simple numbered callout map with these areas:
+
+1. Central Jakarta: protest and government district disruption
+
+2. South Jakarta: office, embassy and commercial area exposure
+
+3. West Jakarta: congestion, crime and access disruption
+
+4. North Jakarta: port, flooding and logistics exposure
+
+5. East Jakarta: road movement and residential disruption
+
+6. Soekarno Hatta airport corridor: airport transfer disruption
+
+7. Source box
+
+The source box at the bottom is too ugly and too prominent.
+
+Either remove it or restyle it into a small clean source list.
+
+Do not let sources dominate the page.
+
+10. Final standard
+
+The report should feel like a Jakarta security brief written by an analyst.
+
+It should not feel like a category summary generated from database fields.
+
+Keep the report full enough to look credible, but make every section more specific, more operational and less generic.

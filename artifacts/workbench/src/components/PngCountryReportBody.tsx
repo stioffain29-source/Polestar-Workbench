@@ -188,7 +188,7 @@ function ItemCard({
             lineHeight: "22px",
           }}
         >
-          {item.title}
+          {item.developmentTitle ?? item.title}
         </div>
         <div style={{ flexShrink: 0 }}>
           <SeverityChip item={item} />
@@ -287,10 +287,11 @@ export default function PngCountryReportBody({
   // Top 3 STORY CLUSTERS (so a syndicated re-run of a Top 3 story never reappears
   // here). Operational Impact still draws on the full window.
   const topThree = d.topThree.slice(0, 3);
-  const incidentThemes = buildCountryIncidentThemes(d.incidentDetailsItems);
+  const incidentThemes = d.incidentThemesOverride ?? buildCountryIncidentThemes(d.incidentDetailsItems);
   // Cap the Operational Impact list (≤5) and the Outlook escalation indicators
   // (≤3) so the trimmed brief stays sharp.
-  const operationalImpact = buildOperationalImpactBullets(d.windowItems).slice(0, 5);
+  const operationalImpact =
+    d.operationalImpactOverride ?? buildOperationalImpactBullets(d.windowItems).slice(0, 5);
   const escalationIndicators = d.escalationIndicators.slice(0, 3);
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
