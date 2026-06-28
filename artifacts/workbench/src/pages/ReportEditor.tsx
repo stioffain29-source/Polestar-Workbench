@@ -1768,6 +1768,7 @@ export default function ReportEditor() {
           )}
         </div>
 
+        <div>
         {staleProse && (
           <div
             className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
@@ -1835,6 +1836,7 @@ export default function ReportEditor() {
               aiProse={aiProseSections}
             />
           )}
+        </div>
         </div>
       </div>
     </div>
