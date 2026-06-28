@@ -6,6 +6,7 @@ import {
   countryReportProseTable,
   incidentCorroborationsTable,
   reliefwebReportsTable,
+  socialWatchItemsTable,
 } from "@workspace/db";
 
 // The integration-status probes derive a public STATE + EVIDENCE for each
@@ -337,6 +338,123 @@ describe("admin_controls status", () => {
     const item = find(await statuses(), "admin_controls");
     expect(item.status).toBe("working");
     expect(item.configured).toBe(true);
+  });
+});
+
+describe("social-watch instagram integration status (freshness honesty)", () => {
+  function configureIg(): void {
+    delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.INSTAGRAM_ENABLED;
+    process.env.INSTAGRAM_API_KEY = "apify-key";
+  }
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+
+  it("reports working when the newest post is inside the freshness window", async () => {
+    configureIg();
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 4, latest: daysAgo(3) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(true);
+    expect(item.summary).toContain("4 KAMMI Instagram post");
+  });
+
+  it("reports dormant with an N-day-old summary when the newest post is past the window", async () => {
+    configureIg();
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 2, latest: daysAgo(120) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("dormant");
+    expect(item.summary).toContain("dormant");
+    expect(item.summary).toMatch(/\d+ day\(s\) old/);
+    expect(item.summary).toContain("30-day freshness window");
+  });
+
+  it("reports no_data when configured but the table is empty", async () => {
+    configureIg();
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 0, latest: null }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("no_data");
+  });
+
+  it("keeps not_configured when no INSTAGRAM_API_KEY is set (freshness branch unreached)", async () => {
+    delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.INSTAGRAM_ENABLED;
+    delete process.env.INSTAGRAM_API_KEY;
+    // Even with a months-stale row present, the not_configured branch wins.
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("not_configured");
+    expect(item.configured).toBe(false);
+  });
+
+  it("keeps disabled when switched off, even with a stale row present", async () => {
+    process.env.SOCIAL_WATCH_ENABLED = "false";
+    process.env.INSTAGRAM_API_KEY = "apify-key";
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("disabled");
+  });
+});
+
+describe("social-watch telegram integration status (freshness honesty)", () => {
+  function configureTg(): void {
+    delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.TELEGRAM_ENABLED;
+    process.env.KAMMI_TELEGRAM_CHANNEL = "kammipusat";
+  }
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+
+  it("reports working when the newest post is inside the freshness window", async () => {
+    configureTg();
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 6, latest: daysAgo(10) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_telegram");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(true);
+    expect(item.summary).toContain("6 KAMMI Telegram post");
+  });
+
+  it("reports dormant with an N-day-old summary when the newest post is past the window", async () => {
+    configureTg();
+    // Mirrors the real-world KAMMI channel, last active in 2016.
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 3, latest: daysAgo(365) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_telegram");
+    expect(item.status).toBe("dormant");
+    expect(item.summary).toContain("dormant");
+    expect(item.summary).toMatch(/\d+ day\(s\) old/);
+    expect(item.summary).toContain("30-day freshness window");
+  });
+
+  it("reports no_data when configured but the table is empty", async () => {
+    configureTg();
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 0, latest: null }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_telegram");
+    expect(item.status).toBe("no_data");
+  });
+
+  it("keeps disabled when the telegram source is switched off, even with a stale row present", async () => {
+    delete process.env.SOCIAL_WATCH_ENABLED;
+    process.env.TELEGRAM_ENABLED = "false";
+    process.env.KAMMI_TELEGRAM_CHANNEL = "kammipusat";
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_telegram");
+    expect(item.status).toBe("disabled");
   });
 });
 
