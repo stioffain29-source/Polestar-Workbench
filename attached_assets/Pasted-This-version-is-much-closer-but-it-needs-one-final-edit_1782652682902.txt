@@ -1,0 +1,95 @@
+This version is much closer, but it needs one final editorial pass.
+
+Do not rebuild the structure. Keep the current structure and layout.
+
+Fix the writing and selection logic.
+
+1. Top 3 Developments
+
+The Top 3 still feels too close to database records.
+
+Rewrite the Top 3 so each item reads like an analyst selected it for operational relevance.
+
+Current issue:
+Fire incident in Greater Jakarta
+Policing and security activity reported in Jakarta
+Crime and public safety incident reported in Jakarta
+
+These are still too generic.
+
+Use stronger development wording, for example:
+
+1. Greater Jakarta fire incidents highlight access and evacuation exposure
+2. Central Jakarta protest and policing activity keep government district disruption risk active
+3. Local crime reporting supports continued caution around after hours movement
+
+Only include the fire item if it has genuine operational relevance. The explanation should link it to road closures, evacuation, access to offices, malls, warehouses, hotels, client sites or commuter routes.
+
+2. Incident Details
+
+Remove repeated wording such as:
+
+“For Jakarta operations this matters…”
+
+It appears too often and still feels templated.
+
+Rewrite the section as natural analyst paragraphs.
+
+Example:
+
+Fire incidents were reported in Greater Jakarta, South Jakarta and East Jakarta. In dense commercial and residential areas, the operational concern is not the fire event alone, but the knock on effect: short notice road closures, local evacuation, utility disruption and access problems around offices, malls, warehouses, hotels or client sites.
+
+Apply the same style to protests, flooding, crime and policing.
+
+3. Current Situation
+
+This section is acceptable, but add one line of Jakarta specific context so it does not feel thin.
+
+The operating picture should make clear that Jakarta is manageable, but disruption prone because routine movement can be affected by the combined effect of protest activity, heavy rain, congestion, crime and localised emergency response activity.
+
+4. Operational Impact and Recommended Actions
+
+These sections are now broadly right.
+
+Keep them concise, but make them slightly more Jakarta specific.
+
+Mention:
+
+Central Jakarta government district
+Jabodetabek commuter movement
+Airport transfers
+Office, hotel and client site access
+After hours staff movement
+
+5. Outlook
+
+The Outlook is close.
+
+Keep the current judgement, but make the escalation indicators more Jakarta specific.
+
+Use indicators such as:
+
+Larger protest activity around Central Jakarta government locations
+Heavy rain causing flooding on commuter or airport transfer routes
+Crime or public safety incidents near offices, hotels, malls, transport hubs or client sites
+
+6. Map
+
+The map is now much better because it includes Central, South, West, North, East Jakarta, the Soekarno Hatta airport corridor and Greater Jakarta.
+
+Keep this map approach.
+
+Minor fixes only:
+
+Make the legend cleaner.
+Keep the note about unplotted records small.
+Avoid grey markers looking like inactive or broken data.
+Do not let the map look like a web screenshot.
+
+7. Final objective
+
+Do not make the report shorter for the sake of it.
+
+Make it read like a polished Jakarta business security brief.
+
+Keep enough substance so it feels credible, but remove wording that sounds generated, generic or copied from a database field.

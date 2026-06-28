@@ -485,6 +485,8 @@ export function aggregateZones(
 export default function CountryReportMap({ incidents, domId, countryName }: CountryReportMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const basemapStyleRef = useRef<"jakarta" | "standard" | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dotsRef = useRef<Array<{ el: HTMLElement; lat: number; lng: number; half: number }>>([]);
 
@@ -524,6 +526,16 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Jakarta reads as a numbered callout schematic, not a street map: use the
+    // label-free CARTO basemap and a faded opacity so the coloured markers
+    // dominate and it does not look like a web-map screenshot (spec §6). Other
+    // theatres keep the standard labelled basemap at full opacity.
+    const basemapUrl = isJakarta
+      ? "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+    const basemapOpacity = isJakarta ? 0.85 : 1;
+    const desiredStyle: "jakarta" | "standard" = isJakarta ? "jakarta" : "standard";
+
     if (!mapRef.current) {
       // No zoom buttons or attribution overlay: the country-report map is a
       // clean report graphic, captured into the PDF via html2canvas. Leaflet
@@ -535,15 +547,22 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         zoomControl: false,
         attributionControl: false,
       });
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        {
-          attribution: '&copy; OpenStreetMap &copy; CARTO',
-          subdomains: "abcd",
-          maxZoom: 19,
-          crossOrigin: true,
-        },
-      ).addTo(mapRef.current);
+      tileLayerRef.current = L.tileLayer(basemapUrl, {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: "abcd",
+        maxZoom: 19,
+        crossOrigin: true,
+        opacity: basemapOpacity,
+      }).addTo(mapRef.current);
+      basemapStyleRef.current = desiredStyle;
+    } else if (tileLayerRef.current && basemapStyleRef.current !== desiredStyle) {
+      // The component instance is reused for a different theatre (countryName
+      // changed without a remount): resync the basemap so Jakarta always gets
+      // the faded label-free schematic and every other theatre keeps the
+      // standard labelled basemap at full opacity — neither inherits the other.
+      tileLayerRef.current.setUrl(basemapUrl);
+      tileLayerRef.current.setOpacity(basemapOpacity);
+      basemapStyleRef.current = desiredStyle;
     }
 
     const map = mapRef.current;
@@ -586,8 +605,10 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       const latLngs: L.LatLngExpression[] = [];
       for (const z of active) {
         const [lat, lng] = z.def.center;
-        // Zero-count alwaysShow zones (worstKey "") draw a neutral grey marker.
-        const color = z.count > 0 ? (SEV_COLOR[z.worstKey] ?? "#999999") : "#999999";
+        // Zero-count alwaysShow zones (worstKey "") draw a soft neutral marker —
+        // a deliberate "monitored, no incidents this period" chip, not the
+        // alarming mid-grey that reads as missing/broken data (spec §6).
+        const color = z.count > 0 ? (SEV_COLOR[z.worstKey] ?? "#999999") : "#CED3DB";
         const size = 28;
         const half = size / 2;
 
@@ -603,7 +624,9 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.display = "flex";
         marker.style.alignItems = "center";
         marker.style.justifyContent = "center";
-        marker.style.color = "#ffffff";
+        // Dark numeral on the soft neutral zero-count chip stays readable; white
+        // numeral on the saturated severity colours.
+        marker.style.color = z.count > 0 ? "#ffffff" : "#36404f";
         marker.style.fontFamily = "Roboto, sans-serif";
         marker.style.fontWeight = "700";
         marker.style.fontSize = "13px";
@@ -756,6 +779,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         mapRef.current.remove();
         mapRef.current = null;
       }
+      tileLayerRef.current = null;
+      basemapStyleRef.current = null;
       overlayRef.current = null;
       dotsRef.current = [];
     };
@@ -798,8 +823,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
                       width: 18,
                       height: 18,
                       borderRadius: "50%",
-                      background: SEV_COLOR[z.worstKey] ?? "#999999",
-                      color: "#fff",
+                      background: z.count > 0 ? (SEV_COLOR[z.worstKey] ?? "#999999") : "#CED3DB",
+                      color: z.count > 0 ? "#fff" : "#36404f",
                       fontFamily: "Roboto, sans-serif",
                       fontSize: 11,
                       fontWeight: 700,
@@ -836,8 +861,9 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
             >
               {isJakarta ? (
                 <>
-                  Each marker is a numbered Jakarta business area, coloured by the highest severity
-                  recorded there this period; grey marks an area with no records this period.
+                  Numbered markers show Jakarta business areas, shaded by the highest severity
+                  recorded there this period; a neutral marker is a monitored area with no incidents
+                  this period.
                   {zoneAgg.unattributed > 0
                     ? " Some records were retained in the assessment but not plotted due to insufficient location detail."
                     : ""}

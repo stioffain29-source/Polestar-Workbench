@@ -1347,6 +1347,7 @@ export function buildStructuredReportDataset(
   // undefined for every other theatre so the renderer uses its generic path).
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
   let operationalImpactOverride: string[] | undefined;
+  let jakartaEscalationIndicators: string[] | undefined;
   let keepPolestarTogether = false;
 
   // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
@@ -1481,6 +1482,7 @@ export function buildStructuredReportDataset(
     polestarView = jakarta.polestarView;
     polestarViewParts = jakarta.polestarViewParts;
     operationalImpactOverride = jakarta.operationalImpact;
+    jakartaEscalationIndicators = jakarta.escalationIndicators;
     incidentThemesOverride = jakarta.incidentThemes;
     topThree = jakarta.topThree;
     keepPolestarTogether = true;
@@ -1653,7 +1655,7 @@ export function buildStructuredReportDataset(
     executiveSummary,
     whatMattersBullets,
     keyDevelopments,
-    escalationIndicators,
+    escalationIndicators: jakartaEscalationIndicators ?? escalationIndicators,
     whatChanged,
     topThree,
     buckets,

@@ -61,18 +61,24 @@ const JAKARTA_THEME_PHRASE: Record<JakartaTheme, string> = {
   governance: "policing activity",
 };
 
-// Lead phrase for a Top-3 analyst-development title (e.g. "Protest activity in
-// Central Jakarta"). Derived from the incident's category + area — both real
-// data fields — so the rewritten title is an analyst development, not an
-// article headline, without inventing specifics.
-const JAKARTA_THEME_LEAD: Record<JakartaTheme, string> = {
-  protest: "Protest activity",
-  flooding: "Flooding and weather disruption",
-  fire: "Fire incident",
-  crime: "Crime and public-safety incident",
-  traffic: "Traffic and movement disruption",
-  airport: "Airport-corridor disruption",
-  governance: "Policing and security activity",
+// Analyst-development headline for a Top-3 item: the conclusion an analyst would
+// draw for operational relevance, not a "category + place" label. Built from the
+// incident's real theme + area, with a sensible Jakarta-wide frame when the
+// record is unattributed. No invented specifics.
+const JAKARTA_THEME_DEVELOPMENT: Record<JakartaTheme, (area: string) => string> = {
+  protest: (a) =>
+    `${a || "Central Jakarta"} protest and policing activity keeps government-district disruption risk active`,
+  flooding: (a) =>
+    `${a || "Greater Jakarta"} flooding keeps commuter and airport-transfer routes exposed`,
+  fire: (a) =>
+    `${a || "Greater Jakarta"} fire incidents highlight access and evacuation exposure`,
+  crime: () =>
+    "Local crime reporting supports continued caution around after hours movement",
+  traffic: (a) =>
+    `${a || "Jakarta"} congestion keeps movement timings and transfers under pressure`,
+  airport: () => "Soekarno-Hatta corridor disruption keeps airport transfers exposed",
+  governance: (a) =>
+    `${a || "Central Jakarta"} policing and security activity keeps movement disruption risk active`,
 };
 
 // Operational "why it matters" line for a Top-3 development, per theme. Sets the
@@ -85,7 +91,7 @@ const JAKARTA_THEME_RELEVANCE: Record<JakartaTheme, string> = {
   fire:
     "A fire in Jakarta's dense commercial and residential districts can force road closures and evacuations and disrupt access to nearby offices, malls, hotels, warehouses and client sites along commuter routes; confirm the status of affected areas before movement.",
   crime:
-    "Reporting supports continued caution around after-hours movement and exposed public areas near offices, hotels and transport hubs.",
+    "Reporting supports continued caution around after hours movement and exposed public areas near offices, hotels and transport hubs.",
   traffic:
     "Congestion on this corridor is a planning constraint for meetings, deliveries and airport transfers; build in time buffers.",
   airport:
@@ -203,34 +209,34 @@ function themeParagraph(p: ThemePresence): string {
       return `Demonstration activity was reported ${whereIn(
         areas,
         "around the central government and business districts",
-      )}. For Jakarta operations this matters most around the presidential palace, parliament and the main thoroughfares of Central Jakarta, where marches can close roads and slow access to nearby offices and government buildings at short notice.${sev}`;
+      )}. The operational concern is less the protest itself than its effect on movement: marches and police lines around the presidential palace, parliament and the main Central Jakarta thoroughfares can close roads and slow access to nearby offices and government buildings at short notice.${sev}`;
     case "flooding":
       return `Flooding and heavy-rain disruption was reported ${whereIn(
         areas,
         "across low-lying parts of the capital",
-      )}. For Jakarta operations this matters most across Greater Jakarta — low-lying access roads, airport-transfer routes, office districts, logistics routes and staff commuting corridors — where standing water lengthens journeys and delays site access and airport runs.${sev}`;
+      )}. The concern is movement rather than the weather alone: standing water on low-lying access roads, airport-transfer routes and staff commuting corridors across Greater Jakarta lengthens journeys and delays site access and airport runs.${sev}`;
     case "fire":
       return `Fire incidents were reported ${whereIn(
         areas,
         "in the capital's dense commercial and residential districts",
-      )}. For Jakarta operations this matters where a blaze forces road closures or evacuations near offices, malls, hotels, warehouses or client sites, disrupting access along the surrounding commuter routes; confirm the status of affected areas before movement.${sev}`;
+      )}. In these dense commercial and residential areas the operational concern is not the fire alone but the knock-on effect: short-notice road closures, local evacuation, utility disruption and access problems around offices, malls, warehouses, hotels or client sites.${sev}`;
     case "crime":
       return `Crime and public-safety incidents were reported ${whereIn(
         areas,
         "across the capital",
-      )}. For Jakarta operations this matters most for after-hours staff movement around offices, hotels and transport hubs and the busier commercial and entertainment areas of South and West Jakarta, where opportunistic street crime and theft are the most common risks.${sev}`;
+      )}. The concern is staff exposure rather than any city-wide threat: opportunistic street crime and theft cluster around after hours movement near offices, hotels and transport hubs, and in the busier commercial and entertainment areas of South and West Jakarta.${sev}`;
     case "traffic":
       return `Traffic and movement disruption was reported ${whereIn(
         areas,
         "on the capital's main corridors",
-      )}. Congestion on the main corridors is a daily constraint on meetings, deliveries and airport transfers, and worsens with rain, roadworks and protest activity.${sev}`;
+      )}. Congestion is a daily constraint on meetings, deliveries and airport transfers, and worsens with rain, roadworks and protest activity, so journey times can move with little warning.${sev}`;
     case "airport":
-      return `Disruption affecting the Soekarno-Hatta airport corridor was reported. Movement between the city and the airport runs through congested toll routes that are sensitive to flooding and incidents, so transfer times can lengthen with little warning.${sev}`;
+      return `Disruption affecting the Soekarno-Hatta airport corridor was reported. Transfers between the city and the airport run through congested toll routes that are sensitive to flooding and incidents, so transfer times can lengthen with little warning.${sev}`;
     case "governance":
       return `Policing and regulatory activity was reported ${whereIn(
         areas,
         "across the capital",
-      )}, including security-force deployments and official measures. Such activity can briefly restrict movement and access around the affected area.${sev}`;
+      )}, including security-force deployments and official measures. The practical concern is short-notice restriction: such activity can briefly close roads and limit access around the affected area until it clears.${sev}`;
   }
 }
 
@@ -260,11 +266,11 @@ export function buildJakartaIncidentThemes(
 // they apply every week and the section never reads empty.
 export function buildJakartaOperationalImpact(): string[] {
   return [
-    "Central Jakarta: protest disruption around government buildings and main roads.",
-    "Greater Jakarta: rain and flooding can affect commuting and airport transfers.",
-    "Office and hotel areas: maintain caution around after hours movement and exposed public areas.",
-    "Cross city movement: allow extra time for meetings, site visits and logistics.",
-    "Local teams: check routes before movement on protest or heavy rain days.",
+    "Central Jakarta government district: protest activity can disrupt movement around government buildings and main roads.",
+    "Jabodetabek commuter movement: heavy rain and flooding can lengthen commuting and airport transfers.",
+    "Office, hotel and client site access: maintain caution around after hours staff movement and exposed public areas.",
+    "Cross-city movement: allow extra time for meetings, site visits, airport transfers and logistics.",
+    "Local teams: check routes before movement on protest or heavy-rain days.",
   ];
 }
 
@@ -275,9 +281,9 @@ export function buildJakartaOperationalImpact(): string[] {
 // carried fresh reporting.
 export function buildJakartaRecommendedActions(): string[] {
   return [
-    "Check protest activity before travelling into Central Jakarta.",
-    "Build time buffers into airport transfers and cross-city movement.",
-    "Avoid unnecessary after-hours movement in poorly monitored areas.",
+    "Check protest activity before travelling into the Central Jakarta government district.",
+    "Build time buffers into airport transfers and cross-city commuter movement.",
+    "Avoid unnecessary after hours staff movement in poorly monitored areas.",
     "Confirm flood-affected routes before staff travel.",
     "Keep local staff and drivers briefed on the day's disruption points.",
     "Escalate incidents near offices, hotels, client sites or main routes.",
@@ -320,12 +326,23 @@ export function buildJakartaCurrentSituation(windowItems: PngReportItem[]): stri
         ? `This week's reporting centred on ${joinList(phrases)}${whereTail}, with the main effect on movement and timings.`
         : "Reporting this week was limited to isolated, lower-level disruption across the capital.";
   const picture =
-    "Central Jakarta remains the main protest and government-district exposure. Across Greater Jakarta, weather and flooding remain the main movement-disruption issue. Crime remains a localised staff-safety and after-hours movement concern. The overall picture is manageable but disruption-prone.";
+    "Central Jakarta remains the main protest and government-district exposure. Across Greater Jakarta, weather and flooding remain the main movement-disruption issue. Crime remains a localised staff-safety and after hours movement concern. The overall picture is manageable but disruption-prone: routine movement can be affected by the combined effect of protest activity, heavy rain, congestion, crime and localised emergency-response activity.";
   return `${lead}\n${picture}`;
 }
 
 export function buildJakartaOutlook(): string {
   return "Over the next seven days, the most likely picture is localised disruption from protest activity, traffic, heavy rain and opportunistic crime rather than a city-wide deterioration. Movement planning — route checks, flexible timings and local verification — remains the main mitigation.";
+}
+
+// Jakarta-specific escalation indicators for the Outlook (spec §5): the standing
+// watch-items an analyst would flag as "what would worsen the picture", phrased
+// for the capital rather than the generic country list.
+export function buildJakartaEscalationIndicators(): string[] {
+  return [
+    "Larger protest activity around Central Jakarta government locations",
+    "Heavy rain causing flooding on commuter or airport-transfer routes",
+    "Crime or public-safety incidents near offices, hotels, malls, transport hubs or client sites",
+  ];
 }
 
 // --- Polestar View ---------------------------------------------------------
@@ -373,8 +390,7 @@ export function applyJakartaTopThree(topThree: PngReportItem[]): PngReportItem[]
   const out = topThree.map((it) => {
     const theme = jakartaThemeForCategory(it.category);
     const area = areaLabel(it.province);
-    const lead = JAKARTA_THEME_LEAD[theme];
-    const developmentTitle = area ? `${lead} in ${area}` : `${lead} reported in Jakarta`;
+    const developmentTitle = JAKARTA_THEME_DEVELOPMENT[theme](area);
     return {
       ...it,
       developmentTitle,
@@ -409,6 +425,7 @@ export interface JakartaBriefOverrides {
   polestarViewParts: PolestarViewParts;
   recommendedActions: string[];
   operationalImpact: string[];
+  escalationIndicators: string[];
   incidentThemes: JakartaIncidentTheme[];
   topThree: PngReportItem[];
 }
@@ -423,6 +440,7 @@ export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrid
     polestarViewParts: parts,
     recommendedActions: buildJakartaRecommendedActions(),
     operationalImpact: buildJakartaOperationalImpact(),
+    escalationIndicators: buildJakartaEscalationIndicators(),
     incidentThemes: buildJakartaIncidentThemes(input.incidentDetailsItems),
     topThree: applyJakartaTopThree(input.topThree),
   };

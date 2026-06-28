@@ -7,6 +7,7 @@ import {
   buildJakartaBluf,
   buildJakartaCurrentSituation,
   buildJakartaOutlook,
+  buildJakartaEscalationIndicators,
   buildJakartaPolestarView,
   applyJakartaTopThree,
   buildJakartaBrief,
@@ -71,6 +72,7 @@ function allProse(): string[] {
     ...Object.values(brief.polestarViewParts),
     ...brief.recommendedActions,
     ...brief.operationalImpact,
+    ...brief.escalationIndicators,
     ...brief.incidentThemes.map((t) => t.heading),
     ...brief.incidentThemes.map((t) => t.paragraph),
     ...brief.topThree.map((t) => t.developmentTitle ?? ""),
@@ -151,8 +153,8 @@ describe("buildJakartaOperationalImpact", () => {
       expect(b).toMatch(/^[^:]+:\s\S/);
       expect(b).not.toMatch(/\d/);
     }
-    expect(bullets[0]).toMatch(/^Central Jakarta:/);
-    expect(bullets.some((b) => /^Greater Jakarta:/.test(b))).toBe(true);
+    expect(bullets[0]).toMatch(/^Central Jakarta government district:/);
+    expect(bullets[1]).toMatch(/^Jabodetabek commuter movement:/);
     expect(bullets.some((b) => /flood/i.test(b))).toBe(true);
   });
 });
@@ -189,6 +191,17 @@ describe("BLUF / Current Situation / Outlook", () => {
   });
 });
 
+describe("buildJakartaEscalationIndicators", () => {
+  it("returns Jakarta-specific, count-free escalation indicators", () => {
+    const ind = buildJakartaEscalationIndicators();
+    expect(ind.length).toBeGreaterThanOrEqual(3);
+    expect(ind.some((i) => /Central Jakarta/.test(i))).toBe(true);
+    expect(ind.some((i) => /flood|rain/i.test(i))).toBe(true);
+    expect(ind.some((i) => /crime|public-safety/i.test(i))).toBe(true);
+    for (const i of ind) expect(i).not.toMatch(/\d/);
+  });
+});
+
 describe("Polestar View", () => {
   it("is a structured, count-free standing judgement", () => {
     const parts = buildJakartaPolestarView();
@@ -203,7 +216,9 @@ describe("applyJakartaTopThree", () => {
       item({ category: "Civil unrest / protest", province: "Central Jakarta", title: "raw headline one" }),
     ];
     const out = applyJakartaTopThree(input);
-    expect(out[0].developmentTitle).toBe("Protest activity in Central Jakarta");
+    expect(out[0].developmentTitle).toBe(
+      "Central Jakarta protest and policing activity keeps government-district disruption risk active",
+    );
     expect(out[0].businessImpact).toMatch(/confirm routes/i);
     // Inputs are not mutated.
     expect(input[0].developmentTitle).toBeUndefined();
@@ -212,7 +227,9 @@ describe("applyJakartaTopThree", () => {
 
   it("falls back to a Jakarta-wide lead when the area is unknown", () => {
     const out = applyJakartaTopThree([item({ category: "Theft / break-in", province: null })]);
-    expect(out[0].developmentTitle).toBe("Crime and public-safety incident reported in Jakarta");
+    expect(out[0].developmentTitle).toBe(
+      "Local crime reporting supports continued caution around after hours movement",
+    );
   });
 
   it("disambiguates two same-theme same-area developments", () => {
@@ -258,6 +275,7 @@ describe("buildJakartaBrief aggregator", () => {
     expect(brief.polestarView.length).toBeGreaterThan(0);
     expect(brief.recommendedActions.length).toBeGreaterThan(0);
     expect(brief.operationalImpact.length).toBeGreaterThan(0);
+    expect(brief.escalationIndicators.length).toBeGreaterThan(0);
     expect(brief.incidentThemes.length).toBeGreaterThan(0);
     expect(brief.topThree.every((t) => !!t.developmentTitle)).toBe(true);
   });
