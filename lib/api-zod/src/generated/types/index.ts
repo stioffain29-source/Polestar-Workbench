@@ -34,6 +34,7 @@ export * from './countryProseSections';
 export * from './countryProseSectionsIncidentSummaries';
 export * from './countryReport';
 export * from './countryReportInput';
+export * from './countryReportPhoto';
 export * from './countryReportUpdate';
 export * from './dashboardOverview';
 export * from './dashboardTopicCard';

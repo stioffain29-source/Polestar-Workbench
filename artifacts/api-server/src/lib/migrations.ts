@@ -254,6 +254,22 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE spot_reports ADD COLUMN IF NOT EXISTS photos jsonb NOT NULL DEFAULT '[]'::jsonb`,
     );
 
+    // Schema: durable analyst layout controls on country reports — map/photo
+    // placement slots and analyst-attached photographs (resized data URLs +
+    // optional caption/source/credit/context). These persist per-report and are
+    // deliberately OUTSIDE the AI prose fingerprint cache, so changing layout
+    // never invalidates or regenerates the narrative. drizzle push only reaches
+    // dev; the writable prod primary gains the columns here on boot. Idempotent.
+    await db.execute(
+      sql`ALTER TABLE country_reports ADD COLUMN IF NOT EXISTS map_placement text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE country_reports ADD COLUMN IF NOT EXISTS photo_placement text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE country_reports ADD COLUMN IF NOT EXISTS report_photos jsonb NOT NULL DEFAULT '[]'::jsonb`,
+    );
+
     // 0a) Schema: per-feed consecutive-failure counter on `sources`.
     //     drizzle `push` adds this in dev, but the writable prod DB is reached
     //     only from the deployment runtime, so add it idempotently on boot too.

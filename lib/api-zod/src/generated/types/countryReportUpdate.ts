@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryReportPhoto } from './countryReportPhoto';
 import type { KpiCard } from './kpiCard';
 
 export interface CountryReportUpdate {
@@ -14,4 +15,7 @@ export interface CountryReportUpdate {
   trendSummary?: string;
   implications?: string;
   keyNumbers?: KpiCard[];
+  mapPlacement?: string;
+  photoPlacement?: string;
+  reportPhotos?: CountryReportPhoto[];
 }

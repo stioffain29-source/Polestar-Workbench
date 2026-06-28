@@ -5,7 +5,6 @@ import {
   useListIncidents,
   useListSources,
   useListReliefWebReports,
-  useListMaritimeSecurityEvents,
   useUpdateCountryReport,
   useGetCountryBaseline,
   useUpsertCountryBaseline,
@@ -53,13 +52,12 @@ import {
   isForeignSubjectForIndonesia,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
-import SituationalContextSection from "@/components/SituationalContextSection";
 import CountryReportVisuals from "@/components/CountryReportVisuals";
-import {
-  buildMaritimeSecuritySummary,
-  maritimeTypeColor,
-  MARITIME_SECURITY_SOURCE_LABEL,
-} from "@/lib/maritimeSecurity";
+import type {
+  CountryMapPlacement,
+  CountryPhotoPlacement,
+} from "@/components/PngCountryReportBody";
+import type { CountryReportPhoto } from "@workspace/api-client-react";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
@@ -177,6 +175,76 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = { name: "", region: "", overview: "", trendSummary: "", implications: "" };
 
+const MAX_REPORT_PHOTO_BYTES = 28 * 1024 * 1024;
+
+// Resize/flatten an uploaded image to a JPEG data URL bounded to a max edge,
+// mirroring the spot-report photo util so inline payloads stay small.
+async function fileToReportPhotoDataUrl(file: File, maxDim = 1600, quality = 0.82): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error("image decode failed"));
+    im.src = dataUrl;
+  });
+  const longest = Math.max(img.width, img.height) || 1;
+  const scale = Math.min(1, maxDim / longest);
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+// Analyst-attached photo block rendered at the chosen placement slot. Static
+// DOM only (img + figcaption) so it rasterises cleanly into the in-app PDF.
+function CountryReportPhotoBlock({ photos }: { photos: CountryReportPhoto[] }) {
+  if (!photos.length) return null;
+  return (
+    <div style={{ margin: "4px 0" }}>
+      {photos.map((p, i) => (
+        <figure key={i} style={{ margin: "0 0 14px 0", breakInside: "avoid" }}>
+          <img
+            src={p.dataUrl}
+            alt={p.caption ?? ""}
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+              borderRadius: 2,
+              border: `1px solid ${POLAR}`,
+            }}
+          />
+          {(p.caption || p.source || p.credit || p.context) && (
+            <figcaption style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 6, lineHeight: 1.45 }}>
+              {p.caption && <div style={{ fontWeight: 700, color: NAVY }}>{p.caption}</div>}
+              {p.context && <div style={{ marginTop: 2 }}>{p.context}</div>}
+              {(p.source || p.credit) && (
+                <div style={{ marginTop: 2, fontStyle: "italic" }}>
+                  {[p.source ? `Source: ${p.source}` : "", p.credit ? `Credit: ${p.credit}` : ""]
+                    .filter(Boolean)
+                    .join("  ·  ")}
+                </div>
+              )}
+            </figcaption>
+          )}
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 const EMPTY_BASELINE: CountryBaseline = {
   operatingEnvironment: "",
   securityContext: "",
@@ -233,13 +301,6 @@ export default function CountryReport() {
   // empty list (and a hidden section) when the feed is unconfigured/unapproved.
   const { data: situationalReports } = useListReliefWebReports(
     country ? { country: country.name ?? undefined, limit: 40 } : {},
-    { query: { enabled: !!country } } as never,
-  );
-  // Standalone ICC CCS / IMB maritime-security events. Their own source — NEVER
-  // an incident and never added to any count on this page; surfaced only as a
-  // separate reference section when the coastal state has reported activity.
-  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents(
-    country ? { limit: 500 } : {},
     { query: { enabled: !!country } } as never,
   );
   const incidents = useMemo(() => {
@@ -351,6 +412,11 @@ export default function CountryReport() {
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  // Durable analyst layout controls (persisted per-report, OUTSIDE the AI prose
+  // fingerprint cache so changing layout never regenerates the narrative).
+  const [mapPlacement, setMapPlacement] = useState<CountryMapPlacement>("end");
+  const [photoPlacement, setPhotoPlacement] = useState<CountryPhotoPlacement>("none");
+  const [reportPhotos, setReportPhotos] = useState<CountryReportPhoto[]>([]);
   const [baselineDraft, setBaselineDraft] = useState<CountryBaseline>(EMPTY_BASELINE);
   const [baselineDirty, setBaselineDirty] = useState(false);
   const seededForSlug = useRef<string | null>(null);
@@ -866,6 +932,9 @@ export default function CountryReport() {
       trendSummary: pick(country.trendSummary, draftedProse?.trendSummary ?? ""),
       implications: pick(country.implications, draftedProse?.implications ?? ""),
     });
+    setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
+    setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
+    setReportPhotos(country.reportPhotos ?? []);
   }, [country, incidentsData, slug, draftedProse]);
 
   useEffect(() => {
@@ -894,6 +963,35 @@ export default function CountryReport() {
 
   const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
+
+  const setPhotoField = (idx: number, field: keyof CountryReportPhoto, v: string) =>
+    setReportPhotos((ps) => ps.map((p, i) => (i === idx ? { ...p, [field]: v } : p)));
+  const movePhoto = (idx: number, dir: -1 | 1) =>
+    setReportPhotos((ps) => {
+      const next = [...ps];
+      const j = idx + dir;
+      if (j < 0 || j >= next.length) return ps;
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  const removePhoto = (idx: number) => setReportPhotos((ps) => ps.filter((_, i) => i !== idx));
+  const addPhotoFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const incoming = await Promise.all(Array.from(files).map((f) => fileToReportPhotoDataUrl(f)));
+    setReportPhotos((ps) => {
+      const merged: CountryReportPhoto[] = [...ps, ...incoming.map((dataUrl) => ({ dataUrl }))];
+      // Bound the total inline payload so the PATCH body stays under the
+      // server's express.json limit.
+      let total = 0;
+      const kept: CountryReportPhoto[] = [];
+      for (const p of merged) {
+        total += p.dataUrl.length;
+        if (total > MAX_REPORT_PHOTO_BYTES) break;
+        kept.push(p);
+      }
+      return kept;
+    });
+  };
 
   const effective = country
     ? {
@@ -934,6 +1032,11 @@ export default function CountryReport() {
         data: {
           name: draft.name,
           region: draft.region,
+          // Durable layout controls — persisted alongside the report row, never
+          // folded into the prose fingerprint cache.
+          mapPlacement,
+          photoPlacement,
+          reportPhotos,
         },
       });
       // Only touch the baseline row if the editor actually changed
@@ -989,6 +1092,9 @@ export default function CountryReport() {
         trendSummary: country.trendSummary ?? "",
         implications: country.implications ?? "",
       });
+      setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
+      setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
+      setReportPhotos(country.reportPhotos ?? []);
     }
     setBaselineDraft(persistedBaseline ?? EMPTY_BASELINE);
     setBaselineDirty(false);
@@ -1027,13 +1133,15 @@ export default function CountryReport() {
     .slice(0, 8);
   const typeChartMax = typeChartData.length > 0 ? Math.max(...typeChartData.map((d) => d.n)) : 0;
 
-  // Standalone ICC CCS / IMB maritime-security layer for this coastal state.
-  // Current-year only (the ingest already scopes to the calendar year), never
-  // windowed to the report period and never added to any incident count.
-  const maritimeSummary = buildMaritimeSecuritySummary(maritimeSecurityEvents, {
-    country: effective.name ?? undefined,
-    limit: 20,
-  });
+  // Analyst-placed incident map node, rendered at the chosen placement slot.
+  const mapNode = (
+    <CountryReportMap
+      incidents={windowIncidents as CountryFastFactsIncident[]}
+      countryName={effective.name}
+    />
+  );
+  // Analyst-attached photo block, rendered at the chosen placement slot.
+  const photoBlock = reportPhotos.length > 0 ? <CountryReportPhotoBlock photos={reportPhotos} /> : null;
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6" style={{ fontFamily: ROBOTO, color: DUSK }}>
@@ -1187,6 +1295,8 @@ export default function CountryReport() {
         </div>
 
         <div className="px-10 py-10 space-y-8">
+      {/* "Cover" photo placement — analyst-attached imagery leads the report. */}
+      {photoPlacement === "cover" && photoBlock}
       {!sourcesLoading && coverage.showBanner && (
         <div
           style={{
@@ -1302,6 +1412,125 @@ export default function CountryReport() {
         </Section>
       )}
 
+      {editing && (
+        <Section title="Report Layout">
+          <div className="grid md:grid-cols-2 gap-3">
+            <label style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "block" }}>
+              Incident map placement
+              <select
+                value={mapPlacement}
+                onChange={(e) => setMapPlacement(e.target.value as CountryMapPlacement)}
+                style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, padding: 8, color: DUSK, width: "100%", marginTop: 4 }}
+              >
+                <option value="none">Hidden</option>
+                <option value="after-bluf">After Bottom Line</option>
+                <option value="after-top3">After Top 3 Developments</option>
+                <option value="after-incident-details">After Incident Details</option>
+                <option value="before-outlook">Before Outlook</option>
+                <option value="before-polestar">Before Polestar View</option>
+                <option value="end">At end (above charts)</option>
+              </select>
+            </label>
+            <label style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "block" }}>
+              Photo placement
+              <select
+                value={photoPlacement}
+                onChange={(e) => setPhotoPlacement(e.target.value as CountryPhotoPlacement)}
+                style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, padding: 8, color: DUSK, width: "100%", marginTop: 4 }}
+              >
+                <option value="none">Hidden</option>
+                <option value="cover">On cover</option>
+                <option value="after-bluf">After Bottom Line</option>
+                <option value="after-top3">After Top 3 Developments</option>
+                <option value="inside-incident-details">Inside Incident Details</option>
+                <option value="before-polestar">Before Polestar View</option>
+              </select>
+            </label>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                void addPhotoFiles(e.target.files);
+                e.target.value = "";
+              }}
+              style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK }}
+            />
+          </div>
+          {reportPhotos.length > 0 && (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+              {reportPhotos.map((p, i) => (
+                <div
+                  key={i}
+                  style={{ border: `1px solid ${POLAR}`, padding: 10, borderRadius: 2, display: "flex", gap: 12 }}
+                >
+                  <img
+                    src={p.dataUrl}
+                    alt=""
+                    style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 2, border: `1px solid ${POLAR}` }}
+                  />
+                  <div style={{ flex: 1, display: "grid", gap: 6 }}>
+                    <input
+                      value={p.caption ?? ""}
+                      onChange={(e) => setPhotoField(i, "caption", e.target.value)}
+                      placeholder="Caption"
+                      style={{ fontFamily: ROBOTO, fontSize: 12, border: `1px solid ${POLAR}`, padding: 8, color: DUSK }}
+                    />
+                    <input
+                      value={p.context ?? ""}
+                      onChange={(e) => setPhotoField(i, "context", e.target.value)}
+                      placeholder="Context"
+                      style={{ fontFamily: ROBOTO, fontSize: 12, border: `1px solid ${POLAR}`, padding: 8, color: DUSK }}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        value={p.source ?? ""}
+                        onChange={(e) => setPhotoField(i, "source", e.target.value)}
+                        placeholder="Source"
+                        style={{ fontFamily: ROBOTO, fontSize: 12, border: `1px solid ${POLAR}`, padding: 8, color: DUSK }}
+                      />
+                      <input
+                        value={p.credit ?? ""}
+                        onChange={(e) => setPhotoField(i, "credit", e.target.value)}
+                        placeholder="Credit"
+                        style={{ fontFamily: ROBOTO, fontSize: 12, border: `1px solid ${POLAR}`, padding: 8, color: DUSK }}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, -1)}
+                        disabled={i === 0}
+                        style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "4px 10px", color: DUSK, opacity: i === 0 ? 0.4 : 1 }}
+                      >
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, 1)}
+                        disabled={i === reportPhotos.length - 1}
+                        style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "4px 10px", color: DUSK, opacity: i === reportPhotos.length - 1 ? 0.4 : 1 }}
+                      >
+                        Down
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid #A33232`, padding: "4px 10px", color: "#A33232" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
       {editing && proseDraft && (
         <Section title="Narrative (editable)">
           {pngDataset && pngDataset.proseVariant === "operating-risk" ? (
@@ -1351,24 +1580,30 @@ export default function CountryReport() {
       {/* Every country — structured theatre or generic — renders the same
           deterministic operating-risk brief from PngCountryReportBody. */}
       {pngEffectiveDataset && (
-        <PngCountryReportBody dataset={pngEffectiveDataset} incidentSummaries={incidentSummaries} />
+        <PngCountryReportBody
+          dataset={pngEffectiveDataset}
+          incidentSummaries={incidentSummaries}
+          mapPlacement={mapPlacement}
+          mapNode={mapNode}
+          photoPlacement={photoPlacement}
+          photoNode={photoBlock}
+        />
       )}
 
+      {/* "End" map placement — the incident map renders here, just above the
+          shared analytics block, when the analyst leaves it at the default. */}
+      {mapPlacement === "end" && mapNode}
+
       {/* Shared analytics block — rendered below the written brief for EVERY
-          country (structured and generic). Map leads, then the severity and
-          incident-type charts, then the Situational Context and Maritime
-          Security reference layers. */}
+          country (structured and generic). Severity and incident-type charts,
+          then the Situational Context reference layer. */}
       <CountryReportVisuals
-        windowIncidents={windowIncidents as CountryFastFactsIncident[]}
         countryName={effective.name}
         severityCounts={facts.severityCounts}
         severityTotal={severityTotal}
         typeChartData={typeChartData}
         typeChartMax={typeChartMax}
         situationalReports={situationalReports}
-        maritimeSummary={maritimeSummary}
-        activeIncidentCount={active.incidents.length}
-        activeBasisLabel={active.basisLabel}
       />
 
       {/* Internal Source Coverage — screen-only, never in the PDF.

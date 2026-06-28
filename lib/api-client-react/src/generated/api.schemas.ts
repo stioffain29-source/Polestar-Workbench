@@ -940,6 +940,14 @@ export interface BrandSettingsUpdate {
   footerText?: string;
 }
 
+export interface CountryReportPhoto {
+  dataUrl: string;
+  caption?: string;
+  source?: string;
+  credit?: string;
+  context?: string;
+}
+
 export interface CountryReport {
   id: number;
   slug: string;
@@ -953,6 +961,11 @@ export interface CountryReport {
   implications?: string | null;
   /** @nullable */
   keyNumbers?: KpiCard[] | null;
+  /** @nullable */
+  mapPlacement?: string | null;
+  /** @nullable */
+  photoPlacement?: string | null;
+  reportPhotos?: CountryReportPhoto[];
   createdAt: string;
 }
 
@@ -973,6 +986,9 @@ export interface CountryReportUpdate {
   trendSummary?: string;
   implications?: string;
   keyNumbers?: KpiCard[];
+  mapPlacement?: string;
+  photoPlacement?: string;
+  reportPhotos?: CountryReportPhoto[];
 }
 
 export interface CountryBaselineWatchlistItem {

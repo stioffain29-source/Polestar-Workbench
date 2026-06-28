@@ -2855,6 +2855,15 @@ export const ListCountryReportsResponseItem = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).nullish(),
+  "mapPlacement": zod.string().nullish(),
+  "photoPlacement": zod.string().nullish(),
+  "reportPhotos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional(),
+  "source": zod.string().optional(),
+  "credit": zod.string().optional(),
+  "context": zod.string().optional()
+})).optional(),
   "createdAt": zod.coerce.date()
 })
 export const ListCountryReportsResponse = zod.array(ListCountryReportsResponseItem)
@@ -2961,6 +2970,15 @@ export const GetCountryReportResponse = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).nullish(),
+  "mapPlacement": zod.string().nullish(),
+  "photoPlacement": zod.string().nullish(),
+  "reportPhotos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional(),
+  "source": zod.string().optional(),
+  "credit": zod.string().optional(),
+  "context": zod.string().optional()
+})).optional(),
   "createdAt": zod.coerce.date()
 })
 
@@ -2980,6 +2998,15 @@ export const UpdateCountryReportBody = zod.object({
   "value": zod.string(),
   "accent": zod.string().optional(),
   "context": zod.string().optional()
+})).optional(),
+  "mapPlacement": zod.string().optional(),
+  "photoPlacement": zod.string().optional(),
+  "reportPhotos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional(),
+  "source": zod.string().optional(),
+  "credit": zod.string().optional(),
+  "context": zod.string().optional()
 })).optional()
 })
 
@@ -2997,6 +3024,15 @@ export const UpdateCountryReportResponse = zod.object({
   "accent": zod.string().optional(),
   "context": zod.string().optional()
 })).nullish(),
+  "mapPlacement": zod.string().nullish(),
+  "photoPlacement": zod.string().nullish(),
+  "reportPhotos": zod.array(zod.object({
+  "dataUrl": zod.string(),
+  "caption": zod.string().optional(),
+  "source": zod.string().optional(),
+  "credit": zod.string().optional(),
+  "context": zod.string().optional()
+})).optional(),
   "createdAt": zod.coerce.date()
 })
 

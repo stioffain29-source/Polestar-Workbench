@@ -1,14 +1,14 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { format } from "date-fns";
 import type {
-  KeyDevelopmentGroup,
-  LocationWatchlistEntry,
   PngReportDataset,
   PngReportItem,
   ReportingConfidence,
-  StructuredLocationAugmentation,
-  StructuredLocationBucket,
 } from "@/lib/pngReportDataset";
+import {
+  buildCountryIncidentThemes,
+  buildOperationalImpactBullets,
+} from "@/lib/countryIncidentThemes";
 
 // Per-incident AI analyst summaries, keyed by incident id, provided by the
 // page. When an incident has an entry it replaces the deterministic
@@ -32,6 +32,30 @@ const SEV_COLOR: Record<string, string> = {
   low: "#6FB872",
   insignificant: "#1B6B7A",
 };
+
+// Where the analyst-placed incident map sits relative to the written brief. The
+// "none" / "end" placements are handled by the page (the page renders the map at
+// the top of the analytics block for "end" and omits it for "none"); the four
+// inline placements below are injected by this component between sections.
+export type CountryMapPlacement =
+  | "none"
+  | "after-bluf"
+  | "after-top3"
+  | "after-incident-details"
+  | "before-outlook"
+  | "before-polestar"
+  | "end";
+
+// Where the analyst-attached photo block sits. "none" omits it; "cover" places
+// it on the cover page (handled by the page); the four inline placements below
+// are injected here.
+export type CountryPhotoPlacement =
+  | "none"
+  | "cover"
+  | "after-bluf"
+  | "after-top3"
+  | "inside-incident-details"
+  | "before-polestar";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -75,20 +99,6 @@ function Prose({ text }: { text: string }) {
 
 function EmptyNote({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK, fontStyle: "italic" }}>{children}</div>;
-}
-
-// Count-free transparency note shown when a location section is capped to the
-// most serious few incidents — tells the reader this is a curated selection, not
-// the full incident list, without ever stating a number (house rule: no counts).
-const LOCATION_TRIM_NOTE =
-  "Showing the most significant incidents only; additional lower-priority reporting this period informs the wider assessment.";
-
-function MoreNote({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, fontStyle: "italic", marginTop: 4 }}>
-      {children}
-    </div>
-  );
 }
 
 function SeverityChip({ item }: { item: PngReportItem }) {
@@ -202,40 +212,7 @@ function ItemCard({
   );
 }
 
-function LocationSection({
-  title,
-  items,
-  emptyFallback,
-  hadFeatured,
-  featuredNote,
-  truncated = false,
-  suppressEmptyLocation = false,
-}: {
-  title: string;
-  items: PngReportItem[];
-  emptyFallback: string;
-  hadFeatured: boolean;
-  featuredNote: string;
-  truncated?: boolean;
-  suppressEmptyLocation?: boolean;
-}) {
-  return (
-    <Section title={title}>
-      {items.length === 0 ? (
-        <EmptyNote>{hadFeatured ? featuredNote : emptyFallback}</EmptyNote>
-      ) : (
-        <div>
-          {items.map((it) => (
-            <ItemCard key={it.id} item={it} suppressEmptyLocation={suppressEmptyLocation} />
-          ))}
-          {truncated ? <MoreNote>{LOCATION_TRIM_NOTE}</MoreNote> : null}
-        </div>
-      )}
-    </Section>
-  );
-}
-
-// Strand sub-heading inside an augmented location section.
+// Theme sub-heading used inside the Incident Details / Outlook sections.
 function StrandLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -254,98 +231,8 @@ function StrandLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Emphasised caveat shown when a location had no confirmed incidents this
-// period — gives the required "absence of reporting is not absence of crime"
-// wording visible weight rather than a faint footnote.
-function CaveatNote({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontFamily: ROBOTO,
-        fontSize: 13,
-        lineHeight: 1.55,
-        color: DUSK,
-        background: "#f4f5f7",
-        borderLeft: `3px solid ${ELECTRIC}`,
-        padding: "10px 12px",
-        borderRadius: 2,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// Augmented location section (PNG Port Moresby / NCD): the bucket's incidents
-// are split into Confirmed Incidents / Police Activity & Arrests / Crime Trend
-// Indicators, followed by an always-present Standing Operating Risk paragraph so
-// the section is never blank. When there are no confirmed incidents this period
-// the EXACT sparse-reporting caveat is shown instead of the bare fallback.
-function StrandedLocationSection({
-  title,
-  strands,
-  augmentation,
-  hadFeatured,
-  featuredNote,
-  truncated = false,
-}: {
-  title: string;
-  strands: NonNullable<StructuredLocationBucket["strands"]>;
-  augmentation: StructuredLocationAugmentation;
-  hadFeatured: boolean;
-  featuredNote: string;
-  truncated?: boolean;
-}) {
-  return (
-    <Section title={title}>
-      <StrandLabel>Confirmed Incidents</StrandLabel>
-      {strands.confirmed.length > 0 ? (
-        <div>
-          {strands.confirmed.map((it) => (
-            <ItemCard key={it.id} item={it} />
-          ))}
-        </div>
-      ) : hadFeatured ? (
-        <EmptyNote>{featuredNote}</EmptyNote>
-      ) : (
-        <CaveatNote>{augmentation.sparseCaveat}</CaveatNote>
-      )}
-
-      <StrandLabel>Police Activity &amp; Arrests</StrandLabel>
-      {strands.police.length > 0 ? (
-        <div>
-          {strands.police.map((it) => (
-            <ItemCard key={it.id} item={it} />
-          ))}
-        </div>
-      ) : (
-        <EmptyNote>
-          No police operations or arrests were separately reported for the district this period.
-        </EmptyNote>
-      )}
-
-      <StrandLabel>Crime Trend Indicators</StrandLabel>
-      {strands.trend.length > 0 ? (
-        <div>
-          {strands.trend.map((it) => (
-            <ItemCard key={it.id} item={it} />
-          ))}
-        </div>
-      ) : (
-        <EmptyNote>No additional crime-trend signals were reported this period.</EmptyNote>
-      )}
-
-      {truncated ? <MoreNote>{LOCATION_TRIM_NOTE}</MoreNote> : null}
-
-      <StrandLabel>Standing Operating Risk</StrandLabel>
-      <Prose text={augmentation.standingOperatingRisk} />
-    </Section>
-  );
-}
-
-// A plain count-free bullet list (What Matters This Week, Priorities for Clients,
-// Escalation Indicators). data-pdf-flow lets the DOM-rasterise PDF break it at
-// the line level rather than pushing the whole block to a new page.
+// A plain count-free bullet list. data-pdf-flow lets the DOM-rasterise PDF break
+// it at the line level rather than pushing the whole block to a new page.
 function BulletList({ items }: { items: string[] }) {
   return (
     <ul
@@ -358,93 +245,6 @@ function BulletList({ items }: { items: string[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-// One themed "Key Development" group: a theme sub-heading, the theme's incident
-// tile cards, then a single deterministic "Business impact:" line. Used for the
-// operating-risk theatres (the example's themed Key Developments layout).
-function KeyDevelopmentGroupSection({
-  group,
-  suppressEmptyLocation = false,
-}: {
-  group: KeyDevelopmentGroup;
-  suppressEmptyLocation?: boolean;
-}) {
-  return (
-    <div data-pdf-row="true" style={{ marginBottom: 18 }}>
-      <StrandLabel>{group.heading}</StrandLabel>
-      {group.items.map((it) => (
-        <ItemCard key={it.id} item={it} suppressEmptyLocation={suppressEmptyLocation} />
-      ))}
-      <div
-        data-pdf-flow="true"
-        style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.5, color: DUSK, marginTop: 4 }}
-      >
-        <span style={{ fontWeight: 700, color: NAVY }}>Business impact: </span>
-        {group.businessImpact}
-      </div>
-    </div>
-  );
-}
-
-// Location Watchlist — a branded three-column table (Location | Main concern |
-// Recommended action). Plain text cells with content-box sizing and generous
-// padding, no line-clamp, so html2canvas rasterises every line cleanly (clamped
-// text renders shifted/clipped under html2canvas).
-function LocationWatchlistTable({ entries }: { entries: LocationWatchlistEntry[] }) {
-  if (entries.length === 0)
-    return <EmptyNote>No location currently carries fresh or standing watch signals for this period.</EmptyNote>;
-  const Cell = ({
-    text,
-    width,
-    head,
-    strong,
-  }: {
-    text: string;
-    width: string;
-    head?: boolean;
-    strong?: boolean;
-  }) => (
-    <div
-      style={{
-        width,
-        boxSizing: "border-box",
-        padding: "8px 10px 10px 10px",
-        fontFamily: ROBOTO,
-        fontSize: head ? 11 : 13,
-        fontWeight: head || strong ? 700 : 400,
-        lineHeight: 1.45,
-        color: head ? "#fff" : strong ? NAVY : DUSK,
-        textTransform: head ? "uppercase" : "none",
-        letterSpacing: head ? "0.05em" : "normal",
-      }}
-    >
-      {text}
-    </div>
-  );
-  return (
-    <div data-pdf-flow="true" style={{ border: `1px solid ${POLAR}` }}>
-      <div
-        style={{
-          display: "flex",
-          background: NAVY,
-          WebkitPrintColorAdjust: "exact",
-          printColorAdjust: "exact",
-        }}
-      >
-        <Cell text="Location" width="24%" head />
-        <Cell text="Main concern" width="38%" head />
-        <Cell text="Recommended action" width="38%" head />
-      </div>
-      {entries.map((e, i) => (
-        <div key={i} style={{ display: "flex", borderTop: i === 0 ? "none" : `1px solid ${POLAR}` }}>
-          <Cell text={e.location} width="24%" strong />
-          <Cell text={e.why} width="38%" />
-          <Cell text={e.action} width="38%" />
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -476,24 +276,84 @@ function ConfidenceBadge({ level }: { level: ReportingConfidence["level"] }) {
   );
 }
 
+// The shared country-brief body. Renders the SAME section order for every
+// theatre (PNG, West Papua, Indonesia, Jakarta and all generic countries):
+// Bottom Line Up Front; Top 3 Developments; Incident Details (themed narrative
+// groups); Current Situation; Operational Impact; Recommended Actions; Outlook;
+// Polestar View; Reporting Confidence. The page appends its analytics block and
+// the Disclaimer below. The analyst-placed map and photo blocks are injected at
+// the chosen inline placements.
 export default function PngCountryReportBody({
   dataset,
   incidentSummaries = {},
+  mapPlacement = "end",
+  mapNode = null,
+  photoPlacement = "none",
+  photoNode = null,
 }: {
   dataset: PngReportDataset;
   incidentSummaries?: Record<string, string>;
+  mapPlacement?: CountryMapPlacement;
+  mapNode?: ReactNode;
+  photoPlacement?: CountryPhotoPlacement;
+  photoNode?: ReactNode;
 }) {
   const d = dataset;
-  const operatingRisk = d.proseVariant === "operating-risk";
+
+  // Top 3 Developments — at most three tiles. The remaining incidents become the
+  // themed Incident Details narrative.
+  const topThree = d.topThree.slice(0, 3);
+  const topIds = new Set(topThree.map((it) => it.id));
+  const remaining = d.windowItems.filter((it) => !topIds.has(it.id));
+  const incidentThemes = buildCountryIncidentThemes(remaining);
+  const operationalImpact = buildOperationalImpactBullets(d.windowItems);
+
+  // Inline injection helpers for the analyst-placed map / photo blocks.
+  const mapAt = (slot: CountryMapPlacement) =>
+    mapPlacement === slot && mapNode ? <div style={{ marginTop: 4 }}>{mapNode}</div> : null;
+  const photoAt = (slot: CountryPhotoPlacement) =>
+    photoPlacement === slot && photoNode ? <div style={{ marginTop: 4 }}>{photoNode}</div> : null;
+
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
       {/* 1. Bottom Line Up Front */}
       <Section title="Bottom Line Up Front">
         <Prose text={d.bluf} />
       </Section>
+      {mapAt("after-bluf")}
+      {photoAt("after-bluf")}
 
-      {/* 2. What Matters This Week — framing paragraph + dominant-theme bullets */}
-      <Section title="What Matters This Week">
+      {/* 2. Top 3 Developments — at most three tiles */}
+      <Section title="Top 3 Developments">
+        {topThree.length === 0 ? (
+          <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
+        ) : (
+          <div>
+            {topThree.map((it) => (
+              <ItemCard key={it.id} item={it} suppressEmptyLocation />
+            ))}
+          </div>
+        )}
+      </Section>
+      {mapAt("after-top3")}
+      {photoAt("after-top3")}
+
+      {/* 3. Incident Details — themed narrative groups of the remaining
+          incidents. Every theme always appears; empty themes read
+          "Not reported this period." (no fabrication, count-free). */}
+      <Section title="Incident Details">
+        {incidentThemes.map((g) => (
+          <div key={g.key} data-pdf-row="true">
+            <StrandLabel>{g.heading}</StrandLabel>
+            <Prose text={g.narrative} />
+          </div>
+        ))}
+        {photoAt("inside-incident-details")}
+      </Section>
+      {mapAt("after-incident-details")}
+
+      {/* 4. Current Situation — framing paragraph + dominant-theme bullets */}
+      <Section title="Current Situation">
         <Prose text={d.executiveSummary} />
         {d.whatMattersBullets.length > 0 ? (
           <div style={{ marginTop: 10 }}>
@@ -502,82 +362,28 @@ export default function PngCountryReportBody({
         ) : null}
       </Section>
 
-      {/* 3. Key Developments. Operating-risk theatres render themed groups
-          (tile cards + "Business impact:" line). PNG / West Papua keep their
-          Top-3 + location-bucket layout (with the NCD strand sections), so their
-          bespoke per-district detail is preserved within Key Developments. */}
-      {operatingRisk ? (
-        <Section title="Key Developments">
-          {d.keyDevelopments.length === 0 ? (
-            <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
-          ) : (
-            d.keyDevelopments.map((g) => (
-              <KeyDevelopmentGroupSection key={g.key} group={g} suppressEmptyLocation />
-            ))
-          )}
-        </Section>
-      ) : (
-        <>
-          <Section title={d.topIncidentsHeading ?? "Key Developments"}>
-            {d.topThree.length === 0 ? (
-              <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
-            ) : (
-              <div>
-                {d.topThree.map((it) => (
-                  <ItemCard key={it.id} item={it} />
-                ))}
-              </div>
-            )}
-          </Section>
-          {d.buckets.map((b) =>
-            b.augmentation && b.strands ? (
-              <StrandedLocationSection
-                key={b.key}
-                title={b.label}
-                strands={b.strands}
-                augmentation={b.augmentation}
-                hadFeatured={b.hadFeatured}
-                featuredNote={d.featuredAboveNote}
-                truncated={b.truncated}
-              />
-            ) : (
-              <LocationSection
-                key={b.key}
-                title={b.label}
-                items={b.items}
-                emptyFallback={d.emptyLocationFallback}
-                hadFeatured={b.hadFeatured}
-                featuredNote={d.featuredAboveNote}
-                truncated={b.truncated}
-              />
-            ),
-          )}
-          <LocationSection
-            title={d.otherBucketLabel}
-            items={d.otherNational}
-            emptyFallback={d.emptyLocationFallback}
-            hadFeatured={d.otherNationalHadFeatured}
-            featuredNote={d.featuredAboveNote}
-            truncated={d.otherNationalTruncated}
-          />
-        </>
-      )}
-
-      {/* 4. Location Watchlist */}
-      <Section title="Location Watchlist">
-        <LocationWatchlistTable entries={d.locationWatchlist} />
+      {/* 5. Operational Impact — per-theme impact lines for the themes present
+          this period. */}
+      <Section title="Operational Impact">
+        {operationalImpact.length === 0 ? (
+          <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
+        ) : (
+          <BulletList items={operationalImpact} />
+        )}
       </Section>
 
-      {/* 5. Priorities for Clients This Week */}
-      <Section title="Priorities for Clients This Week">
+      {/* 6. Recommended Actions — the period's client priorities */}
+      <Section title="Recommended Actions">
         {d.businessImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
         ) : (
           <BulletList items={d.businessImpact} />
         )}
       </Section>
+      {mapAt("before-outlook")}
 
-      {/* 6. Outlook: Next Seven Days — most-likely scenario + escalation indicators */}
+      {/* 7. Outlook: Next Seven Days — most-likely scenario + escalation
+          indicators */}
       <Section title="Outlook: Next Seven Days">
         <Prose text={d.outlook} />
         {d.escalationIndicators.length > 0 ? (
@@ -587,13 +393,15 @@ export default function PngCountryReportBody({
           </div>
         ) : null}
       </Section>
+      {mapAt("before-polestar")}
+      {photoAt("before-polestar")}
 
-      {/* 7. Polestar View */}
+      {/* 8. Polestar View */}
       <Section title="Polestar View">
         <Prose text={d.polestarView} />
       </Section>
 
-      {/* Reporting Confidence — closes the written brief */}
+      {/* 9. Reporting Confidence — closes the written brief */}
       <Section title="Reporting Confidence">
         <div style={{ marginBottom: 8 }}>
           <ConfidenceBadge level={d.reportingConfidence.level} />

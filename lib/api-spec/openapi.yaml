@@ -2414,7 +2414,22 @@ components:
         keyNumbers:
           type: ["array", "null"]
           items: { $ref: "#/components/schemas/KpiCard" }
+        mapPlacement: { type: ["string", "null"] }
+        photoPlacement: { type: ["string", "null"] }
+        reportPhotos:
+          type: array
+          items: { $ref: "#/components/schemas/CountryReportPhoto" }
         createdAt: { type: string, format: date-time }
+
+    CountryReportPhoto:
+      type: object
+      required: [dataUrl]
+      properties:
+        dataUrl: { type: string }
+        caption: { type: string }
+        source: { type: string }
+        credit: { type: string }
+        context: { type: string }
 
     CountryReportInput:
       type: object
@@ -2441,6 +2456,11 @@ components:
         keyNumbers:
           type: array
           items: { $ref: "#/components/schemas/KpiCard" }
+        mapPlacement: { type: string }
+        photoPlacement: { type: string }
+        reportPhotos:
+          type: array
+          items: { $ref: "#/components/schemas/CountryReportPhoto" }
 
     CountryBaselineWatchlistItem:
       type: object

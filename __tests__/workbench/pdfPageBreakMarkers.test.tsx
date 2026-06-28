@@ -127,9 +127,11 @@ describe("PngCountryReportBody page-break markers", () => {
     <PngCountryReportBody dataset={makePngDataset()} />,
   );
 
-  it("marks every atomic incident card with data-pdf-row", () => {
-    // Top 3 (1) + NCD confirmed strand (1) + Morobe (1) + Other (1) = 4 cards.
-    expect(countMatches(html, /data-pdf-row="true"/g)).toBe(4);
+  it("marks every atomic block with data-pdf-row", () => {
+    // The rebuilt renderer marks the Top 3 tile card (1 item in this dataset)
+    // plus each of the six fixed Incident Details theme groups as atomic blocks
+    // the exporter must never split mid-cut: 1 + 6 = 7.
+    expect(countMatches(html, /data-pdf-row="true"/g)).toBe(7);
   });
 
   it("marks long prose blocks with data-pdf-flow for line-level breaks", () => {

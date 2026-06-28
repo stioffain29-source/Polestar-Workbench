@@ -369,9 +369,15 @@ describe("PngCountryReportBody charts & tables", () => {
     expect(html).toContain("Armed robbery reported in Port Moresby");
   });
 
-  it("renders a location bucket card heading and its incident body", () => {
-    expect(html).toContain("Port Moresby / National Capital District");
-    expect(html).toContain("Confirmed NCD incident reported overnight");
+  it("renders themed Incident Details with a count-free location narrative", () => {
+    // The rebuilt renderer drops location buckets; the remaining (non-Top-3)
+    // incidents become the six fixed Incident Details theme groups. The "Other
+    // security" item maps to "Other operational disruption" and its deterministic
+    // narrative cites the province focus and severity emphasis — never a count.
+    expect(html).toContain("Other operational disruption");
+    expect(html).toContain("centred on National Capital District");
+    // Empty themes carry the no-fabrication caveat rather than being hidden.
+    expect(html).toContain("Not reported this period.");
   });
 
   it("renders the card metadata line (category · province · source)", () => {
