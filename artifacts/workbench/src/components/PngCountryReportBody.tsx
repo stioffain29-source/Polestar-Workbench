@@ -248,6 +248,32 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
+// One labelled line of a four-part Incident Details theme analysis (What
+// happened / Where / Why it matters / What could be affected). data-pdf-flow
+// lets the DOM-rasterise PDF break the paragraph at the line level.
+function ThemePart({ label, text }: { label: string; text: string }) {
+  return (
+    <p
+      data-pdf-flow="true"
+      style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "0 0 6px 0" }}
+    >
+      <span style={{ fontWeight: 700, color: NAVY }}>{label}: </span>
+      {text}
+    </p>
+  );
+}
+
+// One grouped Recommended Actions block: an ELECTRIC sub-heading over a
+// count-free bullet list of that group's actions.
+function ActionGroup({ heading, actions }: { heading: string; actions: string[] }) {
+  return (
+    <div data-pdf-row="true" style={{ marginBottom: 10 }}>
+      <StrandLabel>{heading}</StrandLabel>
+      <BulletList items={actions} />
+    </div>
+  );
+}
+
 // Reporting-confidence pill. Neutral on-brand styling (POLAR fill, ELECTRIC
 // border, NAVY text) — deliberately NOT a severity colour, so it is never
 // confused with the five-tier risk ramp (and never touches the reserved
@@ -300,12 +326,12 @@ export default function PngCountryReportBody({
 }) {
   const d = dataset;
 
-  // Top 3 Developments — at most three tiles. The remaining incidents become the
-  // themed Incident Details narrative.
+  // Top 3 Developments — at most three tiles. The Incident Details themes below
+  // analyse d.incidentDetailsItems: every window incident NOT promoted into the
+  // Top 3 STORY CLUSTERS (so a syndicated re-run of a Top 3 story never reappears
+  // here). Operational Impact still draws on the full window.
   const topThree = d.topThree.slice(0, 3);
-  const topIds = new Set(topThree.map((it) => it.id));
-  const remaining = d.windowItems.filter((it) => !topIds.has(it.id));
-  const incidentThemes = buildCountryIncidentThemes(remaining);
+  const incidentThemes = buildCountryIncidentThemes(d.incidentDetailsItems);
   const operationalImpact = buildOperationalImpactBullets(d.windowItems);
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
@@ -338,16 +364,29 @@ export default function PngCountryReportBody({
       {mapAt("after-top3")}
       {photoAt("after-top3")}
 
-      {/* 3. Incident Details — themed narrative groups of the remaining
-          incidents. Every theme always appears; empty themes read
-          "Not reported this period." (no fabrication, count-free). */}
+      {/* 3. Incident Details — PRESENT-ONLY analytical theme groups of the
+          incidents not already shown as Top 3 developments. Each present theme
+          is a four-part analysis (What happened / Where / Why it matters / What
+          could be affected). No fabrication, count-free; absent themes are
+          omitted rather than padded with "not reported" filler. */}
       <Section title="Incident Details">
-        {incidentThemes.map((g) => (
-          <div key={g.key} data-pdf-row="true">
-            <StrandLabel>{g.heading}</StrandLabel>
-            <Prose text={g.narrative} />
-          </div>
-        ))}
+        {incidentThemes.length === 0 ? (
+          <EmptyNote>
+            {d.windowItems.length === 0
+              ? d.emptyLocationFallback
+              : "No further incident reporting beyond the developments above this period."}
+          </EmptyNote>
+        ) : (
+          incidentThemes.map((g) => (
+            <div key={g.key} data-pdf-row="true" style={{ marginBottom: 14 }}>
+              <StrandLabel>{g.heading}</StrandLabel>
+              <ThemePart label="What happened" text={g.whatHappened} />
+              <ThemePart label="Where" text={g.where} />
+              <ThemePart label="Why it matters" text={g.whyItMatters} />
+              <ThemePart label="What could be affected" text={g.whatCouldBeAffected} />
+            </div>
+          ))
+        )}
         {photoAt("inside-incident-details")}
       </Section>
       {mapAt("after-incident-details")}
@@ -372,12 +411,23 @@ export default function PngCountryReportBody({
         )}
       </Section>
 
-      {/* 6. Recommended Actions — the period's client priorities */}
+      {/* 6. Recommended Actions — grouped client priorities (Movement security,
+          Site security, …), emitting only the groups this period's incident mix
+          and watchlist support. The operating-risk theatres (Indonesia /
+          Jakarta) keep their own flat priorities list unchanged. */}
       <Section title="Recommended Actions">
-        {d.businessImpact.length === 0 ? (
+        {d.proseVariant === "operating-risk" ? (
+          d.businessImpact.length === 0 ? (
+            <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
+          ) : (
+            <BulletList items={d.businessImpact} />
+          )
+        ) : d.recommendedActions.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
         ) : (
-          <BulletList items={d.businessImpact} />
+          d.recommendedActions.map((g) => (
+            <ActionGroup key={g.key} heading={g.heading} actions={g.actions} />
+          ))
         )}
       </Section>
       {mapAt("before-outlook")}

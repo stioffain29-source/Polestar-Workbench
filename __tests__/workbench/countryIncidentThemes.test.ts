@@ -75,31 +75,34 @@ describe("themeForCategory", () => {
 });
 
 describe("buildCountryIncidentThemes", () => {
-  it("always returns the six themes in fixed order", () => {
-    const groups = buildCountryIncidentThemes([]);
-    expect(groups.map((g) => g.key)).toEqual([
-      "protest",
-      "crime",
-      "natural",
-      "governance",
-      "fire",
-      "other",
-    ]);
+  it("returns an empty list for an empty window", () => {
+    expect(buildCountryIncidentThemes([])).toEqual([]);
   });
 
-  it("marks empty themes not-reported and never emits counts", () => {
+  it("emits only the themes that actually occurred, in fixed order", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Fire", province: "Lae" }),
+      item({ category: "Civil unrest / protest", province: "Jakarta" }),
+    ]);
+    // Present themes only, in COUNTRY_INCIDENT_THEMES order (protest before fire);
+    // absent themes (crime, natural, governance, other) are omitted entirely.
+    expect(groups.map((g) => g.key)).toEqual(["protest", "fire"]);
+  });
+
+  it("emits four analytical parts and never emits counts", () => {
     const groups = buildCountryIncidentThemes([
       item({ category: "Civil unrest / protest", province: "Jakarta" }),
     ]);
     const protest = groups.find((g) => g.key === "protest")!;
-    const crime = groups.find((g) => g.key === "crime")!;
-    expect(protest.present).toBe(true);
-    expect(protest.narrative).toContain("Jakarta");
-    expect(crime.present).toBe(false);
-    expect(crime.narrative).toBe("Not reported this period.");
-    // No digits in any generated narrative (count-free house rule).
+    expect(protest.where).toContain("Jakarta");
+    expect(protest.whatHappened.length).toBeGreaterThan(0);
+    expect(protest.whyItMatters.length).toBeGreaterThan(0);
+    expect(protest.whatCouldBeAffected.length).toBeGreaterThan(0);
+    // No digits in any generated field (count-free house rule).
     for (const g of groups) {
-      expect(g.narrative).not.toMatch(/\d/);
+      for (const part of [g.whatHappened, g.where, g.whyItMatters, g.whatCouldBeAffected]) {
+        expect(part).not.toMatch(/\d/);
+      }
     }
   });
 
@@ -109,8 +112,8 @@ describe("buildCountryIncidentThemes", () => {
       item({ category: "Theft / break-in", severity: "low", province: "Lae" }),
     ]);
     const crime = groups.find((g) => g.key === "crime")!;
-    expect(crime.narrative).toContain("extreme-severity");
-    expect(crime.narrative).toContain("Lae");
+    expect(crime.whyItMatters).toContain("Extreme-severity");
+    expect(crime.where).toContain("Lae");
   });
 
   it("ranks provinces by frequency", () => {
@@ -120,7 +123,7 @@ describe("buildCountryIncidentThemes", () => {
       item({ category: "Civil unrest / protest", province: "Lae" }),
     ]);
     const protest = groups.find((g) => g.key === "protest")!;
-    expect(protest.narrative).toContain("Port Moresby and Lae");
+    expect(protest.where).toContain("Port Moresby and Lae");
   });
 });
 

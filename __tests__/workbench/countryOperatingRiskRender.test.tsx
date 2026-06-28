@@ -3,7 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import PngCountryReportBody from "../../artifacts/workbench/src/components/PngCountryReportBody";
 import ShippingReportPreview from "../../artifacts/workbench/src/components/ShippingReportPreview";
 import { buildCountryOperatingRiskDataset } from "../../artifacts/workbench/src/lib/countryOperatingRiskDataset";
-import { COUNTRY_INCIDENT_THEMES } from "../../artifacts/workbench/src/lib/countryIncidentThemes";
+import {
+  COUNTRY_INCIDENT_THEMES,
+  buildCountryIncidentThemes,
+} from "../../artifacts/workbench/src/lib/countryIncidentThemes";
 import { DISCLAIMER_TEXT } from "../../artifacts/workbench/src/lib/pdfChrome";
 import type {
   PngSourceIncident,
@@ -20,8 +23,9 @@ import type {
 // Pins the rebuilt render contract (one renderer for every country):
 //  - SECTION ORDER: the brief sections render in the fixed order, opening with
 //    Bottom Line Up Front and closing with Reporting Confidence.
-//  - INCIDENT DETAILS: the six fixed themes always render in order; empty themes
-//    read "Not reported this period." (no fabrication, count-free).
+//  - INCIDENT DETAILS: only the themes actually present in the window render, in
+//    the fixed theme order; absent themes are OMITTED entirely (present-only
+//    analytical groups, no fabricated "Not reported this period." filler theme).
 //  - NO MARITIME SECURITY: country reports no longer carry a Maritime Security
 //    block (topic/shipping reports keep it, out of scope here).
 //  - Top 3 Developments renders real tile cards with the window's localities.
@@ -133,19 +137,38 @@ describe("PngCountryReportBody — country brief render", () => {
     expect(ats).toEqual(sorted); // strictly in order, none reordered
   });
 
-  it("renders the six Incident Details themes in fixed order", () => {
+  it("renders only the present Incident Details themes, in fixed order", () => {
+    // The body builds its themed groups from the SAME dataset field the render
+    // uses (d.incidentDetailsItems), so derive the expected present themes the
+    // same way and assert the render matches exactly.
+    const present = buildCountryIncidentThemes(build(POPULATED).incidentDetailsItems);
+    expect(present.length).toBeGreaterThan(0); // populated window has themes
+    // Scope to the Incident Details SECTION only: theme headings are reused as
+    // the Operational Impact bullet prefixes (built from the full window), so a
+    // whole-document search would wrongly find an absent theme there. The slice
+    // runs from the Incident Details heading to the next section.
+    const detailsStart = html.indexOf("Incident Details");
+    const detailsEnd = html.indexOf("Current Situation");
+    expect(detailsStart).toBeGreaterThanOrEqual(0);
+    expect(detailsEnd).toBeGreaterThan(detailsStart);
+    const section = html.slice(detailsStart, detailsEnd);
     // renderToStaticMarkup escapes "&" to "&amp;", so match the escaped heading.
-    const headingPositions = COUNTRY_INCIDENT_THEMES.map((t) => ({
-      heading: t.heading,
-      at: html.indexOf(t.heading.replace(/&/g, "&amp;")),
-    }));
-    for (const h of headingPositions) {
-      expect(h.at).toBeGreaterThanOrEqual(0); // every theme always renders
+    const positions = present.map((g) =>
+      section.indexOf(g.heading.replace(/&/g, "&amp;")),
+    );
+    for (const at of positions) {
+      expect(at).toBeGreaterThanOrEqual(0); // every PRESENT theme renders
     }
-    const ats = headingPositions.map((h) => h.at);
-    expect(ats).toEqual([...ats].sort((a, b) => a - b)); // fixed order
-    // At least one theme is empty in this window → the no-fabrication caveat.
-    expect(html).toContain("Not reported this period.");
+    expect(positions).toEqual([...positions].sort((a, b) => a - b)); // fixed order
+    // Absent themes are OMITTED entirely — no always-on six-theme scaffold and no
+    // fabricated "Not reported this period." filler.
+    const presentKeys = new Set(present.map((g) => g.key));
+    for (const t of COUNTRY_INCIDENT_THEMES) {
+      if (!presentKeys.has(t.key)) {
+        expect(section.indexOf(t.heading.replace(/&/g, "&amp;"))).toBe(-1);
+      }
+    }
+    expect(section).not.toContain("Not reported this period.");
   });
 
   it("does NOT render a Maritime Security block on country reports", () => {

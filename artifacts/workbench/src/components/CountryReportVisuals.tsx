@@ -65,6 +65,7 @@ export default function CountryReportVisuals({
   countryName,
   severityCounts,
   severityTotal,
+  showSeverityChart = true,
   typeChartData,
   typeChartMax,
   situationalReports,
@@ -72,13 +73,21 @@ export default function CountryReportVisuals({
   countryName: string;
   severityCounts: Record<SeverityKey, number>;
   severityTotal: number;
+  // Whether the severity-distribution chart adds narrative value. When false the
+  // chart is omitted entirely (a single, all-one-band window does not help
+  // explain the risk picture — per the standard, charts must support the
+  // narrative, not appear merely because the data exists). Defaults to true so
+  // existing callers are unaffected.
+  showSeverityChart?: boolean;
   typeChartData: { label: string; n: number }[];
   typeChartMax: number;
   situationalReports: ReliefWebReport[] | undefined | null;
 }) {
   return (
     <>
-      {/* Severity Distribution */}
+      {/* Severity Distribution — shown only when it helps explain the risk
+          picture (multiple bands present, or any High/Extreme record). */}
+      {showSeverityChart && (
       <Section title="Severity Distribution">
         {severityTotal === 0 ? (
           <EmptyNote>No incidents in the active window to chart.</EmptyNote>
@@ -109,6 +118,7 @@ export default function CountryReportVisuals({
           </div>
         )}
       </Section>
+      )}
 
       {/* Incident Breakdown by Type */}
       <Section title="Incident Breakdown by Type">

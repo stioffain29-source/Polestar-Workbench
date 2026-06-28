@@ -10,6 +10,7 @@ import type {
   PngReportDataset,
   PngReportItem,
 } from "../../artifacts/workbench/src/lib/pngReportDataset";
+import { buildCountryIncidentThemes } from "../../artifacts/workbench/src/lib/countryIncidentThemes";
 
 // Guards the markers the DOM-rasterise PDF exporter (`exportPdf.ts`) depends on
 // to find legal page breaks. `pdfPageBreaks.test.ts` proves the slicing MATH is
@@ -119,6 +120,14 @@ function makePngDataset(): PngReportDataset {
       ninetyDayCount: 30,
     },
     windowItems: [topItem, ncdConfirmed, morobeItem],
+    incidentDetailsItems: [ncdConfirmed, morobeItem],
+    recommendedActions: [
+      {
+        key: "movement",
+        heading: "Movement security",
+        actions: ["Vary routes and timings, and confirm route status before travel."],
+      },
+    ],
   };
 }
 
@@ -128,10 +137,17 @@ describe("PngCountryReportBody page-break markers", () => {
   );
 
   it("marks every atomic block with data-pdf-row", () => {
-    // The rebuilt renderer marks the Top 3 tile card (1 item in this dataset)
-    // plus each of the six fixed Incident Details theme groups as atomic blocks
-    // the exporter must never split mid-cut: 1 + 6 = 7.
-    expect(countMatches(html, /data-pdf-row="true"/g)).toBe(7);
+    // The rebuilt renderer marks each Top 3 tile card, each PRESENT Incident
+    // Details theme group, and each grouped Recommended Actions block as atomic
+    // blocks the exporter must never split mid-cut. Present-only themes (no fixed
+    // six-theme scaffold), so derive the expected count from the same dataset.
+    const ds = makePngDataset();
+    const expected =
+      ds.topThree.length +
+      buildCountryIncidentThemes(ds.incidentDetailsItems).length +
+      ds.recommendedActions.length;
+    expect(expected).toBeGreaterThan(0);
+    expect(countMatches(html, /data-pdf-row="true"/g)).toBe(expected);
   });
 
   it("marks long prose blocks with data-pdf-flow for line-level breaks", () => {

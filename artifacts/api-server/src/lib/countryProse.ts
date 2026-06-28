@@ -27,7 +27,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated.
-export const PROSE_PROMPT_VERSION = "v6";
+export const PROSE_PROMPT_VERSION = "v7";
 
 // The model only ever sees this many incidents, and the cache fingerprint hashes
 // exactly the same capped set — so the cache key and the prompt input can never
@@ -217,17 +217,18 @@ GROUNDING — non-negotiable:
 
 WRITING RULES:
 - The five narrative sections do DISTINCT jobs and must not repeat the same fact or sentence across one another:
-  - "bluf" (Bottom Line Up Front): the single most important takeaway for this window, stated first, in 1-2 sentences a busy reader could act on alone.
+  - "bluf" (Bottom Line Up Front): the single most important operational judgement for this window, stated first in plain language. It must answer four things — what the main security picture is this window; where the risk is concentrated; whether the situation has improved, deteriorated or remained stable against the standing pattern; and the practical implication for operations on the ground. 2-4 sentences a busy reader could act on alone.
   - "executiveSummary": characterises what this window shows — the dominant provinces and event types — and what it means for operations now.
   - "whatChanged": how this window differs from the standing pattern; if little or nothing changed, say so plainly rather than manufacturing a shift.
-  - "outlook": the forward view for the coming period — what is likely to happen and where pressure is likely.
-  - "polestarView": the bottom-line analyst judgement and the recommended operating posture.
+  - "outlook": the forward seven-day view. It must NOT simply restate the current situation. Cover the most likely scenario for the coming week; the key areas to watch; the indicators that would signal escalation; the indicators that would signal de-escalation; and the impact on operations if the situation worsens.
+  - "polestarView": the analyst's assessment — judgement, not summary. Answer whether risk is rising, falling or stable; what is driving it; the single biggest operational concern; and what to watch next. Keep it concise and direct.
 - Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the brief.
 - Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
 - Write concrete, information-dense sentences. Name the actual provinces, actors and event types from the incidents. No filler, no hedging boilerplate, no generic risk-management truisms.
 - Write impersonally about the country and its risk trajectory. NEVER address, name or label the reader or audience. Do not use words such as "corporate operators", "operators", "clients", "companies", "businesses", "organisations" or "the reader", and never write "[anyone] should expect ..." or "in the coming period, [audience] should expect ...". State what is likely to happen and where pressure is likely — not what a reader should expect.
 - Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the country — not about the process.
+- Banned automated-sounding phrasing — never write any of these or close variants: "reported this period, centred on ...", "open-source reporting was led by ..." (or "reporting was led by ..."), and "treat any quiet stretch/week as provisional ...". Use plain operational language instead of template filler.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
 
 PER-INCIDENT SUMMARIES ("incidentSummaries"):
@@ -239,11 +240,11 @@ PER-INCIDENT SUMMARIES ("incidentSummaries"):
 
 Return STRICT JSON with EXACTLY these keys and no others:
 {
-  "bluf": string,              // 1-2 sentences: the single most important takeaway for this window, stated first.
+  "bluf": string,              // 2-4 sentences: the main security picture this window, where risk is concentrated, whether it improved/deteriorated/stayed stable vs the standing pattern, and the practical operational implication.
   "executiveSummary": string,  // 3-4 sentences: the headline judgement for this window — the dominant provinces and event types — and what it means for operations now.
   "whatChanged": string,       // 2-3 sentences: how this window differs from the standing pattern; if little changed, say so plainly.
-  "outlook": string,           // 2-3 sentences: the forward view for the coming period, grounded in this window's pattern and the standing background; what to expect and where pressure is likely.
-  "polestarView": string,      // 2-3 sentences: the bottom-line analyst judgement and the recommended operating posture.
+  "outlook": string,           // The forward seven-day view; do NOT restate the current situation. Cover the most likely scenario, key areas to watch, escalation indicators, de-escalation indicators, and the impact on operations if it worsens.
+  "polestarView": string,      // The analyst assessment (judgement, not summary): is risk rising/falling/stable, what is driving it, the single biggest operational concern, and what to watch next.
   "incidentSummaries": object  // Keys are the incident NUMBERS from the INCIDENTS list as strings ("1", "2", ...); each value is that incident's factual summary as described above. Include an entry for every numbered incident.
 }
 Return ONLY the JSON object.`;

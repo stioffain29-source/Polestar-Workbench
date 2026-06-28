@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
@@ -57,23 +57,246 @@ function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: numbe
   return COUNTRY_VIEW[key] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Area-risk ("numbered callout") zones.
+//
+// The GLOBAL REPORT CONTENT AND MAP STANDARD requires country reports to show
+// RISK AREAS rather than raw database points: country incidents geocode to a
+// small fixed set of province / regency centroids (and ~40% carry no location
+// text at all, landing on a generic country centroid), so plotting them as
+// exact dots is misleading. Instead, for a configured country we aggregate the
+// window into a handful of named risk zones, drop ONE numbered, severity-
+// coloured marker on each ACTIVE zone, and list "n. Zone — Severity (count)"
+// in the legend. Empty zones are omitted entirely (no "not reported" filler);
+// records that match no zone are counted in an explicit note, never invented
+// onto the map. Countries with no zone config fall back to the per-coordinate
+// dot map below.
+// ---------------------------------------------------------------------------
+interface RiskZoneDef {
+  name: string;
+  // Where the numbered marker is dropped.
+  center: L.LatLngTuple;
+  // Lower-cased place keywords (regencies, towns, provinces) that place an
+  // incident in this zone when found in its location text or headline.
+  places: string[];
+  // Exact geocoder centroid "lat,lng" strings that belong to this zone, used as
+  // a fallback when the location text is empty.
+  coords?: string[];
+}
+
+// Indonesian Papua (West Papua) risk zones, in display order. Shared by the
+// "papua" and "west papua" reports. PNG keeps the dot map until its own zones
+// are configured.
+const PAPUA_ZONES: RiskZoneDef[] = [
+  {
+    name: "Central Highlands",
+    center: [-3.9, 138.6],
+    places: [
+      "central highlands",
+      "highlands",
+      "wamena",
+      "jayawijaya",
+      "nduga",
+      "tolikara",
+      "lanny jaya",
+      "yahukimo",
+      "pegunungan bintang",
+      "yalimo",
+      "mamberamo tengah",
+      "puncak",
+      "intan jaya",
+      "sugapa",
+      "agisiga",
+      "ilaga",
+      "kenyam",
+      "oksibil",
+    ],
+    coords: ["-3.73,137.03"],
+  },
+  {
+    name: "Jayapura & North Coast",
+    center: [-2.2, 140.2],
+    places: [
+      "jayapura",
+      "sentani",
+      "keerom",
+      "sarmi",
+      "biak",
+      "supiori",
+      "waropen",
+      "mamberamo raya",
+    ],
+    coords: ["-2.53,140.72", "-1.18,136.08"],
+  },
+  {
+    name: "Bird's Head",
+    center: [-1.3, 133.6],
+    places: [
+      "bird's head",
+      "birds head",
+      "manokwari",
+      "bintuni",
+      "teluk bintuni",
+      "wondama",
+      "teluk wondama",
+      "fakfak",
+      "fak-fak",
+      "kaimana",
+    ],
+    coords: ["-0.86,134.06"],
+  },
+  {
+    name: "Papua Tengah",
+    center: [-3.9, 136.1],
+    places: [
+      "papua tengah",
+      "central papua",
+      "nabire",
+      "mimika",
+      "timika",
+      "paniai",
+      "dogiyai",
+      "deiyai",
+      "puncak jaya",
+    ],
+    coords: ["-4.55,136.89"],
+  },
+  {
+    name: "Papua Barat Daya",
+    center: [-1.1, 132.0],
+    places: [
+      "papua barat daya",
+      "southwest papua",
+      "sorong",
+      "raja ampat",
+      "tambrauw",
+      "maybrat",
+      "klademak",
+      "klamono",
+      "aimas",
+    ],
+    coords: ["-0.88,131.25"],
+  },
+];
+
+const RISK_MAP_ZONES: Record<string, RiskZoneDef[]> = {
+  papua: PAPUA_ZONES,
+  "west papua": PAPUA_ZONES,
+};
+
+function resolveRiskZones(name?: string): RiskZoneDef[] | null {
+  const key = (name ?? "").trim().toLowerCase();
+  if (!key) return null;
+  return RISK_MAP_ZONES[key] ?? null;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Drop a trailing " - Source" / " | Source" masthead tail before keyword
+// matching, so a publisher name never pulls an incident into the wrong zone.
+function stripMasthead(title: string): string {
+  const cut = title.replace(/\s*[-|]\s*[^-|]{2,40}$/i, "").trim();
+  return cut.length >= 8 ? cut : title;
+}
+
+// Which zone (by index) an incident belongs to: place-keyword match over its
+// location text and headline first, then an exact geocoder-centroid match.
+// Returns null when the record matches no configured zone.
+function zoneIndexForIncident(i: CountryFastFactsIncident, zones: RiskZoneDef[]): number | null {
+  const loc = (i.location ?? "").toLowerCase();
+  const title = stripMasthead(
+    ((i.displayTitle && i.displayTitle.trim()) || i.title || "").trim(),
+  ).toLowerCase();
+  const hay = `${loc} ${title}`;
+  for (let z = 0; z < zones.length; z++) {
+    for (const p of zones[z].places) {
+      const re = new RegExp(`(^|[^a-z])${escapeRegExp(p)}([^a-z]|$)`, "i");
+      if (re.test(hay)) return z;
+    }
+  }
+  if (
+    typeof i.latitude === "number" &&
+    typeof i.longitude === "number" &&
+    !Number.isNaN(i.latitude) &&
+    !Number.isNaN(i.longitude)
+  ) {
+    const key = `${i.latitude},${i.longitude}`;
+    for (let z = 0; z < zones.length; z++) {
+      if (zones[z].coords?.includes(key)) return z;
+    }
+  }
+  return null;
+}
+
+interface ActiveZone {
+  def: RiskZoneDef;
+  number: number;
+  count: number;
+  worstKey: string;
+}
+
+// Aggregate the window into active zones (count + worst severity each, numbered
+// in config order) plus the count of records that matched no zone.
+function aggregateZones(
+  incidents: CountryFastFactsIncident[],
+  zones: RiskZoneDef[],
+): { active: ActiveZone[]; unattributed: number } {
+  const counts = zones.map(() => ({ count: 0, worstRank: 0, worstKey: "" }));
+  let unattributed = 0;
+  for (const i of incidents) {
+    const z = zoneIndexForIncident(i, zones);
+    if (z === null) {
+      unattributed += 1;
+      continue;
+    }
+    const c = counts[z];
+    c.count += 1;
+    const k = (i.severity ?? "").toLowerCase();
+    const r = SEV_RANK[k] ?? 0;
+    if (r > c.worstRank) {
+      c.worstRank = r;
+      c.worstKey = k;
+    }
+  }
+  const active: ActiveZone[] = [];
+  zones.forEach((def, idx) => {
+    if (counts[idx].count > 0) {
+      active.push({
+        def,
+        number: active.length + 1,
+        count: counts[idx].count,
+        worstKey: counts[idx].worstKey,
+      });
+    }
+  });
+  return { active, unattributed };
+}
+
 /**
- * Interactive incident map for the Country Report Builder.
+ * Incident map for the Country Report Builder.
  *
- * Uses CartoDB Positron tiles (clean, light, professional basemap, no API
- * key required). Plots incidents that have valid latitude+longitude.
+ * Uses CartoDB Positron tiles (clean, light, professional basemap, no API key
+ * required).
  *
- * Markers are rendered as plain absolutely-positioned HTML <div> dots in an
- * overlay layered over the Leaflet container (NOT Leaflet circleMarkers, and NOT
- * <canvas> elements). This is deliberate: the in-app "Download PDF" rasterises
- * the on-screen DOM with html2canvas, which does NOT reliably capture Leaflet's
- * canvas/SVG marker panes NOR standalone <canvas> overlay elements — both show on
- * screen but vanish in the PDF, leaving a legend with no visible points. Plain
- * HTML <div> dots rasterise faithfully, so the screen and the PDF agree. One dot
- * is drawn per distinct coordinate (coloured by the highest severity present and
- * badged with the incident count when several share a point), and dots are
- * re-projected on every map move/zoom. Records without coordinates are not
- * plotted but remain in totals and tables.
+ * Two rendering modes:
+ *  - AREA-RISK (numbered callout) for countries with a configured zone list
+ *    (e.g. Papua / West Papua): one numbered, severity-coloured marker per
+ *    ACTIVE risk zone, with a "n. Zone — Severity (count)" legend. This is the
+ *    standard-preferred country-report map — it shows risk AREAS rather than
+ *    raw database points, which is honest about the province-centroid geocoding.
+ *  - PER-COORDINATE DOTS for all other countries (unchanged): one dot per
+ *    distinct coordinate, coloured by the highest severity present and badged
+ *    with the incident count.
+ *
+ * In BOTH modes markers are plain absolutely-positioned HTML <div> elements in
+ * an overlay layered over the Leaflet container (NOT Leaflet circleMarkers, and
+ * NOT <canvas>). This is deliberate: the in-app "Download PDF" rasterises the
+ * on-screen DOM with html2canvas, which does NOT reliably capture Leaflet's
+ * canvas/SVG marker panes nor standalone <canvas> overlays — both show on screen
+ * but vanish in the PDF. Plain HTML <div> markers rasterise faithfully, so the
+ * screen and the PDF agree. Markers are re-projected on every map move/zoom.
  */
 export default function CountryReportMap({ incidents, domId, countryName }: CountryReportMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -81,9 +304,19 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dotsRef = useRef<Array<{ el: HTMLElement; lat: number; lng: number; half: number }>>([]);
 
+  const zonesDef = resolveRiskZones(countryName);
+  const zoneMode = zonesDef !== null;
+
   const plottable = incidents.filter(
     (i) => typeof i.latitude === "number" && typeof i.longitude === "number"
       && !Number.isNaN(i.latitude) && !Number.isNaN(i.longitude),
+  );
+
+  // Zone aggregation (area-risk mode only). Memoised so the legend and the
+  // marker effect see one consistent result.
+  const zoneAgg = useMemo(
+    () => (zonesDef ? aggregateZones(incidents, zonesDef) : { active: [], unattributed: 0 }),
+    [incidents, zonesDef],
   );
 
   useEffect(() => {
@@ -107,7 +340,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
 
     const map = mapRef.current;
 
-    // Overlay layer that holds the HTML marker dots. Created once, on top of the
+    // Overlay layer that holds the HTML markers. Created once, on top of the
     // tiles; pointer-events:none so it never blocks panning/zooming.
     if (!overlayRef.current) {
       const overlay = document.createElement("div");
@@ -128,10 +361,70 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       }
     };
 
-    // Rebuild dots for the current incident set.
+    // Rebuild markers for the current set.
     overlay.replaceChildren();
     dotsRef.current = [];
 
+    // ---- AREA-RISK (numbered callout) mode ------------------------------
+    if (zoneMode) {
+      const active = zoneAgg.active;
+      if (active.length === 0) {
+        const view = resolveCountryView(countryName);
+        map.setView(view ? view.center : [-3.5, 138.0], view ? view.zoom : 5);
+        map.off("move zoom resize viewreset zoomanim", positionDots);
+        return;
+      }
+
+      const latLngs: L.LatLngExpression[] = [];
+      for (const z of active) {
+        const [lat, lng] = z.def.center;
+        const color = SEV_COLOR[z.worstKey] ?? "#999999";
+        const size = 28;
+        const half = size / 2;
+
+        // Plain absolutely-positioned numbered <div> marker (html2canvas-safe).
+        const marker = document.createElement("div");
+        marker.style.position = "absolute";
+        marker.style.width = `${size}px`;
+        marker.style.height = `${size}px`;
+        marker.style.borderRadius = "50%";
+        marker.style.background = color;
+        marker.style.border = "2px solid #ffffff";
+        marker.style.boxSizing = "border-box";
+        marker.style.display = "flex";
+        marker.style.alignItems = "center";
+        marker.style.justifyContent = "center";
+        marker.style.color = "#ffffff";
+        marker.style.fontFamily = "Roboto, sans-serif";
+        marker.style.fontWeight = "700";
+        marker.style.fontSize = "13px";
+        marker.style.lineHeight = "1";
+        // html2canvas renders text slightly low; a small bottom pad re-centres
+        // the numeral in the exported PDF without shifting it on screen much.
+        marker.style.paddingBottom = "2px";
+        marker.style.pointerEvents = "auto";
+        marker.textContent = String(z.number);
+        marker.title = `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey} (${z.count})`;
+
+        overlay.appendChild(marker);
+        dotsRef.current.push({ el: marker, lat, lng, half });
+        latLngs.push([lat, lng]);
+      }
+
+      if (latLngs.length === 1) {
+        map.setView(latLngs[0] as L.LatLngTuple, 6);
+      } else {
+        map.fitBounds(L.latLngBounds(latLngs), { padding: [36, 36], maxZoom: 7 });
+      }
+      positionDots();
+      map.off("move zoom resize viewreset zoomanim", positionDots);
+      map.on("move zoom resize viewreset zoomanim", positionDots);
+      return () => {
+        map.off("move zoom resize viewreset zoomanim", positionDots);
+      };
+    }
+
+    // ---- PER-COORDINATE DOT mode (all other countries) ------------------
     if (plottable.length === 0) {
       const view = resolveCountryView(countryName);
       if (view) {
@@ -243,7 +536,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     return () => {
       map.off("move zoom resize viewreset zoomanim", positionDots);
     };
-  }, [plottable, countryName]);
+  }, [plottable, countryName, zoneMode, zoneAgg]);
 
   useEffect(() => {
     return () => {
@@ -259,6 +552,79 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   const unplotted = incidents.length - plottable.length;
   const hasPlotted = plottable.length > 0;
 
+  // ---- AREA-RISK legend ------------------------------------------------
+  if (zoneMode) {
+    const active = zoneAgg.active;
+    return (
+      <div>
+        <div
+          id={domId}
+          ref={containerRef}
+          style={{
+            height: 360,
+            width: "100%",
+            position: "relative",
+            border: `1px solid ${POLAR}`,
+            borderRadius: 2,
+            background: "#fafafa",
+          }}
+        />
+        {active.length > 0 ? (
+          <>
+            {/* Numbered risk-zone legend: "n. Zone — Severity (count)". The
+                numbered markers above are HTML <div> overlays, so they appear
+                in BOTH the on-screen view and the rasterised PDF. */}
+            <div className="mt-3" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {active.map((z) => (
+                <div key={z.def.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      background: SEV_COLOR[z.worstKey] ?? "#999999",
+                      color: "#fff",
+                      fontFamily: "Roboto, sans-serif",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      border: `1px solid ${POLAR}`,
+                    }}
+                  >
+                    {z.number}
+                  </span>
+                  <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK }}>
+                    {z.def.name} — {SEV_LABEL[z.worstKey] ?? z.worstKey} ({z.count})
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
+            >
+              Each marker shows a risk area, numbered and coloured by the highest severity recorded there this period.
+              {zoneAgg.unattributed > 0
+                ? ` ${zoneAgg.unattributed} record${zoneAgg.unattributed === 1 ? "" : "s"} could not be tied to a specific area and ${zoneAgg.unattributed === 1 ? "is" : "are"} included in totals and tables but not plotted.`
+                : ""}
+            </div>
+          </>
+        ) : (
+          // No record in the window resolves to a defined risk zone: present the
+          // basemap as country context only, with an explicit note.
+          <div
+            style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
+          >
+            Map reflects country operating context only. No incident in this period resolves to a defined risk area.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---- PER-COORDINATE DOT legend (all other countries) -----------------
   return (
     <div>
       <div

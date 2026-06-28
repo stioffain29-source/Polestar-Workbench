@@ -357,6 +357,14 @@ function makePngDataset(): PngReportDataset {
       ninetyDayCount: 30,
     },
     windowItems: [topItem, ncdConfirmed],
+    incidentDetailsItems: [ncdConfirmed],
+    recommendedActions: [
+      {
+        key: "movement",
+        heading: "Movement security",
+        actions: ["Vary routes and timings, and confirm route status before travel."],
+      },
+    ],
   };
 }
 
@@ -371,13 +379,16 @@ describe("PngCountryReportBody charts & tables", () => {
 
   it("renders themed Incident Details with a count-free location narrative", () => {
     // The rebuilt renderer drops location buckets; the remaining (non-Top-3)
-    // incidents become the six fixed Incident Details theme groups. The "Other
-    // security" item maps to "Other operational disruption" and its deterministic
-    // narrative cites the province focus and severity emphasis — never a count.
+    // incidents become PRESENT-ONLY analytical theme groups. The "Other security"
+    // item maps to "Other operational disruption" and its deterministic narrative
+    // cites the province focus and severity emphasis — never a count.
     expect(html).toContain("Other operational disruption");
-    expect(html).toContain("centred on National Capital District");
-    // Empty themes carry the no-fabrication caveat rather than being hidden.
-    expect(html).toContain("Not reported this period.");
+    expect(html).toContain("Concentrated in National Capital District");
+    // No record/incident/event counts leak into the narrative prose.
+    expect(html).not.toMatch(/\b\d+\s+(incidents?|records?|events?)\b/);
+    // Present-only standard: absent themes are omitted, with no fabricated
+    // "Not reported this period." filler theme.
+    expect(html).not.toContain("Not reported this period.");
   });
 
   it("renders the card metadata line (category · province · source)", () => {

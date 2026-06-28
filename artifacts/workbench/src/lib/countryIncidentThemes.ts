@@ -8,8 +8,9 @@
 //
 // House rules honoured here: COUNT-FREE (no record/incident numbers ever appear
 // in the generated prose), British English, five-tier severity vocabulary, and
-// no fabrication — an empty theme reads "Not reported this period." rather than
-// being hidden or guessed.
+// no fabrication — only themes that ACTUALLY occurred this period are emitted.
+// An empty window yields no theme groups (the renderer shows the explicit
+// "no fresh reporting" fallback), never an invented "Not reported" placeholder.
 
 import type { PngReportItem, PngCategory } from "./pngReportDataset";
 
@@ -68,17 +69,21 @@ export function themeForCategory(category: PngCategory): CountryIncidentTheme {
   return CATEGORY_THEME[category] ?? "other";
 }
 
+// One PRESENT Incident Details theme, rendered as a four-part analytical group.
+// Each field is deterministic, count-free and in British English; a theme only
+// appears when at least one remaining incident fell into it.
 export interface CountryIncidentThemeGroup {
   key: CountryIncidentTheme;
   heading: string;
-  // True when at least one remaining incident fell into this theme.
-  present: boolean;
-  // Count-free deterministic narrative, or the "Not reported this period."
-  // caveat when the theme is empty.
-  narrative: string;
+  // What happened — the kind of activity reported, with the specific categories.
+  whatHappened: string;
+  // Where — the provinces/areas it concentrated in.
+  where: string;
+  // Why it matters — operational significance, severity-aware.
+  whyItMatters: string;
+  // What could be affected — the assets and operations exposed.
+  whatCouldBeAffected: string;
 }
-
-const THEME_EMPTY_NARRATIVE = "Not reported this period.";
 
 // Per-theme operational-impact descriptors (Operational Impact section).
 const THEME_IMPACT: Record<CountryIncidentTheme, string> = {
@@ -93,6 +98,39 @@ const THEME_IMPACT: Record<CountryIncidentTheme, string> = {
   fire: "Fires and explosions cause localised damage and forced evacuation around affected sites; confirm site status before approach.",
   other:
     "Transport, utilities and connectivity disruption can interrupt operations and logistics; plan for contingencies and alternate routing.",
+};
+
+// "What happened" stems — the kind of activity each theme covers.
+const THEME_WHAT: Record<CountryIncidentTheme, string> = {
+  protest: "Protest activity and the crowd-control response to it were reported",
+  crime: "Crime, theft and violent incidents were reported",
+  natural: "Natural-hazard and environmental disruption was reported",
+  governance: "Policing, regulatory and political-stability activity was reported",
+  fire: "Fire and explosion incidents were reported",
+  other: "Operational disruption to transport, utilities or connectivity was reported",
+};
+
+// "Why it matters" — the operational significance of each theme.
+const THEME_SIGNIFICANCE: Record<CountryIncidentTheme, string> = {
+  protest:
+    "Gatherings and the response to them can close roads and disrupt access at short notice.",
+  crime:
+    "Incidents of this kind threaten staff, premises and the movement of cash and assets.",
+  natural: "Hazards of this kind can interrupt transport, utilities and site access.",
+  governance:
+    "Regulatory, policing and political-stability friction can affect compliance, permits and freedom of movement.",
+  fire: "Fires and explosions cause localised damage and can force evacuation around affected sites.",
+  other: "Disruption of this kind can interrupt operations, logistics and connectivity.",
+};
+
+// "What could be affected" — the assets and operations exposed.
+const THEME_AFFECTED: Record<CountryIncidentTheme, string> = {
+  protest: "Road movement, site access and staff commuting near affected areas.",
+  crime: "Staff safety, premises, vehicles and the secure movement of cash and assets.",
+  natural: "Transport links, utilities, site access and the safety of outdoor operations.",
+  governance: "Permits, compliance, checkpoints and freedom of movement.",
+  fire: "Affected premises, the sites immediately around them and their access routes.",
+  other: "Transport, power, communications and the operations that depend on them.",
 };
 
 function joinList(parts: string[]): string {
@@ -116,51 +154,72 @@ function topProvinces(items: PngReportItem[], max = 3): string[] {
     .map(([p]) => p);
 }
 
+// Distinct client-facing categories present, ranked by frequency, capped to max.
+function topCategories(items: PngReportItem[], max = 3): string[] {
+  const counts = new Map<string, number>();
+  for (const it of items) {
+    const c = (it.displayCategory?.trim() || it.category) ?? "";
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([c]) => c);
+}
+
+// Render a raw category label ("Armed robbery / hold-up") as a natural lowercase
+// noun phrase for splicing into a sentence.
+function readableCategory(label: string): string {
+  return label.toLowerCase().replace(/\s*\/\s*/g, " and ");
+}
+
 // Highest five-tier severity index present in an item set (-1 when none).
 const SEVERITY_ORDER = ["insignificant", "low", "moderate", "high", "extreme"];
 function worstSeverityIndex(items: PngReportItem[]): number {
   return items.reduce((m, it) => Math.max(m, SEVERITY_ORDER.indexOf(it.severity)), -1);
 }
 
-// Build the six themed Incident Details groups from the REMAINING incidents
-// (those not already shown as Top 3 tiles). Every theme is always present in the
-// output in fixed order; an empty theme carries the "Not reported this period."
-// caveat. Narratives are deterministic and COUNT-FREE, citing only location
-// focus and severity emphasis.
+// Build the Incident Details groups from the REMAINING incidents (those not
+// already shown as Top 3 above). PRESENT themes only, in fixed order; each is a
+// four-part analytical group (what happened / where / why it matters / what
+// could be affected). Deterministic and COUNT-FREE. Empty input → [].
 export function buildCountryIncidentThemes(
   remaining: PngReportItem[],
 ): CountryIncidentThemeGroup[] {
   const byTheme = new Map<CountryIncidentTheme, PngReportItem[]>();
-  for (const it of remaining) {
+  for (const it of remaining ?? []) {
     const key = themeForCategory(it.category);
     const arr = byTheme.get(key) ?? [];
     arr.push(it);
     byTheme.set(key, arr);
   }
-  return COUNTRY_INCIDENT_THEMES.map((def) => {
-    const items = byTheme.get(def.key) ?? [];
-    if (items.length === 0) {
-      return {
-        key: def.key,
-        heading: def.heading,
-        present: false,
-        narrative: THEME_EMPTY_NARRATIVE,
-      };
-    }
+  return COUNTRY_INCIDENT_THEMES.filter(
+    (def) => (byTheme.get(def.key)?.length ?? 0) > 0,
+  ).map((def) => {
+    const items = byTheme.get(def.key)!;
     const provs = topProvinces(items);
-    const locClause = provs.length ? `, centred on ${joinList(provs)}` : "";
+    const cats = topCategories(items).map(readableCategory);
     const worst = worstSeverityIndex(items);
-    const sevClause =
+    const whatHappened = cats.length
+      ? `${THEME_WHAT[def.key]}, including ${joinList(cats)}.`
+      : `${THEME_WHAT[def.key]}.`;
+    const where = provs.length
+      ? `Concentrated in ${joinList(provs)}.`
+      : "Specific locations were not consistently reported this period.";
+    const sevPrefix =
       worst >= 4
-        ? ", including extreme-severity reporting"
-        : worst >= 3
-          ? ", including high-severity reporting"
+        ? "Extreme-severity reporting featured. "
+        : worst === 3
+          ? "High-severity reporting featured. "
           : "";
+    const whyItMatters = `${sevPrefix}${THEME_SIGNIFICANCE[def.key]}`;
     return {
       key: def.key,
       heading: def.heading,
-      present: true,
-      narrative: `Reported this period${locClause}${sevClause}.`,
+      whatHappened,
+      where,
+      whyItMatters,
+      whatCouldBeAffected: THEME_AFFECTED[def.key],
     };
   });
 }

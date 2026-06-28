@@ -415,6 +415,15 @@ export interface LocationWatchlistEntry {
   action: string;
 }
 
+// One grouped Recommended Actions block (Movement security, Site security, …).
+// Only groups SUPPORTED by this period's incident mix / watchlist are emitted,
+// so the section never pads with irrelevant advice.
+export interface RecommendedActionGroup {
+  key: string;
+  heading: string;
+  actions: string[];
+}
+
 // Assessed confidence in this period's open-source picture. Level drives a chip
 // colour in the renderer; rationale explains the call qualitatively (source
 // breadth + location detail), never with raw counts.
@@ -484,6 +493,12 @@ export interface PngReportDataset {
   polestarView: string;
   reportingConfidence: ReportingConfidence;
   windowItems: PngReportItem[];
+  // Incidents to analyse in "Incident Details" — every windowItem NOT promoted
+  // into the Top 3 story clusters above.
+  incidentDetailsItems: PngReportItem[];
+  // Grouped recommended actions (Movement security, Site security, …), built
+  // from this period's incident mix and the location watchlist.
+  recommendedActions: RecommendedActionGroup[];
 }
 
 export interface BuildArgs {
@@ -630,6 +645,62 @@ function dedupeByTitle(items: PngReportItem[]): PngReportItem[] {
   return Array.from(best.values());
 }
 
+// --- Same-story clustering (Top 3 de-duplication) --------------------------
+// Function words stripped before two headlines are compared for same-story
+// overlap, so the Jaccard score reflects content words only.
+const STORY_STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "at", "for",
+  "with", "by", "from", "as", "is", "are", "was", "were", "be", "been", "after",
+  "amid", "over", "into", "out", "near", "this", "that", "these", "those", "its",
+  "it", "their", "his", "her", "has", "have", "had", "will", "would", "could",
+  "than", "then", "not", "new", "say", "says", "said",
+]);
+function storyTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, " ")
+      .split(/\s+/)
+      .filter((t) => t.length >= 3 && !STORY_STOPWORDS.has(t)),
+  );
+}
+function tokenJaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter += 1;
+  const union = a.size + b.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+// Conservatively cluster syndicated / near-duplicate reports of the SAME event.
+// Two items merge only when they share a province (both-null counts as a match),
+// fall on the same or an adjacent day, carry a compatible category, and their
+// significant title tokens overlap strongly (Jaccard >= 0.5, both titles having
+// at least three significant tokens). Items are processed worst-severity-then-
+// newest first, so each cluster's first member is its representative.
+function clusterSameStory(items: PngReportItem[]): PngReportItem[][] {
+  const DAY = 86_400_000;
+  const sorted = [...items].sort(sortBySeverityThenRecency);
+  const clusters: { rep: PngReportItem; tokens: Set<string>; members: PngReportItem[] }[] = [];
+  for (const it of sorted) {
+    const toks = storyTokens(it.title);
+    const d = (it.incidentDate ?? it.reportedDate).getTime();
+    let placed = false;
+    for (const c of clusters) {
+      if ((c.rep.province ?? null) !== (it.province ?? null)) continue;
+      const cd = (c.rep.incidentDate ?? c.rep.reportedDate).getTime();
+      if (Math.abs(cd - d) > DAY) continue;
+      if (c.rep.category !== it.category && c.rep.displayCategory !== it.displayCategory) continue;
+      if (c.tokens.size < 3 || toks.size < 3) continue;
+      if (tokenJaccard(c.tokens, toks) < 0.5) continue;
+      c.members.push(it);
+      placed = true;
+      break;
+    }
+    if (!placed) clusters.push({ rep: it, tokens: toks, members: [it] });
+  }
+  return clusters.map((c) => c.members);
+}
+
 function capitaliseFirst(s: string): string {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -676,7 +747,7 @@ function baseAction(catLower: string): string {
   if (/(protest|unrest|demonstration|riot|strike|blockad|march)/.test(catLower))
     return "Avoid gatherings and choke points; build in extra transit time and keep routes flexible.";
   if (/(tribal|communal|clash|violen|attack|arson|insurg|militant|armed|gun|shoot|ambush|kidnap)/.test(catLower))
-    return "Hold non-essential movement to affected areas until conditions are confirmed stable.";
+    return "Avoid affected areas; review journey plans and confirm secure routing and site security before any essential movement.";
   if (/(robbery|hold-up|holdup|carjack|theft|break-in|burglar|crime|assault|hijack)/.test(catLower))
     return "Harden movement and premises security; vary routines and avoid predictable timings.";
   return "Maintain standard movement and continuity precautions; monitor for operational follow-on.";
@@ -699,9 +770,10 @@ function watchLine(it: PngReportItem): string {
   const label = it.severityLabel?.trim();
   const lead = label ? `${label}: ` : "";
   const head = `${headline}${loc}`;
-  // Preserve a question/exclamation headline rather than appending a stray period.
-  const sep = /[?!]$/.test(head) ? " " : ". ";
-  return `${lead}${head}${sep}${baseAction(it.category.toLowerCase())}`;
+  // Factual priority line only — the response actions now live in the grouped
+  // Recommended Actions section, so they are no longer repeated per incident.
+  const sep = /[?!]$/.test(head) ? "" : ".";
+  return `${lead}${head}${sep}`;
 }
 
 // A short "why it matters" line for a watchlist location, from its dominant
@@ -714,6 +786,82 @@ function whyForLocation(dominantCatLower: string | null, worstRank: number, fres
     worstRank >= 5 ? "extreme-severity " : worstRank >= 4 ? "high-severity " : "";
   const cat = dominantCatLower ? categoryPhrase(dominantCatLower) : "security-relevant activity";
   return `Fresh ${sev}reporting of ${cat} this period.`;
+}
+
+// Build the grouped Recommended Actions from this period's incident mix and the
+// location watchlist. Deterministic, count-free, British English. Only groups
+// with at least one applicable action are returned; an empty window yields none.
+function buildRecommendedActions(
+  windowItems: PngReportItem[],
+  locationWatchlist: LocationWatchlistEntry[],
+  worstRank: number,
+): RecommendedActionGroup[] {
+  if (windowItems.length === 0) return [];
+  const cats = windowItems.map((it) => it.category.toLowerCase());
+  const has = (re: RegExp) => cats.some((c) => re.test(c));
+  const protest = has(/(protest|unrest|demonstration|riot|strike|blockad|march|labour)/);
+  const armed = has(
+    /(tribal|communal|clash|violen|attack|arson|insurg|militant|armed|gun|shoot|ambush|kidnap|terror|homicide)/,
+  );
+  const crime = has(/(robbery|hold-up|holdup|carjack|theft|break-in|burglar|crime|assault|hijack)/);
+  const natural = has(/(natural|hazard|flood|quake|earthquake|landslide|storm|cyclone|volcan|haze|environment)/);
+  const fire = has(/(fire|explos)/);
+  const transport = has(/(aviation|airport|maritime|port|road|highway|power|utilit|telecom|connectivity)/);
+  const hasWatch = locationWatchlist.length > 0;
+  const groups: RecommendedActionGroup[] = [];
+
+  const movement: string[] = [];
+  if (protest || armed || crime || hasWatch)
+    movement.push(
+      "Vary routes and timings, avoid predictable patterns, and confirm route status before travel.",
+    );
+  if (protest)
+    movement.push("Route around gatherings, rallies and choke points, and build in extra transit time.");
+  if (armed)
+    movement.push(
+      "Treat areas with confirmed violence as no-go for non-essential travel; use secure transport for any essential movement.",
+    );
+  if (movement.length) groups.push({ key: "movement", heading: "Movement security", actions: movement });
+
+  const site: string[] = [];
+  if (armed || crime || protest)
+    site.push("Maintain premises protection: access control, guarding and after-hours security at exposed sites.");
+  if (fire) site.push("Confirm site fire status and evacuation readiness before approach.");
+  if (site.length) groups.push({ key: "site", heading: "Site security", actions: site });
+
+  const staff: string[] = [];
+  if (crime || protest || armed)
+    staff.push("Brief staff and travellers on current risks, local reporting lines and areas to avoid.");
+  if (crime) staff.push("Remind staff to keep a low profile with cash, devices and valuables in public.");
+  if (staff.length) groups.push({ key: "staff", heading: "Staff awareness", actions: staff });
+
+  const journey: string[] = [];
+  if (transport || protest || natural)
+    journey.push("Confirm road, air and port status before travel and hold viable alternates.");
+  if (natural) journey.push("Check weather and hazard conditions before movement and allow for delays.");
+  if (journey.length) groups.push({ key: "journey", heading: "Journey planning", actions: journey });
+
+  groups.push({
+    key: "escalation",
+    heading: "Escalation triggers",
+    actions: [
+      worstRank >= 4
+        ? "Activate contingency and movement-restriction plans if higher-severity or casualty-bearing incidents reach or near operating sites."
+        : "Be ready to tighten precautions if incidents rise in severity or spread to new districts.",
+    ],
+  });
+
+  groups.push({
+    key: "monitoring",
+    heading: "Local monitoring",
+    actions: [
+      hasWatch
+        ? "Track local reporting and official advisories for the locations on the watchlist, and reassess as fresh reporting comes through."
+        : "Track local reporting and official advisories, and reassess as fresh reporting comes through.",
+    ],
+  });
+
+  return groups;
 }
 
 // Generic config-driven builder. The PNG and West Papua entry points below are
@@ -755,15 +903,22 @@ export function buildStructuredReportDataset(
         ? "down"
         : "level";
 
-  // Headline highlights: the three most significant incidents this period.
-  // They get their own "Top 3" section, so they are EXCLUDED from the location
-  // buckets below — otherwise the same incident is reported twice (once in
-  // Top 3, again in its regional section). The regional sections therefore show
-  // the REMAINDER. Aggregate sections (Executive Summary, Business Impact,
-  // Outlook, diagnostics) still draw on the full windowItems set.
-  const topThree = [...windowItems].sort(sortBySeverityThenRecency).slice(0, 3);
-  const topThreeIds = new Set(topThree.map((it) => it.id));
-  const bucketableItems = windowItems.filter((it) => !topThreeIds.has(it.id));
+  // Headline highlights: the three most significant STORIES this period. Feeds
+  // syndicate the same event under several near-identical headlines, so we first
+  // cluster same-story items (title overlap + same place + same/adjacent date +
+  // compatible category) and take the worst-severity, newest representative of
+  // each of the top three clusters. EVERY member of those clusters is then
+  // EXCLUDED from the location buckets and Incident Details below, so a
+  // syndicated re-run of a Top 3 story never reappears lower down. Aggregate
+  // sections (Executive Summary, Outlook, diagnostics) still use full windowItems.
+  const storyClusters = clusterSameStory(windowItems);
+  storyClusters.sort((a, b) => sortBySeverityThenRecency(a[0], b[0]));
+  const topClusters = storyClusters.slice(0, 3);
+  const topThree = topClusters.map((c) => c[0]);
+  const topThreeMemberIds = new Set(topClusters.flatMap((c) => c.map((it) => it.id)));
+  const bucketableItems = windowItems.filter((it) => !topThreeMemberIds.has(it.id));
+  // Incident Details analyses every remaining (non-Top-3) incident.
+  const incidentDetailsItems = bucketableItems;
 
   // Cap the per-location incident cards: each location section (and the "Other"
   // catch-all) shows only the most serious few, sorted severity-then-recency, so
@@ -817,7 +972,7 @@ export function buildStructuredReportDataset(
       // Capped to the most serious few so the section reads as a brief, not a
       // full incident list (aggregate sections still use the full windowItems).
       items: sorted.slice(0, MAX_LOCATION_ITEMS),
-      hadFeatured: windowItems.some((it) => topThreeIds.has(it.id) && inBucket(it)),
+      hadFeatured: windowItems.some((it) => topThreeMemberIds.has(it.id) && inBucket(it)),
       truncated,
       augmentation,
       strands,
@@ -828,7 +983,7 @@ export function buildStructuredReportDataset(
   const otherNational = otherSorted.slice(0, MAX_LOCATION_ITEMS);
   const otherNationalTruncated = otherSorted.length > MAX_LOCATION_ITEMS;
   const otherNationalHadFeatured = windowItems.some(
-    (it) => topThreeIds.has(it.id) && inOther(it),
+    (it) => topThreeMemberIds.has(it.id) && inOther(it),
   );
 
   // --- Executive summary (deterministic, event-led, no parenthetical counts) -
@@ -849,7 +1004,7 @@ export function buildStructuredReportDataset(
       worst && worst.severityRank >= 4
         ? ` The most serious entry reached ${worst.severityLabel} severity.`
         : "";
-    const p1 = `Open-source reporting for ${config.countryName} this period was led by ${catText}.${provText}${sevText}`;
+    const p1 = `The security picture in ${config.countryName} this period was dominated by ${catText}.${provText}${sevText}`;
     const p2 = `The picture is operational rather than a single dramatic event: the priority for business users is movement security, premises protection and continuity at exposed sites while this picture holds.`;
     executiveSummary = `${p1}\n\n${p2}`;
   }
@@ -894,8 +1049,12 @@ export function buildStructuredReportDataset(
           : "The coming week most likely follows the established pattern.";
     const locLine = `Key locations to watch: ${keyLocs}.`;
     const escLine = `Escalation triggers: ${escClause}, and flashpoints around ${config.outlookVolatilityClause}.`;
-    const reduceLine = `Concern would ease with a sustained, well-sourced quiet stretch — but, given uneven open-source coverage, treat any single quiet week as provisional rather than a confirmed improvement.`;
-    outlook = `${mostLikely} ${locLine}\n\n${escLine} ${reduceLine}`;
+    const deEscalation = `Concern would ease with a sustained quiet stretch across ${keyLocs}, no further high-severity or casualty-bearing incidents, and no spread to new districts.`;
+    const worseImpact =
+      curWorstRank >= 4
+        ? "Were the picture to deteriorate, expect direct disruption to movement and site access at the affected locations, with knock-on delays to staff travel and logistics."
+        : "Were the picture to deteriorate, expect localised disruption to movement and access, with possible delays to staff travel and logistics.";
+    outlook = `${mostLikely} ${locLine}\n\n${escLine}\n\n${deEscalation} ${worseImpact}`;
   }
 
   // --- Trajectory (shared by BLUF + Polestar View) ---------------------------
@@ -933,7 +1092,7 @@ export function buildStructuredReportDataset(
       curWorstRank >= 4
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
         : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
-    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: reporting centres on ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}. Treat any quiet stretch as provisional rather than a confirmed improvement, as open-source coverage is uneven.`;
+    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: the bulk of reporting concerns ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}.`;
   }
 
   // --- What Changed This Week (week-on-week delta, qualitative) --------------
@@ -966,7 +1125,7 @@ export function buildStructuredReportDataset(
         : topProvs[0] && prevTopProv && topProvs[0] === prevTopProv
           ? `${topProvs[0]} remained the main focus.`
           : topProvs[0]
-            ? `Reporting centred on ${topProvs[0]}.`
+            ? `Most reporting clustered in ${topProvs[0]}.`
             : "";
     const typeClause =
       leadCat && prevTopCat && leadCat !== prevTopCat
@@ -1044,6 +1203,9 @@ export function buildStructuredReportDataset(
     });
   }
 
+  // --- Recommended Actions (grouped) -----------------------------------------
+  const recommendedActions = buildRecommendedActions(windowItems, locationWatchlist, curWorstRank);
+
   // --- Polestar View (assessed judgement) ------------------------------------
   let polestarView: string;
   if (windowItems.length === 0) {
@@ -1062,7 +1224,7 @@ export function buildStructuredReportDataset(
     const escTrigger = topProvs[0]
       ? `incidents spread beyond ${topProvs[0]}, or higher-severity, casualty-bearing violence is confirmed`
       : "higher-severity, casualty-bearing violence is confirmed, or reporting spreads to new districts";
-    polestarView = `${assessment}, with ${leadCatPhrase}${leadProvClause} leading the reporting. For the week ahead, ${action}. Concern would rise if ${escTrigger}. A single quiet week should not be read as an all-clear: open-source coverage here is uneven, and an absence of reporting is not an absence of risk.`;
+    polestarView = `${assessment}, with ${leadCatPhrase}${leadProvClause} leading the reporting. For the week ahead, ${action}. Concern would rise if ${escTrigger}. Polestar reads the current level as the working baseline rather than a settled improvement, and will reassess as fresh reporting comes through.`;
   }
 
   // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
@@ -1200,7 +1362,7 @@ export function buildStructuredReportDataset(
         (it) => provinceLabel.get(it.province as string) ?? (it.province as string),
         2,
       );
-      const locBit = locs.length ? `, centred on ${joinList(locs)}` : "";
+      const locBit = locs.length ? `, concentrated in ${joinList(locs)}` : "";
       const sevBit =
         g.worst >= 5
           ? ", including extreme-severity reporting"
@@ -1267,6 +1429,8 @@ export function buildStructuredReportDataset(
     polestarView,
     reportingConfidence,
     windowItems,
+    incidentDetailsItems,
+    recommendedActions,
   };
 }
 

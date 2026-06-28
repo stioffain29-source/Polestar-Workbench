@@ -1,6 +1,6 @@
 ---
 name: Country report shared renderer + analyst layout controls
-description: One renderer for ALL country reports (PNG/West Papua/Indonesia/Jakarta + every generic country); fixed section order, 6 themed Incident Details, no Maritime Security, analyst-placed map/photo persisted outside the prose cache.
+description: One renderer for ALL country reports (PNG/West Papua/Indonesia/Jakarta + every generic country); fixed section order, PRESENT-ONLY themed Incident Details (absent themes are omitted, never "Not reported"), no Maritime Security, analyst-placed map/photo persisted outside the prose cache.
 ---
 
 # Country report shared renderer (PngCountryReportBody)
@@ -9,17 +9,20 @@ description: One renderer for ALL country reports (PNG/West Papua/Indonesia/Jaka
 structured theatres AND generic countries — driven by a `PngReportDataset`.
 
 ## Fixed section order (all theatres)
-Bottom Line Up Front → Top 3 Developments (≤3 tiles) → Incident Details (6 themed
-narrative groups) → Current Situation → Operational Impact → Recommended Actions →
+Bottom Line Up Front → Top 3 Developments (≤3 tiles) → Incident Details (PRESENT-ONLY
+themed narrative groups) → Current Situation → Operational Impact → Recommended Actions →
 Outlook → Polestar View → Reporting Confidence → Disclaimer.
 
-## Incident Details themes (6, FIXED order)
-Protest & civil unrest; Crime, theft & robbery; Natural hazards; Governance &
-regulatory; Fire & explosion; Other operational disruption. Mapping lives in
-`lib/countryIncidentThemes.ts` — `themeForCategory` is an EXHAUSTIVE
-`Record<PngCategory, theme>`; adding a new PngCategory forces a theme assignment
-there (compile error otherwise). Empty themes render "Not reported this period."
-Narrative is COUNT-FREE (brand rule: no "(N records)" in prose).
+## Incident Details themes (PRESENT-ONLY, not a fixed six)
+`buildCountryIncidentThemes` (`lib/countryIncidentThemes.ts`) emits a group ONLY for
+themes present in `incidentDetailsItems` this window — absent themes are OMITTED, never
+padded with "Not reported this period." (the old always-on six-theme scaffold was
+removed). Each present theme reads What happened / Where / Why it matters / What could be
+affected. `themeForCategory` is still an EXHAUSTIVE `Record<PngCategory, theme>` (adding a
+PngCategory forces a theme assignment, compile error otherwise). `incidentDetailsItems`
+is windowItems MINUS the Top-3 cluster members. Narrative is COUNT-FREE (brand rule: no
+"(N records)" in prose). Severity is described adjectivally ("High-severity reporting
+featured") — house style across all report builders, NOT a tier-label substitution.
 
 ## Maritime Security REMOVED from country reports
 Country reports no longer render the ICC/IMB maritime-security block or its

@@ -371,6 +371,14 @@ function makePngDataset(): PngReportDataset {
       ninetyDayCount: 30,
     },
     windowItems: [topItem, ncdConfirmed],
+    incidentDetailsItems: [ncdConfirmed],
+    recommendedActions: [
+      {
+        key: "movement",
+        heading: "Movement security",
+        actions: ["Vary routes and timings, and confirm route status before travel."],
+      },
+    ],
   };
 }
 

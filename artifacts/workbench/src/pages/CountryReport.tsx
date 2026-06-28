@@ -1127,11 +1127,42 @@ export default function CountryReport() {
   const windowIncidents = facts.windowIncidents;
   const totalInWindow = windowIncidents.length;
   const severityTotal = SEV_ORDER.reduce((s, k) => s + facts.severityCounts[k], 0);
-  const typeChartData = Array.from(facts.typeCounts.entries())
-    .map(([label, n]) => ({ label, n }))
-    .sort((a, b) => b.n - a.n)
-    .slice(0, 8);
+
+  // Incident-breakdown chart taxonomy. For structured reports (PNG / West Papua
+  // / Indonesia / Jakarta) the bars use the report's OWN client-facing taxonomy
+  // (item.displayCategory) so the chart matches the categories the brief and the
+  // incident cards already use — not the raw incidentClassifier buckets, which
+  // leak database artefacts the standard forbids. Generic country reports keep
+  // the classifier-derived counts.
+  const typeChartData = (() => {
+    if (pngEffectiveDataset && pngEffectiveDataset.windowItems.length > 0) {
+      const counts = new Map<string, number>();
+      for (const it of pngEffectiveDataset.windowItems) {
+        const label = (it.displayCategory ?? "").trim();
+        if (!label) continue;
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .map(([label, n]) => ({ label, n }))
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 8);
+    }
+    return Array.from(facts.typeCounts.entries())
+      .map(([label, n]) => ({ label, n }))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 8);
+  })();
   const typeChartMax = typeChartData.length > 0 ? Math.max(...typeChartData.map((d) => d.n)) : 0;
+
+  // Severity-distribution chart earns its place only when it actually helps
+  // explain the risk picture: show it when at least two severity bands are
+  // present, or when any High/Extreme record is present (so a single serious
+  // band is never hidden). A flat, all-one-low-band window adds no narrative
+  // value, so the chart is omitted — per the standard, charts must support the
+  // narrative, not appear merely because the data exists.
+  const severityBandsPresent = SEV_ORDER.filter((k) => facts.severityCounts[k] > 0).length;
+  const showSeverityChart = severityTotal > 0
+    && (severityBandsPresent >= 2 || facts.severityCounts.high > 0 || facts.severityCounts.extreme > 0);
 
   // Analyst-placed incident map node, rendered at the chosen placement slot.
   const mapNode = (
@@ -1601,6 +1632,7 @@ export default function CountryReport() {
         countryName={effective.name}
         severityCounts={facts.severityCounts}
         severityTotal={severityTotal}
+        showSeverityChart={showSeverityChart}
         typeChartData={typeChartData}
         typeChartMax={typeChartMax}
         situationalReports={situationalReports}
