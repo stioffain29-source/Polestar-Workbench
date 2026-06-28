@@ -13,6 +13,7 @@
 // "no fresh reporting" fallback), never an invented "Not reported" placeholder.
 
 import type { PngReportItem, PngCategory } from "./pngReportDataset";
+import { summariseFireCauses } from "./countryFireCause";
 
 // The six fixed Incident Details themes, in display order.
 export type CountryIncidentTheme =
@@ -83,6 +84,34 @@ export interface CountryIncidentThemeGroup {
   whyItMatters: string;
   // What could be affected — the assets and operations exposed.
   whatCouldBeAffected: string;
+  // Fire theme ONLY: a count-free note separating security-relevant (deliberate)
+  // fires from continuity ones, and stating explicitly that no cause is inferred
+  // where the source did not give one. Undefined for every other theme.
+  causeNote?: string;
+}
+
+// Build the fire-theme cause note from this period's fire/explosion items.
+// Count-free and no-fabrication: deliberate (arson / attack / unrest) framing is
+// used ONLY where the source stated it; otherwise the cause is recorded as not
+// yet reported and never inferred. Undefined when there are no fire items.
+function buildFireCauseNote(items: PngReportItem[]): string | undefined {
+  const s = summariseFireCauses(items);
+  if (s.total === 0) return undefined;
+  let lead: string;
+  if (s.security > 0 && (s.continuity > 0 || s.unclear > 0)) {
+    lead =
+      "Reported causes span both deliberate, security-relevant fires and accidental or operational ones.";
+  } else if (s.security > 0) {
+    lead = "Where a cause was reported, fires were deliberate and are treated as security matters.";
+  } else if (s.continuity > 0) {
+    lead =
+      "These read as accidental or operational fires bearing on business continuity rather than security.";
+  } else {
+    lead = "Causes were not stated this period.";
+  }
+  return s.hasCauseGap
+    ? `${lead} Where a source did not state a cause it is recorded as not yet reported; arson or attack is not inferred.`
+    : lead;
 }
 
 // Per-theme operational-impact descriptors (Operational Impact section).
@@ -220,6 +249,7 @@ export function buildCountryIncidentThemes(
       where,
       whyItMatters,
       whatCouldBeAffected: THEME_AFFECTED[def.key],
+      causeNote: def.key === "fire" ? buildFireCauseNote(items) : undefined,
     };
   });
 }

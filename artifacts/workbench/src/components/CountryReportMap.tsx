@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
+import { classifyLocationConfidence } from "@/lib/countryLocationConfidence";
 
 const SEV_COLOR: Record<string, string> = {
   extreme: "#A33232",
@@ -307,9 +308,26 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   const zonesDef = resolveRiskZones(countryName);
   const zoneMode = zonesDef !== null;
 
-  const plottable = incidents.filter(
-    (i) => typeof i.latitude === "number" && typeof i.longitude === "number"
-      && !Number.isNaN(i.latitude) && !Number.isNaN(i.longitude),
+  // A record is plotted as a PRECISE marker only when it carries a coordinate
+  // AND the title/location text shows we actually know where it happened below
+  // city level (exact coords or a sub-city fix). City- / province-only records
+  // geocode to a centroid, so plotting them as exact dots is false precision —
+  // they are counted in totals, tables and the note instead. Memoised so the
+  // legend, the marker effect and the note all read one consistent set.
+  const plottable = useMemo(
+    () =>
+      incidents.filter(
+        (i) =>
+          typeof i.latitude === "number" &&
+          typeof i.longitude === "number" &&
+          !Number.isNaN(i.latitude) &&
+          !Number.isNaN(i.longitude) &&
+          classifyLocationConfidence({
+            title: (i.displayTitle && i.displayTitle.trim()) || i.title,
+            location: i.location,
+          }).plottable,
+      ),
+    [incidents],
   );
 
   // Zone aggregation (area-risk mode only). Memoised so the legend and the
@@ -668,9 +686,9 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
-            Where several incidents share a location, one marker shows the incident count and is coloured by the highest severity recorded there.
-            {" "}Records without coordinates are included in totals and tables but not plotted on the map.
-            {unplotted > 0 ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} excluded from the map.` : ""}
+            Markers show only incidents with a confirmed local location. Where several share a location, one marker shows the incident count and is coloured by the highest severity recorded there.
+            {" "}City- or province-level records, and records without coordinates, are included in totals and tables but not plotted as precise points.
+            {unplotted > 0 ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} not plotted.` : ""}
           </div>
         </>
       ) : (

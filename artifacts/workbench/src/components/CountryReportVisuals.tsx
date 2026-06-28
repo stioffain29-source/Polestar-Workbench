@@ -155,6 +155,14 @@ export default function CountryReportVisuals({
         )}
       </Section>
 
+      {/* Chart provenance caption (spec §10). Counts belong on captions, never
+          in prose: this states the charts are built from the deduplicated
+          incident set for the reporting period so a reader never mistakes
+          syndicated copies for separate events. */}
+      <p style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 8, opacity: 0.75 }}>
+        Charts show deduplicated incidents for the reporting period.
+      </p>
+
       {/* Situational Context (UN OCHA ReliefWeb supporting layer — not counted) */}
       <SituationalContextSection reports={situationalReports} country={countryName} max={6} />
     </>

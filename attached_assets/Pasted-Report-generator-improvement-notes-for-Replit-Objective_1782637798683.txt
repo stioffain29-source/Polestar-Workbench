@@ -1,0 +1,502 @@
+Report generator improvement notes for Replit
+
+Objective
+
+Improve the Polestar country report generator so the output feels analyst led, customer relevant and credible. This is not a rebuild. It is an enhancement to the existing report generation, incident filtering, deduplication, mapping and narrative logic.
+
+The main issues to fix are:
+
+1. Weak or irrelevant items getting through the incident filter
+2. Duplicate reporting of the same incident, including the sandal factory fire
+3. Fire incidents being reported without explaining whether they are fire safety, arson, unrest related or unknown cause
+4. Map markers being placed at city centre or province centre level, which creates false precision
+5. Top 3 Developments sometimes including low value or weakly relevant stories
+6. Reports not clearly explaining what matters to business users
+
+Required changes
+
+1. Incident quality gate
+
+Before an item is allowed into the report narrative, Top 3 Developments, map or charts, it must pass a quality gate.
+
+Exclude items where the reporting is only:
+
+General tourism
+General economic commentary
+Routine politics
+Routine court or admin process
+Minor crime with no business relevance
+Generic social media chatter
+Old incidents being recycled as new
+Duplicated coverage of an already captured incident
+National level commentary with no operational relevance
+Opinion pieces with no incident or location attached
+
+An item should only be included where it has at least one of the following:
+
+Clear location
+Clear date
+Clear incident type
+Operational impact
+Security relevance
+Business continuity relevance
+Staff movement relevance
+Site, logistics or asset exposure
+Police, emergency service or security force response
+Road closure, evacuation, fire, protest, violent crime or disruption
+
+If an item does not meet this threshold, exclude it from the customer report. It can remain in raw data if needed, but it should not appear in the report.
+
+2. Deduplication
+
+Add stronger deduplication before report generation.
+
+The same incident must not appear more than once just because it has been reported by several sources.
+
+Deduplicate using:
+
+Date
+Location
+Named premises
+Incident type
+Key words
+Source title similarity
+Known named incident
+Reported casualties or damage
+Neighbourhood, district or city
+Time window
+
+Example rule:
+
+If multiple articles report the same sandal factory fire, the report should treat it as one incident. The system may retain multiple source references internally, but the customer report should show one consolidated incident only.
+
+For duplicate candidates, merge them into one incident record with:
+
+Primary incident title
+Best available location
+Highest confirmed severity
+Most specific confirmed cause
+One short summary
+All source links retained internally
+Confidence level
+Last updated timestamp
+
+3. Fire and explosion classification
+
+Do not treat all fire and explosion incidents as the same security issue.
+
+Every fire or explosion record must be assigned one of these cause tags:
+
+Fire safety
+Accidental fire
+Electrical fault
+Industrial or factory fire
+Commercial premises fire
+Residential fire
+Vehicle fire
+Wildfire or environmental fire
+Explosion
+Arson or suspicious fire
+Protest or unrest related fire
+Attack related fire
+Cause not yet reported
+
+Important rule:
+
+Do not imply arson, attack, sabotage or unrest unless the source clearly states this.
+
+If the source does not confirm the cause, use:
+
+Cause not yet reported
+
+Report wording should say:
+
+“Fire incidents were reported, but cause reporting remains inconsistent. Where no cause is confirmed, Polestar treats these as fire safety and continuity issues rather than intentional security incidents.”
+
+4. Fire reporting in the narrative
+
+The report must explain why fires matter.
+
+Separate security relevance from continuity relevance.
+
+Use this logic:
+
+Fire safety or accidental fire
+Relevance is life safety, evacuation, site continuity, building access, utilities and insurance.
+
+Industrial or factory fire
+Relevance is staff safety, supply chain continuity, production interruption, emergency access and nearby site exposure.
+
+Arson or suspicious fire
+Relevance is security, criminal intent, site protection, staff movement and possible repeat targeting.
+
+Protest or unrest related fire
+Relevance is civil unrest, movement restrictions, road closures, crowd control and nearby site exposure.
+
+Explosion
+Relevance is life safety, evacuation, emergency services response, access control and business continuity.
+
+Cause unknown
+Relevance is provisional. Do not overstate. Treat as fire safety and continuity until cause is confirmed.
+
+5. Top 3 Developments selection
+
+Top 3 Developments must not simply be the three highest scoring scraped items.
+
+Top 3 should be selected using analyst value.
+
+Include items where there is:
+
+High severity
+Casualties
+Evacuation
+Major fire
+Significant road closure
+Protest disruption
+Police or security force deployment
+Industrial or logistics impact
+Airport, port, toll road or transport impact
+Incident near a commercial district or operating area
+Regulatory action with direct business impact
+Clear movement, site or continuity relevance
+
+Do not include low value items unless they have clear business impact.
+
+Examples of weak Top 3 items to avoid:
+
+Minor theft
+Routine tourism commentary
+General economic reporting
+Political commentary without operational effect
+A local crime story with no wider relevance
+A duplicate of another Top 3 item
+A vague social media post with no reliable location or impact
+
+Each Top 3 item must answer:
+
+What happened
+Where it happened
+Why it matters
+What business users should do or watch
+
+6. Top 3 duplicate prevention
+
+The Top 3 section must not include two versions of the same incident.
+
+If two items concern the same incident, merge them into one entry.
+
+The second slot should go to the next most relevant separate incident.
+
+7. Map location confidence
+
+Stop plotting broad administrative locations as precise incident points.
+
+Every incident needs a location confidence level:
+
+Exact location
+Street, building, factory, site, port, station, mall, named road or named premises. Plot as a point.
+
+Good local location
+District, subdistrict, town, regency or clearly named area. Plot as an approximate area marker or district marker.
+
+City level only
+Jakarta, Surabaya, Bandung, Medan, Jayapura etc. Do not plot as a precise point.
+
+Province level only
+West Java, East Java, Papua Tengah, Papua Barat Daya etc. Do not plot as a precise point.
+
+Unknown or unclear
+Do not plot.
+
+8. Map plotting rule
+
+Do not place a marker in the middle of Jakarta, or any other city, just because the location is only “Jakarta”.
+
+Do not use city centroids or province centroids as incident points unless the report makes clear that the marker is approximate.
+
+Preferred approach:
+
+Plot exact and good local locations only.
+Do not plot city level or province level only records.
+Include city level and province level records in totals only.
+Add a note below the map explaining what is and is not plotted.
+
+Map note wording:
+
+“Only incidents with usable location detail are plotted. City level, province level and unclear locations are included in the totals but are not shown as precise points. Where several incidents share the same mapped location, one marker is shown and coloured by the highest severity recorded.”
+
+9. Map marker clustering
+
+Where several incidents share the same location, show one marker with a count.
+
+The marker colour should reflect the highest severity at that location.
+
+The map tooltip or table should show:
+
+Location
+Number of incidents
+Highest severity
+Main incident types
+Location confidence
+
+10. Records versus incidents
+
+Clarify the difference between records and incidents.
+
+A record is a scraped article or source entry.
+An incident is a deduplicated event.
+
+Customer facing charts should use deduplicated incidents where possible.
+
+If charts use records, the report must say “records” clearly and explain that multiple records may relate to the same incident.
+
+Preferred wording:
+
+“Charts show deduplicated incidents for the reporting period.”
+
+If deduplication is not yet complete:
+
+“Charts show source records. Some records may relate to the same incident and are subject to deduplication.”
+
+11. Recommended report wording for fires
+
+Replace generic wording like:
+
+“Fire and explosion incidents were reported.”
+
+With:
+
+“Fire incidents were reported during the period, including commercial, industrial and local premises fires. Where cause is not confirmed, these should be treated as fire safety and continuity issues rather than intentional security incidents.”
+
+For Jakarta:
+
+“Fire reporting this week appears primarily relevant to life safety, building access, emergency response and continuity planning. No intentional cause should be inferred unless confirmed by source reporting.”
+
+For Indonesia:
+
+“Fire reporting was geographically broader and included industrial and local premises incidents. Deduplication is required where several sources report the same fire.”
+
+12. Recommended report wording for map limitations
+
+Add this standard note under every map:
+
+“Only incidents with usable location detail are plotted. Broad city, province or unclear locations are included in totals but are not shown as precise points. Map markers should be read as indicative of reported location, not as a complete operating picture.”
+
+13. Recommended report wording for customer relevance
+
+Add a short Customer Relevance section before Recommended Actions.
+
+For Jakarta:
+
+Customer Relevance
+Most relevant to office operations, staff commuting, hotel based visitors, drivers, facilities teams and business continuity leads. Main issues this period are localised fire response, utility disruption, wet weather movement disruption and incidental exposure to crime or protest activity.
+
+For Indonesia:
+
+Customer Relevance
+Most relevant to multi site operators, logistics teams, manufacturing sites, field travel, warehousing, cash movement and staff movement between cities. Main issues this period are localised fires, protest disruption, regulatory follow on, flood or hazard disruption and violent crime exposure in affected areas.
+
+For Papua:
+
+Customer Relevance
+Most relevant to field operations, project sites, secure movement, aviation dependent travel, remote logistics and staff based near affected districts. Main issues are violent crime, security force activity, movement restriction, site exposure and limited response options in higher risk areas.
+
+14. Recommended Actions logic
+
+Recommended actions must be tied to the actual incident picture.
+
+Avoid generic repeated lines.
+
+For Jakarta, actions should include:
+
+Check backup power and generator readiness where outage reporting is relevant.
+Confirm building access and lift operation during power disruption.
+Monitor flood and heavy rain warnings before staff movement.
+Review routes through Central Jakarta before meetings or visitor movement.
+Avoid protest locations and government buildings during known mobilisation.
+Check emergency access and evacuation arrangements for sites near reported fires.
+
+For Indonesia, actions should include:
+
+Check whether any reported fires are near company sites, suppliers or logistics routes.
+Treat unknown cause fires as continuity issues unless intentional cause is confirmed.
+Monitor protest areas before intercity or urban movement.
+Check drainage, flood exposure and site access in affected provinces.
+Review staff movement where police deployments, unrest or violent crime are reported.
+Confirm local authority or regulatory follow on where incidents involve permits, inspections or enforcement.
+
+For Papua, actions should include:
+
+Restrict non essential movement in affected districts.
+Use secure transport for essential movement.
+Avoid predictable travel patterns.
+Track security force operations and localised violence.
+Review site exposure near police, military or separatist activity.
+Confirm air, road and port status before movement.
+Ensure staff have clear reporting lines and check in procedures.
+
+15. Polestar View logic
+
+The Polestar View must be more than a summary.
+
+It should include:
+
+Current risk direction
+Main driver of risk
+Most exposed geography
+Most exposed business activity
+Most likely next disruption
+What would change the assessment
+Practical customer judgement
+
+Suggested structure:
+
+“Polestar assesses that operating risk in [location] is [stable / elevated / deteriorating], driven by [main drivers]. The main business exposure is [movement / site access / staff safety / continuity / logistics]. The most exposed areas are [locations]. The most likely disruption over the next seven days is [scenario]. The assessment would worsen if [trigger]. For now, operators should [action].”
+
+16. Reporting Confidence
+
+Reporting confidence should reflect:
+
+Source reliability
+Number of sources
+Location precision
+Deduplication confidence
+Cause clarity
+Whether the incident is confirmed by official or multiple local sources
+
+Confidence labels:
+
+High confidence
+Multiple credible sources, clear location, clear date, low duplication risk.
+
+Moderate confidence
+Multiple sources or credible local reporting, but some uncertainty around location, cause or duplication.
+
+Low confidence
+Single source, vague location, unclear cause, social media only, or high duplication risk.
+
+Do not use high confidence where the map points are vague or where the cause of major incidents is unclear.
+
+17. Severity logic
+
+Severity should be based on impact, not just keywords.
+
+High or extreme severity should require one or more of:
+
+Fatalities
+Multiple injuries
+Major evacuation
+Major fire or explosion
+Confirmed attack
+Major protest disruption
+Security force deployment with violence
+Transport corridor closure
+Direct effect on commercial, industrial or logistics operations
+Significant business continuity impact
+
+Low severity should be used where:
+
+Minor theft
+No confirmed disruption
+No casualties
+No business impact
+Routine local reporting
+Weak source detail
+
+18. Source handling
+
+Keep full source detail internally.
+
+Customer report does not need every source, but the system should retain sources for audit and checking.
+
+For each incident record, store:
+
+Source title
+Source outlet
+Source date
+URL
+Scrape timestamp
+Incident date
+Location
+Location confidence
+Incident type
+Cause tag
+Severity
+Deduplication group
+Summary
+Customer relevance
+Reason included
+Reason excluded, if excluded
+
+19. Incident exclusion reasons
+
+When an item is filtered out, tag the reason.
+
+Use standard exclusion tags:
+
+Duplicate
+Too vague
+No operational relevance
+General news
+Tourism only
+Routine politics
+Minor crime
+No clear location
+No clear date
+Source unreliable
+Old incident
+Opinion or commentary
+Not security relevant
+Not continuity relevant
+
+This will make it easier to tune the filter later.
+
+20. Acceptance criteria
+
+The fix is acceptable when:
+
+The same fire does not appear more than once in the report.
+The sandal factory fire is consolidated into a single incident.
+Fires are classified by likely relevance and cause status.
+No report implies arson or intentional cause unless confirmed.
+Jakarta map no longer drops vague incidents into the city centre.
+City level and province level records are counted but not plotted as precise points.
+Top 3 Developments contain three separate and operationally relevant issues.
+Weak tourism, general politics, routine economy and minor crime items do not appear in Top 3.
+Recommended Actions are specific to the incident picture.
+Polestar View gives a clear judgement, not just a summary.
+Charts make clear whether they show records or deduplicated incidents.
+Reporting Confidence reflects location precision and deduplication quality.
+
+21. Do not change
+
+Do not rebuild the report format.
+Do not change the visual brand.
+Do not change the PDF export flow unless required for these fixes.
+Do not remove the existing sections.
+Do not add long source lists to customer facing reports.
+Do not over engineer this into a full intelligence platform.
+
+22. Priority order
+
+Priority 1
+Deduplication and slop filtering.
+
+Priority 2
+Location confidence and map plotting rules.
+
+Priority 3
+Fire and explosion cause classification.
+
+Priority 4
+Top 3 selection logic.
+
+Priority 5
+Customer Relevance and sharper Polestar View wording.
+
+Priority 6
+Cleaner chart labelling for records versus incidents.
+
+Expected outcome
+
+The reports should feel less like scraped incident summaries and more like a paid operational risk product. The customer should be able to understand what happened, where it matters, whether it is a security issue or continuity issue, what locations are exposed, and what action they should take.

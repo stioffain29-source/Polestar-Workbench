@@ -26,7 +26,7 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, type CountryFastFactsIncident } from "@/lib/countryFastFacts";
-import { dedupeCountryWindowIncidents } from "@/lib/monitorDedupe";
+import { consolidateCountryStories } from "@/lib/countrySameStory";
 import { shouldGenerateProse } from "@/lib/countryProseGate";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
 import {
@@ -433,12 +433,13 @@ export default function CountryReport() {
     [sourcesData, issueDate, country?.name],
   );
 
-  // Collapse syndicated duplicates (the same wire re-run under an identical
-  // headline) BEFORE Fast Facts, the map, the charts and the related-incidents
-  // table read the active window, so one event never shows or counts twice.
-  // Mirrors the monitor dedupe; the PNG dataset path dedupes separately.
+  // Consolidate same-story incidents (syndicated re-runs AND the same named
+  // premises event reported across a few days) BEFORE Fast Facts, the map, the
+  // charts and the related-incidents table read the active window, so one event
+  // never shows or counts twice. Shares the exact clustering authority the
+  // structured report builder uses, so the page and the brief agree.
   const dedupedWindowIncidents = useMemo(
-    () => dedupeCountryWindowIncidents(active.incidents),
+    () => consolidateCountryStories(active.incidents),
     [active],
   );
 
@@ -994,7 +995,19 @@ export default function CountryReport() {
   const typeChartData = (() => {
     if (pngEffectiveDataset && pngEffectiveDataset.windowItems.length > 0) {
       const counts = new Map<string, number>();
-      for (const it of pngEffectiveDataset.windowItems) {
+      // Count over SAME-STORY-CONSOLIDATED items so the bars honour the
+      // "deduplicated incidents" caption and match the severity chart's
+      // authority (which already runs through consolidateCountryStories). Without
+      // this a single named-premises event reported under several headlines would
+      // be counted multiple times here. Only the chart's counting is
+      // consolidated; the brief's narrative / Top-3 pipeline is untouched.
+      const consolidatedItems = consolidateCountryStories(
+        pngEffectiveDataset.windowItems.map((it) => ({
+          ...it,
+          occurredAt: (it.incidentDate ?? it.reportedDate).toISOString(),
+        })),
+      );
+      for (const it of consolidatedItems) {
         const label = (it.displayCategory ?? "").trim();
         if (!label) continue;
         counts.set(label, (counts.get(label) ?? 0) + 1);

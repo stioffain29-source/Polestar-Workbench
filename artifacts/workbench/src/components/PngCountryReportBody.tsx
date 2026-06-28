@@ -384,6 +384,7 @@ export default function PngCountryReportBody({
               <ThemePart label="Where" text={g.where} />
               <ThemePart label="Why it matters" text={g.whyItMatters} />
               <ThemePart label="What could be affected" text={g.whatCouldBeAffected} />
+              {g.causeNote ? <ThemePart label="Cause" text={g.causeNote} /> : null}
             </div>
           ))
         )}
@@ -410,6 +411,15 @@ export default function PngCountryReportBody({
           <BulletList items={operationalImpact} />
         )}
       </Section>
+
+      {/* Customer Relevance — who the brief matters to plus the period's main
+          issues, derived from the incident mix. Shown before Recommended
+          Actions for both standard and operating-risk variants. */}
+      {d.customerRelevance && d.customerRelevance.trim().length > 0 ? (
+        <Section title="Customer Relevance">
+          <Prose text={d.customerRelevance} />
+        </Section>
+      ) : null}
 
       {/* 6. Recommended Actions — grouped client priorities (Movement security,
           Site security, …), emitting only the groups this period's incident mix

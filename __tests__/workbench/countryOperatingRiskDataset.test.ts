@@ -221,3 +221,75 @@ describe("buildCountryOperatingRiskDataset — empty window (no fabrication)", (
     expect(ds.proseVariant).toBe("operating-risk");
   });
 });
+
+describe("buildCountryOperatingRiskDataset — Reporting Confidence (§16)", () => {
+  // Four clearly-relevant protest incidents, each from a DISTINCT outlet and
+  // carrying a resolved province, so the outlet-count and location-share gates
+  // both clear High. Only the PRECISION of the location text (and any major
+  // fire's cause clarity) is varied per case, isolating the §16 gates: a High
+  // rating must additionally require precise, plottable map points AND no major
+  // incident whose cause the source has not stated.
+  const TITLES = [
+    "Thousands protest in the capital over rising fuel prices",
+    "Demonstrators rally against new transport fares",
+    "Residents stage a protest over prolonged power cuts",
+    "Activists march over wage disputes",
+  ];
+  function set(
+    locations: string[],
+    fire?: { title: string; severity: string; location: string },
+  ): PngSourceIncident[] {
+    const rows = TITLES.map((title, idx) =>
+      inc({
+        id: `c${idx}`,
+        title,
+        severity: "Moderate",
+        source: `Outlet ${idx}`,
+        province: "Metro Manila",
+        location: locations[idx],
+      }),
+    );
+    if (fire) {
+      rows[0] = inc({
+        id: "fire",
+        title: fire.title,
+        severity: fire.severity,
+        source: "Outlet 0",
+        province: "Metro Manila",
+        location: fire.location,
+      });
+    }
+    return rows;
+  }
+
+  const PRECISE = [
+    "Roxas Boulevard, Manila",
+    "EDSA highway, Quezon City",
+    "Barangay 134, Cebu",
+    "near the seaport terminal, Davao",
+  ];
+
+  it("rates High when outlets, locations and precise map points all hold", () => {
+    const ds = build(set(PRECISE));
+    expect(ds.windowItems.length).toBeGreaterThanOrEqual(4);
+    expect(ds.reportingConfidence.level).toBe("High");
+  });
+
+  it("never rates High when the map points are too vague to plot (no false precision)", () => {
+    const ds = build(set(["Manila", "Cebu", "Davao", "Iloilo"]));
+    expect(ds.reportingConfidence.level).not.toBe("High");
+    expect(ds.reportingConfidence.rationale).toMatch(/too broad to map/i);
+  });
+
+  it("never rates High when a major incident's cause is not yet reported", () => {
+    const ds = build(
+      set(PRECISE, {
+        title: "Massive fire engulfs a warehouse",
+        severity: "High",
+        location: "Roxas Boulevard, Manila",
+      }),
+    );
+    expect(ds.reportingConfidence.level).not.toBe("High");
+    expect(ds.reportingConfidence.rationale).toMatch(/cause is not yet reported/i);
+  });
+});
