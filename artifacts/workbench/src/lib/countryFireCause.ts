@@ -173,8 +173,16 @@ export function classifyFireCause(input: {
 
 export interface FireCauseSummary {
   total: number;
-  /** Fires/explosions with a deliberate (security) cause STATED by the source. */
+  /** Fires/explosions reading as a security matter (arson / attack / unrest). */
   security: number;
+  /**
+   * Fires/explosions where the SOURCE explicitly stated a DELIBERATE cause —
+   * arson or an attack (bomb / IED / militant / sabotage). This DELIBERATELY
+   * excludes merely protest-adjacent fires (contextual, not an explicit
+   * deliberate cause). It is the strict gate for the "deliberate fire or arson"
+   * report wording, which must never be triggered by association alone.
+   */
+  deliberate: number;
   /** Fires/explosions reading as a continuity matter. */
   continuity: number;
   /** Fires/explosions where the cause is not yet reported / unclear. */
@@ -189,6 +197,7 @@ export function summariseFireCauses(
   items: { title?: string | null; summary?: string | null; category?: string | null }[],
 ): FireCauseSummary {
   let security = 0;
+  let deliberate = 0;
   let continuity = 0;
   let unclear = 0;
   let hasCauseGap = false;
@@ -200,7 +209,10 @@ export function summariseFireCauses(
     if (r.relevance === "security") security += 1;
     else if (r.relevance === "continuity") continuity += 1;
     else unclear += 1;
+    // Strict deliberate gate: ONLY an explicitly-stated arson or attack cause —
+    // never a merely protest-adjacent fire, which is contextual association.
+    if (r.cause === "arson-suspicious" || r.cause === "attack-related") deliberate += 1;
     if (!r.causeStated) hasCauseGap = true;
   }
-  return { total, security, continuity, unclear, hasCauseGap };
+  return { total, security, deliberate, continuity, unclear, hasCauseGap };
 }

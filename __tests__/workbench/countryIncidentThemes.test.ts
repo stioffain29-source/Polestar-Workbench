@@ -158,6 +158,38 @@ describe("buildCountryIncidentThemes", () => {
   });
 });
 
+describe("buildCountryIncidentThemes — source-safe fire paragraph", () => {
+  it("states the cause is not identified by default and never classifies cause", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Fire", title: "Fire guts warehouse overnight", province: "Lae" }),
+    ]);
+    const fire = groups.find((g) => g.key === "fire")!;
+    expect(fire.paragraph).toContain("Fire and explosion incidents were reported");
+    expect(fire.paragraph).toContain("Available reporting did not consistently identify cause.");
+    expect(fire.paragraph).toContain("the operational concern is local disruption");
+    expect(fire.paragraph).not.toMatch(/deliberate fire or arson|security relevant/);
+  });
+
+  it("does NOT infer a deliberate cause from protest-adjacent fire reporting", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Fire", title: "Fire breaks out near protest march", province: "Jakarta" }),
+    ]);
+    const fire = groups.find((g) => g.key === "fire")!;
+    expect(fire.paragraph).toContain("Available reporting did not consistently identify cause.");
+    expect(fire.paragraph).not.toMatch(/deliberate fire or arson|security relevant/);
+  });
+
+  it("uses the security-relevant wording ONLY when a source states arson or attack", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Fire", title: "Arson suspected in warehouse blaze", province: "Lae" }),
+    ]);
+    const fire = groups.find((g) => g.key === "fire")!;
+    expect(fire.paragraph).toContain("Where source reporting identified deliberate fire or arson");
+    expect(fire.paragraph).toContain("security relevant");
+    expect(fire.paragraph).toContain("the operational concern is local disruption");
+  });
+});
+
 describe("buildOperationalImpactBullets", () => {
   it("returns an empty list for an empty window", () => {
     expect(buildOperationalImpactBullets([])).toEqual([]);

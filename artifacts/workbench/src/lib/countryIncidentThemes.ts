@@ -89,36 +89,34 @@ export interface CountryIncidentThemeGroup {
   whyItMatters: string;
   // What could be affected — the assets and operations exposed.
   whatCouldBeAffected: string;
-  // Fire theme ONLY: a count-free note separating security-relevant (deliberate)
-  // fires from continuity ones, and stating explicitly that no cause is inferred
-  // where the source did not give one. Undefined for every other theme.
-  causeNote?: string;
 }
 
-// Build the fire-theme cause note from this period's fire/explosion items.
-// Count-free and no-fabrication: deliberate (arson / attack / unrest) framing is
-// used ONLY where the source stated it; otherwise the cause is recorded as not
-// yet reported and never inferred. Undefined when there are no fire items.
-function buildFireCauseNote(items: PngReportItem[]): string | undefined {
-  const s = summariseFireCauses(items);
-  if (s.total === 0) return undefined;
+// FIRE & EXPLOSION is written in SOURCE-SAFE operational language. Cardinal rule
+// (analyst instruction): never classify a fire's cause as deliberate, accidental,
+// operational, arson, attack or security-relevant unless a SOURCE explicitly says
+// so. The report states only what is known (incidents + where), what is not
+// confirmed (cause), and the operational relevance — never internal/methodology
+// wording. The security-relevant framing is used ONLY when a source confirmed a
+// deliberate fire or arson.
+const FIRE_OPERATIONAL_CONCERN =
+  "For business users, the operational concern is local disruption: road closures, " +
+  "evacuation, utility interruption, access restrictions and possible impact on nearby " +
+  "offices, warehouses, hotels, client sites or transport routes.";
 
-  // No cause was stated for any fire this period: say so plainly and stop, so the
-  // gap clause below never doubles up with a lead that already makes the point.
-  if (s.security === 0 && s.continuity === 0) {
-    return "Causes have not been reported this period.";
-  }
-
-  let lead: string;
-  if (s.security > 0 && (s.continuity > 0 || s.unclear > 0)) {
-    lead = "Where a cause was reported, some fires were deliberate and others accidental or operational.";
-  } else if (s.security > 0) {
-    lead = "Where a cause was reported, fires were deliberate and bear on security.";
-  } else {
-    lead =
-      "These read as accidental or operational fires bearing on business continuity rather than security.";
-  }
-  return s.hasCauseGap ? `${lead} In other cases the cause was not reported.` : lead;
+function buildFireParagraph(items: PngReportItem[], provinces: string[]): string {
+  const where = provinces.length ? ` in ${joinList(provinces)}` : "";
+  const opening = `Fire and explosion incidents were reported${where}.`;
+  // STRICT gate: use the deliberate count, which is set ONLY when a source
+  // explicitly stated arson or an attack. It deliberately excludes merely
+  // protest-adjacent fires (contextual association is not an explicit cause), so
+  // the security-relevant wording is never inferred.
+  const sourceConfirmedDeliberate = summariseFireCauses(items).deliberate > 0;
+  const cause = sourceConfirmedDeliberate
+    ? "Where source reporting identified deliberate fire or arson, it has been treated as " +
+      "security relevant. Other fire reports are treated as local disruption or business " +
+      "continuity issues unless a cause is confirmed."
+    : "Available reporting did not consistently identify cause.";
+  return `${opening} ${cause} ${FIRE_OPERATIONAL_CONCERN}`;
 }
 
 // Per-theme operational-impact descriptors (Operational Impact section).
@@ -257,16 +255,19 @@ export function buildCountryIncidentThemes(
           ? "High-severity reporting featured. "
           : "";
     const whyItMatters = `${sevPrefix}${THEME_SIGNIFICANCE[def.key]}`;
-    const causeNote = def.key === "fire" ? buildFireCauseNote(items) : undefined;
-    // The renderer shows ONE short, count-free paragraph per theme. Compose it
-    // from the same stems: what happened (+ the main categories), where it
-    // concentrated, then the operational significance and, for fires only, the
-    // no-fabrication cause note.
+    // The renderer shows ONE short, count-free paragraph per theme. Fire &
+    // explosion is special-cased into strict source-safe operational language
+    // (never inferring a cause); every other theme composes from the same stems:
+    // what happened (+ the main categories), where it concentrated, then the
+    // operational significance.
     const catClause = cats.length ? `, including ${joinList(cats)}` : "";
     const whereClause = provs.length ? ` It concentrated in ${joinList(provs)}.` : "";
-    const paragraph = `${THEME_WHAT[def.key]}${catClause}.${whereClause} ${sevPrefix}${THEME_SIGNIFICANCE[def.key]}${causeNote ? ` ${causeNote}` : ""}`
-      .replace(/\s+/g, " ")
-      .trim();
+    const paragraph =
+      def.key === "fire"
+        ? buildFireParagraph(items, provs)
+        : `${THEME_WHAT[def.key]}${catClause}.${whereClause} ${sevPrefix}${THEME_SIGNIFICANCE[def.key]}`
+            .replace(/\s+/g, " ")
+            .trim();
     return {
       key: def.key,
       heading: def.heading,
@@ -275,7 +276,6 @@ export function buildCountryIncidentThemes(
       where,
       whyItMatters,
       whatCouldBeAffected: THEME_AFFECTED[def.key],
-      causeNote,
     };
   });
 }

@@ -89,7 +89,7 @@ describe("classifyFireCause — honours a STATED cause", () => {
 describe("summariseFireCauses", () => {
   it("splits security vs continuity vs unclear and flags the cause gap", () => {
     const s = summariseFireCauses([
-      { title: "Arson suspected at depot" }, // security
+      { title: "Arson suspected at depot" }, // security + deliberate
       { title: "Short circuit blamed for house fire" }, // continuity
       { title: "Fire guts factory" }, // continuity (setting)
       { title: "Fire reported in the area" }, // unclear
@@ -97,8 +97,22 @@ describe("summariseFireCauses", () => {
     ]);
     expect(s.total).toBe(4);
     expect(s.security).toBe(1);
+    expect(s.deliberate).toBe(1);
     expect(s.continuity).toBe(2);
     expect(s.unclear).toBe(1);
     expect(s.hasCauseGap).toBe(true);
+  });
+
+  it("counts ONLY explicit arson/attack as deliberate — never a protest-adjacent fire", () => {
+    const s = summariseFireCauses([
+      { title: "Arson suspected at depot" }, // deliberate (arson)
+      { title: "Bomb blast sets fuel depot ablaze" }, // deliberate (attack)
+      { title: "Rioters set vehicles on fire during protest" }, // security, NOT deliberate
+      { title: "Short circuit blamed for house fire" }, // continuity
+    ]);
+    // The protest-adjacent fire is security-relevant but is contextual, not an
+    // explicit deliberate cause, so it must NOT count toward `deliberate`.
+    expect(s.security).toBe(3);
+    expect(s.deliberate).toBe(2);
   });
 });
