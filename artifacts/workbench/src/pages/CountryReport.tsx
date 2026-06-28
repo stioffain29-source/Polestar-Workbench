@@ -19,15 +19,13 @@ import {
   type ProseBaselineContext,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { draftCountryReportProse, type DraftableIncident } from "@/lib/draftReportProse";
 import { createInFlightBusy } from "@/lib/inFlightBusy";
 import { ArrowLeft, Download, Loader2, Pencil, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
-import { computeCountryFastFacts, titleCaseLocation, type CountryFastFactsIncident, type CountryFastFactCard } from "@/lib/countryFastFacts";
+import { computeCountryFastFacts, type CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import { dedupeCountryWindowIncidents } from "@/lib/monitorDedupe";
 import { shouldGenerateProse } from "@/lib/countryProseGate";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
@@ -60,7 +58,7 @@ import type {
 import type { CountryReportPhoto } from "@workspace/api-client-react";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
-import { buildCountryLayers, buildWatchlistBreakdown, filterCountryRelevant, dropSyndicatedRehashes, summariseLookback, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type WatchlistRow, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
+import { buildCountryLayers, filterCountryRelevant, dropSyndicatedRehashes, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 
 // Brand palette (lowercase per brand spec).
@@ -71,99 +69,7 @@ const POLAR = "#e2e2e2";
 const ROBOTO = "Roboto, sans-serif";
 const BRAND_GRADIENT = "linear-gradient(to right, #0b0a3d 0%, #465bff 100%)";
 
-const SEV_COLOR: Record<string, string> = {
-  extreme: "#A33232",
-  high: "#C0392B",
-  moderate: "#E67E22",
-  low: "#6FB872",
-  insignificant: "#1B6B7A",
-};
-const SEV_LABEL: Record<string, string> = {
-  extreme: "Extreme",
-  high: "High",
-  moderate: "Moderate",
-  low: "Low",
-  insignificant: "Insignificant",
-};
 const SEV_ORDER = ["extreme", "high", "moderate", "low", "insignificant"] as const;
-
-// Deterministic per-incident summary — the labelled fallback shown when an AI
-// summary for an incident is unavailable (mirrors the structured PNG brief,
-// where each card shows `summaries[id] || businessImpact`). Grounded ONLY on the
-// incident's own fields (type, location, date, severity); no fabricated facts,
-// British English, five-tier severity vocab, no parenthetical counts. The
-// page-level "AI narrative unavailable" banner labels the wholesale-fallback case.
-function deterministicIncidentSummary(i: {
-  topic: string;
-  title: string;
-  summary?: string | null;
-  source?: string | null;
-  sourceUrl?: string | null;
-  location?: string | null;
-  severity?: string | null;
-  occurredAt: string;
-}): string {
-  const type = classifyIncidentType(i);
-  const sevLabel = SEV_LABEL[(i.severity ?? "").toLowerCase()];
-  const loc = (i.location ?? "").trim();
-  const where = loc ? ` in ${loc}` : "";
-  const sev = sevLabel ? `, assessed at ${sevLabel} severity` : "";
-  return `${type}${where}, reported ${format(new Date(i.occurredAt), "dd MMM yyyy")}${sev}.`;
-}
-
-// Render a bullet list (implications / watch-next) as newline-joined lines the
-// <Prose> component can lay out as paragraphs.
-function bulletJoin(xs: string[]): string {
-  return (xs ?? []).filter((s) => s && s.trim()).map((s) => `• ${s.trim()}`).join("\n");
-}
-
-// Distribution-chart track. A lighter neutral than POLAR so the coloured
-// severity/type bars read as the dominant element and the empty remainder of
-// each bar recedes instead of competing with the data.
-const CHART_TRACK = "#eef0f3";
-
-/**
- * Standardise a related-incidents title to the headline only. Open-source feeds
- * (especially Google News RSS) append the publisher as a trailing
- * " - Source" / " | Source" / " — Source" segment; some records carry it and
- * some do not, so the Title column reads inconsistently. Strip a trailing
- * separator + source segment so the column is the incident title only (the
- * source already has its own provenance elsewhere; there is no source column).
- */
-function cleanIncidentTitle(title?: string | null, source?: string | null): string {
-  let t = (title ?? "").trim();
-  const src = (source ?? "").trim();
-  if (!t) return "";
-  const seps = [" - ", " — ", " – ", " | "];
-  // First, strip an exact trailing "<sep><source>" when we know the source.
-  if (src) {
-    for (const sep of seps) {
-      const suffix = `${sep}${src}`;
-      if (t.toLowerCase().endsWith(suffix.toLowerCase())) {
-        return t.slice(0, t.length - suffix.length).trim();
-      }
-    }
-  }
-  // Fallback: drop a trailing " - Publisher" segment that the Google-News feed
-  // appends even when it doesn't match the stored source exactly. Kept
-  // deliberately conservative — only strips when the trailing segment LOOKS like
-  // a masthead (contains a publisher keyword) — so genuine titles that happen to
-  // end in a dashed subtitle survive untouched.
-  const m = t.match(/^(.*\S)\s[-–—|]\s([^-–—|]{2,40})$/);
-  if (m) {
-    const tail = m[2].trim();
-    const head = m[1].trim();
-    const wordCount = tail.split(/\s+/).length;
-    // A bare domain ("voi.id", "beritaimn.com") is a publisher handle, never a
-    // headline subtitle, so strip it regardless of the keyword list below.
-    const isBareDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(tail);
-    const looksLikeMasthead = /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media)\b/i.test(tail);
-    if (head.split(/\s+/).length >= 2 && (isBareDomain || (wordCount <= 6 && !/\d/.test(tail) && looksLikeMasthead))) {
-      return head;
-    }
-  }
-  return t;
-}
 
 interface Draft {
   name: string;
@@ -469,18 +375,11 @@ export default function CountryReport() {
   }, [baselineData]);
   const baseline: CountryBaseline | null = editing ? baselineDraft : persistedBaseline;
 
-  // PNG (Papua New Guinea) renders a dedicated nine-section structured brief
-  // instead of the generic country narrative. PNG-only: gated on the country
-  // token so no other country report or monitor is affected.
-  const isPng = useMemo(
-    () => acceptedCountryTokens(country?.name ?? "").includes("papua new guinea"),
-    [country],
-  );
   // The structured nine-section brief now serves TWO theatres: Papua New Guinea
   // and the Indonesian West Papua report (slug `papua`, token "papua" but NOT the
   // PNG group). Both render the same PngCountryReportBody from a config-driven
-  // dataset; everything below keys off `isStructured` rather than `isPng` so the
-  // West Papua brief reaches parity. Any other country keeps the generic brief.
+  // dataset; everything below keys off `isStructured` so the West Papua brief
+  // reaches parity. Any other country keeps the generic brief.
   const structuredTheatre = useMemo<
     "png" | "westPapua" | "indonesia" | "jakarta" | null
   >(() => {
@@ -495,14 +394,6 @@ export default function CountryReport() {
   const layers: CountryLayerBuckets = useMemo(
     () => buildCountryLayers(incidents as CountryFastFactsIncident[], issueDate),
     [incidents, issueDate],
-  );
-  const watchlist: WatchlistRow[] = useMemo(
-    () => (baseline ? buildWatchlistBreakdown(baseline, layers) : []),
-    [baseline, layers],
-  );
-  const lookback = useMemo(
-    () => summariseLookback(layers, baseline, country?.name ?? ""),
-    [layers, baseline, country?.name],
   );
 
   // Active reporting window. Country reports are a WEEKLY brief, so the headline
@@ -818,39 +709,6 @@ export default function CountryReport() {
     if (!editing && proseDraft) setProseDraft(null);
   }, [editing, proseResult, proseDraft]);
 
-  // Unified, render-ready prose. While editing, the live draft drives the
-  // preview so edits are visible immediately (mirrors how name/region use
-  // `effective`). Otherwise prefer the server prose (edited override first),
-  // and fall back to the deterministic template when no AI prose exists.
-  const displayProse = useMemo(() => {
-    const src =
-      editing && proseDraft
-        ? proseDraft
-        : proseResult
-          ? (proseResult.edited ?? proseResult.sections)
-          : null;
-    if (src) {
-      return {
-        executiveSummary: src.executiveSummary,
-        situation: src.situation,
-        whatHappened: src.whatHappened,
-        whatMatters: src.whatMatters,
-        implications: bulletJoin(src.implications),
-        watchNext: bulletJoin(src.watchNext),
-        polestarView: src.polestarView,
-      };
-    }
-    return {
-      executiveSummary: draftedProse?.executiveSummary ?? "",
-      situation: draftedProse?.overview ?? "",
-      whatHappened: draftedProse?.trendSummary ?? "",
-      whatMatters: draftedProse?.whatMatters ?? "",
-      implications: draftedProse?.implications ?? "",
-      watchNext: draftedProse?.watchNext ?? "",
-      polestarView: draftedProse?.polestarView ?? "",
-    };
-  }, [editing, proseDraft, proseResult, draftedProse]);
-
   // PNG: overlay the AI narrative sections (Bottom Line Up Front, Executive
   // Summary, What Changed, Outlook, Polestar View) onto the deterministic dataset,
   // which still supplies every structured section (breakdown, watchlist, incident
@@ -1125,7 +983,6 @@ export default function CountryReport() {
   if (!country || !effective) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Country report not found.</div>;
 
   const windowIncidents = facts.windowIncidents;
-  const totalInWindow = windowIncidents.length;
   const severityTotal = SEV_ORDER.reduce((s, k) => s + facts.severityCounts[k], 0);
 
   // Incident-breakdown chart taxonomy. For structured reports (PNG / West Papua
@@ -1766,116 +1623,6 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FastFactsGrid({ cards }: { cards: CountryFastFactCard[] }) {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {cards.map((c, i) => {
-        const stripColor = c.severity ? (SEV_COLOR[c.severity] ?? ELECTRIC) : ELECTRIC;
-        return (
-          <div
-            key={i}
-            style={{
-              background: "#fff",
-              border: `1px solid ${POLAR}`,
-              borderLeft: `4px solid ${stripColor}`,
-              padding: "12px 14px",
-              borderRadius: 2,
-            }}
-          >
-            <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: DUSK, fontWeight: 700 }}>
-              {c.label}
-            </div>
-            <div style={{ fontFamily: ROBOTO, fontSize: 20, fontWeight: 700, color: NAVY, lineHeight: 1.15, marginTop: 4 }}>
-              {c.value}
-            </div>
-            {c.note && (
-              <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 4 }}>
-                {c.note}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function BaselineBlock({ baseline }: { baseline: CountryBaseline }) {
-  const Row = ({ label, text }: { label: string; text: string }) => (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
-        {label}
-      </div>
-      <div style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.55, color: DUSK }}>{text}</div>
-    </div>
-  );
-  const List = ({ label, items }: { label: string; items: string[] }) => (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontFamily: ROBOTO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: NAVY, fontWeight: 700, marginBottom: 4 }}>
-        {label}
-      </div>
-      <ul style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.55, color: DUSK, margin: 0, paddingLeft: 18 }}>
-        {items.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
-      </ul>
-    </div>
-  );
-  return (
-    <div>
-      <Row label="Operating Environment" text={baseline.operatingEnvironment} />
-      <Row label="Security Context" text={baseline.securityContext} />
-      <List label="Known Risk Areas" items={baseline.knownRiskAreas} />
-      <List label="Key Cities / Provinces" items={baseline.keyCitiesProvinces} />
-      <Row label="Movement Constraints" text={baseline.movementConstraints} />
-      <Row label="Infrastructure Limits" text={baseline.infrastructureLimits} />
-      <Row label="Medical / Evacuation" text={baseline.medicalEvac} />
-      <Row label="Resource-Sector Exposure" text={baseline.resourceSectorExposure} />
-    </div>
-  );
-}
-
-function WatchlistTable({ rows }: { rows: WatchlistRow[] }) {
-  return (
-    <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, overflow: "hidden", background: "#fff" }}>
-      <div className="grid" style={{ gridTemplateColumns: "170px minmax(0, 1fr) 48px 48px 48px 170px", background: NAVY, color: "#fff", fontFamily: ROBOTO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-        <div className="p-2.5">Location</div>
-        <div className="p-2.5">Note</div>
-        <div className="p-2.5" style={{ textAlign: "right" }}>7d</div>
-        <div className="p-2.5" style={{ textAlign: "right" }}>30d</div>
-        <div className="p-2.5" style={{ textAlign: "right" }}>90d</div>
-        <div className="p-2.5" style={{ whiteSpace: "nowrap" }}>Worst (90d)</div>
-      </div>
-      {rows.map((r) => {
-        const sk = (r.worstSeverity ?? "").toLowerCase();
-        const sevColor = SEV_COLOR[sk] ?? "#999";
-        return (
-          <div key={r.label} className="grid items-center" style={{ gridTemplateColumns: "170px minmax(0, 1fr) 48px 48px 48px 170px", borderTop: `1px solid ${POLAR}`, fontFamily: ROBOTO, fontSize: 12, color: DUSK }}>
-            <div className="p-2.5" style={{ fontWeight: 600, color: NAVY }}>{r.label}</div>
-            <div className="p-2.5" style={{ fontSize: 11 }}>{r.note}</div>
-            <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.currentCount}</div>
-            <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.thirtyDayCount}</div>
-            <div className="p-2.5" style={{ textAlign: "right", fontWeight: 700 }}>{r.ninetyDayCount}</div>
-            <div className="p-2.5">
-              {r.worstSeverity ? (
-                <span style={{
-                  background: sevColor, color: "#fff", padding: "0 10px",
-                  minWidth: 92, height: 24, lineHeight: "24px",
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                  textTransform: "uppercase", borderRadius: 2, display: "inline-flex",
-                  alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", boxSizing: "border-box",
-                }}>
-                  {r.worstSeverityLabel}
-                </span>
-              ) : (
-                <span style={{ fontStyle: "italic", color: DUSK, fontSize: 11, whiteSpace: "nowrap" }}>No records</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Country Baseline editor
 // ---------------------------------------------------------------------------
@@ -2131,7 +1878,3 @@ function WatchlistEditor({
     </div>
   );
 }
-
-// Suppress an unused-import warning during development when titleCaseLocation
-// is referenced from the prose draft path but not directly here.
-void titleCaseLocation;
