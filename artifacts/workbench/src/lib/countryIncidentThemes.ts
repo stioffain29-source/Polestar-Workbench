@@ -102,21 +102,23 @@ export interface CountryIncidentThemeGroup {
 function buildFireCauseNote(items: PngReportItem[]): string | undefined {
   const s = summariseFireCauses(items);
   if (s.total === 0) return undefined;
+
+  // No cause was stated for any fire this period: say so plainly and stop, so the
+  // gap clause below never doubles up with a lead that already makes the point.
+  if (s.security === 0 && s.continuity === 0) {
+    return "Causes have not been reported this period.";
+  }
+
   let lead: string;
   if (s.security > 0 && (s.continuity > 0 || s.unclear > 0)) {
-    lead =
-      "Reported causes span both deliberate, security-relevant fires and accidental or operational ones.";
+    lead = "Where a cause was reported, some fires were deliberate and others accidental or operational.";
   } else if (s.security > 0) {
-    lead = "Where a cause was reported, fires were deliberate and are treated as security matters.";
-  } else if (s.continuity > 0) {
+    lead = "Where a cause was reported, fires were deliberate and bear on security.";
+  } else {
     lead =
       "These read as accidental or operational fires bearing on business continuity rather than security.";
-  } else {
-    lead = "Causes were not stated this period.";
   }
-  return s.hasCauseGap
-    ? `${lead} Where a source did not state a cause it is recorded as not yet reported; arson or attack is not inferred.`
-    : lead;
+  return s.hasCauseGap ? `${lead} In other cases the cause was not reported.` : lead;
 }
 
 // Per-theme operational-impact descriptors (Operational Impact section).
