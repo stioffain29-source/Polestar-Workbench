@@ -14,8 +14,13 @@
  * screen without a reload and these tests fail.
  *
  * Covered (PUBLIC, not token-gated) flows:
- *   - /incidents  : create then delete an incident, asserting the list updates.
+ *   - /incidents   : create then delete an incident, asserting the list updates.
  *   - /spot-reports: delete a spot report, asserting the card disappears.
+ *   - /reports     : delete a report, asserting the card disappears.
+ *   - /strikes/backfill: create a strike, asserting the "Recently Added" list
+ *                    shows it without a reload.
+ *   - /protests    : promote a Social Watch post, asserting the row flips from
+ *                    the "Promote" button to its "Incident #N" back-link.
  *
  * CHECKLIST for any NEW same-screen mutation button: wire the mutation's
  * `onSuccess` to `queryClient.invalidateQueries({ queryKey: get<Thing>QueryKey() })`
@@ -30,13 +35,39 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 jest.mock("wouter", () => ({
   __esModule: true,
   useLocation: () => ["/", () => {}],
+  useRoute: () => [false, null],
   Link: ({ children, href }: { children: React.ReactNode; href?: string }) => (
     <a href={href}>{children}</a>
   ),
 }));
 
+// recharts + react-leaflet are pure visualisation (out of scope for a
+// refresh-after-action test) and don't render in jsdom — stub every named
+// export to an inert passthrough so the heavy Protests page mounts.
+jest.mock("recharts", () => {
+  const React = require("react") as typeof import("react");
+  const Passthrough = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement("div", null, children);
+  return new Proxy(
+    {},
+    { get: (_t, prop) => (prop === "__esModule" ? true : Passthrough) },
+  );
+});
+jest.mock("react-leaflet", () => {
+  const React = require("react") as typeof import("react");
+  const Passthrough = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
+  return new Proxy(
+    {},
+    { get: (_t, prop) => (prop === "__esModule" ? true : Passthrough) },
+  );
+});
+
 import Incidents from "@/pages/Incidents";
 import SpotReports from "@/pages/SpotReports";
+import Reports from "@/pages/Reports";
+import StrikesBackfill from "@/pages/StrikesBackfill";
+import Protests from "@/pages/Protests";
 
 // ---------------------------------------------------------------------------
 // In-memory store backing the mocked network layer.
@@ -45,6 +76,10 @@ import SpotReports from "@/pages/SpotReports";
 type Row = Record<string, unknown>;
 let incidents: Row[] = [];
 let spotReports: Row[] = [];
+let reports: Row[] = [];
+let strikes: Row[] = [];
+let socialWatch: Row[] = [];
+let socialRaw: Row[] = [];
 let nextId = 1;
 
 function jsonResponse(body: unknown, status = 200) {
@@ -107,6 +142,56 @@ function installFetch() {
         return jsonResponse(null, 204);
       }
 
+      // Reports list + create + delete (the Reports page also reads the
+      // dashboard overview to clamp draft card dates).
+      if (path === "/api/dashboard/overview" && method === "GET") {
+        return jsonResponse({ topicCards: [] });
+      }
+      if (path === "/api/reports" && method === "GET") {
+        return jsonResponse(reports);
+      }
+      if (path === "/api/reports" && method === "POST") {
+        const data = JSON.parse(init?.body ?? "{}") as Row;
+        const row: Row = { id: nextId++, author: null, hardNumbers: null, ...data };
+        reports = [row, ...reports];
+        return jsonResponse(row, 201);
+      }
+      const repDel = path.match(/^\/api\/reports\/(\d+)$/);
+      if (repDel && method === "DELETE") {
+        const id = Number(repDel[1]);
+        reports = reports.filter((r) => r.id !== id);
+        return jsonResponse(null, 204);
+      }
+
+      // Strikes list + create (Run Backfill screen).
+      if (path === "/api/strikes" && method === "GET") {
+        return jsonResponse(strikes);
+      }
+      if (path === "/api/strikes" && method === "POST") {
+        const data = JSON.parse(init?.body ?? "{}") as Row;
+        const row: Row = { id: nextId++, location: null, summary: null, ...data };
+        strikes = [row, ...strikes];
+        return jsonResponse(row, 201);
+      }
+
+      // Social Watch + Facebook OSINT boards (Protests page) + the Promote
+      // action that mints a back-linked incident.
+      if (path === "/api/social-watch" && method === "GET") {
+        return jsonResponse(socialWatch);
+      }
+      if (path === "/api/social-raw" && method === "GET") {
+        return jsonResponse(socialRaw);
+      }
+      const swPromote = path.match(/^\/api\/social-watch\/(\d+)\/promote$/);
+      if (swPromote && method === "POST") {
+        const id = Number(swPromote[1]);
+        const incidentId = nextId++;
+        socialWatch = socialWatch.map((it) =>
+          it.id === id ? { ...it, promotable: false, promotedIncidentId: incidentId } : it,
+        );
+        return jsonResponse({ incidentId });
+      }
+
       return jsonResponse({ error: `unhandled ${method} ${path}` }, 404);
     },
   );
@@ -162,6 +247,10 @@ beforeAll(() => {
 beforeEach(() => {
   incidents = [];
   spotReports = [];
+  reports = [];
+  strikes = [];
+  socialWatch = [];
+  socialRaw = [];
   nextId = 1;
   installFetch();
   // The delete buttons gate on a `confirm()` prompt — auto-accept it.
@@ -242,5 +331,81 @@ describe("same-screen mutation buttons refresh the visible list", () => {
     await waitFor(() => expect(screen.queryByText(title)).toBeNull());
     expect(await screen.findByText("No spot reports yet.")).toBeTruthy();
     expect(spotReports).toHaveLength(0);
+  });
+
+  it("/reports — deleting a report removes its card without a reload", async () => {
+    reports = [
+      {
+        id: 1,
+        title: "Test Report",
+        topic: "shipping",
+        status: "review",
+        issueDate: "2026-06-18",
+        author: "Analyst",
+      },
+    ];
+
+    renderWithClient(<Reports />);
+
+    // The seeded card loads — find it via its delete (Trash) button.
+    const card = (await screen.findByText("Open Editor")).closest("div.group") as HTMLElement;
+    expect(card).toBeTruthy();
+
+    // Inside the card the only <button> is the delete control (Links are <a>).
+    fireEvent.click(within(card).getByRole("button"));
+
+    // The card must disappear WITHOUT a manual reload.
+    await waitFor(() => expect(screen.queryByText("Open Editor")).toBeNull());
+    expect(await screen.findByText("No reports match.")).toBeTruthy();
+    expect(reports).toHaveLength(0);
+  });
+
+  it("/strikes — recording a strike shows it in 'Recently Added' without a reload", async () => {
+    renderWithClient(<StrikesBackfill />);
+
+    // The empty recent list loads from the mocked API.
+    await screen.findByText("No strikes recorded.");
+
+    // Country is the only required field without a default; fill it uniquely.
+    const country = `Strikeland ${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    fireEvent.change(fieldInput(document.body, "Country"), { target: { value: country } });
+
+    fireEvent.click(screen.getByRole("button", { name: /record strike/i }));
+
+    // The new strike must appear in "Recently Added" WITHOUT a manual reload —
+    // i.e. the create handler invalidated the list query and it refetched.
+    expect(await screen.findByText(new RegExp(country))).toBeTruthy();
+    expect(strikes).toHaveLength(1);
+  });
+
+  it("/protests — promoting a Social Watch post flips the row without a reload", async () => {
+    socialWatch = [
+      {
+        id: 1,
+        platform: "telegram",
+        status: "active",
+        caption: "Test mobilisation caption",
+        url: null,
+        promotable: true,
+        promotedIncidentId: null,
+        alertReasons: [],
+        city: "Jakarta",
+        location: "Jakarta",
+      },
+    ];
+
+    renderWithClient(<Protests />);
+
+    // The promotable row loads and shows a live "Promote" button.
+    const promoteBtn = await screen.findByRole("button", { name: /^promote$/i });
+    fireEvent.click(promoteBtn);
+
+    // After a successful promote the board must refetch (invalidate) so the row
+    // flips to its back-linked "Incident #N" state WITHOUT a manual reload.
+    expect(await screen.findByText(/Incident #\d+/)).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /^promote$/i })).toBeNull(),
+    );
+    expect(socialWatch[0].promotedIncidentId).not.toBeNull();
   });
 });

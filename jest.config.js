@@ -25,6 +25,9 @@ module.exports = {
     "^@assets/.*$": "<rootDir>/__tests__/mocks/asset.ts",
     "\\.(ttf|woff2?|png|jpe?g|svg|gif|webp)(\\?url)?$":
       "<rootDir>/__tests__/mocks/asset.ts",
+    // CSS imports (e.g. `leaflet/dist/leaflet.css`, pulled in by the Protests
+    // page) carry no behaviour for these render tests — stub to a string.
+    "\\.css$": "<rootDir>/__tests__/mocks/asset.ts",
     // The api-server source uses NodeNext `.js`-suffixed relative imports (e.g.
     // `../lib/adminAuth.js`). ts-jest does not rewrite those, so strip the
     // extension off relative specifiers and let jest resolve the `.ts` source.
