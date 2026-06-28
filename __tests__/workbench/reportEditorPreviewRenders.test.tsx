@@ -411,3 +411,49 @@ describe("ReportEditor — live preview renders non-empty content for every topi
     },
   );
 });
+
+// The empty case — zero incidents in the window — is exactly when a preview is
+// most likely to blank out or throw (empty arrays, undefined "top" rows,
+// divide-by-zero in chart math). Per the STRICT no-fabrication rule, analysts
+// opening a report in a quiet week must see a graceful, non-blank scaffold
+// ("not reported" labels / section chrome), never a blank panel or a crash.
+describe("ReportEditor — live preview degrades gracefully with NO incidents", () => {
+  it.each(TOPICS)(
+    "renders non-blank preview chrome when the incident list is empty (%s)",
+    async (topic) => {
+      mockReportData = report(topic);
+      mockIncidents = [];
+
+      const { container } = render(<ReportEditor />);
+
+      // The real topic preview component must mount (title present) without
+      // throwing, even with an empty dataset.
+      await waitFor(() => {
+        const box = container.querySelector(
+          "div.bg-white.border.border-border.rounded-sm.overflow-hidden",
+        );
+        expect(box?.textContent ?? "").toContain(TITLE);
+      });
+
+      const grid = container.querySelector<HTMLElement>(
+        "div.grid.grid-cols-1",
+      );
+      expect(grid).not.toBeNull();
+      const cols = Array.from(grid!.children) as HTMLElement[];
+      expect(cols).toHaveLength(2);
+
+      const previewCol = cols[1];
+      const previewBox = previewCol.querySelector<HTMLElement>(
+        "div.bg-white.border.border-border.rounded-sm.overflow-hidden",
+      );
+      expect(previewBox).not.toBeNull();
+
+      // Not a blank panel: even with no incidents the preview still emits the
+      // report title plus enough section scaffolding / "not reported" chrome to
+      // orient an analyst.
+      const text = (previewBox!.textContent ?? "").trim();
+      expect(text).toContain(TITLE);
+      expect(text.length).toBeGreaterThan(200);
+    },
+  );
+});
