@@ -23,6 +23,13 @@ import type { MaritimeSecurityEvent } from "@workspace/api-client-react";
 // Both the PDF exporter (exportShippingReportPdf) and the on-screen
 // editor preview (ShippingReportPreview) consume this so they cannot drift.
 
+// Hard cap on the Shipping report's Related Incidents table. The server only
+// generates per-incident AI summaries for the first MAX_PROSE_INCIDENTS rows
+// (see artifacts/api-server/src/lib/countryProse.ts), so this must never exceed
+// that cap — otherwise rows beyond it would silently show the deterministic
+// line. Asserted in __tests__/workbench/relatedIncidentsCap.test.ts.
+export const SHIPPING_RELATED_ROW_CAP = 6;
+
 export interface ShippingReportIncident {
   id: number | string;
   title: string;
@@ -1264,7 +1271,7 @@ function prioritiseRelated(
   const ordered = dedupeByTitle(seeded);
   // Cap tight so the Disclaimer block can be pulled back onto the same
   // page rather than orphaned on a near-empty final page.
-  return ordered.slice(0, 6);
+  return ordered.slice(0, SHIPPING_RELATED_ROW_CAP);
 }
 
 export const SHIPPING_SEV_LABEL = SEV_LABEL;

@@ -70,6 +70,28 @@ function titleKey(s: string): string {
   return significantTitleTokens(s).slice(0, 8).join(" ");
 }
 
+// Hard per-topic row caps for the Related Incidents table. Fuel runs a tighter
+// table than the other topic/conflict reports. These bound the rendered rows
+// regardless of the wider `relatedIncidentsLimit` ceiling.
+export const FUEL_RELATED_ROW_CAP = 6;
+export const DEFAULT_RELATED_ROW_CAP = 10;
+
+// The largest number of rows `selectRelatedIncidents` can ever return, across
+// every topic and the `relatedIncidentsLimit` ceiling. The server only
+// generates per-incident AI summaries for the first `MAX_PROSE_INCIDENTS` rows
+// (see artifacts/api-server/src/lib/countryProse.ts), so this must never exceed
+// that cap — otherwise rows beyond it would silently fall back to the
+// deterministic line in both preview and PDF. The lockstep is asserted in
+// __tests__/workbench/relatedIncidentsCap.test.ts; raising a cap here without
+// raising the generation cap fails that guard loudly.
+export function maxRelatedIncidentsRows(): number {
+  const { max } = relatedIncidentsLimit("");
+  return Math.max(
+    Math.min(max, FUEL_RELATED_ROW_CAP),
+    Math.min(max, DEFAULT_RELATED_ROW_CAP),
+  );
+}
+
 // Returns the ordered, deduped, capped rows for the Related Incidents table.
 export function selectRelatedIncidents<T extends RelatedIncidentInput>(
   windowIncidents: T[],
@@ -111,6 +133,8 @@ export function selectRelatedIncidents<T extends RelatedIncidentInput>(
   );
 
   const effectiveMax =
-    topic === "fuel" ? Math.min(max, 6) : Math.min(max, 10);
+    topic === "fuel"
+      ? Math.min(max, FUEL_RELATED_ROW_CAP)
+      : Math.min(max, DEFAULT_RELATED_ROW_CAP);
   return sorted.slice(0, effectiveMax);
 }

@@ -12,6 +12,13 @@ import { classifyIncidentType } from "./incidentClassifier";
 // strike, student, sit-in) vs Civil Unrest (riot, clash, crackdown,
 // curfew, security-force operation).
 
+// Hard cap on the Flashpoint report's Related Incidents table. The server only
+// generates per-incident AI summaries for the first MAX_PROSE_INCIDENTS rows
+// (see artifacts/api-server/src/lib/countryProse.ts), so this must never exceed
+// that cap — otherwise rows beyond it would silently show the deterministic
+// line. Asserted in __tests__/workbench/relatedIncidentsCap.test.ts.
+export const FLASHPOINT_RELATED_ROW_CAP = 6;
+
 export interface FlashpointReportIncident {
   id: number | string;
   title: string;
@@ -1345,7 +1352,7 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
     if (ds !== 0) return ds;
     return b.date.getTime() - a.date.getTime();
   }));
-  const CAP = 6;
+  const CAP = FLASHPOINT_RELATED_ROW_CAP;
   // Seed the lead row with the strongest political-mobilisation record
   // so the centre-of-gravity geography opens the table.
   const politicalSeed = pickPoliticalSeed(rows);
