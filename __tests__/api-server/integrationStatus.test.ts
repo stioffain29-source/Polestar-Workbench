@@ -381,10 +381,11 @@ describe("social-watch instagram integration status (freshness honesty)", () => 
     expect(item.status).toBe("no_data");
   });
 
-  it("keeps not_configured when no INSTAGRAM_API_KEY is set (freshness branch unreached)", async () => {
+  it("keeps not_configured when neither INSTAGRAM_API_KEY nor APIFY_TOKEN is set (freshness branch unreached)", async () => {
     delete process.env.SOCIAL_WATCH_ENABLED;
     delete process.env.INSTAGRAM_ENABLED;
     delete process.env.INSTAGRAM_API_KEY;
+    delete process.env.APIFY_TOKEN;
     // Even with a months-stale row present, the not_configured branch wins.
     const byTable = new Map<unknown, Rows>([
       [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
@@ -392,6 +393,19 @@ describe("social-watch instagram integration status (freshness honesty)", () => 
     const item = find(await statuses(byTable), "social_watch_instagram");
     expect(item.status).toBe("not_configured");
     expect(item.configured).toBe(false);
+  });
+
+  it("reports configured when only APIFY_TOKEN is set (fallback credential)", async () => {
+    delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.INSTAGRAM_ENABLED;
+    delete process.env.INSTAGRAM_API_KEY;
+    process.env.APIFY_TOKEN = "apify_api_fallback";
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 3, latest: daysAgo(2) }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.configured).toBe(true);
+    expect(item.status).toBe("working");
   });
 
   it("keeps disabled when switched off, even with a stale row present", async () => {

@@ -61,7 +61,14 @@ export interface SocialWatchConfig {
   instagram: {
     handle: string;
     provider: string;
+    /** Primary token (INSTAGRAM_API_KEY) — kept for reference/display. */
     apiKey: string;
+    /**
+     * Ordered, deduped candidate Apify tokens to try: INSTAGRAM_API_KEY first,
+     * then the APIFY_TOKEN fallback. fetchInstagramPosts tries the next one when
+     * the primary is missing or rejected with an auth error.
+     */
+    apiKeys: string[];
     apiBase: string;
     actor: string;
     enabled: boolean;
@@ -86,9 +93,17 @@ function envFlag(name: string, dflt: boolean): boolean {
 export function readSocialWatchConfig(): SocialWatchConfig {
   const enabled = envFlag("SOCIAL_WATCH_ENABLED", true);
 
-  const igKey = process.env.INSTAGRAM_API_KEY?.trim() || "";
+  const igPrimaryKey = process.env.INSTAGRAM_API_KEY?.trim() || "";
+  // APIFY_TOKEN is accepted as a fallback Apify credential. It is used when
+  // INSTAGRAM_API_KEY is unset, AND it is tried by fetchInstagramPosts when the
+  // primary key is rejected with an auth error (e.g. a stale/wrong key left in
+  // INSTAGRAM_API_KEY). Ordered (primary first), deduped, non-empty.
+  const igFallbackKey = process.env.APIFY_TOKEN?.trim() || "";
+  const igKeys = Array.from(
+    new Set([igPrimaryKey, igFallbackKey].filter((k) => k.length > 0)),
+  );
   const igEnabled = envFlag("INSTAGRAM_ENABLED", true);
-  const igConfigured = enabled && igEnabled && igKey.length > 0;
+  const igConfigured = enabled && igEnabled && igKeys.length > 0;
 
   const tgChannel =
     process.env.KAMMI_TELEGRAM_CHANNEL?.trim() || DEFAULT_TELEGRAM_CHANNEL;
@@ -107,7 +122,8 @@ export function readSocialWatchConfig(): SocialWatchConfig {
         process.env.KAMMI_INSTAGRAM_HANDLE?.trim() || DEFAULT_INSTAGRAM_HANDLE,
       provider:
         process.env.INSTAGRAM_PROVIDER?.trim() || DEFAULT_INSTAGRAM_PROVIDER,
-      apiKey: igKey,
+      apiKey: igPrimaryKey,
+      apiKeys: igKeys,
       apiBase: process.env.INSTAGRAM_API_BASE?.trim() || DEFAULT_INSTAGRAM_BASE,
       actor: process.env.INSTAGRAM_ACTOR?.trim() || DEFAULT_INSTAGRAM_ACTOR,
       enabled: igEnabled,
@@ -560,11 +576,16 @@ async function fetchJson(
           await sleep(BASE_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
           continue;
         }
-        throw err;
+        // Non-transient HTTP status (a 4xx other than 429 — e.g. 401/403/404) is
+        // NOT retried: a retry cannot fix it, and the Instagram token fallback
+        // must observe the auth error promptly. Tag it so the catch below
+        // re-throws at once instead of burning the remaining attempts on backoff.
+        throw Object.assign(err, { nonRetryable: !transient });
       }
       return await res.json();
     } catch (err) {
       lastErr = err;
+      if ((err as { nonRetryable?: boolean } | null)?.nonRetryable) throw err;
       const aborted = ctrl.signal.aborted;
       if (attempt < FETCH_ATTEMPTS - 1) {
         await sleep(BASE_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
@@ -647,17 +668,21 @@ function normaliseInstagramPost(raw: unknown, handle: string): RawSocialPost | n
   };
 }
 
-async function fetchInstagramPosts(cfg: SocialWatchConfig): Promise<RawSocialPost[]> {
+/** True for an Apify auth rejection (bad/expired/wrong token) — HTTP 401/403. */
+export function isApifyAuthError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  return /\bstatus 40[13]\b/.test(m);
+}
+
+async function fetchInstagramPostsWithToken(
+  cfg: SocialWatchConfig,
+  token: string,
+): Promise<RawSocialPost[]> {
   const ig = cfg.instagram;
-  if (ig.provider !== "apify") {
-    throw new Error(
-      `Instagram provider "${ig.provider}" not implemented (only "apify" is supported)`,
-    );
-  }
   // Apify run-sync-get-dataset-items endpoint for the Instagram scraper actor.
-  // The key is the Apify token; it is sent as a query param per Apify's API and
-  // NEVER stored or surfaced. Only PUBLIC profile posts are requested.
-  const url = `${ig.apiBase}/v2/acts/${encodeURIComponent(ig.actor)}/run-sync-get-dataset-items?token=${encodeURIComponent(ig.apiKey)}`;
+  // The token is sent as a query param per Apify's API and is NEVER stored or
+  // surfaced. Only PUBLIC profile posts are requested.
+  const url = `${ig.apiBase}/v2/acts/${encodeURIComponent(ig.actor)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
   const input = {
     directUrls: [`https://www.instagram.com/${ig.handle}/`],
     resultsType: "posts",
@@ -680,6 +705,35 @@ async function fetchInstagramPosts(cfg: SocialWatchConfig): Promise<RawSocialPos
     if (norm) out.push(norm);
   }
   return out;
+}
+
+export async function fetchInstagramPosts(cfg: SocialWatchConfig): Promise<RawSocialPost[]> {
+  const ig = cfg.instagram;
+  if (ig.provider !== "apify") {
+    throw new Error(
+      `Instagram provider "${ig.provider}" not implemented (only "apify" is supported)`,
+    );
+  }
+  // Try each candidate Apify token in order (INSTAGRAM_API_KEY first, then the
+  // APIFY_TOKEN fallback). A 401/403 means the token is bad/expired/wrong, so
+  // fall through to the next candidate; any other error (or a success) stops
+  // here. An auth rejection starts no Apify run, so the fallback never costs an
+  // extra paid run.
+  const tokens = ig.apiKeys;
+  if (tokens.length === 0) {
+    throw new Error("no Instagram API token configured");
+  }
+  let lastErr: unknown;
+  for (let i = 0; i < tokens.length; i++) {
+    try {
+      return await fetchInstagramPostsWithToken(cfg, tokens[i]!);
+    } catch (err) {
+      lastErr = err;
+      if (i < tokens.length - 1 && isApifyAuthError(err)) continue;
+      throw err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 // --- Telegram (free public web channel view, no login) ----------------------
@@ -926,7 +980,7 @@ export async function runSocialWatchIngest(
       log(`  instagram FETCH ERROR: ${msg}`);
     }
   } else {
-    log("  instagram: not configured (INSTAGRAM_API_KEY unset or disabled)");
+    log("  instagram: not configured (INSTAGRAM_API_KEY/APIFY_TOKEN unset or disabled)");
   }
 
   // --- Telegram pass.

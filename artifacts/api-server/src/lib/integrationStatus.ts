@@ -645,6 +645,7 @@ async function socialFeedStatus(name: string): Promise<string | null> {
 async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
   const envVars = [
     "INSTAGRAM_API_KEY",
+    "APIFY_TOKEN",
     "INSTAGRAM_ENABLED",
     "INSTAGRAM_PROVIDER",
     "INSTAGRAM_API_BASE",
@@ -691,7 +692,7 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
   } else if (!configured) {
     status = "not_configured";
     summary =
-      "No INSTAGRAM_API_KEY — the paid Instagram scraper is disabled, so no Instagram posts are collected. The Telegram social-watch source and all incident feeds are unaffected.";
+      "No Instagram credential (INSTAGRAM_API_KEY or APIFY_TOKEN) — the paid Instagram scraper is disabled, so no Instagram posts are collected. The Telegram social-watch source and all incident feeds are unaffected.";
   } else if (feedStatus === "failing") {
     status = "failing_upstream";
     summary =

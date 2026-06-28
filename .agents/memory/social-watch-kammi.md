@@ -23,7 +23,14 @@ explicit operator promote action.
   mutations stay token-gated.
 
 **Config (all env, graceful no-op when unset):** `SOCIAL_WATCH_ENABLED`,
-Instagram = `INSTAGRAM_API_KEY` (paid scraper, required to enable) +
+Instagram = `INSTAGRAM_API_KEY` (paid Apify scraper, primary) with `APIFY_TOKEN`
+as an accepted FALLBACK credential — used when `INSTAGRAM_API_KEY` is unset, and
+tried automatically when the primary key is REJECTED with an auth error (HTTP
+401/403, e.g. a stale/wrong key in `INSTAGRAM_API_KEY`). The fallback advances
+to the next token ONLY on 401/403 — that starts no Apify run, so it costs no
+extra paid run; non-auth errors (5xx/429/network/timeout) do NOT advance. For
+this to be prompt, `fetchJson` must fail fast on non-transient 4xx (it used to
+retry every error 3× with backoff — fixed). Plus
 `INSTAGRAM_PROVIDER`(apify)/`INSTAGRAM_ENABLED`/`INSTAGRAM_API_BASE`/`INSTAGRAM_ACTOR`/
 `KAMMI_INSTAGRAM_HANDLE`(@kammi.pusat); Telegram = FREE public web view
 (`t.me/s/<channel>`) via `KAMMI_TELEGRAM_CHANNEL` + `TELEGRAM_ENABLED`,
