@@ -397,6 +397,279 @@ describe("Shipping PDF — Related Incidents summary line emitted", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Long-report cap-crossing parity (regression guard).
+//
+// The per-incident AI summaries are GENERATED for a capped set keyed by id, and
+// resolveIncidentSummary silently falls back to the deterministic line for any
+// row whose id is missing from the map. So if the editor ever requested
+// summaries for a DIFFERENT set of rows than an exporter actually draws — a
+// different cap, ordering or dedup pass once the input pool is large — some PDF
+// rows would silently show the deterministic line while the preview showed the
+// richer AI line: the exact preview/PDF divergence this feature must prevent.
+//
+// The small-dataset tests above never cross the generation cap
+// (MAX_PROSE_INCIDENTS = 60 on the server). Here we feed each exporter an input
+// pool LARGER than that cap and assert, for the shipping AND topic exporters:
+//   - the id set the editor would request summaries for (relatedForSummaries in
+//     ReportEditor) is EXACTLY the id set the exporter renders — no row drawn
+//     that was never offered a summary, and no requested id that is not drawn;
+//   - with an AI summary supplied for every requested id, NO rendered row
+//     silently falls back to its deterministic line.
+// ---------------------------------------------------------------------------
+
+const POOL_SIZE = 75; // > SERVER_GENERATION_CAP (60)
+
+// The server caps the incident set it FINGERPRINTS and generates summaries for
+// at MAX_PROSE_INCIDENTS = 60 (artifacts/api-server/src/lib/countryProse.ts,
+// via canonicalIncidents). Any incident the editor requests BEYOND this cap is
+// dropped from the canonical set, so it receives no AI summary and
+// resolveIncidentSummary silently falls back to its deterministic line. We
+// cannot import that constant here: countryProse.ts pulls in @workspace/ingest,
+// whose dev-env loader uses import.meta and breaks every ts-jest suite that
+// imports it. So we pin the value locally and assert against it.
+const SERVER_GENERATION_CAP = 60;
+
+// Faithful replica of the server's canonicalIncidents: deterministically order
+// (most-recent first, then title, then id) and truncate to the cap. The summary
+// map the server returns is keyed by the ids that SURVIVE this truncation, so
+// this is exactly the boundary at which a requested row loses its AI summary.
+function serverCanonicalIds(
+  rows: Array<{ id: string; title: string; occurredAt: string }>,
+  cap: number,
+): string[] {
+  return [...rows]
+    .sort((a, b) => {
+      const da = a.occurredAt.slice(0, 10);
+      const db = b.occurredAt.slice(0, 10);
+      if (da !== db) return da < db ? 1 : -1; // most recent first
+      const t = a.title.localeCompare(b.title);
+      if (t !== 0) return t;
+      return a.id.localeCompare(b.id);
+    })
+    .slice(0, cap)
+    .map((r) => r.id);
+}
+
+// Collision-proof per-id sentinel: a drawn row is detectable by id and can
+// never be confused with a title or prose fragment.
+const aiSentinel = (id: string) => `AISUMMARY-${id}-ENDMARK`;
+
+// The ids whose AI sentinel actually reached the page. We supply a sentinel for
+// EVERY input incident (not just the requested set) so a row drawn that the
+// editor never offered a summary for is also detectable here.
+function drawnIdsFrom(text: string[], allIds: string[]): Set<string> {
+  const has = new Set(text);
+  return new Set(allIds.filter((id) => has.has(aiSentinel(id))));
+}
+
+function expectSameIdSet(a: Set<string>, b: Set<string>) {
+  expect([...a].sort()).toEqual([...b].sort());
+}
+
+// Spread occurredAt across the inclusive weekly window (issue date 2026-06-15
+// covers 09..15 June) so every row is in-window.
+const windowDay = (i: number) => String(9 + (i % 7)).padStart(2, "0");
+
+describe("Long Shipping PDF — editor-requested ids match the drawn rows", () => {
+  // Distinct in their first significant title tokens (so the selector's
+  // title-dedupe keeps them separate) and unambiguously shipping-relevant.
+  const LONG_SHIP_INCIDENTS: ShippingReportIncident[] = Array.from(
+    { length: POOL_SIZE },
+    (_, i) => ({
+      id: `ts${i}`,
+      topic: "shipping",
+      title: `Tanker attacked by armed skiffs in the Gulf of Aden incident ${i}`,
+      severity: i % 2 === 0 ? "high" : "moderate",
+      occurredAt: `2026-06-${windowDay(i)}T08:00:00+00:00`,
+      country: "Yemen",
+      summary: `Armed men in skiffs attacked a tanker underway, case ${i}.`,
+      source: "Test Wire",
+      sourceUrl: `https://example.com/ts${i}`,
+      location: null,
+    }),
+  );
+
+  // The exact set the editor requests summaries for: ReportEditor's
+  // relatedForSummaries for shipping is buildShippingReportDataset(...)
+  // .relatedIncidents — the SAME builder the exporter draws from.
+  function editorRequestedRows() {
+    return buildShippingReportDataset(
+      LONG_SHIP_INCIDENTS,
+      "shipping",
+      ISSUE_DATE,
+      [],
+    ).relatedIncidents;
+  }
+
+  it("pool exceeds the generation cap and the rendered set is parity-locked", async () => {
+    expect(LONG_SHIP_INCIDENTS.length).toBeGreaterThanOrEqual(60);
+    const requested = editorRequestedRows();
+    const requestedIds = new Set(requested.map((r) => String(r.id)));
+    expect(requestedIds.size).toBeGreaterThan(0);
+
+    // PROTECTIVE INVARIANT: even from a >60 input pool the editor never REQUESTS
+    // more summaries than the server will fingerprint/generate for, so the
+    // server's canonical 60-cap can never silently drop a RENDERED row's
+    // summary. If a future cap raise breaks this, the truncation test below
+    // shows what would start failing silently in the PDF.
+    expect(requestedIds.size).toBeLessThanOrEqual(SERVER_GENERATION_CAP);
+
+    const summaries: Record<string, string> = {};
+    for (const inc of LONG_SHIP_INCIDENTS)
+      summaries[String(inc.id)] = aiSentinel(String(inc.id));
+
+    const text = await textAfter(() =>
+      exportShippingReportPdf(
+        SHIP_DATA,
+        LONG_SHIP_INCIDENTS,
+        "shipping.pdf",
+        [],
+        [],
+        summaries,
+      ),
+    );
+
+    const drawnIds = drawnIdsFrom(
+      text,
+      LONG_SHIP_INCIDENTS.map((i) => String(i.id)),
+    );
+    // The drawn rows are EXACTLY the rows the editor requested summaries for.
+    expectSameIdSet(drawnIds, requestedIds);
+
+    // No rendered row silently fell back to its deterministic line.
+    for (const row of requested) {
+      expect(text).not.toContain(deterministicIncidentSummary(row));
+      expect(text).toContain(aiSentinel(String(row.id)));
+    }
+  });
+});
+
+describe("Long Topic PDF — editor-requested ids match the drawn rows", () => {
+  const LONG_TOPIC_INCIDENTS: TopicFastFactsIncident[] = Array.from(
+    { length: POOL_SIZE },
+    (_, i) => ({
+      id: `te${i}`,
+      topic: "energy",
+      title: `Power grid failure causes a rolling blackout in sector ${i}`,
+      severity: i % 2 === 0 ? "high" : "moderate",
+      occurredAt: `2026-06-${windowDay(i)}T08:00:00.000Z`,
+      country: "Indonesia",
+      summary: `Grid outage number ${i} cut power to a district.`,
+      source: "Test Source",
+    }),
+  );
+
+  // ReportEditor's relatedForSummaries for a generic topic: window-filter on
+  // the issue date, then selectRelatedIncidents — the SAME pipeline the topic
+  // exporter runs inside drawRelatedIncidents.
+  function editorRequestedRows() {
+    return selectRelatedIncidents(
+      filterTopicReportIncidents(LONG_TOPIC_INCIDENTS, "energy", ISSUE_DATE),
+      "energy",
+    );
+  }
+
+  it("pool exceeds the generation cap and the rendered set is parity-locked", async () => {
+    expect(LONG_TOPIC_INCIDENTS.length).toBeGreaterThanOrEqual(60);
+    const requested = editorRequestedRows();
+    const requestedIds = new Set(requested.map((r) => String(r.id)));
+    expect(requestedIds.size).toBeGreaterThan(0);
+
+    // PROTECTIVE INVARIANT (see the shipping test): from a >60 pool the editor
+    // still requests at most the server generation cap, so no rendered row can
+    // be silently dropped by the server's canonical 60-cap truncation.
+    expect(requestedIds.size).toBeLessThanOrEqual(SERVER_GENERATION_CAP);
+
+    const summaries: Record<string, string> = {};
+    for (const inc of LONG_TOPIC_INCIDENTS)
+      summaries[String(inc.id)] = aiSentinel(String(inc.id));
+
+    const text = await textAfter(() =>
+      exportTopicReportPdf(
+        TOPIC_DATA,
+        LONG_TOPIC_INCIDENTS,
+        TOPIC_LABELS,
+        "energy.pdf",
+        { incidentSummaries: summaries },
+      ),
+    );
+
+    const drawnIds = drawnIdsFrom(
+      text,
+      LONG_TOPIC_INCIDENTS.map((i) => String(i.id)),
+    );
+    expectSameIdSet(drawnIds, requestedIds);
+
+    for (const row of requested) {
+      expect(text).not.toContain(deterministicIncidentSummary(row));
+      expect(text).toContain(aiSentinel(String(row.id)));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Generation-cap truncation boundary (the failure mode the invariant guards).
+//
+// The two parity tests above prove the editor's requested set survives intact
+// today because it is far below the server's 60-incident generation cap. This
+// test makes the BOUNDARY itself concrete: feed a >60 requested set through a
+// faithful replica of the server's canonical-cap truncation, build the summary
+// map exactly as the server would (keyed ONLY by the surviving ids), and prove
+// that:
+//   - every SURVIVING (top-60) row resolves to its AI line, and
+//   - every TRUNCATED (61st+) row silently falls back to its deterministic line
+//     — no error, no marker, indistinguishable from "AI unavailable".
+// This is the exact silent divergence that would reach the PDF if the editor
+// ever requested more rows than the server generates for, which is why the
+// parity tests assert requestedIds.size <= SERVER_GENERATION_CAP.
+// ---------------------------------------------------------------------------
+describe("Server generation cap truncates summaries past 60 -> silent fallback", () => {
+  // 75 rows with strictly DECREASING dates, so the server's most-recent-first
+  // canonical order equals index order: survivors are cap00..cap59, the dropped
+  // overflow is cap60..cap74.
+  const CAP_POOL = Array.from({ length: POOL_SIZE }, (_, i) => ({
+    id: `cap${String(i).padStart(2, "0")}`,
+    topic: "shipping",
+    title: `Cap boundary incident ${String(i).padStart(2, "0")}`,
+    severity: "moderate" as const,
+    occurredAt: new Date(Date.UTC(2026, 5, 15) - i * 86_400_000).toISOString(),
+    country: "Yemen",
+    location: null,
+    source: "Test Wire",
+  }));
+
+  it("only the surviving 60 ids get summaries; the overflow falls back silently", () => {
+    expect(CAP_POOL.length).toBeGreaterThan(SERVER_GENERATION_CAP);
+
+    const survivorIds = serverCanonicalIds(CAP_POOL, SERVER_GENERATION_CAP);
+    expect(survivorIds.length).toBe(SERVER_GENERATION_CAP);
+
+    // The server returns a summary map keyed ONLY by the surviving ids.
+    const generated: Record<string, string> = {};
+    for (const sid of survivorIds) generated[sid] = aiSentinel(sid);
+
+    const survivors = new Set(survivorIds);
+    const overflow = CAP_POOL.filter((r) => !survivors.has(r.id));
+    expect(overflow.length).toBe(POOL_SIZE - SERVER_GENERATION_CAP);
+
+    // Surviving rows resolve to their AI summary.
+    for (const row of CAP_POOL) {
+      if (!survivors.has(row.id)) continue;
+      expect(resolveIncidentSummary(row, generated)).toBe(aiSentinel(row.id));
+    }
+
+    // Truncated rows have NO entry in the map -> resolveIncidentSummary silently
+    // returns the deterministic line, with no AI marker. This is the regression
+    // the requestedIds.size <= cap invariant prevents from ever reaching a PDF.
+    for (const row of overflow) {
+      const resolved = resolveIncidentSummary(row, generated);
+      expect(resolved).toBe(deterministicIncidentSummary(row));
+      expect(resolved).not.toContain("AISUMMARY");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Topic PDF (exportTopicReportPdf -> drawRelatedIncidents, via the shared
 // filterTopicReportIncidents + selectRelatedIncidents selector).
 // ---------------------------------------------------------------------------
