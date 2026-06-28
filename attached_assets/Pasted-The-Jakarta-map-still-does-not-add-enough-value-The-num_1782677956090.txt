@@ -1,0 +1,76 @@
+The Jakarta map still does not add enough value.
+
+The numbered dot approach only works when there are a small number of specific incidents with reliable locations. For Jakarta, the report is not really about single incident points. It is about operating exposure across the city: protests, flooding, crime, logistics, airport transfers and commercial district access.
+
+We need to discuss and test better map formats.
+
+Preferred options:
+
+1. Icon based operational exposure map
+
+Use simple icons instead of numbered dots.
+
+Example icons:
+
+Protest / crowd: Central Jakarta
+Flood / rain: North Jakarta, Greater Jakarta commuter belt
+Crime / public safety: South Jakarta, West Jakarta, transport hubs
+Fire / emergency response: dense commercial or residential areas
+Port / logistics: North Jakarta
+Airport / transfer route: Soekarno Hatta corridor
+Road disruption: cross city movement routes
+
+Each area should show the dominant exposure type, not just a number.
+
+2. Risk area map with labels
+
+Use shaded or outlined areas for:
+
+Central Jakarta: protest and government district disruption
+South Jakarta: office, embassy and commercial exposure
+West Jakarta: congestion, crime and access disruption
+North Jakarta: port, flooding and logistics exposure
+East Jakarta: road movement and residential disruption
+Soekarno Hatta corridor: airport transfer disruption
+Greater Jakarta: commuter belt and weather related movement disruption
+
+This should look like a clean report graphic, not a web map screenshot.
+
+3. Corridor and access map
+
+For Jakarta, the most useful map may be an access map rather than an incident map.
+
+Show:
+
+Airport corridor
+Central Jakarta government district
+Main commercial and hotel areas
+Port and logistics exposure
+Greater Jakarta commuter routes
+
+This would better support business users planning airport transfers, meetings, site visits and staff movement.
+
+4. Area exposure table instead of a map
+
+If the map cannot be made useful, replace it with a simple area exposure table.
+
+Example columns:
+
+Area
+Main exposure
+Operational relevance
+Action
+
+This may be more useful than a weak map.
+
+Map rule going forward:
+
+Use incident dots only when there are a small number of specific incidents with reliable locations.
+
+Use icons, shaded areas, callouts or an area exposure table when the report is about broader operating conditions.
+
+The map must answer a practical question:
+
+Where should the reader be cautious, and why?
+
+If it cannot answer that, remove it.
