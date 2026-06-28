@@ -4,10 +4,9 @@ import {
   type InsertSocialWatchItem,
 } from "@workspace/db";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { fetchBody } from "./feedFetch";
 import { recordSourceHealth } from "./sourceHealth";
 
-// KAMMI Pusat public social-media protest WATCH ingest (Instagram + Telegram).
+// KAMMI Pusat public social-media protest WATCH ingest (Instagram).
 //
 // This is ADDITIVE CONTEXT, modelled on reliefwebReports / maritimeMovement: a
 // social-watch item is NEVER an incident and lives in its own table precisely
@@ -16,15 +15,14 @@ import { recordSourceHealth } from "./sourceHealth";
 // (routes/socialWatch.ts) and only for an item whose text/image confirms the
 // protest is actually active.
 //
-// SCOPE: KAMMI Pusat's confirmed OFFICIAL PUBLIC channels only. Instagram is
-// pulled through a paid third-party scraper (provider-agnostic, keyed on a
-// secret requested via the environment-secrets flow). Telegram is read for free
-// from the public web channel view (server-rendered, no login, no bot token).
+// SCOPE: KAMMI Pusat's confirmed OFFICIAL PUBLIC Instagram account only, pulled
+// through a paid third-party scraper (provider-agnostic, keyed on a secret
+// requested via the environment-secrets flow).
 //
 // PRIVACY (enforced in code): only PUBLIC posts are ever requested. No private
-// Telegram groups, WhatsApp content, phone numbers, personal-account
-// identifiers or member-level data are fetched or stored. Captions are
-// sanitised (sanitiseCaption) before persistence.
+// groups, WhatsApp content, phone numbers, personal-account identifiers or
+// member-level data are fetched or stored. Captions are sanitised
+// (sanitiseCaption) before persistence.
 //
 // Like every ingest module it NEVER throws (all failures captured in the
 // returned summary) and NEVER closes the shared DB pool (only the CLI wrapper
@@ -32,11 +30,10 @@ import { recordSourceHealth } from "./sourceHealth";
 
 // --- Config ------------------------------------------------------------------
 
-// Confirmed official handles (June 2026): Instagram @kammi.pusat, Telegram
-// public channel KAMMI_MuslimNegarawan (Humas PP KAMMI). Both overridable by
-// env so the monitored channel can change without a code edit.
+// Confirmed official handle (June 2026): Instagram @kammi.pusat (Humas PP
+// KAMMI). Overridable by env so the monitored account can change without a
+// code edit.
 const DEFAULT_INSTAGRAM_HANDLE = "kammi.pusat";
-const DEFAULT_TELEGRAM_CHANNEL = "KAMMI_MuslimNegarawan";
 const DEFAULT_INSTAGRAM_PROVIDER = "apify";
 const DEFAULT_INSTAGRAM_ACTOR = "apify~instagram-scraper";
 const DEFAULT_INSTAGRAM_BASE = "https://api.apify.com";
@@ -45,11 +42,10 @@ const SOURCE_NAME = "social_watch";
 const ACTOR_NAME = "KAMMI Pusat";
 
 // Source Health rows live under the flashpoint topic (the Protests & Civil
-// Unrest monitor reads flashpoint), so the two new entries sit with the other
-// Indonesia protest collection.
+// Unrest monitor reads flashpoint), so the entry sits with the other Indonesia
+// protest collection.
 const HEALTH_TOPIC = "flashpoint";
 export const SOCIAL_WATCH_IG_HEALTH_NAME = "KAMMI Instagram (Social Watch)";
-export const SOCIAL_WATCH_TG_HEALTH_NAME = "KAMMI Telegram (Social Watch)";
 
 const MAX_ITEMS_DEFAULT = 40;
 const FETCH_TIMEOUT_MS = 20000;
@@ -73,12 +69,6 @@ export interface SocialWatchConfig {
     actor: string;
     enabled: boolean;
     /** True when a key is present and the source is not switched off. */
-    configured: boolean;
-  };
-  telegram: {
-    channel: string;
-    enabled: boolean;
-    /** Telegram needs no key — "configured" means a channel is set + enabled. */
     configured: boolean;
   };
   maxItems: number;
@@ -105,11 +95,6 @@ export function readSocialWatchConfig(): SocialWatchConfig {
   const igEnabled = envFlag("INSTAGRAM_ENABLED", true);
   const igConfigured = enabled && igEnabled && igKeys.length > 0;
 
-  const tgChannel =
-    process.env.KAMMI_TELEGRAM_CHANNEL?.trim() || DEFAULT_TELEGRAM_CHANNEL;
-  const tgEnabled = envFlag("TELEGRAM_ENABLED", true);
-  const tgConfigured = enabled && tgEnabled && tgChannel.length > 0;
-
   const maxRaw = Number(process.env.SOCIAL_WATCH_MAX_ITEMS);
   const maxItems = Number.isFinite(maxRaw)
     ? Math.min(120, Math.max(5, Math.trunc(maxRaw)))
@@ -129,17 +114,12 @@ export function readSocialWatchConfig(): SocialWatchConfig {
       enabled: igEnabled,
       configured: igConfigured,
     },
-    telegram: {
-      channel: tgChannel,
-      enabled: tgEnabled,
-      configured: tgConfigured,
-    },
     maxItems,
   };
 }
 
 export function isSocialWatchActive(cfg = readSocialWatchConfig()): boolean {
-  return cfg.enabled && (cfg.instagram.configured || cfg.telegram.configured);
+  return cfg.enabled && cfg.instagram.configured;
 }
 
 // --- Keyword / classification vocabulary ------------------------------------
@@ -541,7 +521,7 @@ export function makeDedupKey(caption: string, imageUrls: string[]): string {
 // --- Raw post shape ----------------------------------------------------------
 
 export interface RawSocialPost {
-  platform: "instagram" | "telegram";
+  platform: "instagram";
   channel: string;
   externalId: string;
   url: string;
@@ -594,21 +574,6 @@ async function fetchJson(
       }
     } finally {
       clearTimeout(timer);
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
-}
-
-async function fetchHtmlWithRetry(url: string): Promise<string> {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
-    try {
-      return await fetchBody(url, FETCH_TIMEOUT_MS);
-    } catch (err) {
-      lastErr = err;
-      if (attempt < FETCH_ATTEMPTS - 1) {
-        await sleep(BASE_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
-      }
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
@@ -736,86 +701,6 @@ export async function fetchInstagramPosts(cfg: SocialWatchConfig): Promise<RawSo
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-// --- Telegram (free public web channel view, no login) ----------------------
-
-function stripTags(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#(\d+);/g, (_m, n) => String.fromCodePoint(Number(n)))
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-export function parseTelegramHtml(html: string, channel: string): RawSocialPost[] {
-  const out: RawSocialPost[] = [];
-  // Each public message carries data-post="channel/<id>". Slice the document at
-  // those anchors so we process one message block at a time.
-  const anchorRe = /data-post="([^"]+\/(\d+))"/g;
-  const anchors: { idx: number; postPath: string; id: string }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = anchorRe.exec(html)) !== null) {
-    anchors.push({ idx: m.index, postPath: m[1]!, id: m[2]! });
-  }
-  for (let i = 0; i < anchors.length; i++) {
-    const start = anchors[i]!.idx;
-    const end = i + 1 < anchors.length ? anchors[i + 1]!.idx : html.length;
-    const block = html.slice(start, end);
-
-    const textMatch = block.match(
-      /<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/,
-    );
-    const caption = textMatch ? stripTags(textMatch[1]!) : "";
-
-    const imageUrls: string[] = [];
-    const photoRe = /background-image:\s*url\(['"]?([^'")]+)['"]?\)/g;
-    let p: RegExpExecArray | null;
-    while ((p = photoRe.exec(block)) !== null) {
-      if (/cdn|telesco|telegram/i.test(p[1]!)) imageUrls.push(p[1]!);
-    }
-
-    let postedAt: Date | null = null;
-    const timeMatch = block.match(/<time[^>]*datetime="([^"]+)"/);
-    if (timeMatch) {
-      const d = new Date(timeMatch[1]!);
-      if (!Number.isNaN(d.getTime())) postedAt = d;
-    }
-
-    const isRepost = /tgme_widget_message_forwarded_from/.test(block);
-
-    if (!caption && imageUrls.length === 0) continue;
-
-    out.push({
-      platform: "telegram",
-      channel,
-      externalId: `tg_${anchors[i]!.id}`,
-      url: `https://t.me/${anchors[i]!.postPath}`,
-      caption,
-      imageUrls: Array.from(new Set(imageUrls)).slice(0, 6),
-      postedAt,
-      isRepost,
-    });
-  }
-  return out;
-}
-
-async function fetchTelegramPosts(cfg: SocialWatchConfig): Promise<RawSocialPost[]> {
-  // Public, server-rendered channel view — no login, no bot token, no private
-  // groups. The /s/ path is the public preview page.
-  const url = `https://t.me/s/${encodeURIComponent(cfg.telegram.channel)}`;
-  const html = await fetchHtmlWithRetry(url);
-  const posts = parseTelegramHtml(html, cfg.telegram.channel);
-  // Newest last in the page; cap to the configured window.
-  return posts.slice(-cfg.maxItems);
-}
-
 // --- Summary types -----------------------------------------------------------
 
 export interface PlatformResult {
@@ -831,7 +716,6 @@ export interface SocialWatchSummary {
   mode: "commit" | "dry-run";
   active: boolean;
   instagram: PlatformResult;
-  telegram: PlatformResult;
   fetched: number;
   relevant: number;
   duplicateInDb: number;
@@ -858,7 +742,6 @@ export function emptySocialWatchSummary(): SocialWatchSummary {
     mode: "dry-run",
     active: isSocialWatchActive(cfg),
     instagram: pr(cfg.instagram.configured),
-    telegram: pr(cfg.telegram.configured),
     fetched: 0,
     relevant: 0,
     duplicateInDb: 0,
@@ -936,8 +819,8 @@ function assembleItem(post: RawSocialPost): AssembledItem | null {
 
 /**
  * Run the KAMMI social-watch ingest. Pulls recent PUBLIC posts from the
- * configured Instagram + Telegram channels, classifies them, de-duplicates
- * reposts, flags watch alerts, and stores NEW items as supporting context.
+ * configured Instagram account, classifies them, de-duplicates reposts, flags
+ * watch alerts, and stores NEW items as supporting context.
  * Never throws; never closes the shared pool.
  */
 export async function runSocialWatchIngest(
@@ -983,38 +866,12 @@ export async function runSocialWatchIngest(
     log("  instagram: not configured (INSTAGRAM_API_KEY/APIFY_TOKEN unset or disabled)");
   }
 
-  // --- Telegram pass.
-  summary.telegram = {
-    configured: cfg.telegram.configured,
-    fetchOk: true,
-    fetched: 0,
-    relevant: 0,
-    error: null,
-  };
-  if (cfg.telegram.configured) {
-    try {
-      const posts = await fetchTelegramPosts(cfg);
-      summary.telegram.fetched = posts.length;
-      collected.push(...posts);
-      log(`  telegram(${cfg.telegram.channel}): ${posts.length} public post(s)`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      summary.telegram.fetchOk = false;
-      summary.telegram.error = msg;
-      errors.push(`telegram: ${msg}`);
-      log(`  telegram FETCH ERROR: ${msg}`);
-    }
-  } else {
-    log("  telegram: not configured (no channel or disabled)");
-  }
-
   // --- Classify + relevance-filter.
   const assembled: AssembledItem[] = [];
   for (const post of collected) {
     const item = assembleItem(post);
     if (!item) continue;
-    if (post.platform === "instagram") summary.instagram.relevant++;
-    else summary.telegram.relevant++;
+    summary.instagram.relevant++;
     assembled.push(item);
   }
   summary.fetched = collected.length;
@@ -1112,7 +969,6 @@ export async function runSocialWatchIngest(
   if (commit) {
     const touched: string[] = [];
     if (summary.instagram.fetchOk && cfg.instagram.configured) touched.push("instagram");
-    if (summary.telegram.fetchOk && cfg.telegram.configured) touched.push("telegram");
     if (touched.length > 0) {
       await db
         .update(socialWatchItemsTable)
@@ -1126,7 +982,7 @@ export async function runSocialWatchIngest(
     }
   }
 
-  // --- Source Health: one entry per platform.
+  // --- Source Health: the Instagram social-watch entry.
   if (commit) {
     await recordSourceHealthForPlatform(
       SOCIAL_WATCH_IG_HEALTH_NAME,
@@ -1134,13 +990,6 @@ export async function runSocialWatchIngest(
       cfg.instagram.configured,
       summary.instagram,
       "KAMMI Pusat Instagram — public protest/mobilisation posts pulled via a paid third-party scraper as supporting CONTEXT (never incidents). Promotion to an incident is explicit and gated.",
-    );
-    await recordSourceHealthForPlatform(
-      SOCIAL_WATCH_TG_HEALTH_NAME,
-      `https://t.me/s/${cfg.telegram.channel}`,
-      cfg.telegram.configured,
-      summary.telegram,
-      "KAMMI public Telegram channel — read free from the public web channel view (no login) as supporting CONTEXT (never incidents).",
     );
   }
 
