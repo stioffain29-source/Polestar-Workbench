@@ -1,0 +1,208 @@
+GLOBAL REPORT CONTENT AND MAP STANDARD
+
+Apply this across all Polestar country reports, weekly reports and watch products.
+
+The current report format is broadly acceptable and should be retained. The issue is not the template. The issue is the content logic, report writing and map output.
+
+Reports must read like analyst products, not database exports.
+
+1. Executive content
+
+The Bottom Line Up Front must explain what changed, why it matters, and what the reader should do with the information.
+
+Avoid generic wording such as:
+
+“Reported this period, centred on...”
+
+“Open-source reporting was led by...”
+
+“Treat quiet stretches as provisional...”
+
+Use plain operational language instead.
+
+The BLUF should answer:
+
+What is the main security picture this week?
+Where is the risk concentrated?
+Has the situation improved, deteriorated or remained stable?
+What is the practical implication for business users?
+
+2. Top developments
+
+The Top 3 Developments section must be curated, not mechanically selected.
+
+Do not include three items that are versions of the same story.
+
+Where multiple reports refer to the same incident, merge them into one development.
+
+Each development should include:
+
+Incident title
+Location
+Why it matters
+Operational relevance
+Severity rating
+
+Severity should not be inflated. Do not mark every serious sounding item as High. Use the full scale properly.
+
+3. Incident details section
+
+Replace generic category summaries with useful analytical content.
+
+Each category should only appear if there is something meaningful to say.
+
+For each relevant category, include:
+
+What happened
+Where it happened
+Why it matters
+What could be affected
+
+Remove empty or low value category text.
+
+Do not include categories that do not belong to the report type. For example, fertiliser categories must not appear in country security reports.
+
+4. Recommended actions
+
+Recommended actions must be grouped and practical.
+
+Do not repeat the same action line under several incidents.
+
+Use grouped actions such as:
+
+Movement security
+Site security
+Staff awareness
+Journey planning
+Escalation triggers
+Local monitoring
+
+Actions must be specific enough to be useful, but not over written.
+
+Avoid generic filler such as:
+
+“Hold non-essential movement to affected areas until conditions are confirmed stable.”
+
+Use this only where it is genuinely justified.
+
+5. Outlook
+
+The outlook must explain the most likely next seven day picture.
+
+It should include:
+
+Most likely scenario
+Key areas to watch
+Escalation triggers
+De-escalation indicators
+Business impact if the situation worsens
+
+The outlook should not simply repeat the current situation.
+
+6. Polestar View
+
+Polestar View is the assessment section.
+
+It should provide judgement, not summary.
+
+It should answer:
+
+Is risk rising, falling or stable?
+What is driving the risk?
+What is the operational concern?
+What should users watch next?
+
+Keep it concise and direct.
+
+7. Maps
+
+Maps must add value or be removed.
+
+Do not use meaningless incident dots, poorly rendered markers or over zoomed regional maps where the reader cannot understand the relevance.
+
+Where precise coordinates are weak, missing or generic, do not plot them as exact incident points.
+
+Use one of the following approaches instead:
+
+Area risk map
+Numbered callout map
+Province level map
+Corridor map
+City inset map
+No map, if the map adds no value
+
+For country reports, the preferred map should show risk areas rather than raw database points.
+
+Examples:
+
+Papua:
+Central Highlands
+Jayapura and North Coast
+Bird’s Head
+Papua Tengah
+Papua Barat Daya
+
+Thailand:
+Bangkok protest areas
+Southern border provinces
+Key transport or tourism areas if relevant
+
+Philippines:
+Metro Manila
+Mindanao
+BARMM
+Key ports, airports or commercial centres if relevant
+
+PNG:
+Port Moresby
+Highlands
+Lae
+Enga
+Resource project areas if relevant
+
+Map markers must be legible, correctly scaled and clearly labelled.
+
+If several incidents share a location, show one marker with a count or numbered label.
+
+Map legend must be simple and readable.
+
+Do not use tiny dots that cannot be interpreted in the PDF.
+
+8. Charts
+
+Charts must support the narrative.
+
+Do not include charts just because the data exists.
+
+Severity distribution is useful only if it helps explain the risk picture.
+
+Incident breakdown by type must use the correct report taxonomy.
+
+Remove irrelevant categories and database artefacts.
+
+9. Writing standard
+
+All report text must be written in clean, plain English.
+
+Avoid filler, vague phrasing and automated sounding text.
+
+Reports should feel like they have been reviewed by an analyst.
+
+Every section must earn its place.
+
+If a section does not add operational value, remove it or replace it with something useful.
+
+10. Acceptance criteria
+
+Before export, each report must pass the following checks:
+
+No duplicate versions of the same incident in Top 3
+No irrelevant categories
+No database artefacts
+No generic “reported this period” filler
+No meaningless map points
+No unreadable map markers
+No repeated recommended actions
+BLUF gives a clear operational judgement
+Polestar View gives an actual assessment
+Outlook explains what to watch next
