@@ -101,6 +101,9 @@ let nextId = 1;
 // it refetched (the regression being guarded).
 let countryBaseline: Row | null = null;
 let baselineGetCount = 0;
+// CountryReport baseline-SAVE flow: capture the last PUT payload so the test can
+// assert the upsert body the editor sent matches the edited fields.
+let lastBaselinePut: Row | null = null;
 
 function jsonResponse(body: unknown, status = 200) {
   const text = body === undefined || body === null ? "" : JSON.stringify(body);
@@ -227,9 +230,34 @@ function installFetch() {
           reportPhotos: [],
         });
       }
+      if (path === "/api/countries/testlandia" && method === "PATCH") {
+        // The report row update (name/region/layout). The save flow fires this
+        // before the baseline upsert; echo a merged country back.
+        const data = JSON.parse(init?.body ?? "{}") as Row;
+        return jsonResponse({
+          slug: "testlandia",
+          name: "Testlandia",
+          region: "Test Region",
+          overview: "",
+          trendSummary: "",
+          implications: "",
+          mapPlacement: "none",
+          photoPlacement: "none",
+          reportPhotos: [],
+          ...data,
+        });
+      }
       if (path === "/api/countries/testlandia/baseline" && method === "GET") {
         baselineGetCount += 1;
         if (!countryBaseline) return jsonResponse({ error: "not found" }, 404);
+        return jsonResponse(countryBaseline);
+      }
+      if (path === "/api/countries/testlandia/baseline" && method === "PUT") {
+        // Persist the upserted baseline so the post-save refetch surfaces the
+        // edited values, and capture the payload for assertion.
+        const data = JSON.parse(init?.body ?? "{}") as Row;
+        lastBaselinePut = data;
+        countryBaseline = { ...data };
         return jsonResponse(countryBaseline);
       }
       if (path === "/api/countries/testlandia/baseline" && method === "DELETE") {
@@ -309,6 +337,7 @@ beforeEach(() => {
   socialRaw = [];
   countryBaseline = null;
   baselineGetCount = 0;
+  lastBaselinePut = null;
   nextId = 1;
   installFetch();
   // The delete buttons gate on a `confirm()` prompt — auto-accept it.
@@ -506,5 +535,70 @@ describe("same-screen mutation buttons refresh the visible list", () => {
     // The report reflects the cleared baseline: the curated watchlist label is
     // gone from the screen.
     await waitFor(() => expect(screen.queryByDisplayValue(watchLabel)).toBeNull());
+  });
+
+  it("/countries/:slug — editing baseline fields (incl. a watchlist entry) and saving sends the right upsert payload and re-renders the saved values", async () => {
+    // Seed a curated baseline so the editor opens against real content.
+    const seededWatchLabel = `Seeded Province ${Date.now()}`;
+    countryBaseline = {
+      operatingEnvironment: "Original operating note.",
+      securityContext: "Original security context.",
+      knownRiskAreas: [],
+      keyCitiesProvinces: [],
+      movementConstraints: "",
+      infrastructureLimits: "",
+      medicalEvac: "",
+      resourceSectorExposure: "",
+      locationWatchlist: [
+        { label: seededWatchLabel, note: "Seeded watch entry", match: ["seeded"] },
+      ],
+    };
+
+    renderWithClient(<CountryReport />);
+
+    // Enter edit mode — the baseline editor only renders while editing.
+    fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
+
+    // The seeded baseline loaded into the editor.
+    const opEnvInput = await screen.findByDisplayValue("Original operating note.");
+    const secCtxInput = screen.getByDisplayValue("Original security context.");
+    const watchLabelInput = screen.getByDisplayValue(seededWatchLabel);
+
+    // Edit the two free-text baseline fields and rename the watchlist entry's
+    // label so each maps onto a distinct part of the upsert payload.
+    const newOpEnv = "Edited operating environment.";
+    const newSecCtx = "Edited security context.";
+    const newWatchLabel = `Edited Province ${Date.now()}`;
+    fireEvent.change(opEnvInput, { target: { value: newOpEnv } });
+    fireEvent.change(secCtxInput, { target: { value: newSecCtx } });
+    fireEvent.change(watchLabelInput, { target: { value: newWatchLabel } });
+
+    // Save the report (top-right). This fires the PATCH report update, then the
+    // baseline PUT (baselineDirty), then invalidates the baseline query.
+    const callsBeforeSave = baselineGetCount;
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    // The baseline upsert must carry the edited values verbatim.
+    await waitFor(() => expect(lastBaselinePut).not.toBeNull());
+    expect(lastBaselinePut?.operatingEnvironment).toBe(newOpEnv);
+    expect(lastBaselinePut?.securityContext).toBe(newSecCtx);
+    expect(lastBaselinePut?.locationWatchlist).toEqual([
+      { label: newWatchLabel, note: "Seeded watch entry", match: ["seeded"] },
+    ]);
+
+    // Save invalidates the baseline query, so it must refetch — proving the
+    // saved values round-trip back to the screen rather than going stale.
+    await waitFor(() => expect(baselineGetCount).toBeGreaterThan(callsBeforeSave));
+    expect((countryBaseline as Row).operatingEnvironment).toBe(newOpEnv);
+
+    // Editing exits on a successful save (the Save button is gone) and the
+    // edited values re-render — re-opening the editor shows the saved content.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull(),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
+    expect(await screen.findByDisplayValue(newOpEnv)).toBeTruthy();
+    expect(screen.getByDisplayValue(newSecCtx)).toBeTruthy();
+    expect(screen.getByDisplayValue(newWatchLabel)).toBeTruthy();
   });
 });
