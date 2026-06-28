@@ -64,6 +64,12 @@ module.exports = {
     "^@workspace/api-zod$": "<rootDir>/lib/api-zod/src/index.ts",
     "^@workspace/api-client-react$":
       "<rootDir>/lib/api-client-react/src/index.ts",
+    // `@tanstack/react-query` is only installed in the workbench package, not at
+    // the repo root, so component tests that need the REAL client (not a
+    // `jest.mock`) must be pointed at the workbench copy. Tests that
+    // `jest.mock("@tanstack/react-query", ...)` still override this mapping.
+    "^@tanstack/react-query$":
+      "<rootDir>/artifacts/workbench/node_modules/@tanstack/react-query",
   },
   transform: {
     ...tsJestTransformCfg,
