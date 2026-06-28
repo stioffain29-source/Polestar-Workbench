@@ -52,3 +52,23 @@ planned/active/other group tables, Promote button (hooks
 
 **Privacy:** captions sanitised; no phone numbers / personal accounts / WhatsApp
 / member data stored (`sanitiseCaption`).
+
+**Apify-task import (one-off / re-runnable):** an Apify *task* ("Polestar
+Instagram KAMMI Watch") can be imported via `import:apify-instagram`
+(`--taskId|--datasetId`, `--limit`, `--commit`; dry-run default). The named task
+has ZERO task-runs (the backing actor was run directly), so
+`resolveApifyTaskOrActorLatestDataset` must FALL BACK from the task's last run to
+the **backing actor's** last SUCCEEDED run's dataset. Strictly GET-only metadata
++ dataset reads — it must NEVER POST/run-sync (no new paid run); token in the
+query-param only, redacted from errors.
+- Rows land in the `social_raw` table (NOT `social_watch_items`) tagged
+  `source_name=instagram_kammi`, `platform=instagram`, `country=Indonesia`,
+  `classification=context`, `credible=false`, `promotable=false`. They are DB-only
+  by design: `routes/socialRaw.ts` hard-filters its review queue to
+  `source_name="facebook_osint"`, so KAMMI rows are queryable but not surfaced
+  there unless a dedicated UI is requested.
+- **Handle guard (actor-fallback safety):** the importer defaults to keeping only
+  `ownerUsername==="kammi.pusat"` (override `--expectHandle`, disable
+  `--any-handle`) so if that backing actor is ever reused for a different IG
+  target the resolved dataset can't be mis-filed as KAMMI/Indonesia. Idempotent:
+  re-running an unchanged dataset inserts 0 (dedup on `dedup_key`+`external_id`).

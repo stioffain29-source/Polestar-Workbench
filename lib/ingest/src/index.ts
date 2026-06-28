@@ -150,6 +150,16 @@ export type {
   ConfidenceInput,
 } from "./facebookOsintEligibility";
 export {
+  normaliseInstagramPost,
+  persistInstagramKammiPosts,
+  resolveApifyTaskOrActorLatestDataset,
+} from "./instagramKammi";
+export type {
+  RawInstagramPost,
+  PersistInstagramKammiOptions,
+  PersistInstagramKammiResult,
+} from "./instagramKammi";
+export {
   runGdeltEnrich,
   isGdeltConfigured,
   isGdeltEnrichEnabled,
