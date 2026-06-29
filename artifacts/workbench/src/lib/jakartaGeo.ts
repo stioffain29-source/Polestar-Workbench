@@ -94,29 +94,6 @@
   ];
 
   /**
-   * Real key sites plotted as markers on the operational map. Each `corridorId`
-   * matches a JAKARTA_CORRIDOR_AREAS id so the marker takes that corridor's
-   * live exposure colour. Coordinates are [lat, lon] (Leaflet order).
-   */
-  export interface JakartaKeyPoint {
-    /** Matches a JAKARTA_CORRIDOR_AREAS id (drives exposure colour). */
-    corridorId: string;
-    /** Short site label shown on the map. */
-    label: string;
-    lat: number;
-    lon: number;
-    /** Label anchor relative to the marker. */
-    labelSide?: "top" | "bottom" | "left" | "right";
-  }
-
-  export const JAKARTA_KEY_POINTS: JakartaKeyPoint[] = [
-    { corridorId: "central-government", label: "Government district", lat: -6.1754, lon: 106.8272, labelSide: "left" },
-    { corridorId: "commercial-hotels", label: "Central business district", lat: -6.2249, lon: 106.8095, labelSide: "bottom" },
-    { corridorId: "airport-corridor", label: "Soekarno-Hatta Airport", lat: -6.1256, lon: 106.6559, labelSide: "top" },
-    { corridorId: "north-port", label: "Tanjung Priok port", lat: -6.1048, lon: 106.8806, labelSide: "right" },
-  ];
-
-  /**
    * Indicative movement corridors plotted as route lines. Each `corridorId`
    * matches a JAKARTA_CORRIDOR_AREAS id (drives exposure colour). `path` is an
    * ordered list of [lat, lon] waypoints; `labelAt` is the path index used to

@@ -337,9 +337,9 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
     siteLabel: "Tanjung Priok Port",
     siteLabelSide: "top",
     areaLabel: {
-      text: "NORTH JAKARTA PORT & LOGISTICS AREA",
-      lat: -6.165,
-      lon: 106.905,
+      text: "NORTH JAKARTA & PORT AREA",
+      lat: -6.172,
+      lon: 106.915,
     },
   },
   {
@@ -383,12 +383,47 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
   },
 ];
 
-// Corridor band captions (rotated along each route).
-const CORRIDOR_LABEL: Record<string, string> = {
-  "airport-corridor": "AIRPORT CORRIDOR",
-  "north-port": "LOGISTICS CORRIDOR",
-  "cross-city-routes": "CROSS-CITY MOVEMENT ROUTES",
-  "commuter-belt": "GREATER JAKARTA COMMUTER BELT",
+// Areas shown as movement corridors only: no numbered site badge on the map —
+// their exposure reads from the route line + caption, not a ranked dot.
+const CORRIDOR_ONLY_IDS = new Set(["commuter-belt", "cross-city-routes"]);
+
+// Corridor captions sit horizontally in open map space, each in its corridor's
+// own identity colour, so the routes read apart without crowding the sites. The
+// airport corridor is the one exception — its caption rides rotated along the
+// band, matching the reference.
+interface CorridorCaption {
+  text: string;
+  lat: number;
+  lon: number;
+  color: string;
+  rotate?: boolean;
+}
+const CORRIDOR_CAPTION: Record<string, CorridorCaption> = {
+  "airport-corridor": {
+    text: "AIRPORT CORRIDOR",
+    lat: -6.15,
+    lon: 106.715,
+    color: "#7E8893",
+    rotate: true,
+  },
+  "north-port": {
+    text: "LOGISTICS CORRIDOR",
+    lat: -6.135,
+    lon: 106.955,
+    color: "#B26A2B",
+  },
+  "cross-city-routes": {
+    text: "CROSS-CITY MOVEMENT ROUTES",
+    lat: -6.249,
+    lon: 106.884,
+    color: "#5C7B3F",
+  },
+  "commuter-belt": {
+    text: "GREATER JAKARTA COMMUTER BELT",
+    lat: -6.353,
+    lon: 106.835,
+    color: "#2F6FB0",
+  },
 };
 
 // Each corridor carries its OWN identity colour (matching the reference) so the
@@ -402,9 +437,9 @@ interface CorridorStyle {
 }
 const CORRIDOR_STYLE: Record<string, CorridorStyle> = {
   "airport-corridor": { fill: "#C3AEDD", accent: "#8E74B5" },
-  "north-port": { fill: "#E6B27E", accent: "#C0792F", dashed: true },
+  "north-port": { fill: "#E6B27E", accent: "#C0792F", dashed: true, thin: true },
   "cross-city-routes": { fill: "#AFCF96", accent: "#6E9A52" },
-  "commuter-belt": { fill: "#AFCF96", accent: "#6E9A52", dashed: true, thin: true },
+  "commuter-belt": { fill: "#9FC3E8", accent: "#2F6FB0", dashed: true, thin: true },
 };
 const DEFAULT_CORRIDOR_STYLE: CorridorStyle = {
   fill: "#B9C2CC",
@@ -471,6 +506,9 @@ export default function JakartaCorridorMap({
   const ranked = useMemo(
     () =>
       corridor.statuses
+        // Cross-city movement is shown as a corridor line on the map, not as a
+        // ranked site/area, so it is dropped from the numbered exposure list.
+        .filter((s) => s.area.id !== "cross-city-routes")
         .map((status, i) => ({ status, i }))
         .sort(
           (a, b) =>
@@ -598,16 +636,16 @@ export default function JakartaCorridorMap({
           i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
         );
       };
-      const outer = style.thin ? 6 : 12;
+      const outer = style.thin ? 7 : 15;
       const inner = style.thin ? 3.5 : 9;
       ctx.setLineDash([]);
       trace();
       ctx.lineWidth = outer;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.28)`;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.34)`;
       ctx.stroke();
       trace();
       ctx.lineWidth = inner;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.96)`;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.92)`;
       if (style.dashed) ctx.setLineDash(style.thin ? [3, 5] : [12, 9]);
       ctx.stroke();
       ctx.setLineDash([]);
@@ -757,7 +795,7 @@ export default function JakartaCorridorMap({
       const h = el.clientHeight;
       if (w === 0 || h === 0) return;
 
-      const scale = Math.max(3, Math.min(window.devicePixelRatio || 1, 2) * 2);
+      const scale = Math.min(window.devicePixelRatio || 1, 2) * 2;
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
@@ -812,31 +850,44 @@ export default function JakartaCorridorMap({
         const style = CORRIDOR_STYLE[line.corridorId] ?? DEFAULT_CORRIDOR_STYLE;
         const pts = line.path.map((c) => proj(c[0], c[1]));
         drawBand(ctx, pts, style);
-        drawArrow(ctx, pts[1], pts[0], style.accent);
-        drawArrow(ctx, pts[pts.length - 2], pts[pts.length - 1], style.accent);
+        // Arrowheads only on the cross-city movement routes — the other
+        // corridors read as directionless bands/fans, matching the reference.
+        if (line.corridorId === "cross-city-routes") {
+          drawArrow(ctx, pts[1], pts[0], style.accent);
+          drawArrow(ctx, pts[pts.length - 2], pts[pts.length - 1], style.accent);
+        }
       }
 
-      // 4) Rotated corridor captions along each band.
+      // 4) Corridor captions: horizontal & colour-coded in open space, except
+      //    the airport corridor which rides rotated along its band.
       for (const line of JAKARTA_CORRIDOR_LINES) {
-        const text = CORRIDOR_LABEL[line.corridorId];
-        if (!text) continue;
-        const pts = line.path.map((c) => proj(c[0], c[1]));
-        const idx = Math.min(
-          line.labelAt ?? Math.floor(pts.length / 2),
-          pts.length - 1,
-        );
-        const a = pts[Math.max(0, idx - 1)];
-        const b = pts[Math.min(pts.length - 1, idx + 1)];
-        let ang = Math.atan2(b.y - a.y, b.x - a.x);
-        if (ang > Math.PI / 2) ang -= Math.PI;
-        if (ang < -Math.PI / 2) ang += Math.PI;
-        const anchor = pts[idx];
-        label(ctx, text, anchor.x, anchor.y - 9, {
-          font: "700 9px 'Roboto Condensed', Roboto, sans-serif",
-          color: "#5C636E",
-          spacing: "0.08em",
-          rotate: ang,
-        });
+        const cap = CORRIDOR_CAPTION[line.corridorId];
+        if (!cap) continue;
+        const at = proj(cap.lat, cap.lon);
+        if (cap.rotate) {
+          const pts = line.path.map((c) => proj(c[0], c[1]));
+          const idx = Math.min(
+            line.labelAt ?? Math.floor(pts.length / 2),
+            pts.length - 1,
+          );
+          const a = pts[Math.max(0, idx - 1)];
+          const b = pts[Math.min(pts.length - 1, idx + 1)];
+          let ang = Math.atan2(b.y - a.y, b.x - a.x);
+          if (ang > Math.PI / 2) ang -= Math.PI;
+          if (ang < -Math.PI / 2) ang += Math.PI;
+          label(ctx, cap.text, at.x, at.y, {
+            font: "700 9px 'Roboto Condensed', Roboto, sans-serif",
+            color: cap.color,
+            spacing: "0.08em",
+            rotate: ang,
+          });
+        } else {
+          blockLabel(ctx, cap.text, at.x, at.y, 16, 11, {
+            font: "700 9px 'Roboto Condensed', Roboto, sans-serif",
+            color: cap.color,
+            spacing: "0.07em",
+          });
+        }
       }
 
       // 5) Region / sea / place labels.
@@ -870,13 +921,15 @@ export default function JakartaCorridorMap({
         const p = proj(a.areaLabel.lat, a.areaLabel.lon);
         blockLabel(ctx, a.areaLabel.text, p.x, p.y, 16, 11, {
           font: "700 9.5px 'Roboto Condensed', Roboto, sans-serif",
-          color: "#3C3C46",
+          color: "#55555F",
           spacing: "0.06em",
         });
       }
 
-      // 7) Numbered icon badges + site labels on top.
+      // 7) Numbered icon badges + site labels on top (sites only — the
+      //    corridor-only areas are drawn as route lines, not numbered badges).
       for (const a of JAKARTA_MAP_AREAS) {
+        if (CORRIDOR_ONLY_IDS.has(a.id)) continue;
         const level = levelFor.get(a.id) ?? "not-assessed";
         const n = numberFor.get(a.id) ?? 0;
         const p = proj(a.marker[0], a.marker[1]);
