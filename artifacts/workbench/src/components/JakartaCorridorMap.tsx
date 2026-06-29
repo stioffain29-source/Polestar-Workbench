@@ -9,8 +9,9 @@ import {
 } from "@/lib/jakartaCorridors";
 import {
   JAKARTA_VIEW_BBOX,
-  JAKARTA_KEY_POINTS,
   JAKARTA_CORRIDOR_LINES,
+  JAKARTA_GEO,
+  JAKARTA_MAP_LABELS,
 } from "@/lib/jakartaGeo";
 
 const NAVY = "#0B0B3D";
@@ -56,8 +57,8 @@ const SEV_RANK: Record<JakartaExposureLevel, number> = {
   "not-assessed": 0,
 };
 
-// Sea backdrop shown behind the basemap while tiles stream in.
-const SEA = "#DCE6F0";
+// Pale Java Sea backdrop behind the custom illustration.
+const SEA = "#D6E2F0";
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace("#", "");
@@ -67,6 +68,193 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
     b: parseInt(h.slice(4, 6), 16),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Monochrome line icons (government building, office tower, anchor, plane, a
+// dashed commuter ring and a movement-route glyph). Drawn on a canvas so they
+// can be baked into the map PNG AND surfaced as <img> in the legend / list —
+// both html2canvas-safe, unlike inline SVG. Each draws centred on (x, y) with
+// a roughly 16px footprint.
+// ---------------------------------------------------------------------------
+export type JakartaMapIcon =
+  | "civic"
+  | "tower"
+  | "anchor"
+  | "plane"
+  | "ring"
+  | "route";
+
+function drawCivicIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: string,
+) {
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.moveTo(x - 7.5, y - 3);
+  ctx.lineTo(x, y - 8);
+  ctx.lineTo(x + 7.5, y - 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(x - 7.5, y - 3, 15, 1.6);
+  for (const cx of [-6, -3, 0, 3, 6]) ctx.fillRect(x + cx - 0.55, y - 1, 1.1, 7);
+  ctx.fillRect(x - 8, y + 6, 16, 1.9);
+}
+
+function drawTowerIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: string,
+) {
+  ctx.fillStyle = c;
+  ctx.fillRect(x - 6, y - 8, 5.6, 16);
+  ctx.fillRect(x + 0.6, y - 4, 5.6, 12);
+  ctx.fillStyle = "#ffffff";
+  for (let r = 0; r < 4; r++) {
+    ctx.fillRect(x - 4.7, y - 6.4 + r * 3.4, 1.3, 1.3);
+    ctx.fillRect(x - 2.5, y - 6.4 + r * 3.4, 1.3, 1.3);
+  }
+  for (let r = 0; r < 3; r++) {
+    ctx.fillRect(x + 1.9, y - 2.4 + r * 3.4, 1.3, 1.3);
+    ctx.fillRect(x + 3.9, y - 2.4 + r * 3.4, 1.3, 1.3);
+  }
+}
+
+function drawAnchorIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: string,
+) {
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(x, y - 6, 2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y - 4);
+  ctx.lineTo(x, y + 7);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - 4, y - 1.5);
+  ctx.lineTo(x + 4, y - 1.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y + 2, 6, 0.18 * Math.PI, 0.82 * Math.PI);
+  ctx.stroke();
+}
+
+function drawPlaneIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: string,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.moveTo(0, -8.5);
+  ctx.quadraticCurveTo(1.7, -7, 1.7, -2.5);
+  ctx.lineTo(8, 1.5);
+  ctx.lineTo(8, 3.2);
+  ctx.lineTo(1.7, 1);
+  ctx.lineTo(1.7, 6);
+  ctx.lineTo(3.5, 7.7);
+  ctx.lineTo(3.5, 8.9);
+  ctx.lineTo(0, 7.8);
+  ctx.lineTo(-3.5, 8.9);
+  ctx.lineTo(-3.5, 7.7);
+  ctx.lineTo(-1.7, 6);
+  ctx.lineTo(-1.7, 1);
+  ctx.lineTo(-8, 3.2);
+  ctx.lineTo(-8, 1.5);
+  ctx.lineTo(-1.7, -2.5);
+  ctx.quadraticCurveTo(-1.7, -7, 0, -8.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawRingIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: string,
+) {
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([2.6, 2.4]);
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawRouteIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: string,
+) {
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(x - 7.5, y);
+  ctx.lineTo(x + 7.5, y);
+  ctx.stroke();
+  for (const hx of [-1, 5]) {
+    ctx.beginPath();
+    ctx.moveTo(x + hx - 3, y - 3);
+    ctx.lineTo(x + hx, y);
+    ctx.lineTo(x + hx - 3, y + 3);
+    ctx.stroke();
+  }
+}
+
+function drawAreaIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  kind: JakartaMapIcon,
+  c: string,
+) {
+  if (kind === "civic") drawCivicIcon(ctx, x, y, c);
+  else if (kind === "tower") drawTowerIcon(ctx, x, y, c);
+  else if (kind === "anchor") drawAnchorIcon(ctx, x, y, c);
+  else if (kind === "plane") drawPlaneIcon(ctx, x, y, c);
+  else if (kind === "ring") drawRingIcon(ctx, x, y, c);
+  else drawRouteIcon(ctx, x, y, c);
+}
+
+function iconDataUrl(kind: JakartaMapIcon, color: string, px = 24): string {
+  const s = 3;
+  const cv = document.createElement("canvas");
+  cv.width = px * s;
+  cv.height = px * s;
+  const ctx = cv.getContext("2d");
+  if (!ctx) return "";
+  ctx.scale(s, s);
+  ctx.translate(px / 2, px / 2);
+  drawAreaIcon(ctx, 0, 0, kind, color);
+  return cv.toDataURL("image/png");
+}
+
+// Each functional area's icon for the legend, ranked list and map badge.
+const AREA_ICON: Record<string, JakartaMapIcon> = {
+  "central-government": "civic",
+  "commercial-hotels": "tower",
+  "airport-corridor": "plane",
+  "north-port": "anchor",
+  "commuter-belt": "ring",
+  "cross-city-routes": "route",
+};
 
 const MONTHS = [
   "January",
@@ -202,17 +390,14 @@ export default function JakartaCorridorMap({
       });
       mapRef.current = map;
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-        {
-          subdomains: "abcd",
-          maxZoom: 19,
-          crossOrigin: true,
-          opacity: 1,
-        },
-      ).addTo(map);
+      // No raster tile layer: the figure is a fully custom stylised
+      // illustration drawn on the overlay canvas (sea, land, dashed regency
+      // boundaries, soft zones, movement bands, labels and badges) so it
+      // matches the report's house style rather than a generic web basemap.
+      // Leaflet is used only for the lat/lng → pixel projection of the locked
+      // view.
 
-      // Markers + corridor overlay (offscreen canvas → data-URL <img>).
+      // Custom illustration overlay (offscreen canvas → data-URL <img>).
       const overlay = document.createElement("img");
       overlay.alt = "";
       overlay.style.position = "absolute";
@@ -452,7 +637,7 @@ export default function JakartaCorridorMap({
               ref={mapElRef}
               style={{
                 width: "100%",
-                height: 470,
+                height: 500,
                 position: "relative",
                 background: SEA,
               }}

@@ -69,11 +69,29 @@
    * so the movement corridors and key points are all in frame.
    */
   export const JAKARTA_VIEW_BBOX = {
-    minLon: 106.595,
-    minLat: -6.415,
-    maxLon: 107.02,
-    maxLat: -6.07,
+    minLon: 106.555,
+    minLat: -6.470,
+    maxLon: 107.060,
+    maxLat: -6.010,
   };
+
+  /** Stylised place / region / sea labels drawn on the operational map. */
+  export type JakartaMapLabelKind = "sea" | "region" | "place";
+  export interface JakartaMapLabel {
+    text: string;
+    lat: number;
+    lon: number;
+    kind: JakartaMapLabelKind;
+  }
+  export const JAKARTA_MAP_LABELS: JakartaMapLabel[] = [
+    { text: "Java Sea", lat: -6.035, lon: 106.840, kind: "sea" },
+    { text: "TANGERANG REGENCY", lat: -6.330, lon: 106.605, kind: "region" },
+    { text: "BEKASI REGENCY", lat: -6.300, lon: 107.015, kind: "region" },
+    { text: "Tangerang", lat: -6.190, lon: 106.635, kind: "place" },
+    { text: "Depok", lat: -6.398, lon: 106.823, kind: "place" },
+    { text: "Bekasi", lat: -6.235, lon: 106.985, kind: "place" },
+    { text: "Cibubur", lat: -6.372, lon: 106.902, kind: "place" },
+  ];
 
   /**
    * Real key sites plotted as markers on the operational map. Each `corridorId`
