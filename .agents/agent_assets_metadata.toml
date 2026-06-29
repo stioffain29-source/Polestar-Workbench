@@ -611,3 +611,15 @@ id = "lZsyC27roRbIa1YvHFamk"
 uri = "file://screenshots/jakarta_exposure_map_v5.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map — redesign sample"
+
+[[outputs]]
+id = "kWd7gvs74BOzl9OjaAotX"
+uri = "file://screenshots/jakarta_exposure_map_v9.jpg"
+type = "image"
+title = "Jakarta Operational Exposure Map (redesigned)"
+
+[[outputs]]
+id = "AR3lE83k1xQxUN9UIiaPk"
+uri = "file://attached_assets/image_1782704366565.png"
+type = "image"
+title = "Reference (Crisis24 / Control Risks)"

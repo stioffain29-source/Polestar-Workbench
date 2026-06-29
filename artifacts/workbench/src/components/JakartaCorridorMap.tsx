@@ -64,7 +64,7 @@ const SEA = "#D6E2F0";
 // professional travel-risk reference (land reads as paper, the sea as a pale
 // wash). Operating exposure is carried by the soft zones, never the land fill.
 const LAND_FILL = "#F4F2EC";
-const BOUNDARY = "#C7C4BB";
+const BOUNDARY = "#E4E0D6";
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace("#", "");
@@ -332,36 +332,36 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
   {
     id: "north-port",
     icon: "anchor",
-    marker: [-6.1048, 106.8806],
-    zoneRadius: 50,
+    marker: [-6.108, 106.885],
+    zoneRadius: 34,
     siteLabel: "Tanjung Priok Port",
     siteLabelSide: "top",
     areaLabel: {
       text: "NORTH JAKARTA PORT & LOGISTICS AREA",
-      lat: -6.142,
-      lon: 106.86,
+      lat: -6.165,
+      lon: 106.905,
     },
   },
   {
     id: "central-government",
     icon: "civic",
-    marker: [-6.1754, 106.8272],
-    zoneRadius: 44,
+    marker: [-6.18, 106.815],
+    zoneRadius: 30,
     areaLabel: {
       text: "CENTRAL JAKARTA GOVERNMENT DISTRICT",
-      lat: -6.198,
-      lon: 106.83,
+      lat: -6.213,
+      lon: 106.812,
     },
   },
   {
     id: "commercial-hotels",
     icon: "tower",
-    marker: [-6.2249, 106.8095],
-    zoneRadius: 52,
+    marker: [-6.245, 106.732],
+    zoneRadius: 34,
     areaLabel: {
       text: "MAIN COMMERCIAL & HOTEL AREAS",
-      lat: -6.246,
-      lon: 106.785,
+      lat: -6.272,
+      lon: 106.730,
     },
   },
   {
@@ -379,18 +379,37 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
   {
     id: "cross-city-routes",
     icon: "route",
-    marker: [-6.2186, 106.8138],
+    marker: [-6.259, 106.92],
   },
 ];
 
-// Corridor band captions (rotated along each route) + which read as dashed.
+// Corridor band captions (rotated along each route).
 const CORRIDOR_LABEL: Record<string, string> = {
   "airport-corridor": "AIRPORT CORRIDOR",
   "north-port": "LOGISTICS CORRIDOR",
   "cross-city-routes": "CROSS-CITY MOVEMENT ROUTES",
   "commuter-belt": "GREATER JAKARTA COMMUTER BELT",
 };
-const CORRIDOR_DASHED = new Set(["north-port", "commuter-belt"]);
+
+// Each corridor carries its OWN identity colour (matching the reference) so the
+// routes read apart at a glance. Operating exposure is shown by the soft zones,
+// the badges and the ranked list — never by the corridor colour.
+interface CorridorStyle {
+  fill: string;
+  accent: string;
+  dashed?: boolean;
+  thin?: boolean;
+}
+const CORRIDOR_STYLE: Record<string, CorridorStyle> = {
+  "airport-corridor": { fill: "#C3AEDD", accent: "#8E74B5" },
+  "north-port": { fill: "#E6B27E", accent: "#C0792F", dashed: true },
+  "cross-city-routes": { fill: "#AFCF96", accent: "#6E9A52" },
+  "commuter-belt": { fill: "#AFCF96", accent: "#6E9A52", dashed: true, thin: true },
+};
+const DEFAULT_CORRIDOR_STYLE: CorridorStyle = {
+  fill: "#B9C2CC",
+  accent: "#8A929C",
+};
 
 const legendHeadStyle: CSSProperties = {
   fontFamily: "Roboto, sans-serif",
@@ -564,30 +583,32 @@ export default function JakartaCorridorMap({
       ctx.fill();
     };
 
-    // Soft pastel movement band along a projected polyline.
+    // Soft pastel movement band along a projected polyline, in the corridor's
+    // own identity colour (solid, dashed, or thin-dotted).
     const drawBand = (
       ctx: CanvasRenderingContext2D,
       pts: { x: number; y: number }[],
-      level: JakartaExposureLevel,
-      dashed: boolean,
+      style: CorridorStyle,
     ) => {
       if (pts.length < 2) return;
-      const { r, g, b } = hexToRgb(EXPOSURE_FILL[level]);
+      const { r, g, b } = hexToRgb(style.fill);
       const trace = () => {
         ctx.beginPath();
         pts.forEach((p, i) =>
           i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
         );
       };
+      const outer = style.thin ? 7 : 15;
+      const inner = style.thin ? 3.5 : 9;
       ctx.setLineDash([]);
       trace();
-      ctx.lineWidth = 15;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.40)`;
+      ctx.lineWidth = outer;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.34)`;
       ctx.stroke();
       trace();
-      ctx.lineWidth = 9;
+      ctx.lineWidth = inner;
       ctx.strokeStyle = `rgba(${r},${g},${b},0.92)`;
-      if (dashed) ctx.setLineDash([11, 8]);
+      if (style.dashed) ctx.setLineDash(style.thin ? [3, 5] : [12, 9]);
       ctx.stroke();
       ctx.setLineDash([]);
     };
@@ -785,14 +806,14 @@ export default function JakartaCorridorMap({
         drawZone(ctx, p.x, p.y, level, a.zoneRadius);
       }
 
-      // 3) Movement corridor bands + outward arrowheads.
+      // 3) Movement corridor bands + outward arrowheads, each in the
+      //    corridor's own identity colour.
       for (const line of JAKARTA_CORRIDOR_LINES) {
-        const level = levelFor.get(line.corridorId) ?? "not-assessed";
+        const style = CORRIDOR_STYLE[line.corridorId] ?? DEFAULT_CORRIDOR_STYLE;
         const pts = line.path.map((c) => proj(c[0], c[1]));
-        drawBand(ctx, pts, level, CORRIDOR_DASHED.has(line.corridorId));
-        const accent = EXPOSURE_ACCENT[level];
-        drawArrow(ctx, pts[1], pts[0], accent);
-        drawArrow(ctx, pts[pts.length - 2], pts[pts.length - 1], accent);
+        drawBand(ctx, pts, style);
+        drawArrow(ctx, pts[1], pts[0], style.accent);
+        drawArrow(ctx, pts[pts.length - 2], pts[pts.length - 1], style.accent);
       }
 
       // 4) Rotated corridor captions along each band.
@@ -842,14 +863,14 @@ export default function JakartaCorridorMap({
         }
       }
 
-      // 6) Area captions in each area's exposure accent.
+      // 6) Area captions — neutral slate, like the reference (exposure is read
+      //    from the zone colour and the ranked list, not the caption).
       for (const a of JAKARTA_MAP_AREAS) {
         if (!a.areaLabel) continue;
-        const level = levelFor.get(a.id) ?? "not-assessed";
         const p = proj(a.areaLabel.lat, a.areaLabel.lon);
         blockLabel(ctx, a.areaLabel.text, p.x, p.y, 16, 11, {
           font: "700 9.5px 'Roboto Condensed', Roboto, sans-serif",
-          color: EXPOSURE_ACCENT[level],
+          color: "#55555F",
           spacing: "0.06em",
         });
       }

@@ -136,39 +136,37 @@
       // Soekarno-Hatta → central Jakarta along the airport toll route.
       path: [
         [-6.1256, 106.6559],
-        [-6.1340, 106.7060],
-        [-6.1520, 106.7560],
-        [-6.1660, 106.7980],
-        [-6.1754, 106.8272],
+        [-6.1400, 106.7050],
+        [-6.1600, 106.7600],
+        [-6.1800, 106.8150],
       ],
       labelAt: 2,
     },
     {
       corridorId: "north-port",
-      label: "Port access route",
-      // Tanjung Priok port → the main commercial / CBD area.
+      label: "Logistics corridor",
+      // Tanjung Priok port → east toward the Bekasi industrial belt.
       path: [
-        [-6.1048, 106.8806],
-        [-6.1380, 106.8640],
-        [-6.1700, 106.8440],
-        [-6.1980, 106.8250],
-        [-6.2249, 106.8095],
+        [-6.1080, 106.8850],
+        [-6.1160, 106.9300],
+        [-6.1350, 106.9720],
+        [-6.1580, 107.0050],
       ],
       labelAt: 2,
     },
     {
       corridorId: "cross-city-routes",
-      label: "Inner cross-city axis",
+      label: "Cross-city movement routes",
+      // Broad east–west movement axis across the southern city, kept well
+      // south of the central government zone so its caption stays clear.
       path: [
-        [-6.1370, 106.8130],
-        [-6.1754, 106.8272],
-        [-6.1944, 106.8229],
-        [-6.2186, 106.8138],
-        [-6.2435, 106.7997],
+        [-6.2500, 106.7600],
+        [-6.2550, 106.8150],
+        [-6.2580, 106.8700],
+        [-6.2600, 106.9250],
+        [-6.2620, 106.9700],
       ],
-      // North tip — keeps the route's number clear of the central government /
-      // CBD markers, which crowd the same central spine.
-      labelAt: 0,
+      labelAt: 1,
     },
     {
       corridorId: "commuter-belt",
