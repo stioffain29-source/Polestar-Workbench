@@ -55,7 +55,7 @@ const PANEL_BG = "#F3F5F8";
 
 // ---- Single full-canvas graphic --------------------------------------------
 // The entire figure (base map, exposure fills, boundaries, routes, icons,
-// leader-line callouts, legend and footer) is rendered into ONE high-DPI
+// district exposure tags, legend and footer) is rendered into ONE high-DPI
 // canvas and emitted as a single data-URL <img>. This guarantees the on-screen
 // preview and the DOM-rasterised PDF are pixel-identical, and sidesteps
 // html2canvas (which mangles inline SVG and will not copy a live <canvas>
@@ -108,27 +108,6 @@ function setFont(
 ): void {
   const fam = condensed ? "'Roboto Condensed'" : "Roboto";
   ctx.font = `${italic ? "italic " : ""}${weight} ${size}px ${fam}, sans-serif`;
-}
-
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxW: number,
-): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const t = cur ? `${cur} ${w}` : w;
-    if (ctx.measureText(t).width <= maxW || !cur) {
-      cur = t;
-    } else {
-      lines.push(cur);
-      cur = w;
-    }
-  }
-  if (cur) lines.push(cur);
-  return lines;
 }
 
 // Draw a monochrome glyph into a 24x24 logical box. No inline SVG, no emoji.
@@ -414,6 +393,45 @@ function centredLabel(
   ctx.textAlign = "left";
 }
 
+// Exposure chip — a small accent pill with white level text, placed inside a
+// district under its name so the level reads without decoding the fill alone.
+function drawExposureChip(
+  ctx: CanvasRenderingContext2D,
+  level: JakartaExposureLevel,
+  cx: number,
+  cy: number,
+): void {
+  const label = EXPOSURE_LABEL[level].toUpperCase();
+  setFont(ctx, 700, 9, true);
+  const w = ctx.measureText(label).width + 14;
+  const h = 16;
+  const x = cx - w / 2;
+  const y = cy - h / 2;
+  roundRectPath(ctx, x, y, w, h, h / 2);
+  ctx.fillStyle = EXPOSURE_ACCENT[level];
+  ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, cx, y + h / 2 + 0.5);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+}
+
+// District name + exposure chip stacked inside a district polygon.
+function drawDistrictTag(
+  ctx: CanvasRenderingContext2D,
+  nameLines: string[],
+  level: JakartaExposureLevel,
+  gx: number,
+  gyName: number,
+  gyChip: number,
+): void {
+  const size = nameLines.length > 1 ? 13 : 14.5;
+  centredLabel(ctx, nameLines, gx, gyName, size, NAVY, 700);
+  drawExposureChip(ctx, level, geoX(gx), geoY(gyChip));
+}
+
 // ---- Geometry --------------------------------------------------------------
 const DKI = {
   north: [
@@ -482,17 +500,6 @@ const BELT_RING: Pt[] = [
   [10, 97],
   [3, 70],
 ];
-
-interface CalloutDef {
-  id: string;
-  title: string;
-  blurb: string;
-  anchor: Pt;
-  box: { x: number; y: number };
-  level: JakartaExposureLevel;
-}
-
-const CALLOUT_W = 168;
 
 // ---- Date range ------------------------------------------------------------
 const MONTHS = [
@@ -622,7 +629,7 @@ function renderExposureMap(
   // District markers (icons).
   drawDistrictMarker(ctx, "port", geoX(60), geoY(20));
   drawDistrictMarker(ctx, "government", geoX(51), geoY(33));
-  drawDistrictMarker(ctx, "building", geoX(46), geoY(61));
+  drawDistrictMarker(ctx, "building", geoX(46), geoY(57));
   drawDistrictMarker(ctx, "plane", geoX(8), geoY(20));
 
   // Sea label.
@@ -633,166 +640,33 @@ function renderExposureMap(
   ctx.fillText("Java Sea", geoX(50), geoY(6));
   ctx.textAlign = "left";
 
-  // District + regency labels.
-  centredLabel(ctx, ["NORTH JAKARTA"], 41, 20, 14.5, NAVY, 700);
-  centredLabel(ctx, ["WEST", "JAKARTA"], 33, 40, 14, NAVY, 700);
-  centredLabel(ctx, ["CENTRAL", "JAKARTA"], 51, 44, 13, NAVY, 700);
-  centredLabel(ctx, ["EAST", "JAKARTA"], 67, 40, 14, NAVY, 700);
-  centredLabel(ctx, ["SOUTH JAKARTA"], 46, 69, 14.5, NAVY, 700);
+  // District name + exposure chip, set inside each district. The supporting
+  // table below carries the "why it matters" and "action" detail, so the map
+  // stays a glanceable choropleth rather than repeating the table in callouts.
+  drawDistrictTag(ctx, ["NORTH JAKARTA"], levelOf("north-port"), 41, 18, 23);
+  drawDistrictTag(ctx, ["WEST JAKARTA"], WEST_LEVEL, 34, 38, 43);
+  drawDistrictTag(
+    ctx,
+    ["CENTRAL", "JAKARTA"],
+    levelOf("central-government"),
+    50,
+    40,
+    47.5,
+  );
+  drawDistrictTag(ctx, ["EAST JAKARTA"], EAST_LEVEL, 67, 38, 43);
+  drawDistrictTag(
+    ctx,
+    ["SOUTH JAKARTA"],
+    levelOf("commercial-hotels"),
+    46,
+    66,
+    71,
+  );
+
+  // Regency context labels (not assessed).
   centredLabel(ctx, ["TANGERANG", "REGENCY"], 9, 34, 10.5, "#8A9099", 600);
   centredLabel(ctx, ["BEKASI", "REGENCY"], 91, 34, 10.5, "#8A9099", 600);
   centredLabel(ctx, ["BOGOR REGENCY"], 50, 90, 10.5, "#8A9099", 600);
-
-  // Callouts.
-  const callouts: CalloutDef[] = [
-    {
-      id: "airport-corridor",
-      title: "Soekarno-Hatta Airport Corridor",
-      blurb:
-        "Airport transfers can be delayed by congestion, flooding or policing on the toll routes to and from the terminals.",
-      anchor: [8, 20],
-      box: { x: 36, y: 96 },
-      level: levelOf("airport-corridor"),
-    },
-    {
-      id: "north-port",
-      title: "North Jakarta & Port Area",
-      blurb:
-        "Port operations, warehousing and low-lying access roads are exposed to flooding and can disrupt logistics and deliveries.",
-      anchor: [60, 19],
-      box: { x: 470, y: 96 },
-      level: levelOf("north-port"),
-    },
-    {
-      id: "central-government",
-      title: "Central Jakarta Government District",
-      blurb:
-        "Protest and policing activity around government buildings can close roads and slow access at short notice.",
-      anchor: [51, 34],
-      box: { x: 636, y: 246 },
-      level: levelOf("central-government"),
-    },
-    {
-      id: "west-jakarta",
-      title: "West Jakarta",
-      blurb:
-        "Congestion and crime risk across commercial and residential areas can affect after-hours movement and deliveries.",
-      anchor: [33, 44],
-      box: { x: 34, y: 300 },
-      level: WEST_LEVEL,
-    },
-    {
-      id: "commercial-hotels",
-      title: "Main Commercial & Hotel Areas",
-      blurb:
-        "Offices, hotels and embassies concentrate here; incidents bear directly on staff, meetings and visitor movement.",
-      anchor: [45, 62],
-      box: { x: 34, y: 478 },
-      level: levelOf("commercial-hotels"),
-    },
-    {
-      id: "east-jakarta",
-      title: "East Jakarta",
-      blurb:
-        "Road works, local incidents and residential density can lengthen movement and disrupt access.",
-      anchor: [67, 44],
-      box: { x: 636, y: 430 },
-      level: EAST_LEVEL,
-    },
-    {
-      id: "commuter-belt",
-      title: "Greater Jakarta Commuter Belt",
-      blurb:
-        "Heavy rain, flooding and congestion across Greater Jakarta can lengthen commutes and disrupt site access.",
-      anchor: [82, 86],
-      box: { x: 470, y: 556 },
-      level: levelOf("commuter-belt"),
-    },
-    {
-      id: "cross-city-routes",
-      title: "Cross-City Movement Routes",
-      blurb:
-        "Congestion, incidents or closures on the main arterials and toll roads can delay meetings, site visits and deliveries.",
-      anchor: [58, 55],
-      box: { x: 214, y: 600 },
-      level: levelOf("cross-city-routes"),
-    },
-  ];
-
-  // Pre-measure each callout box so the leader lines connect to real edges.
-  const TITLE_SIZE = 12.5;
-  const BLURB_SIZE = 10.5;
-  const PAD = 9;
-  const BAR_W = 5;
-  const innerW = CALLOUT_W - PAD * 2 - BAR_W;
-  const laid = callouts.map((c) => {
-    setFont(ctx, 700, TITLE_SIZE, true);
-    const titleLines = wrapText(ctx, c.title, innerW);
-    setFont(ctx, 400, BLURB_SIZE);
-    const blurbLines = wrapText(ctx, c.blurb, innerW);
-    const h =
-      PAD * 2 +
-      titleLines.length * (TITLE_SIZE + 2) +
-      4 +
-      blurbLines.length * (BLURB_SIZE + 3);
-    return { c, titleLines, blurbLines, rect: { ...c.box, w: CALLOUT_W, h } };
-  });
-
-  // Leaders + anchor dots first, so boxes sit above the lines.
-  for (const { c, rect } of laid) {
-    const a = { x: geoX(c.anchor[0]), y: geoY(c.anchor[1]) };
-    const conn = connectionPoint(rect, a);
-    const accent = EXPOSURE_ACCENT[c.level];
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.moveTo(conn.x, conn.y);
-    ctx.lineTo(a.x, a.y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(a.x, a.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = accent;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(a.x, a.y, 5.5, 0, Math.PI * 2);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  // Boxes + text.
-  for (const { c, titleLines, blurbLines, rect } of laid) {
-    const accent = EXPOSURE_ACCENT[c.level];
-    roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 4);
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fill();
-    ctx.strokeStyle = "#CDD3DA";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.save();
-    roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 4);
-    ctx.clip();
-    ctx.fillStyle = accent;
-    ctx.fillRect(rect.x, rect.y, BAR_W, rect.h);
-    ctx.restore();
-
-    const tx = rect.x + BAR_W + PAD;
-    let ty = rect.y + PAD + TITLE_SIZE;
-    setFont(ctx, 700, TITLE_SIZE, true);
-    ctx.fillStyle = NAVY;
-    ctx.textBaseline = "alphabetic";
-    for (const ln of titleLines) {
-      ctx.fillText(ln, tx, ty);
-      ty += TITLE_SIZE + 2;
-    }
-    ty += 4;
-    setFont(ctx, 400, BLURB_SIZE);
-    ctx.fillStyle = DUSK;
-    for (const ln of blurbLines) {
-      ctx.fillText(ln, tx, ty);
-      ty += BLURB_SIZE + 3;
-    }
-  }
 
   // Legend.
   drawLegend(ctx);
@@ -801,19 +675,6 @@ function renderExposureMap(
   drawFooter(ctx, rangeLabel);
 
   return canvas.toDataURL("image/png");
-}
-
-function connectionPoint(
-  box: { x: number; y: number; w: number; h: number },
-  p: { x: number; y: number },
-): { x: number; y: number } {
-  const clamp = (v: number, lo: number, hi: number) =>
-    Math.max(lo, Math.min(hi, v));
-  if (p.y < box.y) return { x: clamp(p.x, box.x, box.x + box.w), y: box.y };
-  if (p.y > box.y + box.h)
-    return { x: clamp(p.x, box.x, box.x + box.w), y: box.y + box.h };
-  if (p.x < box.x) return { x: box.x, y: clamp(p.y, box.y, box.y + box.h) };
-  return { x: box.x + box.w, y: clamp(p.y, box.y, box.y + box.h) };
 }
 
 function legendHeader(
@@ -887,24 +748,8 @@ function drawLegend(ctx: CanvasRenderingContext2D): void {
     ctx.restore();
   }, "Commuter belt");
 
-  y = legendHeader(ctx, "NOTES", y + 12) + 8;
-  const notes = [
-    "This map shows operating exposure by area and route, combining each area's standing profile with reporting this period.",
-    "It does not plot individual incident locations.",
-    "Boundaries are indicative.",
-    "Always confirm conditions locally before travelling.",
-  ];
-  setFont(ctx, 400, 10.5);
-  ctx.fillStyle = DUSK;
-  ctx.textBaseline = "alphabetic";
-  for (const note of notes) {
-    const lines = wrapText(ctx, note, LEGEND.w - 12);
-    for (const ln of lines) {
-      y += 14;
-      ctx.fillText(ln, x + 2, y);
-    }
-    y += 3;
-  }
+  // Notes are carried by the caption beneath the figure, keeping the sidebar
+  // airy; the map key above already explains every symbol.
 }
 
 function drawFooter(ctx: CanvasRenderingContext2D, rangeLabel: string): void {
@@ -951,8 +796,8 @@ export interface JakartaCorridorMapProps {
  * Greater-Jakarta geography (Java Sea, the five DKI districts, surrounding
  * regencies, the airport landmass and the commuter belt), shades each profiled
  * area by an operating-exposure level, draws the main movement routes, and
- * carries leader-line callouts, a legend (exposure / map key / notes), a
- * sources line and the weekly date range.
+ * carries an in-district exposure tag per district, a legend (exposure level /
+ * map key), a sources line and the weekly date range.
  *
  * Exposure levels are honest: each area carries a standing profile that live
  * reporting can only RAISE, never invent. The supporting table below repeats
@@ -1041,9 +886,11 @@ export default function JakartaCorridorMap({
           fontStyle: "italic",
         }}
       >
-        Operational exposure by area and route — not a live incident map. Levels
-        combine each area's standing profile with this period's reporting; the
-        regencies are shown as context and not assessed.
+        Operational exposure by area and route — not a live incident map; it
+        does not plot individual incident locations and boundaries are
+        indicative. Levels combine each area's standing profile with this
+        period's reporting; the regencies are shown as context and not assessed.
+        Always confirm conditions locally before travelling.
         {unattributed > 0
           ? " Some records were retained in the assessment but not tied to a specific area."
           : ""}
