@@ -85,7 +85,7 @@
   }
   export const JAKARTA_MAP_LABELS: JakartaMapLabel[] = [
     { text: "Java Sea", lat: -6.035, lon: 106.840, kind: "sea" },
-    { text: "TANGERANG REGENCY", lat: -6.330, lon: 106.605, kind: "region" },
+    { text: "TANGERANG REGENCY", lat: -6.330, lon: 106.642, kind: "region" },
     { text: "BEKASI REGENCY", lat: -6.300, lon: 107.015, kind: "region" },
     { text: "Tangerang", lat: -6.190, lon: 106.635, kind: "place" },
     { text: "Depok", lat: -6.398, lon: 106.823, kind: "place" },
