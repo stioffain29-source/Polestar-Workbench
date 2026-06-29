@@ -333,7 +333,7 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
     id: "north-port",
     icon: "anchor",
     marker: [-6.108, 106.885],
-    zoneRadius: 34,
+    zoneRadius: 56,
     siteLabel: "Tanjung Priok Port",
     siteLabelSide: "top",
     areaLabel: {
@@ -346,7 +346,7 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
     id: "central-government",
     icon: "civic",
     marker: [-6.18, 106.815],
-    zoneRadius: 30,
+    zoneRadius: 64,
     areaLabel: {
       text: "CENTRAL JAKARTA GOVERNMENT DISTRICT",
       lat: -6.213,
@@ -357,7 +357,7 @@ const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
     id: "commercial-hotels",
     icon: "tower",
     marker: [-6.245, 106.732],
-    zoneRadius: 34,
+    zoneRadius: 56,
     areaLabel: {
       text: "MAIN COMMERCIAL & HOTEL AREAS",
       lat: -6.272,
@@ -403,26 +403,26 @@ const CORRIDOR_CAPTION: Record<string, CorridorCaption> = {
     text: "AIRPORT CORRIDOR",
     lat: -6.15,
     lon: 106.715,
-    color: "#7E8893",
+    color: "#6B7280",
     rotate: true,
   },
   "north-port": {
     text: "LOGISTICS CORRIDOR",
     lat: -6.135,
     lon: 106.955,
-    color: "#B26A2B",
+    color: "#6B7280",
   },
   "cross-city-routes": {
     text: "CROSS-CITY MOVEMENT ROUTES",
     lat: -6.249,
     lon: 106.884,
-    color: "#5C7B3F",
+    color: "#6B7280",
   },
   "commuter-belt": {
     text: "GREATER JAKARTA COMMUTER BELT",
     lat: -6.353,
     lon: 106.835,
-    color: "#2F6FB0",
+    color: "#6E86A6",
   },
 };
 
@@ -636,8 +636,8 @@ export default function JakartaCorridorMap({
           i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
         );
       };
-      const outer = style.thin ? 7 : 15;
-      const inner = style.thin ? 3.5 : 9;
+      const outer = style.thin ? 8 : 22;
+      const inner = style.thin ? 3.5 : 12;
       ctx.setLineDash([]);
       trace();
       ctx.lineWidth = outer;
