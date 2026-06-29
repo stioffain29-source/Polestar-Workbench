@@ -635,9 +635,23 @@ export default function JakartaCorridorMap({
       const { r, g, b } = hexToRgb(style.fill);
       const trace = () => {
         ctx.beginPath();
-        pts.forEach((p, i) =>
-          i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
-        );
+        if (pts.length < 3) {
+          pts.forEach((p, i) =>
+            i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
+          );
+          return;
+        }
+        // Smooth the band through its waypoints (quadratic through segment
+        // midpoints) so turns read as soft curves rather than sharp kinks —
+        // e.g. the commuter belt's bend near Depok.
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const xc = (pts[i].x + pts[i + 1].x) / 2;
+          const yc = (pts[i].y + pts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+        }
+        const last = pts[pts.length - 1];
+        ctx.lineTo(last.x, last.y);
       };
       const outer = style.thin ? 8 : 22;
       const inner = style.thin ? 3.5 : 12;
@@ -815,12 +829,30 @@ export default function JakartaCorridorMap({
       ctx.fillStyle = SEA;
       ctx.fillRect(0, 0, w, h);
       const traceGeoRing = (ring: number[][]) => {
+        const pr = ring.map((c) => proj(c[1], c[0]));
+        const n = pr.length;
         ctx.beginPath();
-        ring.forEach((c, i) => {
-          const p = proj(c[1], c[0]);
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        });
+        if (n < 3) {
+          pr.forEach((p, i) =>
+            i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
+          );
+          ctx.closePath();
+          return;
+        }
+        // Round the polygon outline (quadratic through edge midpoints, wrapping
+        // closed) so the coastline and land edges read as a soft sea edge
+        // rather than faceted straight segments.
+        ctx.moveTo((pr[n - 1].x + pr[0].x) / 2, (pr[n - 1].y + pr[0].y) / 2);
+        for (let i = 0; i < n; i++) {
+          const cur = pr[i];
+          const nxt = pr[(i + 1) % n];
+          ctx.quadraticCurveTo(
+            cur.x,
+            cur.y,
+            (cur.x + nxt.x) / 2,
+            (cur.y + nxt.y) / 2,
+          );
+        }
         ctx.closePath();
       };
       ctx.fillStyle = LAND_FILL;
