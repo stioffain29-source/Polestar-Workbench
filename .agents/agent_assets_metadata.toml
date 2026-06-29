@@ -575,3 +575,9 @@ id = "3wG8GZnqGa0iJ-nV5eLaY"
 uri = "file://docs/workbench-audit-2026-06-17.md"
 type = "text"
 title = "Workbench Audit — 17 Jun 2026"
+
+[[outputs]]
+id = "3dIDGVbwnyJMCcmtx3efU"
+uri = "file://screenshots/jakarta-exposure-map-sample.jpg"
+type = "image"
+title = "Jakarta – Operational Exposure Map (redesigned sample)"
