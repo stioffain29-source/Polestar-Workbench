@@ -331,3 +331,167 @@ export function buildJakartaCorridorStatuses(
   });
   return { statuses, unattributed };
 }
+
+// ===========================================================================
+// Geographic 5-city exposure model (for the Leaflet exposure map overlay)
+// ===========================================================================
+//
+// The corridor model above answers "which FUNCTION (movement / access /
+// business activity) is exposed". The map instead shades the five real DKI
+// Jakarta administrative cities by their operating exposure, so the choropleth
+// drawn over the Leaflet basemap lines up with actual geography. The ids match
+// the "city" feature ids in jakartaGeo.ts (north / west / central / east /
+// south). Each city carries a STANDING baseline that live reporting can only
+// RAISE, never invent — identical honesty rule to the corridor model.
+
+export interface JakartaCity {
+  /** Stable id — MUST match the geo "city" feature id in jakartaGeo.ts. */
+  id: "north" | "west" | "central" | "east" | "south";
+  /** Display name shown on the map label and legend. */
+  name: string;
+  /** Standing operating-exposure profile for the city (window-independent). */
+  baselineExposure: JakartaExposureLevel;
+  /** Lower-cased keywords that attribute an incident to this city. */
+  keywords: string[];
+}
+
+// The five DKI cities in a fixed scan order (first match wins). Keywords are
+// district-specific so cross-city leakage stays low; the central and southern
+// business cores carry the higher standing baselines.
+export const JAKARTA_CITIES: JakartaCity[] = [
+  {
+    id: "central",
+    name: "Central Jakarta",
+    baselineExposure: "elevated",
+    keywords: [
+      "central jakarta", "jakarta pusat", "menteng", "tanah abang", "gambir",
+      "monas", "monumen nasional", "medan merdeka", "istana",
+      "presidential palace", "parliament", "dpr", "mpr", "senen", "kemayoran",
+      "sawah besar", "cempaka putih", "johar baru", "thamrin",
+      "government district",
+    ],
+  },
+  {
+    id: "north",
+    name: "North Jakarta",
+    baselineExposure: "elevated",
+    keywords: [
+      "north jakarta", "jakarta utara", "tanjung priok", "priok",
+      "kelapa gading", "penjaringan", "koja", "cilincing", "pademangan",
+      "ancol", "sunter",
+    ],
+  },
+  {
+    id: "west",
+    name: "West Jakarta",
+    baselineExposure: "monitored",
+    keywords: [
+      "west jakarta", "jakarta barat", "grogol", "palmerah", "taman sari",
+      "tambora", "kebon jeruk", "kembangan", "cengkareng", "kalideres",
+      "slipi", "petamburan",
+    ],
+  },
+  {
+    id: "south",
+    name: "South Jakarta",
+    baselineExposure: "monitored",
+    keywords: [
+      "south jakarta", "jakarta selatan", "scbd", "sudirman", "kuningan",
+      "setiabudi", "kebayoran", "mega kuningan", "senopati", "kemang", "tebet",
+      "mampang", "pancoran", "cilandak", "senayan", "pasar minggu", "jagakarsa",
+      "pesanggrahan",
+    ],
+  },
+  {
+    id: "east",
+    name: "East Jakarta",
+    baselineExposure: "low",
+    keywords: [
+      "east jakarta", "jakarta timur", "cakung", "jatinegara", "matraman",
+      "pulo gadung", "pulogadung", "kramat jati", "duren sawit", "cipayung",
+      "makasar", "ciracas", "pasar rebo", "rawamangun", "cawang", "halim",
+    ],
+  },
+];
+
+// Which city an incident belongs to: keyword match over its location text and
+// (masthead-stripped) headline, scanned in display order (first match wins).
+// Returns null when the record matches no city.
+export function cityIndexForIncident(
+  i: CountryFastFactsIncident,
+  cities: JakartaCity[] = JAKARTA_CITIES,
+): number | null {
+  const loc = (i.location ?? "").toLowerCase();
+  const title = stripMasthead(
+    ((i.displayTitle && i.displayTitle.trim()) || i.title || "").trim(),
+  ).toLowerCase();
+  const hay = `${loc} ${title}`;
+  const matches = (p: string) =>
+    new RegExp(`(^|[^a-z])${escapeRegExp(p)}([^a-z]|$)`, "i").test(hay);
+
+  for (let c = 0; c < cities.length; c++) {
+    for (const p of cities[c].keywords) {
+      if (matches(p)) return c;
+    }
+  }
+  return null;
+}
+
+export interface JakartaCityStatus {
+  city: JakartaCity;
+  /** Live records attributed to the city in the active window. */
+  count: number;
+  /** Worst severity key present this period ("" when none). */
+  worstKey: string;
+  /** True when the city carried live reporting this period. */
+  elevated: boolean;
+  /** The city's standing operating-exposure profile (window-independent). */
+  baselineExposure: JakartaExposureLevel;
+  /** Operating-exposure derived from this period's worst severity, or null. */
+  liveExposure: JakartaExposureLevel | null;
+  /** Displayed level = the higher of baseline and live. Live can only raise. */
+  displayExposure: JakartaExposureLevel;
+}
+
+// Build the per-city this-week status from the live window plus the count of
+// records that matched no city (carried in totals/tables, never shaded).
+export function buildJakartaCityStatuses(
+  incidents: CountryFastFactsIncident[],
+  cities: JakartaCity[] = JAKARTA_CITIES,
+): { statuses: JakartaCityStatus[]; unattributed: number } {
+  const counts = cities.map(() => ({ count: 0, worstRank: 0, worstKey: "" }));
+  let unattributed = 0;
+  for (const i of incidents) {
+    const c = cityIndexForIncident(i, cities);
+    if (c === null) {
+      unattributed += 1;
+      continue;
+    }
+    const cell = counts[c];
+    cell.count += 1;
+    const k = (i.severity ?? "").toLowerCase();
+    const r = SEV_RANK[k] ?? 0;
+    if (r > cell.worstRank) {
+      cell.worstRank = r;
+      cell.worstKey = k;
+    }
+  }
+  const statuses = cities.map((city, idx) => {
+    const cell = counts[idx];
+    const baselineExposure = city.baselineExposure;
+    const liveExposure = cell.count > 0 ? severityToExposure(cell.worstKey) : null;
+    const displayExposure = liveExposure
+      ? maxExposure(baselineExposure, liveExposure)
+      : baselineExposure;
+    return {
+      city,
+      count: cell.count,
+      worstKey: cell.count > 0 ? cell.worstKey : "",
+      elevated: cell.count > 0,
+      baselineExposure,
+      liveExposure,
+      displayExposure,
+    };
+  });
+  return { statuses, unattributed };
+}

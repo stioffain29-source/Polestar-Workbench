@@ -8,6 +8,7 @@ import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 const SAMPLE: CountryFastFactsIncident[] = [
   {
     id: 1,
+    topic: "flashpoint",
     title: "Large demonstration outside ministry in Menteng, Central Jakarta",
     severity: "high",
     occurredAt: "2026-06-26T03:00:00.000Z",
@@ -15,6 +16,7 @@ const SAMPLE: CountryFastFactsIncident[] = [
   },
   {
     id: 2,
+    topic: "shipping",
     title: "Container backlog and tidal flooding at Tanjung Priok port",
     severity: "moderate",
     occurredAt: "2026-06-25T02:00:00.000Z",
@@ -22,6 +24,7 @@ const SAMPLE: CountryFastFactsIncident[] = [
   },
   {
     id: 3,
+    topic: "flashpoint",
     title: "Robbery near office towers in SCBD, Sudirman",
     severity: "moderate",
     occurredAt: "2026-06-24T10:00:00.000Z",
@@ -29,24 +32,27 @@ const SAMPLE: CountryFastFactsIncident[] = [
   },
   {
     id: 4,
-    title: "Toll-route congestion delays transfers to Soekarno-Hatta airport",
-    severity: "low",
+    topic: "flashpoint",
+    title: "Protest march disrupts Grogol, West Jakarta",
+    severity: "moderate",
     occurredAt: "2026-06-24T22:00:00.000Z",
-    location: "Soekarno-Hatta corridor",
+    location: "Grogol, West Jakarta",
   },
   {
     id: 5,
-    title: "Heavy rain floods commuter routes across Bekasi",
-    severity: "moderate",
+    topic: "flashpoint",
+    title: "Brief gathering near Jatinegara market, East Jakarta",
+    severity: "low",
     occurredAt: "2026-06-23T20:00:00.000Z",
-    location: "Bekasi, Greater Jakarta",
+    location: "Jatinegara, East Jakarta",
   },
   {
     id: 6,
-    title: "Gridlock on JORR outer ring road during evening peak",
-    severity: "low",
+    topic: "flashpoint",
+    title: "Heavy rain floods commuter routes across Bekasi",
+    severity: "moderate",
     occurredAt: "2026-06-23T11:00:00.000Z",
-    location: "JORR toll road",
+    location: "Bekasi, Greater Jakarta",
   },
 ];
 
