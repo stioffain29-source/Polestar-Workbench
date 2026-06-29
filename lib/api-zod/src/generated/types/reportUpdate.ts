@@ -27,5 +27,9 @@ export interface ReportUpdate {
   implications?: string;
   polestarView?: string;
   watchNext?: string;
+  activismRead?: string;
+  civilUnrestRead?: string;
+  forecastRead?: string;
+  regionalCountryRead?: string;
   author?: string;
 }

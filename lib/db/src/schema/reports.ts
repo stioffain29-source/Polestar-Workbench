@@ -100,6 +100,14 @@ export const reportsTable = pgTable("reports", {
   implications: text("implications"),
   polestarView: text("polestar_view"),
   watchNext: text("watch_next"),
+  // Flashpoint/protests data-driven "reads" — editable analyst overrides.
+  // Blank/NULL falls back to the dataset-generated read so the on-screen
+  // preview, the in-app PDF and the headless PDF stay identical and no prose
+  // is fabricated. See FlashpointReportPreview / exportFlashpointReportPdf.
+  activismRead: text("activism_read"),
+  civilUnrestRead: text("civil_unrest_read"),
+  forecastRead: text("forecast_read"),
+  regionalCountryRead: text("regional_country_read"),
   author: text("author"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

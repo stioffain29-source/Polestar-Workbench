@@ -67,6 +67,18 @@ export interface FlashpointReportData {
   implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
+  activismRead?: string | null;
+  civilUnrestRead?: string | null;
+  forecastRead?: string | null;
+  regionalCountryRead?: string | null;
+}
+
+// Data-driven reads are full sections, not analyst notes: a saved override
+// REPLACES the generated read; a blank value falls back to the dataset read so
+// nothing is fabricated and the in-app PDF == the on-screen preview.
+function pickRead(editor: string | null | undefined, auto: string): string {
+  const t = (editor ?? "").trim();
+  return t ? t : auto;
 }
 
 export type { FlashpointReportIncident };
@@ -567,7 +579,11 @@ export async function exportFlashpointReportPdf(
   drawFastFactsKpiCards(ctx, ds.fastFacts);
 
   // Activism and Protest Read — prose leads the activism table.
-  drawSectionWithProse(ctx, "Activism and Protest Read", ds.activismRead);
+  drawSectionWithProse(
+    ctx,
+    "Activism and Protest Read",
+    pickRead(data.activismRead, ds.activismRead),
+  );
   drawIncidentTable(
     ctx,
     null,
@@ -579,7 +595,7 @@ export async function exportFlashpointReportPdf(
   drawSectionWithProse(
     ctx,
     "Civil Unrest and Public Order Read",
-    ds.civilUnrestRead,
+    pickRead(data.civilUnrestRead, ds.civilUnrestRead),
   );
   drawIncidentTable(
     ctx,
@@ -595,13 +611,13 @@ export async function exportFlashpointReportPdf(
   if (ds.forecastFuture.length > 0) {
     drawForecastFutureTable(ctx, ds.forecastFuture);
   }
-  renderProse(ctx, ds.forecastRead);
+  renderProse(ctx, pickRead(data.forecastRead, ds.forecastRead));
 
   // Regional and Country View — prose leads the country bar chart.
   drawSectionWithProse(
     ctx,
     "Regional and Country View",
-    ds.regionalCountryRead,
+    pickRead(data.regionalCountryRead, ds.regionalCountryRead),
   );
   drawHorizontalBarChart(
     ctx,

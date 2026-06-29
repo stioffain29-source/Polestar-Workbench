@@ -68,12 +68,25 @@ function pickProse(editor: string | null | undefined, auto: string): string {
   return `${t}\n\n${auto}`;
 }
 
+// Data-driven "reads" (Activism, Civil Unrest, Forecast, Regional) are full
+// section bodies, not short analyst notes: a saved override REPLACES the
+// generated read outright; a blank value falls back to the dataset read so
+// nothing is fabricated and the editor preview == the PDF.
+function pickRead(editor: string | null | undefined, auto: string): string {
+  const t = (editor ?? "").trim();
+  return t ? t : auto;
+}
+
 export interface FlashpointPreviewReport {
   title?: string;
   topic?: string;
   issueDate?: string;
   author?: string | null;
   executiveSummary?: string | null;
+  activismRead?: string | null;
+  civilUnrestRead?: string | null;
+  forecastRead?: string | null;
+  regionalCountryRead?: string | null;
   whatMatters?: string | null;
   implications?: string | null;
   watchNext?: string | null;
@@ -445,7 +458,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section title="Activism and Protest Read">
-          <Paragraphs text={ds.activismRead} />
+          <Paragraphs text={pickRead(report.activismRead, ds.activismRead)} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.activismRows}
@@ -455,7 +468,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section title="Civil Unrest and Public Order Read">
-          <Paragraphs text={ds.civilUnrestRead} />
+          <Paragraphs text={pickRead(report.civilUnrestRead, ds.civilUnrestRead)} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.unrestRows}
@@ -487,11 +500,11 @@ export default function FlashpointReportPreview({
               </table>
             </div>
           )}
-          <Paragraphs text={ds.forecastRead} />
+          <Paragraphs text={pickRead(report.forecastRead, ds.forecastRead)} />
         </Section>
 
         <Section title="Regional and Country View">
-          <Paragraphs text={ds.regionalCountryRead} />
+          <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
           <div className="mt-4">
             <div
               className="uppercase mb-2"

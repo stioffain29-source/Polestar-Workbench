@@ -49,6 +49,7 @@ import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import { filterTopicReportIncidents } from "@/lib/topicFastFacts";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
+import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
@@ -127,6 +128,10 @@ interface FormState {
   implications: string;
   polestarView: string;
   watchNext: string;
+  activismRead: string;
+  civilUnrestRead: string;
+  forecastRead: string;
+  regionalCountryRead: string;
   author: string;
 }
 
@@ -143,6 +148,10 @@ const EMPTY: FormState = {
   implications: "",
   polestarView: "",
   watchNext: "",
+  activismRead: "",
+  civilUnrestRead: "",
+  forecastRead: "",
+  regionalCountryRead: "",
   author: "",
 };
 
@@ -568,6 +577,10 @@ export default function ReportEditor() {
         implications: form.implications,
         watchNext: form.watchNext,
         polestarView: form.polestarView,
+        activismRead: form.activismRead,
+        civilUnrestRead: form.civilUnrestRead,
+        forecastRead: form.forecastRead,
+        regionalCountryRead: form.regionalCountryRead,
       };
 
       if (form.topic === "flashpoint" || form.topic === "protests") {
@@ -726,6 +739,17 @@ export default function ReportEditor() {
       return s ? (saved as string) : drafted;
     };
 
+    // Flashpoint/protests render four data-driven "reads" (Activism & Protest,
+    // Civil Unrest & Public Order, Forecast, Regional & Country View). Build the
+    // SAME dataset the preview/PDF consume so each read seeds with the exact
+    // generated text the analyst edits; pick() then applies the identical
+    // staleness/saved-override rules used by every other section. Other topics
+    // never render these reads, so leave them blank.
+    const fpReads =
+      topic === "flashpoint" || topic === "protests"
+        ? buildFlashpointReportDataset(incidents ?? [], topic, issueDate)
+        : null;
+
     // Replace empty titles and the well-known old regional defaults (e.g.
     // "APAC Fuel Watch", "Hormuz Maritime Watch") with the canonical title.
     // Any other stored title is treated as a manual edit and preserved.
@@ -742,6 +766,18 @@ export default function ReportEditor() {
       implications: pick(report.implications, draft.implications),
       polestarView: pick(report.polestarView, draft.polestarView),
       watchNext: pick(report.watchNext, draft.watchNext),
+      activismRead: fpReads
+        ? pick(report.activismRead, fpReads.activismRead)
+        : "",
+      civilUnrestRead: fpReads
+        ? pick(report.civilUnrestRead, fpReads.civilUnrestRead)
+        : "",
+      forecastRead: fpReads
+        ? pick(report.forecastRead, fpReads.forecastRead)
+        : "",
+      regionalCountryRead: fpReads
+        ? pick(report.regionalCountryRead, fpReads.regionalCountryRead)
+        : "",
       author: report.author ?? "",
     });
   }, [report, incidents]);
@@ -838,6 +874,37 @@ export default function ReportEditor() {
       delete payload.whatHappened;
       delete payload.implications;
       delete payload.executiveSummary;
+    }
+    // Flashpoint/protests "reads" are analyst OVERRIDES. Persist a read only
+    // when it differs from the freshly-generated dataset read; an untouched or
+    // blank field stores "" so the report keeps rendering the live
+    // auto-generated read (no fabrication, no frozen-stale prose). Other topics
+    // never carry these columns.
+    if (form.topic === "flashpoint" || form.topic === "protests") {
+      const gen = buildFlashpointReportDataset(
+        incidentsForExport,
+        form.topic,
+        form.issueDate,
+      );
+      const overrideRead = (val: string, generated: string) => {
+        const t = (val ?? "").trim();
+        return t && t !== (generated ?? "").trim() ? t : "";
+      };
+      payload.activismRead = overrideRead(form.activismRead, gen.activismRead);
+      payload.civilUnrestRead = overrideRead(
+        form.civilUnrestRead,
+        gen.civilUnrestRead,
+      );
+      payload.forecastRead = overrideRead(form.forecastRead, gen.forecastRead);
+      payload.regionalCountryRead = overrideRead(
+        form.regionalCountryRead,
+        gen.regionalCountryRead,
+      );
+    } else {
+      delete payload.activismRead;
+      delete payload.civilUnrestRead;
+      delete payload.forecastRead;
+      delete payload.regionalCountryRead;
     }
     // Empty override → clear the stored rating (card pull falls back to the
     // computed/auto value). A set value persists the analyst's choice.
@@ -1236,24 +1303,71 @@ export default function ReportEditor() {
               />
             </Field>
           )}
-          <Field label="Situation">
-            <Textarea
-              rows={4}
-              value={form.situation}
-              onChange={(e) => set("situation", e.target.value)}
-              className="rounded-sm"
-            />
-          </Field>
-          {form.topic !== "conflict" && (
-            <Field label="What Happened">
+          {/* Flashpoint/protests reports replace the generic Situation /
+              What Happened spine with four data-driven "reads". Each textarea
+              marries the on-screen + PDF section one-for-one, in the same
+              order; clear a box to restore the auto-generated text. */}
+          {(form.topic === "flashpoint" || form.topic === "protests") && (
+            <>
+              <Field label="Activism & Protest Read">
+                <Textarea
+                  rows={5}
+                  value={form.activismRead}
+                  onChange={(e) => set("activismRead", e.target.value)}
+                  className="rounded-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Clear any read to restore the auto-generated text.
+                </p>
+              </Field>
+              <Field label="Civil Unrest & Public Order Read">
+                <Textarea
+                  rows={5}
+                  value={form.civilUnrestRead}
+                  onChange={(e) => set("civilUnrestRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label={"Forecast: Next 7\u201314 Days"}>
+                <Textarea
+                  rows={5}
+                  value={form.forecastRead}
+                  onChange={(e) => set("forecastRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Regional & Country View">
+                <Textarea
+                  rows={5}
+                  value={form.regionalCountryRead}
+                  onChange={(e) => set("regionalCountryRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+            </>
+          )}
+          {form.topic !== "flashpoint" && form.topic !== "protests" && (
+            <Field label="Situation">
               <Textarea
-                rows={5}
-                value={form.whatHappened}
-                onChange={(e) => set("whatHappened", e.target.value)}
+                rows={4}
+                value={form.situation}
+                onChange={(e) => set("situation", e.target.value)}
                 className="rounded-sm"
               />
             </Field>
           )}
+          {form.topic !== "conflict" &&
+            form.topic !== "flashpoint" &&
+            form.topic !== "protests" && (
+              <Field label="What Happened">
+                <Textarea
+                  rows={5}
+                  value={form.whatHappened}
+                  onChange={(e) => set("whatHappened", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+            )}
           <Field label="What Matters">
             <Textarea
               rows={4}

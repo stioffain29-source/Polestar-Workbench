@@ -528,6 +528,14 @@ export interface Report {
   /** @nullable */
   watchNext?: string | null;
   /** @nullable */
+  activismRead?: string | null;
+  /** @nullable */
+  civilUnrestRead?: string | null;
+  /** @nullable */
+  forecastRead?: string | null;
+  /** @nullable */
+  regionalCountryRead?: string | null;
+  /** @nullable */
   author?: string | null;
   createdAt: string;
 }
@@ -562,6 +570,10 @@ export interface ReportInput {
   implications?: string;
   polestarView?: string;
   watchNext?: string;
+  activismRead?: string;
+  civilUnrestRead?: string;
+  forecastRead?: string;
+  regionalCountryRead?: string;
   author?: string;
 }
 
@@ -595,6 +607,10 @@ export interface ReportUpdate {
   implications?: string;
   polestarView?: string;
   watchNext?: string;
+  activismRead?: string;
+  civilUnrestRead?: string;
+  forecastRead?: string;
+  regionalCountryRead?: string;
   author?: string;
 }
 

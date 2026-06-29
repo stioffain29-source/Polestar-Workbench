@@ -243,6 +243,10 @@ export const GetDashboardOverviewResponse = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "activismRead": zod.string().nullish(),
+  "civilUnrestRead": zod.string().nullish(),
+  "forecastRead": zod.string().nullish(),
+  "regionalCountryRead": zod.string().nullish(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }))
@@ -1427,6 +1431,10 @@ export const ListReportsResponseItem = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "activismRead": zod.string().nullish(),
+  "civilUnrestRead": zod.string().nullish(),
+  "forecastRead": zod.string().nullish(),
+  "regionalCountryRead": zod.string().nullish(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -1570,6 +1578,10 @@ export const CreateReportBody = zod.object({
   "implications": zod.string().optional(),
   "polestarView": zod.string().optional(),
   "watchNext": zod.string().optional(),
+  "activismRead": zod.string().optional(),
+  "civilUnrestRead": zod.string().optional(),
+  "forecastRead": zod.string().optional(),
+  "regionalCountryRead": zod.string().optional(),
   "author": zod.string().optional()
 })
 
@@ -1716,6 +1728,10 @@ export const GetReportResponse = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "activismRead": zod.string().nullish(),
+  "civilUnrestRead": zod.string().nullish(),
+  "forecastRead": zod.string().nullish(),
+  "regionalCountryRead": zod.string().nullish(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -1862,6 +1878,10 @@ export const UpdateReportBody = zod.object({
   "implications": zod.string().optional(),
   "polestarView": zod.string().optional(),
   "watchNext": zod.string().optional(),
+  "activismRead": zod.string().optional(),
+  "civilUnrestRead": zod.string().optional(),
+  "forecastRead": zod.string().optional(),
+  "regionalCountryRead": zod.string().optional(),
   "author": zod.string().optional()
 })
 
@@ -2003,6 +2023,10 @@ export const UpdateReportResponse = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "activismRead": zod.string().nullish(),
+  "civilUnrestRead": zod.string().nullish(),
+  "forecastRead": zod.string().nullish(),
+  "regionalCountryRead": zod.string().nullish(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })

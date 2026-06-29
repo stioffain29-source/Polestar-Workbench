@@ -37,6 +37,14 @@ export interface Report {
   /** @nullable */
   watchNext?: string | null;
   /** @nullable */
+  activismRead?: string | null;
+  /** @nullable */
+  civilUnrestRead?: string | null;
+  /** @nullable */
+  forecastRead?: string | null;
+  /** @nullable */
+  regionalCountryRead?: string | null;
+  /** @nullable */
   author?: string | null;
   createdAt: Date;
 }

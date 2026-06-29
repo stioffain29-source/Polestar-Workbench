@@ -245,6 +245,24 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS executive_summary text`,
     );
 
+    // Schema: flashpoint/protests editable data-driven "reads" (Activism &
+    // Protest, Civil Unrest & Public Order, Forecast, Regional & Country View).
+    // Blank/NULL falls back to the dataset-generated read. drizzle push only
+    // reaches dev, so the writable prod primary gains the columns here on boot.
+    // Idempotent — IF NOT EXISTS.
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS activism_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS civil_unrest_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS forecast_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS regional_country_read text`,
+    );
+
     // Schema: analyst-attached photographs on spot reports (resized data URLs +
     // optional captions), rendered after Incident Details on screen and in the
     // DOM-rasterised PDF. drizzle push only reaches dev, so the writable prod

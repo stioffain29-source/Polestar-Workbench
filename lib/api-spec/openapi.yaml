@@ -1919,6 +1919,10 @@ components:
         implications: { type: ["string", "null"] }
         polestarView: { type: ["string", "null"] }
         watchNext: { type: ["string", "null"] }
+        activismRead: { type: ["string", "null"] }
+        civilUnrestRead: { type: ["string", "null"] }
+        forecastRead: { type: ["string", "null"] }
+        regionalCountryRead: { type: ["string", "null"] }
         author: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
 
@@ -2051,6 +2055,10 @@ components:
         implications: { type: string }
         polestarView: { type: string }
         watchNext: { type: string }
+        activismRead: { type: string }
+        civilUnrestRead: { type: string }
+        forecastRead: { type: string }
+        regionalCountryRead: { type: string }
         author: { type: string }
 
     ReportUpdate:
@@ -2074,6 +2082,10 @@ components:
         implications: { type: string }
         polestarView: { type: string }
         watchNext: { type: string }
+        activismRead: { type: string }
+        civilUnrestRead: { type: string }
+        forecastRead: { type: string }
+        regionalCountryRead: { type: string }
         author: { type: string }
 
     SpotReportExportEntry:
