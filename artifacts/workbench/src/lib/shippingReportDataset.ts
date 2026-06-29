@@ -13,6 +13,7 @@ import {
   FREIGHT_MARKET_INDEX_RE,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
+import { stripWireCruft } from "./incidentTitle";
 import {
   buildMaritimeSecuritySummary,
   type MaritimeSecuritySummary,
@@ -454,6 +455,15 @@ function isShippingMarketOnly(r: ShippingReportIncident): boolean {
 // require a verb or event word that signals real-world disruption.
 const COMMERCIAL_OPERATIONAL_RE = /\b(port (clos|closes|closed|closure|shut|halt|disrupt|congest|congestion|strike|stoppage|stopped|fire|blast|outage)|berth (clos|closes|closed|closure|congest|congestion|delay|delays|delayed)|terminal (clos|closes|closed|closure|fire|congest|disrupt|outage)|dock(workers?| strike|workers strike|workers walk)|stevedore strike|wharf (strike|stoppage)|canal (clos|closes|closed|closure|congest|congestion|disrupt|halt)|(vessel|ship|tanker|carrier|fleet) (divert|diverted|reroute|rerouted|re-?routed|delay|delayed|stranded|adrift|grounded|stopped|halt|halted|skipped)|skip(ping)? (port|call|calls)|port skipping|schedule (slip|slippage|disruption|reliability|miss|missed)|sailing cancel|blank sailing|service (suspension|suspended|cancel|cancelled|withdrawn)|liner service (suspension|cancel|cancelled)|war[\s-]?risk (premium|surcharge|adjust|adjustment|widened|extended|raised|raise|hike|hiked|review|reviewed)|insurance (premium|surcharge) (rise|rises|risen|jump|jumped|hike|hiked|adjust|adjustment|widen|widened|extended|raised|raise)|p&i (premium|surcharge|warning|advisory)|protection and indemnity (premium|warning|advisory)|surcharge (introduce|introduced|impose|imposed|raise|raised|hike|hiked|extend|extended)|advisory (issued|expanded|extended|widened|tightened)|naval (escort|patrol|protection)|convoy (operation|escort|protection)|crew (change|repatriation) (disrupt|delay|delayed|suspended|halted)|cargo (flow|movement|disruption|halt|backlog|backlogged)|export (halt|suspension|suspended|ban|banned)|import (halt|disruption|backlog)|attack(ed)? .{0,30}(vessel|tanker|ship|carrier|port|terminal)|seiz(ed|ure)? .{0,30}(vessel|tanker|ship|carrier|cargo)|hijack(ed)? .{0,30}(vessel|tanker|ship|carrier|cargo)|drone .{0,30}(vessel|tanker|ship|carrier|port|terminal)|missile .{0,30}(vessel|tanker|ship|carrier|port|terminal))\b/i;
 
+// Strip social/video wire cruft ("Watch:", trailing "VIDEO BY <credit>",
+// "(VIDEO)") from a record's title before enrichment, dedupe and rendering, so
+// the Shipping report's tables and cards never show it and cruft-only duplicates
+// collapse. Shared with the other report topics via lib/incidentTitle.
+function stripIncidentWireCruft<T extends { title: string }>(i: T): T {
+  const cleaned = stripWireCruft(i.title);
+  return cleaned === i.title ? i : { ...i, title: cleaned };
+}
+
 export function buildShippingReportDataset(
   incidents: ShippingReportIncident[],
   topic: string,
@@ -483,7 +493,7 @@ export function buildShippingReportDataset(
       sourceUrl: i.sourceUrl ?? null,
       location: i.location ?? null,
     });
-  const windowed = rawWindow.filter(passesShipping);
+  const windowed = rawWindow.filter(passesShipping).map(stripIncidentWireCruft);
   const enrichedAll = sortByDateDesc(enrich(windowed));
   const enriched = enrichedAll.filter((r) => r.region !== "Out of scope");
   const outOfScopeCount = enrichedAll.length - enriched.length;
@@ -514,7 +524,7 @@ export function buildShippingReportDataset(
       return ms >= start30Ms && ms <= end30Ms;
     } catch { return false; }
   });
-  const windowed30 = raw30.filter(passesShipping);
+  const windowed30 = raw30.filter(passesShipping).map(stripIncidentWireCruft);
   const enriched30 = sortByDateDesc(enrich(windowed30)).filter((r) => r.region !== "Out of scope");
   const thirtyDayShortLabel = `${format(start30, "d MMM")} - ${format(endDate, "d MMM yyyy")}`;
 

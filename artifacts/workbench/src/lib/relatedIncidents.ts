@@ -8,6 +8,7 @@
 
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
 import { relatedIncidentsLimit } from "./reportWindow";
+import { stripWireCruft } from "./incidentTitle";
 
 export interface RelatedIncidentInput {
   topic: string;
@@ -100,9 +101,25 @@ export function selectRelatedIncidents<T extends RelatedIncidentInput>(
   if (windowIncidents.length === 0) return [];
   const { max } = relatedIncidentsLimit(topic);
 
+  // Strip social/video wire cruft from every rendered title (and the English
+  // displayTitle when present) BEFORE dedupe, classification or capping. The
+  // cleaned string then drives titleKey, so a "Watch:" copy and a plain copy of
+  // the SAME event collapse to one row instead of listing the event twice — the
+  // same fix the flashpoint dataset applies. The same shared selector feeds both
+  // the on-screen preview and the PDF builder, so cleaning here keeps the two in
+  // lockstep. Shared with flashpoint via lib/incidentTitle.stripWireCruft.
+  const cleaned: T[] = windowIncidents.map((i) => {
+    const cleanedTitle = stripWireCruft(i.title);
+    const dt = (i as { displayTitle?: unknown }).displayTitle;
+    if (typeof dt === "string") {
+      return { ...i, title: cleanedTitle, displayTitle: stripWireCruft(dt) };
+    }
+    return cleanedTitle === i.title ? i : { ...i, title: cleanedTitle };
+  });
+
   const seen = new Set<string>();
   const deduped: T[] = [];
-  for (const i of windowIncidents) {
+  for (const i of cleaned) {
     const k = titleKey(i.title);
     if (k && seen.has(k)) continue;
     if (k) seen.add(k);

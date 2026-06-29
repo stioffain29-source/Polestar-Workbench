@@ -28,6 +28,7 @@ import { deriveWestPapuaProvince, extractWestPapuaItem } from "@workspace/ingest
 import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest/indonesiaExtract";
 import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
 import { clusterSameStoryRows, incidentTypeKey, type SameStoryRow } from "./countrySameStory";
+import { stripWireCruft } from "./incidentTitle";
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import { scoreClusterValue } from "./countryTopValue";
@@ -623,8 +624,9 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
   const sev = (i.severity ?? "").toLowerCase();
   const reportedDate = new Date(i.occurredAt);
   const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
-  const title =
-    i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source);
+  const title = stripWireCruft(
+    i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source),
+  );
   return {
     id: String(i.id ?? `${i.title}-${i.occurredAt}`),
     title,

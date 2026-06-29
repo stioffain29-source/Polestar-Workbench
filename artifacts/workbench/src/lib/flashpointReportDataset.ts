@@ -2,6 +2,7 @@ import { format, parseISO, max as dateMax, differenceInCalendarDays } from "date
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import { classifyIncidentType } from "./incidentClassifier";
+import { stripWireCruft } from "./incidentTitle";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any
@@ -567,37 +568,6 @@ function stripMasthead(title: string): string {
     const lead = t.slice(0, pipe).trim();
     if (lead.split(/\s+/).length >= 2) t = lead;
   }
-  return t;
-}
-
-// Wire / social headlines carry video call-to-action cruft that is meaningless
-// in a static PDF ("Watch: ...", "... VIDEO BY <credit>", "... (VIDEO)") and
-// also breaks dedupe — a "Watch:" copy and a plain copy of the SAME event
-// produce different keys, so the same protest survives twice. Strip it for BOTH
-// the rendered title and the dedup signature. Conservative: a leading keyword is
-// only removed when a separator (": - | —") follows it, so a real headline such
-// as "Watch out for protests" is never touched.
-function stripWireCruft(title: string): string {
-  let t = (title ?? "").trim();
-  // Trailing "VIDEO BY <credit>" attribution (publisher already peeled off).
-  // Case-sensitive: a capitalised "VIDEO"/"Video" followed by "BY"/"by" and a
-  // capitalised credit name (1-5 tokens) running to the END. This strips a real
-  // credit ("VIDEO BY ALLEN LIMOS", "Video by Allen Limos") but leaves lowercase
-  // prose ("...video by citizen journalist goes viral") and a sentence-start
-  // "Video by far the biggest protest" untouched — no-fabrication safe.
-  t = t
-    .replace(
-      /\s*(?:[-\u2013\u2014|(\[]\s*)?(?:VIDEO|Video)\s+(?:BY|by)\s+[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*){0,4}\s*$/,
-      "",
-    )
-    .trim();
-  // Trailing standalone "(VIDEO)", "[WATCH]", " - WATCH NOW", " | VIDEO".
-  t = t.replace(/\s*[-\u2013\u2014|(\[]\s*(?:watch(?:\s+now)?|video)\s*[)\]]?\s*$/i, "").trim();
-  // Leading "WATCH:", "Video -", "MUST WATCH:", "VIDEO EXCLUSIVE -".
-  t = t.replace(
-    /^\s*(?:must[- ]?watch|watch\s+now|watch|exclusive\s+video|video\s+exclusive|video)\s*[:\-\u2013\u2014|]\s*/i,
-    "",
-  ).trim();
   return t;
 }
 

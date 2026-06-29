@@ -10,6 +10,7 @@ import { format, parseISO, max as dateMax } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { isCountryRelevant } from "./topicRelevance";
+import { stripWireCruft } from "./incidentTitle";
 
 export const COUNTRY_WINDOW_TOPIC = "country";
 
@@ -130,7 +131,23 @@ export function computeCountryFastFacts(opts: {
 }): CountryFactsBreakdown {
   const { issueDate } = opts;
   const win = resolveReportWindow(COUNTRY_WINDOW_TOPIC, issueDate);
-  const windowIncidents = opts.windowIncidents ?? filterCountryReportIncidents(opts.incidents, issueDate);
+  // Strip social/video wire cruft from the title (and English displayTitle when
+  // present) on every windowed record BEFORE the cards, charts, table and the
+  // headless PDF read it, so the country report never shows "Watch:" /
+  // "(VIDEO)" / "VIDEO BY <credit>". Both the on-screen preview and the PDF
+  // exporter call this function, so cleaning here keeps them in lockstep. Shared
+  // with the other report topics via lib/incidentTitle.stripWireCruft.
+  const windowIncidents = (
+    opts.windowIncidents ?? filterCountryReportIncidents(opts.incidents, issueDate)
+  ).map((i) => {
+    const t = stripWireCruft(i.title);
+    const dt = i.displayTitle;
+    if (typeof dt === "string" && dt.trim()) {
+      const cdt = stripWireCruft(dt);
+      return t === i.title && cdt === dt ? i : { ...i, title: t, displayTitle: cdt };
+    }
+    return t === i.title ? i : { ...i, title: t };
+  });
   const total = windowIncidents.length;
 
   // Highest severity
