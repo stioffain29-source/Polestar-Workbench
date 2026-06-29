@@ -145,7 +145,9 @@
         [-6.2186, 106.8138],
         [-6.2435, 106.7997],
       ],
-      labelAt: 3,
+      // North tip — keeps the route's number clear of the central government /
+      // CBD markers, which crowd the same central spine.
+      labelAt: 0,
     },
     {
       corridorId: "commuter-belt",

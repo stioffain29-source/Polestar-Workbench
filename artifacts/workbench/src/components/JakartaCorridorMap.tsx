@@ -8,7 +8,6 @@ import {
   type JakartaExposureLevel,
 } from "@/lib/jakartaCorridors";
 import {
-  JAKARTA_GEO,
   JAKARTA_VIEW_BBOX,
   JAKARTA_KEY_POINTS,
   JAKARTA_CORRIDOR_LINES,
@@ -49,14 +48,25 @@ const EXPOSURE_ORDER: JakartaExposureLevel[] = [
   "low",
   "not-assessed",
 ];
+const SEV_RANK: Record<JakartaExposureLevel, number> = {
+  high: 4,
+  elevated: 3,
+  monitored: 2,
+  low: 1,
+  "not-assessed": 0,
+};
 
-// Faint administrative outline of the five DKI cities, drawn (no fill) purely
-// for geographic orientation under the corridors and key points.
-const DKI_OUTLINE = "rgba(11,11,61,0.28)";
 // Sea backdrop shown behind the basemap while tiles stream in.
 const SEA = "#DCE6F0";
 
-type LabelSide = "top" | "bottom" | "left" | "right";
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace("#", "");
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
 
 const MONTHS = [
   "January",
@@ -96,113 +106,6 @@ function weeklyRangeLabel(issueDate?: string): string {
   return `${sd} ${MONTHS[sm]} ${sy} to ${ed} ${MONTHS[em]} ${ey}`;
 }
 
-// A key-site label: name + exposure pill, rendered as plain HTML so html2canvas
-// rasterises it faithfully into the in-app PDF (a live <canvas>/SVG marker is
-// dropped/mangled on clone — see CountryReportMap).
-function buildPointLabel(name: string, level: JakartaExposureLevel): HTMLDivElement {
-  const wrap = document.createElement("div");
-  wrap.style.position = "absolute";
-  wrap.style.display = "flex";
-  wrap.style.flexDirection = "column";
-  wrap.style.alignItems = "flex-start";
-  wrap.style.gap = "3px";
-  wrap.style.padding = "3px 7px 4px";
-  wrap.style.background = "rgba(255,255,255,0.9)";
-  wrap.style.border = `1px solid ${POLAR}`;
-  wrap.style.borderRadius = "3px";
-  wrap.style.boxSizing = "border-box";
-  wrap.style.whiteSpace = "nowrap";
-  wrap.style.pointerEvents = "none";
-
-  const nm = document.createElement("div");
-  nm.textContent = name.toUpperCase();
-  nm.style.fontFamily = "'Roboto Condensed', Roboto, sans-serif";
-  nm.style.fontWeight = "700";
-  nm.style.fontSize = "11px";
-  nm.style.lineHeight = "1";
-  nm.style.color = NAVY;
-  nm.style.letterSpacing = "0.03em";
-
-  const chip = document.createElement("div");
-  chip.textContent = EXPOSURE_LABEL[level].toUpperCase();
-  chip.style.fontFamily = "Roboto, sans-serif";
-  chip.style.fontWeight = "700";
-  chip.style.fontSize = "9px";
-  chip.style.lineHeight = "1";
-  chip.style.letterSpacing = "0.05em";
-  chip.style.padding = "2px 6px 3px";
-  chip.style.borderRadius = "2px";
-  chip.style.color = "#ffffff";
-  chip.style.background = EXPOSURE_ACCENT[level];
-
-  wrap.appendChild(nm);
-  wrap.appendChild(chip);
-  return wrap;
-}
-
-// A movement-corridor label: a short colour swatch + route name, on one line.
-function buildCorridorLabel(name: string, level: JakartaExposureLevel): HTMLDivElement {
-  const wrap = document.createElement("div");
-  wrap.style.position = "absolute";
-  wrap.style.display = "inline-flex";
-  wrap.style.alignItems = "center";
-  wrap.style.gap = "5px";
-  wrap.style.padding = "2px 7px 3px";
-  wrap.style.background = "rgba(255,255,255,0.9)";
-  wrap.style.border = `1px solid ${POLAR}`;
-  wrap.style.borderRadius = "3px";
-  wrap.style.boxSizing = "border-box";
-  wrap.style.whiteSpace = "nowrap";
-  wrap.style.pointerEvents = "none";
-
-  const swatch = document.createElement("div");
-  swatch.style.width = "16px";
-  swatch.style.height = "0";
-  swatch.style.borderTop = `3px solid ${EXPOSURE_ACCENT[level]}`;
-  swatch.style.borderRadius = "2px";
-
-  const nm = document.createElement("div");
-  nm.textContent = name;
-  nm.style.fontFamily = "Roboto, sans-serif";
-  nm.style.fontWeight = "700";
-  nm.style.fontSize = "10px";
-  nm.style.lineHeight = "1";
-  nm.style.color = DUSK;
-  nm.style.letterSpacing = "0.02em";
-
-  wrap.appendChild(swatch);
-  wrap.appendChild(nm);
-  return wrap;
-}
-
-// Anchor a label relative to a marker point given a preferred side.
-function placeLabel(el: HTMLDivElement, x: number, y: number, side: LabelSide) {
-  const gap = 11;
-  switch (side) {
-    case "left":
-      el.style.left = `${x - gap}px`;
-      el.style.top = `${y}px`;
-      el.style.transform = "translate(-100%, -50%)";
-      break;
-    case "right":
-      el.style.left = `${x + gap}px`;
-      el.style.top = `${y}px`;
-      el.style.transform = "translate(0, -50%)";
-      break;
-    case "top":
-      el.style.left = `${x}px`;
-      el.style.top = `${y - gap}px`;
-      el.style.transform = "translate(-50%, -100%)";
-      break;
-    case "bottom":
-    default:
-      el.style.left = `${x}px`;
-      el.style.top = `${y + gap}px`;
-      el.style.transform = "translate(-50%, 0)";
-      break;
-  }
-}
-
 export interface JakartaCorridorMapProps {
   incidents: CountryFastFactsIncident[];
   /** Report issue date (YYYY-MM-DD) — drives the footer weekly date range. */
@@ -212,22 +115,23 @@ export interface JakartaCorridorMapProps {
 }
 
 /**
- * Jakarta operational exposure map — a REAL Leaflet basemap (CartoDB
- * light_nolabels tiles: actual coastline, the Java Sea and the road network)
- * with the city's KEY OPERATING SITES drawn as markers and the main MOVEMENT
- * CORRIDORS drawn as route lines, each coloured by live operating exposure. A
- * faint administrative outline of the five DKI cities sits underneath purely
- * for orientation.
+ * Jakarta operational exposure map — a clean, client-grade figure in the style
+ * of professional travel-risk mapping (Crisis24 / International SOS): a REAL
+ * light Leaflet basemap (CartoDB light_nolabels — actual coastline, the Java
+ * Sea and the road network) carrying ONLY small numbered markers for key sites
+ * and thin lines for the main movement corridors, each coloured by operating
+ * exposure. The map face is kept clean — no district blocks, no white boxes,
+ * chips or pills. Every detail lives in the ranked list to the right; the
+ * numbers tie the two together.
  *
- * PDF parity: the basemap is <img> tiles, the corridor lines + key-point
- * markers are an offscreen-canvas → data-URL <img>, and the labels are HTML
- * <div>s — every layer is something html2canvas rasterises faithfully, so the
- * on-screen preview and the DOM-rasterised in-app PDF stay identical (a live
- * <canvas> or Leaflet SVG vector layer would be dropped/mangled on clone).
+ * PDF parity: the basemap is <img> tiles and the markers + corridor lines (with
+ * their numbers baked in) are a single offscreen-canvas → data-URL <img> — both
+ * are layers html2canvas rasterises faithfully, so the on-screen preview and the
+ * DOM-rasterised in-app PDF stay identical (a live <canvas> or Leaflet SVG
+ * vector layer would be dropped/mangled on clone).
  *
- * Exposure levels are honest: each corridor carries a standing profile that
- * live reporting can only RAISE, never invent. The supporting table below
- * repeats the corridor-level exposure plus a practical action.
+ * Exposure levels are honest: each area carries a standing profile that live
+ * reporting can only RAISE, never invent.
  */
 export default function JakartaCorridorMap({
   incidents,
@@ -240,26 +144,45 @@ export default function JakartaCorridorMap({
   );
   const rangeLabel = useMemo(() => weeklyRangeLabel(issueDate), [issueDate]);
 
-  // corridor area id -> displayed exposure level.
-  const levelFor = useMemo(() => {
-    const m = new Map<string, JakartaExposureLevel>();
-    for (const s of corridor.statuses) m.set(s.area.id, s.displayExposure);
-    return m;
-  }, [corridor]);
-
-  // Re-render the overlay only when the displayed exposure set changes.
-  const drawKey = useMemo(
+  // Ranked by operating exposure (worst first), stable on original order. The
+  // rank number is what the map markers and the right-hand list both display.
+  const ranked = useMemo(
     () =>
       corridor.statuses
-        .map((s) => `${s.area.id}:${s.displayExposure}`)
-        .join(","),
+        .map((status, i) => ({ status, i }))
+        .sort(
+          (a, b) =>
+            SEV_RANK[b.status.displayExposure] -
+              SEV_RANK[a.status.displayExposure] || a.i - b.i,
+        )
+        .map((x, idx) => ({ status: x.status, number: idx + 1 })),
     [corridor],
+  );
+
+  const numberFor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of ranked) m.set(r.status.area.id, r.number);
+    return m;
+  }, [ranked]);
+
+  const levelFor = useMemo(() => {
+    const m = new Map<string, JakartaExposureLevel>();
+    for (const r of ranked) m.set(r.status.area.id, r.status.displayExposure);
+    return m;
+  }, [ranked]);
+
+  // Re-render the overlay only when the displayed exposure / numbering changes.
+  const drawKey = useMemo(
+    () =>
+      ranked
+        .map((r) => `${r.status.area.id}:${r.number}:${r.status.displayExposure}`)
+        .join(","),
+    [ranked],
   );
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const overlayImgRef = useRef<HTMLImageElement | null>(null);
-  const labelLayerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!mapElRef.current) return;
@@ -289,7 +212,7 @@ export default function JakartaCorridorMap({
         },
       ).addTo(map);
 
-      // Corridor + key-point overlay (offscreen canvas → data-URL <img>).
+      // Markers + corridor overlay (offscreen canvas → data-URL <img>).
       const overlay = document.createElement("img");
       overlay.alt = "";
       overlay.style.position = "absolute";
@@ -301,32 +224,59 @@ export default function JakartaCorridorMap({
       overlay.style.zIndex = "400";
       mapElRef.current.appendChild(overlay);
       overlayImgRef.current = overlay;
-
-      // HTML label layer (site names + corridor names + exposure pills).
-      const labels = document.createElement("div");
-      labels.style.position = "absolute";
-      labels.style.left = "0";
-      labels.style.top = "0";
-      labels.style.right = "0";
-      labels.style.bottom = "0";
-      labels.style.pointerEvents = "none";
-      labels.style.zIndex = "500";
-      mapElRef.current.appendChild(labels);
-      labelLayerRef.current = labels;
     }
 
     const map = mapRef.current;
+    map.invalidateSize();
     const bounds = L.latLngBounds(
       [JAKARTA_VIEW_BBOX.minLat, JAKARTA_VIEW_BBOX.minLon],
       [JAKARTA_VIEW_BBOX.maxLat, JAKARTA_VIEW_BBOX.maxLon],
     );
     map.fitBounds(bounds, { padding: [10, 10] });
 
+    const keyPointAreaIds = new Set(JAKARTA_KEY_POINTS.map((k) => k.corridorId));
+
+    const drawMarker = (
+      ctx: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      level: JakartaExposureLevel,
+      n: number,
+    ) => {
+      // Subtle exposure halo (the only shaded overlay, kept faint).
+      const { r, g, b } = hexToRgb(EXPOSURE_ACCENT[level]);
+      const grad = ctx.createRadialGradient(x, y, 2, x, y, 22);
+      grad.addColorStop(0, `rgba(${r},${g},${b},0.20)`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.beginPath();
+      ctx.arc(x, y, 22, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      // Marker disc.
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = EXPOSURE_ACCENT[level];
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 11, 0, Math.PI * 2);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(0,0,0,0.22)";
+      ctx.stroke();
+      // Number.
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 12px 'Roboto Condensed', Roboto, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(n), x, y + 0.5);
+    };
+
     const draw = () => {
       const el = mapElRef.current;
       const img = overlayImgRef.current;
-      const labels = labelLayerRef.current;
-      if (!el || !img || !labels) return;
+      if (!el || !img) return;
       const w = el.clientWidth;
       const h = el.clientHeight;
       if (w === 0 || h === 0) return;
@@ -341,24 +291,7 @@ export default function JakartaCorridorMap({
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      // 1) Faint DKI administrative outline (no fill) for orientation.
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = DKI_OUTLINE;
-      for (const f of JAKARTA_GEO) {
-        if (f.role !== "city") continue;
-        ctx.beginPath();
-        for (const ring of f.polys) {
-          ring.forEach((pt, idx) => {
-            const p = map.latLngToContainerPoint([pt[1], pt[0]]);
-            if (idx === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-          });
-          ctx.closePath();
-        }
-        ctx.stroke();
-      }
-
-      // 2) Movement corridors — white casing then a coloured core.
+      // 1) Movement corridors — thin coloured lines with a faint white casing.
       for (const line of JAKARTA_CORRIDOR_LINES) {
         const level = levelFor.get(line.corridorId) ?? "not-assessed";
         const pts = line.path.map((c) => map.latLngToContainerPoint([c[0], c[1]]));
@@ -372,52 +305,34 @@ export default function JakartaCorridorMap({
           ctx.strokeStyle = colour;
           ctx.stroke();
         };
-        stroke(7, "rgba(255,255,255,0.92)");
-        stroke(4, EXPOSURE_ACCENT[level]);
+        stroke(3.2, "rgba(255,255,255,0.65)");
+        stroke(1.8, EXPOSURE_ACCENT[level]);
       }
 
-      // 3) Key sites — white halo + exposure-coloured dot.
+      // 2) Numbered markers for key sites.
       for (const kp of JAKARTA_KEY_POINTS) {
         const level = levelFor.get(kp.corridorId) ?? "not-assessed";
+        const n = numberFor.get(kp.corridorId) ?? 0;
         const p = map.latLngToContainerPoint([kp.lat, kp.lon]);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(0,0,0,0.18)";
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 5.2, 0, Math.PI * 2);
-        ctx.fillStyle = EXPOSURE_ACCENT[level];
-        ctx.fill();
+        drawMarker(ctx, p.x, p.y, level, n);
       }
 
-      img.src = canvas.toDataURL("image/png");
-
-      // Labels.
-      labels.replaceChildren();
+      // 3) Numbered discs for corridors that have no site marker (the pure
+      //    movement routes), placed at the route's label anchor.
       for (const line of JAKARTA_CORRIDOR_LINES) {
+        if (keyPointAreaIds.has(line.corridorId)) continue;
         const level = levelFor.get(line.corridorId) ?? "not-assessed";
+        const n = numberFor.get(line.corridorId) ?? 0;
         const idx = Math.min(
           line.labelAt ?? Math.floor(line.path.length / 2),
           line.path.length - 1,
         );
         const anchor = line.path[idx];
         const p = map.latLngToContainerPoint([anchor[0], anchor[1]]);
-        const label = buildCorridorLabel(line.label, level);
-        label.style.left = `${p.x}px`;
-        label.style.top = `${p.y}px`;
-        label.style.transform = "translate(-50%, -50%)";
-        labels.appendChild(label);
+        drawMarker(ctx, p.x, p.y, level, n);
       }
-      for (const kp of JAKARTA_KEY_POINTS) {
-        const level = levelFor.get(kp.corridorId) ?? "not-assessed";
-        const p = map.latLngToContainerPoint([kp.lat, kp.lon]);
-        const label = buildPointLabel(kp.label, level);
-        placeLabel(label, p.x, p.y, kp.labelSide ?? "right");
-        labels.appendChild(label);
-      }
+
+      img.src = canvas.toDataURL("image/png");
     };
 
     map.whenReady(draw);
@@ -427,7 +342,7 @@ export default function JakartaCorridorMap({
       window.clearTimeout(t);
       map.off("resize moveend zoomend viewreset", draw);
     };
-  }, [drawKey, levelFor]);
+  }, [drawKey, numberFor, levelFor]);
 
   useEffect(() => {
     return () => {
@@ -436,16 +351,13 @@ export default function JakartaCorridorMap({
         mapRef.current = null;
       }
       overlayImgRef.current = null;
-      labelLayerRef.current = null;
     };
   }, []);
 
-  const anyElevated = corridor.statuses.some((s) => s.elevated);
-
   return (
     <div>
-      {/* Figure title (the map placement slot carries no outer heading). */}
-      <div style={{ marginBottom: 8 }}>
+      {/* Figure title. */}
+      <div style={{ marginBottom: 10 }}>
         <div
           style={{
             fontFamily: "'Roboto Condensed', Roboto, sans-serif",
@@ -471,242 +383,270 @@ export default function JakartaCorridorMap({
         </div>
       </div>
 
-      {/* Real Leaflet basemap with the corridor + key-point overlay. */}
-      <div
-        id={domId}
-        style={{
-          width: "100%",
-          border: `1px solid ${POLAR}`,
-          borderRadius: 2,
-          background: "#ffffff",
-          boxSizing: "border-box",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          ref={mapElRef}
-          style={{
-            width: "100%",
-            height: 460,
-            position: "relative",
-            background: SEA,
-          }}
-        />
-      </div>
-
-      {/* Legend — exposure levels plus the two map symbols. */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 14,
-          marginTop: 10,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: NAVY,
-          }}
-        >
-          Exposure level
-        </span>
-        {EXPOSURE_ORDER.map((lvl) => (
-          <span key={lvl} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span
+      {/* Clean map on the left, ranked detail list on the right. */}
+      <div style={{ display: "flex", gap: 18, alignItems: "stretch" }}>
+        <div style={{ flex: "1.5 1 0", minWidth: 0 }}>
+          <div
+            id={domId}
+            style={{
+              width: "100%",
+              border: `1px solid ${POLAR}`,
+              borderRadius: 2,
+              background: "#ffffff",
+              boxSizing: "border-box",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              ref={mapElRef}
               style={{
-                display: "inline-block",
-                width: 13,
-                height: 13,
-                borderRadius: 2,
-                background: EXPOSURE_FILL[lvl],
-                border: `1px solid ${EXPOSURE_ACCENT[lvl]}`,
+                width: "100%",
+                height: 470,
+                position: "relative",
+                background: SEA,
               }}
             />
-            <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
-              {EXPOSURE_LABEL[lvl]}
+          </div>
+
+          {/* Small legend. */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 10,
+              marginTop: 9,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: NAVY,
+              }}
+            >
+              Risk
             </span>
-          </span>
-        ))}
-        <span style={{ width: 1, height: 16, background: POLAR }} />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              display: "inline-block",
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              background: DUSK,
-              border: "2px solid #ffffff",
-              boxSizing: "border-box",
-            }}
-          />
-          <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
-            Key site
-          </span>
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              display: "inline-block",
-              width: 18,
-              height: 0,
-              borderTop: `3px solid ${DUSK}`,
-              borderRadius: 2,
-            }}
-          />
-          <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
-            Movement corridor
-          </span>
-        </span>
+            {EXPOSURE_ORDER.map((lvl) => (
+              <span key={lvl} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: EXPOSURE_ACCENT[lvl],
+                  }}
+                />
+                <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 10.5, color: DUSK }}>
+                  {EXPOSURE_LABEL[lvl]}
+                </span>
+              </span>
+            ))}
+            <span style={{ width: 1, height: 13, background: POLAR }} />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: DUSK,
+                  color: "#fff",
+                  fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 9,
+                }}
+              >
+                1
+              </span>
+              <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 10.5, color: DUSK }}>
+                Keyed site / route
+              </span>
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 16,
+                  height: 0,
+                  borderTop: `2px solid ${DUSK}`,
+                }}
+              />
+              <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 10.5, color: DUSK }}>
+                Movement corridor
+              </span>
+            </span>
+          </div>
+        </div>
+
+        {/* Ranked detail list. */}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <RankedList ranked={ranked} />
+        </div>
       </div>
 
-      {/* Caption / sources. */}
+      {/* One short caption below. */}
       <div
         style={{
           fontFamily: "Roboto, sans-serif",
           fontSize: 10.5,
           color: DUSK,
-          marginTop: 8,
+          marginTop: 12,
           fontStyle: "italic",
         }}
       >
-        Markers show key operating sites and lines show the main movement
-        corridors, each coloured by operating exposure — its standing profile,
-        raised where this period carried reporting. The basemap shows the real
-        coastline and road network for context only. Routes are indicative and
-        individual incidents are not plotted. Always confirm conditions locally
-        before travelling. Basemap © OpenStreetMap contributors © CARTO.
+        Markers and lines are coloured by operating exposure — each area's
+        standing profile, raised where this period carried reporting; numbers
+        key to the list. Routes are indicative; individual incidents are not
+        plotted. Basemap © OpenStreetMap contributors © CARTO.
         {corridor.unattributed > 0
-          ? " Some records were retained in the assessment but not tied to a specific corridor."
+          ? " Some records were retained in the assessment but not tied to a specific area."
           : ""}
       </div>
-
-      <ExposureTable statuses={corridor.statuses} anyElevated={anyElevated} />
     </div>
   );
 }
 
-function ExposureTable({
-  statuses,
-  anyElevated,
+function RankedList({
+  ranked,
 }: {
-  statuses: JakartaCorridorStatus[];
-  anyElevated: boolean;
+  ranked: { status: JakartaCorridorStatus; number: number }[];
 }) {
-  const columns = "minmax(0, 1.1fr) 150px minmax(0, 1.4fr) minmax(0, 1.4fr)";
-  const cell: React.CSSProperties = {
-    fontFamily: "Roboto, sans-serif",
-    fontSize: 11.5,
-    color: DUSK,
-    padding: "8px 10px",
-    boxSizing: "border-box",
-    lineHeight: 1.32,
-  };
   return (
     <div
       style={{
-        marginTop: 14,
         border: `1px solid ${POLAR}`,
         borderRadius: 2,
         overflow: "hidden",
         background: "#ffffff",
+        height: "100%",
+        boxSizing: "border-box",
       }}
     >
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: columns,
           background: NAVY,
           color: "#ffffff",
+          fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+          fontWeight: 700,
+          fontSize: 11,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          padding: "8px 11px",
         }}
       >
-        {["Area", "Exposure level", "Why it matters", "Action"].map((h) => (
-          <div
-            key={h}
-            style={{
-              ...cell,
-              color: "#ffffff",
-              fontWeight: 700,
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            {h}
-          </div>
-        ))}
+        Sites & corridors — ranked by exposure
       </div>
-      {statuses.map((s) => {
+      {ranked.map(({ status: s, number }, i) => {
         const accent = EXPOSURE_ACCENT[s.displayExposure];
         return (
           <div
             key={s.area.id}
             style={{
-              display: "grid",
-              gridTemplateColumns: columns,
-              borderTop: `1px solid ${POLAR}`,
-              alignItems: "stretch",
+              display: "flex",
+              gap: 9,
+              alignItems: "flex-start",
+              padding: "9px 11px",
+              borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
             }}
           >
-            <div style={{ ...cell }}>
-              <div style={{ fontWeight: 700, color: NAVY }}>{s.area.name}</div>
-              <div style={{ marginTop: 2, fontSize: 10.5, color: "#6b7280" }}>
-                {s.area.exposure}
+            <span
+              style={{
+                flex: "0 0 auto",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: accent,
+                color: "#ffffff",
+                fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                fontWeight: 700,
+                fontSize: 11,
+                marginTop: 1,
+              }}
+            >
+              {number}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: NAVY,
+                  lineHeight: 1.15,
+                }}
+              >
+                {s.area.name}
               </div>
-            </div>
-            <div style={{ ...cell }}>
-              <span
+              <div
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  color: accent,
+                  marginTop: 4,
                 }}
               >
                 <span
                   style={{
-                    display: "inline-block",
-                    width: 11,
-                    height: 11,
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 9,
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    color: "#ffffff",
+                    background: accent,
                     borderRadius: 2,
-                    background: EXPOSURE_FILL[s.displayExposure],
-                    border: `1px solid ${accent}`,
+                    padding: "2px 6px 3px",
                   }}
-                />
-                {EXPOSURE_LABEL[s.displayExposure]}
-              </span>
-              <div style={{ marginTop: 3, fontSize: 9.5, color: "#7a828e" }}>
-                {s.elevated ? "Raised by reporting this period" : "Standing profile"}
+                >
+                  {EXPOSURE_LABEL[s.displayExposure]}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "Roboto, sans-serif",
+                    fontSize: 9.5,
+                    color: "#7a828e",
+                  }}
+                >
+                  {s.elevated ? "Raised this period" : "Standing profile"}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontSize: 11,
+                  color: DUSK,
+                  lineHeight: 1.34,
+                  marginTop: 5,
+                }}
+              >
+                {s.area.relevance}
+              </div>
+              <div
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontSize: 11,
+                  color: "#555a63",
+                  lineHeight: 1.34,
+                  marginTop: 4,
+                }}
+              >
+                <span style={{ fontWeight: 700, color: NAVY }}>Action: </span>
+                {s.area.action}
               </div>
             </div>
-            <div style={{ ...cell }}>{s.area.relevance}</div>
-            <div style={{ ...cell }}>{s.area.action}</div>
           </div>
         );
       })}
-      <div
-        style={{
-          ...cell,
-          borderTop: `1px solid ${POLAR}`,
-          fontStyle: "italic",
-          fontSize: 10,
-          color: DUSK,
-        }}
-      >
-        {anyElevated
-          ? "Levels shown are the higher of each area's standing exposure profile and this period's reporting."
-          : "No area carried fresh reporting this period; levels shown are each area's standing exposure profile."}
-      </div>
     </div>
   );
 }

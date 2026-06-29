@@ -593,3 +593,9 @@ id = "cBcedpXF94zA3gvCsQDZf"
 uri = "file://screenshots/jakarta_exposure_map_v2.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map — key sites + movement corridors"
+
+[[outputs]]
+id = "ecVHxbh7U8qzyshQSQhYO"
+uri = "file://screenshots/jakarta_exposure_map_v3.jpg"
+type = "image"
+title = "Jakarta Operational Exposure Map — clean map + ranked list (sample)"
