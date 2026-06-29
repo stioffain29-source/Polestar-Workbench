@@ -203,12 +203,12 @@ export default function JakartaCorridorMap({
       mapRef.current = map;
 
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
         {
           subdomains: "abcd",
           maxZoom: 19,
           crossOrigin: true,
-          opacity: 0.95,
+          opacity: 1,
         },
       ).addTo(map);
 
@@ -254,20 +254,20 @@ export default function JakartaCorridorMap({
       ctx.fill();
       // Marker disc.
       ctx.beginPath();
-      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
       ctx.fillStyle = EXPOSURE_ACCENT[level];
       ctx.fill();
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.strokeStyle = "#ffffff";
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(x, y, 11, 0, Math.PI * 2);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(0,0,0,0.22)";
+      ctx.arc(x, y, 8.9, 0, Math.PI * 2);
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = "rgba(11,11,61,0.18)";
       ctx.stroke();
       // Number.
       ctx.fillStyle = "#ffffff";
-      ctx.font = "700 12px 'Roboto Condensed', Roboto, sans-serif";
+      ctx.font = "700 10px 'Roboto Condensed', Roboto, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(n), x, y + 0.5);
@@ -305,8 +305,8 @@ export default function JakartaCorridorMap({
           ctx.strokeStyle = colour;
           ctx.stroke();
         };
-        stroke(3.2, "rgba(255,255,255,0.65)");
-        stroke(1.8, EXPOSURE_ACCENT[level]);
+        stroke(3.6, "rgba(255,255,255,0.7)");
+        stroke(2, EXPOSURE_ACCENT[level]);
       }
 
       // 2) Numbered markers for key sites.
@@ -384,7 +384,7 @@ export default function JakartaCorridorMap({
       </div>
 
       {/* Clean map on the left, ranked detail list on the right. */}
-      <div style={{ display: "flex", gap: 18, alignItems: "stretch" }}>
+      <div style={{ display: "flex", gap: 22, alignItems: "flex-start" }}>
         <div style={{ flex: "1.5 1 0", minWidth: 0 }}>
           <div
             id={domId}
@@ -414,14 +414,14 @@ export default function JakartaCorridorMap({
               display: "flex",
               flexWrap: "wrap",
               alignItems: "center",
-              gap: 10,
-              marginTop: 9,
+              gap: 14,
+              marginTop: 12,
             }}
           >
             <span
               style={{
                 fontFamily: "Roboto, sans-serif",
-                fontSize: 9.5,
+                fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
@@ -435,13 +435,13 @@ export default function JakartaCorridorMap({
                 <span
                   style={{
                     display: "inline-block",
-                    width: 10,
-                    height: 10,
+                    width: 9,
+                    height: 9,
                     borderRadius: "50%",
                     background: EXPOSURE_ACCENT[lvl],
                   }}
                 />
-                <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 10.5, color: DUSK }}>
+                <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
                   {EXPOSURE_LABEL[lvl]}
                 </span>
               </span>
@@ -465,7 +465,7 @@ export default function JakartaCorridorMap({
               >
                 1
               </span>
-              <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 10.5, color: DUSK }}>
+              <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
                 Keyed site / route
               </span>
             </span>
@@ -478,7 +478,7 @@ export default function JakartaCorridorMap({
                   borderTop: `2px solid ${DUSK}`,
                 }}
               />
-              <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 10.5, color: DUSK }}>
+              <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
                 Movement corridor
               </span>
             </span>
@@ -495,10 +495,10 @@ export default function JakartaCorridorMap({
       <div
         style={{
           fontFamily: "Roboto, sans-serif",
-          fontSize: 10.5,
+          fontSize: 11,
           color: DUSK,
-          marginTop: 12,
-          fontStyle: "italic",
+          lineHeight: 1.55,
+          marginTop: 14,
         }}
       >
         Markers and lines are coloured by operating exposure — each area's
@@ -525,7 +525,6 @@ function RankedList({
         borderRadius: 2,
         overflow: "hidden",
         background: "#ffffff",
-        height: "100%",
         boxSizing: "border-box",
       }}
     >
@@ -535,10 +534,10 @@ function RankedList({
           color: "#ffffff",
           fontFamily: "'Roboto Condensed', Roboto, sans-serif",
           fontWeight: 700,
-          fontSize: 11,
-          letterSpacing: "0.05em",
+          fontSize: 11.5,
+          letterSpacing: "0.06em",
           textTransform: "uppercase",
-          padding: "8px 11px",
+          padding: "10px 13px",
         }}
       >
         Sites & corridors — ranked by exposure
@@ -550,9 +549,9 @@ function RankedList({
             key={s.area.id}
             style={{
               display: "flex",
-              gap: 9,
+              gap: 11,
               alignItems: "flex-start",
-              padding: "9px 11px",
+              padding: "11px 13px",
               borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
             }}
           >
@@ -562,14 +561,14 @@ function RankedList({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 20,
-                height: 20,
+                width: 18,
+                height: 18,
                 borderRadius: "50%",
                 background: accent,
                 color: "#ffffff",
                 fontFamily: "'Roboto Condensed', Roboto, sans-serif",
                 fontWeight: 700,
-                fontSize: 11,
+                fontSize: 10,
                 marginTop: 1,
               }}
             >
@@ -580,9 +579,9 @@ function RankedList({
                 style={{
                   fontFamily: "'Roboto Condensed', Roboto, sans-serif",
                   fontWeight: 700,
-                  fontSize: 13,
+                  fontSize: 13.5,
                   color: NAVY,
-                  lineHeight: 1.15,
+                  lineHeight: 1.2,
                 }}
               >
                 {s.area.name}
@@ -623,10 +622,10 @@ function RankedList({
               <div
                 style={{
                   fontFamily: "Roboto, sans-serif",
-                  fontSize: 11,
+                  fontSize: 11.5,
                   color: DUSK,
-                  lineHeight: 1.34,
-                  marginTop: 5,
+                  lineHeight: 1.4,
+                  marginTop: 6,
                 }}
               >
                 {s.area.relevance}
@@ -634,10 +633,10 @@ function RankedList({
               <div
                 style={{
                   fontFamily: "Roboto, sans-serif",
-                  fontSize: 11,
+                  fontSize: 11.5,
                   color: "#555a63",
-                  lineHeight: 1.34,
-                  marginTop: 4,
+                  lineHeight: 1.4,
+                  marginTop: 5,
                 }}
               >
                 <span style={{ fontWeight: 700, color: NAVY }}>Action: </span>

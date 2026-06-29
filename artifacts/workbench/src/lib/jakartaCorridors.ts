@@ -111,9 +111,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     exposure: "Protest and policing disruption",
     icon: "crowd",
     relevance:
-      "Demonstrations and police lines around government buildings and main thoroughfares can close roads and slow access at short notice.",
-    action:
-      "Check protest activity before travelling into the government district; keep alternative routes ready.",
+      "Protests near government buildings can close central roads at short notice.",
+    action: "Check protest activity before travelling in; hold alternative routes.",
     baselineExposure: "elevated",
     pos: { x: 48, y: 45 },
     keywords: [
@@ -130,9 +129,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     exposure: "Office, client-meeting and visitor exposure",
     icon: "building",
     relevance:
-      "Concentrates offices, hotels and client sites; incidents here bear directly on staff, meetings and visitor movement.",
-    action:
-      "Maintain caution around after-hours movement near offices, hotels and exposed public areas; confirm venues before meetings.",
+      "Dense offices and hotels mean incidents here hit staff and meetings directly.",
+    action: "Confirm venues; stay alert around after-hours movement.",
     baselineExposure: "monitored",
     pos: { x: 51, y: 63 },
     keywords: [
@@ -150,9 +148,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     exposure: "Airport-transfer disruption",
     icon: "plane",
     relevance:
-      "Transfers between the city and Soekarno-Hatta run through congested, flood-sensitive toll routes; disruption lengthens airport runs.",
-    action:
-      "Allow additional buffer on airport transfers; confirm the toll-route status before departure.",
+      "City\u2013airport transfers run on congested, flood-prone toll routes.",
+    action: "Allow extra buffer; confirm toll-route status before departure.",
     baselineExposure: "monitored",
     pos: { x: 13, y: 39 },
     airportPrePass: true,
@@ -168,9 +165,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     exposure: "Logistics, flooding and access disruption",
     icon: "port",
     relevance:
-      "Port, warehousing and low-lying access roads here drive logistics timings and are exposed to tidal and rain flooding.",
-    action:
-      "Confirm port-area access and flood status before logistics movements; build slack into delivery windows.",
+      "Port and low-lying access roads drive logistics timings and flood easily.",
+    action: "Confirm port access and flood status; build in delivery slack.",
     baselineExposure: "elevated",
     pos: { x: 64, y: 16 },
     keywords: [
@@ -187,9 +183,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     exposure: "Rain, flooding and congestion exposure",
     icon: "flood",
     relevance:
-      "Heavy rain and flooding across Jabodetabek lengthen commuting and site access for staff living outside the centre.",
-    action:
-      "Check flood-affected routes before staff travel on heavy-rain days; allow extra commuting time.",
+      "Rain and flooding across Jabodetabek lengthen staff commutes and site access.",
+    action: "Check flood-hit routes on heavy-rain days; allow extra time.",
     baselineExposure: "monitored",
     pos: { x: 30, y: 85 },
     keywords: [
@@ -205,9 +200,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     exposure: "Meeting, site-visit and staff-movement delays",
     icon: "road",
     relevance:
-      "Congestion on the main toll roads and arterials is a daily planning constraint on meetings, deliveries and transfers.",
-    action:
-      "Build time buffers into cross-city movement; brief drivers on the day's congestion and closure points.",
+      "Congestion on the main toll roads and arterials constrains daily movement.",
+    action: "Build time buffers; brief drivers on closures.",
     baselineExposure: "monitored",
     pos: { x: 80, y: 60 },
     keywords: [

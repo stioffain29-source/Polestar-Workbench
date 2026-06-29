@@ -114,26 +114,29 @@
   export const JAKARTA_CORRIDOR_LINES: JakartaCorridorLine[] = [
     {
       corridorId: "airport-corridor",
-      label: "Airport toll corridor",
+      label: "Airport corridor",
+      // Soekarno-Hatta → central Jakarta along the airport toll route.
       path: [
-        [-6.2186, 106.8138],
-        [-6.1955, 106.7720],
-        [-6.1640, 106.7180],
-        [-6.1380, 106.6820],
         [-6.1256, 106.6559],
+        [-6.1340, 106.7060],
+        [-6.1520, 106.7560],
+        [-6.1660, 106.7980],
+        [-6.1754, 106.8272],
       ],
-      labelAt: 3,
+      labelAt: 2,
     },
     {
       corridorId: "north-port",
       label: "Port access route",
+      // Tanjung Priok port → the main commercial / CBD area.
       path: [
-        [-6.1754, 106.8272],
-        [-6.1520, 106.8520],
-        [-6.1250, 106.8700],
         [-6.1048, 106.8806],
+        [-6.1380, 106.8640],
+        [-6.1700, 106.8440],
+        [-6.1980, 106.8250],
+        [-6.2249, 106.8095],
       ],
-      labelAt: 1,
+      labelAt: 2,
     },
     {
       corridorId: "cross-city-routes",
