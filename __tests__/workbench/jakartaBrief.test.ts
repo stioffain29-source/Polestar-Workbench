@@ -125,8 +125,11 @@ describe("buildJakartaIncidentThemes", () => {
   });
 
   it("never describes a Low-only theme as a severity escalation", () => {
+    // A concrete anchor (province) so the theme has something to say and is not
+    // dropped as too-thin; the assertion is that a Low theme carries no
+    // escalation language.
     const groups = buildJakartaIncidentThemes([
-      item({ category: "Theft / break-in", severity: "low" }),
+      item({ category: "Theft / break-in", severity: "low", province: "West Jakarta" }),
     ]);
     const crime = groups.find((g) => g.key === "crime")!;
     expect(crime.paragraph.toLowerCase()).not.toMatch(/escalat|high severity|extreme severity/);

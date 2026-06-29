@@ -218,10 +218,11 @@ function hasToken(hay: string, token: string): boolean {
   return new RegExp(`(^|[^a-z])${escapeRegExp(token)}([^a-z]|$)`, "i").test(hay);
 }
 
-// Per-item evidence text: the cleaned English headline (or the original title)
-// as PRIMARY evidence, with the reported summary as SECONDARY. Lower-cased once.
+// Per-item evidence text: the cleaned English headline as PRIMARY evidence
+// (PngReportItem.title already resolves to displayTitle when present, else the
+// cleaned raw title), with the reported summary as SECONDARY. Lower-cased once.
 function itemEvidence(it: PngReportItem): string {
-  const head = ((it.displayTitle && it.displayTitle.trim()) || it.title || "").toLowerCase();
+  const head = (it.title || "").toLowerCase();
   const summ = (it.summary ?? "").toLowerCase();
   return `${head} ${summ}`;
 }
