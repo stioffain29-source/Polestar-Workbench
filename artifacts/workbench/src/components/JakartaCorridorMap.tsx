@@ -4,24 +4,23 @@ import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import {
   buildJakartaCorridorStatuses,
-  buildJakartaCityStatuses,
   type JakartaCorridorStatus,
-  type JakartaCityStatus,
   type JakartaExposureLevel,
 } from "@/lib/jakartaCorridors";
 import {
   JAKARTA_GEO,
-  JAKARTA_CITY_BBOX,
-  type JakartaGeoFeature,
+  JAKARTA_VIEW_BBOX,
+  JAKARTA_KEY_POINTS,
+  JAKARTA_CORRIDOR_LINES,
 } from "@/lib/jakartaGeo";
 
 const NAVY = "#0B0B3D";
 const DUSK = "#303030";
 const POLAR = "#E2E2E2";
 
-// Operating-exposure tints for THIS graphic. Deliberately pale, distinct from
-// the incident-severity ramp, and never the reserved A33232 (Extreme) or
-// 1B6B7A (Insignificant) hexes.
+// Operating-exposure tints for THIS graphic. Deliberately distinct from the
+// incident-severity ramp, and never the reserved A33232 (Extreme) or 1B6B7A
+// (Insignificant) hexes.
 const EXPOSURE_FILL: Record<JakartaExposureLevel, string> = {
   high: "#E2ADAD",
   elevated: "#EAC59B",
@@ -51,12 +50,13 @@ const EXPOSURE_ORDER: JakartaExposureLevel[] = [
   "not-assessed",
 ];
 
-// Context geography (surrounding regencies) — drawn as faint un-assessed land.
-const CONTEXT_FILL = "#E6E9ED";
-const CONTEXT_BORDER = "#C4CAD2";
-const CITY_BORDER = "#FFFFFF";
+// Faint administrative outline of the five DKI cities, drawn (no fill) purely
+// for geographic orientation under the corridors and key points.
+const DKI_OUTLINE = "rgba(11,11,61,0.28)";
 // Sea backdrop shown behind the basemap while tiles stream in.
 const SEA = "#DCE6F0";
+
+type LabelSide = "top" | "bottom" | "left" | "right";
 
 const MONTHS = [
   "January",
@@ -96,64 +96,18 @@ function weeklyRangeLabel(issueDate?: string): string {
   return `${sd} ${MONTHS[sm]} ${sy} to ${ed} ${MONTHS[em]} ${ey}`;
 }
 
-// ---- Polygon geometry helpers ---------------------------------------------
-// Shoelace area + area-weighted centroid of a [lon,lat] ring. Used to place
-// each city's name label at its visual centre.
-function ringSignedArea(ring: number[][]): number {
-  let a = 0;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    a += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
-  }
-  return a / 2;
-}
-
-function ringCentroid(ring: number[][]): [number, number] {
-  let x = 0;
-  let y = 0;
-  let a = 0;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const f = ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
-    x += (ring[j][0] + ring[i][0]) * f;
-    y += (ring[j][1] + ring[i][1]) * f;
-    a += f;
-  }
-  a *= 0.5;
-  if (Math.abs(a) < 1e-12) {
-    const sum = ring.reduce<[number, number]>(
-      (s, p) => [s[0] + p[0], s[1] + p[1]],
-      [0, 0],
-    );
-    return [sum[0] / ring.length, sum[1] / ring.length];
-  }
-  return [x / (6 * a), y / (6 * a)];
-}
-
-// Centroid of a feature's largest ring (its dominant landmass).
-function featureCentroid(f: JakartaGeoFeature): [number, number] {
-  let best = f.polys[0];
-  let bestArea = -1;
-  for (const ring of f.polys) {
-    const ar = Math.abs(ringSignedArea(ring));
-    if (ar > bestArea) {
-      bestArea = ar;
-      best = ring;
-    }
-  }
-  return ringCentroid(best);
-}
-
-// A district name + exposure pill, rendered as plain HTML so html2canvas
+// A key-site label: name + exposure pill, rendered as plain HTML so html2canvas
 // rasterises it faithfully into the in-app PDF (a live <canvas>/SVG marker is
 // dropped/mangled on clone — see CountryReportMap).
-function buildCityLabel(name: string, level: JakartaExposureLevel): HTMLDivElement {
+function buildPointLabel(name: string, level: JakartaExposureLevel): HTMLDivElement {
   const wrap = document.createElement("div");
   wrap.style.position = "absolute";
   wrap.style.display = "flex";
   wrap.style.flexDirection = "column";
-  wrap.style.alignItems = "center";
+  wrap.style.alignItems = "flex-start";
   wrap.style.gap = "3px";
   wrap.style.padding = "3px 7px 4px";
-  wrap.style.background = "rgba(255,255,255,0.86)";
+  wrap.style.background = "rgba(255,255,255,0.9)";
   wrap.style.border = `1px solid ${POLAR}`;
   wrap.style.borderRadius = "3px";
   wrap.style.boxSizing = "border-box";
@@ -167,7 +121,7 @@ function buildCityLabel(name: string, level: JakartaExposureLevel): HTMLDivEleme
   nm.style.fontSize = "11px";
   nm.style.lineHeight = "1";
   nm.style.color = NAVY;
-  nm.style.letterSpacing = "0.04em";
+  nm.style.letterSpacing = "0.03em";
 
   const chip = document.createElement("div");
   chip.textContent = EXPOSURE_LABEL[level].toUpperCase();
@@ -186,6 +140,69 @@ function buildCityLabel(name: string, level: JakartaExposureLevel): HTMLDivEleme
   return wrap;
 }
 
+// A movement-corridor label: a short colour swatch + route name, on one line.
+function buildCorridorLabel(name: string, level: JakartaExposureLevel): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.style.position = "absolute";
+  wrap.style.display = "inline-flex";
+  wrap.style.alignItems = "center";
+  wrap.style.gap = "5px";
+  wrap.style.padding = "2px 7px 3px";
+  wrap.style.background = "rgba(255,255,255,0.9)";
+  wrap.style.border = `1px solid ${POLAR}`;
+  wrap.style.borderRadius = "3px";
+  wrap.style.boxSizing = "border-box";
+  wrap.style.whiteSpace = "nowrap";
+  wrap.style.pointerEvents = "none";
+
+  const swatch = document.createElement("div");
+  swatch.style.width = "16px";
+  swatch.style.height = "0";
+  swatch.style.borderTop = `3px solid ${EXPOSURE_ACCENT[level]}`;
+  swatch.style.borderRadius = "2px";
+
+  const nm = document.createElement("div");
+  nm.textContent = name;
+  nm.style.fontFamily = "Roboto, sans-serif";
+  nm.style.fontWeight = "700";
+  nm.style.fontSize = "10px";
+  nm.style.lineHeight = "1";
+  nm.style.color = DUSK;
+  nm.style.letterSpacing = "0.02em";
+
+  wrap.appendChild(swatch);
+  wrap.appendChild(nm);
+  return wrap;
+}
+
+// Anchor a label relative to a marker point given a preferred side.
+function placeLabel(el: HTMLDivElement, x: number, y: number, side: LabelSide) {
+  const gap = 11;
+  switch (side) {
+    case "left":
+      el.style.left = `${x - gap}px`;
+      el.style.top = `${y}px`;
+      el.style.transform = "translate(-100%, -50%)";
+      break;
+    case "right":
+      el.style.left = `${x + gap}px`;
+      el.style.top = `${y}px`;
+      el.style.transform = "translate(0, -50%)";
+      break;
+    case "top":
+      el.style.left = `${x}px`;
+      el.style.top = `${y - gap}px`;
+      el.style.transform = "translate(-50%, -100%)";
+      break;
+    case "bottom":
+    default:
+      el.style.left = `${x}px`;
+      el.style.top = `${y + gap}px`;
+      el.style.transform = "translate(-50%, 0)";
+      break;
+  }
+}
+
 export interface JakartaCorridorMapProps {
   incidents: CountryFastFactsIncident[];
   /** Report issue date (YYYY-MM-DD) — drives the footer weekly date range. */
@@ -197,19 +214,20 @@ export interface JakartaCorridorMapProps {
 /**
  * Jakarta operational exposure map — a REAL Leaflet basemap (CartoDB
  * light_nolabels tiles: actual coastline, the Java Sea and the road network)
- * with the five DKI Jakarta administrative cities shaded by operating exposure
- * as an overlay drawn over the map. Surrounding regencies are drawn as faint
- * un-assessed context land.
+ * with the city's KEY OPERATING SITES drawn as markers and the main MOVEMENT
+ * CORRIDORS drawn as route lines, each coloured by live operating exposure. A
+ * faint administrative outline of the five DKI cities sits underneath purely
+ * for orientation.
  *
- * PDF parity: the basemap is <img> tiles, the district choropleth is an
- * offscreen-canvas → data-URL <img>, and the labels are HTML <div>s — every
- * layer is something html2canvas rasterises faithfully, so the on-screen
- * preview and the DOM-rasterised in-app PDF stay identical (a live <canvas> or
- * Leaflet SVG vector layer would be dropped/mangled on clone).
+ * PDF parity: the basemap is <img> tiles, the corridor lines + key-point
+ * markers are an offscreen-canvas → data-URL <img>, and the labels are HTML
+ * <div>s — every layer is something html2canvas rasterises faithfully, so the
+ * on-screen preview and the DOM-rasterised in-app PDF stay identical (a live
+ * <canvas> or Leaflet SVG vector layer would be dropped/mangled on clone).
  *
- * Exposure levels are honest: each city carries a standing profile that live
- * reporting can only RAISE, never invent. The supporting table below repeats
- * the corridor-level exposure plus a practical action.
+ * Exposure levels are honest: each corridor carries a standing profile that
+ * live reporting can only RAISE, never invent. The supporting table below
+ * repeats the corridor-level exposure plus a practical action.
  */
 export default function JakartaCorridorMap({
   incidents,
@@ -220,27 +238,27 @@ export default function JakartaCorridorMap({
     () => buildJakartaCorridorStatuses(incidents),
     [incidents],
   );
-  const cities = useMemo(
-    () => buildJakartaCityStatuses(incidents),
-    [incidents],
-  );
   const rangeLabel = useMemo(() => weeklyRangeLabel(issueDate), [issueDate]);
 
-  const cityLevel = useMemo(() => {
-    const m = new Map<string, JakartaCityStatus>();
-    for (const s of cities.statuses) m.set(s.city.id, s);
+  // corridor area id -> displayed exposure level.
+  const levelFor = useMemo(() => {
+    const m = new Map<string, JakartaExposureLevel>();
+    for (const s of corridor.statuses) m.set(s.area.id, s.displayExposure);
     return m;
-  }, [cities]);
+  }, [corridor]);
 
   // Re-render the overlay only when the displayed exposure set changes.
   const drawKey = useMemo(
-    () => cities.statuses.map((s) => `${s.city.id}:${s.displayExposure}`).join(","),
-    [cities],
+    () =>
+      corridor.statuses
+        .map((s) => `${s.area.id}:${s.displayExposure}`)
+        .join(","),
+    [corridor],
   );
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const polyImgRef = useRef<HTMLImageElement | null>(null);
+  const overlayImgRef = useRef<HTMLImageElement | null>(null);
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -267,24 +285,24 @@ export default function JakartaCorridorMap({
           subdomains: "abcd",
           maxZoom: 19,
           crossOrigin: true,
-          opacity: 0.9,
+          opacity: 0.95,
         },
       ).addTo(map);
 
-      // District-choropleth overlay (offscreen canvas → data-URL <img>).
-      const polyImg = document.createElement("img");
-      polyImg.alt = "";
-      polyImg.style.position = "absolute";
-      polyImg.style.left = "0";
-      polyImg.style.top = "0";
-      polyImg.style.width = "100%";
-      polyImg.style.height = "100%";
-      polyImg.style.pointerEvents = "none";
-      polyImg.style.zIndex = "400";
-      mapElRef.current.appendChild(polyImg);
-      polyImgRef.current = polyImg;
+      // Corridor + key-point overlay (offscreen canvas → data-URL <img>).
+      const overlay = document.createElement("img");
+      overlay.alt = "";
+      overlay.style.position = "absolute";
+      overlay.style.left = "0";
+      overlay.style.top = "0";
+      overlay.style.width = "100%";
+      overlay.style.height = "100%";
+      overlay.style.pointerEvents = "none";
+      overlay.style.zIndex = "400";
+      mapElRef.current.appendChild(overlay);
+      overlayImgRef.current = overlay;
 
-      // HTML label layer (district name + exposure pill).
+      // HTML label layer (site names + corridor names + exposure pills).
       const labels = document.createElement("div");
       labels.style.position = "absolute";
       labels.style.left = "0";
@@ -299,14 +317,14 @@ export default function JakartaCorridorMap({
 
     const map = mapRef.current;
     const bounds = L.latLngBounds(
-      [JAKARTA_CITY_BBOX.minLat, JAKARTA_CITY_BBOX.minLon],
-      [JAKARTA_CITY_BBOX.maxLat, JAKARTA_CITY_BBOX.maxLon],
+      [JAKARTA_VIEW_BBOX.minLat, JAKARTA_VIEW_BBOX.minLon],
+      [JAKARTA_VIEW_BBOX.maxLat, JAKARTA_VIEW_BBOX.maxLon],
     );
-    map.fitBounds(bounds, { padding: [12, 12] });
+    map.fitBounds(bounds, { padding: [10, 10] });
 
     const draw = () => {
       const el = mapElRef.current;
-      const img = polyImgRef.current;
+      const img = overlayImgRef.current;
       const labels = labelLayerRef.current;
       if (!el || !img || !labels) return;
       const w = el.clientWidth;
@@ -323,9 +341,13 @@ export default function JakartaCorridorMap({
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      const trace = (rings: number[][][]) => {
+      // 1) Faint DKI administrative outline (no fill) for orientation.
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = DKI_OUTLINE;
+      for (const f of JAKARTA_GEO) {
+        if (f.role !== "city") continue;
         ctx.beginPath();
-        for (const ring of rings) {
+        for (const ring of f.polys) {
           ring.forEach((pt, idx) => {
             const p = map.latLngToContainerPoint([pt[1], pt[0]]);
             if (idx === 0) ctx.moveTo(p.x, p.y);
@@ -333,51 +355,67 @@ export default function JakartaCorridorMap({
           });
           ctx.closePath();
         }
-      };
-
-      // 1) Context regencies (faint un-assessed land), drawn first so the
-      //    profiled cities sit cleanly on top.
-      for (const f of JAKARTA_GEO) {
-        if (f.role !== "context") continue;
-        trace(f.polys);
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = CONTEXT_FILL;
-        ctx.fill("evenodd");
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = CONTEXT_BORDER;
         ctx.stroke();
       }
 
-      // 2) The five DKI cities, shaded by displayed exposure.
-      for (const f of JAKARTA_GEO) {
-        if (f.role !== "city") continue;
-        const st = cityLevel.get(f.id);
-        const level: JakartaExposureLevel = st ? st.displayExposure : "not-assessed";
-        trace(f.polys);
-        ctx.globalAlpha = 0.74;
-        ctx.fillStyle = EXPOSURE_FILL[level];
-        ctx.fill("evenodd");
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = CITY_BORDER;
+      // 2) Movement corridors — white casing then a coloured core.
+      for (const line of JAKARTA_CORRIDOR_LINES) {
+        const level = levelFor.get(line.corridorId) ?? "not-assessed";
+        const pts = line.path.map((c) => map.latLngToContainerPoint([c[0], c[1]]));
+        const stroke = (width: number, colour: string) => {
+          ctx.beginPath();
+          pts.forEach((p, idx) => {
+            if (idx === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          });
+          ctx.lineWidth = width;
+          ctx.strokeStyle = colour;
+          ctx.stroke();
+        };
+        stroke(7, "rgba(255,255,255,0.92)");
+        stroke(4, EXPOSURE_ACCENT[level]);
+      }
+
+      // 3) Key sites — white halo + exposure-coloured dot.
+      for (const kp of JAKARTA_KEY_POINTS) {
+        const level = levelFor.get(kp.corridorId) ?? "not-assessed";
+        const p = map.latLngToContainerPoint([kp.lat, kp.lon]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(0,0,0,0.18)";
         ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 5.2, 0, Math.PI * 2);
+        ctx.fillStyle = EXPOSURE_ACCENT[level];
+        ctx.fill();
       }
 
       img.src = canvas.toDataURL("image/png");
 
-      // City name + exposure labels at each city's centroid.
+      // Labels.
       labels.replaceChildren();
-      for (const f of JAKARTA_GEO) {
-        if (f.role !== "city") continue;
-        const st = cityLevel.get(f.id);
-        const level: JakartaExposureLevel = st ? st.displayExposure : "not-assessed";
-        const [lon, lat] = featureCentroid(f);
-        const p = map.latLngToContainerPoint([lat, lon]);
-        const label = buildCityLabel(f.name, level);
+      for (const line of JAKARTA_CORRIDOR_LINES) {
+        const level = levelFor.get(line.corridorId) ?? "not-assessed";
+        const idx = Math.min(
+          line.labelAt ?? Math.floor(line.path.length / 2),
+          line.path.length - 1,
+        );
+        const anchor = line.path[idx];
+        const p = map.latLngToContainerPoint([anchor[0], anchor[1]]);
+        const label = buildCorridorLabel(line.label, level);
         label.style.left = `${p.x}px`;
         label.style.top = `${p.y}px`;
         label.style.transform = "translate(-50%, -50%)";
+        labels.appendChild(label);
+      }
+      for (const kp of JAKARTA_KEY_POINTS) {
+        const level = levelFor.get(kp.corridorId) ?? "not-assessed";
+        const p = map.latLngToContainerPoint([kp.lat, kp.lon]);
+        const label = buildPointLabel(kp.label, level);
+        placeLabel(label, p.x, p.y, kp.labelSide ?? "right");
         labels.appendChild(label);
       }
     };
@@ -389,7 +427,7 @@ export default function JakartaCorridorMap({
       window.clearTimeout(t);
       map.off("resize moveend zoomend viewreset", draw);
     };
-  }, [drawKey, cityLevel]);
+  }, [drawKey, levelFor]);
 
   useEffect(() => {
     return () => {
@@ -397,7 +435,7 @@ export default function JakartaCorridorMap({
         mapRef.current.remove();
         mapRef.current = null;
       }
-      polyImgRef.current = null;
+      overlayImgRef.current = null;
       labelLayerRef.current = null;
     };
   }, []);
@@ -428,12 +466,12 @@ export default function JakartaCorridorMap({
             marginTop: 2,
           }}
         >
-          Movement, access and business-disruption exposure across the five DKI
-          Jakarta cities · {rangeLabel}
+          Key operating sites and movement corridors across Greater Jakarta ·{" "}
+          {rangeLabel}
         </div>
       </div>
 
-      {/* Real Leaflet basemap with the district exposure overlay. */}
+      {/* Real Leaflet basemap with the corridor + key-point overlay. */}
       <div
         id={domId}
         style={{
@@ -456,7 +494,7 @@ export default function JakartaCorridorMap({
         />
       </div>
 
-      {/* Exposure-level legend. */}
+      {/* Legend — exposure levels plus the two map symbols. */}
       <div
         style={{
           display: "flex",
@@ -495,6 +533,37 @@ export default function JakartaCorridorMap({
             </span>
           </span>
         ))}
+        <span style={{ width: 1, height: 16, background: POLAR }} />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              background: DUSK,
+              border: "2px solid #ffffff",
+              boxSizing: "border-box",
+            }}
+          />
+          <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
+            Key site
+          </span>
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 18,
+              height: 0,
+              borderTop: `3px solid ${DUSK}`,
+              borderRadius: 2,
+            }}
+          />
+          <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
+            Movement corridor
+          </span>
+        </span>
       </div>
 
       {/* Caption / sources. */}
@@ -507,13 +576,14 @@ export default function JakartaCorridorMap({
           fontStyle: "italic",
         }}
       >
-        District shading shows operating exposure — each city's standing profile,
-        raised where this period carried reporting; the surrounding regencies are
-        shown as geographic context and not assessed. Boundaries are indicative
-        and individual incidents are not plotted. Always confirm conditions
-        locally before travelling. Basemap © OpenStreetMap contributors © CARTO.
-        {cities.unattributed > 0
-          ? " Some records were retained in the assessment but not tied to a specific city."
+        Markers show key operating sites and lines show the main movement
+        corridors, each coloured by operating exposure — its standing profile,
+        raised where this period carried reporting. The basemap shows the real
+        coastline and road network for context only. Routes are indicative and
+        individual incidents are not plotted. Always confirm conditions locally
+        before travelling. Basemap © OpenStreetMap contributors © CARTO.
+        {corridor.unattributed > 0
+          ? " Some records were retained in the assessment but not tied to a specific corridor."
           : ""}
       </div>
 

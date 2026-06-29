@@ -587,3 +587,9 @@ id = "BXUXjwFt0wDWasGlzjkJU"
 uri = "file://screenshots/jakarta_exposure_map_sample.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map — sample"
+
+[[outputs]]
+id = "cBcedpXF94zA3gvCsQDZf"
+uri = "file://screenshots/jakarta_exposure_map_v2.jpg"
+type = "image"
+title = "Jakarta Operational Exposure Map — key sites + movement corridors"

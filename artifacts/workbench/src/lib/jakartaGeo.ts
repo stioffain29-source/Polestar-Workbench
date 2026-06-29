@@ -63,3 +63,100 @@
   ] }
   ];
   
+  /**
+   * Wider lon/lat fit box used by the operational map: includes Soekarno-Hatta
+   * airport (west) and the Greater Jakarta commuter belt (Tangerang/Depok/Bekasi)
+   * so the movement corridors and key points are all in frame.
+   */
+  export const JAKARTA_VIEW_BBOX = {
+    minLon: 106.595,
+    minLat: -6.415,
+    maxLon: 107.02,
+    maxLat: -6.07,
+  };
+
+  /**
+   * Real key sites plotted as markers on the operational map. Each `corridorId`
+   * matches a JAKARTA_CORRIDOR_AREAS id so the marker takes that corridor's
+   * live exposure colour. Coordinates are [lat, lon] (Leaflet order).
+   */
+  export interface JakartaKeyPoint {
+    /** Matches a JAKARTA_CORRIDOR_AREAS id (drives exposure colour). */
+    corridorId: string;
+    /** Short site label shown on the map. */
+    label: string;
+    lat: number;
+    lon: number;
+    /** Label anchor relative to the marker. */
+    labelSide?: "top" | "bottom" | "left" | "right";
+  }
+
+  export const JAKARTA_KEY_POINTS: JakartaKeyPoint[] = [
+    { corridorId: "central-government", label: "Government district", lat: -6.1754, lon: 106.8272, labelSide: "left" },
+    { corridorId: "commercial-hotels", label: "Central business district", lat: -6.2249, lon: 106.8095, labelSide: "bottom" },
+    { corridorId: "airport-corridor", label: "Soekarno-Hatta Airport", lat: -6.1256, lon: 106.6559, labelSide: "top" },
+    { corridorId: "north-port", label: "Tanjung Priok port", lat: -6.1048, lon: 106.8806, labelSide: "right" },
+  ];
+
+  /**
+   * Indicative movement corridors plotted as route lines. Each `corridorId`
+   * matches a JAKARTA_CORRIDOR_AREAS id (drives exposure colour). `path` is an
+   * ordered list of [lat, lon] waypoints; `labelAt` is the path index used to
+   * anchor the corridor's label (defaults to the middle).
+   */
+  export interface JakartaCorridorLine {
+    corridorId: string;
+    label: string;
+    path: [number, number][];
+    labelAt?: number;
+  }
+
+  export const JAKARTA_CORRIDOR_LINES: JakartaCorridorLine[] = [
+    {
+      corridorId: "airport-corridor",
+      label: "Airport toll corridor",
+      path: [
+        [-6.2186, 106.8138],
+        [-6.1955, 106.7720],
+        [-6.1640, 106.7180],
+        [-6.1380, 106.6820],
+        [-6.1256, 106.6559],
+      ],
+      labelAt: 3,
+    },
+    {
+      corridorId: "north-port",
+      label: "Port access route",
+      path: [
+        [-6.1754, 106.8272],
+        [-6.1520, 106.8520],
+        [-6.1250, 106.8700],
+        [-6.1048, 106.8806],
+      ],
+      labelAt: 1,
+    },
+    {
+      corridorId: "cross-city-routes",
+      label: "Inner cross-city axis",
+      path: [
+        [-6.1370, 106.8130],
+        [-6.1754, 106.8272],
+        [-6.1944, 106.8229],
+        [-6.2186, 106.8138],
+        [-6.2435, 106.7997],
+      ],
+      labelAt: 3,
+    },
+    {
+      corridorId: "commuter-belt",
+      label: "Greater Jakarta commuter belt",
+      path: [
+        [-6.2300, 106.6450],
+        [-6.2900, 106.7100],
+        [-6.3760, 106.8200],
+        [-6.3300, 106.9300],
+        [-6.2410, 106.9920],
+      ],
+      labelAt: 2,
+    },
+  ];
