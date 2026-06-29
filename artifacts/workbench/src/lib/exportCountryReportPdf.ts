@@ -52,6 +52,7 @@ import { buildSituationalContext } from "./situationalContext";
 import { drawSituationalContextPdf } from "./situationalContextPdf";
 import {
   buildJakartaCorridorStatuses,
+  hazardSummaryLabel,
   type JakartaCorridorStatus,
 } from "./jakartaCorridors";
 import type { ReliefWebReport } from "@workspace/api-client-react";
@@ -227,9 +228,9 @@ function drawJakartaExposureTable(ctx: Ctx, statuses: JakartaCorridorStatus[]) {
       sanitize(`${s.number}. ${s.area.name}`),
       colAreaW - 8,
     );
-    const expLines: string[] = pdf.splitTextToSize(sanitize(s.area.exposure), colExpW - 8);
-    const relLines: string[] = pdf.splitTextToSize(sanitize(s.area.relevance), colRelW - 8);
-    const actLines: string[] = pdf.splitTextToSize(sanitize(s.area.action), colActW - 8);
+    const expLines: string[] = pdf.splitTextToSize(sanitize(hazardSummaryLabel(s)), colExpW - 8);
+    const relLines: string[] = pdf.splitTextToSize(sanitize(s.relevance), colRelW - 8);
+    const actLines: string[] = pdf.splitTextToSize(sanitize(s.action), colActW - 8);
     const statusLabel = s.elevated
       ? `Elevated · ${(SEV_LABEL[s.worstKey] ?? s.worstKey).toUpperCase()}`
       : "Monitored";

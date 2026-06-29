@@ -262,6 +262,178 @@ export function corridorIndexForIncident(
   return null;
 }
 
+// ===========================================================================
+// Live hazard classification — what was ACTUALLY reported this period
+// ===========================================================================
+//
+// The area descriptions are NOT standing templates. A hazard (flooding,
+// protest, crime…) is named ONLY when a live incident of that kind was
+// attributed to the area this period. An area with no live reporting shows a
+// neutral standing line that names NO active hazard; an area whose live records
+// match no recognised hazard shows a generic "security-relevant activity"
+// line. This keeps the map honest — it never asserts flooding when Jakarta is
+// not flooding, protests when none were reported, and so on for every category.
+
+export type JakartaHazard =
+  | "protest"
+  | "flooding"
+  | "crime"
+  | "fire"
+  | "traffic"
+  | "policing";
+
+// Fixed priority for ordering/labelling when several hazards co-occur.
+const HAZARD_PRIORITY: JakartaHazard[] = [
+  "protest",
+  "flooding",
+  "crime",
+  "fire",
+  "traffic",
+  "policing",
+];
+
+// Text patterns, tested in priority order (first match wins) over the
+// masthead-stripped headline + location, so e.g. "police fire teargas at
+// protest" reads as protest, not fire, and "gunmen open fire" reads as crime.
+const HAZARD_PATTERNS: { hazard: JakartaHazard; re: RegExp }[] = [
+  {
+    hazard: "protest",
+    re: /(protest|demonstrat|unrest|rally|riot|blockad|\bstrike|walkout|sit-in|\bdemo\b|labour action)/i,
+  },
+  {
+    hazard: "flooding",
+    re: /(flood|banjir|inundat|deluge|waterlogg|heavy rain)/i,
+  },
+  {
+    hazard: "crime",
+    re: /(robber|theft|burglar|break-in|carjack|assault|murder|homicid|stabb|shoot|gunm|gunfire|open fire|kidnap|extort|looting|\bcrime\b)/i,
+  },
+  {
+    hazard: "fire",
+    re: /(\bfire\b|blaze|wildfire|explos|conflagration)/i,
+  },
+  {
+    hazard: "traffic",
+    re: /(traffic|congestion|macet|gridlock|\btoll\b|highway|motorway|road closure|derail|\btrain\b|\bkrl\b|\bmrt\b|\blrt\b|busway|transjakarta|collision|pile-up)/i,
+  },
+  {
+    hazard: "policing",
+    re: /(police|raid|\barrest|crackdown|security operation|patrol|detain|manhunt)/i,
+  },
+];
+
+// Classify a single incident's hazard from its text, or null when it matches no
+// recognised hazard. Mirrors the corridor attribution's masthead strip.
+export function hazardForIncident(
+  i: CountryFastFactsIncident,
+): JakartaHazard | null {
+  const loc = (i.location ?? "").toLowerCase();
+  const title = stripMasthead(
+    ((i.displayTitle && i.displayTitle.trim()) || i.title || "").trim(),
+  ).toLowerCase();
+  const hay = `${loc} ${title}`;
+  for (const { hazard, re } of HAZARD_PATTERNS) {
+    if (re.test(hay)) return hazard;
+  }
+  return null;
+}
+
+// Short factual noun phrase per hazard (lower-case, for the "… was reported"
+// lead). "fire incidents" is the only plural.
+const HAZARD_LEAD: Record<JakartaHazard, string> = {
+  protest: "protest activity",
+  flooding: "flooding or heavy rain",
+  crime: "crime",
+  fire: "fire incidents",
+  traffic: "traffic or transport disruption",
+  policing: "policing activity",
+};
+
+// Practical action per hazard (used when that hazard led the area this period).
+const HAZARD_ACTION: Record<JakartaHazard, string> = {
+  protest:
+    "Check protest activity and hold alternative routes before travelling in.",
+  flooding:
+    "Check affected routes on heavy-rain days and allow extra time.",
+  crime:
+    "Maintain caution around after-hours movement and exposed public areas.",
+  fire: "Confirm the status of affected areas before movement.",
+  traffic: "Build in time buffers and brief drivers on possible closures.",
+  policing:
+    "Verify local conditions before travel; security activity can briefly restrict access.",
+};
+
+// Short Title-Case label per hazard, for the headless PDF "main exposure"
+// column. Built ONLY from hazards actually reported this period.
+const HAZARD_LABEL: Record<JakartaHazard, string> = {
+  protest: "Protest",
+  flooding: "Flooding / heavy rain",
+  crime: "Crime",
+  fire: "Fire",
+  traffic: "Traffic",
+  policing: "Policing",
+};
+
+// Short locative used in the factual lead, per area id.
+const AREA_LOCATIVE: Record<string, string> = {
+  "central-government": "around the central government district",
+  "commercial-hotels": "across the main commercial and hotel areas",
+  "airport-corridor": "on the Soekarno-Hatta airport corridor",
+  "north-port": "around North Jakarta and the port area",
+  "commuter-belt": "across the Greater Jakarta commuter belt",
+  "cross-city-routes": "on the main cross-city movement routes",
+};
+
+function joinHazardLeads(xs: string[]): string {
+  const a = xs.filter((s) => s.length > 0);
+  if (a.length <= 1) return a[0] ?? "";
+  if (a.length === 2) return `${a[0]} and ${a[1]}`;
+  return `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`;
+}
+
+// Build the display-ready relevance + action for an area from what was ACTUALLY
+// reported this period. No live reporting → neutral standing line (no hazard
+// named). Live reporting but no recognised hazard → generic line. Otherwise the
+// line names only the hazards that occurred, in priority order.
+export function buildAreaProse(
+  areaId: string,
+  count: number,
+  hazards: JakartaHazard[],
+): { relevance: string; action: string } {
+  const loc = AREA_LOCATIVE[areaId] ?? "here";
+  if (count === 0) {
+    return {
+      relevance:
+        "No specific incidents were reported here this period; the area's standing movement and access considerations continue to apply.",
+      action: "Confirm local conditions before travel.",
+    };
+  }
+  const ordered = HAZARD_PRIORITY.filter((h) => hazards.includes(h));
+  if (ordered.length === 0) {
+    return {
+      relevance: `Security-relevant activity was reported ${loc} this period.`,
+      action: "Confirm local conditions before travel.",
+    };
+  }
+  const lead = joinHazardLeads(ordered.map((h) => HAZARD_LEAD[h]));
+  const verb =
+    ordered.length > 1 ? "were" : ordered[0] === "fire" ? "were" : "was";
+  const relevance = `${lead.charAt(0).toUpperCase()}${lead.slice(1)} ${verb} reported ${loc} this period.`;
+  return { relevance, action: HAZARD_ACTION[ordered[0]] };
+}
+
+// Short "main exposure" summary for the headless PDF table column, derived from
+// what was ACTUALLY reported this period — never a standing hazard template, so
+// the PDF never names a hazard the on-screen map does not.
+export function hazardSummaryLabel(status: {
+  count: number;
+  hazards: JakartaHazard[];
+}): string {
+  if (status.count === 0) return "Standing profile";
+  if (status.hazards.length === 0) return "Security-relevant activity";
+  return status.hazards.map((h) => HAZARD_LABEL[h]).join(", ");
+}
+
 export interface JakartaCorridorStatus {
   area: JakartaCorridorArea;
   /** 1-based display number. */
@@ -272,6 +444,12 @@ export interface JakartaCorridorStatus {
   worstKey: string;
   /** True when the area carried live reporting this period. */
   elevated: boolean;
+  /** Hazards actually reported in the area this period (priority order). */
+  hazards: JakartaHazard[];
+  /** Display-ready relevance line, derived from this period's reporting. */
+  relevance: string;
+  /** Display-ready action line, derived from this period's reporting. */
+  action: string;
   /** The area's standing operating-exposure profile (window-independent). */
   baselineExposure: JakartaExposureLevel;
   /** Operating-exposure derived from this period's worst severity, or null
@@ -288,6 +466,7 @@ export function buildJakartaCorridorStatuses(
   areas: JakartaCorridorArea[] = JAKARTA_CORRIDOR_AREAS,
 ): { statuses: JakartaCorridorStatus[]; unattributed: number } {
   const counts = areas.map(() => ({ count: 0, worstRank: 0, worstKey: "" }));
+  const hazardSets: Set<JakartaHazard>[] = areas.map(() => new Set());
   let unattributed = 0;
   for (const i of incidents) {
     const a = corridorIndexForIncident(i, areas);
@@ -303,6 +482,8 @@ export function buildJakartaCorridorStatuses(
       c.worstRank = r;
       c.worstKey = k;
     }
+    const hz = hazardForIncident(i);
+    if (hz) hazardSets[a].add(hz);
   }
   const statuses = areas.map((area, idx) => {
     const c = counts[idx];
@@ -312,12 +493,17 @@ export function buildJakartaCorridorStatuses(
     const displayExposure = liveExposure
       ? maxExposure(baselineExposure, liveExposure)
       : baselineExposure;
+    const hazards = HAZARD_PRIORITY.filter((h) => hazardSets[idx].has(h));
+    const prose = buildAreaProse(area.id, c.count, hazards);
     return {
       area,
       number: idx + 1,
       count: c.count,
       worstKey: c.count > 0 ? c.worstKey : "",
       elevated: c.count > 0,
+      hazards,
+      relevance: prose.relevance,
+      action: prose.action,
       baselineExposure,
       liveExposure,
       displayExposure,

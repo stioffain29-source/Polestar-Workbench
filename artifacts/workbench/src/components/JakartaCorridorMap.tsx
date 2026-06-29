@@ -653,8 +653,8 @@ export default function JakartaCorridorMap({
         const last = pts[pts.length - 1];
         ctx.lineTo(last.x, last.y);
       };
-      const outer = style.thin ? 8 : 22;
-      const inner = style.thin ? 3.5 : 12;
+      const outer = style.thin ? 6 : 13;
+      const inner = style.thin ? 2.8 : 6;
       ctx.setLineDash([]);
       trace();
       ctx.lineWidth = outer;
@@ -663,7 +663,7 @@ export default function JakartaCorridorMap({
       trace();
       ctx.lineWidth = inner;
       ctx.strokeStyle = `rgba(${r},${g},${b},0.92)`;
-      if (style.dashed) ctx.setLineDash(style.thin ? [3, 5] : [12, 9]);
+      if (style.dashed) ctx.setLineDash(style.thin ? [3, 5] : [9, 7]);
       ctx.stroke();
       ctx.setLineDash([]);
     };
@@ -1292,7 +1292,7 @@ function RankedList({
                   marginTop: 6,
                 }}
               >
-                {s.area.relevance}
+                {s.relevance}
               </div>
               <div
                 style={{
@@ -1304,7 +1304,7 @@ function RankedList({
                 }}
               >
                 <span style={{ fontWeight: 700, color: NAVY }}>Action: </span>
-                {s.area.action}
+                {s.action}
               </div>
             </div>
           </div>

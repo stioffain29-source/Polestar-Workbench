@@ -6,6 +6,7 @@ import {
   JAKARTA_EXPOSURE_RANK,
   corridorIndexForIncident,
   buildJakartaCorridorStatuses,
+  hazardSummaryLabel,
   severityToExposure,
   maxExposure,
 } from "../../artifacts/workbench/src/lib/jakartaCorridors";
@@ -200,5 +201,62 @@ describe("buildJakartaCorridorStatuses — this-week elevation", () => {
     ]);
     expect(unattributed).toBe(1);
     expect(statuses.every((s) => s.count === 0)).toBe(true);
+  });
+});
+
+describe("dynamic hazard prose — names a hazard ONLY when reported", () => {
+  it("names no hazard for an empty window (neutral standing line)", () => {
+    const { statuses } = buildJakartaCorridorStatuses([]);
+    for (const s of statuses) {
+      expect(s.count).toBe(0);
+      expect(hazardSummaryLabel(s)).toBe("Standing profile");
+      expect(s.relevance).toContain("No specific incidents were reported");
+      expect(s.relevance).not.toMatch(/flood|protest|crime|\bfire\b|traffic/i);
+    }
+  });
+
+  it("names protest only where a protest was reported", () => {
+    const { statuses } = buildJakartaCorridorStatuses([
+      incident({
+        location: "Menteng",
+        title: "Large demonstration outside ministry",
+        severity: "high",
+      }),
+    ]);
+    const central = statuses[CENTRAL_IDX];
+    expect(hazardSummaryLabel(central)).toBe("Protest");
+    expect(central.relevance).toContain("Protest activity was reported");
+    // An unaffected area must not inherit the protest claim.
+    expect(hazardSummaryLabel(statuses[COMMUTER_IDX])).toBe("Standing profile");
+    expect(statuses[COMMUTER_IDX].relevance).not.toMatch(/protest/i);
+  });
+
+  it("names flooding disjunctively when flooding or heavy rain is reported", () => {
+    const { statuses } = buildJakartaCorridorStatuses([
+      incident({
+        location: "Bekasi",
+        title: "Heavy rain floods commuter routes",
+        severity: "moderate",
+      }),
+    ]);
+    const commuter = statuses[COMMUTER_IDX];
+    expect(commuter.count).toBe(1);
+    expect(hazardSummaryLabel(commuter)).toBe("Flooding / heavy rain");
+    expect(commuter.relevance).toContain("Flooding or heavy rain was reported");
+  });
+
+  it("does NOT claim flooding for a landslide-only record", () => {
+    const { statuses } = buildJakartaCorridorStatuses([
+      incident({
+        location: "Bekasi",
+        title: "Landslide damages homes",
+        severity: "moderate",
+      }),
+    ]);
+    const commuter = statuses[COMMUTER_IDX];
+    expect(commuter.count).toBe(1);
+    expect(commuter.relevance).not.toMatch(/flood/i);
+    expect(commuter.relevance).toContain("Security-relevant activity was reported");
+    expect(hazardSummaryLabel(commuter)).toBe("Security-relevant activity");
   });
 });
