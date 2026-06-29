@@ -440,6 +440,11 @@ export const ReportRiskRating = {
   extreme: 'extreme',
 } as const;
 
+/**
+ * @nullable
+ */
+export type ReportConflictAreaReads = {[key: string]: string} | null;
+
 export interface KpiCard {
   label: string;
   value: string;
@@ -536,6 +541,28 @@ export interface Report {
   /** @nullable */
   regionalCountryRead?: string | null;
   /** @nullable */
+  chokepointRouteRead?: string | null;
+  /** @nullable */
+  vesselPiracyRead?: string | null;
+  /** @nullable */
+  commercialImpactRead?: string | null;
+  /** @nullable */
+  maritimeSecurityRead?: string | null;
+  /** @nullable */
+  cargoSecurityRead?: string | null;
+  /** @nullable */
+  logisticsHubRead?: string | null;
+  /** @nullable */
+  fuelMarketRead?: string | null;
+  /** @nullable */
+  fuelOperationalRead?: string | null;
+  /** @nullable */
+  fuelRegionalHighlights?: string | null;
+  /** @nullable */
+  conflictOtherWatchedRead?: string | null;
+  /** @nullable */
+  conflictAreaReads?: ReportConflictAreaReads;
+  /** @nullable */
   author?: string | null;
   createdAt: string;
 }
@@ -553,6 +580,8 @@ export const ReportInputRiskRating = {
   high: 'high',
   extreme: 'extreme',
 } as const;
+
+export type ReportInputConflictAreaReads = {[key: string]: string};
 
 export interface ReportInput {
   title: string;
@@ -574,6 +603,17 @@ export interface ReportInput {
   civilUnrestRead?: string;
   forecastRead?: string;
   regionalCountryRead?: string;
+  chokepointRouteRead?: string;
+  vesselPiracyRead?: string;
+  commercialImpactRead?: string;
+  maritimeSecurityRead?: string;
+  cargoSecurityRead?: string;
+  logisticsHubRead?: string;
+  fuelMarketRead?: string;
+  fuelOperationalRead?: string;
+  fuelRegionalHighlights?: string;
+  conflictOtherWatchedRead?: string;
+  conflictAreaReads?: ReportInputConflictAreaReads;
   author?: string;
 }
 
@@ -590,6 +630,8 @@ export const ReportUpdateRiskRating = {
   high: 'high',
   extreme: 'extreme',
 } as const;
+
+export type ReportUpdateConflictAreaReads = {[key: string]: string};
 
 export interface ReportUpdate {
   title?: string;
@@ -611,6 +653,17 @@ export interface ReportUpdate {
   civilUnrestRead?: string;
   forecastRead?: string;
   regionalCountryRead?: string;
+  chokepointRouteRead?: string;
+  vesselPiracyRead?: string;
+  commercialImpactRead?: string;
+  maritimeSecurityRead?: string;
+  cargoSecurityRead?: string;
+  logisticsHubRead?: string;
+  fuelMarketRead?: string;
+  fuelOperationalRead?: string;
+  fuelRegionalHighlights?: string;
+  conflictOtherWatchedRead?: string;
+  conflictAreaReads?: ReportUpdateConflictAreaReads;
   author?: string;
 }
 

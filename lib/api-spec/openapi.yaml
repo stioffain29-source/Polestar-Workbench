@@ -1923,6 +1923,17 @@ components:
         civilUnrestRead: { type: ["string", "null"] }
         forecastRead: { type: ["string", "null"] }
         regionalCountryRead: { type: ["string", "null"] }
+        chokepointRouteRead: { type: ["string", "null"] }
+        vesselPiracyRead: { type: ["string", "null"] }
+        commercialImpactRead: { type: ["string", "null"] }
+        maritimeSecurityRead: { type: ["string", "null"] }
+        cargoSecurityRead: { type: ["string", "null"] }
+        logisticsHubRead: { type: ["string", "null"] }
+        fuelMarketRead: { type: ["string", "null"] }
+        fuelOperationalRead: { type: ["string", "null"] }
+        fuelRegionalHighlights: { type: ["string", "null"] }
+        conflictOtherWatchedRead: { type: ["string", "null"] }
+        conflictAreaReads: { type: ["object", "null"], additionalProperties: { type: string } }
         author: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
 
@@ -2059,6 +2070,17 @@ components:
         civilUnrestRead: { type: string }
         forecastRead: { type: string }
         regionalCountryRead: { type: string }
+        chokepointRouteRead: { type: string }
+        vesselPiracyRead: { type: string }
+        commercialImpactRead: { type: string }
+        maritimeSecurityRead: { type: string }
+        cargoSecurityRead: { type: string }
+        logisticsHubRead: { type: string }
+        fuelMarketRead: { type: string }
+        fuelOperationalRead: { type: string }
+        fuelRegionalHighlights: { type: string }
+        conflictOtherWatchedRead: { type: string }
+        conflictAreaReads: { type: object, additionalProperties: { type: string } }
         author: { type: string }
 
     ReportUpdate:
@@ -2086,6 +2108,17 @@ components:
         civilUnrestRead: { type: string }
         forecastRead: { type: string }
         regionalCountryRead: { type: string }
+        chokepointRouteRead: { type: string }
+        vesselPiracyRead: { type: string }
+        commercialImpactRead: { type: string }
+        maritimeSecurityRead: { type: string }
+        cargoSecurityRead: { type: string }
+        logisticsHubRead: { type: string }
+        fuelMarketRead: { type: string }
+        fuelOperationalRead: { type: string }
+        fuelRegionalHighlights: { type: string }
+        conflictOtherWatchedRead: { type: string }
+        conflictAreaReads: { type: object, additionalProperties: { type: string } }
         author: { type: string }
 
     SpotReportExportEntry:

@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { pickRead } from "@/lib/pickRead";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildConflictReportDataset,
@@ -63,7 +64,7 @@ export interface ConflictPreviewReport {
   title?: string;
   topic?: string;
   issueDate?: string;
-  author?: string | null;
+  author?: string | null; conflictOtherWatchedRead?: string | null; conflictAreaReads?: Record<string, string> | null;
   situation?: string | null;
   whatMatters?: string | null;
   watchNext?: string | null;
@@ -264,7 +265,7 @@ function SeverityChip({ sevKey: k, label }: { sevKey: string; label: string }) {
   );
 }
 
-function AreaBlock({ area }: { area: ConflictEnrichedAreaLike }) {
+function AreaBlock({ area, read }: { area: ConflictEnrichedAreaLike; read: string }) {
   return (
     <div className="mb-5">
       <h3
@@ -279,7 +280,7 @@ function AreaBlock({ area }: { area: ConflictEnrichedAreaLike }) {
       >
         {area.theatre}
       </h3>
-      <Paragraphs text={area.paragraph} />
+      <Paragraphs text={read} />
     </div>
   );
 }
@@ -538,13 +539,13 @@ export default function ConflictReportPreview({
             </p>
           ) : (
             ds.topActivityAreas.map((area) => (
-              <AreaBlock key={area.theatre} area={area} />
+              <AreaBlock key={area.theatre} area={area} read={pickRead(report.conflictAreaReads?.[area.theatre], area.paragraph)} />
             ))
           )}
         </Section>
 
         <Section title="Other Watched Theatres">
-          <Paragraphs text={ds.autoOtherWatched} />
+          <Paragraphs text={pickRead(report.conflictOtherWatchedRead, ds.autoOtherWatched)} />
         </Section>
 
         <Section title="What Matters for Business">

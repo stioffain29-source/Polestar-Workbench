@@ -263,6 +263,45 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS regional_country_read text`,
     );
 
+    // Schema: topic-specific editable data-driven "reads" for shipping, cargo,
+    // fuel and conflict (same blank/NULL → generated-read fallback semantics as
+    // the flashpoint reads above). regional_country_read (added above) is reused
+    // for shipping + cargo regional sections. drizzle push only reaches dev, so
+    // the writable prod primary gains these on boot. Idempotent — IF NOT EXISTS.
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS chokepoint_route_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS vessel_piracy_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS commercial_impact_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS maritime_security_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS cargo_security_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS logistics_hub_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS fuel_market_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS fuel_operational_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS fuel_regional_highlights text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS conflict_other_watched_read text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS conflict_area_reads jsonb`,
+    );
+
     // Schema: analyst-attached photographs on spot reports (resized data URLs +
     // optional captions), rendered after Incident Details on screen and in the
     // DOM-rasterised PDF. drizzle push only reaches dev, so the writable prod

@@ -44,6 +44,7 @@ import {
   type TopicAiProse,
 } from "./topicProseResolution";
 import { LOCATION_NOT_IDENTIFIED as _LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
+import { pickRead } from "./pickRead";
 import {
   buildShippingReportDataset,
   type ShippingReportIncident,
@@ -152,6 +153,12 @@ export interface ShippingReportData {
   implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
+  // Analyst overrides for each data-driven read (blank → live generated read).
+  chokepointRouteRead?: string | null;
+  vesselPiracyRead?: string | null;
+  commercialImpactRead?: string | null;
+  maritimeSecurityRead?: string | null;
+  regionalCountryRead?: string | null;
 }
 
 export type { ShippingReportIncident };
@@ -609,10 +616,14 @@ function drawRelatedIncidents(
 // same order, so preview == PDF. These events are a standalone source and are
 // never part of any incident count.
 
-function drawMaritimeSecurity(ctx: Ctx, summary: MaritimeSecuritySummary) {
+function drawMaritimeSecurity(
+  ctx: Ctx,
+  summary: MaritimeSecuritySummary,
+  read: string,
+) {
   ensureSpace(ctx, 24 + 30);
   drawSectionHeading(ctx, "Maritime Security (ICC CCS / IMB)");
-  renderProse(ctx, summary.read);
+  renderProse(ctx, read);
 
   const { pdf, MX, CW } = ctx;
 
@@ -1167,14 +1178,18 @@ export async function exportShippingReportPdf(
   drawFastFactsKpiCards(ctx, ds.fastFacts);
 
   // Chokepoint / Route Read — prose leads the chokepoint table.
-  drawSectionWithProse(ctx, "Chokepoint / Route Read", ds.chokepointRouteRead);
+  drawSectionWithProse(
+    ctx,
+    "Chokepoint / Route Read",
+    pickRead(data.chokepointRouteRead, ds.chokepointRouteRead),
+  );
   drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
 
   // Vessel Threat and Piracy Read — prose leads both window tables.
   drawSectionWithProse(
     ctx,
     "Vessel Threat and Piracy Read",
-    ds.vesselPiracyRead,
+    pickRead(data.vesselPiracyRead, ds.vesselPiracyRead),
   );
   drawIncidentTable<VesselRow>(
     ctx,
@@ -1200,7 +1215,11 @@ export async function exportShippingReportPdf(
   // Maritime Security (ICC CCS / IMB) — standalone source, drawn in the SAME
   // order ShippingReportPreview renders it (preview == PDF). These events are
   // never part of any incident count above.
-  drawMaritimeSecurity(ctx, ds.maritimeSecurity);
+  drawMaritimeSecurity(
+    ctx,
+    ds.maritimeSecurity,
+    pickRead(data.maritimeSecurityRead, ds.maritimeSecurity.read),
+  );
 
   // Commercial Impact on Shipping — prose leads the operational
   // commercial-pressure table; pure market commentary is filtered out
@@ -1208,7 +1227,7 @@ export async function exportShippingReportPdf(
   drawSectionWithProse(
     ctx,
     "Commercial Impact on Shipping",
-    ds.commercialImpactRead,
+    pickRead(data.commercialImpactRead, ds.commercialImpactRead),
   );
   drawIncidentTable<EnrichedIncident>(ctx, null, ds.commercialRows, {
     showActColumn: true,
@@ -1221,7 +1240,7 @@ export async function exportShippingReportPdf(
   drawSectionWithProse(
     ctx,
     "Regional and Country View",
-    ds.regionalCountryRead,
+    pickRead(data.regionalCountryRead, ds.regionalCountryRead),
   );
   drawHorizontalBarChart(ctx, "Records by Region", ds.regionRows, {
     labelW: 160,

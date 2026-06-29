@@ -95,6 +95,7 @@ import {
   type CargoCountryRow,
   type CargoPortBreakdown,
 } from "./cargoNarratives";
+import { pickRead } from "./pickRead";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
  *  market data and the caller did not pass allowMissingMarketData. The
@@ -136,6 +137,13 @@ export interface TopicReportData {
   implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
+  // Analyst overrides for the data-driven reads (blank → live generated read).
+  cargoSecurityRead?: string | null;
+  logisticsHubRead?: string | null;
+  regionalCountryRead?: string | null;
+  fuelMarketRead?: string | null;
+  fuelOperationalRead?: string | null;
+  fuelRegionalHighlights?: string | null;
   /**
    * Raw report.hardNumbers jsonb. Parsed by jetFuelTrajectory.ts to drive
    * the Jet Fuel Price Trajectory chart and the jet fuel hard-number card.
@@ -1030,7 +1038,10 @@ export async function exportTopicReportPdf(
       if (body && body.trim()) drawSectionWithProse(ctx, label, body);
     };
 
-    renderProseSection("Market Read", fuelData.marketData.marketRead);
+    renderProseSection(
+      "Market Read",
+      pickRead(data.fuelMarketRead, fuelData.marketData.marketRead),
+    );
     renderProseSection(
       "Situation",
       resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
@@ -1045,11 +1056,14 @@ export async function exportTopicReportPdf(
     );
     renderProseSection(
       "Operational Read",
-      fuelData.incidentData.operationalRead,
+      pickRead(data.fuelOperationalRead, fuelData.incidentData.operationalRead),
     );
     renderProseSection(
       "Regional Highlights",
-      fuelData.incidentData.regionalHighlights,
+      pickRead(
+        data.fuelRegionalHighlights,
+        fuelData.incidentData.regionalHighlights,
+      ),
     );
     if (fuelData.incidentData.producerBuyerActions.length > 0) {
       // Guard against an orphaned section heading: if there isn't room
@@ -1137,8 +1151,8 @@ export async function exportTopicReportPdf(
       // Cargo Security Read + Logistics Hub Read lead the analysis, in the same
       // order the on-screen preview renders them.
       for (const [label, body] of [
-        ["Cargo Security Read", cargoSecurity],
-        ["Logistics Hub Read", cargoNode],
+        ["Cargo Security Read", pickRead(data.cargoSecurityRead, cargoSecurity)],
+        ["Logistics Hub Read", pickRead(data.logisticsHubRead, cargoNode)],
       ] as [string, string][]) {
         if (body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
@@ -1151,8 +1165,12 @@ export async function exportTopicReportPdf(
         ensureSpace(ctx, 24 + 20 + 56);
         drawSectionHeading(ctx, "Country Risk Breakdown");
         drawCargoCountryTable(ctx, cargoCountry.rows);
-        if (cargoCountry.regionalRead && cargoCountry.regionalRead.trim()) {
-          drawSectionWithProse(ctx, "Regional Read", cargoCountry.regionalRead);
+        const cargoRegionalRead = pickRead(
+          data.regionalCountryRead,
+          cargoCountry.regionalRead,
+        );
+        if (cargoRegionalRead.trim()) {
+          drawSectionWithProse(ctx, "Regional Read", cargoRegionalRead);
         }
       }
       const cargoPorts = buildCargoPortBreakdown(windowIncidents);

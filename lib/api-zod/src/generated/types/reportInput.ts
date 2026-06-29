@@ -7,6 +7,7 @@
  */
 import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { KpiCard } from './kpiCard';
+import type { ReportInputConflictAreaReads } from './reportInputConflictAreaReads';
 import type { ReportInputRiskRating } from './reportInputRiskRating';
 import type { ReportStatus } from './reportStatus';
 import type { Topic } from './topic';
@@ -31,5 +32,16 @@ export interface ReportInput {
   civilUnrestRead?: string;
   forecastRead?: string;
   regionalCountryRead?: string;
+  chokepointRouteRead?: string;
+  vesselPiracyRead?: string;
+  commercialImpactRead?: string;
+  maritimeSecurityRead?: string;
+  cargoSecurityRead?: string;
+  logisticsHubRead?: string;
+  fuelMarketRead?: string;
+  fuelOperationalRead?: string;
+  fuelRegionalHighlights?: string;
+  conflictOtherWatchedRead?: string;
+  conflictAreaReads?: ReportInputConflictAreaReads;
   author?: string;
 }

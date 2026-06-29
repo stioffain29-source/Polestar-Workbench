@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
+import { pickRead } from "@/lib/pickRead";
 import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
@@ -76,7 +77,7 @@ export interface ReportPreviewData {
   whatHappened?: string | null;
   whatMatters?: string | null;
   implications?: string | null;
-  polestarView?: string | null;
+  polestarView?: string | null; cargoSecurityRead?: string | null; logisticsHubRead?: string | null; regionalCountryRead?: string | null; fuelMarketRead?: string | null; fuelOperationalRead?: string | null; fuelRegionalHighlights?: string | null;
   watchNext?: string | null;
   /**
    * Raw jsonb from report.hardNumbers. Parsed by jetFuelTrajectory.ts.
@@ -939,11 +940,11 @@ export default function ReportPreview({
               )}
             </Section>
 
-            <NarrativeSection title="Market Read" text={fuelData.marketData.marketRead} />
+            <NarrativeSection title="Market Read" text={pickRead(report.fuelMarketRead, fuelData.marketData.marketRead)} />
             <NarrativeSection title="Situation" text={resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)} />
             <NarrativeSection title="What Happened" text={resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)} />
-            <NarrativeSection title="Operational Read" text={fuelData.incidentData.operationalRead} />
-            <NarrativeSection title="Regional Highlights" text={fuelData.incidentData.regionalHighlights} />
+            <NarrativeSection title="Operational Read" text={pickRead(report.fuelOperationalRead, fuelData.incidentData.operationalRead)} />
+            <NarrativeSection title="Regional Highlights" text={pickRead(report.fuelRegionalHighlights, fuelData.incidentData.regionalHighlights)} />
             {fuelData.incidentData.producerBuyerActions.length > 0 && (
               <Section title="Producer and Buyer Actions">
                 <ProducerActionsTable rows={fuelData.incidentData.producerBuyerActions} />
@@ -967,31 +968,27 @@ export default function ReportPreview({
             )}
 
             {(() => {
-              const pick = (editor: string | null | undefined, auto: string): string => {
-                const t = (editor ?? "").trim();
-                return t.length > 0 ? t : auto;
-              };
               return (
                 <>
                   {isCargo && (
                     <>
                       <NarrativeSection
                         title="Cargo Security Read"
-                        text={buildCargoSecurityRead(cargoWindow)}
+                        text={pickRead(report.cargoSecurityRead, buildCargoSecurityRead(cargoWindow))}
                       />
                       <NarrativeSection
                         title="Logistics Hub Read"
-                        text={buildLogisticsHubRead(cargoWindow)}
+                        text={pickRead(report.logisticsHubRead, buildLogisticsHubRead(cargoWindow))}
                       />
                       {cargoCountry && cargoCountry.rows.length > 0 && (
                         <>
                           <Section title="Country Risk Breakdown">
                             <CargoCountryTable rows={cargoCountry.rows} />
                           </Section>
-                          {cargoCountry.regionalRead && (
+                          {pickRead(report.regionalCountryRead, cargoCountry.regionalRead) && (
                             <NarrativeSection
                               title="Regional Read"
-                              text={cargoCountry.regionalRead}
+                              text={pickRead(report.regionalCountryRead, cargoCountry.regionalRead)}
                             />
                           )}
                         </>
@@ -1015,38 +1012,38 @@ export default function ReportPreview({
                   <NarrativeSection
                     title="Situation"
                     text={isCargo
-                      ? pick(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
+                      ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
                       : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
                   />
                   <NarrativeSection
                     title="What Happened"
                     text={isCargo
-                      ? pick(report.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(cargoWindow)))
+                      ? pickRead(report.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(cargoWindow)))
                       : resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)}
                   />
                   <NarrativeSection
                     title="What Matters"
                     text={isCargo
-                      ? pick(report.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(cargoWindow)))
+                      ? pickRead(report.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(cargoWindow)))
                       : resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)}
                   />
                   <BulletsSection
                     title="Implications for Business"
                     text={isCargo
-                      ? pick(report.implications, aiOr(aiProse?.implications, buildCargoImplications(cargoWindow)))
+                      ? pickRead(report.implications, aiOr(aiProse?.implications, buildCargoImplications(cargoWindow)))
                       : resolveSimpleProse(report.implications, aiProse?.implications, proseDraft.implications)}
                   />
                   <BulletsSection
                     title="Watch Next"
                     text={isCargo
-                      ? pick(report.watchNext, aiOr(aiProse?.watchNext, buildCargoWatchNext(cargoWindow)))
+                      ? pickRead(report.watchNext, aiOr(aiProse?.watchNext, buildCargoWatchNext(cargoWindow)))
                       : resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
                     max={8}
                   />
                   <NarrativeSection
                     title="Polestar View"
                     text={isCargo
-                      ? pick(report.polestarView, aiOr(aiProse?.polestarView, buildCargoPolestarView(cargoWindow)))
+                      ? pickRead(report.polestarView, aiOr(aiProse?.polestarView, buildCargoPolestarView(cargoWindow)))
                       : resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)}
                   />
                   {isCargo && cargoGrouped && (

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
+import { pickRead } from "@/lib/pickRead";
 import {
   resolveSimpleProse,
   stableDraftTopicReportProse,
@@ -96,7 +97,7 @@ export interface ShippingPreviewReport {
   whatMatters?: string | null;
   implications?: string | null;
   watchNext?: string | null;
-  polestarView?: string | null;
+  polestarView?: string | null; chokepointRouteRead?: string | null; vesselPiracyRead?: string | null; commercialImpactRead?: string | null; maritimeSecurityRead?: string | null; regionalCountryRead?: string | null;
 }
 
 function toBullets(text?: string | null, max = 7): string[] {
@@ -819,14 +820,14 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section title="Chokepoint / Route Read">
-          <Paragraphs text={ds.chokepointRouteRead} />
+          <Paragraphs text={pickRead(report.chokepointRouteRead, ds.chokepointRouteRead)} />
           <div className="mt-4">
             <ChokepointTable rows={ds.chokepointRows} />
           </div>
         </Section>
 
         <Section title="Vessel Threat and Piracy Read">
-          <Paragraphs text={ds.vesselPiracyRead} />
+          <Paragraphs text={pickRead(report.vesselPiracyRead, ds.vesselPiracyRead)} />
           <div
             className="uppercase mb-2 mt-4"
             style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
@@ -854,7 +855,7 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section title="Maritime Security (ICC CCS / IMB)">
-          <Paragraphs text={ds.maritimeSecurity.read} />
+          <Paragraphs text={pickRead(report.maritimeSecurityRead, ds.maritimeSecurity.read)} />
           {ds.maritimeSecurity.byType.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4 mb-3">
               {ds.maritimeSecurity.byType.map((b) => (
@@ -927,7 +928,7 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section title="Commercial Impact on Shipping">
-          <Paragraphs text={ds.commercialImpactRead} />
+          <Paragraphs text={pickRead(report.commercialImpactRead, ds.commercialImpactRead)} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.commercialRows}
@@ -939,7 +940,7 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section title="Regional and Country View">
-          <Paragraphs text={ds.regionalCountryRead} />
+          <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
           <div className="mt-4 mb-5">
             <div
               className="uppercase mb-2"

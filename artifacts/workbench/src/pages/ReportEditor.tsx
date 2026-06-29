@@ -132,6 +132,22 @@ interface FormState {
   civilUnrestRead: string;
   forecastRead: string;
   regionalCountryRead: string;
+  // Shipping reads (regionalCountryRead reused for "Regional & Country View").
+  chokepointRouteRead: string;
+  vesselPiracyRead: string;
+  commercialImpactRead: string;
+  maritimeSecurityRead: string;
+  // Cargo reads (regionalCountryRead reused for "Regional Read").
+  cargoSecurityRead: string;
+  logisticsHubRead: string;
+  // Fuel reads.
+  fuelMarketRead: string;
+  fuelOperationalRead: string;
+  fuelRegionalHighlights: string;
+  // Conflict: single Other Watched Theatres read + per-theatre map keyed by
+  // the activity-area theatre name.
+  conflictOtherWatchedRead: string;
+  conflictAreaReads: Record<string, string>;
   author: string;
 }
 
@@ -152,6 +168,17 @@ const EMPTY: FormState = {
   civilUnrestRead: "",
   forecastRead: "",
   regionalCountryRead: "",
+  chokepointRouteRead: "",
+  vesselPiracyRead: "",
+  commercialImpactRead: "",
+  maritimeSecurityRead: "",
+  cargoSecurityRead: "",
+  logisticsHubRead: "",
+  fuelMarketRead: "",
+  fuelOperationalRead: "",
+  fuelRegionalHighlights: "",
+  conflictOtherWatchedRead: "",
+  conflictAreaReads: {},
   author: "",
 };
 
@@ -263,6 +290,18 @@ export default function ReportEditor() {
     form.topic !== "flashpoint" &&
     form.topic !== "protests" &&
     form.topic !== "fuel";
+
+  // Theatre names for the conflict report's per-theatre "Top Activity Area"
+  // read overrides. Built from the SAME dataset the preview/PDF render, so the
+  // editor only offers a textarea for a theatre that actually appears.
+  const conflictAreaTheatres = useMemo<string[]>(() => {
+    if (form.topic !== "conflict") return [];
+    return buildConflictReportDataset(
+      incidentsForExport,
+      form.topic,
+      form.issueDate,
+    ).topActivityAreas.map((a) => a.theatre);
+  }, [form.topic, form.issueDate, incidentsForExport]);
 
   const relatedForSummaries = useMemo(() => {
     if (!summariesEnabled) return [];
@@ -581,6 +620,17 @@ export default function ReportEditor() {
         civilUnrestRead: form.civilUnrestRead,
         forecastRead: form.forecastRead,
         regionalCountryRead: form.regionalCountryRead,
+        chokepointRouteRead: form.chokepointRouteRead,
+        vesselPiracyRead: form.vesselPiracyRead,
+        commercialImpactRead: form.commercialImpactRead,
+        maritimeSecurityRead: form.maritimeSecurityRead,
+        cargoSecurityRead: form.cargoSecurityRead,
+        logisticsHubRead: form.logisticsHubRead,
+        fuelMarketRead: form.fuelMarketRead,
+        fuelOperationalRead: form.fuelOperationalRead,
+        fuelRegionalHighlights: form.fuelRegionalHighlights,
+        conflictOtherWatchedRead: form.conflictOtherWatchedRead,
+        conflictAreaReads: form.conflictAreaReads,
       };
 
       if (form.topic === "flashpoint" || form.topic === "protests") {
@@ -778,6 +828,22 @@ export default function ReportEditor() {
       regionalCountryRead: fpReads
         ? pick(report.regionalCountryRead, fpReads.regionalCountryRead)
         : "",
+      // Topic-specific reads (shipping/cargo/fuel/conflict) seed SAVED-ONLY:
+      // pick(saved, "") drops stale saved prose and otherwise returns the saved
+      // override or blank. A blank field renders the live generated read at
+      // render time (pickRead in the preview + PDF) — no dataset build needed
+      // here and no fabricated prose is frozen into the editor.
+      chokepointRouteRead: pick(report.chokepointRouteRead, ""),
+      vesselPiracyRead: pick(report.vesselPiracyRead, ""),
+      commercialImpactRead: pick(report.commercialImpactRead, ""),
+      maritimeSecurityRead: pick(report.maritimeSecurityRead, ""),
+      cargoSecurityRead: pick(report.cargoSecurityRead, ""),
+      logisticsHubRead: pick(report.logisticsHubRead, ""),
+      fuelMarketRead: pick(report.fuelMarketRead, ""),
+      fuelOperationalRead: pick(report.fuelOperationalRead, ""),
+      fuelRegionalHighlights: pick(report.fuelRegionalHighlights, ""),
+      conflictOtherWatchedRead: pick(report.conflictOtherWatchedRead, ""),
+      conflictAreaReads: proseIsStale ? {} : (report.conflictAreaReads ?? {}),
       author: report.author ?? "",
     });
   }, [report, incidents]);
@@ -875,11 +941,63 @@ export default function ReportEditor() {
       delete payload.implications;
       delete payload.executiveSummary;
     }
-    // Flashpoint/protests "reads" are analyst OVERRIDES. Persist a read only
-    // when it differs from the freshly-generated dataset read; an untouched or
-    // blank field stores "" so the report keeps rendering the live
-    // auto-generated read (no fabrication, no frozen-stale prose). Other topics
-    // never carry these columns.
+    // Data-driven "reads" are analyst OVERRIDES — a blank/NULL column renders
+    // the live generated read (no fabrication, no frozen-stale prose). Each
+    // topic carries only its own read columns, so delete every read that does
+    // not belong to the current topic before persisting. regionalCountryRead is
+    // SHARED by flashpoint/protests ("Regional & Country View"), shipping
+    // ("Regional & Country View") and cargo ("Regional Read").
+    const READ_KEYS_BY_TOPIC: Record<string, readonly string[]> = {
+      flashpoint: [
+        "activismRead",
+        "civilUnrestRead",
+        "forecastRead",
+        "regionalCountryRead",
+      ],
+      protests: [
+        "activismRead",
+        "civilUnrestRead",
+        "forecastRead",
+        "regionalCountryRead",
+      ],
+      shipping: [
+        "chokepointRouteRead",
+        "vesselPiracyRead",
+        "commercialImpactRead",
+        "maritimeSecurityRead",
+        "regionalCountryRead",
+      ],
+      cargo_watch: ["cargoSecurityRead", "logisticsHubRead", "regionalCountryRead"],
+      fuel: ["fuelMarketRead", "fuelOperationalRead", "fuelRegionalHighlights"],
+      conflict: ["conflictOtherWatchedRead", "conflictAreaReads"],
+    };
+    const ALL_READ_KEYS = [
+      "activismRead",
+      "civilUnrestRead",
+      "forecastRead",
+      "regionalCountryRead",
+      "chokepointRouteRead",
+      "vesselPiracyRead",
+      "commercialImpactRead",
+      "maritimeSecurityRead",
+      "cargoSecurityRead",
+      "logisticsHubRead",
+      "fuelMarketRead",
+      "fuelOperationalRead",
+      "fuelRegionalHighlights",
+      "conflictOtherWatchedRead",
+      "conflictAreaReads",
+    ] as const;
+    const keepReads = new Set(READ_KEYS_BY_TOPIC[form.topic] ?? []);
+    for (const key of ALL_READ_KEYS) {
+      if (!keepReads.has(key)) delete payload[key];
+    }
+
+    // Flashpoint/protests seed PRE-FILLED with the generated read, so persist a
+    // read only when it differs from a freshly-generated dataset read; an
+    // untouched field stores "" (renders the live auto read). Shipping, cargo
+    // and fuel seed SAVED-ONLY (blank box), so their form value already IS the
+    // override and flows through {...payload} unchanged.
     if (form.topic === "flashpoint" || form.topic === "protests") {
       const gen = buildFlashpointReportDataset(
         incidentsForExport,
@@ -900,11 +1018,16 @@ export default function ReportEditor() {
         form.regionalCountryRead,
         gen.regionalCountryRead,
       );
-    } else {
-      delete payload.activismRead;
-      delete payload.civilUnrestRead;
-      delete payload.forecastRead;
-      delete payload.regionalCountryRead;
+    } else if (form.topic === "conflict") {
+      // Conflict reads seed SAVED-ONLY too. Prune blank per-theatre entries so
+      // the JSONB map holds only genuine analyst overrides (each absent key
+      // renders that theatre's live auto read).
+      const pruned: Record<string, string> = {};
+      for (const [theatre, text] of Object.entries(form.conflictAreaReads)) {
+        const t = (text ?? "").trim();
+        if (t) pruned[theatre] = t;
+      }
+      payload.conflictAreaReads = pruned;
     }
     // Empty override → clear the stored rating (card pull falls back to the
     // computed/auto value). A set value persists the analyst's choice.
@@ -1343,6 +1466,158 @@ export default function ReportEditor() {
                   onChange={(e) => set("regionalCountryRead", e.target.value)}
                   className="rounded-sm"
                 />
+              </Field>
+            </>
+          )}
+          {/* Shipping/cargo/fuel/conflict render data-driven "reads" too. Each
+              textarea mirrors one preview + PDF section one-for-one; a blank box
+              renders the live generated read (no fabrication). Seeded
+              SAVED-ONLY, so an empty field means "use the auto read". */}
+          {form.topic === "shipping" && (
+            <>
+              <Field label="Chokepoint / Route Read">
+                <Textarea
+                  rows={5}
+                  value={form.chokepointRouteRead}
+                  onChange={(e) => set("chokepointRouteRead", e.target.value)}
+                  className="rounded-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Clear any read to restore the auto-generated text.
+                </p>
+              </Field>
+              <Field label="Vessel Threat and Piracy Read">
+                <Textarea
+                  rows={5}
+                  value={form.vesselPiracyRead}
+                  onChange={(e) => set("vesselPiracyRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Maritime Security (ICC CCS / IMB) Read">
+                <Textarea
+                  rows={5}
+                  value={form.maritimeSecurityRead}
+                  onChange={(e) => set("maritimeSecurityRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Commercial Impact on Shipping Read">
+                <Textarea
+                  rows={5}
+                  value={form.commercialImpactRead}
+                  onChange={(e) => set("commercialImpactRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Regional and Country View">
+                <Textarea
+                  rows={5}
+                  value={form.regionalCountryRead}
+                  onChange={(e) => set("regionalCountryRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+            </>
+          )}
+          {form.topic === "cargo_watch" && (
+            <>
+              <Field label="Cargo Security Read">
+                <Textarea
+                  rows={5}
+                  value={form.cargoSecurityRead}
+                  onChange={(e) => set("cargoSecurityRead", e.target.value)}
+                  className="rounded-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Clear any read to restore the auto-generated text.
+                </p>
+              </Field>
+              <Field label="Logistics Hub Read">
+                <Textarea
+                  rows={5}
+                  value={form.logisticsHubRead}
+                  onChange={(e) => set("logisticsHubRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Regional Read">
+                <Textarea
+                  rows={5}
+                  value={form.regionalCountryRead}
+                  onChange={(e) => set("regionalCountryRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+            </>
+          )}
+          {form.topic === "fuel" && (
+            <>
+              <Field label="Fuel Market Read">
+                <Textarea
+                  rows={5}
+                  value={form.fuelMarketRead}
+                  onChange={(e) => set("fuelMarketRead", e.target.value)}
+                  className="rounded-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Clear any read to restore the auto-generated text.
+                </p>
+              </Field>
+              <Field label="Fuel Operational Read">
+                <Textarea
+                  rows={5}
+                  value={form.fuelOperationalRead}
+                  onChange={(e) => set("fuelOperationalRead", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+              <Field label="Regional Highlights">
+                <Textarea
+                  rows={5}
+                  value={form.fuelRegionalHighlights}
+                  onChange={(e) => set("fuelRegionalHighlights", e.target.value)}
+                  className="rounded-sm"
+                />
+              </Field>
+            </>
+          )}
+          {form.topic === "conflict" && (
+            <>
+              {conflictAreaTheatres.map((theatre, idx) => (
+                <Field key={theatre} label={`Top Activity Area \u2014 ${theatre}`}>
+                  <Textarea
+                    rows={5}
+                    value={form.conflictAreaReads[theatre] ?? ""}
+                    onChange={(e) =>
+                      set("conflictAreaReads", {
+                        ...form.conflictAreaReads,
+                        [theatre]: e.target.value,
+                      })
+                    }
+                    className="rounded-sm"
+                  />
+                  {idx === 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Clear any read to restore the auto-generated text.
+                    </p>
+                  )}
+                </Field>
+              ))}
+              <Field label="Other Watched Theatres Read">
+                <Textarea
+                  rows={5}
+                  value={form.conflictOtherWatchedRead}
+                  onChange={(e) =>
+                    set("conflictOtherWatchedRead", e.target.value)
+                  }
+                  className="rounded-sm"
+                />
+                {conflictAreaTheatres.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Clear any read to restore the auto-generated text.
+                  </p>
+                )}
               </Field>
             </>
           )}

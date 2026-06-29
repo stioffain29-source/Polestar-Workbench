@@ -35,6 +35,7 @@ import {
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import { pickRead } from "./pickRead";
 import {
   buildConflictReportDataset,
   isGenericConflictProse,
@@ -65,6 +66,9 @@ export interface ConflictReportData {
   implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
+  // Analyst overrides for the conflict reads (blank → live generated read).
+  conflictOtherWatchedRead?: string | null;
+  conflictAreaReads?: Record<string, string> | null;
 }
 
 export type { ConflictReportIncident };
@@ -80,8 +84,14 @@ function pickProse(editor: string | null | undefined, auto: string): string {
 }
 
 // --- Top Activity Areas (country heading + paragraph each) ------------------
-function drawTopActivityAreas(ctx: Ctx, areas: ConflictActivityArea[]) {
+function drawTopActivityAreas(
+  ctx: Ctx,
+  areas: ConflictActivityArea[],
+  reads?: Record<string, string> | null,
+) {
   const { pdf, MX, CW } = ctx;
+  const resolveRead = (area: ConflictActivityArea): string =>
+    pickRead(reads?.[area.theatre], area.paragraph);
   if (areas.length === 0) {
     drawSectionHeading(ctx, "Top Activity Areas");
     setText(pdf, DUSK);
@@ -104,7 +114,7 @@ function drawTopActivityAreas(ctx: Ctx, areas: ConflictActivityArea[]) {
   setRoboto(pdf, "light");
   pdf.setFontSize(11);
   const firstLines: string[] = pdf.splitTextToSize(
-    sanitize(areas[0].paragraph),
+    sanitize(resolveRead(areas[0])),
     CW,
   );
   const headingBlockH = 14 + 14 + 8 + 16;
@@ -113,15 +123,16 @@ function drawTopActivityAreas(ctx: Ctx, areas: ConflictActivityArea[]) {
   drawSectionHeading(ctx, "Top Activity Areas");
 
   areas.forEach((area, idx) => {
+    const body = resolveRead(area);
     if (idx > 0) {
       setRoboto(pdf, "light");
       pdf.setFontSize(11);
-      const lines: string[] = pdf.splitTextToSize(sanitize(area.paragraph), CW);
+      const lines: string[] = pdf.splitTextToSize(sanitize(body), CW);
       const need = 16 + Math.min(lines.length, 3) * 17 + 10;
       if (ctx.y + need > ctx.H - ctx.BOTTOM) newPage(ctx);
     }
     drawSubtitle(ctx, area.theatre);
-    renderProse(ctx, area.paragraph);
+    renderProse(ctx, body);
   });
 }
 
@@ -321,13 +332,13 @@ export async function exportConflictReportPdf(
   drawFastFactsKpiCards(ctx, ds.fastFacts);
 
   // 3. Top Activity Areas (dynamic top-3 theatres, country heading + para).
-  drawTopActivityAreas(ctx, ds.topActivityAreas);
+  drawTopActivityAreas(ctx, ds.topActivityAreas, data.conflictAreaReads);
 
   // 4. Other Watched Theatres.
   drawSectionWithProse(
     ctx,
     "Other Watched Theatres",
-    ds.autoOtherWatched,
+    pickRead(data.conflictOtherWatchedRead, ds.autoOtherWatched),
   );
 
   // 5. What Matters for Business.

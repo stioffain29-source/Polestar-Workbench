@@ -7,6 +7,7 @@
  */
 import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { KpiCard } from './kpiCard';
+import type { ReportConflictAreaReads } from './reportConflictAreaReads';
 import type { ReportRiskRating } from './reportRiskRating';
 import type { ReportStatus } from './reportStatus';
 import type { Topic } from './topic';
@@ -44,6 +45,28 @@ export interface Report {
   forecastRead?: string | null;
   /** @nullable */
   regionalCountryRead?: string | null;
+  /** @nullable */
+  chokepointRouteRead?: string | null;
+  /** @nullable */
+  vesselPiracyRead?: string | null;
+  /** @nullable */
+  commercialImpactRead?: string | null;
+  /** @nullable */
+  maritimeSecurityRead?: string | null;
+  /** @nullable */
+  cargoSecurityRead?: string | null;
+  /** @nullable */
+  logisticsHubRead?: string | null;
+  /** @nullable */
+  fuelMarketRead?: string | null;
+  /** @nullable */
+  fuelOperationalRead?: string | null;
+  /** @nullable */
+  fuelRegionalHighlights?: string | null;
+  /** @nullable */
+  conflictOtherWatchedRead?: string | null;
+  /** @nullable */
+  conflictAreaReads?: ReportConflictAreaReads;
   /** @nullable */
   author?: string | null;
   createdAt: Date;

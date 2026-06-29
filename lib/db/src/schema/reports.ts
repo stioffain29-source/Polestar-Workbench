@@ -108,6 +108,28 @@ export const reportsTable = pgTable("reports", {
   civilUnrestRead: text("civil_unrest_read"),
   forecastRead: text("forecast_read"),
   regionalCountryRead: text("regional_country_read"),
+  // Topic-specific data-driven "reads" — editable analyst overrides with the
+  // SAME semantics as the flashpoint reads above: blank/NULL falls back to the
+  // dataset-generated read so the on-screen preview, the in-app PDF and the
+  // headless PDF stay identical and no prose is fabricated. regionalCountryRead
+  // (above) is REUSED for shipping "Regional & Country View" + cargo
+  // "Regional Read" (a report row is always a single topic, so no collision).
+  // Shipping:
+  chokepointRouteRead: text("chokepoint_route_read"),
+  vesselPiracyRead: text("vessel_piracy_read"),
+  commercialImpactRead: text("commercial_impact_read"),
+  maritimeSecurityRead: text("maritime_security_read"),
+  // Cargo Watch:
+  cargoSecurityRead: text("cargo_security_read"),
+  logisticsHubRead: text("logistics_hub_read"),
+  // Fuel:
+  fuelMarketRead: text("fuel_market_read"),
+  fuelOperationalRead: text("fuel_operational_read"),
+  fuelRegionalHighlights: text("fuel_regional_highlights"),
+  // Conflict: single Other Watched Theatres read + a per-theatre map keyed by
+  // the activity-area theatre name (Record<theatre, override>).
+  conflictOtherWatchedRead: text("conflict_other_watched_read"),
+  conflictAreaReads: jsonb("conflict_area_reads").$type<Record<string, string>>(),
   author: text("author"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
