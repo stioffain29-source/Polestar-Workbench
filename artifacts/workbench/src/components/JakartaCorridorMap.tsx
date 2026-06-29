@@ -203,7 +203,7 @@ export default function JakartaCorridorMap({
       mapRef.current = map;
 
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
+        "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
         {
           subdomains: "abcd",
           maxZoom: 19,
@@ -236,6 +236,62 @@ export default function JakartaCorridorMap({
 
     const keyPointAreaIds = new Set(JAKARTA_KEY_POINTS.map((k) => k.corridorId));
 
+    // Soft, feathered exposure footprint — a translucent overlay that sits
+    // lightly on the base map (no hard edge, no district block).
+    const drawZone = (
+      ctx: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      level: JakartaExposureLevel,
+      radius: number,
+    ) => {
+      const { r, g, b } = hexToRgb(EXPOSURE_ACCENT[level]);
+      const grad = ctx.createRadialGradient(x, y, radius * 0.12, x, y, radius);
+      grad.addColorStop(0, `rgba(${r},${g},${b},0.20)`);
+      grad.addColorStop(0.55, `rgba(${r},${g},${b},0.09)`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    };
+
+    // Translucent corridor shading — concentric soft strokes that fade at the
+    // edge so a route reads as a shaded band, not a hard angular line.
+    const drawBand = (
+      ctx: CanvasRenderingContext2D,
+      pts: { x: number; y: number }[],
+      level: JakartaExposureLevel,
+    ) => {
+      const { r, g, b } = hexToRgb(EXPOSURE_ACCENT[level]);
+      const trace = () => {
+        ctx.beginPath();
+        pts.forEach((p, idx) => {
+          if (idx === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+      };
+      const layers: [number, number][] = [
+        [22, 0.05],
+        [16, 0.07],
+        [11, 0.1],
+        [7, 0.13],
+        [4, 0.17],
+      ];
+      for (const [width, alpha] of layers) {
+        trace();
+        ctx.lineWidth = width;
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.stroke();
+      }
+      // Faint centre thread for gentle route definition (not a thick line).
+      trace();
+      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.4)`;
+      ctx.stroke();
+    };
+
+    // Small, refined numbered site marker.
     const drawMarker = (
       ctx: CanvasRenderingContext2D,
       x: number,
@@ -243,31 +299,21 @@ export default function JakartaCorridorMap({
       level: JakartaExposureLevel,
       n: number,
     ) => {
-      // Subtle exposure halo (the only shaded overlay, kept faint).
-      const { r, g, b } = hexToRgb(EXPOSURE_ACCENT[level]);
-      const grad = ctx.createRadialGradient(x, y, 2, x, y, 22);
-      grad.addColorStop(0, `rgba(${r},${g},${b},0.20)`);
-      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
       ctx.beginPath();
-      ctx.arc(x, y, 22, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-      // Marker disc.
-      ctx.beginPath();
-      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
       ctx.fillStyle = EXPOSURE_ACCENT[level];
       ctx.fill();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = "#ffffff";
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(x, y, 8.9, 0, Math.PI * 2);
-      ctx.lineWidth = 0.75;
-      ctx.strokeStyle = "rgba(11,11,61,0.18)";
+      ctx.arc(x, y, 7.9, 0, Math.PI * 2);
+      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = "rgba(11,11,61,0.16)";
       ctx.stroke();
       // Number.
       ctx.fillStyle = "#ffffff";
-      ctx.font = "700 10px 'Roboto Condensed', Roboto, sans-serif";
+      ctx.font = "700 9px 'Roboto Condensed', Roboto, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(n), x, y + 0.5);
@@ -291,45 +337,50 @@ export default function JakartaCorridorMap({
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      // 1) Movement corridors — thin coloured lines with a faint white casing.
-      for (const line of JAKARTA_CORRIDOR_LINES) {
-        const level = levelFor.get(line.corridorId) ?? "not-assessed";
-        const pts = line.path.map((c) => map.latLngToContainerPoint([c[0], c[1]]));
-        const stroke = (width: number, colour: string) => {
-          ctx.beginPath();
-          pts.forEach((p, idx) => {
-            if (idx === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-          });
-          ctx.lineWidth = width;
-          ctx.strokeStyle = colour;
-          ctx.stroke();
-        };
-        stroke(3.6, "rgba(255,255,255,0.7)");
-        stroke(2, EXPOSURE_ACCENT[level]);
-      }
-
-      // 2) Numbered markers for key sites.
-      for (const kp of JAKARTA_KEY_POINTS) {
-        const level = levelFor.get(kp.corridorId) ?? "not-assessed";
-        const n = numberFor.get(kp.corridorId) ?? 0;
-        const p = map.latLngToContainerPoint([kp.lat, kp.lon]);
-        drawMarker(ctx, p.x, p.y, level, n);
-      }
-
-      // 3) Numbered discs for corridors that have no site marker (the pure
-      //    movement routes), placed at the route's label anchor.
-      for (const line of JAKARTA_CORRIDOR_LINES) {
-        if (keyPointAreaIds.has(line.corridorId)) continue;
-        const level = levelFor.get(line.corridorId) ?? "not-assessed";
-        const n = numberFor.get(line.corridorId) ?? 0;
+      // Per-area anchors shared by the zones and the numbered markers.
+      const keyMarkers = JAKARTA_KEY_POINTS.map((kp) => ({
+        id: kp.corridorId,
+        level: levelFor.get(kp.corridorId) ?? "not-assessed",
+        n: numberFor.get(kp.corridorId) ?? 0,
+        p: map.latLngToContainerPoint([kp.lat, kp.lon]),
+      }));
+      const discMarkers = JAKARTA_CORRIDOR_LINES.filter(
+        (line) => !keyPointAreaIds.has(line.corridorId),
+      ).map((line) => {
         const idx = Math.min(
           line.labelAt ?? Math.floor(line.path.length / 2),
           line.path.length - 1,
         );
         const anchor = line.path[idx];
-        const p = map.latLngToContainerPoint([anchor[0], anchor[1]]);
-        drawMarker(ctx, p.x, p.y, level, n);
+        return {
+          level: levelFor.get(line.corridorId) ?? "not-assessed",
+          n: numberFor.get(line.corridorId) ?? 0,
+          p: map.latLngToContainerPoint([anchor[0], anchor[1]]),
+        };
+      });
+
+      // 1) Translucent corridor shading — drawn first so it sits lightest.
+      for (const line of JAKARTA_CORRIDOR_LINES) {
+        const level = levelFor.get(line.corridorId) ?? "not-assessed";
+        const pts = line.path.map((c) =>
+          map.latLngToContainerPoint([c[0], c[1]]),
+        );
+        drawBand(ctx, pts, level);
+      }
+
+      // 2) Soft exposure zones — a broad footprint for the point areas that
+      //    have no route of their own, and a gentle one under each key site.
+      const corridorAreaIds = new Set(
+        JAKARTA_CORRIDOR_LINES.map((l) => l.corridorId),
+      );
+      for (const m of keyMarkers) {
+        const radius = corridorAreaIds.has(m.id) ? 30 : 50;
+        drawZone(ctx, m.p.x, m.p.y, m.level, radius);
+      }
+
+      // 3) Small refined numbered markers on top.
+      for (const m of [...keyMarkers, ...discMarkers]) {
+        drawMarker(ctx, m.p.x, m.p.y, m.level, m.n);
       }
 
       img.src = canvas.toDataURL("image/png");
@@ -473,9 +524,11 @@ export default function JakartaCorridorMap({
               <span
                 style={{
                   display: "inline-block",
-                  width: 16,
-                  height: 0,
-                  borderTop: `2px solid ${DUSK}`,
+                  width: 20,
+                  height: 7,
+                  borderRadius: 4,
+                  background:
+                    "linear-gradient(90deg, rgba(48,48,48,0) 0%, rgba(48,48,48,0.3) 50%, rgba(48,48,48,0) 100%)",
                 }}
               />
               <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
