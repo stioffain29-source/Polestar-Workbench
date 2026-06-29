@@ -581,3 +581,9 @@ id = "3dIDGVbwnyJMCcmtx3efU"
 uri = "file://screenshots/jakarta-exposure-map-sample.jpg"
 type = "image"
 title = "Jakarta – Operational Exposure Map (redesigned sample)"
+
+[[outputs]]
+id = "BXUXjwFt0wDWasGlzjkJU"
+uri = "file://screenshots/jakarta_exposure_map_sample.jpg"
+type = "image"
+title = "Jakarta Operational Exposure Map — sample"
