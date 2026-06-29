@@ -598,16 +598,16 @@ export default function JakartaCorridorMap({
           i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
         );
       };
-      const outer = style.thin ? 7 : 15;
+      const outer = style.thin ? 6 : 12;
       const inner = style.thin ? 3.5 : 9;
       ctx.setLineDash([]);
       trace();
       ctx.lineWidth = outer;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.34)`;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.28)`;
       ctx.stroke();
       trace();
       ctx.lineWidth = inner;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.92)`;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.96)`;
       if (style.dashed) ctx.setLineDash(style.thin ? [3, 5] : [12, 9]);
       ctx.stroke();
       ctx.setLineDash([]);
@@ -757,7 +757,7 @@ export default function JakartaCorridorMap({
       const h = el.clientHeight;
       if (w === 0 || h === 0) return;
 
-      const scale = Math.min(window.devicePixelRatio || 1, 2) * 2;
+      const scale = Math.max(3, Math.min(window.devicePixelRatio || 1, 2) * 2);
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
@@ -870,7 +870,7 @@ export default function JakartaCorridorMap({
         const p = proj(a.areaLabel.lat, a.areaLabel.lon);
         blockLabel(ctx, a.areaLabel.text, p.x, p.y, 16, 11, {
           font: "700 9.5px 'Roboto Condensed', Roboto, sans-serif",
-          color: "#55555F",
+          color: "#3C3C46",
           spacing: "0.06em",
         });
       }
