@@ -634,4 +634,10 @@ title = "Jakarta Operational Exposure Map (sharpened)"
 id = "IHuxCCQobig2qzPGPEf9b"
 uri = "file://screenshots/jakarta-exposure-map.jpg"
 type = "image"
-title = "Jakarta — Operational Exposure Map (current render)"
+title = "My render — Jakarta Operational Exposure Map"
+
+[[outputs]]
+id = "Yk17-Yw55F9siLlnmt73M"
+uri = "file://attached_assets/download_1782711875187.png"
+type = "image"
+title = "Your confirmed target"
