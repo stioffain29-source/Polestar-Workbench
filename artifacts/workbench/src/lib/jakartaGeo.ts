@@ -69,10 +69,10 @@
    * so the movement corridors and key points are all in frame.
    */
   export const JAKARTA_VIEW_BBOX = {
-    minLon: 106.555,
-    minLat: -6.470,
-    maxLon: 107.060,
-    maxLat: -6.010,
+    minLon: 106.590,
+    minLat: -6.425,
+    maxLon: 107.045,
+    maxLat: -6.030,
   };
 
   /** Stylised place / region / sea labels drawn on the operational map. */

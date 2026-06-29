@@ -570,6 +570,9 @@ export default function JakartaCorridorMap({
         touchZoom: false,
         // A non-interactive report figure: lock the framing entirely.
         zoomDelta: 0,
+        // Fit the view box EXACTLY (no integer-zoom snapping, which would round
+        // down and float the content inside empty land).
+        zoomSnap: 0,
       });
       mapRef.current = map;
 
@@ -600,7 +603,7 @@ export default function JakartaCorridorMap({
       [JAKARTA_VIEW_BBOX.minLat, JAKARTA_VIEW_BBOX.minLon],
       [JAKARTA_VIEW_BBOX.maxLat, JAKARTA_VIEW_BBOX.maxLon],
     );
-    map.fitBounds(bounds, { padding: [10, 10] });
+    map.fitBounds(bounds, { padding: [6, 6] });
 
     // Soft radial exposure footprint under a site (feathered, no hard edge).
     const drawZone = (
