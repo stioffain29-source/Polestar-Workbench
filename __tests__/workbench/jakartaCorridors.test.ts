@@ -9,6 +9,7 @@ import {
   hazardSummaryLabel,
   severityToExposure,
   maxExposure,
+  standingDisplayExposure,
 } from "../../artifacts/workbench/src/lib/jakartaCorridors";
 import type { CountryFastFactsIncident } from "../../artifacts/workbench/src/lib/countryFastFacts";
 
@@ -146,6 +147,16 @@ describe("jakartaCorridors — area baselines", () => {
   });
 });
 
+describe("standingDisplayExposure — caps a quiet area at monitored", () => {
+  it("caps elevated/high baselines at monitored, leaves lower ones", () => {
+    expect(standingDisplayExposure("high")).toBe("monitored");
+    expect(standingDisplayExposure("elevated")).toBe("monitored");
+    expect(standingDisplayExposure("monitored")).toBe("monitored");
+    expect(standingDisplayExposure("low")).toBe("low");
+    expect(standingDisplayExposure("not-assessed")).toBe("not-assessed");
+  });
+});
+
 describe("buildJakartaCorridorStatuses — this-week elevation", () => {
   it("returns all six areas standing/monitored for an empty window", () => {
     const { statuses, unattributed } = buildJakartaCorridorStatuses([]);
@@ -155,11 +166,27 @@ describe("buildJakartaCorridorStatuses — this-week elevation", () => {
       expect(s.count).toBe(0);
       expect(s.elevated).toBe(false);
       expect(s.worstKey).toBe("");
-      // No live reporting: live is null, display falls back to baseline.
       expect(s.liveExposure).toBeNull();
-      expect(s.displayExposure).toBe(s.baselineExposure);
+      // No live reporting: a quiet area shows its standing baseline CAPPED at
+      // "monitored" — it must never read as an active alarm tier.
+      expect(s.displayExposure).toBe(standingDisplayExposure(s.baselineExposure));
+      expect(["monitored", "low", "not-assessed"]).toContain(s.displayExposure);
     }
     expect(statuses.map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("never shows an elevated standing baseline as an alarm tier when quiet", () => {
+    const { statuses } = buildJakartaCorridorStatuses([]);
+    const elevatedBaseline = statuses.filter(
+      (s) => s.baselineExposure === "elevated",
+    );
+    // The model carries at least one structurally-important node (e.g. the
+    // port) with an "elevated" standing baseline; with no reporting it must
+    // read "monitored", never "elevated"/"high".
+    expect(elevatedBaseline.length).toBeGreaterThan(0);
+    for (const s of elevatedBaseline) {
+      expect(s.displayExposure).toBe("monitored");
+    }
   });
 
   it("flips a matched area to elevated and tracks worst severity", () => {
@@ -174,11 +201,11 @@ describe("buildJakartaCorridorStatuses — this-week elevation", () => {
     // A high record raises the live exposure to "high"; display = max(baseline, live).
     expect(central.liveExposure).toBe("high");
     expect(central.displayExposure).toBe("high");
-    // Other areas stay standing (display == baseline, no live).
+    // Other areas stay standing (display == capped baseline, no live).
     expect(statuses[COMMUTER_IDX].elevated).toBe(false);
     expect(statuses[COMMUTER_IDX].liveExposure).toBeNull();
     expect(statuses[COMMUTER_IDX].displayExposure).toBe(
-      statuses[COMMUTER_IDX].baselineExposure,
+      standingDisplayExposure(statuses[COMMUTER_IDX].baselineExposure),
     );
   });
 

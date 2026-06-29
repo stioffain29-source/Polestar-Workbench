@@ -70,6 +70,24 @@ export function maxExposure(
   return JAKARTA_EXPOSURE_RANK[a] >= JAKARTA_EXPOSURE_RANK[b] ? a : b;
 }
 
+// This graphic is a THIS-PERIOD operating-exposure map. An area that carried NO
+// live reporting must never read as an active alarm tier ("elevated"/"high")
+// off its standing baseline alone — that contradicts its own "Standing profile
+// / no incidents reported" line and would let a quiet node outrank one that
+// actually had an incident. So a quiet area's displayed level is its standing
+// baseline CAPPED at "monitored" (a watched node). Only live reporting (via the
+// buildJakarta*Statuses below) can raise an area above this cap.
+export const STANDING_EXPOSURE_CAP: JakartaExposureLevel = "monitored";
+
+export function standingDisplayExposure(
+  baseline: JakartaExposureLevel,
+): JakartaExposureLevel {
+  return JAKARTA_EXPOSURE_RANK[baseline] >
+    JAKARTA_EXPOSURE_RANK[STANDING_EXPOSURE_CAP]
+    ? STANDING_EXPOSURE_CAP
+    : baseline;
+}
+
 export interface JakartaCorridorArea {
   /** Stable id (used as React key and in tests). */
   id: string;
@@ -455,7 +473,9 @@ export interface JakartaCorridorStatus {
   /** Operating-exposure derived from this period's worst severity, or null
    *  when the area carried no live reporting. */
   liveExposure: JakartaExposureLevel | null;
-  /** Displayed level = the higher of baseline and live. Live can only raise. */
+  /** Displayed level. With live reporting it is the higher of baseline and
+   *  live; with NO live reporting the standing baseline is shown CAPPED at
+   *  "monitored", so a quiet area never reads as an active alarm tier. */
   displayExposure: JakartaExposureLevel;
 }
 
@@ -492,7 +512,7 @@ export function buildJakartaCorridorStatuses(
       c.count > 0 ? severityToExposure(c.worstKey) : null;
     const displayExposure = liveExposure
       ? maxExposure(baselineExposure, liveExposure)
-      : baselineExposure;
+      : standingDisplayExposure(baselineExposure);
     const hazards = HAZARD_PRIORITY.filter((h) => hazardSets[idx].has(h));
     const prose = buildAreaProse(area.id, c.count, hazards);
     return {
@@ -629,7 +649,9 @@ export interface JakartaCityStatus {
   baselineExposure: JakartaExposureLevel;
   /** Operating-exposure derived from this period's worst severity, or null. */
   liveExposure: JakartaExposureLevel | null;
-  /** Displayed level = the higher of baseline and live. Live can only raise. */
+  /** Displayed level. With live reporting it is the higher of baseline and
+   *  live; with NO live reporting the standing baseline is shown CAPPED at
+   *  "monitored", so a quiet area never reads as an active alarm tier. */
   displayExposure: JakartaExposureLevel;
 }
 
@@ -662,7 +684,7 @@ export function buildJakartaCityStatuses(
     const liveExposure = cell.count > 0 ? severityToExposure(cell.worstKey) : null;
     const displayExposure = liveExposure
       ? maxExposure(baselineExposure, liveExposure)
-      : baselineExposure;
+      : standingDisplayExposure(baselineExposure);
     return {
       city,
       count: cell.count,

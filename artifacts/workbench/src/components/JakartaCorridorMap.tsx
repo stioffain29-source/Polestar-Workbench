@@ -513,7 +513,11 @@ export default function JakartaCorridorMap({
         .sort(
           (a, b) =>
             SEV_RANK[b.status.displayExposure] -
-              SEV_RANK[a.status.displayExposure] || a.i - b.i,
+              SEV_RANK[a.status.displayExposure] ||
+            // At the same tier, an area that actually carried reporting this
+            // period ranks above a quiet "standing profile" area.
+            Number(b.status.elevated) - Number(a.status.elevated) ||
+            a.i - b.i,
         )
         .map((x, idx) => ({ status: x.status, number: idx + 1 })),
     [corridor],
