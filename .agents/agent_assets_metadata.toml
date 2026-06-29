@@ -605,3 +605,9 @@ id = "z8jWyAHfFWM9p9eaHQ48x"
 uri = "file://screenshots/jakarta_exposure_map_v4.jpg"
 type = "image"
 title = "Jakarta — Operational Exposure Map (translucent overlays)"
+
+[[outputs]]
+id = "lZsyC27roRbIa1YvHFamk"
+uri = "file://screenshots/jakarta_exposure_map_v5.jpg"
+type = "image"
+title = "Jakarta Operational Exposure Map — redesign sample"
