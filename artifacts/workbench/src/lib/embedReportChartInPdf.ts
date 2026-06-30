@@ -35,6 +35,17 @@ export async function embedReactChartInPdf(
   ctx: Ctx,
   element: ReactElement,
 ): Promise<void> {
+  // Charts rasterise to a PNG image (no embedded text), so a headless run —
+  // e.g. the font-audit exporter, which has no DOM — can safely skip them. Guard
+  // here before renderElementToHtml touches `document`; embedChartMarkupInPdf
+  // carries the same guard for the markup entry point.
+  if (typeof document === "undefined") {
+    console.warn(
+      "[embedReportChartInPdf] Chart embedding requires a browser DOM. " +
+        "Use the in-app Download PDF button or exportReportPdfBrowser.mjs.",
+    );
+    return;
+  }
   const html = renderElementToHtml(element);
   await embedChartMarkupInPdf(ctx, html);
 }

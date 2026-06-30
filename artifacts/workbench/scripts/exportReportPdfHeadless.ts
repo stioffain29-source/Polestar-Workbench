@@ -33,7 +33,6 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
 const REPORT_ID = Number(process.env.REPORT_ID ?? "13");
 const TOPIC = (process.env.TOPIC ?? "flashpoint").toLowerCase();
-const API = process.env.API_BASE ?? "http://localhost:80";
 const OUT = resolvePath(process.cwd(), process.env.OUT_PATH ?? `screenshots/${TOPIC}_report.pdf`);
 
 // Intercept pdf.save() across every exporter and divert to writeFileSync.
@@ -86,8 +85,14 @@ async function main() {
     return;
   }
 
-  const report = (await fetch(`${API}/api/reports/${REPORT_ID}`).then((r) => r.json())) as AnyReport;
-  const incidents = (await fetch(`${API}/api/incidents?limit=500`).then((r) => r.json())) as unknown[];
+  // Topic briefs read report + incidents DIRECTLY from Postgres (the private
+  // `/api` surface is owner-gated and cannot authenticate headlessly), applying
+  // the SAME relevance gate + corroboration attachment the API does, so the
+  // headless PDF exercises every topic `pdf.text` path for the font audit.
+  const { fetchTopicReport, fetchTopicIncidents, fetchMaritimeMovement } =
+    await import("./topicReportData");
+  const report = (await fetchTopicReport(REPORT_ID)) as AnyReport;
+  const incidents = (await fetchTopicIncidents()) as unknown[];
   // Optional ISSUE_DATE override so a headless export can reproduce the SAME
   // reporting window the in-editor preview renders. The editor advances a draft
   // to today and clamps to the latest record, so a verification run that wants
@@ -113,21 +118,19 @@ async function main() {
     const { buildGatewayFlow, RED_SEA_GATEWAYS } = await import(
       "../src/lib/maritimeDirectionalFlow"
     );
-    // Fetch live movement so the headless PDF faithfully reproduces the in-app
+    // Load live movement so the headless PDF faithfully reproduces the in-app
     // shipping export. The Maritime Intelligence board reads the global movement
-    // pool (latest snapshot per theatre), so keep the broad fetch for it.
-    const movement = (await fetch(`${API}/api/maritime-movement?limit=200`)
-      .then((r) => r.json())
-      .catch(() => [])) as Parameters<typeof exportShippingReportPdf>[3];
+    // pool (latest snapshot per theatre), so keep the broad load for it.
+    const movement = (await fetchMaritimeMovement(undefined, 200).catch(
+      () => [],
+    )) as Parameters<typeof exportShippingReportPdf>[3];
     // The directional-flow panel reads PER-GATEWAY histories with the SAME params
     // the monitor + report editor use (theatre-scoped, limit 40) so the headless
     // PDF cannot diverge from the verified on-screen surfaces in a populated DB.
     const fetchGatewayRows = async (theatre: string) =>
-      (await fetch(
-        `${API}/api/maritime-movement?theatre=${encodeURIComponent(theatre)}&limit=40`,
-      )
-        .then((r) => r.json())
-        .catch(() => [])) as Parameters<typeof buildGatewayFlow>[0];
+      (await fetchMaritimeMovement(theatre, 40).catch(() => [])) as Parameters<
+        typeof buildGatewayFlow
+      >[0];
     const [babRows, suezRows] = await Promise.all([
       fetchGatewayRows(RED_SEA_GATEWAYS[0].theatre),
       fetchGatewayRows(RED_SEA_GATEWAYS[1].theatre),
