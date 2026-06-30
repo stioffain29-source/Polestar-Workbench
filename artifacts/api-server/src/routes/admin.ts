@@ -7,6 +7,7 @@ import {
   runReliefWebReportsOnce,
   runIccPiracyOnce,
   runMovementOnce,
+  runGdeltStructuredOnce,
 } from "../lib/ingestRunner";
 import { backfillRelevance, backfillSeverity } from "../lib/migrations";
 
@@ -320,6 +321,94 @@ router.post("/admin/icc-piracy", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin icc-piracy failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Protected manual trigger for ONLY the GDELT Cloud structured event layer.
+//
+// Same token gate + concurrency guarantees as /admin/ingest (shares the cross-
+// instance advisory lock via runGdeltStructuredOnce), but refreshes the
+// structured GDELT context layer WITHOUT re-running the full multi-minute
+// incident chain. These rows are NEVER incidents — they live in their own
+// isolated table and can never inflate any count or reach a report/PDF. The
+// pass self-throttles (cadence gate + hard QU cap), so a trigger inside the
+// cadence window no-ops and spends zero QU; the returned summary's `reason`
+// field ("cadence" | "no-api-key" | "disabled" | "ok") explains what happened.
+router.post("/admin/gdelt-structured", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin gdelt-structured called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  try {
+    req.log.info("admin gdelt-structured started");
+    const result = await runGdeltStructuredOnce();
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const g = result.gdeltStructured;
+    req.log.info(
+      {
+        configured: g.configured,
+        enabled: g.enabled,
+        ran: g.ran,
+        reason: g.reason,
+        eventsFetched: g.eventsFetched,
+        storiesFetched: g.storiesFetched,
+        inserted: g.inserted,
+        totalAfter: g.totalAfter,
+        quSpent: g.quSpent,
+        fetchOk: g.fetchOk,
+        durationMs: result.durationMs,
+      },
+      "admin gdelt-structured finished",
+    );
+    res.json({
+      ok: true,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      gdeltStructured: {
+        configured: g.configured,
+        enabled: g.enabled,
+        ran: g.ran,
+        reason: g.reason,
+        windowFrom: g.windowFrom,
+        windowTo: g.windowTo,
+        countriesQueried: g.countriesQueried,
+        eventsFetched: g.eventsFetched,
+        storiesFetched: g.storiesFetched,
+        eventsDropped: g.eventsDropped,
+        rejected: g.rejected,
+        newToInsert: g.newToInsert,
+        inserted: g.inserted,
+        totalAfter: g.totalAfter,
+        latestSourceDate: g.latestSourceDate,
+        quSpent: g.quSpent,
+        fetchOk: g.fetchOk,
+        errors: g.errors,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin gdelt-structured failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

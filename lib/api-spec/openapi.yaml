@@ -18,6 +18,7 @@ tags:
   - name: cards
   - name: liveuamap
   - name: integrations
+  - name: gdelt-structured
   - name: Auth
     description: Browser and mobile authentication endpoints.
 
@@ -203,6 +204,52 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ReliefWebReport" }
+
+  /gdelt-structured-items:
+    get:
+      operationId: listGdeltStructuredItems
+      tags: [gdelt-structured]
+      summary: >-
+        GDELT Cloud structured event layer — daily Events + Stories for the
+        monitored APAC countries, stored as a standalone STRUCTURED CONTEXT
+        layer in its own table (never as incidents, so they never inflate any
+        count or reach a report/PDF). Events are bucketed into lanes; Indonesian
+        items are sub-bucketed (Jakarta / Indonesian Papua). Most-recent first.
+      parameters:
+        - name: lane
+          in: query
+          description: Limit to one derived lane (events only; stories have no lane)
+          schema: { $ref: "#/components/schemas/GdeltLane" }
+        - name: country
+          in: query
+          description: Limit to one country (exact match on GDELT's country name)
+          schema: { type: string }
+        - name: subBucket
+          in: query
+          description: Limit to one tracked Indonesian sub-bucket
+          schema: { $ref: "#/components/schemas/GdeltSubBucket" }
+        - name: kind
+          in: query
+          description: Limit to one item kind (event or story)
+          schema: { type: string, enum: [event, story] }
+        - name: days
+          in: query
+          description: >-
+            Only return items whose source date is within this many days (1-30,
+            default 30). The collector never stores items older than 30 days.
+          schema: { type: integer, minimum: 1, maximum: 30 }
+        - name: limit
+          in: query
+          description: Max number of most-recent items to return (1-500, default 200)
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GdeltStructuredItem" }
 
   /social-watch:
     get:
@@ -2909,6 +2956,85 @@ components:
           type: string
           enum: [tanker, cargo, other]
         lastSeenAt: { type: string, format: date-time }
+
+    GdeltLane:
+      type: string
+      enum:
+        - Protests
+        - Civil unrest and riots
+        - Security incidents
+        - Crime
+        - Transport disruption
+      description: >-
+        The lane an EVENT is bucketed into, derived from GDELT's verbatim
+        taxonomy (never fabricated). Stories carry no lane.
+
+    GdeltSubBucket:
+      type: string
+      enum: [Jakarta, Indonesian Papua]
+      description: >-
+        A tracked Indonesian sub-bucket. Set only when an Indonesian item's
+        geography matches Jakarta or Indonesian Papua; otherwise null.
+
+    GdeltStructuredItem:
+      type: object
+      description: >-
+        A GDELT Cloud structured Event or Story stored as a standalone
+        STRUCTURED CONTEXT item. NOT an incident: these rows live in their own
+        table and never feed any incident count, report, or PDF. All fields are
+        kept verbatim from GDELT except lane / subBucket, which are derived from
+        the verbatim taxonomy.
+      required: [id, kind, externalId, title]
+      properties:
+        id: { type: integer }
+        sourceName: { type: string }
+        kind: { type: string, enum: [event, story] }
+        externalId: { type: string }
+        title: { type: string }
+        summary: { type: ["string", "null"] }
+        url: { type: ["string", "null"] }
+        primaryStoryUrl: { type: ["string", "null"] }
+        sourceDate: { type: ["string", "null"], format: date-time }
+        codedAt: { type: ["string", "null"], format: date-time }
+        upstreamUpdatedAt: { type: ["string", "null"], format: date-time }
+        country: { type: ["string", "null"] }
+        region: { type: ["string", "null"] }
+        continent: { type: ["string", "null"] }
+        admin1: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        family: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        subcategory: { type: ["string", "null"] }
+        domain: { type: ["string", "null"] }
+        eventCode: { type: ["string", "null"] }
+        lane: { type: ["string", "null"] }
+        subBucket: { type: ["string", "null"] }
+        hasFatalities: { type: ["boolean", "null"] }
+        fatalities: { type: ["integer", "null"] }
+        imageUrl: { type: ["string", "null"] }
+        topLanguage: { type: ["string", "null"] }
+        actors:
+          type: array
+          items: {}
+        metrics:
+          type: object
+          additionalProperties: true
+        topArticles:
+          type: array
+          items: {}
+        linkedEvents:
+          type: array
+          items: {}
+        storyRefs:
+          type: array
+          items: {}
+        extras:
+          type: object
+          additionalProperties: true
+        fetchedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: ["string", "null"], format: date-time }
 
     ReliefWebReport:
       type: object

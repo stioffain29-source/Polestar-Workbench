@@ -1440,6 +1440,112 @@ export interface MaritimeVessel {
 }
 
 /**
+ * The lane an EVENT is bucketed into, derived from GDELT's verbatim taxonomy (never fabricated). Stories carry no lane.
+ */
+export type GdeltLane = typeof GdeltLane[keyof typeof GdeltLane];
+
+
+export const GdeltLane = {
+  Protests: 'Protests',
+  Civil_unrest_and_riots: 'Civil unrest and riots',
+  Security_incidents: 'Security incidents',
+  Crime: 'Crime',
+  Transport_disruption: 'Transport disruption',
+} as const;
+
+/**
+ * A tracked Indonesian sub-bucket. Set only when an Indonesian item's geography matches Jakarta or Indonesian Papua; otherwise null.
+ */
+export type GdeltSubBucket = typeof GdeltSubBucket[keyof typeof GdeltSubBucket];
+
+
+export const GdeltSubBucket = {
+  Jakarta: 'Jakarta',
+  Indonesian_Papua: 'Indonesian Papua',
+} as const;
+
+export type GdeltStructuredItemKind = typeof GdeltStructuredItemKind[keyof typeof GdeltStructuredItemKind];
+
+
+export const GdeltStructuredItemKind = {
+  event: 'event',
+  story: 'story',
+} as const;
+
+export type GdeltStructuredItemMetrics = { [key: string]: unknown };
+
+export type GdeltStructuredItemExtras = { [key: string]: unknown };
+
+/**
+ * A GDELT Cloud structured Event or Story stored as a standalone STRUCTURED CONTEXT item. NOT an incident: these rows live in their own table and never feed any incident count, report, or PDF. All fields are kept verbatim from GDELT except lane / subBucket, which are derived from the verbatim taxonomy.
+ */
+export interface GdeltStructuredItem {
+  id: number;
+  sourceName?: string;
+  kind: GdeltStructuredItemKind;
+  externalId: string;
+  title: string;
+  /** @nullable */
+  summary?: string | null;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  primaryStoryUrl?: string | null;
+  /** @nullable */
+  sourceDate?: string | null;
+  /** @nullable */
+  codedAt?: string | null;
+  /** @nullable */
+  upstreamUpdatedAt?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  region?: string | null;
+  /** @nullable */
+  continent?: string | null;
+  /** @nullable */
+  admin1?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  family?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  subcategory?: string | null;
+  /** @nullable */
+  domain?: string | null;
+  /** @nullable */
+  eventCode?: string | null;
+  /** @nullable */
+  lane?: string | null;
+  /** @nullable */
+  subBucket?: string | null;
+  /** @nullable */
+  hasFatalities?: boolean | null;
+  /** @nullable */
+  fatalities?: number | null;
+  /** @nullable */
+  imageUrl?: string | null;
+  /** @nullable */
+  topLanguage?: string | null;
+  actors?: unknown[];
+  metrics?: GdeltStructuredItemMetrics;
+  topArticles?: unknown[];
+  linkedEvents?: unknown[];
+  storyRefs?: unknown[];
+  extras?: GdeltStructuredItemExtras;
+  /** @nullable */
+  fetchedAt?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+/**
  * A UN OCHA ReliefWeb situational / humanitarian report stored as supporting CONTEXT for a monitored APAC country. NOT an incident: these rows live in their own table and never feed any incident count.
  */
 export interface ReliefWebReport {
@@ -1872,6 +1978,45 @@ country?: string;
  */
 limit?: number;
 };
+
+export type ListGdeltStructuredItemsParams = {
+/**
+ * Limit to one derived lane (events only; stories have no lane)
+ */
+lane?: GdeltLane;
+/**
+ * Limit to one country (exact match on GDELT's country name)
+ */
+country?: string;
+/**
+ * Limit to one tracked Indonesian sub-bucket
+ */
+subBucket?: GdeltSubBucket;
+/**
+ * Limit to one item kind (event or story)
+ */
+kind?: ListGdeltStructuredItemsKind;
+/**
+ * Only return items whose source date is within this many days (1-30, default 30). The collector never stores items older than 30 days.
+ * @minimum 1
+ * @maximum 30
+ */
+days?: number;
+/**
+ * Max number of most-recent items to return (1-500, default 200)
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+};
+
+export type ListGdeltStructuredItemsKind = typeof ListGdeltStructuredItemsKind[keyof typeof ListGdeltStructuredItemsKind];
+
+
+export const ListGdeltStructuredItemsKind = {
+  event: 'event',
+  story: 'story',
+} as const;
 
 export type ListSocialWatchItemsParams = {
 /**

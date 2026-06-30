@@ -42,6 +42,7 @@ import type {
   EditReportIncidentSummariesInput,
   EditReportProseInput,
   ErrorEnvelope,
+  GdeltStructuredItem,
   GenerateCountryProseInput,
   GenerateReportIncidentSummariesInput,
   GenerateReportProseInput,
@@ -54,6 +55,7 @@ import type {
   IncidentInput,
   IncidentUpdate,
   IntegrationStatusResponse,
+  ListGdeltStructuredItemsParams,
   ListIncidentsParams,
   ListLiveuamapEventsParams,
   ListMaritimeMovementParams,
@@ -822,6 +824,90 @@ export function useListReliefWebReports<TData = Awaited<ReturnType<typeof listRe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListReliefWebReportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListGdeltStructuredItemsUrl = (params?: ListGdeltStructuredItemsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/gdelt-structured-items?${stringifiedParams}` : `/api/gdelt-structured-items`
+}
+
+/**
+ * @summary GDELT Cloud structured event layer — daily Events + Stories for the monitored APAC countries, stored as a standalone STRUCTURED CONTEXT layer in its own table (never as incidents, so they never inflate any count or reach a report/PDF). Events are bucketed into lanes; Indonesian items are sub-bucketed (Jakarta / Indonesian Papua). Most-recent first.
+ */
+export const listGdeltStructuredItems = async (params?: ListGdeltStructuredItemsParams, options?: RequestInit): Promise<GdeltStructuredItem[]> => {
+
+  return customFetch<GdeltStructuredItem[]>(getListGdeltStructuredItemsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGdeltStructuredItemsQueryKey = (params?: ListGdeltStructuredItemsParams,) => {
+    return [
+    `/api/gdelt-structured-items`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListGdeltStructuredItemsQueryOptions = <TData = Awaited<ReturnType<typeof listGdeltStructuredItems>>, TError = ErrorType<unknown>>(params?: ListGdeltStructuredItemsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGdeltStructuredItems>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGdeltStructuredItemsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGdeltStructuredItems>>> = ({ signal }) => listGdeltStructuredItems(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGdeltStructuredItems>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGdeltStructuredItemsQueryResult = NonNullable<Awaited<ReturnType<typeof listGdeltStructuredItems>>>
+export type ListGdeltStructuredItemsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary GDELT Cloud structured event layer — daily Events + Stories for the monitored APAC countries, stored as a standalone STRUCTURED CONTEXT layer in its own table (never as incidents, so they never inflate any count or reach a report/PDF). Events are bucketed into lanes; Indonesian items are sub-bucketed (Jakarta / Indonesian Papua). Most-recent first.
+ */
+
+export function useListGdeltStructuredItems<TData = Awaited<ReturnType<typeof listGdeltStructuredItems>>, TError = ErrorType<unknown>>(
+ params?: ListGdeltStructuredItemsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGdeltStructuredItems>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGdeltStructuredItemsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

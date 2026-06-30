@@ -23,6 +23,8 @@ import {
   runFacebookOsintIngest,
   emptyFacebookOsintSummary,
   runGdeltEnrich,
+  runGdeltStructuredIngest,
+  emptyGdeltStructuredSummary,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   type IngestSummary,
@@ -36,6 +38,7 @@ import {
   type SocialWatchSummary,
   type FacebookOsintSummary,
   type GdeltEnrichSummary,
+  type GdeltStructuredSummary,
   type TitleTranslationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -80,6 +83,17 @@ export type IngestRunResult =
       socialWatch: SocialWatchSummary;
       facebookOsint: FacebookOsintSummary;
       gdeltEnrich: GdeltEnrichSummary;
+      gdeltStructured: GdeltStructuredSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type GdeltStructuredRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      gdeltStructured: GdeltStructuredSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -295,6 +309,18 @@ function emptyGdeltEnrich(err: unknown): GdeltEnrichSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`GDELT enrichment failed: ${msg}`],
+  };
+}
+
+function emptyGdeltStructured(err: unknown): GdeltStructuredSummary {
+  const base = emptyGdeltStructuredSummary();
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    mode: "commit",
+    fetchOk: false,
+    errors: [msg],
+    logLines: [`GDELT structured ingest failed: ${msg}`],
   };
 }
 
@@ -758,6 +784,35 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "GDELT enrichment pass failed");
       gdeltEnrich = emptyGdeltEnrich(err);
     }
+    // GDELT Cloud structured event layer. A SEPARATE, ADDITIVE structured source
+    // from the gdeltEnrich pass above: it does a daily broad pull of GDELT Cloud
+    // v2 events + stories for the monitored APAC countries into its OWN isolated
+    // table (gdelt_structured_items) as standalone CONTEXT. These rows are NEVER
+    // incidents — the module never imports/writes the incidents table, so it can
+    // never inflate any count or reach a report/PDF. Self-throttled (cadence gate
+    // + hard QU cap) so it no-ops on most runs and stays inside the free GDELT
+    // budget; no-ops cleanly when unconfigured. Runs LAST and isolated in its own
+    // try so a GDELT outage or budget cap can never fail the wider ingest.
+    let gdeltStructured: GdeltStructuredSummary;
+    try {
+      gdeltStructured = await runGdeltStructuredIngest({ commit: true });
+      logger.info(
+        {
+          ran: gdeltStructured.ran,
+          reason: gdeltStructured.reason,
+          eventsFetched: gdeltStructured.eventsFetched,
+          storiesFetched: gdeltStructured.storiesFetched,
+          inserted: gdeltStructured.inserted,
+          totalAfter: gdeltStructured.totalAfter,
+          quSpent: gdeltStructured.quSpent,
+          fetchOk: gdeltStructured.fetchOk,
+        },
+        "GDELT structured event layer pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "GDELT structured event layer pass failed");
+      gdeltStructured = emptyGdeltStructured(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
@@ -781,6 +836,38 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       socialWatch,
       facebookOsint,
       gdeltEnrich,
+      gdeltStructured,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the GDELT Cloud structured event-layer ingest, committing to the
+ * database. Used by the manual admin trigger so an operator can refresh the
+ * structured context layer WITHOUT re-running the full multi-minute incident
+ * chain. These rows are NEVER incidents and live in their own isolated table,
+ * so they can never inflate any count. The pass is self-throttled (cadence gate
+ * + hard QU cap) so a manual trigger inside the cadence window no-ops and spends
+ * zero QU. Shares the same advisory lock so it can never collide with a full run.
+ */
+export async function runGdeltStructuredOnce(): Promise<GdeltStructuredRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let gdeltStructured: GdeltStructuredSummary;
+    try {
+      gdeltStructured = await runGdeltStructuredIngest({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "GDELT structured event layer ingest failed");
+      gdeltStructured = emptyGdeltStructured(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      gdeltStructured,
     };
   });
   if (!res.ran) return res;

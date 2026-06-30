@@ -505,6 +505,66 @@ export const ListReliefWebReportsResponse = zod.array(ListReliefWebReportsRespon
 
 
 /**
+ * @summary GDELT Cloud structured event layer — daily Events + Stories for the monitored APAC countries, stored as a standalone STRUCTURED CONTEXT layer in its own table (never as incidents, so they never inflate any count or reach a report/PDF). Events are bucketed into lanes; Indonesian items are sub-bucketed (Jakarta / Indonesian Papua). Most-recent first.
+ */
+export const listGdeltStructuredItemsQueryDaysMax = 30;
+
+export const listGdeltStructuredItemsQueryLimitMax = 500;
+
+
+
+export const ListGdeltStructuredItemsQueryParams = zod.object({
+  "lane": zod.enum(['Protests', 'Civil unrest and riots', 'Security incidents', 'Crime', 'Transport disruption']).optional().describe('Limit to one derived lane (events only; stories have no lane)'),
+  "country": zod.coerce.string().optional().describe('Limit to one country (exact match on GDELT\'s country name)'),
+  "subBucket": zod.enum(['Jakarta', 'Indonesian Papua']).optional().describe('Limit to one tracked Indonesian sub-bucket'),
+  "kind": zod.enum(['event', 'story']).optional().describe('Limit to one item kind (event or story)'),
+  "days": zod.coerce.number().min(1).max(listGdeltStructuredItemsQueryDaysMax).optional().describe('Only return items whose source date is within this many days (1-30, default 30). The collector never stores items older than 30 days.'),
+  "limit": zod.coerce.number().min(1).max(listGdeltStructuredItemsQueryLimitMax).optional().describe('Max number of most-recent items to return (1-500, default 200)')
+})
+
+export const ListGdeltStructuredItemsResponseItem = zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string().optional(),
+  "kind": zod.enum(['event', 'story']),
+  "externalId": zod.string(),
+  "title": zod.string(),
+  "summary": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "primaryStoryUrl": zod.string().nullish(),
+  "sourceDate": zod.coerce.date().nullish(),
+  "codedAt": zod.coerce.date().nullish(),
+  "upstreamUpdatedAt": zod.coerce.date().nullish(),
+  "country": zod.string().nullish(),
+  "region": zod.string().nullish(),
+  "continent": zod.string().nullish(),
+  "admin1": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "family": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "domain": zod.string().nullish(),
+  "eventCode": zod.string().nullish(),
+  "lane": zod.string().nullish(),
+  "subBucket": zod.string().nullish(),
+  "hasFatalities": zod.boolean().nullish(),
+  "fatalities": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "topLanguage": zod.string().nullish(),
+  "actors": zod.array(zod.unknown()).optional(),
+  "metrics": zod.record(zod.string(), zod.unknown()).optional(),
+  "topArticles": zod.array(zod.unknown()).optional(),
+  "linkedEvents": zod.array(zod.unknown()).optional(),
+  "storyRefs": zod.array(zod.unknown()).optional(),
+  "extras": zod.record(zod.string(), zod.unknown()).optional(),
+  "fetchedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date().nullish()
+}).describe('A GDELT Cloud structured Event or Story stored as a standalone STRUCTURED CONTEXT item. NOT an incident: these rows live in their own table and never feed any incident count, report, or PDF. All fields are kept verbatim from GDELT except lane \/ subBucket, which are derived from the verbatim taxonomy.')
+export const ListGdeltStructuredItemsResponse = zod.array(ListGdeltStructuredItemsResponseItem)
+
+
+/**
  * @summary KAMMI Pusat public Instagram protest-watch items, stored as supporting CONTEXT (never as incidents, so they never inflate any count). The only path into incidents is the explicit promote action.
  */
 export const listSocialWatchItemsQueryLimitMax = 200;

@@ -555,6 +555,78 @@ export async function runDataMigrations(): Promise<void> {
         ON reliefweb_reports (published_at)
     `);
 
+    // Schema: GDELT Cloud structured event layer. A pilot ADDITIVE structured
+    // source modelled on reliefweb_reports — GDELT Cloud v2 events + stories are
+    // stored as standalone structured CONTEXT in their OWN table, NEVER as
+    // incidents, so a GDELT event can never inflate any incident count, never
+    // reach a report/PDF, and never touch the report editor. `kind` discriminates
+    // 'event' (drives lanes) from 'story' (lane always NULL — GDELT does not
+    // lane-code stories, so we never fabricate one). Dedup per
+    // (source_name, kind, external_id). drizzle push only reaches dev, so the
+    // prod primary gains the table here on boot. All idempotent (IF NOT EXISTS).
+    // Mirrors lib/db/src/schema/gdeltStructuredItems.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS gdelt_structured_items (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL DEFAULT 'gdelt_cloud',
+        kind text NOT NULL,
+        external_id text NOT NULL,
+        title text NOT NULL,
+        summary text,
+        url text,
+        primary_story_url text,
+        source_date timestamptz,
+        coded_at timestamptz,
+        upstream_updated_at timestamptz,
+        country text,
+        region text,
+        continent text,
+        admin1 text,
+        location text,
+        latitude double precision,
+        longitude double precision,
+        family text,
+        category text,
+        subcategory text,
+        domain text,
+        event_code text,
+        lane text,
+        sub_bucket text,
+        has_fatalities boolean,
+        fatalities integer,
+        image_url text,
+        top_language text,
+        actors jsonb NOT NULL DEFAULT '[]'::jsonb,
+        metrics jsonb NOT NULL DEFAULT '{}'::jsonb,
+        top_articles jsonb NOT NULL DEFAULT '[]'::jsonb,
+        linked_events jsonb NOT NULL DEFAULT '[]'::jsonb,
+        story_refs jsonb NOT NULL DEFAULT '[]'::jsonb,
+        extras jsonb NOT NULL DEFAULT '{}'::jsonb,
+        fetched_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS gdelt_structured_items_source_kind_external_unique
+        ON gdelt_structured_items (source_name, kind, external_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS gdelt_structured_items_source_date_idx
+        ON gdelt_structured_items (source_date)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS gdelt_structured_items_country_idx
+        ON gdelt_structured_items (country)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS gdelt_structured_items_lane_idx
+        ON gdelt_structured_items (lane)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS gdelt_structured_items_sub_bucket_idx
+        ON gdelt_structured_items (sub_bucket)
+    `);
+
     // Schema: KAMMI Pusat Instagram public social-media protest WATCH
     // items. A CONTEXT source modelled on reliefweb_reports / maritime_movement:
     // a social item is NEVER an incident and lives in its OWN table precisely so

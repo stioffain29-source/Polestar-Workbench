@@ -1,5 +1,9 @@
 import { db } from "@workspace/db";
-import { resolveAisKey } from "@workspace/ingest";
+import {
+  resolveAisKey,
+  isGdeltStructuredConfigured,
+  isGdeltStructuredEnabled,
+} from "@workspace/ingest";
 import { sql } from "drizzle-orm";
 import {
   summarizeIngestFailures,
@@ -349,6 +353,50 @@ function facebookOsintActive(): boolean {
 async function hoursSinceNewestSocialRaw(): Promise<number | null> {
   const res = await db.execute(
     sql`SELECT MAX(created_at) AS last FROM social_raw`,
+  );
+  const row = res.rows[0] as { last: Date | string | null } | undefined;
+  if (!row?.last) return null;
+  return (Date.now() - new Date(row.last).getTime()) / MS_PER_HOUR;
+}
+
+/**
+ * True when the GDELT Cloud structured event layer is active — a key is present
+ * and it is not switched off. Mirrors isGdeltStructuredConfigured() +
+ * isGdeltStructuredEnabled() in lib/ingest/src/gdeltStructured.ts so the
+ * scheduler gates on the SAME condition the collector uses: when unconfigured
+ * the gdelt_structured_items table is empty by design, so gating on its
+ * freshness would force a needless full scrape on every cold start.
+ */
+function gdeltStructuredActive(): boolean {
+  return isGdeltStructuredConfigured() && isGdeltStructuredEnabled();
+}
+
+/**
+ * The GDELT structured layer's own refresh cadence in hours (default 24 =
+ * daily). The collector self-throttles to this interval via its internal
+ * cadence gate (and free-tier QU budget), so the boot gate keys staleness off
+ * the SAME interval — using the shorter generic ingest interval would force a
+ * full scrape in the gap between the two even though the GDELT pass would then
+ * no-op on its cadence gate and spend zero QU.
+ */
+function gdeltStructuredIntervalHours(): number {
+  const raw = process.env["GDELT_STRUCTURED_INTERVAL_HOURS"];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 24;
+}
+
+/**
+ * Hours since the newest GDELT structured pull (or null when the table is
+ * empty). The structured event layer refreshes ONLY inside a full ingest
+ * (runIngestOnce → runGdeltStructuredIngest), so — like strikes, the land
+ * topics, AIS movement and the social layers — a stale-but-populated table is a
+ * reason to run. Uses fetched_at (the pull heartbeat the collector stamps on
+ * every committed run) so a quiet news window does not look stale. Only
+ * considered when gdeltStructuredActive().
+ */
+async function hoursSinceNewestGdeltStructured(): Promise<number | null> {
+  const res = await db.execute(
+    sql`SELECT MAX(fetched_at) AS last FROM gdelt_structured_items`,
   );
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
@@ -769,6 +817,22 @@ export function startIngestScheduler(): void {
             : null;
           const socialRawStale =
             fbOsintActive && (socialRawAge === null || socialRawAge >= hours);
+          // GDELT Cloud structured event layer also refreshes ONLY inside a full
+          // ingest. Same shape as the social layers: a stale table is a reason to
+          // run, but ONLY when configured+enabled — otherwise the table is empty
+          // by design and gating on it would force a needless scrape on every
+          // cold start. Keyed off the GDELT cadence (default 24h), NOT the
+          // generic interval, because the collector self-throttles to that
+          // interval and would no-op (spending zero QU) on a shorter trigger. An
+          // empty table while active IS a trigger (initial population).
+          const gdeltActive = gdeltStructuredActive();
+          const gdeltStructuredAge = gdeltActive
+            ? await hoursSinceNewestGdeltStructured()
+            : null;
+          const gdeltStructuredStale =
+            gdeltActive &&
+            (gdeltStructuredAge === null ||
+              gdeltStructuredAge >= gdeltStructuredIntervalHours());
           // A movement table already past the 14-day SLA at boot means the
           // refresh path fell behind (the catch-up below restores it, but the
           // breach itself is worth an alert in production).
@@ -793,7 +857,8 @@ export function startIngestScheduler(): void {
             movementStale ||
             maritimeSecurityStale ||
             socialWatchStale ||
-            socialRawStale
+            socialRawStale ||
+            gdeltStructuredStale
           ) {
             logger.info(
               {
@@ -823,6 +888,11 @@ export function startIngestScheduler(): void {
                 socialRawAgeHours:
                   socialRawAge === null ? null : Math.round(socialRawAge),
                 socialRawStale,
+                gdeltStructuredAgeHours:
+                  gdeltStructuredAge === null
+                    ? null
+                    : Math.round(gdeltStructuredAge),
+                gdeltStructuredStale,
               },
               "boot ingest: data stale, running catch-up",
             );

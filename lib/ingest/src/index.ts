@@ -163,9 +163,19 @@ export {
   isGdeltEnrichEnabled,
 } from "./gdeltEnrich";
 export {
+  runGdeltStructuredIngest,
+  emptyGdeltStructuredSummary,
+  isGdeltStructuredConfigured,
+  isGdeltStructuredEnabled,
+} from "./gdeltStructured";
+export type { GdeltStructuredSummary } from "./gdeltStructured";
+export {
   GDELT_HEALTH_NAME,
   GDELT_HEALTH_TOPIC,
   GDELT_NOT_CONFIGURED_MESSAGE,
+  GDELT_STRUCTURED_HEALTH_NAME,
+  GDELT_STRUCTURED_HEALTH_TOPIC,
+  GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE,
   RELIEFWEB_CORROBORATION_HEALTH_NAME,
   RELIEFWEB_REPORTS_HEALTH_NAME,
   isOptionalIntegrationSource,

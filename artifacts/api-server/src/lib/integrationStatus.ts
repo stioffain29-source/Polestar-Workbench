@@ -6,6 +6,7 @@ import {
   reliefwebReportsTable,
   maritimeMovementTable,
   sourcesTable,
+  gdeltStructuredItemsTable,
 } from "@workspace/db";
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
@@ -20,6 +21,11 @@ import {
   REGISTRY_HEALTH_NAME,
   readSocialWatchConfig,
   SOCIAL_WATCH_IG_HEALTH_NAME,
+  isGdeltStructuredConfigured,
+  isGdeltStructuredEnabled,
+  GDELT_STRUCTURED_HEALTH_NAME,
+  GDELT_STRUCTURED_HEALTH_TOPIC,
+  GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE,
 } from "@workspace/ingest";
 import { socialWatchItemsTable } from "@workspace/db";
 import type {
@@ -771,6 +777,106 @@ function xOsintStatus(): IntegrationStatusItem {
   };
 }
 
+const GDELT_STRUCTURED_DETAIL =
+  "Daily pull of GDELT Cloud v2 Events + Stories for Indonesia, the Philippines, Thailand and Papua New Guinea, bucketed into lanes (Protests, Civil unrest and riots, Security incidents, Crime, Transport disruption) with Jakarta and Indonesian-Papua sub-buckets. A standalone STRUCTURED CONTEXT layer in its own table — never an incident, so it never inflates any count or reaches a report/PDF. Self-throttles to a daily cadence with a hard per-run call cap to stay inside the free-tier QU budget.";
+
+async function gdeltStructuredStatus(): Promise<IntegrationStatusItem> {
+  const envVars = [
+    "GDELT_CLOUD_API_KEY",
+    "GDELT_STRUCTURED_ENABLED",
+    "GDELT_STRUCTURED_INTERVAL_HOURS",
+    "GDELT_STRUCTURED_MAX_CALLS",
+    "GDELT_CLOUD_API_BASE",
+  ];
+  const configured = isGdeltStructuredConfigured();
+  const enabled = isGdeltStructuredEnabled();
+  const docsUrl = "https://gdeltcloud.com";
+
+  // EVIDENCE: how many structured items are stored, across how many lanes and
+  // countries, the most recent source date, plus the collector's own live
+  // health row (a sustained upstream outage escalates it to "failing").
+  let total = 0;
+  let latest: Date | null = null;
+  let lanes = 0;
+  let countries = 0;
+  let feedStatus: string | null = null;
+  try {
+    const [row] = await db
+      .select({
+        n: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${gdeltStructuredItemsTable.sourceDate})`,
+        lanes: sql<number>`count(distinct ${gdeltStructuredItemsTable.lane})::int`,
+        countries: sql<number>`count(distinct ${gdeltStructuredItemsTable.country})::int`,
+      })
+      .from(gdeltStructuredItemsTable);
+    total = row?.n ?? 0;
+    latest = row?.latest ?? null;
+    lanes = row?.lanes ?? 0;
+    countries = row?.countries ?? 0;
+    const [health] = await db
+      .select({ status: sourcesTable.status })
+      .from(sourcesTable)
+      .where(
+        and(
+          eq(sourcesTable.name, GDELT_STRUCTURED_HEALTH_NAME),
+          eq(sourcesTable.topic, GDELT_STRUCTURED_HEALTH_TOPIC),
+        ),
+      );
+    feedStatus = health?.status ?? null;
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "gdelt structured integration status query failed");
+    return unknownItem({
+      key: "gdelt_structured",
+      label: GDELT_STRUCTURED_HEALTH_NAME,
+      configured,
+      envVars,
+      summary: "Status query failed.",
+      detail: GDELT_STRUCTURED_DETAIL,
+      docsUrl,
+    });
+  }
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (!enabled) {
+    status = "disabled";
+    summary =
+      "Switched off (GDELT_STRUCTURED_ENABLED=false) — the structured event layer is not collected. Incident feeds are unaffected.";
+  } else if (!configured) {
+    status = "not_configured";
+    summary = GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE;
+  } else if (feedStatus === "failing") {
+    status = "failing_upstream";
+    summary =
+      "Configured, but GDELT Cloud is returning errors on consecutive runs — no structured items are being collected.";
+  } else if (total > 0) {
+    status = "working";
+    summary = `Holding ${total} structured event/story item(s) across ${lanes} lane(s) and ${countries} country(ies) as standalone context — never counted as incidents.`;
+  } else {
+    status = "no_data";
+    summary =
+      "Configured, but no structured items collected yet — awaiting the next daily GDELT Cloud pull.";
+  }
+
+  return {
+    key: "gdelt_structured",
+    label: GDELT_STRUCTURED_HEALTH_NAME,
+    status,
+    summary,
+    detail: GDELT_STRUCTURED_DETAIL,
+    configured,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("Items stored", total),
+      metric("Lanes covered", lanes),
+      metric("Countries covered", countries),
+      metric("Latest event", fmtDate(latest)),
+    ],
+    docsUrl,
+  };
+}
+
 function adminControlsStatus(): IntegrationStatusItem {
   const configured = Boolean(process.env["INGEST_ADMIN_TOKEN"]?.trim());
   return {
@@ -807,6 +913,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       vesselRegistryStatus(),
       openaiStatus(),
       socialInstagramStatus(),
+      gdeltStructuredStatus(),
       Promise.resolve(tapaStatus()),
       Promise.resolve(xOsintStatus()),
     ]),

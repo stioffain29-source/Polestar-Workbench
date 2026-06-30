@@ -18,6 +18,7 @@ import Shipping from "./pages/Shipping";
 import Strikes from "./pages/Strikes";
 import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
+import GdeltStructured from "./pages/GdeltStructured";
 import Countries from "./pages/Countries";
 import CountryReport from "./pages/CountryReport";
 import Reports from "./pages/Reports";
@@ -201,6 +202,7 @@ function Router() {
         <Route path="/strikes/backfill" component={StrikesBackfill} />
         <Route path="/strikes/:theatre" component={Strikes} />
         <Route path="/sources" component={Sources} />
+        <Route path="/gdelt-structured" component={GdeltStructured} />
         <Route path="/countries" component={Countries} />
         <Route path="/countries/:slug" component={CountryReport} />
         <Route path="/reports" component={Reports} />
