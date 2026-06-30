@@ -1,0 +1,145 @@
+Reset the Operational Exposure Map design.
+
+Stop iterating the current version. The output is not client ready and the layout is not working.
+
+The map should be an operational exposure graphic, not a report table with a small map attached.
+
+Build one clean sample first. Do not wire final data or generate the PDF until the sample is approved.
+
+Core Design Direction
+
+Use a light Carto / Positron style Leaflet base map.
+
+Place translucent coloured overlays directly over the map to show exposure areas, corridors and operating zones.
+
+The map should carry the operating picture visually.
+
+The right hand panel should only summarise the top exposures. It should not carry a long table.
+
+No logo inside the map page. This sits inside a Polestar report.
+
+No floating white callout boxes.
+
+No chunky district blocks.
+
+No large pills over the map.
+
+No cut off text.
+
+No internal source coverage block in the exported PDF.
+
+Map Content
+
+The map must show these items clearly:
+
+1. Central Jakarta government district
+   Use a red translucent zone or halo around the government district.
+
+2. Main commercial and hotel areas
+   Use an amber translucent zone around the main commercial / hotel area.
+
+3. North Jakarta port and logistics area
+   Use an amber translucent zone around Tanjung Priok / North Jakarta logistics area.
+
+4. Soekarno Hatta airport corridor
+   Use a translucent corridor from the airport towards central Jakarta.
+
+5. Cross city movement routes
+   Use soft translucent route bands across the city, not thin random lines.
+
+6. Greater Jakarta commuter belt
+   Use a subtle dashed boundary or wide translucent context zone around the wider commuting area.
+
+Overlay Style
+
+Use soft transparent overlays, around 20 to 35 percent opacity.
+
+Use rounded corridor bands rather than hard angular lines.
+
+Use restrained colours:
+
+High: red
+Elevated: amber / orange
+Monitored: muted yellow
+Low: muted green
+Not assessed / context: light grey
+
+The overlays should sit lightly on the map and allow the base map to remain readable.
+
+Markers
+
+Use small refined numbered markers only where needed.
+
+Markers should match the right hand ranked list.
+
+Do not use large icon badges.
+
+Do not crowd the map with labels.
+
+Labels
+
+Use a small number of clear labels only:
+
+Airport corridor
+Central Jakarta government district
+Main commercial and hotel areas
+North Jakarta port and logistics area
+Cross city movement routes
+Greater Jakarta commuter belt
+
+Labels should be subtle and placed inside or near the overlay zones.
+
+Right Hand Panel
+
+Limit the right hand panel to the top 4 ranked exposures only.
+
+Each item should have:
+
+Location / corridor name
+Exposure level
+One short why it matters line
+One short action line
+
+No long paragraphs.
+
+No fifth or sixth item if it causes the panel to overflow.
+
+Any extra detail belongs in the report body, not on this map page.
+
+Footer and Legend
+
+Use a small clean legend under the map.
+
+Keep the caption to one short sentence:
+
+This map shows operating exposure by area and route, based on open source reporting and local media. It does not plot individual incidents.
+
+Remove the internal source coverage section from the exported report. That can remain in debug view only, not in the client PDF.
+
+Page Layout
+
+Use a two column layout:
+
+Left: map, taking around 65 percent of page width.
+Right: ranked exposure panel, taking around 35 percent of page width.
+
+The map should be visually dominant.
+
+The panel should support the map, not overwhelm it.
+
+Acceptance Criteria
+
+The sample is only acceptable if:
+
+It looks client ready at report size.
+The map is the main visual.
+Translucent overlays clearly show exposure areas and movement corridors.
+The ranked panel fits fully on the page.
+There is no cut off text.
+There is no duplicate Polestar logo.
+There are no floating callout boxes.
+There are no chunky blocks.
+There is no internal source coverage visible in the exported PDF.
+The output looks like a professional operational risk map, not a prototype dashboard screenshot.
+
+Build one static sample first and show me the screenshot before proceeding.
