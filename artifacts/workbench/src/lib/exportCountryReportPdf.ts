@@ -45,6 +45,7 @@ import type { CountryBaseline } from "./countryBaselines";
 import {
   buildCountryLayers,
   resolveActiveCountryWindow,
+  resolvePreviousCountryWindow,
   type WatchlistRow,
   type CountryCoverageStatus,
 } from "./countryReportLayers";
@@ -55,6 +56,13 @@ import {
   hazardSummaryLabel,
   type JakartaCorridorStatus,
 } from "./jakartaCorridors";
+import {
+  buildJakartaReportDataset,
+  type PngReportDataset,
+  type PngReportItem,
+  type PngSourceIncident,
+} from "./pngReportDataset";
+import type { JakartaTableRow } from "./jakartaBrief";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 
 export interface PdfIncident {
@@ -671,6 +679,289 @@ function drawCoverageBanner(ctx: Ctx, coverage: CountryCoverageStatus) {
   ctx.y = top + boxH + 10;
 }
 
+// --- Jakarta tactical-brief renderers --------------------------------------
+// The Jakarta city report carries its OWN 13-section structure (mirrors the
+// on-screen JakartaReportBody). These headless renderers reuse the same
+// jakartaBrief.ts builders the screen uses, so the script-generated PDF and the
+// on-screen DOM-rasterised PDF stay in lockstep. Reached for Jakarta only;
+// every other theatre keeps the generic country layout below.
+
+function jakartaDateLine(item: PngReportItem): string {
+  const reported = format(item.reportedDate, "dd MMM yyyy");
+  if (item.occurredEarlier && item.incidentDate) {
+    return `Occurred ${format(item.incidentDate, "dd MMM")} · reported ${reported}`;
+  }
+  return `Reported ${reported}`;
+}
+
+// A plain count-free bullet list. Breaks at the line level so a long list never
+// orphans a whole block to the next page.
+function drawJakartaBulletList(ctx: Ctx, items: string[]) {
+  const { pdf, MX, CW } = ctx;
+  const lineH = 16;
+  for (const item of items) {
+    setRoboto(pdf, "light");
+    pdf.setFontSize(11);
+    setText(pdf, DUSK);
+    const lines: string[] = pdf.splitTextToSize(sanitize(`• ${item}`), CW - 6);
+    for (const ln of lines) {
+      ensureSpace(ctx, lineH);
+      pdf.text(ln, MX + 6, ctx.y + 11);
+      ctx.y += lineH;
+    }
+    ctx.y += 4;
+  }
+  ctx.y += 6;
+}
+
+// ELECTRIC strand sub-heading (used above the port-action list).
+function drawJakartaStrandLabel(ctx: Ctx, label: string) {
+  ensureSpace(ctx, 22);
+  const { pdf, MX } = ctx;
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(8);
+  setText(pdf, ELECTRIC);
+  pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 11);
+  ctx.y += 20;
+}
+
+// A standing exposure table (Area | Why it matters | Action), the headless
+// counterpart to the on-screen OpsTable.
+function drawJakartaOpsTable(ctx: Ctx, rows: JakartaTableRow[]) {
+  const { pdf, MX, CW } = ctx;
+  const colAreaW = Math.round(CW * 0.24);
+  const colWhyW = Math.round(CW * 0.42);
+  const colActW = CW - colAreaW - colWhyW;
+  const rowH = 20;
+
+  const header = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("AREA", MX + 6, ctx.y + 13);
+    pdf.text("WHY IT MATTERS", MX + colAreaW + 6, ctx.y + 13);
+    pdf.text("ACTION", MX + colAreaW + colWhyW + 6, ctx.y + 13);
+    ctx.y += rowH;
+  };
+
+  ensureSpace(ctx, rowH * 2);
+  header();
+
+  for (const r of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+    const areaLines: string[] = pdf.splitTextToSize(sanitize(r.area), colAreaW - 8);
+    const whyLines: string[] = pdf.splitTextToSize(sanitize(r.why), colWhyW - 8);
+    const actLines: string[] = pdf.splitTextToSize(sanitize(r.action), colActW - 8);
+    const rh = Math.max(
+      rowH,
+      areaLines.length * 12 + 10,
+      whyLines.length * 12 + 10,
+      actLines.length * 12 + 10,
+    );
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      header();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    const textOpts = { lineHeightFactor: 1.4 };
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.text(areaLines, MX + 6, ctx.y + 14, textOpts);
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.text(whyLines, MX + colAreaW + 6, ctx.y + 14, textOpts);
+    pdf.text(actLines, MX + colAreaW + colWhyW + 6, ctx.y + 14, textOpts);
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+}
+
+// One "Key Flashpoint" card: development title, severity chip, meta line and
+// the deterministic operational-impact body. Mirrors the on-screen
+// FlashpointCard (never an AI per-incident summary).
+function drawJakartaFlashpointCard(ctx: Ctx, item: PngReportItem) {
+  const { pdf, MX, CW } = ctx;
+  const sk = sevKey(item.severity);
+  const color = SEV_COLOR[sk] ?? ELECTRIC;
+  const padX = 12;
+  const padY = 12;
+  const chipW = 64;
+  const innerW = CW - padX * 2;
+
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(11);
+  const titleText = item.developmentTitle ?? item.title;
+  const titleLines: string[] = pdf.splitTextToSize(
+    sanitize(titleText),
+    innerW - chipW - 10,
+  );
+
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  const metaParts = [item.displayCategory, jakartaDateLine(item)].filter(Boolean);
+  if (item.source) metaParts.push(item.source);
+  const metaLines: string[] = pdf.splitTextToSize(
+    sanitize(metaParts.join("  ·  ")),
+    innerW,
+  );
+
+  pdf.setFontSize(9);
+  const bodyLines: string[] = pdf.splitTextToSize(
+    sanitize(item.businessImpact),
+    innerW,
+  );
+
+  const titleBlockH = Math.max(titleLines.length * 14, 18);
+  const cardH =
+    padY + titleBlockH + 6 + metaLines.length * 11 + 6 + bodyLines.length * 12 + padY;
+
+  if (ctx.y + cardH > ctx.H - ctx.BOTTOM) newPage(ctx);
+  const top = ctx.y;
+
+  setFill(pdf, WHITE);
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.5);
+  pdf.rect(MX, top, CW, cardH, "FD");
+  setFill(pdf, color);
+  pdf.rect(MX, top, 4, cardH, "F");
+
+  // Title.
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(11);
+  setText(pdf, NAVY);
+  pdf.text(titleLines, MX + padX, top + padY + 11, { lineHeightFactor: 1.25 });
+
+  // Severity chip, top-right.
+  const chipX = MX + CW - padX - chipW;
+  setFill(pdf, color);
+  pdf.rect(chipX, top + padY, chipW, 14, "F");
+  setText(pdf, WHITE);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(6.5);
+  pdf.text(
+    sanitize((SEV_LABEL[sk] ?? item.severityLabel ?? "").toUpperCase()),
+    chipX + chipW / 2,
+    top + padY + 9.5,
+    { align: "center" },
+  );
+
+  // Meta line.
+  let yy = top + padY + titleBlockH + 6;
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  setText(pdf, DUSK);
+  pdf.text(metaLines, MX + padX, yy + 8, { lineHeightFactor: 1.3 });
+
+  // Operational-impact body.
+  yy += metaLines.length * 11 + 6;
+  pdf.setFontSize(9);
+  setText(pdf, DUSK);
+  pdf.text(bodyLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+
+  ctx.y = top + cardH + 10;
+}
+
+// The Jakarta-only 13-section tactical operating brief, rendered in the exact
+// order the on-screen JakartaReportBody uses.
+function renderJakartaBrief(
+  ctx: Ctx,
+  dataset: PngReportDataset,
+  jakartaExposure: JakartaCorridorStatus[],
+) {
+  const d = dataset;
+  const tactical = d.jakartaTacticalBrief;
+
+  // 1. Bottom Line Up Front
+  drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
+
+  // 2. Operating Picture
+  drawSectionWithProse(
+    ctx,
+    "Operating Picture",
+    d.executiveSummary || "Not populated.",
+  );
+
+  // 3. Key Flashpoints This Week — at most three cards.
+  drawSectionHeading(ctx, "Key Flashpoints This Week");
+  const topThree = d.topThree.slice(0, 3);
+  if (topThree.length === 0) {
+    renderProse(ctx, d.emptyLocationFallback);
+  } else {
+    for (const it of topThree) drawJakartaFlashpointCard(ctx, it);
+    ctx.y += 4;
+  }
+
+  // 4. Movement and Access Impact
+  drawSectionHeading(ctx, "Movement and Access Impact");
+  if (tactical) drawJakartaBulletList(ctx, tactical.movementAccess);
+  else renderProse(ctx, "Not populated.");
+
+  // 5. Business District Exposure (intro + standing table)
+  drawSectionHeading(ctx, "Business District Exposure");
+  if (tactical) {
+    renderProse(ctx, tactical.businessDistrict.intro);
+    drawJakartaOpsTable(ctx, tactical.businessDistrict.rows);
+  } else {
+    renderProse(ctx, "Not populated.");
+  }
+
+  // 6. Port and Logistics Implications (intro + table + port actions)
+  drawSectionHeading(ctx, "Port and Logistics Implications");
+  if (tactical) {
+    renderProse(ctx, tactical.portLogistics.intro);
+    drawJakartaOpsTable(ctx, tactical.portLogistics.rows);
+    drawJakartaStrandLabel(ctx, "Port Actions");
+    drawJakartaBulletList(ctx, tactical.portLogistics.actions);
+  } else {
+    renderProse(ctx, "Not populated.");
+  }
+
+  // 7. Airport, Hotel and Office Implications
+  drawSectionWithProse(
+    ctx,
+    "Airport, Hotel and Office Implications",
+    tactical ? tactical.airportHotelOffice : "Not populated.",
+  );
+
+  // 8. Route and Timing Guidance
+  drawSectionHeading(ctx, "Route and Timing Guidance");
+  if (tactical) drawJakartaBulletList(ctx, tactical.routeTiming);
+  else renderProse(ctx, "Not populated.");
+
+  // 9. Recommended Actions
+  drawSectionHeading(ctx, "Recommended Actions");
+  if (d.businessImpact.length === 0) renderProse(ctx, d.businessImpactEmptyNote);
+  else drawJakartaBulletList(ctx, d.businessImpact);
+
+  // 10. Escalation Indicators
+  drawSectionHeading(ctx, "Escalation Indicators");
+  if (d.escalationIndicators.length === 0) {
+    renderProse(ctx, "No specific escalation indicators flagged this period.");
+  } else {
+    drawJakartaBulletList(ctx, d.escalationIndicators);
+  }
+
+  // 11. Seven Day Outlook
+  drawSectionWithProse(ctx, "Seven Day Outlook", d.outlook || "Not populated.");
+
+  // 12. Polestar View
+  drawSectionWithProse(ctx, "Polestar View", d.polestarView || "Not populated.");
+
+  // 13. Map and Area Summary
+  drawSectionHeading(ctx, "Map and Area Summary");
+  if (jakartaExposure.length > 0) drawJakartaExposureTable(ctx, jakartaExposure);
+  renderProse(ctx, tactical ? tactical.areaSummary : "Not populated.");
+}
+
 function buildKpiCards(facts: CountryFactsBreakdown): KpiCardData[] {
   return facts.cards.map((c) => ({
     label: c.label,
@@ -740,6 +1031,36 @@ export async function exportCountryReportPdf(
 
   // Coverage banner — only renders when the weekly window is empty.
   if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
+
+  // Jakarta carries its OWN 13-section tactical operating brief (mirrors the
+  // on-screen JakartaReportBody). Build the same dataset the screen uses and
+  // render those sections, then close the document and return early so the
+  // generic country layout below never runs for Jakarta. Every other theatre
+  // falls through unchanged.
+  if (country.name.trim().toLowerCase() === "jakarta") {
+    const jakartaDataset = buildJakartaReportDataset({
+      windowIncidents: active.incidents as unknown as PngSourceIncident[],
+      previousWindowIncidents: resolvePreviousCountryWindow(
+        layers,
+        todayIso,
+      ) as unknown as PngSourceIncident[],
+      thirtyDay: layers.thirtyDay as unknown as PngSourceIncident[],
+      ninetyDay: layers.ninetyDay as unknown as PngSourceIncident[],
+      baselineWatchlist: (extras.baseline?.locationWatchlist ?? []).map(
+        (w) => w.label,
+      ),
+      periodLabel: active.basisLabel,
+    });
+    const jakartaExposure = buildJakartaCorridorStatuses(
+      active.incidents as unknown as CountryFastFactsIncident[],
+    ).statuses;
+    renderJakartaBrief(ctx, jakartaDataset, jakartaExposure);
+
+    drawDisclaimer(ctx);
+    drawFooters(ctx.pdf);
+    ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
+    return;
+  }
 
   // 1. Executive Summary
   drawNarrative(

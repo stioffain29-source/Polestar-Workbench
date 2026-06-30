@@ -28,3 +28,17 @@ Audit method: per-page content-stream Tf-operator inventory (resolves each
 selected font resource back to its BaseFont). jsPDF auto-registers the 14
 standard PDF fonts in the font dictionary, but only /Roboto* may be SELECTED
 by a Tf operator. PASS = no non-Roboto font is ever selected.
+
+==== jakarta_country.pdf (Jakarta 13-section tactical brief) ====
+  page 1: Tf-used fonts = ['Roboto-Bold', 'Roboto-Regular']
+  page 2: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page 4: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page 5: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page 6: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  --> ALL fonts USED via Tf: ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  --> NON-Roboto used: NONE — PASS
+  Section order verified: BLUF, Operating Picture, Key Flashpoints, Movement &
+  Access, Business District table, Port & Logistics, Airport/Hotel/Office,
+  Route & Timing, Recommended Actions, Escalation Indicators, Seven Day Outlook,
+  Polestar View, Map & Area Summary.
