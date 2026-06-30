@@ -1,0 +1,210 @@
+ask: Upgrade Jakarta City Report to Tactical Operating Brief
+
+Update the Jakarta city report so it is no longer a high level city risk summary. It needs to read like a practical operating brief for business users, security teams, logistics teams and travellers operating in Jakarta.
+
+Do not rebuild the whole report system. Keep the current Polestar report layout, branding, risk ratings and PDF export structure. This is a content, structure and report logic improvement.
+
+Core problem to fix
+
+The current report is too generic. It says Jakarta is manageable but disruption prone, and gives broad advice such as check routes, build time buffers and avoid after hours movement. That is not enough for a paying client.
+
+The report must answer:
+
+Where is the issue?
+
+Which business districts or routes are affected?
+
+What does it mean for offices, hotels, warehouses, port movements and airport transfers?
+
+What should the client do before moving people or cargo?
+
+What triggers escalation or a change of plan?
+
+Required new report structure
+
+Use this structure for the Jakarta report:
+
+Bottom Line Up Front
+Operating Picture
+Key Flashpoints This Week
+Movement and Access Impact
+Business District Exposure
+Port and Logistics Implications
+Airport, Hotel and Office Implications
+Route and Timing Guidance
+Recommended Actions
+Escalation Indicators
+Seven Day Outlook
+Polestar View
+Map and area summary
+Make the content Jakarta specific
+
+The report should reference named Jakarta operating areas where relevant, including:
+
+Central Jakarta
+Gambir
+Monas
+Istana Merdeka area
+DPR/MPR area
+Sudirman
+Thamrin
+SCBD
+Senayan
+Kuningan
+Gatot Subroto
+Menteng
+North Jakarta
+Tanjung Priok Port
+Ancol
+Kelapa Gading
+Soekarno Hatta airport corridor
+Jabodetabek commuter belt
+Greater Jakarta industrial and warehouse areas
+
+Do not use all of these every time. Use them when the incident data supports it.
+
+Movement and access logic
+
+Replace generic movement wording with specific operational wording.
+
+Bad:
+
+“Movement may be disrupted.”
+
+Good:
+
+“Protest activity around Gambir, Monas or the government district can affect Jl. Medan Merdeka, Jl. MH Thamrin and access to nearby offices, hotels and government buildings. Confirm route status before departure and keep an alternate route available.”
+
+Bad:
+
+“Build time buffers.”
+
+Good:
+
+“Allow additional journey time for airport transfers during late afternoon, evening rain periods and Friday peak traffic. Confirm driver routing before departure, not once delays have already started.”
+
+Port and logistics section
+
+Add a dedicated section called:
+
+Port and Logistics Implications
+
+This is essential. Jakarta is a port city and the report must reflect that.
+
+The section should cover Tanjung Priok, North Jakarta access roads, container movement, trucking, customs clearance, warehousing and onward distribution into Greater Jakarta.
+
+Use wording like this:
+
+“Jakarta’s port exposure is concentrated around Tanjung Priok, North Jakarta and the connecting road network into Greater Jakarta industrial and warehouse areas. Heavy rain, flooding, congestion, protest activity, police controls or localised security incidents can affect container collection, truck movement, driver availability, delivery windows and warehouse access.”
+
+Include an operational table:
+
+Area	Impact	Action
+Tanjung Priok Port	Possible delay to container collection, port access and delivery windows	Confirm gate status, terminal conditions and truck availability before dispatch
+North Jakarta access roads	Flooding and congestion can slow port movements	Build buffer time into port collections and deliveries
+Port to warehouse routes	Disruption can affect onward distribution into Greater Jakarta	Pre agree alternate routing with transport providers
+Customs / terminal delays	Knock on effect for clearance, loading and delivery	Track dwell time and prioritise time sensitive cargo
+Driver and vehicle exposure	Waiting vehicles may face theft, extortion or opportunistic crime	Avoid unnecessary roadside staging and use secure waiting areas
+Recommended port actions
+
+Add these where relevant:
+
+Confirm Tanjung Priok gate and terminal status before dispatch.
+
+Check flood and congestion conditions on North Jakarta access routes.
+
+Build additional time into container collection and final mile delivery.
+
+Avoid leaving trucks staged outside port or warehouse areas for extended periods.
+
+Ask logistics providers for route confirmation before movement.
+
+Escalate if port access, terminal operations or key arterial roads are disrupted.
+
+Business district exposure
+
+Add a section that converts incidents into business impact.
+
+Example format:
+
+Area	Why it matters	Operational action
+Gambir / Monas / Istana area	Protest and policing exposure	Avoid non essential meetings nearby during demonstrations
+Sudirman / Thamrin	Main business corridor and traffic choke point	Confirm route before departure and keep alternate route ready
+Kuningan / Gatot Subroto	Embassies, offices and arterial routes	Allow additional journey time during protest or rain periods
+SCBD / Senayan	Offices, hotels, malls and business meetings	Monitor congestion and avoid exposed public areas after hours
+Soekarno Hatta corridor	Airport transfer route, weather and congestion sensitive	Add movement buffer and confirm driver routing
+Tanjung Priok / North Jakarta	Port, logistics and warehouse exposure	Confirm port, truck and route status before dispatch
+Go / no go and escalation triggers
+
+Add clear escalation indicators.
+
+Use triggers such as:
+
+Crowd size increases into the hundreds near government buildings.
+
+Police roadblocks or traffic diversions are reported.
+
+Flooding affects low clearance vehicles or arterial roads.
+
+Drivers cannot confirm two viable routes.
+
+Port access, terminal gates or container collection are delayed.
+
+Trucks are forced to wait outside secure areas.
+
+Incidents are reported near offices, hotels, warehouses, malls, transport hubs or client sites.
+
+Airport transfer time exceeds normal planning assumptions.
+
+Map improvement
+
+The current map is too broad. Improve the Jakarta map layer so it is operationally useful.
+
+The map should show:
+
+Central Jakarta government district
+Sudirman / Thamrin business corridor
+SCBD / Senayan
+Kuningan / Gatot Subroto
+Soekarno Hatta airport corridor
+Tanjung Priok Port
+North Jakarta access area
+Greater Jakarta / Jabodetabek commuter belt
+
+Use markers for incidents and shaded areas for operating zones where possible.
+
+The map should help a client understand where disruption could affect movement, port access, airport transfer, office access or logistics.
+
+Tone and writing style
+
+Use plain English.
+
+Keep it concise.
+
+No generic filler.
+
+No dramatic language.
+
+No speculation.
+
+No unsupported claims.
+
+Focus on business impact, movement, access, port operations, logistics, staff safety and decision making.
+
+Use British spelling.
+
+Output requirement
+
+Produce an updated Jakarta report template and generation logic that creates a tactical operating brief, not a general city summary.
+
+The final report should help a client decide:
+
+Can staff travel?
+
+Which areas need caution?
+
+Can cargo move?
+
+Are port or warehouse movements affected?
+
+Do we need to delay, reroute or escalate?

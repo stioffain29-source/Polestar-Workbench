@@ -402,6 +402,18 @@ const AREA_LOCATIVE: Record<string, string> = {
   "cross-city-routes": "on the main cross-city movement routes",
 };
 
+// Operational impact phrase per area — what a disruption HERE actually hits for
+// a business traveller / operations team. Drives the panel's "why it matters",
+// so the line is operationally specific, never a bare "crime reported".
+const AREA_IMPACT: Record<string, string> = {
+  "central-government": "road access and movement around government buildings",
+  "commercial-hotels": "staff movement, hotel access and client meetings",
+  "airport-corridor": "airport transfers and journey timings",
+  "north-port": "port access, deliveries and logistics timings",
+  "commuter-belt": "staff commutes and site access across the wider metro",
+  "cross-city-routes": "cross-city movement, meetings and site visits",
+};
+
 function joinHazardLeads(xs: string[]): string {
   const a = xs.filter((s) => s.length > 0);
   if (a.length <= 1) return a[0] ?? "";
@@ -440,6 +452,72 @@ export function buildAreaProse(
   return { relevance, action: HAZARD_ACTION[ordered[0]] };
 }
 
+// Operationally-framed "why it matters" + "action" for the ranked side panel.
+// Short, but never vague: it ties the reported hazard(s) to what they disrupt
+// for operations in THIS area. With no live reporting it states the area's
+// standing operational relevance (already business-framed), never a fabricated
+// this-period claim. Drives the panel AND its PDF parity.
+export function buildAreaPanelProse(
+  area: JakartaCorridorArea,
+  count: number,
+  hazards: JakartaHazard[],
+): { relevance: string; action: string } {
+  if (count === 0) {
+    return { relevance: area.relevance, action: area.action };
+  }
+  const impact = AREA_IMPACT[area.id] ?? "movement and access in the area";
+  const ordered = HAZARD_PRIORITY.filter((h) => hazards.includes(h));
+  if (ordered.length === 0) {
+    return {
+      relevance: `Reported activity may affect ${impact}.`,
+      action: area.action,
+    };
+  }
+  const lead = joinHazardLeads(ordered.map((h) => HAZARD_LEAD[h]));
+  return {
+    relevance: `${lead.charAt(0).toUpperCase()}${lead.slice(1)} may affect ${impact}.`,
+    action: HAZARD_ACTION[ordered[0]],
+  };
+}
+
+// Compact, glanceable action per hazard for the ranked side panel (and its PDF
+// parity). Same honest model as HAZARD_ACTION, tightened to a single short line.
+const HAZARD_ACTION_SHORT: Record<JakartaHazard, string> = {
+  protest: "Avoid protest sites; reroute.",
+  flooding: "Check flood routes; add time.",
+  crime: "Stay alert after hours.",
+  fire: "Confirm area status first.",
+  traffic: "Add journey time buffers.",
+  policing: "Verify access before travel.",
+};
+
+// Compact one-line variant of buildAreaProse for the ranked side panel: a short
+// "why it matters" line and a short action line, derived from the SAME honest
+// hazard model so the panel never names a hazard that was not reported.
+export function buildAreaProseShort(
+  count: number,
+  hazards: JakartaHazard[],
+): { relevance: string; action: string } {
+  if (count === 0) {
+    return {
+      relevance: "No incidents reported this period.",
+      action: "Confirm local conditions.",
+    };
+  }
+  const ordered = HAZARD_PRIORITY.filter((h) => hazards.includes(h));
+  if (ordered.length === 0) {
+    return {
+      relevance: "Security-relevant activity reported.",
+      action: "Confirm local conditions.",
+    };
+  }
+  const lead = joinHazardLeads(ordered.map((h) => HAZARD_LEAD[h]));
+  return {
+    relevance: `${lead.charAt(0).toUpperCase()}${lead.slice(1)} reported.`,
+    action: HAZARD_ACTION_SHORT[ordered[0]],
+  };
+}
+
 // Short "main exposure" summary for the headless PDF table column, derived from
 // what was ACTUALLY reported this period — never a standing hazard template, so
 // the PDF never names a hazard the on-screen map does not.
@@ -468,6 +546,10 @@ export interface JakartaCorridorStatus {
   relevance: string;
   /** Display-ready action line, derived from this period's reporting. */
   action: string;
+  /** Compact one-line relevance for the ranked side panel (and PDF parity). */
+  relevanceShort: string;
+  /** Compact one-line action for the ranked side panel (and PDF parity). */
+  actionShort: string;
   /** The area's standing operating-exposure profile (window-independent). */
   baselineExposure: JakartaExposureLevel;
   /** Operating-exposure derived from this period's worst severity, or null
@@ -515,6 +597,7 @@ export function buildJakartaCorridorStatuses(
       : standingDisplayExposure(baselineExposure);
     const hazards = HAZARD_PRIORITY.filter((h) => hazardSets[idx].has(h));
     const prose = buildAreaProse(area.id, c.count, hazards);
+    const proseShort = buildAreaPanelProse(area, c.count, hazards);
     return {
       area,
       number: idx + 1,
@@ -524,6 +607,8 @@ export function buildJakartaCorridorStatuses(
       hazards,
       relevance: prose.relevance,
       action: prose.action,
+      relevanceShort: proseShort.relevance,
+      actionShort: proseShort.action,
       baselineExposure,
       liveExposure,
       displayExposure,

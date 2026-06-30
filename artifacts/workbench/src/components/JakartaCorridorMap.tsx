@@ -4,14 +4,11 @@ import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import {
   buildJakartaCorridorStatuses,
-  type JakartaCorridorStatus,
   type JakartaExposureLevel,
 } from "@/lib/jakartaCorridors";
 import {
   JAKARTA_VIEW_BBOX,
   JAKARTA_CORRIDOR_LINES,
-  JAKARTA_GEO,
-  JAKARTA_MAP_LABELS,
 } from "@/lib/jakartaGeo";
 
 const NAVY = "#0B0B3D";
@@ -57,15 +54,6 @@ const SEV_RANK: Record<JakartaExposureLevel, number> = {
   "not-assessed": 0,
 };
 
-// Pale Java Sea backdrop behind the custom illustration.
-const SEA = "#D6E2F0";
-
-// Warm near-white land + faint dashed administrative boundaries, matching the
-// professional travel-risk reference (land reads as paper, the sea as a pale
-// wash). Operating exposure is carried by the soft zones, never the land fill.
-const LAND_FILL = "#F4F2EC";
-const BOUNDARY = "#E4E0D6";
-
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace("#", "");
   return {
@@ -74,193 +62,6 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
     b: parseInt(h.slice(4, 6), 16),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Monochrome line icons (government building, office tower, anchor, plane, a
-// dashed commuter ring and a movement-route glyph). Drawn on a canvas so they
-// can be baked into the map PNG AND surfaced as <img> in the legend / list —
-// both html2canvas-safe, unlike inline SVG. Each draws centred on (x, y) with
-// a roughly 16px footprint.
-// ---------------------------------------------------------------------------
-export type JakartaMapIcon =
-  | "civic"
-  | "tower"
-  | "anchor"
-  | "plane"
-  | "ring"
-  | "route";
-
-function drawCivicIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  c: string,
-) {
-  ctx.fillStyle = c;
-  ctx.beginPath();
-  ctx.moveTo(x - 7.5, y - 3);
-  ctx.lineTo(x, y - 8);
-  ctx.lineTo(x + 7.5, y - 3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(x - 7.5, y - 3, 15, 1.6);
-  for (const cx of [-6, -3, 0, 3, 6]) ctx.fillRect(x + cx - 0.55, y - 1, 1.1, 7);
-  ctx.fillRect(x - 8, y + 6, 16, 1.9);
-}
-
-function drawTowerIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  c: string,
-) {
-  ctx.fillStyle = c;
-  ctx.fillRect(x - 6, y - 8, 5.6, 16);
-  ctx.fillRect(x + 0.6, y - 4, 5.6, 12);
-  ctx.fillStyle = "#ffffff";
-  for (let r = 0; r < 4; r++) {
-    ctx.fillRect(x - 4.7, y - 6.4 + r * 3.4, 1.3, 1.3);
-    ctx.fillRect(x - 2.5, y - 6.4 + r * 3.4, 1.3, 1.3);
-  }
-  for (let r = 0; r < 3; r++) {
-    ctx.fillRect(x + 1.9, y - 2.4 + r * 3.4, 1.3, 1.3);
-    ctx.fillRect(x + 3.9, y - 2.4 + r * 3.4, 1.3, 1.3);
-  }
-}
-
-function drawAnchorIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  c: string,
-) {
-  ctx.strokeStyle = c;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.arc(x, y - 6, 2, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x, y - 4);
-  ctx.lineTo(x, y + 7);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x - 4, y - 1.5);
-  ctx.lineTo(x + 4, y - 1.5);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(x, y + 2, 6, 0.18 * Math.PI, 0.82 * Math.PI);
-  ctx.stroke();
-}
-
-function drawPlaneIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  c: string,
-) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(-Math.PI / 4);
-  ctx.fillStyle = c;
-  ctx.beginPath();
-  ctx.moveTo(0, -8.5);
-  ctx.quadraticCurveTo(1.7, -7, 1.7, -2.5);
-  ctx.lineTo(8, 1.5);
-  ctx.lineTo(8, 3.2);
-  ctx.lineTo(1.7, 1);
-  ctx.lineTo(1.7, 6);
-  ctx.lineTo(3.5, 7.7);
-  ctx.lineTo(3.5, 8.9);
-  ctx.lineTo(0, 7.8);
-  ctx.lineTo(-3.5, 8.9);
-  ctx.lineTo(-3.5, 7.7);
-  ctx.lineTo(-1.7, 6);
-  ctx.lineTo(-1.7, 1);
-  ctx.lineTo(-8, 3.2);
-  ctx.lineTo(-8, 1.5);
-  ctx.lineTo(-1.7, -2.5);
-  ctx.quadraticCurveTo(-1.7, -7, 0, -8.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawRingIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  c: string,
-) {
-  ctx.strokeStyle = c;
-  ctx.lineWidth = 1.6;
-  ctx.setLineDash([2.6, 2.4]);
-  ctx.beginPath();
-  ctx.arc(x, y, 7, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-function drawRouteIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  c: string,
-) {
-  ctx.strokeStyle = c;
-  ctx.lineWidth = 1.6;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(x - 7.5, y);
-  ctx.lineTo(x + 7.5, y);
-  ctx.stroke();
-  for (const hx of [-1, 5]) {
-    ctx.beginPath();
-    ctx.moveTo(x + hx - 3, y - 3);
-    ctx.lineTo(x + hx, y);
-    ctx.lineTo(x + hx - 3, y + 3);
-    ctx.stroke();
-  }
-}
-
-function drawAreaIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  kind: JakartaMapIcon,
-  c: string,
-) {
-  if (kind === "civic") drawCivicIcon(ctx, x, y, c);
-  else if (kind === "tower") drawTowerIcon(ctx, x, y, c);
-  else if (kind === "anchor") drawAnchorIcon(ctx, x, y, c);
-  else if (kind === "plane") drawPlaneIcon(ctx, x, y, c);
-  else if (kind === "ring") drawRingIcon(ctx, x, y, c);
-  else drawRouteIcon(ctx, x, y, c);
-}
-
-function iconDataUrl(kind: JakartaMapIcon, color: string, px = 24): string {
-  const s = 3;
-  const cv = document.createElement("canvas");
-  cv.width = px * s;
-  cv.height = px * s;
-  const ctx = cv.getContext("2d");
-  if (!ctx) return "";
-  ctx.scale(s, s);
-  ctx.translate(px / 2, px / 2);
-  drawAreaIcon(ctx, 0, 0, kind, color);
-  return cv.toDataURL("image/png");
-}
-
-// Each functional area's icon for the legend, ranked list and map badge.
-const AREA_ICON: Record<string, JakartaMapIcon> = {
-  "central-government": "civic",
-  "commercial-hotels": "tower",
-  "airport-corridor": "plane",
-  "north-port": "anchor",
-  "commuter-belt": "ring",
-  "cross-city-routes": "route",
-};
 
 const MONTHS = [
   "January",
@@ -309,88 +110,77 @@ export interface JakartaCorridorMapProps {
 }
 
 // ---------------------------------------------------------------------------
-// Map composition — the fixed cartographic furniture drawn over the projected
-// view: each functional area's icon badge + soft exposure zone, plus rotated
-// corridor captions. Marker / label coordinates are [lat, lon].
+// Map composition — the cartographic furniture drawn over the REAL basemap: a
+// soft exposure zone + small numbered marker per key site, plus a subtle area
+// caption. Marker / label coordinates are [lat, lon].
 // ---------------------------------------------------------------------------
 interface JakartaMapArea {
   /** Matches a JAKARTA_CORRIDOR_AREAS id (drives exposure colour + number). */
   id: string;
-  icon: JakartaMapIcon;
-  /** Icon-badge anchor [lat, lon]. */
+  /** Numbered-marker anchor [lat, lon]. */
   marker: [number, number];
-  /** Soft radial exposure zone radius in px (omitted = no zone). */
-  zoneRadius?: number;
-  /** Optional site label drawn beside the badge. */
+  /** Soft elliptical exposure zone (px radii + rotation) shaped to the area's
+   *  district footprint, so the zone reads as a real operating area rather than
+   *  a generic circle. Omitted = no zone. */
+  zone?: { rx: number; ry: number; rotateDeg?: number };
+  /** Optional site label drawn beside the marker. */
   siteLabel?: string;
   siteLabelSide?: "top" | "bottom" | "left" | "right";
-  /** Optional area caption (uppercase, in the area's exposure accent). */
+  /** Optional area caption (uppercase, neutral slate, placed near the zone). */
   areaLabel?: { text: string; lat: number; lon: number };
 }
 
 const JAKARTA_MAP_AREAS: JakartaMapArea[] = [
   {
     id: "north-port",
-    icon: "anchor",
     marker: [-6.108, 106.885],
-    zoneRadius: 56,
-    siteLabel: "Tanjung Priok Port",
-    siteLabelSide: "top",
+    // Coastal port strip — a wide, shallow E–W ellipse along the waterfront.
+    zone: { rx: 90, ry: 42, rotateDeg: -8 },
     areaLabel: {
-      text: "NORTH JAKARTA & PORT AREA",
-      lat: -6.172,
-      lon: 106.915,
+      text: "NORTH JAKARTA PORT & LOGISTICS",
+      lat: -6.145,
+      lon: 106.93,
     },
   },
   {
     id: "central-government",
-    icon: "civic",
     marker: [-6.18, 106.815],
-    zoneRadius: 64,
+    // Government core — a distinctly N–S oblong over the central district.
+    zone: { rx: 50, ry: 76, rotateDeg: 0 },
     areaLabel: {
-      text: "CENTRAL JAKARTA GOVERNMENT DISTRICT",
-      lat: -6.213,
-      lon: 106.812,
+      text: "CENTRAL GOVERNMENT DISTRICT",
+      lat: -6.214,
+      lon: 106.808,
     },
   },
   {
     id: "commercial-hotels",
-    icon: "tower",
-    marker: [-6.245, 106.732],
-    zoneRadius: 56,
+    marker: [-6.245, 106.79],
+    // Commercial & hotel core — a tilted oblong over the southern CBD axis.
+    zone: { rx: 52, ry: 72, rotateDeg: 16 },
     areaLabel: {
-      text: "MAIN COMMERCIAL & HOTEL AREAS",
-      lat: -6.272,
-      lon: 106.730,
+      text: "COMMERCIAL & HOTEL CORE",
+      lat: -6.276,
+      lon: 106.79,
     },
   },
   {
     id: "airport-corridor",
-    icon: "plane",
     marker: [-6.1256, 106.6559],
-    siteLabel: "Soekarno-Hatta International Airport",
-    siteLabelSide: "right",
   },
   {
     id: "commuter-belt",
-    icon: "ring",
     marker: [-6.33, 106.93],
   },
   {
     id: "cross-city-routes",
-    icon: "route",
     marker: [-6.259, 106.92],
   },
 ];
 
-// Areas shown as movement corridors only: no numbered site badge on the map —
-// their exposure reads from the route line + caption, not a ranked dot.
-const CORRIDOR_ONLY_IDS = new Set(["commuter-belt", "cross-city-routes"]);
-
-// Corridor captions sit horizontally in open map space, each in its corridor's
-// own identity colour, so the routes read apart without crowding the sites. The
-// airport corridor is the one exception — its caption rides rotated along the
-// band, matching the reference.
+// Corridor captions sit horizontally in open map space in a neutral slate, so
+// the routes read without competing with the exposure zones. The airport
+// corridor caption rides rotated along its band.
 interface CorridorCaption {
   text: string;
   lat: number;
@@ -401,34 +191,28 @@ interface CorridorCaption {
 const CORRIDOR_CAPTION: Record<string, CorridorCaption> = {
   "airport-corridor": {
     text: "AIRPORT CORRIDOR",
-    lat: -6.15,
-    lon: 106.715,
+    lat: -6.151,
+    lon: 106.726,
     color: "#6B7280",
     rotate: true,
-  },
-  "north-port": {
-    text: "LOGISTICS CORRIDOR",
-    lat: -6.135,
-    lon: 106.955,
-    color: "#6B7280",
   },
   "cross-city-routes": {
     text: "CROSS-CITY MOVEMENT ROUTES",
     lat: -6.249,
-    lon: 106.884,
+    lon: 106.9,
     color: "#6B7280",
   },
   "commuter-belt": {
     text: "GREATER JAKARTA COMMUTER BELT",
     lat: -6.353,
-    lon: 106.835,
-    color: "#6E86A6",
+    lon: 106.84,
+    color: "#7C8AA0",
   },
 };
 
-// Each corridor carries its OWN identity colour (matching the reference) so the
-// routes read apart at a glance. Operating exposure is shown by the soft zones,
-// the badges and the ranked list — never by the corridor colour.
+// Each corridor carries a subtle identity style so the movement axes read apart
+// at a glance. Operating exposure is shown by the soft zones and the ranked
+// panel — never by the corridor colour.
 interface CorridorStyle {
   fill: string;
   accent: string;
@@ -436,10 +220,10 @@ interface CorridorStyle {
   thin?: boolean;
 }
 const CORRIDOR_STYLE: Record<string, CorridorStyle> = {
-  "airport-corridor": { fill: "#C3AEDD", accent: "#8E74B5" },
-  "north-port": { fill: "#E6B27E", accent: "#C0792F", dashed: true, thin: true },
-  "cross-city-routes": { fill: "#AFCF96", accent: "#6E9A52" },
-  "commuter-belt": { fill: "#9FC3E8", accent: "#2F6FB0", dashed: true, thin: true },
+  "airport-corridor": { fill: "#A78FC9", accent: "#7E5EAE" },
+  "north-port": { fill: "#DCA56F", accent: "#B5701F", dashed: true },
+  "cross-city-routes": { fill: "#9BBE83", accent: "#5E8A45" },
+  "commuter-belt": { fill: "#8FB2DA", accent: "#4E76A6", dashed: true },
 };
 const DEFAULT_CORRIDOR_STYLE: CorridorStyle = {
   fill: "#B9C2CC",
@@ -465,27 +249,26 @@ const legendTextStyle: CSSProperties = {
   fontSize: 11,
   color: DUSK,
 };
-const legendIconStyle: CSSProperties = {
-  width: 16,
-  height: 16,
-  display: "block",
-};
+
+// How many ranked exposures the side panel shows (and how many numbered markers
+// the map carries). Kept tight so the figure stays uncrowded and client-ready.
+const TOP_N = 4;
 
 /**
  * Jakarta operational exposure map — a clean, client-grade figure in the style
  * of professional travel-risk mapping (Crisis24 / International SOS): a REAL
- * light Leaflet basemap (CartoDB light_nolabels — actual coastline, the Java
- * Sea and the road network) carrying ONLY small numbered markers for key sites
- * and thin lines for the main movement corridors, each coloured by operating
- * exposure. The map face is kept clean — no district blocks, no white boxes,
- * chips or pills. Every detail lives in the ranked list to the right; the
- * numbers tie the two together.
+ * light Leaflet basemap (CartoDB Positron — actual coastline, the Java Sea, the
+ * road network and place labels) carrying translucent operating-exposure zones,
+ * subtle movement corridors and small numbered markers for the key sites, with
+ * a compact ranked panel beside it. The numbers tie the map and the panel
+ * together.
  *
- * PDF parity: the basemap is <img> tiles and the markers + corridor lines (with
- * their numbers baked in) are a single offscreen-canvas → data-URL <img> — both
- * are layers html2canvas rasterises faithfully, so the on-screen preview and the
- * DOM-rasterised in-app PDF stay identical (a live <canvas> or Leaflet SVG
- * vector layer would be dropped/mangled on clone).
+ * PDF parity: the basemap is crossOrigin <img> tiles and every overlay (zones,
+ * corridor bands, numbered markers, captions) is a single offscreen-canvas →
+ * data-URL <img> layered over the tiles — both are layers html2canvas
+ * rasterises faithfully, so the on-screen preview and the DOM-rasterised
+ * in-app PDF stay identical (a live <canvas> or Leaflet SVG vector layer would
+ * be dropped/mangled on clone).
  *
  * Exposure levels are honest: each area carries a standing profile that live
  * reporting can only RAISE, never invent.
@@ -502,11 +285,11 @@ export default function JakartaCorridorMap({
   const rangeLabel = useMemo(() => weeklyRangeLabel(issueDate), [issueDate]);
 
   // Ranked by operating exposure (worst first), stable on original order. The
-  // rank number is what the map markers and the right-hand list both display.
+  // rank number is what the map markers and the right-hand panel both display.
   const ranked = useMemo(
     () =>
       corridor.statuses
-        // Cross-city movement is shown as a corridor line on the map, not as a
+        // Cross-city movement is shown as a corridor band on the map, not as a
         // ranked site/area, so it is dropped from the numbered exposure list.
         .filter((s) => s.area.id !== "cross-city-routes")
         .map((status, i) => ({ status, i }))
@@ -523,11 +306,15 @@ export default function JakartaCorridorMap({
     [corridor],
   );
 
+  // Only the top-N exposures are shown — on the map (numbered markers) and in
+  // the side panel — so the figure stays clean.
+  const top = useMemo(() => ranked.slice(0, TOP_N), [ranked]);
+
   const numberFor = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of ranked) m.set(r.status.area.id, r.number);
+    for (const r of top) m.set(r.status.area.id, r.number);
     return m;
-  }, [ranked]);
+  }, [top]);
 
   const levelFor = useMemo(() => {
     const m = new Map<string, JakartaExposureLevel>();
@@ -539,20 +326,12 @@ export default function JakartaCorridorMap({
   const drawKey = useMemo(
     () =>
       ranked
-        .map((r) => `${r.status.area.id}:${r.number}:${r.status.displayExposure}`)
+        .map(
+          (r, i) =>
+            `${r.status.area.id}:${i < TOP_N ? r.number : "-"}:${r.status.displayExposure}`,
+        )
         .join(","),
     [ranked],
-  );
-
-  // Monochrome key icons (baked once) for the map-key legend column.
-  const legendIcons = useMemo(
-    () => ({
-      civic: iconDataUrl("civic", NAVY),
-      tower: iconDataUrl("tower", NAVY),
-      anchor: iconDataUrl("anchor", NAVY),
-      plane: iconDataUrl("plane", NAVY),
-    }),
-    [],
   );
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
@@ -577,17 +356,30 @@ export default function JakartaCorridorMap({
         // Fit the view box EXACTLY (no integer-zoom snapping, which would round
         // down and float the content inside empty land).
         zoomSnap: 0,
+        zoomAnimation: false,
+        markerZoomAnimation: false,
       });
       mapRef.current = map;
 
-      // No raster tile layer: the figure is a fully custom stylised
-      // illustration drawn on the overlay canvas (sea, land, dashed regency
-      // boundaries, soft zones, movement bands, labels and badges) so it
-      // matches the report's house style rather than a generic web basemap.
-      // Leaflet is used only for the lat/lng → pixel projection of the locked
-      // view.
+      // Real light basemap — CartoDB Voyager (a light Carto style with a clearly
+      // readable road network, coastline, the Java Sea and place labels, less
+      // washed-out than Positron) at full opacity. The translucent exposure zones
+      // still dominate. crossOrigin so html2canvas can rasterise into the PDF.
+      L.tileLayer(
+        // Force @2x (retina) tiles always. The figure sits at a FRACTIONAL zoom
+        // (zoomSnap 0) so Leaflet stretches integer-zoom tiles; serving 2x-density
+        // tiles keeps the basemap crisp instead of pixelated at that scale.
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+        {
+          attribution: "&copy; OpenStreetMap &copy; CARTO",
+          subdomains: "abcd",
+          maxZoom: 19,
+          crossOrigin: true,
+          opacity: 1,
+        },
+      ).addTo(map);
 
-      // Custom illustration overlay (offscreen canvas → data-URL <img>).
+      // Overlay (offscreen canvas → data-URL <img>) drawn above the tiles.
       const overlay = document.createElement("img");
       overlay.alt = "";
       overlay.style.position = "absolute";
@@ -596,7 +388,7 @@ export default function JakartaCorridorMap({
       overlay.style.width = "100%";
       overlay.style.height = "100%";
       overlay.style.pointerEvents = "none";
-      overlay.style.zIndex = "400";
+      overlay.style.zIndex = "450";
       mapElRef.current.appendChild(overlay);
       overlayImgRef.current = overlay;
     }
@@ -609,23 +401,48 @@ export default function JakartaCorridorMap({
     );
     map.fitBounds(bounds, { padding: [6, 6] });
 
-    // Soft radial exposure footprint under a site (feathered, no hard edge).
+    const topIds = new Set(top.map((r) => r.status.area.id));
+
+    // Soft elliptical exposure footprint over a district (feathered, no hard
+    // edge). The fill is a radial gradient drawn in a y-scaled frame so the
+    // falloff is truly elliptical; a thin uniform outline keeps the zone
+    // legible against the basemap without reading as a hard ring.
     const drawZone = (
       ctx: CanvasRenderingContext2D,
       x: number,
       y: number,
       level: JakartaExposureLevel,
-      radius: number,
+      rx: number,
+      ry: number,
+      rotateDeg: number,
     ) => {
       const { r, g, b } = hexToRgb(EXPOSURE_FILL[level]);
-      const grad = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius);
-      grad.addColorStop(0, `rgba(${r},${g},${b},0.62)`);
-      grad.addColorStop(0.55, `rgba(${r},${g},${b},0.32)`);
+      const { r: ar, g: ag, b: ab } = hexToRgb(EXPOSURE_ACCENT[level]);
+      const rot = (rotateDeg * Math.PI) / 180;
+      // Feathered fill (scaled frame → elliptical falloff).
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.scale(1, ry / rx);
+      const grad = ctx.createRadialGradient(0, 0, rx * 0.08, 0, 0, rx);
+      grad.addColorStop(0, `rgba(${r},${g},${b},0.46)`);
+      grad.addColorStop(0.55, `rgba(${r},${g},${b},0.22)`);
       grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(0, 0, rx, 0, Math.PI * 2);
       ctx.fillStyle = grad;
       ctx.fill();
+      ctx.restore();
+      // Thin, uniform outline.
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx * 0.82, ry * 0.82, 0, 0, Math.PI * 2);
+      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = `rgba(${ar},${ag},${ab},0.42)`;
+      ctx.stroke();
+      ctx.restore();
     };
 
     // Soft pastel movement band along a projected polyline, in the corridor's
@@ -645,9 +462,6 @@ export default function JakartaCorridorMap({
           );
           return;
         }
-        // Smooth the band through its waypoints (quadratic through segment
-        // midpoints) so turns read as soft curves rather than sharp kinks —
-        // e.g. the commuter belt's bend near Depok.
         ctx.moveTo(pts[0].x, pts[0].y);
         for (let i = 1; i < pts.length - 1; i++) {
           const xc = (pts[i].x + pts[i + 1].x) / 2;
@@ -657,17 +471,19 @@ export default function JakartaCorridorMap({
         const last = pts[pts.length - 1];
         ctx.lineTo(last.x, last.y);
       };
-      const outer = style.thin ? 6 : 13;
-      const inner = style.thin ? 2.8 : 6;
+      const outer = style.thin ? 3.6 : 5;
+      const inner = style.thin ? 1.4 : 1.9;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.setLineDash([]);
       trace();
       ctx.lineWidth = outer;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.34)`;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.28)`;
       ctx.stroke();
       trace();
       ctx.lineWidth = inner;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.92)`;
-      if (style.dashed) ctx.setLineDash(style.thin ? [3, 5] : [9, 7]);
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.98)`;
+      if (style.dashed) ctx.setLineDash(style.thin ? [6, 6] : [12, 8]);
       ctx.stroke();
       ctx.setLineDash([]);
     };
@@ -680,7 +496,7 @@ export default function JakartaCorridorMap({
       color: string,
     ) => {
       const ang = Math.atan2(to.y - from.y, to.x - from.x);
-      const s = 8;
+      const s = 7;
       ctx.beginPath();
       ctx.moveTo(to.x, to.y);
       ctx.lineTo(
@@ -774,38 +590,28 @@ export default function JakartaCorridorMap({
       );
     };
 
-    // White icon disc + small exposure-coloured number badge.
-    const drawBadge = (
+    // Small refined numbered marker: a coloured disc with a white ring and a
+    // centred white number. No icon glyph, no large badge.
+    const drawMarker = (
       ctx: CanvasRenderingContext2D,
       x: number,
       y: number,
-      icon: JakartaMapIcon,
       accent: string,
       n: number,
     ) => {
       ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.arc(x, y, 13, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = "rgba(11,11,61,0.22)";
-      ctx.stroke();
-      drawAreaIcon(ctx, x, y, icon, NAVY);
-      const bx = x + 10.5;
-      const by = y - 10.5;
-      ctx.beginPath();
-      ctx.arc(bx, by, 7, 0, Math.PI * 2);
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
       ctx.fillStyle = accent;
       ctx.fill();
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 2;
       ctx.strokeStyle = "#ffffff";
       ctx.stroke();
       ctx.fillStyle = "#ffffff";
-      ctx.font = "700 9px 'Roboto Condensed', Roboto, sans-serif";
+      ctx.font = "700 11px 'Roboto Condensed', Roboto, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(String(n), bx, by + 0.4);
+      ctx.fillText(String(n), x, y + 0.4);
     };
 
     const draw = () => {
@@ -829,152 +635,88 @@ export default function JakartaCorridorMap({
       const proj = (lat: number, lon: number) =>
         map.latLngToContainerPoint([lat, lon]);
 
-      // 1) Sea backdrop + warm land polygons with faint dashed boundaries.
-      ctx.fillStyle = SEA;
-      ctx.fillRect(0, 0, w, h);
-      const traceGeoRing = (ring: number[][]) => {
-        const pr = ring.map((c) => proj(c[1], c[0]));
-        const n = pr.length;
-        ctx.beginPath();
-        if (n < 3) {
-          pr.forEach((p, i) =>
-            i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
-          );
-          ctx.closePath();
-          return;
-        }
-        // Round the polygon outline (quadratic through edge midpoints, wrapping
-        // closed) so the coastline and land edges read as a soft sea edge
-        // rather than faceted straight segments.
-        ctx.moveTo((pr[n - 1].x + pr[0].x) / 2, (pr[n - 1].y + pr[0].y) / 2);
-        for (let i = 0; i < n; i++) {
-          const cur = pr[i];
-          const nxt = pr[(i + 1) % n];
-          ctx.quadraticCurveTo(
-            cur.x,
-            cur.y,
-            (cur.x + nxt.x) / 2,
-            (cur.y + nxt.y) / 2,
-          );
-        }
-        ctx.closePath();
-      };
-      ctx.fillStyle = LAND_FILL;
-      for (const f of JAKARTA_GEO)
-        for (const ring of f.polys) {
-          traceGeoRing(ring);
-          ctx.fill();
-        }
-      ctx.strokeStyle = BOUNDARY;
-      ctx.lineWidth = 0.8;
-      ctx.setLineDash([3, 3]);
-      for (const f of JAKARTA_GEO)
-        for (const ring of f.polys) {
-          traceGeoRing(ring);
-          ctx.stroke();
-        }
-      ctx.setLineDash([]);
-
-      // 2) Soft exposure zones under the key sites.
+      // 1) Soft elliptical exposure zones over the key districts.
       for (const a of JAKARTA_MAP_AREAS) {
-        if (!a.zoneRadius) continue;
+        if (!a.zone) continue;
         const level = levelFor.get(a.id) ?? "not-assessed";
         const p = proj(a.marker[0], a.marker[1]);
-        drawZone(ctx, p.x, p.y, level, a.zoneRadius);
+        drawZone(ctx, p.x, p.y, level, a.zone.rx, a.zone.ry, a.zone.rotateDeg ?? 0);
       }
 
-      // 3) Movement corridor bands + outward arrowheads, each in the
-      //    corridor's own identity colour.
+      // 2) Movement corridor bands + outward arrowheads on the cross-city axis.
       for (const line of JAKARTA_CORRIDOR_LINES) {
         const style = CORRIDOR_STYLE[line.corridorId] ?? DEFAULT_CORRIDOR_STYLE;
         const pts = line.path.map((c) => proj(c[0], c[1]));
         drawBand(ctx, pts, style);
-        // Arrowheads only on the cross-city movement routes — the other
-        // corridors read as directionless bands/fans, matching the reference.
         if (line.corridorId === "cross-city-routes") {
           drawArrow(ctx, pts[1], pts[0], style.accent);
           drawArrow(ctx, pts[pts.length - 2], pts[pts.length - 1], style.accent);
         }
       }
 
-      // 4) Corridor captions: horizontal & colour-coded in open space, except
-      //    the airport corridor which rides rotated along its band.
+      // 3) Area + corridor captions — FEWER but CLEARER per the brief: one
+      //    consistent style (Roboto Condensed, larger than before, white-halo,
+      //    NO background block) in a neutral slate. Only the three exposure zones
+      //    and the airport / cross-city / commuter corridors are named; the port
+      //    corridor is covered by the North Jakarta zone label, so it has none.
+      const CAPTION_FONT = "700 11px 'Roboto Condensed', Roboto, sans-serif";
+      const CAPTION_COLOR = "#33343F";
+      const CAPTION_SPACING = "0.04em";
+      for (const a of JAKARTA_MAP_AREAS) {
+        if (!a.areaLabel) continue;
+        const p = proj(a.areaLabel.lat, a.areaLabel.lon);
+        blockLabel(ctx, a.areaLabel.text, p.x, p.y, 18, 13, {
+          font: CAPTION_FONT,
+          color: CAPTION_COLOR,
+          spacing: CAPTION_SPACING,
+        });
+      }
+      const NAMED_CORRIDORS = new Set([
+        "airport-corridor",
+        "cross-city-routes",
+        "commuter-belt",
+      ]);
       for (const line of JAKARTA_CORRIDOR_LINES) {
+        if (!NAMED_CORRIDORS.has(line.corridorId)) continue;
         const cap = CORRIDOR_CAPTION[line.corridorId];
         if (!cap) continue;
         const at = proj(cap.lat, cap.lon);
         if (cap.rotate) {
           const pts = line.path.map((c) => proj(c[0], c[1]));
-          const idx = Math.min(
+          const mid = Math.min(
             line.labelAt ?? Math.floor(pts.length / 2),
             pts.length - 1,
           );
-          const a = pts[Math.max(0, idx - 1)];
-          const b = pts[Math.min(pts.length - 1, idx + 1)];
-          let ang = Math.atan2(b.y - a.y, b.x - a.x);
+          const aPt = pts[Math.max(0, mid - 1)];
+          const bPt = pts[Math.min(pts.length - 1, mid + 1)];
+          let ang = Math.atan2(bPt.y - aPt.y, bPt.x - aPt.x);
           if (ang > Math.PI / 2) ang -= Math.PI;
           if (ang < -Math.PI / 2) ang += Math.PI;
           label(ctx, cap.text, at.x, at.y, {
-            font: "700 9px 'Roboto Condensed', Roboto, sans-serif",
-            color: cap.color,
-            spacing: "0.08em",
+            font: CAPTION_FONT,
+            color: CAPTION_COLOR,
+            spacing: CAPTION_SPACING,
             rotate: ang,
           });
         } else {
-          blockLabel(ctx, cap.text, at.x, at.y, 16, 11, {
-            font: "700 9px 'Roboto Condensed', Roboto, sans-serif",
-            color: cap.color,
-            spacing: "0.07em",
+          blockLabel(ctx, cap.text, at.x, at.y, 22, 13, {
+            font: CAPTION_FONT,
+            color: CAPTION_COLOR,
+            spacing: CAPTION_SPACING,
           });
         }
       }
 
-      // 5) Region / sea / place labels.
-      for (const lbl of JAKARTA_MAP_LABELS) {
-        const p = proj(lbl.lat, lbl.lon);
-        if (lbl.kind === "sea") {
-          label(ctx, lbl.text, p.x, p.y, {
-            font: "italic 12.5px Roboto, sans-serif",
-            color: "#6E86A6",
-            spacing: "0.16em",
-          });
-        } else if (lbl.kind === "region") {
-          blockLabel(ctx, lbl.text, p.x, p.y, 10, 11, {
-            font: "700 9px 'Roboto Condensed', Roboto, sans-serif",
-            color: "#9AA0A8",
-            spacing: "0.14em",
-          });
-        } else {
-          label(ctx, lbl.text, p.x, p.y, {
-            font: "11px Roboto, sans-serif",
-            color: "#8A9099",
-            spacing: "0.02em",
-          });
-        }
-      }
-
-      // 6) Area captions — neutral slate, like the reference (exposure is read
-      //    from the zone colour and the ranked list, not the caption).
+      // 4) Numbered markers — only for the top-N ranked areas, so the map never
+      //    crowds. Each number ties its marker to the ranked panel on the right.
       for (const a of JAKARTA_MAP_AREAS) {
-        if (!a.areaLabel) continue;
-        const p = proj(a.areaLabel.lat, a.areaLabel.lon);
-        blockLabel(ctx, a.areaLabel.text, p.x, p.y, 16, 11, {
-          font: "700 9.5px 'Roboto Condensed', Roboto, sans-serif",
-          color: "#55555F",
-          spacing: "0.06em",
-        });
-      }
-
-      // 7) Numbered icon badges + site labels on top (sites only — the
-      //    corridor-only areas are drawn as route lines, not numbered badges).
-      for (const a of JAKARTA_MAP_AREAS) {
-        if (CORRIDOR_ONLY_IDS.has(a.id)) continue;
+        if (!topIds.has(a.id)) continue;
         const level = levelFor.get(a.id) ?? "not-assessed";
         const n = numberFor.get(a.id) ?? 0;
         const p = proj(a.marker[0], a.marker[1]);
-        drawBadge(ctx, p.x, p.y, a.icon, EXPOSURE_ACCENT[level], n);
+        drawMarker(ctx, p.x, p.y, EXPOSURE_ACCENT[level], n);
         if (a.siteLabel) {
-          const off = 20;
+          const off = 17;
           const side = a.siteLabelSide ?? "top";
           let tx = p.x;
           let ty = p.y;
@@ -990,7 +732,7 @@ export default function JakartaCorridorMap({
           } else {
             ty = p.y + off;
           }
-          blockLabel(ctx, a.siteLabel, tx, ty, 18, 12, {
+          blockLabel(ctx, a.siteLabel, tx, ty, 16, 12, {
             font: "700 10px Roboto, sans-serif",
             color: NAVY,
             align,
@@ -1003,6 +745,9 @@ export default function JakartaCorridorMap({
 
     map.whenReady(draw);
     const t = window.setTimeout(draw, 80);
+    // Tiles arrive asynchronously — redraw once they have loaded so the baked
+    // overlay sits over a fully-painted basemap.
+    const t2 = window.setTimeout(draw, 700);
     map.on("resize moveend zoomend viewreset", draw);
     // Redraw once webfonts settle so the baked PNG uses Roboto Condensed, not a
     // fallback (the in-app PDF rasterises this <img>, so parity depends on it).
@@ -1011,9 +756,10 @@ export default function JakartaCorridorMap({
     }
     return () => {
       window.clearTimeout(t);
+      window.clearTimeout(t2);
       map.off("resize moveend zoomend viewreset", draw);
     };
-  }, [drawKey, numberFor, levelFor]);
+  }, [drawKey, numberFor, levelFor, top]);
 
   useEffect(() => {
     return () => {
@@ -1049,14 +795,14 @@ export default function JakartaCorridorMap({
             marginTop: 2,
           }}
         >
-          Key operating sites and movement corridors across Greater Jakarta ·{" "}
-          {rangeLabel}
+          Operating exposure by area and movement corridor across Greater
+          Jakarta · {rangeLabel}
         </div>
       </div>
 
-      {/* Clean map on the left, ranked detail list on the right. */}
-      <div style={{ display: "flex", gap: 22, alignItems: "flex-start" }}>
-        <div style={{ flex: "1.5 1 0", minWidth: 0 }}>
+      {/* Map (~65%) on the left, ranked panel (~35%) on the right. */}
+      <div style={{ display: "flex", gap: 18, alignItems: "stretch" }}>
+        <div style={{ flex: "65 1 0", minWidth: 0 }}>
           <div
             id={domId}
             style={{
@@ -1072,85 +818,61 @@ export default function JakartaCorridorMap({
               ref={mapElRef}
               style={{
                 width: "100%",
-                height: 500,
+                height: 440,
                 position: "relative",
-                background: SEA,
+                background: "#EAEAEA",
               }}
             />
           </div>
 
-          {/* Two-column legend: exposure ramp + map key. */}
+          {/* Compact legend under the map. */}
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: 30,
-              marginTop: 12,
-              padding: "11px 14px",
+              alignItems: "center",
+              gap: "8px 20px",
+              marginTop: 10,
+              padding: "9px 13px",
               border: `1px solid ${POLAR}`,
               borderRadius: 2,
               background: "#ffffff",
             }}
           >
-            <div>
-              <div style={legendHeadStyle}>Exposure level</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px 18px" }}>
-                {EXPOSURE_ORDER.map((lvl) => (
-                  <span key={lvl} style={legendRowStyle}>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 15,
-                        height: 10,
-                        borderRadius: 2,
-                        background: EXPOSURE_FILL[lvl],
-                        border: `1px solid ${EXPOSURE_ACCENT[lvl]}`,
-                      }}
-                    />
-                    <span style={legendTextStyle}>{EXPOSURE_LABEL[lvl]}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div style={legendHeadStyle}>Map key</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px 18px" }}>
-                <span style={legendRowStyle}>
-                  <img src={legendIcons.civic} alt="" style={legendIconStyle} />
-                  <span style={legendTextStyle}>Government district</span>
-                </span>
-                <span style={legendRowStyle}>
-                  <img src={legendIcons.tower} alt="" style={legendIconStyle} />
-                  <span style={legendTextStyle}>Commercial / hotel area</span>
-                </span>
-                <span style={legendRowStyle}>
-                  <img src={legendIcons.anchor} alt="" style={legendIconStyle} />
-                  <span style={legendTextStyle}>Port / logistics</span>
-                </span>
-                <span style={legendRowStyle}>
-                  <img src={legendIcons.plane} alt="" style={legendIconStyle} />
-                  <span style={legendTextStyle}>Airport</span>
-                </span>
-                <span style={legendRowStyle}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 18,
-                      height: 4,
-                      borderRadius: 2,
-                      background: "#9AA6B5",
-                    }}
-                  />
-                  <span style={legendTextStyle}>Movement corridor</span>
-                </span>
-              </div>
-            </div>
+            <div style={legendHeadStyle}>Exposure</div>
+            {EXPOSURE_ORDER.map((lvl) => (
+              <span key={lvl} style={legendRowStyle}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 15,
+                    height: 10,
+                    borderRadius: 2,
+                    background: EXPOSURE_FILL[lvl],
+                    border: `1px solid ${EXPOSURE_ACCENT[lvl]}`,
+                  }}
+                />
+                <span style={legendTextStyle}>{EXPOSURE_LABEL[lvl]}</span>
+              </span>
+            ))}
+            <span style={legendRowStyle}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 18,
+                  height: 4,
+                  borderRadius: 2,
+                  background: "#9AA6B5",
+                }}
+              />
+              <span style={legendTextStyle}>Movement corridor</span>
+            </span>
           </div>
         </div>
 
-        {/* Ranked detail list. */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
-          <RankedList ranked={ranked} />
+        {/* Ranked top-N panel. */}
+        <div style={{ flex: "35 1 0", minWidth: 0 }}>
+          <RankedPanel ranked={top} />
         </div>
       </div>
 
@@ -1161,25 +883,23 @@ export default function JakartaCorridorMap({
           fontSize: 11,
           color: DUSK,
           lineHeight: 1.55,
-          marginTop: 14,
+          marginTop: 12,
         }}
       >
-        This map shows operating exposure by area and route, based on
-        open-source reporting and local media. It does not plot individual
-        incidents. Boundaries are indicative; always confirm conditions locally
-        before travelling.
-        {corridor.unattributed > 0
-          ? " Some records were retained in the assessment but not tied to a specific area."
-          : ""}
+        This map shows operating exposure by area and route, based on open
+        source reporting and local media. It does not plot individual incidents.
       </div>
     </div>
   );
 }
 
-function RankedList({
+function RankedPanel({
   ranked,
 }: {
-  ranked: { status: JakartaCorridorStatus; number: number }[];
+  ranked: {
+    status: import("@/lib/jakartaCorridors").JakartaCorridorStatus;
+    number: number;
+  }[];
 }) {
   return (
     <div
@@ -1189,6 +909,7 @@ function RankedList({
         overflow: "hidden",
         background: "#ffffff",
         boxSizing: "border-box",
+        height: "100%",
       }}
     >
       <div
@@ -1203,7 +924,7 @@ function RankedList({
           padding: "10px 13px",
         }}
       >
-        Sites & corridors — ranked by exposure
+        Top exposures this period
       </div>
       {ranked.map(({ status: s, number }, i) => {
         const accent = EXPOSURE_ACCENT[s.displayExposure];
@@ -1212,7 +933,7 @@ function RankedList({
             key={s.area.id}
             style={{
               display: "flex",
-              gap: 11,
+              gap: 10,
               alignItems: "flex-start",
               padding: "11px 13px",
               borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
@@ -1224,24 +945,19 @@ function RankedList({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 18,
-                height: 18,
+                width: 19,
+                height: 19,
                 borderRadius: "50%",
                 background: accent,
                 color: "#ffffff",
                 fontFamily: "'Roboto Condensed', Roboto, sans-serif",
                 fontWeight: 700,
-                fontSize: 10,
+                fontSize: 11,
                 marginTop: 1,
               }}
             >
               {number}
             </span>
-            <img
-              src={iconDataUrl(AREA_ICON[s.area.id] ?? "route", accent)}
-              alt=""
-              style={{ flex: "0 0 auto", width: 18, height: 18, marginTop: 1 }}
-            />
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
@@ -1290,25 +1006,25 @@ function RankedList({
               <div
                 style={{
                   fontFamily: "Roboto, sans-serif",
-                  fontSize: 11.5,
+                  fontSize: 11,
                   color: DUSK,
-                  lineHeight: 1.4,
-                  marginTop: 6,
+                  lineHeight: 1.35,
+                  marginTop: 5,
                 }}
               >
-                {s.relevance}
+                {s.relevanceShort}
               </div>
               <div
                 style={{
                   fontFamily: "Roboto, sans-serif",
-                  fontSize: 11.5,
+                  fontSize: 11,
                   color: "#555a63",
-                  lineHeight: 1.4,
-                  marginTop: 5,
+                  lineHeight: 1.35,
+                  marginTop: 3,
                 }}
               >
                 <span style={{ fontWeight: 700, color: NAVY }}>Action: </span>
-                {s.action}
+                {s.actionShort}
               </div>
             </div>
           </div>

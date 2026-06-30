@@ -121,13 +121,14 @@
     },
     {
       corridorId: "north-port",
-      label: "Logistics corridor",
-      // Tanjung Priok port → east toward the Bekasi industrial belt.
+      label: "Port corridor",
+      // Tanjung Priok port → SOUTH into the central city (links the port and its
+      // low-lying access roads to the government/commercial core).
       path: [
-        [-6.1080, 106.8850],
-        [-6.1160, 106.9300],
-        [-6.1350, 106.9720],
-        [-6.1580, 107.0050],
+        [-6.1080, 106.8830],
+        [-6.1350, 106.8620],
+        [-6.1600, 106.8420],
+        [-6.1820, 106.8250],
       ],
       labelAt: 2,
     },

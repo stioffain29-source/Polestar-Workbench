@@ -580,13 +580,13 @@ title = "Workbench Audit — 17 Jun 2026"
 id = "3dIDGVbwnyJMCcmtx3efU"
 uri = "file://screenshots/jakarta-exposure-map-sample.jpg"
 type = "image"
-title = "Jakarta – Operational Exposure Map (redesigned sample)"
+title = "Jakarta Operational Exposure Map — redesigned sample"
 
 [[outputs]]
 id = "BXUXjwFt0wDWasGlzjkJU"
 uri = "file://screenshots/jakarta_exposure_map_sample.jpg"
 type = "image"
-title = "Jakarta Operational Exposure Map — sample"
+title = "Jakarta — Operational Exposure Map (final polish: labels restored, operational panel, port corridor re-routed)"
 
 [[outputs]]
 id = "cBcedpXF94zA3gvCsQDZf"

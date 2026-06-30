@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 
-import PngCountryReportBody from "../../artifacts/workbench/src/components/PngCountryReportBody";
+import JakartaReportBody from "../../artifacts/workbench/src/components/JakartaReportBody";
 import { buildJakartaReportDataset } from "../../artifacts/workbench/src/lib/pngReportDataset";
 import type {
   PngSourceIncident,
@@ -9,21 +9,21 @@ import type {
 
 // Render-level sibling to `jakartaBrief.test.ts` (which pins the Jakarta section
 // BUILDERS in isolation). This proves the integration: that
-// `buildJakartaReportDataset` wires those builders into the dataset OVERRIDE
-// fields, and that the SHARED renderer (PngCountryReportBody — same component
-// for screen and the DOM-rasterised PDF, so screen == PDF) actually consumes
-// them instead of the generic country builders. The dataset/builder tests alone
-// could pass while the renderer ignored an override and silently fell back to
-// the generic operating-risk prose.
+// `buildJakartaReportDataset` wires the tactical builders into the dataset's
+// `jakartaTacticalBrief` field, and that the DEDICATED Jakarta renderer
+// (JakartaReportBody — the same component for screen and the DOM-rasterised PDF,
+// so screen == PDF) consumes them and lays the brief out as the 13-section
+// TACTICAL OPERATING BRIEF.
 //
 // Pins the Jakarta render contract:
-//  - INCIDENT DETAILS render from `incidentThemesOverride` (Jakarta theme
-//    headings), not the generic country themes.
-//  - OPERATIONAL IMPACT renders from `operationalImpactOverride`.
-//  - RECOMMENDED ACTIONS (operating-risk variant) render from `businessImpact`
-//    (= Jakarta recommended actions).
-//  - TOP 3 cards show the analyst `developmentTitle`, not the raw headline.
-//  - TOP 3 is not forced all-Low: a genuine High development surfaces.
+//  - The thirteen sections render in the fixed Jakarta order.
+//  - ESCALATION INDICATORS is its OWN section (between Recommended Actions and
+//    the Seven Day Outlook), not folded into the outlook.
+//  - The exposure tables carry the Area / Why it matters / Action headers.
+//  - The OLD generic-country headings (Top 3 Developments, Incident Details,
+//    Outlook: Next Seven Days) are GONE — proving the dedicated renderer is
+//    used, not the shared PngCountryReportBody.
+//  - The corridor map is injected once, inside §13.
 //  - NO-COUNT brief: no record/incident/event count leaks into the narrative.
 
 const PERIOD = "23–29 June 2026";
@@ -46,9 +46,10 @@ function inc(
   };
 }
 
-// Jakarta window: titles chosen to categorise across distinct Jakarta themes
-// (protest / crime / flooding / traffic) so multiple override themes form; one
-// genuine High keeps the Top 3 from reading all-Low.
+// Jakarta window: titles chosen to categorise across distinct Jakarta themes and
+// attribute to several corridor areas (central government / commercial / port /
+// cross-city), so the tactical sections have live leads; one genuine High keeps
+// the Top-3-equivalent flashpoints from reading all-Low.
 const JAKARTA_WINDOW: PngSourceIncident[] = [
   inc({
     id: "j1",
@@ -64,7 +65,7 @@ const JAKARTA_WINDOW: PngSourceIncident[] = [
   }),
   inc({
     id: "j3",
-    title: "Seasonal flooding inundates main roads after heavy overnight rain",
+    title: "Seasonal flooding shuts container terminal access roads at Tanjung Priok",
     severity: "Moderate",
     location: "North Jakarta",
   }),
@@ -105,99 +106,112 @@ function textOf(html: string): string {
     .trim();
 }
 
+// The fixed 13-section Jakarta tactical-brief order.
 const SECTION_ORDER = [
   "Bottom Line Up Front",
-  "Top 3 Developments",
-  "Incident Details",
-  "Current Situation",
-  "Operational Impact",
+  "Operating Picture",
+  "Key Flashpoints This Week",
+  "Movement and Access Impact",
+  "Business District Exposure",
+  "Port and Logistics Implications",
+  "Airport, Hotel and Office Implications",
+  "Route and Timing Guidance",
   "Recommended Actions",
-  "Outlook: Next Seven Days",
+  "Escalation Indicators",
+  "Seven Day Outlook",
   "Polestar View",
+  "Map and Area Summary",
 ];
 
-const SEV_LOW_RANK = 2;
-const SEV_HIGH_RANK = 4;
+// Headings that belong to the OLD shared generic-country renderer. None may
+// appear in the dedicated Jakarta body.
+const RETIRED_HEADINGS = [
+  "Top 3 Developments",
+  "Incident Details",
+  "Outlook: Next Seven Days",
+];
 
-describe("Jakarta report — dataset wires the analyst-brief overrides", () => {
+describe("Jakarta report — dataset wires the tactical brief", () => {
   const d = build(JAKARTA_WINDOW);
 
-  it("populates the Jakarta override fields the renderer reads", () => {
+  it("populates the jakartaTacticalBrief the dedicated renderer reads", () => {
     expect(d.proseVariant).toBe("operating-risk");
-    expect(d.incidentThemesOverride?.length ?? 0).toBeGreaterThan(0);
-    expect(d.operationalImpactOverride?.length ?? 0).toBeGreaterThan(0);
-    expect(d.businessImpact.length).toBeGreaterThan(0); // recommended actions
-    const devTitles = d.topThree
-      .map((t) => t.developmentTitle)
-      .filter((x): x is string => Boolean(x));
-    expect(devTitles.length).toBeGreaterThan(0);
+    expect(d.jakartaTacticalBrief).toBeTruthy();
+    const t = d.jakartaTacticalBrief!;
+    expect(t.movementAccess.length).toBeGreaterThan(0);
+    expect(t.businessDistrict.rows.length).toBeGreaterThan(0);
+    expect(t.portLogistics.rows.length).toBeGreaterThan(0);
+    expect(t.portLogistics.actions.length).toBeGreaterThan(0);
+    expect(t.airportHotelOffice.length).toBeGreaterThan(0);
+    expect(t.routeTiming.length).toBeGreaterThan(0);
+    expect(t.areaSummary.length).toBeGreaterThan(0);
   });
 
-  it("surfaces a genuine High development rather than forcing Top 3 all-Low", () => {
-    expect(d.topThree.length).toBeGreaterThan(0);
-    expect(d.topThree.every((t) => t.severityRank <= SEV_LOW_RANK)).toBe(false);
-    expect(d.topThree.some((t) => t.severityRank >= SEV_HIGH_RANK)).toBe(true);
+  it("names live corridor areas in the movement section (raise-not-invent)", () => {
+    const movement = d.jakartaTacticalBrief!.movementAccess.join(" ");
+    expect(movement).toMatch(/Central Jakarta government district/);
   });
 });
 
-describe("PngCountryReportBody — Jakarta brief render", () => {
+describe("JakartaReportBody — 13-section tactical brief render", () => {
   const d = build(JAKARTA_WINDOW);
-  const html = renderToStaticMarkup(<PngCountryReportBody dataset={d} />);
+  const html = renderToStaticMarkup(
+    <JakartaReportBody dataset={d} mapNode={<div>JKT_MAP_SENTINEL</div>} />,
+  );
 
-  it("renders the brief sections in the fixed order", () => {
+  it("renders the thirteen sections in the fixed Jakarta order", () => {
     const ats = SECTION_ORDER.map((title) => html.indexOf(title));
-    for (const at of ats) expect(at).toBeGreaterThanOrEqual(0);
+    for (let i = 0; i < SECTION_ORDER.length; i++) {
+      expect(ats[i]).toBeGreaterThanOrEqual(0);
+    }
     expect(ats).toEqual([...ats].sort((a, b) => a - b));
   });
 
-  it("renders Incident Details from the Jakarta theme override", () => {
-    const start = html.indexOf("Incident Details");
-    const end = html.indexOf("Current Situation");
-    expect(start).toBeGreaterThanOrEqual(0);
-    expect(end).toBeGreaterThan(start);
-    const section = html.slice(start, end);
-    const headings = (d.incidentThemesOverride ?? []).map((t) => t.heading);
-    expect(headings.length).toBeGreaterThan(0);
-    for (const h of headings) {
-      expect(section.indexOf(esc(h))).toBeGreaterThanOrEqual(0);
+  it("renders Escalation Indicators as its own section before the Seven Day Outlook", () => {
+    const escAt = html.indexOf("Escalation Indicators");
+    const ra = html.indexOf("Recommended Actions");
+    const outlook = html.indexOf("Seven Day Outlook");
+    expect(ra).toBeGreaterThanOrEqual(0);
+    expect(escAt).toBeGreaterThan(ra);
+    expect(outlook).toBeGreaterThan(escAt);
+  });
+
+  it("drops every retired generic-country heading", () => {
+    for (const h of RETIRED_HEADINGS) {
+      expect(html.indexOf(h)).toBe(-1);
     }
   });
 
-  it("renders Operational Impact from the Jakarta override bullets", () => {
-    const start = html.indexOf("Operational Impact");
-    const end = html.indexOf("Recommended Actions");
-    expect(start).toBeGreaterThanOrEqual(0);
-    expect(end).toBeGreaterThan(start);
-    const section = html.slice(start, end);
-    const bullets = d.operationalImpactOverride ?? [];
-    expect(bullets.length).toBeGreaterThan(0);
-    for (const b of bullets) {
-      expect(section.indexOf(esc(b))).toBeGreaterThanOrEqual(0);
+  it("renders the exposure tables with Area / Why it matters / Action headers", () => {
+    expect(html.indexOf("Why it matters")).toBeGreaterThanOrEqual(0);
+    // Business district table rows render from the override.
+    const rows = d.jakartaTacticalBrief!.businessDistrict.rows;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(html.indexOf(esc(r.area))).toBeGreaterThanOrEqual(0);
     }
   });
 
-  it("renders Recommended Actions from the Jakarta recommended-actions list", () => {
-    const start = html.indexOf("Recommended Actions");
-    const end = html.indexOf("Outlook: Next Seven Days");
+  it("renders the Port and Logistics implications with their action bullets", () => {
+    const start = html.indexOf("Port and Logistics Implications");
+    const end = html.indexOf("Airport, Hotel and Office Implications");
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
     const section = html.slice(start, end);
-    expect(d.businessImpact.length).toBeGreaterThan(0);
-    for (const a of d.businessImpact) {
+    const actions = d.jakartaTacticalBrief!.portLogistics.actions;
+    expect(actions.length).toBeGreaterThan(0);
+    for (const a of actions) {
       expect(section.indexOf(esc(a))).toBeGreaterThanOrEqual(0);
     }
   });
 
-  it("shows the analyst development titles on the Top 3 cards", () => {
-    const start = html.indexOf("Top 3 Developments");
-    const end = html.indexOf("Incident Details");
-    const section = html.slice(start, end);
-    const devTitles = d.topThree
-      .slice(0, 3)
-      .map((t) => t.developmentTitle)
-      .filter((x): x is string => Boolean(x));
-    expect(devTitles.length).toBeGreaterThan(0);
-    for (const t of devTitles) {
-      expect(section.indexOf(esc(t))).toBeGreaterThanOrEqual(0);
-    }
+  it("injects the corridor map once, inside the Map and Area Summary section", () => {
+    const mapAt = html.indexOf("JKT_MAP_SENTINEL");
+    const sectionAt = html.indexOf("Map and Area Summary");
+    expect(sectionAt).toBeGreaterThanOrEqual(0);
+    expect(mapAt).toBeGreaterThan(sectionAt);
+    // Rendered exactly once.
+    expect(html.indexOf("JKT_MAP_SENTINEL", mapAt + 1)).toBe(-1);
   });
 
   it("leaks no record/incident/event count into the narrative brief", () => {

@@ -1,0 +1,79 @@
+This version is close enough to polish. Do not redesign again.
+
+Keep this layout and structure:
+
+Map left.
+Top exposures panel right.
+Light Carto map.
+Translucent overlays.
+No logo.
+No floating boxes.
+No district blocks.
+
+Final fixes required:
+
+1. Make the overlays more meaningful
+
+The current circles and ovals still feel generic. Tie the overlays more clearly to the operating zones:
+
+Central Jakarta government district
+Main commercial and hotel core
+North Jakarta port and logistics area
+Soekarno Hatta airport corridor
+Cross city movement routes
+Greater Jakarta commuter belt
+
+2. Improve movement corridors
+
+The corridors need to look like operating corridors, not random coloured lines.
+
+Use soft translucent bands with clear direction and better placement.
+
+Airport corridor should clearly run from Soekarno Hatta towards central Jakarta.
+
+Port corridor should clearly link North Jakarta / Tanjung Priok to the city.
+
+Cross city movement route should show east west access across the city.
+
+Commuter belt should remain a subtle wider context line.
+
+3. Improve labels
+
+The labels on the map are still too small and inconsistent.
+
+Use fewer labels, but make the important ones clearer:
+
+Airport corridor
+Central Jakarta government district
+Commercial and hotel core
+North Jakarta port and logistics area
+Cross city movement routes
+Greater Jakarta commuter belt
+
+4. Strengthen the right hand panel
+
+The panel is now too thin. Keep it short, but make the wording more useful.
+
+Each item should include:
+
+Location
+Exposure level
+Why it matters
+Action
+
+Do not use vague lines like “Crime reported” or “Flooding reported”. Say what it means operationally.
+
+Example:
+
+Crime and protest activity may affect staff movement, hotel access and client meetings.
+
+Action: Confirm routes and avoid exposed public areas after hours.
+
+5. Keep everything inside the page
+
+No cut off footer.
+No cut off panel.
+No hidden content.
+No debug or internal source coverage in the PDF.
+
+This is now a polish task, not a redesign task. Make this version sharper, clearer and client ready.

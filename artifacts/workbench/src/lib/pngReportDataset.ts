@@ -32,7 +32,9 @@ import { stripWireCruft } from "./incidentTitle";
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import { scoreClusterValue } from "./countryTopValue";
-import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme } from "./jakartaBrief";
+import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
+import { buildJakartaCorridorStatuses } from "./jakartaCorridors";
+import type { CountryFastFactsIncident } from "./countryFastFacts";
 
 export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
@@ -575,6 +577,11 @@ export interface PngReportDataset {
   // the complete assessment paragraph never splits across a page boundary
   // (spec §5). Unset for every other theatre — no markup change.
   keepPolestarTogether?: boolean;
+  // Jakarta-only tactical operating brief (Movement & Access Impact, Business
+  // District / Port exposure tables, Airport-Hotel-Office, Route & Timing, and
+  // the map area summary). Consumed ONLY by JakartaReportBody; unset for every
+  // other theatre, leaving their rendering byte-identical.
+  jakartaTacticalBrief?: JakartaTacticalBrief;
 }
 
 export interface BuildArgs {
@@ -1350,6 +1357,7 @@ export function buildStructuredReportDataset(
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
   let operationalImpactOverride: string[] | undefined;
   let jakartaEscalationIndicators: string[] | undefined;
+  let jakartaTacticalBrief: JakartaTacticalBrief | undefined;
   let keepPolestarTogether = false;
 
   // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
@@ -1476,7 +1484,25 @@ export function buildStructuredReportDataset(
   // the operating-risk + polestar blocks so it has the final say on the sections
   // it owns; polestarViewParts is kept consistent with the overridden paragraph.
   if (config.jakartaProse) {
-    const jakarta = buildJakartaBrief({ windowItems, incidentDetailsItems, topThree });
+    // Per-area corridor statuses for the live-aware tactical sections. Derived
+    // from the SAME window incidents the rest of the brief reads; the derivation
+    // is count-free (only the SET of elevated areas and their hazards matters),
+    // so it agrees with the deduped corridor map regardless of syndication.
+    const corridorIncidents: CountryFastFactsIncident[] = windowIncidents.map((i) => ({
+      topic: "jakarta",
+      title: i.title,
+      displayTitle: i.displayTitle ?? null,
+      severity: i.severity,
+      occurredAt: i.occurredAt,
+      location: i.location ?? null,
+    }));
+    const { statuses } = buildJakartaCorridorStatuses(corridorIncidents);
+    const jakarta = buildJakartaBrief({
+      windowItems,
+      incidentDetailsItems,
+      topThree,
+      corridorStatuses: statuses,
+    });
     bluf = jakarta.bluf;
     executiveSummary = jakarta.executiveSummary;
     outlook = jakarta.outlook;
@@ -1487,6 +1513,7 @@ export function buildStructuredReportDataset(
     jakartaEscalationIndicators = jakarta.escalationIndicators;
     incidentThemesOverride = jakarta.incidentThemes;
     topThree = jakarta.topThree;
+    jakartaTacticalBrief = jakarta.tactical;
     keepPolestarTogether = true;
   }
 
@@ -1658,6 +1685,7 @@ export function buildStructuredReportDataset(
     whatMattersBullets,
     keyDevelopments,
     escalationIndicators: jakartaEscalationIndicators ?? escalationIndicators,
+    jakartaTacticalBrief,
     whatChanged,
     topThree,
     buckets,

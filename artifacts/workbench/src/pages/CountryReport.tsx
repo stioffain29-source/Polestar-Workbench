@@ -29,6 +29,7 @@ import { computeCountryFastFacts, type CountryFastFactsIncident } from "@/lib/co
 import { consolidateCountryStories } from "@/lib/countrySameStory";
 import { shouldGenerateProse } from "@/lib/countryProseGate";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
+import JakartaReportBody from "@/components/JakartaReportBody";
 import {
   buildPngReportDataset,
   buildWestPapuaReportDataset,
@@ -1447,22 +1448,29 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {/* Every country — structured theatre or generic — renders the same
-          deterministic operating-risk brief from PngCountryReportBody. */}
-      {pngEffectiveDataset && (
-        <PngCountryReportBody
-          dataset={pngEffectiveDataset}
-          incidentSummaries={incidentSummaries}
-          mapPlacement={mapPlacement}
-          mapNode={mapNode}
-          photoPlacement={photoPlacement}
-          photoNode={photoBlock}
-        />
-      )}
+      {/* Jakarta renders the dedicated 13-section TACTICAL OPERATING BRIEF; every
+          other theatre — structured or generic — keeps the shared deterministic
+          operating-risk brief from PngCountryReportBody. The Jakarta brief always
+          renders its corridor map inside its own §13 (Map and Area Summary), so
+          the end/inline map-placement controls do not apply to it. */}
+      {pngEffectiveDataset &&
+        (isJakarta ? (
+          <JakartaReportBody dataset={pngEffectiveDataset} mapNode={mapNode} />
+        ) : (
+          <PngCountryReportBody
+            dataset={pngEffectiveDataset}
+            incidentSummaries={incidentSummaries}
+            mapPlacement={mapPlacement}
+            mapNode={mapNode}
+            photoPlacement={photoPlacement}
+            photoNode={photoBlock}
+          />
+        ))}
 
       {/* "End" map placement — the incident map renders here, just above the
-          shared analytics block, when the analyst leaves it at the default. */}
-      {mapPlacement === "end" && mapNode}
+          shared analytics block, when the analyst leaves it at the default. For
+          Jakarta the map already lives in §13, so it is suppressed here. */}
+      {!isJakarta && mapPlacement === "end" && mapNode}
 
       {/* Situational Context reference layer — rendered below the written brief
           for EVERY country (structured and generic). Per the reworked country

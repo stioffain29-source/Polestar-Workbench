@@ -16,6 +16,7 @@
 
 import type { PngReportItem, PngCategory } from "./pngReportDataset";
 import type { PolestarViewParts } from "./countryPolestarView";
+import type { JakartaCorridorStatus } from "./jakartaCorridors";
 
 // The Jakarta operating-picture themes, in fixed display order. Deliberately
 // fewer, stronger labels than the generic category list — focused on what
@@ -566,12 +567,210 @@ export function applyJakartaTopThree(topThree: PngReportItem[]): PngReportItem[]
   return out;
 }
 
+// --- Tactical operating brief (spec sections 4–8 and 13) -------------------
+//
+// These power the Jakarta-only tactical sections (Movement and Access Impact,
+// Business District Exposure, Port and Logistics Implications, Airport / Hotel /
+// Office Implications, Route and Timing Guidance, and the map area summary).
+//
+// The TABLES and the standing route/timing guidance are window-independent
+// conditional advice (they apply every week), so they are constant. The INTROS,
+// the movement-impact bullets and the area summary are LIVE-AWARE: they lead with
+// an elevated corridor's reported relevance ONLY when that area actually carried
+// reporting this period (raise-not-invent), then fall back to a standing
+// assessment. Every string is count-free.
+
+// A single area row in a tactical exposure table: the location, why it matters
+// operationally, and the recommended action. (`why` doubles as the "Impact"
+// column for the port table.)
+export interface JakartaTableRow {
+  area: string;
+  why: string;
+  action: string;
+}
+
+export interface JakartaTacticalBrief {
+  movementAccess: string[];
+  businessDistrict: { intro: string; rows: JakartaTableRow[] };
+  portLogistics: { intro: string; rows: JakartaTableRow[]; actions: string[] };
+  airportHotelOffice: string;
+  routeTiming: string[];
+  areaSummary: string;
+}
+
+function corridorById(
+  statuses: JakartaCorridorStatus[],
+  id: string,
+): JakartaCorridorStatus | null {
+  return statuses.find((s) => s.area.id === id) ?? null;
+}
+
+function elevatedStatuses(
+  statuses: JakartaCorridorStatus[],
+): JakartaCorridorStatus[] {
+  return statuses.filter((s) => s.elevated);
+}
+
+// Spec §4. One bullet per area that carried live reporting this period, leading
+// with that area's reported relevance and action; a single standing bullet when
+// the window is quiet (never an invented "all clear").
+export function buildJakartaMovementAccess(
+  statuses: JakartaCorridorStatus[],
+): string[] {
+  const live = elevatedStatuses(statuses);
+  if (live.length === 0) {
+    return [
+      "No area-specific movement disruption was reported this period. Jakarta's standing pattern continues to shape access: protest and policing activity around the central government district, flood-prone commuter and airport-transfer routes, and congestion on the main cross-city corridors. Confirm local conditions before travel.",
+    ];
+  }
+  return live.map((s) => `${s.area.name}: ${s.relevance} ${s.action}`.trim());
+}
+
+// Spec §5. Standing exposure table for the central and southern business
+// districts. The intro leads with a live elevated-area relevance when one is
+// reported, then states the standing framing.
+const JAKARTA_BUSINESS_DISTRICT_ROWS: JakartaTableRow[] = [
+  {
+    area: "Sudirman–Thamrin corridor",
+    why: "Jakarta's primary office and banking spine; protest marches and road closures here directly affect staff movement and client meetings.",
+    action: "Confirm meeting venues and travel windows; keep alternative routes ready on protest days.",
+  },
+  {
+    area: "SCBD, Senayan and Gatot Subroto",
+    why: "Dense corporate towers, hotels and event venues concentrate staff and visitors in a compact area.",
+    action: "Brief staff on venue access; keep arrivals and departures flexible around peak congestion.",
+  },
+  {
+    area: "Kuningan and Mega Kuningan",
+    why: "Embassy, hotel and corporate cluster where localised security or protest activity can restrict access at short notice.",
+    action: "Verify access before client visits; keep situational awareness around hotels and offices.",
+  },
+  {
+    area: "Menteng and the central government fringe",
+    why: "Adjacent to government buildings and frequent protest routes, so spillover can close surrounding roads.",
+    action: "Check protest activity before travelling in; allow extra time on government-district approaches.",
+  },
+];
+
+export function buildJakartaBusinessDistrict(
+  statuses: JakartaCorridorStatus[],
+): { intro: string; rows: JakartaTableRow[] } {
+  const central = corridorById(statuses, "central-government");
+  const commercial = corridorById(statuses, "commercial-hotels");
+  const leads: string[] = [];
+  if (commercial?.elevated) leads.push(commercial.relevance);
+  if (central?.elevated) leads.push(central.relevance);
+  const standing =
+    "Jakarta's main business districts run along the Sudirman–Thamrin spine and the southern corporate clusters. Their density means localised disruption — protest, congestion or a security incident — translates quickly into delays for staff movement, client meetings and hotel access.";
+  const intro = leads.length ? `${leads.join(" ")} ${standing}` : standing;
+  return { intro, rows: JAKARTA_BUSINESS_DISTRICT_ROWS };
+}
+
+// Spec §6. Standing exposure table for North Jakarta and the port, plus a short
+// list of recommended port actions. The intro leads with the port area's live
+// relevance when reported.
+const JAKARTA_PORT_LOGISTICS_ROWS: JakartaTableRow[] = [
+  {
+    area: "Tanjung Priok port",
+    why: "Indonesia's main container port; congestion, labour action or access restrictions delay cargo movement and clearance.",
+    action: "Confirm port and terminal access; build slack into delivery and collection windows.",
+  },
+  {
+    area: "North Jakarta access roads",
+    why: "Low-lying approach roads flood readily and carry heavy port and industrial traffic.",
+    action: "Check flood status on heavy-rain days; stage time-critical shipments outside peak congestion.",
+  },
+  {
+    area: "Kelapa Gading and Ancol",
+    why: "Mixed commercial, residential and logistics areas prone to flooding and local congestion.",
+    action: "Allow extra time for deliveries and movement; verify routes after heavy rain.",
+  },
+  {
+    area: "Airport cargo corridor",
+    why: "Soekarno-Hatta air freight shares the same congested, flood-prone toll routes as passenger transfers.",
+    action: "Confirm toll-route status; allow buffer for time-sensitive air cargo.",
+  },
+];
+
+export function buildJakartaPortLogistics(
+  statuses: JakartaCorridorStatus[],
+): { intro: string; rows: JakartaTableRow[]; actions: string[] } {
+  const port = corridorById(statuses, "north-port");
+  const standing =
+    "North Jakarta and the Tanjung Priok port area drive the capital's logistics timings. Port congestion, low-lying flood-prone access roads and heavy industrial traffic mean delivery and collection windows need slack built in, especially during heavy rain.";
+  const intro = port?.elevated ? `${port.relevance} ${standing}` : standing;
+  const actions = [
+    "Confirm port and terminal access before dispatch; congestion and restrictions can change at short notice.",
+    "Check flood status on North Jakarta approach roads during heavy rain and stage time-critical shipments accordingly.",
+    "Build slack into delivery and collection windows around peak congestion periods.",
+    "Brief drivers on alternative routes between the port, the airport cargo corridor and inland warehouses.",
+  ];
+  return { intro, rows: JAKARTA_PORT_LOGISTICS_ROWS, actions };
+}
+
+// Spec §7. Airport-transfer and hotel/office exposure prose. Leads with a live
+// elevated-area relevance for the airport corridor or the commercial-hotel
+// cluster when reported, then the standing assessment.
+export function buildJakartaAirportHotelOffice(
+  statuses: JakartaCorridorStatus[],
+): string {
+  const airport = corridorById(statuses, "airport-corridor");
+  const commercial = corridorById(statuses, "commercial-hotels");
+  const leads: string[] = [];
+  if (airport?.elevated) leads.push(airport.relevance);
+  if (commercial?.elevated) leads.push(commercial.relevance);
+  const standing =
+    "Airport transfers between the city and Soekarno-Hatta run on congested, flood-prone toll routes, so journey times can vary widely; allow a generous buffer and confirm the toll-route status before departure. Hotels and offices in the central and southern business districts concentrate staff and visitors, so localised protest, congestion or security activity can affect access and client meetings; confirm venues and keep arrival and departure timings flexible.";
+  return leads.length ? `${leads.join(" ")} ${standing}` : standing;
+}
+
+// Spec §8. Standing route and timing guidance — conditional advice that applies
+// every week, so it is a constant set.
+export function buildJakartaRouteTiming(): string[] {
+  return [
+    "Allow generous time buffers on airport transfers and cross-city journeys; congestion is the default condition, not the exception.",
+    "Check protest activity around Central Jakarta government locations before travelling in, and keep alternative routes ready.",
+    "On heavy-rain days, check flood-affected routes across the commuter belt before staff move.",
+    "Keep meeting and travel timings flexible so movement can shift around protest, flooding or congestion at short notice.",
+    "Brief drivers on possible closures and alternative routes between offices, hotels, the port and the airport.",
+  ];
+}
+
+// Spec §13. Short summary under the corridor map. Names the areas that carried
+// live reporting this period (count-free); otherwise a standing-profile note.
+export function buildJakartaAreaSummary(
+  statuses: JakartaCorridorStatus[],
+): string {
+  const live = elevatedStatuses(statuses);
+  if (live.length === 0) {
+    return "No area carried fresh reporting this period; the map reflects each area's standing operating-exposure profile. The central government district and the North Jakarta port area carry the highest standing exposure.";
+  }
+  const names = joinList(live.map((s) => s.area.name));
+  return `Reporting this period was attributed to ${names}; the remaining areas reflect their standing operating-exposure profile. Confirm local conditions before travel.`;
+}
+
+export function buildJakartaTacticalBrief(
+  statuses: JakartaCorridorStatus[],
+): JakartaTacticalBrief {
+  return {
+    movementAccess: buildJakartaMovementAccess(statuses),
+    businessDistrict: buildJakartaBusinessDistrict(statuses),
+    portLogistics: buildJakartaPortLogistics(statuses),
+    airportHotelOffice: buildJakartaAirportHotelOffice(statuses),
+    routeTiming: buildJakartaRouteTiming(),
+    areaSummary: buildJakartaAreaSummary(statuses),
+  };
+}
+
 // --- Aggregator ------------------------------------------------------------
 
 export interface JakartaBriefInput {
   windowItems: PngReportItem[];
   incidentDetailsItems: PngReportItem[];
   topThree: PngReportItem[];
+  // Per-area corridor statuses for the live-aware tactical sections. Optional so
+  // existing callers/tests keep working; absent → standing-only tactical brief.
+  corridorStatuses?: JakartaCorridorStatus[];
 }
 
 export interface JakartaBriefOverrides {
@@ -585,6 +784,7 @@ export interface JakartaBriefOverrides {
   escalationIndicators: string[];
   incidentThemes: JakartaIncidentTheme[];
   topThree: PngReportItem[];
+  tactical: JakartaTacticalBrief;
 }
 
 export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrides {
@@ -600,5 +800,6 @@ export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrid
     escalationIndicators: buildJakartaEscalationIndicators(),
     incidentThemes: buildJakartaIncidentThemes(input.incidentDetailsItems),
     topThree: applyJakartaTopThree(input.topThree),
+    tactical: buildJakartaTacticalBrief(input.corridorStatuses ?? []),
   };
 }
