@@ -1023,6 +1023,12 @@ export async function exportTopicReportPdf(
         benchmarkLabel: fuelData.marketData.jetFuelBenchmarkLabel,
       }),
     );
+    // Jet-fuel lag note — mirror the preview (ReportPreview.tsx) so the PDF
+    // also explains why the jet "as of" date trails the daily Brent/WTI close
+    // (EIA U.S. Gulf Coast jet fuel publishes weekly). Keeps screen == PDF.
+    if (fuelData.marketData.jetDataNote) {
+      renderProse(ctx, fuelData.marketData.jetDataNote);
+    }
 
     // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
     // Operational Read, Regional Highlights, Producer and Buyer Actions)
