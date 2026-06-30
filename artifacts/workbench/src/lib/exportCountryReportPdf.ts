@@ -58,10 +58,18 @@ import {
 } from "./jakartaCorridors";
 import {
   buildJakartaReportDataset,
+  buildPngReportDataset,
+  buildWestPapuaReportDataset,
+  buildIndonesiaReportDataset,
   type PngReportDataset,
   type PngReportItem,
   type PngSourceIncident,
 } from "./pngReportDataset";
+import {
+  buildCountryIncidentThemes,
+  buildOperationalImpactBullets,
+} from "./countryIncidentThemes";
+import { acceptedCountryTokens } from "./countryMatch";
 import type { JakartaTableRow } from "./jakartaBrief";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 
@@ -962,6 +970,198 @@ function renderJakartaBrief(
   renderProse(ctx, tactical ? tactical.areaSummary : "Not populated.");
 }
 
+// One structured-brief incident card — the headless counterpart to the
+// on-screen ItemCard (PngCountryReportBody). Title, severity chip, a meta line
+// (display category · province · date · source) and the deterministic
+// business-impact body. Used for the Top 3 Developments cards. When
+// `suppressEmptyLocation` is set an absent province is omitted (mirrors the
+// on-screen Top-3 cards) rather than printing "Location not specified".
+function drawStructuredItemCard(
+  ctx: Ctx,
+  item: PngReportItem,
+  suppressEmptyLocation = false,
+) {
+  const { pdf, MX, CW } = ctx;
+  const sk = sevKey(item.severity);
+  const color = SEV_COLOR[sk] ?? ELECTRIC;
+  const padX = 12;
+  const padY = 12;
+  const chipW = 64;
+  const innerW = CW - padX * 2;
+
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(11);
+  const titleText = item.developmentTitle ?? item.title;
+  const titleLines: string[] = pdf.splitTextToSize(
+    sanitize(titleText),
+    innerW - chipW - 10,
+  );
+
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  const metaParts = [
+    item.displayCategory,
+    item.province ?? (suppressEmptyLocation ? "" : "Location not specified"),
+    jakartaDateLine(item),
+  ].filter(Boolean);
+  if (item.source) metaParts.push(item.source);
+  const metaLines: string[] = pdf.splitTextToSize(
+    sanitize(metaParts.join("  ·  ")),
+    innerW,
+  );
+
+  pdf.setFontSize(9);
+  const bodyLines: string[] = pdf.splitTextToSize(
+    sanitize(item.businessImpact),
+    innerW,
+  );
+
+  const titleBlockH = Math.max(titleLines.length * 14, 18);
+  const cardH =
+    padY + titleBlockH + 6 + metaLines.length * 11 + 6 + bodyLines.length * 12 + padY;
+
+  if (ctx.y + cardH > ctx.H - ctx.BOTTOM) newPage(ctx);
+  const top = ctx.y;
+
+  setFill(pdf, WHITE);
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.5);
+  pdf.rect(MX, top, CW, cardH, "FD");
+  setFill(pdf, color);
+  pdf.rect(MX, top, 4, cardH, "F");
+
+  // Title.
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(11);
+  setText(pdf, NAVY);
+  pdf.text(titleLines, MX + padX, top + padY + 11, { lineHeightFactor: 1.25 });
+
+  // Severity chip, top-right.
+  const chipX = MX + CW - padX - chipW;
+  setFill(pdf, color);
+  pdf.rect(chipX, top + padY, chipW, 14, "F");
+  setText(pdf, WHITE);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(6.5);
+  pdf.text(
+    sanitize((SEV_LABEL[sk] ?? item.severityLabel ?? "").toUpperCase()),
+    chipX + chipW / 2,
+    top + padY + 9.5,
+    { align: "center" },
+  );
+
+  // Meta line.
+  let yy = top + padY + titleBlockH + 6;
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(8);
+  setText(pdf, DUSK);
+  pdf.text(metaLines, MX + padX, yy + 8, { lineHeightFactor: 1.3 });
+
+  // Business-impact body.
+  yy += metaLines.length * 11 + 6;
+  pdf.setFontSize(9);
+  setText(pdf, DUSK);
+  pdf.text(bodyLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+
+  ctx.y = top + cardH + 10;
+}
+
+// The shared structured country brief (PNG / West Papua / Indonesia), rendered
+// in the EXACT eight-section order the on-screen PngCountryReportBody uses, so
+// the script-generated PDF and the on-screen DOM-rasterised PDF stay in
+// lockstep. Reached for those three theatres only; Jakarta has its own
+// renderer and every other theatre keeps the generic country layout below.
+function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
+  const d = dataset;
+
+  // 1. Bottom Line Up Front
+  drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
+
+  // 2. Top 3 Developments — at most three cards.
+  drawSectionHeading(ctx, "Top 3 Developments");
+  const topThree = d.topThree.slice(0, 3);
+  if (topThree.length === 0) {
+    renderProse(ctx, d.emptyLocationFallback);
+  } else {
+    for (const it of topThree) drawStructuredItemCard(ctx, it, true);
+    ctx.y += 4;
+  }
+
+  // 3. Incident Details — meaningful theme groups of the incidents not already
+  // shown as Top 3 developments. Mirrors the on-screen empty-note logic.
+  drawSectionHeading(ctx, "Incident Details");
+  const incidentThemes =
+    d.incidentThemesOverride ??
+    buildCountryIncidentThemes(d.incidentDetailsItems);
+  if (incidentThemes.length === 0) {
+    renderProse(
+      ctx,
+      d.windowItems.length === 0
+        ? d.emptyLocationFallback
+        : d.incidentDetailsItems.length === 0
+          ? "No further incident reporting beyond the developments above this period."
+          : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail.",
+    );
+  } else {
+    for (const g of incidentThemes) {
+      drawJakartaStrandLabel(ctx, g.heading);
+      renderProse(ctx, g.paragraph);
+    }
+  }
+
+  // 4. Current Situation
+  drawSectionWithProse(
+    ctx,
+    "Current Situation",
+    d.executiveSummary || "Not populated.",
+  );
+
+  // 5. Operational Impact — per-theme impact lines (≤5).
+  drawSectionHeading(ctx, "Operational Impact");
+  const operationalImpact =
+    d.operationalImpactOverride ??
+    buildOperationalImpactBullets(d.windowItems).slice(0, 5);
+  if (operationalImpact.length === 0) {
+    renderProse(ctx, d.businessImpactEmptyNote);
+  } else {
+    drawJakartaBulletList(ctx, operationalImpact);
+  }
+
+  // 6. Recommended Actions — operating-risk theatres (Indonesia) render a flat
+  // priorities list; PNG / West Papua render grouped action blocks.
+  drawSectionHeading(ctx, "Recommended Actions");
+  if (d.proseVariant === "operating-risk") {
+    if (d.businessImpact.length === 0) renderProse(ctx, d.businessImpactEmptyNote);
+    else drawJakartaBulletList(ctx, d.businessImpact);
+  } else if (d.recommendedActions.length === 0) {
+    renderProse(ctx, d.businessImpactEmptyNote);
+  } else {
+    for (const g of d.recommendedActions) {
+      drawJakartaStrandLabel(ctx, g.heading);
+      drawJakartaBulletList(ctx, g.actions);
+    }
+  }
+
+  // 7. Outlook: Next Seven Days — outlook prose + escalation indicators (≤3).
+  drawSectionWithProse(
+    ctx,
+    "Outlook: Next Seven Days",
+    d.outlook || "Not populated.",
+  );
+  const escalationIndicators = d.escalationIndicators.slice(0, 3);
+  if (escalationIndicators.length > 0) {
+    drawJakartaStrandLabel(ctx, "Escalation Indicators");
+    drawJakartaBulletList(ctx, escalationIndicators);
+  }
+
+  // 8. Polestar View — closes the written brief.
+  drawSectionWithProse(
+    ctx,
+    "Polestar View",
+    d.polestarView || "Not populated.",
+  );
+}
+
 function buildKpiCards(facts: CountryFactsBreakdown): KpiCardData[] {
   return facts.cards.map((c) => ({
     label: c.label,
@@ -1055,6 +1255,52 @@ export async function exportCountryReportPdf(
       active.incidents as unknown as CountryFastFactsIncident[],
     ).statuses;
     renderJakartaBrief(ctx, jakartaDataset, jakartaExposure);
+
+    drawDisclaimer(ctx);
+    drawFooters(ctx.pdf);
+    ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
+    return;
+  }
+
+  // PNG / West Papua / Indonesia carry their OWN structured eight-section brief
+  // (mirrors the on-screen PngCountryReportBody). Build the SAME dataset the
+  // screen uses with the matching builder, render those sections in the same
+  // order, then close the document and return early so the generic country
+  // layout below never runs for these theatres. Every other country falls
+  // through unchanged.
+  const structuredTokens = acceptedCountryTokens(country.name ?? "");
+  const structuredBuilder = structuredTokens.includes("papua new guinea")
+    ? buildPngReportDataset
+    : structuredTokens.includes("papua")
+      ? buildWestPapuaReportDataset
+      : structuredTokens.includes("indonesia")
+        ? buildIndonesiaReportDataset
+        : null;
+  if (structuredBuilder) {
+    const structuredDataset = structuredBuilder({
+      windowIncidents: active.incidents as unknown as PngSourceIncident[],
+      previousWindowIncidents: resolvePreviousCountryWindow(
+        layers,
+        todayIso,
+      ) as unknown as PngSourceIncident[],
+      thirtyDay: layers.thirtyDay as unknown as PngSourceIncident[],
+      ninetyDay: layers.ninetyDay as unknown as PngSourceIncident[],
+      baselineWatchlist: (extras.baseline?.locationWatchlist ?? []).map(
+        (w) => w.label,
+      ),
+      periodLabel: active.basisLabel,
+    });
+    renderStructuredBrief(ctx, structuredDataset);
+
+    // Situational Context (UN OCHA ReliefWeb) — supporting layer, not counted;
+    // mirrors the on-screen CountryReportVisuals below the written brief.
+    drawSituationalContextPdf(
+      ctx,
+      buildSituationalContext(extras.situationalReports ?? [], {
+        country: country.name,
+        max: 6,
+      }),
+    );
 
     drawDisclaimer(ctx);
     drawFooters(ctx.pdf);
