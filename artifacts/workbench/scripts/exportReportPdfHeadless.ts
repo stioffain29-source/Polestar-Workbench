@@ -59,6 +59,33 @@ interface AnyReport {
 }
 
 async function main() {
+  // Country briefs read directly from Postgres below and never touch the
+  // owner-gated `/api` report/incidents endpoints, so skip those HTTP fetches.
+  if (TOPIC === "country") {
+    // Structured country brief (PNG / West Papua / Indonesia). Reads incidents,
+    // baseline and ReliefWeb situational reports DIRECTLY from Postgres (the
+    // private `/api` surface is owner-gated and cannot authenticate headlessly)
+    // and applies the same country filter as the on-screen report, so the
+    // headless PDF exercises every structured-brief `pdf.text` path for the
+    // font audit. Slug via COUNTRY_SLUG (default papua-new-guinea).
+    const slug = (process.env.COUNTRY_SLUG ?? "papua-new-guinea").toLowerCase();
+    const { exportCountryReportPdf } = await import("../src/lib/exportCountryReportPdf");
+    const { fetchCountryReportData } = await import("./countryReportData");
+    const {
+      country,
+      incidents: countryIncidents,
+      extras,
+    } = await fetchCountryReportData(slug);
+    await exportCountryReportPdf(country, countryIncidents, {}, OUT, extras);
+    console.log(
+      `Country ${country.name}: ${countryIncidents.length} matched incidents, ` +
+        `${extras.situationalReports?.length ?? 0} situational reports, ` +
+        `baseline ${extras.baseline ? "present" : "absent"}`,
+    );
+    console.log(`Wrote ${OUT}`);
+    return;
+  }
+
   const report = (await fetch(`${API}/api/reports/${REPORT_ID}`).then((r) => r.json())) as AnyReport;
   const incidents = (await fetch(`${API}/api/incidents?limit=500`).then((r) => r.json())) as unknown[];
   // Optional ISSUE_DATE override so a headless export can reproduce the SAME
