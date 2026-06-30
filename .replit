@@ -20,6 +20,10 @@ author = "agent"
 task = "workflow.run"
 args = "pdf-fonts"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "topic-font-audit"
+
 [[workflows.workflow]]
 name = "pdf-fonts"
 author = "agent"
@@ -27,6 +31,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash artifacts/workbench/scripts/validateFonts.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "topic-font-audit"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash artifacts/workbench/scripts/auditTopicFonts.sh"
 
 [workflows.workflow.metadata]
 isValidation = true

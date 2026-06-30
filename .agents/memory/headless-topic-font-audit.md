@@ -27,3 +27,12 @@ same pattern the country branch uses.
   to a PNG (no embedded text), so a headless run can safely skip them — the guard
   belongs at the TOP of `embedReactChartInPdf` too. Skipping charts does NOT
   weaken the font audit (it only inspects `pdf.text` Tf operators).
+- The repeatable guard is `scripts/auditTopicFonts.sh` (mirror of
+  `auditCountryFonts.sh`), registered as the `topic-font-audit` validation step.
+  It exports shipping/fuel/cargo_watch/flashpoint, audits via `fontAuditTf.py`,
+  regenerates the TOP block of `FONT_AUDIT.txt` (above the jakarta_country /
+  country sentinels, which it preserves), and exits non-zero on any non-Roboto
+  selection. Report ids are resolved to the LATEST per topic by
+  `fetchLatestTopicReportId` (flashpoint family = topics flashpoint|protests) so
+  no fragile id pins live in the script — pin with `REPORT_ID` only to reproduce
+  a specific report.

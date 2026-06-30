@@ -77,6 +77,28 @@ async function loadIncidents(): Promise<unknown[]> {
   return asJson(await withCorroborations(rows));
 }
 
+// Resolve the most recent report id for a topic so the font audit always
+// exercises the LATEST report of each family (mirrors how auditCountryFonts.sh
+// pins stable country slugs). Flashpoint reports are stored under topic
+// 'protests' (their incidents live under 'flashpoint'), so accept either.
+export async function fetchLatestTopicReportId(topic: string): Promise<number> {
+  const t = topic.toLowerCase();
+  const topics =
+    t === "flashpoint" || t === "protests"
+      ? ["flashpoint", "protests"]
+      : [t];
+  const [row] = await db
+    .select({ id: reportsTable.id })
+    .from(reportsTable)
+    .where(inArray(reportsTable.topic, topics))
+    .orderBy(desc(reportsTable.id))
+    .limit(1);
+  if (!row) {
+    throw new Error(`No report found for topic "${topic}" in the database.`);
+  }
+  return row.id;
+}
+
 // Mirror of GET /api/reports/:id.
 export async function fetchTopicReport(id: number): Promise<unknown> {
   const [row] = await db

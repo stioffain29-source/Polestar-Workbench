@@ -31,7 +31,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   return origFetch(input as RequestInfo, init);
 }) as typeof fetch;
 
-const REPORT_ID = Number(process.env.REPORT_ID ?? "13");
+const REPORT_ID_ENV = process.env.REPORT_ID?.trim();
 const TOPIC = (process.env.TOPIC ?? "flashpoint").toLowerCase();
 const OUT = resolvePath(process.cwd(), process.env.OUT_PATH ?? `screenshots/${TOPIC}_report.pdf`);
 
@@ -89,9 +89,17 @@ async function main() {
   // `/api` surface is owner-gated and cannot authenticate headlessly), applying
   // the SAME relevance gate + corroboration attachment the API does, so the
   // headless PDF exercises every topic `pdf.text` path for the font audit.
-  const { fetchTopicReport, fetchTopicIncidents, fetchMaritimeMovement } =
-    await import("./topicReportData");
-  const report = (await fetchTopicReport(REPORT_ID)) as AnyReport;
+  const {
+    fetchTopicReport,
+    fetchTopicIncidents,
+    fetchMaritimeMovement,
+    fetchLatestTopicReportId,
+  } = await import("./topicReportData");
+  // Pin via REPORT_ID, otherwise audit the LATEST report of this topic family.
+  const reportId = REPORT_ID_ENV
+    ? Number(REPORT_ID_ENV)
+    : await fetchLatestTopicReportId(TOPIC);
+  const report = (await fetchTopicReport(reportId)) as AnyReport;
   const incidents = (await fetchTopicIncidents()) as unknown[];
   // Optional ISSUE_DATE override so a headless export can reproduce the SAME
   // reporting window the in-editor preview renders. The editor advances a draft
