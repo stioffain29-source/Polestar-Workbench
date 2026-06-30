@@ -38,7 +38,5 @@ by a Tf operator. PASS = no non-Roboto font is ever selected.
   page 6: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
   --> ALL fonts USED via Tf: ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
   --> NON-Roboto used: NONE — PASS
-  Section order verified: BLUF, Operating Picture, Key Flashpoints, Movement &
-  Access, Business District table, Port & Logistics, Airport/Hotel/Office,
-  Route & Timing, Recommended Actions, Escalation Indicators, Seven Day Outlook,
-  Polestar View, Map & Area Summary.
+  Section order verified: Bottom Line Up Front, Operating Picture, Key Flashpoints This Week, Movement and Access Impact, Business District Exposure, Port and Logistics Implications, Airport, Hotel and Office Implications, Route and Timing Guidance, Recommended Actions, Escalation Indicators, Seven Day Outlook, Polestar View, Map and Area Summary.
+  (regenerate with: npx tsx --import ./scripts/registerLoader.mjs scripts/auditJakartaPdf.ts --write)
