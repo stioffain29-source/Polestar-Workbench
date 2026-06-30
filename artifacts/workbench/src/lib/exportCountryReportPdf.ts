@@ -70,7 +70,13 @@ import {
   buildOperationalImpactBullets,
 } from "./countryIncidentThemes";
 import { acceptedCountryTokens } from "./countryMatch";
-import type { JakartaTableRow } from "./jakartaBrief";
+import type {
+  JakartaTableRow,
+  JakartaPriorityAreaRow,
+  JakartaPortLogisticsRow,
+  JakartaStaffMovementImpact,
+  JakartaRoleAction,
+} from "./jakartaBrief";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 
 export interface PdfIncident {
@@ -793,93 +799,112 @@ function drawJakartaOpsTable(ctx: Ctx, rows: JakartaTableRow[]) {
   ctx.y += 8;
 }
 
-// One "Key Flashpoint" card: development title, severity chip, meta line and
-// the deterministic operational-impact body. Mirrors the on-screen
-// FlashpointCard (never an AI per-incident summary).
-function drawJakartaFlashpointCard(ctx: Ctx, item: PngReportItem) {
+// A generic count-free grid table (headed, fixed-width columns), the headless
+// counterpart to the on-screen PriorityTable / PortTable. The first column is
+// rendered bold-navy; widthFracs are fractions of the content width and must sum
+// to ~1. `centerFirst` centres the first column (used for the priority number).
+function drawJakartaGridTable(
+  ctx: Ctx,
+  headers: string[],
+  widthFracs: number[],
+  rows: string[][],
+  centerFirst = false,
+) {
   const { pdf, MX, CW } = ctx;
-  const sk = sevKey(item.severity);
-  const color = SEV_COLOR[sk] ?? ELECTRIC;
-  const padX = 12;
-  const padY = 12;
-  const chipW = 64;
-  const innerW = CW - padX * 2;
+  const n = headers.length;
+  const widths = widthFracs.map((f) => Math.round(CW * f));
+  // Absorb rounding drift into the last column so the grid spans exactly CW.
+  widths[n - 1] = CW - widths.slice(0, n - 1).reduce((a, b) => a + b, 0);
+  const xs: number[] = [];
+  let acc = MX;
+  for (const w of widths) {
+    xs.push(acc);
+    acc += w;
+  }
+  const rowH = 20;
+
+  const header = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    headers.forEach((h, i) => {
+      const center = centerFirst && i === 0;
+      pdf.text(
+        sanitize(h.toUpperCase()),
+        center ? xs[i] + widths[i] / 2 : xs[i] + 6,
+        ctx.y + 13,
+        center ? { align: "center" } : undefined,
+      );
+    });
+    ctx.y += rowH;
+  };
+
+  ensureSpace(ctx, rowH * 2);
+  header();
+
+  for (const r of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+    const cellLines = r.map((c, i) => pdf.splitTextToSize(sanitize(c), widths[i] - 8) as string[]);
+    const rh = Math.max(rowH, ...cellLines.map((ls) => ls.length * 12 + 10));
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      header();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    const textOpts = { lineHeightFactor: 1.4 };
+    cellLines.forEach((ls, i) => {
+      const first = i === 0;
+      setRoboto(pdf, first ? "bold" : "regular");
+      setText(pdf, first ? NAVY : DUSK);
+      const center = centerFirst && first;
+      pdf.text(
+        ls,
+        center ? xs[i] + widths[i] / 2 : xs[i] + 6,
+        ctx.y + 14,
+        center ? { ...textOpts, align: "center" } : textOpts,
+      );
+    });
+
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+}
+
+// A labelled prose block (ELECTRIC uppercase label + DUSK body), the headless
+// counterpart to the on-screen LabelledBlock. Used for Staff Movement Impact and
+// role-based Recommended Actions.
+function drawJakartaLabelledBlock(ctx: Ctx, label: string, text: string) {
+  const { pdf, MX, CW } = ctx;
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(9);
+  const bodyLines: string[] = pdf.splitTextToSize(sanitize(text), CW);
+  const blockH = 16 + bodyLines.length * 13 + 8;
+  ensureSpace(ctx, blockH);
 
   setRoboto(pdf, "bold");
-  pdf.setFontSize(11);
-  const titleText = item.developmentTitle ?? item.title;
-  const titleLines: string[] = pdf.splitTextToSize(
-    sanitize(titleText),
-    innerW - chipW - 10,
-  );
+  pdf.setFontSize(8);
+  setText(pdf, ELECTRIC);
+  pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 10);
+  ctx.y += 16;
 
   setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  const metaParts = [item.displayCategory, jakartaDateLine(item)].filter(Boolean);
-  if (item.source) metaParts.push(item.source);
-  const metaLines: string[] = pdf.splitTextToSize(
-    sanitize(metaParts.join("  ·  ")),
-    innerW,
-  );
-
-  pdf.setFontSize(9);
-  const bodyLines: string[] = pdf.splitTextToSize(
-    sanitize(item.businessImpact),
-    innerW,
-  );
-
-  const titleBlockH = Math.max(titleLines.length * 14, 18);
-  const cardH =
-    padY + titleBlockH + 6 + metaLines.length * 11 + 6 + bodyLines.length * 12 + padY;
-
-  if (ctx.y + cardH > ctx.H - ctx.BOTTOM) newPage(ctx);
-  const top = ctx.y;
-
-  setFill(pdf, WHITE);
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(0.5);
-  pdf.rect(MX, top, CW, cardH, "FD");
-  setFill(pdf, color);
-  pdf.rect(MX, top, 4, cardH, "F");
-
-  // Title.
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(11);
-  setText(pdf, NAVY);
-  pdf.text(titleLines, MX + padX, top + padY + 11, { lineHeightFactor: 1.25 });
-
-  // Severity chip, top-right.
-  const chipX = MX + CW - padX - chipW;
-  setFill(pdf, color);
-  pdf.rect(chipX, top + padY, chipW, 14, "F");
-  setText(pdf, WHITE);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(6.5);
-  pdf.text(
-    sanitize((SEV_LABEL[sk] ?? item.severityLabel ?? "").toUpperCase()),
-    chipX + chipW / 2,
-    top + padY + 9.5,
-    { align: "center" },
-  );
-
-  // Meta line.
-  let yy = top + padY + titleBlockH + 6;
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8);
-  setText(pdf, DUSK);
-  pdf.text(metaLines, MX + padX, yy + 8, { lineHeightFactor: 1.3 });
-
-  // Operational-impact body.
-  yy += metaLines.length * 11 + 6;
   pdf.setFontSize(9);
   setText(pdf, DUSK);
-  pdf.text(bodyLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
-
-  ctx.y = top + cardH + 10;
+  pdf.text(bodyLines, MX, ctx.y + 9, { lineHeightFactor: 1.4 });
+  ctx.y += bodyLines.length * 13 + 8;
 }
 
 // The Jakarta-only 13-section tactical operating brief, rendered in the exact
-// order the on-screen JakartaReportBody uses.
+// order the on-screen JakartaReportBody uses. Section titles MUST stay in
+// lockstep with JakartaReportBody and auditJakartaPdf CANONICAL_SECTIONS.
 function renderJakartaBrief(
   ctx: Ctx,
   dataset: PngReportDataset,
@@ -891,71 +916,85 @@ function renderJakartaBrief(
   // 1. Bottom Line Up Front
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
 
-  // 2. Operating Picture
+  // 2. Tactical Operating Picture
   drawSectionWithProse(
     ctx,
-    "Operating Picture",
+    "Tactical Operating Picture",
     d.executiveSummary || "Not populated.",
   );
 
-  // 3. Key Flashpoints This Week — at most three cards.
-  drawSectionHeading(ctx, "Key Flashpoints This Week");
-  const topThree = d.topThree.slice(0, 3);
-  if (topThree.length === 0) {
-    renderProse(ctx, d.emptyLocationFallback);
-  } else {
-    for (const it of topThree) drawJakartaFlashpointCard(ctx, it);
-    ctx.y += 4;
-  }
-
-  // 4. Movement and Access Impact
-  drawSectionHeading(ctx, "Movement and Access Impact");
-  if (tactical) drawJakartaBulletList(ctx, tactical.movementAccess);
-  else renderProse(ctx, "Not populated.");
-
-  // 5. Business District Exposure (intro + standing table)
-  drawSectionHeading(ctx, "Business District Exposure");
+  // 3. Priority Areas This Week — ranked, data-driven table
+  drawSectionHeading(ctx, "Priority Areas This Week");
   if (tactical) {
-    renderProse(ctx, tactical.businessDistrict.intro);
-    drawJakartaOpsTable(ctx, tactical.businessDistrict.rows);
+    drawJakartaPriorityTable(ctx, tactical.priorityAreas);
   } else {
     renderProse(ctx, "Not populated.");
   }
 
-  // 6. Port and Logistics Implications (intro + table + port actions)
-  drawSectionHeading(ctx, "Port and Logistics Implications");
+  // 4. Staff Movement Impact — broken out by movement type
+  drawSectionHeading(ctx, "Staff Movement Impact");
+  if (tactical) {
+    const sm = tactical.staffMovement;
+    const fields: Array<[string, keyof JakartaStaffMovementImpact]> = [
+      ["Office access", "officeAccess"],
+      ["Hotel to office movement", "hotelToOffice"],
+      ["Airport transfer", "airportTransfer"],
+      ["Client meeting movement", "clientMeeting"],
+      ["Staff commute", "staffCommute"],
+      ["Driver route planning", "driverRoute"],
+      ["After hours movement", "afterHours"],
+    ];
+    for (const [label, key] of fields) drawJakartaLabelledBlock(ctx, label, sm[key]);
+  } else {
+    renderProse(ctx, "Not populated.");
+  }
+
+  // 5. Airport Transfer Impact
+  drawSectionWithProse(
+    ctx,
+    "Airport Transfer Impact",
+    tactical ? tactical.airportTransfer : "Not populated.",
+  );
+
+  // 6. Port and Logistics Impact (intro + 4-col table + port actions)
+  drawSectionHeading(ctx, "Port and Logistics Impact");
   if (tactical) {
     renderProse(ctx, tactical.portLogistics.intro);
-    drawJakartaOpsTable(ctx, tactical.portLogistics.rows);
+    drawJakartaPortTable(ctx, tactical.portLogistics.rows);
     drawJakartaStrandLabel(ctx, "Port Actions");
     drawJakartaBulletList(ctx, tactical.portLogistics.actions);
   } else {
     renderProse(ctx, "Not populated.");
   }
 
-  // 7. Airport, Hotel and Office Implications
-  drawSectionWithProse(
-    ctx,
-    "Airport, Hotel and Office Implications",
-    tactical ? tactical.airportHotelOffice : "Not populated.",
-  );
+  // 7. Office, Hotel and Meeting Venue Exposure (intro + standing table)
+  drawSectionHeading(ctx, "Office, Hotel and Meeting Venue Exposure");
+  if (tactical) {
+    renderProse(ctx, tactical.officeHotelVenue.intro);
+    drawJakartaOpsTable(ctx, tactical.officeHotelVenue.rows);
+  } else {
+    renderProse(ctx, "Not populated.");
+  }
 
   // 8. Route and Timing Guidance
   drawSectionHeading(ctx, "Route and Timing Guidance");
   if (tactical) drawJakartaBulletList(ctx, tactical.routeTiming);
   else renderProse(ctx, "Not populated.");
 
-  // 9. Recommended Actions
-  drawSectionHeading(ctx, "Recommended Actions");
-  if (d.businessImpact.length === 0) renderProse(ctx, d.businessImpactEmptyNote);
-  else drawJakartaBulletList(ctx, d.businessImpact);
-
-  // 10. Escalation Indicators
-  drawSectionHeading(ctx, "Escalation Indicators");
+  // 9. Escalation Triggers
+  drawSectionHeading(ctx, "Escalation Triggers");
   if (d.escalationIndicators.length === 0) {
-    renderProse(ctx, "No specific escalation indicators flagged this period.");
+    renderProse(ctx, "No specific escalation triggers flagged this period.");
   } else {
     drawJakartaBulletList(ctx, d.escalationIndicators);
+  }
+
+  // 10. Recommended Actions — role based
+  drawSectionHeading(ctx, "Recommended Actions");
+  if (tactical && tactical.roleActions.length > 0) {
+    for (const a of tactical.roleActions) drawJakartaLabelledBlock(ctx, a.role, a.guidance);
+  } else {
+    renderProse(ctx, "Not populated.");
   }
 
   // 11. Seven Day Outlook
@@ -964,10 +1003,37 @@ function renderJakartaBrief(
   // 12. Polestar View
   drawSectionWithProse(ctx, "Polestar View", d.polestarView || "Not populated.");
 
-  // 13. Map and Area Summary
-  drawSectionHeading(ctx, "Map and Area Summary");
+  // 13. Operational Map
+  drawSectionHeading(ctx, "Operational Map");
   if (jakartaExposure.length > 0) drawJakartaExposureTable(ctx, jakartaExposure);
   renderProse(ctx, tactical ? tactical.areaSummary : "Not populated.");
+}
+
+// The ranked Priority Areas table (# | Area | Driver | Business impact | Action).
+function drawJakartaPriorityTable(ctx: Ctx, rows: JakartaPriorityAreaRow[]) {
+  drawJakartaGridTable(
+    ctx,
+    ["#", "Area", "Driver", "Business impact", "Action"],
+    [0.09, 0.23, 0.17, 0.29, 0.22],
+    rows.map((r) => [
+      String(r.priority),
+      r.elevated ? `${r.area} (active this week)` : r.area,
+      r.driver,
+      r.businessImpact,
+      r.action,
+    ]),
+    true,
+  );
+}
+
+// The 4-column Port and Logistics table.
+function drawJakartaPortTable(ctx: Ctx, rows: JakartaPortLogisticsRow[]) {
+  drawJakartaGridTable(
+    ctx,
+    ["Area", "Operational relevance", "Possible impact", "Required action"],
+    [0.22, 0.24, 0.27, 0.27],
+    rows.map((r) => [r.area, r.operationalRelevance, r.possibleImpact, r.requiredAction]),
+  );
 }
 
 // One structured-brief incident card — the headless counterpart to the

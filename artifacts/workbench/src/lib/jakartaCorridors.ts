@@ -130,7 +130,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     icon: "crowd",
     relevance:
       "Protests near government buildings can close central roads at short notice.",
-    action: "Check protest activity before travelling in; hold alternative routes.",
+    action:
+      "Confirm protest activity around Monas, Istana Merdeka and DPR/MPR before travelling in; hold a second route via Gatot Subroto.",
     baselineExposure: "elevated",
     pos: { x: 48, y: 45 },
     keywords: [
@@ -148,7 +149,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     icon: "building",
     relevance:
       "Dense offices and hotels mean incidents here hit staff and meetings directly.",
-    action: "Confirm venues; stay alert around after-hours movement.",
+    action:
+      "Confirm Sudirman, Thamrin, SCBD and Kuningan route status before client meetings; brief staff on after-hours movement.",
     baselineExposure: "monitored",
     pos: { x: 51, y: 63 },
     keywords: [
@@ -167,7 +169,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     icon: "plane",
     relevance:
       "City\u2013airport transfers run on congested, flood-prone toll routes.",
-    action: "Allow extra buffer; confirm toll-route status before departure.",
+    action:
+      "Confirm the airport toll road and Tangerang approach before departure; widen the transfer window for time-critical flights.",
     baselineExposure: "monitored",
     pos: { x: 13, y: 39 },
     airportPrePass: true,
@@ -184,7 +187,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     icon: "port",
     relevance:
       "Port and low-lying access roads drive logistics timings and flood easily.",
-    action: "Confirm port access and flood status; build in delivery slack.",
+    action:
+      "Confirm Tanjung Priok terminal and gate status before dispatch; check Cilincing and Koja access roads for flooding.",
     baselineExposure: "elevated",
     pos: { x: 64, y: 16 },
     keywords: [
@@ -202,7 +206,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     icon: "flood",
     relevance:
       "Rain and flooding across Jabodetabek lengthen staff commutes and site access.",
-    action: "Check flood-hit routes on heavy-rain days; allow extra time.",
+    action:
+      "Check Bekasi, Depok and South Tangerang access roads for flooding before morning movement; hold a second route.",
     baselineExposure: "monitored",
     pos: { x: 30, y: 85 },
     keywords: [
@@ -219,7 +224,8 @@ export const JAKARTA_CORRIDOR_AREAS: JakartaCorridorArea[] = [
     icon: "road",
     relevance:
       "Congestion on the main toll roads and arterials constrains daily movement.",
-    action: "Build time buffers; brief drivers on closures.",
+    action:
+      "Brief drivers on inner and outer ring road status; require two viable routes before departure.",
     baselineExposure: "monitored",
     pos: { x: 80, y: 60 },
     keywords: [
@@ -370,15 +376,16 @@ const HAZARD_LEAD: Record<JakartaHazard, string> = {
 // Practical action per hazard (used when that hazard led the area this period).
 const HAZARD_ACTION: Record<JakartaHazard, string> = {
   protest:
-    "Check protest activity and hold alternative routes before travelling in.",
+    "Confirm protest activity around Monas, Istana Merdeka and DPR/MPR; hold a second route before travelling in.",
   flooding:
-    "Check affected routes on heavy-rain days and allow extra time.",
+    "Check low-clearance access roads in North Jakarta and the commuter belt for flooding before movement.",
   crime:
-    "Maintain caution around after-hours movement and exposed public areas.",
-  fire: "Confirm the status of affected areas before movement.",
-  traffic: "Build in time buffers and brief drivers on possible closures.",
+    "Brief staff on after-hours movement around offices, hotels and malls; confirm secure pickup points.",
+  fire: "Confirm the affected block and its approach roads before movement.",
+  traffic:
+    "Confirm inner and outer ring road status; require two viable routes before departure.",
   policing:
-    "Verify local conditions before travel; security activity can briefly restrict access.",
+    "Confirm police cordons on Thamrin, Sudirman and Medan Merdeka before approach.",
 };
 
 // Short Title-Case label per hazard, for the headless PDF "main exposure"
@@ -425,6 +432,14 @@ function joinHazardLeads(xs: string[]): string {
 // reported this period. No live reporting → neutral standing line (no hazard
 // named). Live reporting but no recognised hazard → generic line. Otherwise the
 // line names only the hazards that occurred, in priority order.
+//
+// Standing (no-live-reporting) action per area — reuses the area's own
+// location-anchored action so a quiet area still gives a named instruction
+// rather than generic filler.
+const AREA_STANDING_ACTION: Record<string, string> = Object.fromEntries(
+  JAKARTA_CORRIDOR_AREAS.map((a) => [a.id, a.action]),
+);
+
 export function buildAreaProse(
   areaId: string,
   count: number,
@@ -435,14 +450,18 @@ export function buildAreaProse(
     return {
       relevance:
         "No specific incidents were reported here this period; the area's standing movement and access considerations continue to apply.",
-      action: "Confirm local conditions before travel.",
+      action:
+        AREA_STANDING_ACTION[areaId] ??
+        "Hold a confirmed primary and alternate route for the area.",
     };
   }
   const ordered = HAZARD_PRIORITY.filter((h) => hazards.includes(h));
   if (ordered.length === 0) {
     return {
       relevance: `Security-relevant activity was reported ${loc} this period.`,
-      action: "Confirm local conditions before travel.",
+      action:
+        AREA_STANDING_ACTION[areaId] ??
+        "Hold a confirmed primary and alternate route for the area.",
     };
   }
   const lead = joinHazardLeads(ordered.map((h) => HAZARD_LEAD[h]));
@@ -483,12 +502,12 @@ export function buildAreaPanelProse(
 // Compact, glanceable action per hazard for the ranked side panel (and its PDF
 // parity). Same honest model as HAZARD_ACTION, tightened to a single short line.
 const HAZARD_ACTION_SHORT: Record<JakartaHazard, string> = {
-  protest: "Avoid protest sites; reroute.",
-  flooding: "Check flood routes; add time.",
-  crime: "Stay alert after hours.",
-  fire: "Confirm area status first.",
-  traffic: "Add journey time buffers.",
-  policing: "Verify access before travel.",
+  protest: "Avoid Monas/Istana; reroute.",
+  flooding: "Check low-clearance roads first.",
+  crime: "Brief after-hours movement.",
+  fire: "Confirm block status first.",
+  traffic: "Hold two ring-road routes.",
+  policing: "Confirm cordons before approach.",
 };
 
 // Compact one-line variant of buildAreaProse for the ranked side panel: a short

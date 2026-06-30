@@ -34,18 +34,18 @@ const SRC = (p: string) => resolvePath(WORKBENCH, "src", p);
 // "Done looks like" list and the comments in both source files.
 const CANONICAL_SECTIONS = [
   "Bottom Line Up Front",
-  "Operating Picture",
-  "Key Flashpoints This Week",
-  "Movement and Access Impact",
-  "Business District Exposure",
-  "Port and Logistics Implications",
-  "Airport, Hotel and Office Implications",
+  "Tactical Operating Picture",
+  "Priority Areas This Week",
+  "Staff Movement Impact",
+  "Airport Transfer Impact",
+  "Port and Logistics Impact",
+  "Office, Hotel and Meeting Venue Exposure",
   "Route and Timing Guidance",
+  "Escalation Triggers",
   "Recommended Actions",
-  "Escalation Indicators",
   "Seven Day Outlook",
   "Polestar View",
-  "Map and Area Summary",
+  "Operational Map",
 ];
 
 // ---------------------------------------------------------------------------

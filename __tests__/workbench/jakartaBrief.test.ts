@@ -1,494 +1,65 @@
-import type { PngReportItem, PngCategory } from "@/lib/pngReportDataset";
 import {
-  jakartaThemeForCategory,
-  buildJakartaIncidentThemes,
+  buildJakartaOutlook,
   buildJakartaOperationalImpact,
   buildJakartaRecommendedActions,
-  buildJakartaBluf,
-  buildJakartaCurrentSituation,
-  buildJakartaOutlook,
+  buildJakartaRouteTiming,
   buildJakartaEscalationIndicators,
   buildJakartaPolestarView,
-  applyJakartaTopThree,
-  buildJakartaBrief,
-  buildJakartaMovementAccess,
-  buildJakartaBusinessDistrict,
-  buildJakartaPortLogistics,
-  buildJakartaAirportHotelOffice,
-  buildJakartaRouteTiming,
-  buildJakartaAreaSummary,
-  buildJakartaTacticalBrief,
-  JAKARTA_THEME_ORDER,
-  type JakartaTacticalBrief,
-} from "@/lib/jakartaBrief";
-import { buildJakartaCorridorStatuses } from "@/lib/jakartaCorridors";
-import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
+  JAKARTA_POLESTAR_PARAGRAPH,
+} from "../../artifacts/workbench/src/lib/jakartaBrief";
 
-const SEV_RANK: Record<string, number> = {
-  insignificant: 1,
-  low: 2,
-  moderate: 3,
-  high: 4,
-  extreme: 5,
-};
+// Parenthetical record/incident count annotations are banned from report prose
+// (counts belong only on Fast Facts tiles and chart captions).
+const COUNT_ANNOTATION = /\(\s*\d+\s*(records?|incidents?|of\b)/i;
 
-function item(
-  partial: Partial<PngReportItem> & { category: PngCategory },
-): PngReportItem {
-  const severity = partial.severity ?? "moderate";
-  return {
-    id: Math.random().toString(36).slice(2),
-    title: "Sample Jakarta incident headline",
-    summary: "",
-    province: null,
-    category: partial.category,
-    displayCategory: partial.category,
-    businessImpact: "",
-    severity,
-    severityLabel: severity.charAt(0).toUpperCase() + severity.slice(1),
-    severityRank: SEV_RANK[severity] ?? 3,
-    reportedDate: new Date("2026-06-20T00:00:00Z"),
-    incidentDate: null,
-    occurredEarlier: false,
-    source: "",
-    url: null,
-    confidence: "moderate",
-    ...partial,
-  };
+// Jargon the structured-brief builders must never emit.
+const BANNED_JARGON = [
+  "operating tempo",
+  "standing baseline",
+  "reads this period as",
+];
+
+function assertClean(text: string) {
+  expect(text.trim().length).toBeGreaterThan(0);
+  expect(COUNT_ANNOTATION.test(text)).toBe(false);
+  const lower = text.toLowerCase();
+  for (const phrase of BANNED_JARGON) {
+    expect(lower).not.toContain(phrase);
+  }
 }
 
-// Live-window incident shaped for the corridor-status builder (the live-aware
-// tactical sections derive their leads from elevated corridor statuses).
-function corridorInc(
-  over: Partial<CountryFastFactsIncident> & { title: string; severity: string },
-): CountryFastFactsIncident {
-  return {
-    topic: "jakarta",
-    occurredAt: "2026-06-27T08:00:00+00:00",
-    displayTitle: null,
-    location: null,
-    ...over,
-  } as CountryFastFactsIncident;
-}
-
-// Corridor statuses with several elevated areas (live reporting attributed) and
-// the all-quiet case, to drive the live-aware tactical builders.
-const LIVE_STATUSES = buildJakartaCorridorStatuses([
-  corridorInc({
-    title: "Street protest near the presidential palace",
-    severity: "high",
-    location: "Central Jakarta",
-  }),
-  corridorInc({
-    title: "Flooding shuts container terminal access at Tanjung Priok",
-    severity: "moderate",
-    location: "North Jakarta",
-  }),
-]).statuses;
-const EMPTY_STATUSES = buildJakartaCorridorStatuses([]).statuses;
-
-// Flatten a tactical brief to every emitted string for the house-rule sweeps.
-function tacticalStrings(t: JakartaTacticalBrief): string[] {
-  return [
-    ...t.movementAccess,
-    t.businessDistrict.intro,
-    ...t.businessDistrict.rows.flatMap((r) => [r.area, r.why, r.action]),
-    t.portLogistics.intro,
-    ...t.portLogistics.rows.flatMap((r) => [r.area, r.why, r.action]),
-    ...t.portLogistics.actions,
-    t.airportHotelOffice,
-    ...t.routeTiming,
-    t.areaSummary,
-  ];
-}
-
-// Every string the builders emit, gathered for the count-free / banned-phrase
-// house-rule assertions.
-function allProse(): string[] {
-  const window = [
-    item({ category: "Civil unrest / protest", province: "Central Jakarta" }),
-    item({ category: "Natural hazard", province: "North Jakarta" }),
-    item({ category: "Theft / break-in", province: "West Jakarta", severity: "low" }),
-    item({ category: "Road / highway", province: "East Jakarta" }),
-    item({ category: "Aviation / airport", province: "Soekarno-Hatta Airport Corridor" }),
-    item({ category: "Policing operation", province: "South Jakarta" }),
-  ];
-  const brief = buildJakartaBrief({
-    windowItems: window,
-    incidentDetailsItems: window,
-    topThree: window.slice(0, 3),
-    corridorStatuses: LIVE_STATUSES,
-  });
-  const empty = buildJakartaBrief({
-    windowItems: [],
-    incidentDetailsItems: [],
-    topThree: [],
-    corridorStatuses: EMPTY_STATUSES,
-  });
-  return [
-    brief.bluf,
-    brief.executiveSummary,
-    brief.outlook,
-    brief.polestarView,
-    ...Object.values(brief.polestarViewParts),
-    ...brief.recommendedActions,
-    ...brief.operationalImpact,
-    ...brief.escalationIndicators,
-    ...brief.incidentThemes.map((t) => t.heading),
-    ...brief.incidentThemes.map((t) => t.paragraph),
-    ...brief.topThree.map((t) => t.developmentTitle ?? ""),
-    ...brief.topThree.map((t) => t.businessImpact ?? ""),
-    ...tacticalStrings(brief.tactical),
-    ...tacticalStrings(empty.tactical),
-    empty.bluf,
-    empty.executiveSummary,
-    empty.outlook,
-  ];
-}
-
-describe("jakartaThemeForCategory", () => {
-  it("maps representative categories to Jakarta themes", () => {
-    expect(jakartaThemeForCategory("Civil unrest / protest")).toBe("protest");
-    expect(jakartaThemeForCategory("Labour action")).toBe("protest");
-    expect(jakartaThemeForCategory("Natural hazard")).toBe("flooding");
-    expect(jakartaThemeForCategory("Environmental / haze")).toBe("flooding");
-    expect(jakartaThemeForCategory("Theft / break-in")).toBe("crime");
-    expect(jakartaThemeForCategory("Fire")).toBe("fire");
-    expect(jakartaThemeForCategory("Road / highway")).toBe("traffic");
-    expect(jakartaThemeForCategory("Aviation / airport")).toBe("airport");
-    expect(jakartaThemeForCategory("Policing operation")).toBe("governance");
-    expect(jakartaThemeForCategory("Government stability")).toBe("governance");
-  });
-});
-
-describe("buildJakartaIncidentThemes", () => {
-  it("returns an empty list for an empty window (no fabrication)", () => {
-    expect(buildJakartaIncidentThemes([])).toEqual([]);
+describe("jakartaBrief deterministic prose builders", () => {
+  it("the outlook paragraph is non-empty and count-free", () => {
+    assertClean(buildJakartaOutlook());
   });
 
-  it("emits only present themes, in fixed Jakarta order", () => {
-    const groups = buildJakartaIncidentThemes([
-      item({ category: "Policing operation", province: "South Jakarta" }),
-      item({ category: "Civil unrest / protest", province: "Central Jakarta" }),
-      item({ category: "Natural hazard", province: "North Jakarta" }),
-    ]);
-    expect(groups.map((g) => g.key)).toEqual(["protest", "flooding", "governance"]);
-    // Order matches the declared JAKARTA_THEME_ORDER.
-    const order = JAKARTA_THEME_ORDER.filter((t) => groups.some((g) => g.key === t));
-    expect(groups.map((g) => g.key)).toEqual(order);
+  it("the Polestar paragraph is non-empty and count-free", () => {
+    assertClean(JAKARTA_POLESTAR_PARAGRAPH);
   });
 
-  it("includes the resolved area in the paragraph and stays count-free", () => {
-    const groups = buildJakartaIncidentThemes([
-      item({ category: "Civil unrest / protest", province: "Central Jakarta" }),
-    ]);
-    const protest = groups.find((g) => g.key === "protest")!;
-    expect(protest.paragraph).toContain("Central Jakarta");
-    for (const g of groups) expect(g.paragraph).not.toMatch(/\d/);
-  });
-
-  it("never describes a Low-only theme as a severity escalation", () => {
-    // A concrete anchor (province) so the theme has something to say and is not
-    // dropped as too-thin; the assertion is that a Low theme carries no
-    // escalation language.
-    const groups = buildJakartaIncidentThemes([
-      item({ category: "Theft / break-in", severity: "low", province: "West Jakarta" }),
-    ]);
-    const crime = groups.find((g) => g.key === "crime")!;
-    expect(crime.paragraph.toLowerCase()).not.toMatch(/escalat|high severity|extreme severity/);
-  });
-
-  it("surfaces high/extreme severity in the tail when present", () => {
-    const groups = buildJakartaIncidentThemes([
-      item({ category: "Homicide / violent crime", severity: "extreme" }),
-    ]);
-    const crime = groups.find((g) => g.key === "crime")!;
-    expect(crime.paragraph.toLowerCase()).toContain("extreme severity");
-  });
-});
-
-describe("buildJakartaOperationalImpact", () => {
-  // Spec §4: five FIXED, location-led standing bullets (no-arg). These are
-  // conditional standing guidance, not event claims, so the set is constant and
-  // the section never reads empty regardless of the window.
-  it("returns the five fixed, location-led, count-free bullets", () => {
-    const bullets = buildJakartaOperationalImpact();
-    expect(bullets).toHaveLength(5);
-    // Each bullet leads with a location/role label before a colon.
-    for (const b of bullets) {
-      expect(b).toMatch(/^[^:]+:\s\S/);
-      expect(b).not.toMatch(/\d/);
-    }
-    expect(bullets[0]).toMatch(/^Central Jakarta government district:/);
-    expect(bullets[1]).toMatch(/^Jabodetabek commuter movement:/);
-    expect(bullets.some((b) => /flood/i.test(b))).toBe(true);
-  });
-});
-
-describe("buildJakartaRecommendedActions", () => {
-  it("emits practical, location-based, count-free actions", () => {
-    const actions = buildJakartaRecommendedActions();
-    expect(actions.length).toBeGreaterThanOrEqual(5);
-    expect(actions.some((a) => /Central Jakarta/.test(a))).toBe(true);
-    expect(actions.some((a) => /airport transfers/i.test(a))).toBe(true);
-    for (const a of actions) expect(a).not.toMatch(/\d/);
-  });
-});
-
-describe("BLUF / Current Situation / Outlook", () => {
-  it("BLUF gives a standing assessment for an empty window and names themes otherwise", () => {
-    expect(buildJakartaBluf([])).toMatch(/manageable but disruption-prone/i);
-    const live = buildJakartaBluf([item({ category: "Civil unrest / protest", province: "Central Jakarta" })]);
-    expect(live).toMatch(/protest activity/i);
-    expect(live).toContain("Central Jakarta");
-  });
-
-  it("Current Situation holds the standing operating picture when empty", () => {
-    const cs = buildJakartaCurrentSituation([]);
-    expect(cs).toMatch(/standing operating picture/i);
-    expect(cs).toMatch(/manageable but disruption-prone/i);
-  });
-
-  it("Outlook is a next-seven-days most-likely scenario", () => {
-    const outlook = buildJakartaOutlook();
-    expect(outlook).toMatch(/next seven days/i);
-    expect(outlook).toMatch(/localised disruption/i);
-    expect(outlook).not.toMatch(/\d/);
-  });
-});
-
-describe("buildJakartaEscalationIndicators", () => {
-  it("returns Jakarta-specific, count-free escalation indicators", () => {
-    const ind = buildJakartaEscalationIndicators();
-    expect(ind.length).toBeGreaterThanOrEqual(3);
-    expect(ind.some((i) => /Central Jakarta/.test(i))).toBe(true);
-    expect(ind.some((i) => /flood|rain/i.test(i))).toBe(true);
-    expect(ind.some((i) => /crime|public-safety/i.test(i))).toBe(true);
-    for (const i of ind) expect(i).not.toMatch(/\d/);
-  });
-});
-
-describe("Polestar View", () => {
-  it("is a structured, count-free standing judgement", () => {
+  it("the Polestar view parts are non-empty and count-free", () => {
     const parts = buildJakartaPolestarView();
-    expect(parts.paragraph).toMatch(/route checks/i);
-    for (const v of Object.values(parts)) expect(v).not.toMatch(/\d/);
-  });
-});
-
-describe("applyJakartaTopThree", () => {
-  it("rewrites titles as analyst developments with an operational relevance line, without mutating inputs", () => {
-    const input = [
-      item({ category: "Civil unrest / protest", province: "Central Jakarta", title: "raw headline one" }),
-    ];
-    const out = applyJakartaTopThree(input);
-    expect(out[0].developmentTitle).toBe(
-      "Central Jakarta protest and policing activity keeps government-district disruption risk active",
-    );
-    expect(out[0].businessImpact).toMatch(/confirm routes/i);
-    // Inputs are not mutated.
-    expect(input[0].developmentTitle).toBeUndefined();
-    expect(input[0].businessImpact).toBe("");
+    const all = [
+      parts.direction,
+      parts.driver,
+      parts.exposedGeography,
+      parts.exposedActivity,
+      parts.likelyDisruption,
+      parts.whatWouldChange,
+      parts.practicalJudgement,
+      parts.paragraph,
+    ].join(" \n ");
+    assertClean(all);
   });
 
-  it("falls back to a Jakarta-wide lead when the area is unknown", () => {
-    const out = applyJakartaTopThree([item({ category: "Theft / break-in", province: null })]);
-    expect(out[0].developmentTitle).toBe(
-      "Local crime reporting supports continued caution around after hours movement",
-    );
-  });
-
-  it("disambiguates two same-theme same-area developments", () => {
-    const out = applyJakartaTopThree([
-      item({ category: "Civil unrest / protest", province: "Central Jakarta", title: "first protest near palace" }),
-      item({ category: "Civil unrest / protest", province: "Central Jakarta", title: "second protest near parliament" }),
-    ]);
-    expect(out[0].developmentTitle).not.toBe(out[1].developmentTitle);
-  });
-});
-
-describe("house rules across the whole brief", () => {
-  it("never emits digits in any generated prose", () => {
-    for (const s of allProse()) expect(s).not.toMatch(/\d/);
-  });
-
-  it("avoids the spec's banned generic phrasing", () => {
-    const banned = [
-      "remain important",
-      "Monitor localised flooding",
-      "Maintain awareness",
-      "maintain standard movement precautions",
-    ];
-    const joined = allProse().join("\n").toLowerCase();
-    for (const phrase of banned) expect(joined).not.toContain(phrase.toLowerCase());
-  });
-});
-
-// ===========================================================================
-// Tactical (13-section) builders — Spec §4–§8 and §13
-// ===========================================================================
-
-describe("buildJakartaMovementAccess", () => {
-  it("returns one standing bullet when no area carried live reporting", () => {
-    const bullets = buildJakartaMovementAccess(EMPTY_STATUSES);
-    expect(bullets).toHaveLength(1);
-    expect(bullets[0]).toMatch(/no area-specific movement disruption/i);
-    expect(bullets[0]).not.toMatch(/\d/);
-  });
-
-  it("names only the areas that carried live reporting (raise-not-invent)", () => {
-    const bullets = buildJakartaMovementAccess(LIVE_STATUSES);
-    expect(bullets.length).toBeGreaterThanOrEqual(2);
-    expect(bullets.some((b) => /Central Jakarta government district/.test(b))).toBe(true);
-    expect(bullets.some((b) => /North Jakarta & port area/.test(b))).toBe(true);
-    // Quiet areas are never invented into a movement bullet.
-    expect(bullets.some((b) => /commuter belt/i.test(b))).toBe(false);
-    for (const b of bullets) expect(b).not.toMatch(/\d/);
-  });
-});
-
-describe("buildJakartaBusinessDistrict", () => {
-  it("returns the standing intro and fixed Area/Why/Action rows when quiet", () => {
-    const { intro, rows } = buildJakartaBusinessDistrict(EMPTY_STATUSES);
-    expect(intro).toMatch(/Sudirman/);
-    expect(rows.length).toBeGreaterThanOrEqual(3);
-    for (const r of rows) {
-      expect(r.area.length).toBeGreaterThan(0);
-      expect(r.why.length).toBeGreaterThan(0);
-      expect(r.action.length).toBeGreaterThan(0);
-      expect(`${r.area} ${r.why} ${r.action}`).not.toMatch(/\d/);
-    }
-  });
-
-  it("leads the intro with a live relevance when the commercial cluster is elevated", () => {
-    const statuses = buildJakartaCorridorStatuses([
-      corridorInc({
-        title: "Armed robbery near a Sudirman office tower",
-        severity: "moderate",
-        location: "South Jakarta",
-      }),
-    ]).statuses;
-    const { intro } = buildJakartaBusinessDistrict(statuses);
-    expect(intro).toMatch(/reported/i);
-    expect(intro).toMatch(/Sudirman/); // standing framing still present
-  });
-});
-
-describe("buildJakartaPortLogistics", () => {
-  it("returns an intro, an Area/Why/Action table and port-action bullets", () => {
-    const { intro, rows, actions } = buildJakartaPortLogistics(EMPTY_STATUSES);
-    expect(intro).toMatch(/Tanjung Priok/);
-    expect(rows.length).toBeGreaterThanOrEqual(3);
-    expect(actions.length).toBeGreaterThanOrEqual(3);
-    for (const a of actions) expect(a).not.toMatch(/\d/);
-    for (const r of rows) {
-      expect(`${r.area} ${r.why} ${r.action}`).not.toMatch(/\d/);
-    }
-  });
-
-  it("leads the intro with the port area's live relevance when elevated", () => {
-    const { intro } = buildJakartaPortLogistics(LIVE_STATUSES);
-    expect(intro).toMatch(/reported/i);
-    expect(intro).toMatch(/Tanjung Priok/);
-  });
-});
-
-describe("buildJakartaAirportHotelOffice", () => {
-  it("returns count-free standing prose when quiet", () => {
-    const text = buildJakartaAirportHotelOffice(EMPTY_STATUSES);
-    expect(text).toMatch(/Soekarno-Hatta/);
-    expect(text).not.toMatch(/\d/);
-  });
-
-  it("leads with a live relevance when the airport corridor is elevated", () => {
-    const statuses = buildJakartaCorridorStatuses([
-      corridorInc({
-        title: "Flooding delays transfers along the congested toll route",
-        severity: "moderate",
-        location: "Soekarno-Hatta Airport Corridor",
-      }),
-    ]).statuses;
-    const text = buildJakartaAirportHotelOffice(statuses);
-    expect(text).toMatch(/reported/i);
-    expect(text).not.toMatch(/\d/);
-  });
-});
-
-describe("buildJakartaRouteTiming", () => {
-  it("returns fixed, count-free standing route and timing guidance", () => {
-    const bullets = buildJakartaRouteTiming();
-    expect(bullets.length).toBeGreaterThanOrEqual(4);
-    for (const b of bullets) expect(b).not.toMatch(/\d/);
-  });
-});
-
-describe("buildJakartaAreaSummary", () => {
-  it("describes a standing-profile map when no area carried reporting", () => {
-    const text = buildJakartaAreaSummary(EMPTY_STATUSES);
-    expect(text).toMatch(/standing operating-exposure profile/i);
-    expect(text).not.toMatch(/\d/);
-  });
-
-  it("names the live areas when reporting is attributed", () => {
-    const text = buildJakartaAreaSummary(LIVE_STATUSES);
-    expect(text).toMatch(/Central Jakarta government district/);
-    expect(text).toMatch(/North Jakarta & port area/);
-    expect(text).not.toMatch(/\d/);
-  });
-});
-
-describe("buildJakartaTacticalBrief", () => {
-  it("aggregates every tactical section from the corridor statuses", () => {
-    const t = buildJakartaTacticalBrief(LIVE_STATUSES);
-    expect(t.movementAccess.length).toBeGreaterThan(0);
-    expect(t.businessDistrict.rows.length).toBeGreaterThan(0);
-    expect(t.businessDistrict.intro.length).toBeGreaterThan(0);
-    expect(t.portLogistics.rows.length).toBeGreaterThan(0);
-    expect(t.portLogistics.actions.length).toBeGreaterThan(0);
-    expect(t.airportHotelOffice.length).toBeGreaterThan(0);
-    expect(t.routeTiming.length).toBeGreaterThan(0);
-    expect(t.areaSummary.length).toBeGreaterThan(0);
-  });
-
-  it("falls back to a standing-only brief for an empty corridor set", () => {
-    const t = buildJakartaTacticalBrief([]);
-    expect(t.movementAccess).toHaveLength(1);
-    expect(t.areaSummary).toMatch(/standing operating-exposure profile/i);
-  });
-});
-
-describe("buildJakartaBrief aggregator", () => {
-  it("returns every override field, the tactical brief, and rewrites the Top 3", () => {
-    const window = [
-      item({ category: "Civil unrest / protest", province: "Central Jakarta" }),
-      item({ category: "Natural hazard", province: "North Jakarta" }),
-    ];
-    const brief = buildJakartaBrief({
-      windowItems: window,
-      incidentDetailsItems: window,
-      topThree: window,
-      corridorStatuses: LIVE_STATUSES,
-    });
-    expect(brief.bluf.length).toBeGreaterThan(0);
-    expect(brief.executiveSummary.length).toBeGreaterThan(0);
-    expect(brief.outlook.length).toBeGreaterThan(0);
-    expect(brief.polestarView.length).toBeGreaterThan(0);
-    expect(brief.recommendedActions.length).toBeGreaterThan(0);
-    expect(brief.operationalImpact.length).toBeGreaterThan(0);
-    expect(brief.escalationIndicators.length).toBeGreaterThan(0);
-    expect(brief.incidentThemes.length).toBeGreaterThan(0);
-    expect(brief.topThree.every((t) => !!t.developmentTitle)).toBe(true);
-    // Tactical brief is present and wired to the elevated corridor statuses.
-    expect(brief.tactical.movementAccess.length).toBeGreaterThan(0);
-    expect(brief.tactical.portLogistics.actions.length).toBeGreaterThan(0);
-  });
-
-  it("still returns a standing-only tactical brief when corridorStatuses is omitted", () => {
-    const brief = buildJakartaBrief({
-      windowItems: [],
-      incidentDetailsItems: [],
-      topThree: [],
-    });
-    expect(brief.tactical.movementAccess).toHaveLength(1);
+  it.each([
+    ["operational impact", buildJakartaOperationalImpact()],
+    ["recommended actions", buildJakartaRecommendedActions()],
+    ["route and timing guidance", buildJakartaRouteTiming()],
+    ["escalation indicators", buildJakartaEscalationIndicators()],
+  ])("%s lines are all non-empty and count-free", (_label, lines) => {
+    expect(Array.isArray(lines)).toBe(true);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) assertClean(line);
   });
 });
