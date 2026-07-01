@@ -928,8 +928,8 @@ function renderJakartaBrief(
   // 3. Crime Trends and Business Impact — dedicated crime section
   drawSectionHeading(ctx, "Crime Trends and Business Impact");
   if (tactical) {
-    renderProse(ctx, tactical.crimeTrends.standingPattern);
     renderProse(ctx, tactical.crimeTrends.reportedThisPeriod);
+    renderProse(ctx, tactical.crimeTrends.standingPattern);
     renderProse(ctx, tactical.crimeTrends.trendRead);
     drawJakartaCrimeTable(ctx, tactical.crimeTrends.businessImpact);
   } else {

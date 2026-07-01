@@ -1032,10 +1032,52 @@ const JAKARTA_CRIME_BUSINESS_ROWS: JakartaCrimeBusinessRow[] = [
   },
 ];
 
+// Crime-type buckets → a concise business consequence, so the this-period read
+// explains what the REPORTED crime means for business. Derived ONLY from the
+// crime types actually extracted from the window, never invented.
+const CRIME_PROPERTY_TYPES = new Set(["theft", "robbery", "burglary"]);
+const CRIME_VIOLENT_TYPES = new Set([
+  "assault",
+  "shootings",
+  "violent attacks",
+  "public disorder",
+  "kidnapping",
+]);
+const CRIME_LOGISTICS_TYPES = new Set(["extortion"]);
+const CRIME_DRUG_TYPES = new Set(["drug-related crime"]);
+
+// Compose the business-consequence clause from the crime types present this
+// period. Count-free; only names a consequence when its crime type was reported.
+function crimeBusinessConsequence(types: string[]): string {
+  const clauses: string[] = [];
+  if (types.some((t) => CRIME_PROPERTY_TYPES.has(t)))
+    clauses.push(
+      "staff and visitors face property loss and opportunistic theft around transport hubs, crowded commercial areas and after-hours movement",
+    );
+  if (types.some((t) => CRIME_VIOLENT_TYPES.has(t)))
+    clauses.push(
+      "there is a risk of violence around disputes, crowds and nightlife",
+    );
+  if (types.some((t) => CRIME_LOGISTICS_TYPES.has(t)))
+    clauses.push(
+      "informal levies and intimidation can disrupt logistics around ports and industrial areas",
+    );
+  if (types.some((t) => CRIME_DRUG_TYPES.has(t)))
+    clauses.push(
+      "narcotics enforcement carries legal and reputational risk for staff and visitors",
+    );
+  if (clauses.length === 0)
+    return "The practical concern is staff exposure around after-hours movement near offices, hotels and transport hubs rather than a city-wide threat.";
+  return `For business, ${clauses.join("; ")}.`;
+}
+
 // Build the Crime Trends & Business Impact section. `items` is the report window;
 // the this-period read is derived ONLY from crime-theme items (via the shared
-// CRIME_GROUPS / presentAreas), so it never invents crime that was not reported.
-// The standing pattern and business-impact table are curated and always shown.
+// CRIME_GROUPS / SETTING_GROUPS / presentAreas), so it never invents crime that
+// was not reported. It LEADS the section — naming the crime types, areas,
+// settings and business consequence that actually surfaced this period — with
+// the curated standing pattern and business-impact table shown afterwards as the
+// durable baseline.
 export function buildJakartaCrimeTrends(
   items: PngReportItem[],
 ): JakartaCrimeTrends {
@@ -1043,6 +1085,7 @@ export function buildJakartaCrimeTrends(
     (it) => jakartaThemeForCategory(it.category) === "crime",
   );
   const crimeTypes = extractLabels(crimeItems, CRIME_GROUPS);
+  const settings = extractLabels(crimeItems, SETTING_GROUPS, 2);
   const area = joinList(presentAreas(crimeItems));
 
   let reportedThisPeriod: string;
@@ -1055,10 +1098,14 @@ export function buildJakartaCrimeTrends(
       ? joinList(crimeTypes)
       : "crime and public-safety incidents";
     const where = area ? ` in ${area}` : "";
-    reportedThisPeriod = `Open-source reporting this period featured ${what}${where}. Treat this as a partial signal of the wider picture rather than a complete crime record.`;
-    trendRead = `This period's reporting sits within Jakarta's standing pattern of opportunistic and property crime; on its own it does not indicate a city-wide shift. Read it as texture on top of the standing crime profile, which remains the working assumption for planning.`;
+    const settingPart = settings.length
+      ? ` Reporting clustered around ${joinList(settings)}.`
+      : "";
+    const consequence = crimeBusinessConsequence(crimeTypes);
+    reportedThisPeriod = `This period's open-source reporting featured ${what}${where}.${settingPart} ${consequence} Treat this as a partial signal of the wider picture rather than a complete crime record.`;
+    trendRead = `This reporting sits within Jakarta's standing pattern of opportunistic and property crime rather than signalling a city-wide shift; use it to focus staff-movement and site precautions where crime actually surfaced this period.`;
   } else {
-    reportedThisPeriod = `No fresh crime-specific reporting was identified in the sources this period. This is not evidence that crime is absent — routine opportunistic and property crime is heavily under-reported — so the standing pattern continues to apply.`;
+    reportedThisPeriod = `No fresh crime-specific reporting was identified in the sources this period. This is not evidence that crime is absent — routine opportunistic and property crime is heavily under-reported — so the standing pattern below continues to apply.`;
     trendRead = `With no distinct crime reporting this period, plan against Jakarta's standing pattern of opportunistic and property crime rather than assuming a quieter environment.`;
   }
 

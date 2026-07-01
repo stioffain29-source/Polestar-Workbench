@@ -51,11 +51,11 @@ describe("buildJakartaCrimeTrends", () => {
     );
     expect(trends.trendRead).toContain("standing pattern");
     expect(trends.reportedThisPeriod).not.toContain(
-      "Open-source reporting this period featured",
+      "This period's open-source reporting featured",
     );
   });
 
-  it("crime-present branch: reports the period's crime signal from crime-theme items", () => {
+  it("crime-present branch: leads with the period's reported crime and its business consequence", () => {
     const trends = buildJakartaCrimeTrends([
       item({
         category: "Theft / break-in" as PngCategory,
@@ -63,11 +63,27 @@ describe("buildJakartaCrimeTrends", () => {
       }),
     ]);
     expect(trends.reportedThisPeriod).toContain(
-      "Open-source reporting this period featured",
+      "This period's open-source reporting featured",
     );
+    expect(trends.reportedThisPeriod).toContain("theft");
+    // Property crime must surface its concrete business consequence, not a
+    // generic standing essay.
+    expect(trends.reportedThisPeriod).toContain("For business,");
+    expect(trends.reportedThisPeriod).toContain("property loss");
     expect(trends.reportedThisPeriod).toContain("partial signal");
     expect(trends.reportedThisPeriod).not.toContain(
       "No fresh crime-specific reporting",
     );
+  });
+
+  it("violent crime adds a distinct violence consequence clause", () => {
+    const trends = buildJakartaCrimeTrends([
+      item({
+        category: "Homicide / violent crime" as PngCategory,
+        title: "Stabbing in a late-night brawl reported in South Jakarta",
+      }),
+    ]);
+    expect(trends.reportedThisPeriod).toContain("For business,");
+    expect(trends.reportedThisPeriod).toContain("risk of violence");
   });
 });

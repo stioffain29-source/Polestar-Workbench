@@ -24,6 +24,13 @@ Roboto-only fonts; `scripts/validateFonts.sh` is the CI font gate (needs
 only automated proof. A section added to only one surface silently diverges and
 fails the audit with a confusing "canonical vs on-screen" order mismatch.
 
+Same lockstep applies to the ORDER of prose blocks WITHIN a section (e.g. the
+crime section's reportedThisPeriod / standingPattern / trendRead): surfaces 2 and
+3 are two independent hand-written renderers, so reordering blocks in
+`JakartaReportBody.tsx` without mirroring it in `renderJakartaBrief`
+(`exportCountryReportPdf.ts`) silently breaks headless-PDF parity. A field-name
+grep that omits `exportCountryReportPdf.ts` will miss the second site.
+
 ## Crime this-period read — no-fabrication gate
 `buildJakartaCrimeTrends` must gate its "this period featured …" read on
 `crimeItems.length` (i.e. category maps to the crime theme), NOT on whether a

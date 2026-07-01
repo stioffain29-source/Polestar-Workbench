@@ -192,6 +192,18 @@ describe("JakartaReportBody — 13-section tactical brief render", () => {
     expect(ats).toEqual([...ats].sort((a, b) => a - b));
   });
 
+  it("leads the crime section with the reporting-period read before the standing baseline", () => {
+    const ct = d.jakartaTacticalBrief!.crimeTrends;
+    const start = html.indexOf("Crime Trends and Business Impact");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const pReported = html.indexOf(esc(ct.reportedThisPeriod), start);
+    const pStanding = html.indexOf(esc(ct.standingPattern), start);
+    const pTrend = html.indexOf(esc(ct.trendRead), start);
+    expect(pReported).toBeGreaterThanOrEqual(0);
+    expect(pStanding).toBeGreaterThan(pReported);
+    expect(pTrend).toBeGreaterThan(pStanding);
+  });
+
   it("renders Escalation Triggers as its own section before Recommended Actions", () => {
     const escAt = html.indexOf("Escalation Triggers");
     const ra = html.indexOf("Recommended Actions");

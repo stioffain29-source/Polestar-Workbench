@@ -308,8 +308,8 @@ export default function JakartaReportBody({
       <Section title="Crime Trends and Business Impact">
         {tactical ? (
           <>
-            <Prose text={tactical.crimeTrends.standingPattern} />
             <Prose text={tactical.crimeTrends.reportedThisPeriod} />
+            <Prose text={tactical.crimeTrends.standingPattern} />
             <Prose text={tactical.crimeTrends.trendRead} />
             <CrimeTable rows={tactical.crimeTrends.businessImpact} />
           </>
