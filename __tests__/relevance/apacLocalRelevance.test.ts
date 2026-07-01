@@ -192,3 +192,87 @@ describe("apac_local ingest allow/deny gate — informal slang + abbreviations",
     });
   });
 });
+
+// apac_local also ingests Philippine (Inquirer / Rappler / GMA) and Thai
+// (Bangkok Post / Khaosod English) outlets. Philippine English desks routinely
+// code-switch into Tagalog slang ("rali", "welga", "barilan", "holdap"), and
+// Thai outlets report incidents in English. These fixtures lock that coverage
+// so a future allow/deny edit cannot silently start dropping genuine Tagalog-
+// worded incidents — or leaking the "aust-rali-a" / "patay na baterya" homonym
+// traps. See `lib/ingest/src/topicConfigs.ts` (APAC_LOCAL).
+describe("apac_local ingest allow/deny gate — Tagalog + Thai wording", () => {
+  describe("keeps genuine Tagalog-worded incidents", () => {
+    const kept: Array<[string, string]> = [
+      // protest / civil unrest
+      ["rali", "Rali ng mga estudyante sa Manila laban sa pagtaas ng pamasahe"],
+      ["rali laban", "Malaking rali laban sa reklamasyon sa Cebu"],
+      ["welga", "Welga ng mga tsuper, paralisado ang biyahe sa Cebu"],
+      // crime
+      ["barilan", "Barilan sa palengke, dalawa patay sa Davao"],
+      ["pamamaril", "Pamamaril sa Quezon City, isa ang sugatan"],
+      ["nakawan", "Nakawan sa bahay sa Iloilo, milyon ang nawala"],
+      ["holdap", "Holdap sa jeepney sa Manila, tatlong pasahero biktima"],
+      ["saksak", "Saksakan sa bar sa Cebu, isa ang patay"],
+      ["patayan", "Patayan sa Cotabato, apat ang tinamaan"],
+      // security incidents
+      ["pananambang", "Pananambang sa sundalo sa Basilan, dalawa ang patay"],
+      // terrorism / blast
+      ["pagsabog", "Pagsabog ng bomba sa Zamboanga, limang sugatan"],
+      // transport disruption
+      ["aksidente", "Aksidente sa highway sa Cebu, walong sugatan"],
+      ["banggaan", "Banggaan ng bus at truck sa Baguio, tatlong patay"],
+    ];
+    it.each(kept)("keeps %s", (_label, title) => {
+      const c = classify(title);
+      expect(c.kept).toBe(true);
+      expect(c.reason).toMatch(/^allow:/);
+    });
+  });
+
+  describe("keeps Thai incidents (reported in English by Thai outlets)", () => {
+    const kept: Array<[string, string]> = [
+      ["Thai protest", "Anti-government protesters rally in Bangkok"],
+      ["Thai deep-south shooting", "Gunmen open fire in Narathiwat, two rangers killed"],
+      ["Thai deep-south bombing", "Roadside bomb blast wounds soldiers in Pattani"],
+    ];
+    it.each(kept)("keeps %s", (_label, title) => {
+      const c = classify(title);
+      expect(c.kept).toBe(true);
+      expect(c.reason).toMatch(/^allow:/);
+    });
+  });
+
+  describe("routes Tagalog / Thai homonym traps correctly", () => {
+    it("does not leak an Australia (aust-RALI-a) non-incident story via 'rali'", () => {
+      // "australia" contains the substring "rali"; the allow tokens are the
+      // bound forms "rali ng" / "rali laban" / "rali kontra", so a plain
+      // Australia trade story must fall through to no-allowlist-match.
+      const c = classify("Australia to boost trade ties with Manila");
+      expect(c.kept).toBe(false);
+      expect(c.reason).toBe("no-allowlist-match");
+    });
+
+    it("does not read 'patay na baterya' (dead battery) as a killing", () => {
+      // "patay" (=dead) is deliberately NOT an allow token; only the incident
+      // forms "patayan" / "pagpatay" are, so a dead-battery story is dropped.
+      const c = classify("Patay na baterya, dahilan ng pagkaantala ng biyahe sa Manila");
+      expect(c.kept).toBe(false);
+      expect(c.reason).toBe("no-allowlist-match");
+    });
+
+    it("does not read a Songkran water festival as an incident", () => {
+      // Thai festival crowds are not an incident; no allow cue matches.
+      const c = classify("Songkran water festival draws huge crowds in Bangkok");
+      expect(c.kept).toBe(false);
+      expect(c.reason).toBe("no-allowlist-match");
+    });
+
+    it("lets the deny-list win over a Tagalog crime cue in a sports story", () => {
+      // "barilan" (shootout) as a basketball metaphor plus the deny cue
+      // "basketball" — deny is evaluated first, so it never leaks in.
+      const c = classify("Barilan ng tatlong-puntos sa basketball final sa Manila");
+      expect(c.kept).toBe(false);
+      expect(c.reason).toMatch(/^deny:/);
+    });
+  });
+});

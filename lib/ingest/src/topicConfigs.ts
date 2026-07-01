@@ -779,6 +779,17 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "unras", "tawuran",
     "demo mahasiswa", "demo buruh", "demo warga", "demo tolak", "demo ricuh",
     "aksi demo", "gelar demo",
+    // protest / civil unrest — Tagalog (Philippine English outlets code-switch).
+    // "rali" is the Tagalog spelling of "rally" (one l, so the English "rally"
+    // token above does NOT cover it); it is bound to a following participle
+    // ("ng"/"laban"/"kontra") to avoid the substring trap in "aust-rali-a".
+    // "welga" is the Tagalog labour-strike term.
+    "rali ng", "rali laban", "rali kontra", "welga", "welgang bayan",
+    // Thai outlets (Bangkok Post, Khaosod English) report incidents in English,
+    // so the English protest/crime/security cues above already cover them; no
+    // safe romanized-Thai slang token was identified (the sole candidate "mob"
+    // is a substring of "mobile"/"mobility" and is deliberately avoided). Thai
+    // wording is asserted via fixtures in apacLocalRelevance.test.ts.
     // crime
     "murder", "shooting", "shot dead", "robbery", "theft", "stabbing",
     "kidnap", "kidnapping", "abduction", "homicide", "assault", "extortion",
@@ -788,6 +799,12 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     // crime — informal slang + abbreviations: "curanmor" (motor-vehicle theft),
     // "geng motor" (violent bike gangs).
     "curanmor", "geng motor",
+    // crime — Tagalog: "barilan" (shootout), "pamamaril" (shooting), "nakawan"
+    // (robbery), "holdap" (hold-up), "saksak" (stab/stabbing — matches the
+    // "saksakan"/"sinaksak" forms), "patayan" (killings), "pagpatay" (murder).
+    // The "-an"/"pag-" forms are used, not the bare "patay" (=dead), so a
+    // non-incident "patay na baterya" (dead battery) does not leak in.
+    "barilan", "pamamaril", "nakawan", "holdap", "saksak", "patayan", "pagpatay",
     // terrorism
     "terror", "terrorist", "terrorism", "suicide bomb", "bomb blast",
     "bombing", "explosion", "improvised explosive", "insurgent", "insurgency",
@@ -795,6 +812,8 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "jamaah islamiyah", "new people's army", "separatist",
     "teroris", "terorisme", "bom bunuh diri", "serangan bom", "ledakan bom",
     "densus 88", "ledakan",
+    // terrorism / blast — Tagalog: "pagsabog" (explosion/blast).
+    "pagsabog",
     // security incidents (armed / conflict)
     "gunmen", "gunfire", "ambush", "shootout", "firefight", "hostage",
     "arson", "grenade", "landmine", "checkpoint", "security forces",
@@ -804,6 +823,8 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "operasi keamanan",
     // security — abbreviation: "kkb" (armed criminal group, used for Papua).
     "kkb",
+    // security — Tagalog: "pananambang" (ambush).
+    "pananambang",
     // transport disruption
     "plane crash", "boat sinks", "ferry", "capsize", "airport", "collision",
     "derail", "train crash", "road accident", "bus crash", "flight cancel",
@@ -812,6 +833,8 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "tabrakan", "bandara", "pelabuhan",
     // transport — informal abbreviation: "laka lantas" (traffic accident).
     "laka lantas",
+    // transport — Tagalog: "aksidente" (accident), "banggaan" (collision/crash).
+    "aksidente", "banggaan",
   ],
   deny: [
     ...COMMON_DENY,
