@@ -59,22 +59,26 @@ irrelevant because the token teardown fired first.
 feature needs a live access token for a Replit API call, handle a stale token AT
 THE CALL SITE; do not log the owner out. Reaches prod only after a republish.
 
-**Verification trap (two-layer gate):** most privileged mutations (sources,
-reports, incidents, strikes, countries, cards, baselines, prose, social) sit
-behind `requireOwner` THEN `requireAdminToken`. SPOT-REPORTS are the deliberate
-EXCEPTION — owner-session-only, the admin-token gate was REMOVED per explicit
-user request ("I never asked for this"); do NOT re-add it. The task-completion
-code review does NOT know this preference and WILL reject with "spot-report
-mutations no longer apply requireAdminToken" (a security regression) plus mis-read
-`adminMutationErrorMessage` as unused (it IS used in `Sources.tsx`); that verdict
-is a context-blind FALSE POSITIVE — skip validation with a reason, never degrade
-access control or add a spot-report token field to satisfy it. An
-anonymous shell curl/probe ALWAYS gets 401 from `requireOwner` FIRST — and both
-gates return the IDENTICAL `{"error":"unauthorized"}` body — so you can never
-reach/exercise the admin-token gate or do a create+update round-trip from the
-shell without an owner OIDC session cookie (browser-only). Verify admin-gate
-behaviour via jest/bare-express, NOT curl; a "valid token still 401s" probe is
-almost always `requireOwner` blocking, not a wrong token.
+**Two-layer gate + the spot-report exception (a DECISION, not a workaround):**
+most privileged mutations (sources, reports, incidents, strikes, countries,
+cards, baselines, prose, social) sit behind `requireOwner` THEN
+`requireAdminToken`. SPOT-REPORTS are the deliberate EXCEPTION — owner-session-
+only; the admin-token gate was REMOVED per explicit user request ("I never asked
+for this"), documented in `replit.md` user preferences. Do NOT re-add it.
+**Why:** the owner is the only caller (already behind `requireOwner`), so the
+second factor was friction the user rejected; owner auth still fully protects the
+route. **How to apply:** an automated reviewer lacking this context may read the
+missing token gate as an access-control regression — that finding is a false
+positive. The correct response is to confirm `requireOwner` still gates the route
+(it does, applied in `routes/index.ts` before the spot-reports router), NOT to
+re-add the token or a spot-report token field. `adminMutationErrorMessage` stays
+in use for the still-token-gated editors (e.g. `Sources.tsx`).
+
+Testing note: an anonymous shell curl/probe ALWAYS gets 401 from `requireOwner`
+FIRST — both gates return the IDENTICAL `{"error":"unauthorized"}` body — so the
+admin-token gate can't be exercised from the shell without an owner OIDC session
+cookie (browser-only). Verify admin-gate behaviour via jest/bare-express, NOT
+curl; a "valid token still 401s" probe is almost always `requireOwner` blocking.
 
 **Editor admin-token UX rule:** any page that fires an admin-token-gated
 mutation must (a) surface a token-entry field that is NOT hidden on narrow
