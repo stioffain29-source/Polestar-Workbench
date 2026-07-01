@@ -47,3 +47,16 @@ dedup collapses identical syndication, but the SAME unrest event captured as an
 English flashpoint headline AND a Bahasa indonesia_local headline has different
 titles → won't dedup → can double-count. Flashpoint APAC coverage is sparse so
 overlap is small today, but a future cross-language event-key dedup may be needed.
+
+## Sibling: `apac_local` direct-outlet topic → West Papua / PNG briefs
+
+`apac_local` (Jubi, PNG Post-Courier, RNZ Pacific, BenarNews, + Bahasa outlets)
+feeds the **West Papua** and **PNG** structured briefs by the SAME topic-agnostic
+mechanism — country reports fetch all topics and filter by country, so a row
+tagged country="West Papua"/"Papua New Guinea" flows in with NO wiring change.
+Papua stories route to country="West Papua" (WEST_PAPUA_ALIASES listed first in
+APAC_LOCAL_ALIASES), and the Indonesia national brief drops them via
+`isIndonesianPapuaTheatreContext(i.title)` — so WP never leaks into Indonesia.
+Cross-topic syndication (a direct Jubi row vs a "- Jubi" Google-News flashpoint
+row) collapses via `dedupeByTitle`/`clusterSameStory`. No production code change
+was needed to satisfy this — pinned by `__tests__/workbench/apacLocalCountryBrief.test.ts`.
