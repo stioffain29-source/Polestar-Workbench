@@ -271,7 +271,7 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     category: "Producer action",
     test: [
-      /\b(opec\+?|saudi aramco|adnoc|qatarenergy|petrobras|rosneft|gazprom|cnooc|pertamina|petronas|reliance|ongc)\b/,
+      /\b(opec\+?|saudi aramco|adnoc|qatarenergy|petrobras|rosneft|gazprom|cnooc|pertamina|petronas|reliance industries|reliance jamnagar|jamnagar|ongc)\b/,
       /\b(production|output) (cut|hike|increase|reduce|boost|target|guidance)/,
       /\b(refinery|refiner|refining) .{0,30}(announce|cut|raise|expand|restart|shut|maintenance|outage)/,
       /\b(supply (contract|deal|agreement|swap)|long[- ]term contract)/,
@@ -361,9 +361,13 @@ function fmtDate(iso: string): string {
 
 function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): string {
   const t = haystack(i);
+  // "Reliance" is a common English noun ("reduce reliance on …"), so the actor
+  // is only the company when the distinctive corporate/refinery tokens appear.
+  if (/\b(reliance industries|reliance jamnagar|jamnagar)\b/.test(t))
+    return "Reliance";
   const ACTORS = [
     "OPEC+", "OPEC", "Saudi Aramco", "ADNOC", "QatarEnergy", "Petrobras",
-    "Rosneft", "Gazprom", "Sinopec", "CNPC", "CNOOC", "Reliance",
+    "Rosneft", "Gazprom", "Sinopec", "CNPC", "CNOOC",
     "Indian Oil", "Bharat Petroleum", "Hindustan Petroleum", "ONGC",
     "Pertamina", "Petronas",
     // Airlines (aviation demand response shows the carrier as the actor).
@@ -431,6 +435,74 @@ function nearDuplicate(a: Set<string>, b: Set<string>): boolean {
   return (overlap >= 4 && jaccard >= 0.4) || overlap >= Math.ceil(0.7 * smaller);
 }
 
+// Fuel-market topical guard for cross-topic action rows. A shipping-topic
+// incident is admitted to the Producer/Buyer Actions table ONLY when it
+// carries an unambiguous fuel / crude / refined-product / national-oil-
+// company signal, so a container-ship, grain or piracy story that happens
+// to match a generic action pattern (e.g. a bare "export ban") never leaks.
+const FUEL_ACTION_TOPICAL_RE =
+  /(?<!\b(?:palm|cooking|vegetable|veg|olive|sunflower|soybean|soy|coconut|mustard|castor|sesame|groundnut|peanut|edible)\s)\b(oil|crude|petroleum|refiner\w*|refined|gasoline|petrol|diesel|jet fuel|kerosene|lpg|naphtha|fuel oil|bunker|barrel|barrels|bpd|opec\+?|aramco|adnoc|petrobras|rosneft|gazprom|qatarenergy|pertamina|petronas|cnpc|sinopec|cnooc|ongc|reliance industries|jamnagar)\b/;
+
+// The cross-read from the shipping topic admits ONLY genuine actions — a
+// bare oil-price-movement / market signal is not a producer or buyer ACTION
+// and reintroduces exactly the crude-market noise the fuel topic is
+// deliberately scoped to exclude, so it never enters via cross-read. (Fuel-
+// topic rows keep their full category range, market signals included.)
+const CROSS_READ_ACTION_CATEGORIES = new Set<FuelActionCategory>([
+  "Producer action",
+  "Buyer action",
+  "Government / policy action",
+  "Infrastructure / routing action",
+]);
+
+/**
+ * Incident set for the Producer/Buyer Actions table ONLY. It merges the
+ * canonical in-window fuel incidents with genuine fuel-market ACTIONS that
+ * the ingestion pipeline files under the `shipping` topic (OPEC+ output
+ * moves, ADNOC / Aramco / Pertamina tenders, crude-route producer actions).
+ * These are real producer/buyer actions that never reach the fuel topic
+ * because the fuel relevance gate is deliberately scoped to fuel-OPERATIONAL
+ * incidents and excludes OPEC / crude-market framing.
+ *
+ * The cross-read is strictly bounded to the SAME reporting window (both fuel
+ * and shipping are weekly, so the window bounds are identical) and requires
+ * BOTH a discrete action category AND a fuel-market topical signal — so no
+ * out-of-window row and no non-fuel shipping story can enter. Every OTHER
+ * Fuel Watch section stays on the canonical fuel window, untouched.
+ */
+export function filterFuelActionIncidents(
+  incidents: TopicFastFactsIncident[],
+  issueDate: string,
+): TopicFastFactsIncident[] {
+  const fuelWindow = filterTopicReportIncidents(incidents, "fuel", issueDate);
+  const shippingWindow = filterTopicReportIncidents(incidents, "shipping", issueDate);
+
+  const keyOf = (i: TopicFastFactsIncident): string =>
+    (i.sourceUrl && i.sourceUrl.trim().toLowerCase()) ||
+    (i.id != null ? `id:${i.id}` : "") ||
+    `t:${i.title.trim().toLowerCase()}`;
+
+  const seen = new Set<string>();
+  const out: TopicFastFactsIncident[] = [];
+  for (const i of fuelWindow) {
+    const k = keyOf(i);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(i);
+  }
+  for (const i of shippingWindow) {
+    const t = haystack(i);
+    if (!FUEL_ACTION_TOPICAL_RE.test(t)) continue;
+    const cat = classifyCategory(t);
+    if (cat === null || !CROSS_READ_ACTION_CATEGORIES.has(cat)) continue;
+    const k = keyOf(i);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(i);
+  }
+  return out;
+}
+
 /**
  * Classified producer / buyer / government / infrastructure / market
  * actions referenced in the window. Returns ordered table rows or an
@@ -440,7 +512,7 @@ export function buildFuelProducerBuyerActions(opts: {
   issueDate: string;
   incidents: TopicFastFactsIncident[];
 }): ProducerBuyerActionRow[] {
-  const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
+  const window = filterFuelActionIncidents(opts.incidents, opts.issueDate);
   if (window.length === 0) return [];
 
   const raw: (ProducerBuyerActionRow & { tokens: Set<string> })[] = [];
