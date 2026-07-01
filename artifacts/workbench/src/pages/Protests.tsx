@@ -4,6 +4,7 @@ import {
   useListSocialWatchItems,
   usePromoteSocialWatchItem,
   useCreateSocialWatchItem,
+  useDeleteSocialWatchItem,
   getListSocialWatchItemsQueryKey,
   useListSocialRawItems,
   usePromoteSocialRawItem,
@@ -1000,8 +1001,10 @@ function AddWatchItemForm() {
 
 function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLoading: boolean }) {
   const promote = usePromoteSocialWatchItem();
+  const remove = useDeleteSocialWatchItem();
   const queryClient = useQueryClient();
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const groups = useMemo(() => {
@@ -1039,6 +1042,28 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
       );
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function onRemove(id: number) {
+    if (!window.confirm("Remove this social-watch post? This only deletes the context row — it never affects any incident.")) {
+      return;
+    }
+    setError(null);
+    setRemovingId(id);
+    try {
+      await remove.mutateAsync({ id });
+      // Deleting does not auto-refetch the board, so invalidate every
+      // social-watch list query to drop the removed row from the panel.
+      await queryClient.invalidateQueries({
+        queryKey: getListSocialWatchItemsQueryKey(),
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Removal failed — the item may have already been promoted to an incident.",
+      );
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -1091,6 +1116,8 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
         empty="No planned mobilisation posts."
         onPromote={onPromote}
         pendingId={pendingId}
+        onRemove={onRemove}
+        removingId={removingId}
       />
       <SocialWatchGroup
         title="Active / on-street"
@@ -1098,6 +1125,8 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
         empty="No active mobilisation posts."
         onPromote={onPromote}
         pendingId={pendingId}
+        onRemove={onRemove}
+        removingId={removingId}
       />
       <SocialWatchGroup
         title="Other context (cancelled / unclear)"
@@ -1105,6 +1134,8 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
         empty="No additional context posts."
         onPromote={onPromote}
         pendingId={pendingId}
+        onRemove={onRemove}
+        removingId={removingId}
       />
     </div>
   );
@@ -1116,12 +1147,16 @@ function SocialWatchGroup({
   empty,
   onPromote,
   pendingId,
+  onRemove,
+  removingId,
 }: {
   title: string;
   items: SocialWatchItem[];
   empty: string;
   onPromote: (id: number) => void;
   pendingId: number | null;
+  onRemove: (id: number) => void;
+  removingId: number | null;
 }) {
   return (
     <div className="bg-white border border-border rounded-sm">
@@ -1143,6 +1178,7 @@ function SocialWatchGroup({
                 <th className="text-left p-2 font-sans font-medium">Caption</th>
                 <th className="text-left p-2 font-sans font-medium w-[70px]">Source</th>
                 <th className="text-left p-2 font-sans font-medium w-[150px]">Promote</th>
+                <th className="text-left p-2 font-sans font-medium w-[90px]">Remove</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -1196,6 +1232,21 @@ function SocialWatchGroup({
                         </button>
                       ) : (
                         <span className="text-muted-foreground">Not eligible</span>
+                      )}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {promoted ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onRemove(it.id)}
+                          disabled={removingId === it.id}
+                          className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm border disabled:opacity-50"
+                          style={{ color: "#A33232", borderColor: "#A33232" }}
+                        >
+                          {removingId === it.id ? "Removing…" : "Remove"}
+                        </button>
                       )}
                     </td>
                   </tr>

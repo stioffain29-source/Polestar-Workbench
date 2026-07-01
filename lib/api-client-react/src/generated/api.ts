@@ -1076,6 +1076,76 @@ export const useCreateSocialWatchItem = <TError = ErrorType<void>,
       return useMutation(getCreateSocialWatchItemMutationOptions(options));
     }
 
+export const getDeleteSocialWatchItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/social-watch/${id}`
+}
+
+/**
+ * @summary Remove a single hand-entered social-watch context row (wrong URL, duplicate, off-topic paste). Deletes ONLY the context row — it never touches any incident, so no incident count changes. Refuses (409) if the item was already promoted to an incident; delete the incident first.
+ */
+export const deleteSocialWatchItem = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteSocialWatchItemUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSocialWatchItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSocialWatchItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSocialWatchItem>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSocialWatchItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSocialWatchItem>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSocialWatchItem(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSocialWatchItemMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSocialWatchItem>>>
+
+    export type DeleteSocialWatchItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a single hand-entered social-watch context row (wrong URL, duplicate, off-topic paste). Deletes ONLY the context row — it never touches any incident, so no incident count changes. Refuses (409) if the item was already promoted to an incident; delete the incident first.
+ */
+export const useDeleteSocialWatchItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSocialWatchItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSocialWatchItem>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSocialWatchItemMutationOptions(options));
+    }
+
 export const getPromoteSocialWatchItemUrl = (id: number,) => {
 
 

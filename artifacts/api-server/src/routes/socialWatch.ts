@@ -16,6 +16,7 @@ import {
 import {
   ListSocialWatchItemsQueryParams,
   PromoteSocialWatchItemParams,
+  DeleteSocialWatchItemParams,
   CreateSocialWatchItemBody,
 } from "@workspace/api-zod";
 import { requireAdminToken } from "../lib/adminAuth";
@@ -219,6 +220,43 @@ router.post("/social-watch", requireAdminToken, async (req, res): Promise<void> 
     "Manually added KAMMI social-watch item (context only)",
   );
   res.status(201).json(inserted[0]);
+});
+
+// Remove a single hand-entered social-watch CONTEXT row (wrong URL, duplicate
+// that dodged dedupe, off-topic paste). This deletes ONLY the context row in
+// the social-watch table — it NEVER touches `incidents`, so no incident count
+// can change. If the item was already promoted to an incident it is refused
+// (409): the incident is the source of truth at that point, so the analyst must
+// delete the incident first. Auth mirrors the create/promote actions.
+router.delete("/social-watch/:id", requireAdminToken, async (req, res): Promise<void> => {
+  const parsed = DeleteSocialWatchItemParams.safeParse({ id: req.params.id });
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const id = parsed.data.id;
+
+  const [item] = await db
+    .select({ id: socialWatchItemsTable.id, promotedIncidentId: socialWatchItemsTable.promotedIncidentId })
+    .from(socialWatchItemsTable)
+    .where(eq(socialWatchItemsTable.id, id))
+    .limit(1);
+  if (!item) {
+    res.status(404).json({ error: "Social-watch item not found" });
+    return;
+  }
+  if (item.promotedIncidentId !== null) {
+    res.status(409).json({
+      error: "Item already promoted to an incident — delete the incident first",
+      incidentId: item.promotedIncidentId,
+    });
+    return;
+  }
+
+  await db.delete(socialWatchItemsTable).where(eq(socialWatchItemsTable.id, id));
+
+  req.log.info({ socialWatchItemId: id }, "Deleted KAMMI social-watch item (context only)");
+  res.status(204).end();
 });
 
 // Trim an optional analyst string input; return undefined when blank so the

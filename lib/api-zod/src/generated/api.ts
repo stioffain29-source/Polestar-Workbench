@@ -659,6 +659,14 @@ export const CreateSocialWatchItemResponse = zod.object({
 
 
 /**
+ * @summary Remove a single hand-entered social-watch context row (wrong URL, duplicate, off-topic paste). Deletes ONLY the context row — it never touches any incident, so no incident count changes. Refuses (409) if the item was already promoted to an incident; delete the incident first.
+ */
+export const DeleteSocialWatchItemParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Promote a confirmed-active social-watch item into a flashpoint incident (Indonesia). Only items whose text/image confirms the protest is active are eligible; planned/mobilisation, cancelled and unclear items are rejected. The created incident links back to the source post.
  */
 export const PromoteSocialWatchItemParams = zod.object({
