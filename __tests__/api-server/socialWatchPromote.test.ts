@@ -36,6 +36,7 @@ import {
   adminAuthHeaders,
   enableTestAdminToken,
 } from "./adminAuthTestHelpers";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // ---------------------------------------------------------------------------
 // Stateful in-memory DB backing both routers.
@@ -637,6 +638,13 @@ describe("manual-paste social-watch items are context, never incidents", () => {
 
 describe("social-watch ingest never writes the incidents table", () => {
   const savedEnv = { ...process.env };
+
+  beforeEach(() => {
+    // Start from a known-clean integration env so an Instagram credential
+    // (INSTAGRAM_API_KEY or APIFY_TOKEN) leaking in from the real workspace
+    // can't quietly re-enable the source and drive a network fetch.
+    clearIntegrationEnv();
+  });
 
   afterEach(() => {
     process.env = { ...savedEnv };

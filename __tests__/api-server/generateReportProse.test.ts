@@ -3,6 +3,7 @@ import {
   type GenerateReportProseInput,
   type ProseIncidentInput,
 } from "../../artifacts/api-server/src/lib/reportProse";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // Exercises the INTERNALS of generateReportProse / callOnce — the prompt
 // assembly (topic-aware grounding system prompt, numbered incident block) and
@@ -105,6 +106,7 @@ function topicReply(over: Record<string, unknown> = {}): string {
 const origFetch = global.fetch;
 
 beforeEach(() => {
+  clearIntegrationEnv();
   calls = [];
   process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = BASE_URL;
   process.env.AI_INTEGRATIONS_OPENAI_API_KEY = API_KEY;

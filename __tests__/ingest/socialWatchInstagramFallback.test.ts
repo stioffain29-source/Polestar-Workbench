@@ -3,6 +3,7 @@ import {
   fetchInstagramPosts,
   isApifyAuthError,
 } from "../../lib/ingest/src/socialWatch";
+import { clearIntegrationEnv } from "../api-server/integrationEnvTestHelpers";
 
 // The Instagram social-watch scraper accepts APIFY_TOKEN as a fallback Apify
 // credential. It is used when INSTAGRAM_API_KEY is unset, AND it is tried when
@@ -17,8 +18,9 @@ describe("instagram apify-token fallback", () => {
   let fetchSpy: jest.SpyInstance | undefined;
 
   beforeEach(() => {
-    delete process.env.SOCIAL_WATCH_ENABLED;
-    delete process.env.INSTAGRAM_ENABLED;
+    // Start from a known-clean integration env so a real INSTAGRAM_API_KEY /
+    // APIFY_TOKEN in the workspace can't shadow the fixed test tokens below.
+    clearIntegrationEnv();
     process.env.INSTAGRAM_PROVIDER = "apify";
     process.env.INSTAGRAM_API_KEY = "primary-token";
     process.env.APIFY_TOKEN = "apify_api_fallback";

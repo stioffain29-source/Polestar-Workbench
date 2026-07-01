@@ -3,6 +3,7 @@ import {
   type GenerateProseInput,
   type ProseIncidentInput,
 } from "../../artifacts/api-server/src/lib/countryProse";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // Exercises the RETRY / BACKOFF layer that wraps callOnce in
 // generateCountryProse — the part the request-assembly / parsing suite
@@ -107,6 +108,7 @@ const origFetch = global.fetch;
 const origSetTimeout = global.setTimeout;
 
 beforeEach(() => {
+  clearIntegrationEnv();
   process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = BASE_URL;
   process.env.AI_INTEGRATIONS_OPENAI_API_KEY = API_KEY;
   // Collapse every backoff (and the abort timer) to the next tick so the retry

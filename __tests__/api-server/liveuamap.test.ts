@@ -1,8 +1,11 @@
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
+
 const originalFetch = global.fetch;
 
 describe("getLiveuamapEvents upstream failure", () => {
   beforeEach(() => {
     jest.resetModules();
+    clearIntegrationEnv();
     process.env.LIVEUAMAP_API_KEY = "test-key";
   });
 

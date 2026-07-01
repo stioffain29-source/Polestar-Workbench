@@ -4,6 +4,7 @@ import {
   isVesselRegistryConfigured,
   resolveVesselClasses,
 } from "../../lib/ingest/src/vesselRegistry";
+import { clearIntegrationEnv } from "../api-server/integrationEnvTestHelpers";
 
 describe("classifyVesselClass", () => {
   it("maps bulk carriers to bulk", () => {
@@ -43,6 +44,11 @@ describe("classifyVesselClass", () => {
 
 describe("readVesselRegistryConfig", () => {
   const saved = { ...process.env };
+  beforeEach(() => {
+    // Start from a known-clean integration env so ambient VESSEL_REGISTRY_*
+    // secrets from the real workspace can't skew the config-resolution checks.
+    clearIntegrationEnv();
+  });
   afterEach(() => {
     process.env = { ...saved };
   });

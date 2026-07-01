@@ -4,16 +4,17 @@ import {
   openAiProseModel,
   openAiFastModel,
 } from "../../lib/ingest/src/openaiConfig";
+import { clearIntegrationEnv } from "../api-server/integrationEnvTestHelpers";
 
 const savedEnv = { ...process.env };
 
 describe("openaiConfig", () => {
   beforeEach(() => {
     process.env = { ...savedEnv };
-    delete process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    delete process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_BASE_URL;
+    // Start from a known-clean integration env so an OpenAI credential from
+    // EITHER pair (AI_INTEGRATIONS_OPENAI_* or OPENAI_*) left in the real
+    // workspace can't mask an "unconfigured" assertion.
+    clearIntegrationEnv();
     delete process.env.OPENAI_PROSE_MODEL;
     delete process.env.OPENAI_FAST_MODEL;
   });

@@ -2,6 +2,7 @@ import {
   generateIncidentSummaries,
   type ProseIncidentInput,
 } from "../../artifacts/api-server/src/lib/countryProse";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // Exercises the INTERNALS of generateIncidentSummaries — the prompt assembly and
 // the result parsing/mapping — by stubbing only the LLM TRANSPORT (global.fetch),
@@ -92,6 +93,7 @@ function reply(summaries: Record<string, string>): string {
 const origFetch = global.fetch;
 
 beforeEach(() => {
+  clearIntegrationEnv();
   calls = [];
   process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = BASE_URL;
   process.env.AI_INTEGRATIONS_OPENAI_API_KEY = API_KEY;

@@ -4,6 +4,7 @@ import {
   type ProseIncidentInput,
   type ProseBaselineContext,
 } from "../../artifacts/api-server/src/lib/countryProse";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // Exercises the INTERNALS of generateCountryProse / callOnce — the prompt
 // assembly (grounding system prompt, standing-background block, numbered
@@ -145,6 +146,7 @@ function pngReply(over: Record<string, unknown> = {}): string {
 const origFetch = global.fetch;
 
 beforeEach(() => {
+  clearIntegrationEnv();
   calls = [];
   process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = BASE_URL;
   process.env.AI_INTEGRATIONS_OPENAI_API_KEY = API_KEY;
