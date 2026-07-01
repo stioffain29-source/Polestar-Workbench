@@ -313,7 +313,7 @@ function ApacLocalSourceHealthPanel() {
       {isLoading ? (
         <div className="p-6 text-center text-sm text-muted-foreground">Checking APAC local feeds…</div>
       ) : feeds.length === 0 ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">No APAC local feed health available yet — run the apac_local ingest.</div>
+        <div className="p-6 text-center text-sm text-muted-foreground">No APAC local feed health available yet — run the APAC local ingest.</div>
       ) : (
         <>
           <div className="divide-y divide-border">
