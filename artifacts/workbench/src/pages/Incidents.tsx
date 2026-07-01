@@ -139,7 +139,7 @@ export default function Incidents() {
                 <div className="p-3 text-xs">{i.country}</div>
                 <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
                 <div className="p-3 text-xs uppercase font-serif">{i.confidence}</div>
-                <div className="p-3 text-xs text-muted-foreground truncate">{i.source ?? "—"}</div>
+                <div className="p-3 text-xs text-muted-foreground truncate" title={i.source ?? undefined}>{i.source ?? "—"}</div>
                 <div className="p-3 flex items-center justify-center gap-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); setLocation(`/spot-reports/new?incidentId=${i.id}`); }}
@@ -202,7 +202,7 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
         <Meta label="Location" value={incident.location ?? "—"} />
         <Meta label="Occurred" value={format(new Date(incident.occurredAt), "dd MMM yyyy HH:mm")} />
         <Meta label="Confidence" value={incident.confidence} />
-        <Meta label="Source" value={incident.source ?? "—"} />
+        <Meta label="Source" value={incident.source ?? "—"} wide />
       </div>
       <div>
         <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Summary</label>
@@ -264,11 +264,11 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
   return (
-    <div>
+    <div className={wide ? "col-span-2" : undefined}>
       <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className="font-medium text-sm mt-0.5">{value}</div>
+      <div className="font-medium text-sm mt-0.5 break-words">{value}</div>
     </div>
   );
 }
