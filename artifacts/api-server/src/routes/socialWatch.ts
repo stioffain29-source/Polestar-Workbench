@@ -571,7 +571,7 @@ router.post("/social-watch/:id/promote", requireAdminToken, async (req, res): Pr
   res.status(201).json(incident);
 });
 
-function buildIncidentTitle(item: {
+export function buildIncidentTitle(item: {
   issue: string | null;
   city: string;
   location: string | null;
@@ -600,7 +600,7 @@ export function buildIncidentSource(item: {
   return "KAMMI Social Watch";
 }
 
-function buildIncidentSummary(item: {
+export function buildIncidentSummary(item: {
   caption: string | null;
   eventTimeText: string | null;
   location: string | null;
