@@ -15,6 +15,14 @@
 export const MIN_PAGE_FILL = 0.45;
 export const PAGE_BREAK_GUARD_PX = 24;
 
+// A block that must never be sliced across a page boundary (e.g. the Jakarta
+// operational map + legend + operating-zone cards). `top`/`bottom` are offsets
+// from the document top, matching the break-candidate coordinate space.
+export interface KeepRange {
+  top: number;
+  bottom: number;
+}
+
 // Refine the raw element/line tops gathered from the DOM into the final ordered
 // list of legal break offsets. Always includes 0 and the document end. De-dupes
 // candidates that sit within PAGE_BREAK_GUARD_PX of the previous KEPT one (not
@@ -57,7 +65,28 @@ export function buildPageSlices(
   pageCssHeight: number,
   candidates: number[],
   initialStart = 0,
+  keepRanges: KeepRange[] = [],
 ): Array<{ start: number; end: number }> {
+  // Normalise the keep-together blocks (valid, rounded, ascending).
+  const ranges = keepRanges
+    .filter((r) => r.bottom > r.top)
+    .map((r) => ({ top: Math.round(r.top), bottom: Math.round(r.bottom) }))
+    .sort((a, b) => a.top - b.top);
+
+  // Effective candidate list: union each range's TOP in (so a page may legally
+  // break BEFORE a kept block) and drop any candidate that sits strictly INSIDE
+  // a kept block (so a page can never END mid-block). With no ranges this is
+  // exactly the input candidate set, so default behaviour is unchanged.
+  const isInsideRange = (y: number) =>
+    ranges.some((r) => y > r.top && y < r.bottom);
+  const effective = Array.from(
+    new Set<number>([...candidates, ...ranges.map((r) => r.top)]),
+  )
+    .filter((y) => !isInsideRange(y))
+    .sort((a, b) => a - b);
+  const rangeContaining = (y: number) =>
+    ranges.find((r) => y > r.top && y < r.bottom) ?? null;
+
   const pages: Array<{ start: number; end: number }> = [];
   let start = initialStart;
 
@@ -67,7 +96,7 @@ export function buildPageSlices(
 
     if (target < totalHeight) {
       const minUsefulBreak = start + pageCssHeight * MIN_PAGE_FILL;
-      const useful = candidates.filter(
+      const useful = effective.filter(
         (y) =>
           y > start + PAGE_BREAK_GUARD_PX &&
           y <= target - PAGE_BREAK_GUARD_PX &&
@@ -80,6 +109,18 @@ export function buildPageSlices(
 
     if (end <= start + PAGE_BREAK_GUARD_PX) {
       end = target;
+    }
+
+    // Keep-together guard: a forced target cut must never land inside an atomic
+    // block. Pull the page end back to the block's top so it starts whole on the
+    // next page — unless the block already began at/above this page's start or is
+    // taller than a full page, in which case a clean break is impossible and we
+    // accept the cut to guarantee forward progress.
+    const hit = rangeContaining(end);
+    if (hit) {
+      const fitsOnAPage = hit.bottom - hit.top <= pageCssHeight;
+      end =
+        hit.top > start + PAGE_BREAK_GUARD_PX && fitsOnAPage ? hit.top : target;
     }
 
     pages.push({ start, end });

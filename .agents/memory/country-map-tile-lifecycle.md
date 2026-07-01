@@ -26,3 +26,23 @@ on theatre change; the create-block sets `tileLayerRef`/`basemapStyleRef`, and a
 `else if (style changed)` branch calls `setUrl`/`setOpacity`. Reset both refs in
 the unmount cleanup. Caught in review; SSR render tests don't run the effect and
 the zones test is pure-fn, so neither would have caught it.
+
+## Conditionally-rendered map container (JakartaCorridorMap)
+
+Same family of bug, different trigger: `JakartaCorridorMap` renders the Leaflet
+container div ONLY when `model.points.length > 0` (else a "map unavailable"
+panel, strict no-fabrication). The setup effect creates the map once inside
+`if (!mapRef.current)` and guards `if (!mapElRef.current) return`.
+
+**Rule:** whenever a Leaflet map's CONTAINER is conditionally rendered, add a
+teardown effect that removes the map instance (`mapRef.current.remove()` +
+null both `mapRef`/overlay refs) when the container unmounts (here: keyed on
+`model`, early-return while points exist).
+
+**Why:** without it, a mappable→unmappable→mappable transition (the editor
+switching to a window with no located incidents, then back) leaves the old map
+instance alive in `mapRef` bound to a now-detached DOM node. The container
+remounts as a NEW element, but `if (!mapRef.current)` sees the stale instance
+and skips creation → `invalidateSize`/`fitBounds` fire on the detached node →
+broken/blank map. Unmount cleanup (`[]` deps) does NOT fire because the
+component itself never unmounts, only its inner map div.

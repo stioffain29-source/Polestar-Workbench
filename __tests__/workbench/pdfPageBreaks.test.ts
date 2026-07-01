@@ -157,6 +157,93 @@ describe("buildPageSlices — no large empty remainder when a break exists", () 
   });
 });
 
+describe("buildPageSlices — keep-together blocks (data-pdf-keep)", () => {
+  it("pulls the page end back to a block top rather than cutting through it", () => {
+    const pageCssHeight = 1000;
+    const totalHeight = 2400;
+    // No interior candidate would otherwise force a hard cut at 1000, which sits
+    // inside the [820, 1600] block. The slicer must instead end the page at 820
+    // so the block starts whole on the next page.
+    const candidates = [0, totalHeight];
+    const keepRanges = [{ top: 820, bottom: 1600 }];
+
+    const slices = buildPageSlices(
+      totalHeight,
+      pageCssHeight,
+      candidates,
+      0,
+      keepRanges,
+    );
+
+    expect(slices[0].end).toBe(820);
+    // The block [820, 1600] is never split across a boundary.
+    for (const s of slices) {
+      const cutsBlock = s.end > 820 && s.end < 1600;
+      expect(cutsBlock).toBe(false);
+    }
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+  });
+
+  it("never ENDS a page on a candidate that sits inside a kept block", () => {
+    const pageCssHeight = 1000;
+    const totalHeight = 3000;
+    // 900 sits inside the [700, 1500] block; it must be dropped as a legal end.
+    const candidates = [0, 900, 1500, 2400, totalHeight];
+    const keepRanges = [{ top: 700, bottom: 1500 }];
+
+    const slices = buildPageSlices(
+      totalHeight,
+      pageCssHeight,
+      candidates,
+      0,
+      keepRanges,
+    );
+
+    for (const s of slices) {
+      const insideBlock = s.end > 700 && s.end < 1500;
+      expect(insideBlock).toBe(false);
+    }
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+  });
+
+  it("degrades to a hard cut when a block is taller than a whole page", () => {
+    const pageCssHeight = 1000;
+    const totalHeight = 3000;
+    // The block [100, 2600] cannot fit on any page, so forward progress wins:
+    // the slicer accepts the page-target cut rather than looping forever.
+    const candidates = [0, totalHeight];
+    const keepRanges = [{ top: 100, bottom: 2600 }];
+
+    const slices = buildPageSlices(
+      totalHeight,
+      pageCssHeight,
+      candidates,
+      0,
+      keepRanges,
+    );
+
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+    expect(slices.length).toBeGreaterThan(1);
+  });
+
+  it("is unchanged from the no-range call when keepRanges is empty", () => {
+    const pageCssHeight = 1000;
+    const totalHeight = 2500;
+    const candidates = [0, 900, 1850, totalHeight];
+
+    const withoutRanges = buildPageSlices(totalHeight, pageCssHeight, candidates);
+    const withEmptyRanges = buildPageSlices(
+      totalHeight,
+      pageCssHeight,
+      candidates,
+      0,
+      [],
+    );
+
+    expect(withEmptyRanges).toEqual(withoutRanges);
+  });
+});
+
 describe("buildPageSlices — cover page (page 1) stays intact", () => {
   it("reserves the cover via initialStart and never re-slices it", () => {
     const pageCssHeight = 1000;

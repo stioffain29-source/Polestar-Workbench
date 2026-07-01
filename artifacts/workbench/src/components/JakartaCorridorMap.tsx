@@ -550,6 +550,26 @@ export default function JakartaCorridorMap({
     };
   }, []);
 
+  // If the reporting window loses every plottable location (e.g. the editor
+  // switches to a report/window with no located incidents), the conditional map
+  // DOM below unmounts. Tear the Leaflet instance down here so that a later
+  // window which DOES resolve points rebuilds a fresh map on the remounted node
+  // instead of reusing an instance still bound to the detached container.
+  useEffect(() => {
+    if (model.points.length > 0) return;
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+    overlayImgRef.current = null;
+  }, [model]);
+
+  // When nothing in the window resolves to a plottable location, the Leaflet
+  // canvas would render empty. Show an explicit "map unavailable" panel in its
+  // place instead — the legend and operating-zone cards still carry the standing
+  // guidance, and no marker is ever invented (strict no-fabrication).
+  const hasMappablePoints = model.points.length > 0;
+
   const notMappedParts: string[] = [];
   if (model.notMapped.insufficientLocation > 0) {
     notMappedParts.push(
@@ -605,15 +625,58 @@ export default function JakartaCorridorMap({
               overflow: "hidden",
             }}
           >
-            <div
-              ref={mapElRef}
-              style={{
-                width: "100%",
-                height: 440,
-                position: "relative",
-                background: "#EAEAEA",
-              }}
-            />
+            {hasMappablePoints ? (
+              <div
+                ref={mapElRef}
+                style={{
+                  width: "100%",
+                  height: 440,
+                  position: "relative",
+                  background: "#EAEAEA",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  height: 440,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  padding: 24,
+                  boxSizing: "border-box",
+                  background: "#F6F6F6",
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    letterSpacing: "0.02em",
+                    textTransform: "uppercase",
+                    color: NAVY,
+                    marginBottom: 6,
+                  }}
+                >
+                  Operational map unavailable
+                </div>
+                <div
+                  style={{
+                    fontFamily: "Roboto, sans-serif",
+                    fontSize: 12.5,
+                    lineHeight: 1.55,
+                    color: DUSK,
+                    maxWidth: 420,
+                  }}
+                >
+                  Insufficient location detail this period to plot incidents. The
+                  operating-zone guidance and exposure legend below still apply.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Legend: incident types, map references and operating exposure. */}

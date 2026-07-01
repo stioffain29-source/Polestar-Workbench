@@ -27,9 +27,20 @@ const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const ROBOTO = "Roboto, sans-serif";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  keepTogether,
+}: {
+  title: string;
+  children: React.ReactNode;
+  keepTogether?: boolean;
+}) {
   return (
-    <section className="report-section">
+    <section
+      className="report-section"
+      {...(keepTogether ? { "data-pdf-keep": "true" } : {})}
+    >
       <h2
         style={{
           fontFamily: ROBOTO,
@@ -215,23 +226,26 @@ function OpsTable({ rows }: { rows: JakartaTableRow[] }) {
   );
 }
 
-// The standing Crime business-impact table (Crime pattern | Business impact |
-// Precaution). Durable analyst guidance, not this period's findings.
+// The standing Crime exposure table, keyed to named operating contexts
+// (Operating context | Crime exposure | Precaution) — durable analyst guidance
+// that links Jakarta's crime picture to staff movement, hotels and client
+// meetings, airport transfers, port access and logistics routes. Not this
+// period's findings.
 function CrimeTable({ rows }: { rows: JakartaCrimeBusinessRow[] }) {
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}>
       <thead>
         <tr>
-          <th style={{ ...baseHeadCell, width: "26%" }}>Crime pattern</th>
-          <th style={{ ...baseHeadCell, width: "42%" }}>Business impact</th>
+          <th style={{ ...baseHeadCell, width: "28%" }}>Operating context</th>
+          <th style={{ ...baseHeadCell, width: "40%" }}>Crime exposure</th>
           <th style={{ ...baseHeadCell, width: "32%" }}>Precaution</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r, i) => (
           <tr key={i}>
-            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.pattern}</td>
-            <td style={baseCell}>{r.businessImpact}</td>
+            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.context}</td>
+            <td style={baseCell}>{r.exposure}</td>
             <td style={baseCell}>{r.precaution}</td>
           </tr>
         ))}
@@ -404,10 +418,11 @@ export default function JakartaReportBody({
         <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
       </Section>
 
-      {/* 13. Operational Map */}
-      <Section title="Operational Map">
+      {/* 13. Operational Map — heading, map, legend and operating-zone cards are
+          a single keep-together block so they never split across a PDF page. */}
+      <Section title="Operational Map" keepTogether>
         {mapNode ? <div style={{ marginBottom: 12 }}>{mapNode}</div> : null}
-        {tactical ? <Prose text={tactical.areaSummary} /> : <EmptyNote>Not populated.</EmptyNote>}
+        {tactical ? <Prose text={tactical.areaSummary} keepTogether /> : <EmptyNote>Not populated.</EmptyNote>}
       </Section>
     </>
   );

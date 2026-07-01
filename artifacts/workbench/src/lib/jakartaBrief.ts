@@ -637,11 +637,13 @@ export interface JakartaRoleAction {
 }
 
 // Crime Trends & Business Impact (dedicated crime section). A single curated
-// STANDING business-impact row — durable analyst guidance about Jakarta's
-// enduring crime patterns, NEVER this period's live findings.
+// STANDING exposure row keyed to a named operating context (staff movement,
+// hotels and client meetings, airport transfers, port access and logistics
+// routes) — durable analyst guidance about how Jakarta's enduring crime
+// patterns bear on business operations, NEVER this period's live findings.
 export interface JakartaCrimeBusinessRow {
-  pattern: string;
-  businessImpact: string;
+  context: string;
+  exposure: string;
   precaution: string;
 }
 
@@ -978,57 +980,48 @@ export function buildJakartaAreaSummary(
 const JAKARTA_CRIME_STANDING =
   "Jakarta's standing crime picture is dominated by opportunistic and property crime rather than targeted attacks on business. The persistent exposures are street theft and pickpocketing around transport hubs and crowded commercial areas, vehicle crime and smash-and-grab in traffic, residential and premises break-ins in dense districts, and card or ATM fraud. Extortion and informal levies (premanisme) affect logistics around ports and industrial areas, and periodic drug-enforcement operations create legal and reputational risk for staff and visitors. Violent crime is a lower routine concern but can flare around nightlife, crowds and disputes.";
 
-// The standing business-impact table. Always present — it is the durable "why it
-// affects business" answer, independent of what surfaced this period.
-const JAKARTA_CRIME_BUSINESS_ROWS: JakartaCrimeBusinessRow[] = [
+// The standing crime-exposure table, keyed to named operating contexts. Always
+// present — it is the durable "how Jakarta's crime picture affects THIS
+// operation" answer, tying each enduring crime pattern to the staff movement,
+// venue, transfer, port and logistics activity it bears on, independent of what
+// surfaced this period. Count-free; British English.
+const JAKARTA_CRIME_CONTEXT_ROWS: JakartaCrimeBusinessRow[] = [
   {
-    pattern: "Opportunistic street theft and pickpocketing",
-    businessImpact:
-      "Staff and visitors are exposed around transport hubs, markets, malls and busy streets, most of all after dark and in crowds.",
+    context:
+      "Staff movement and after-hours transport — SCBD and the Sudirman–Thamrin corridor",
+    exposure:
+      "Street theft, pickpocketing and phone-snatching around transport hubs, crowded pavements and busy commercial streets, worst after dark and while staff move on foot between offices, hotels and venues.",
     precaution:
-      "Keep phones, cash and valuables out of sight; use booked, tracked transport rather than street-hailing after hours.",
+      "Use booked, tracked transport rather than street-hailing after hours; keep phones, cash and valuables out of sight on foot; brief staff on well-lit, populated routes.",
   },
   {
-    pattern: "Vehicle crime and traffic-stop theft (begal, smash-and-grab)",
-    businessImpact:
-      "Drivers and passengers are exposed at lights and in congestion on arterial roads and at night.",
+    context: "Hotels and client meetings — SCBD, Kuningan and Senayan",
+    exposure:
+      "Distraction theft and bag-snatching in lobbies, cafés and crowded venues, and card skimming or ATM fraud at less secure terminals around meeting locations.",
     precaution:
-      "Keep doors locked and windows up; keep bags and devices out of view; brief drivers on secure routes and stops.",
+      "Keep bags and devices attended in public areas; use ATMs inside banks and reputable hotels; confirm venues and arrival windows before client meetings.",
   },
   {
-    pattern: "Residential and premises break-ins",
-    businessImpact:
-      "Staff housing, serviced apartments and offices in dense districts face burglary and forced-entry risk, especially out of hours.",
+    context: "Airport transfers — Soekarno-Hatta corridor",
+    exposure:
+      "Vehicle crime and smash-and-grab at lights and in congestion on the airport toll road, and distraction theft or scams around terminals and the kerbside.",
     precaution:
-      "Confirm guarding, alarms and access control at residences and offices; review after-hours premises cover.",
+      "Keep doors locked and windows up in traffic; keep bags out of view; use pre-booked drivers and confirm the transfer at both ends.",
   },
   {
-    pattern: "Card skimming and ATM fraud",
-    businessImpact:
-      "Staff and travellers face financial loss using ATMs and card terminals in less secure locations.",
+    context:
+      "Port access and logistics — Tanjung Priok and North Jakarta industrial roads",
+    exposure:
+      "Extortion and informal levies (premanisme), cargo theft and pilferage, and intimidation around the port, container yards and industrial access roads.",
     precaution:
-      "Use ATMs inside banks and reputable venues; monitor accounts and set transaction alerts.",
+      "Work through established operators and hauliers; report demands rather than paying roadside; confirm gate, escort and yard-security arrangements before dispatch.",
   },
   {
-    pattern: "Extortion and informal levies (premanisme)",
-    businessImpact:
-      "Intimidation and unofficial charges can disrupt cargo movement and site works around ports and industrial areas.",
+    context: "Cross-city logistics routes and driver planning",
+    exposure:
+      "Smash-and-grab and traffic-stop theft (begal) in night-time congestion, and opportunistic theft from stationary or slow-moving vehicles on the inner and outer ring roads and main arterials.",
     precaution:
-      "Work through established operators; report demands; avoid ad-hoc roadside arrangements.",
-  },
-  {
-    pattern: "Drug-enforcement operations",
-    businessImpact:
-      "Raids and checks at venues carry legal and reputational risk for staff and visitors; penalties are severe.",
-    precaution:
-      "Brief travellers on zero-tolerance narcotics laws; avoid venues under enforcement scrutiny.",
-  },
-  {
-    pattern: "Violent crime and public disorder",
-    businessImpact:
-      "Routine business exposure is lower, but brawls, disputes and crowd flare-ups can develop around events and nightlife.",
-    precaution:
-      "Avoid confrontations and crowds; extract staff from developing disturbances early.",
+      "Brief drivers on secure routes and stops; vary predictable timing; keep cargo and valuables out of sight and vehicles locked.",
   },
 ];
 
@@ -1052,22 +1045,22 @@ function crimeBusinessConsequence(types: string[]): string {
   const clauses: string[] = [];
   if (types.some((t) => CRIME_PROPERTY_TYPES.has(t)))
     clauses.push(
-      "staff and visitors face property loss and opportunistic theft around transport hubs, crowded commercial areas and after-hours movement",
+      "staff face property loss and opportunistic theft during on-foot movement and after-hours transport around SCBD and the Sudirman–Thamrin corridor, and in hotel lobbies and client-meeting venues in Kuningan and Senayan",
     );
   if (types.some((t) => CRIME_VIOLENT_TYPES.has(t)))
     clauses.push(
-      "there is a risk of violence around disputes, crowds and nightlife",
+      "there is a risk of violence around disputes, crowds and nightlife near hotels and venues, and on late transfers",
     );
   if (types.some((t) => CRIME_LOGISTICS_TYPES.has(t)))
     clauses.push(
-      "informal levies and intimidation can disrupt logistics around ports and industrial areas",
+      "informal levies and intimidation can disrupt port access and logistics around Tanjung Priok and North Jakarta industrial roads",
     );
   if (types.some((t) => CRIME_DRUG_TYPES.has(t)))
     clauses.push(
-      "narcotics enforcement carries legal and reputational risk for staff and visitors",
+      "narcotics enforcement carries legal and reputational risk for staff and visitors at venues and on transfers",
     );
   if (clauses.length === 0)
-    return "The practical concern is staff exposure around after-hours movement near offices, hotels and transport hubs rather than a city-wide threat.";
+    return "The practical concern is staff exposure during airport transfers, hotel and client-meeting movement and after-hours transport around offices and transport hubs, plus port access and cross-city logistics routes, rather than a city-wide threat.";
   return `For business, ${clauses.join("; ")}.`;
 }
 
@@ -1113,7 +1106,7 @@ export function buildJakartaCrimeTrends(
     reportedThisPeriod,
     standingPattern: JAKARTA_CRIME_STANDING,
     trendRead,
-    businessImpact: JAKARTA_CRIME_BUSINESS_ROWS,
+    businessImpact: JAKARTA_CRIME_CONTEXT_ROWS,
   };
 }
 

@@ -1049,14 +1049,14 @@ function drawJakartaPortTable(ctx: Ctx, rows: JakartaPortLogisticsRow[]) {
   );
 }
 
-// The standing Crime business-impact table (Crime pattern | Business impact |
+// The standing Crime exposure table (Operating context | Crime exposure |
 // Precaution), the headless counterpart to the on-screen CrimeTable.
 function drawJakartaCrimeTable(ctx: Ctx, rows: JakartaCrimeBusinessRow[]) {
   drawJakartaGridTable(
     ctx,
-    ["Crime pattern", "Business impact", "Precaution"],
-    [0.26, 0.42, 0.32],
-    rows.map((r) => [r.pattern, r.businessImpact, r.precaution]),
+    ["Operating context", "Crime exposure", "Precaution"],
+    [0.28, 0.4, 0.32],
+    rows.map((r) => [r.context, r.exposure, r.precaution]),
   );
 }
 

@@ -276,6 +276,37 @@ describe("JakartaReportBody — 13-section tactical brief render", () => {
     expect(html.indexOf("JKT_MAP_SENTINEL", mapAt + 1)).toBe(-1);
   });
 
+  it("marks the Operational Map section keep-together so map + legend + zones stay on one PDF page", () => {
+    // The exporter reads data-pdf-keep to pull a page break BEFORE this block
+    // rather than slicing the map away from its legend/operating-zone cards.
+    expect((html.match(/data-pdf-keep="true"/g) ?? []).length).toBe(1);
+    // The marker sits on the section that carries the map sentinel.
+    const keepAt = html.indexOf("data-pdf-keep");
+    const mapAt = html.indexOf("JKT_MAP_SENTINEL");
+    const nextSectionAfterKeep = html.indexOf("<section", keepAt + 1);
+    expect(keepAt).toBeGreaterThanOrEqual(0);
+    expect(mapAt).toBeGreaterThan(keepAt);
+    // No further <section> opens between the keep marker and the map — the map
+    // lives inside the kept section.
+    expect(
+      nextSectionAfterKeep === -1 || nextSectionAfterKeep > mapAt,
+    ).toBe(true);
+  });
+
+  it("keys the crime exposure table to named operating contexts", () => {
+    // The Crime section table separates operating context from exposure, tying
+    // Jakarta's crime picture to staff movement, hotels, transfers, port and
+    // logistics rather than a generic crime-pattern list.
+    expect(html.indexOf("Operating context")).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf("Crime exposure")).toBeGreaterThanOrEqual(0);
+    const rows = d.jakartaTacticalBrief!.crimeTrends.businessImpact;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(html.indexOf(esc(r.context))).toBeGreaterThanOrEqual(0);
+      expect(html.indexOf(esc(r.exposure))).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   it("leaks no record/incident/event count into the narrative brief", () => {
     const text = textOf(html);
     expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);

@@ -2,7 +2,11 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { ensureRobotoLoaded, setRoboto } from "./pdfFonts";
-import { buildPageSlices, refineBreakCandidates } from "./pdfPageBreaks";
+import {
+  buildPageSlices,
+  refineBreakCandidates,
+  type KeepRange,
+} from "./pdfPageBreaks";
 
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
@@ -546,7 +550,10 @@ function lineBreakTops(el: HTMLElement, rootTop: number): number[] {
 // the raw tops to the pure `refineBreakCandidates` for de-duping/filtering. The
 // refinement + slicing geometry lives in `pdfPageBreaks.ts` so it is unit-tested
 // without a DOM.
-function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): number[] {
+function collectBreakCandidates(
+  root: HTMLElement,
+  pageCssHeight: number,
+): { candidates: number[]; keepRanges: KeepRange[] } {
   const rootRect = root.getBoundingClientRect();
   const selectors = [
     "section",
@@ -572,7 +579,21 @@ function collectBreakCandidates(root: HTMLElement, pageCssHeight: number): numbe
       .forEach((top) => rawTops.push(top));
   });
 
-  return refineBreakCandidates(rawTops, root.scrollHeight, pageCssHeight);
+  // Atomic keep-together blocks (data-pdf-keep) — e.g. the Jakarta operational
+  // map + legend + operating-zone cards — must never be sliced across a page.
+  const keepRanges: KeepRange[] = [];
+  root.querySelectorAll<HTMLElement>("[data-pdf-keep]").forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    keepRanges.push({
+      top: Math.round(rect.top - rootRect.top),
+      bottom: Math.round(rect.bottom - rootRect.top),
+    });
+  });
+
+  return {
+    candidates: refineBreakCandidates(rawTops, root.scrollHeight, pageCssHeight),
+    keepRanges,
+  };
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -666,9 +687,18 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
     const coverEnd = coverBreakOffset(clone);
     const bodyAvailableHeight = pageHeight - HEADER_BAND_H - BODY_TOP_PAD - FOOTER_BAND_H - BODY_BOTTOM_PAD;
     const pageCssHeight = bodyAvailableHeight / scaleToPdf;
-    const breakCandidates = collectBreakCandidates(clone, pageCssHeight);
+    const { candidates: breakCandidates, keepRanges } = collectBreakCandidates(
+      clone,
+      pageCssHeight,
+    );
     const coverSlices = coverEnd > 0 ? [{ start: 0, end: coverEnd }] : [];
-    const bodySlices = buildPageSlices(sourceHeight, pageCssHeight, breakCandidates, coverEnd);
+    const bodySlices = buildPageSlices(
+      sourceHeight,
+      pageCssHeight,
+      breakCandidates,
+      coverEnd,
+      keepRanges,
+    );
     const title = reportTitleFrom(clone, filename);
 
     const canvas = await html2canvas(clone, {

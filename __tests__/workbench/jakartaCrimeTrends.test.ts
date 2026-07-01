@@ -35,10 +35,22 @@ describe("buildJakartaCrimeTrends", () => {
     expect(Array.isArray(trends.businessImpact)).toBe(true);
     expect(trends.businessImpact.length).toBeGreaterThan(0);
     for (const row of trends.businessImpact) {
-      expect(row.pattern.length).toBeGreaterThan(0);
-      expect(row.businessImpact.length).toBeGreaterThan(0);
+      expect(row.context.length).toBeGreaterThan(0);
+      expect(row.exposure.length).toBeGreaterThan(0);
       expect(row.precaution.length).toBeGreaterThan(0);
     }
+  });
+
+  it("standing exposure rows are keyed to named operating contexts", () => {
+    const trends = buildJakartaCrimeTrends([]);
+    const contexts = trends.businessImpact.map((r) => r.context).join(" | ");
+    // Each durable row must tie crime to a named business activity/location, not
+    // a generic crime label.
+    expect(contexts).toContain("Staff movement");
+    expect(contexts).toContain("Hotels and client meetings");
+    expect(contexts).toContain("Airport transfers");
+    expect(contexts).toContain("Port access and logistics");
+    expect(contexts).toContain("Cross-city logistics routes");
   });
 
   it("no-crime branch: falls back to the standing pattern without inventing crime", () => {
