@@ -549,19 +549,41 @@ const ID_ENGLISH = { gl: "ID", hl: "en-ID", ceid: "ID:en" } as const;
 // syndicated neighbour story resolves to the neighbour (and falls out of the
 // Indonesia report) rather than being blind-stamped Indonesia by the per-feed
 // default. Indonesia is the broad catch-all, checked last.
+// West Papua gazetteer (bare "papua" token + the full Papua-provinces list).
+// Shared by indonesia_local AND apac_local so any Papua story is diverted to
+// its own "West Papua" report and NEVER mis-stamped "Indonesia".
+const WEST_PAPUA_ALIASES = [
+  "papua", "west papua", "papua barat", "papua tengah", "papua pegunungan",
+  "papua selatan", "papua barat daya", "tembagapura", "grasberg", "freeport",
+  "timika", "mimika", "intan jaya", "puncak jaya", "nduga", "ilaga", "sugapa",
+  "paniai", "enarotali", "yahukimo", "dekai", "oksibil", "beoga", "kenyam",
+  "wamena", "jayawijaya", "nabire", "jayapura", "merauke", "manokwari",
+  "sorong", "biak", "fakfak", "kaimana", "asmat", "keerom", "sarmi",
+  "waropen", "raja ampat", "maybrat", "tpnpb",
+];
+
+// Broad Indonesia gazetteer (country, demonyms, islands, provinces, cities).
+// Shared by indonesia_local AND apac_local; always the LAST (catch-all) entry.
+const INDONESIA_BROAD_ALIASES = [
+  "indonesia", "indonesian", "jakarta", "jabodetabek", "java", "jawa",
+  "jawa barat", "jawa timur", "jawa tengah", "sumatra", "sumatera",
+  "sumatera utara", "sumatera barat", "sumatera selatan", "sulawesi",
+  "sulawesi selatan", "sulawesi utara", "sulawesi tengah", "sulawesi tenggara",
+  "sulawesi barat", "kalimantan", "kalimantan timur", "kalimantan barat",
+  "kalimantan selatan", "kalimantan tengah", "kalimantan utara", "borneo",
+  "bali", "lombok", "nusa tenggara", "ntt", "ntb", "maluku", "aceh", "medan",
+  "surabaya", "bandung", "semarang", "makassar", "palembang", "yogyakarta",
+  "jogja", "solo", "bekasi", "depok", "tangerang", "bogor", "batam",
+  "pekanbaru", "padang", "banjarmasin", "pontianak", "samarinda", "balikpapan",
+  "manado", "denpasar", "mataram", "kupang", "ambon", "jambi", "lampung",
+  "bengkulu", "banten", "cirebon", "malang", "kediri", "tegal", "sukabumi",
+  "garut", "tasikmalaya", "banyuwangi", "jember", "gresik", "sidoarjo", "riau",
+  "gorontalo", "kepulauan riau", "bangka belitung", "ternate", "palu",
+  "kendari", "mamuju", "sorong selatan",
+];
+
 const INDONESIA_LOCAL_ALIASES: CountryAlias[] = [
-  {
-    canonical: "West Papua",
-    aliases: [
-      "papua", "west papua", "papua barat", "papua tengah", "papua pegunungan",
-      "papua selatan", "papua barat daya", "tembagapura", "grasberg", "freeport",
-      "timika", "mimika", "intan jaya", "puncak jaya", "nduga", "ilaga", "sugapa",
-      "paniai", "enarotali", "yahukimo", "dekai", "oksibil", "beoga", "kenyam",
-      "wamena", "jayawijaya", "nabire", "jayapura", "merauke", "manokwari",
-      "sorong", "biak", "fakfak", "kaimana", "asmat", "keerom", "sarmi",
-      "waropen", "raja ampat", "maybrat", "tpnpb",
-    ],
-  },
+  { canonical: "West Papua", aliases: WEST_PAPUA_ALIASES },
   { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "bougainville"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak", "johor"] },
   { canonical: "Singapore", aliases: ["singapore", "singapura"] },
@@ -569,26 +591,7 @@ const INDONESIA_LOCAL_ALIASES: CountryAlias[] = [
   { canonical: "Thailand", aliases: ["thailand", "bangkok"] },
   { canonical: "Timor-Leste", aliases: ["timor-leste", "timor leste", "east timor", "timor timur", "dili"] },
   { canonical: "Brunei", aliases: ["brunei"] },
-  {
-    canonical: "Indonesia",
-    aliases: [
-      "indonesia", "indonesian", "jakarta", "jabodetabek", "java", "jawa",
-      "jawa barat", "jawa timur", "jawa tengah", "sumatra", "sumatera",
-      "sumatera utara", "sumatera barat", "sumatera selatan", "sulawesi",
-      "sulawesi selatan", "sulawesi utara", "sulawesi tengah", "sulawesi tenggara",
-      "sulawesi barat", "kalimantan", "kalimantan timur", "kalimantan barat",
-      "kalimantan selatan", "kalimantan tengah", "kalimantan utara", "borneo",
-      "bali", "lombok", "nusa tenggara", "ntt", "ntb", "maluku", "aceh", "medan",
-      "surabaya", "bandung", "semarang", "makassar", "palembang", "yogyakarta",
-      "jogja", "solo", "bekasi", "depok", "tangerang", "bogor", "batam",
-      "pekanbaru", "padang", "banjarmasin", "pontianak", "samarinda", "balikpapan",
-      "manado", "denpasar", "mataram", "kupang", "ambon", "jambi", "lampung",
-      "bengkulu", "banten", "cirebon", "malang", "kediri", "tegal", "sukabumi",
-      "garut", "tasikmalaya", "banyuwangi", "jember", "gresik", "sidoarjo", "riau",
-      "gorontalo", "kepulauan riau", "bangka belitung", "ternate", "palu",
-      "kendari", "mamuju", "sorong selatan",
-    ],
-  },
+  { canonical: "Indonesia", aliases: INDONESIA_BROAD_ALIASES },
 ];
 
 // Bahasa-first per-family feeds. defaultCountry="Indonesia" so an unmatched
@@ -670,6 +673,140 @@ const INDONESIA_LOCAL_CONFIG: NewsTopicConfig = {
   classifyConfidence: classifyNewsConfidence,
 };
 
+// ---------------------------------------------------------------------------
+// apac_local — curated DIRECT-outlet RSS (NOT Google News) across the six
+// tracked APAC territories (Indonesia, Jakarta, Philippines, Thailand, Papua
+// New Guinea, West Papua). Each feed reads the outlet's own RSS via `directUrl`
+// with a fixed `sourceName`, so processFeed skips the Google-News masthead
+// split. West Papua is the FIRST alias so any Papua story diverts to its own
+// tag and is NEVER mis-stamped Indonesia. Mirrors indonesia_local's engine and
+// reuses the existing FP_APAC_ANCHOR_RE relevance branch — NO version bump.
+// ---------------------------------------------------------------------------
+
+const APAC_LOCAL_ALIASES: CountryAlias[] = [
+  { canonical: "West Papua", aliases: WEST_PAPUA_ALIASES },
+  {
+    canonical: "Papua New Guinea",
+    aliases: [
+      "papua new guinea", "png", "port moresby", "bougainville", "lae",
+      "mount hagen", "mt hagen", "enga", "hela", "madang", "morobe", "goroka",
+      "wewak", "kokopo", "kimbe", "kavieng", "wabag", "tari",
+    ],
+  },
+  {
+    canonical: "Philippines",
+    aliases: [
+      "philippines", "philippine", "filipino", "filipina", "manila",
+      "quezon city", "mindanao", "cebu", "davao", "iloilo", "zamboanga",
+      "baguio", "cotabato", "sulu", "basilan", "maguindanao", "marawi",
+      "cagayan", "tacloban", "bangsamoro", "bacolod", "general santos",
+    ],
+  },
+  {
+    canonical: "Thailand",
+    aliases: [
+      "thailand", "thai", "bangkok", "chiang mai", "phuket", "pattani",
+      "yala", "narathiwat", "songkhla", "hat yai", "chiang rai", "korat",
+      "nakhon", "udon thani", "khon kaen", "surat thani", "pattaya",
+    ],
+  },
+  { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak", "johor"] },
+  { canonical: "Singapore", aliases: ["singapore", "singapura"] },
+  { canonical: "Timor-Leste", aliases: ["timor-leste", "timor leste", "east timor", "timor timur", "dili"] },
+  { canonical: "Brunei", aliases: ["brunei"] },
+  { canonical: "Indonesia", aliases: INDONESIA_BROAD_ALIASES },
+];
+
+// Curated direct-outlet RSS. defaultCountry names each outlet's home nation so
+// an unmatched local story resolves correctly; multi-country desks (RNZ
+// Pacific, BenarNews) default to "Unknown" rather than blind-stamping a nation.
+// q is unused for direct feeds (directUrl bypasses the Google-News builder).
+const APAC_LOCAL_FEEDS: TopicFeed[] = [
+  // Indonesia
+  { q: "", label: "Antara News", directUrl: "https://en.antaranews.com/rss/news", sourceName: "Antara News", defaultCountry: "Indonesia" },
+  { q: "", label: "CNN Indonesia", directUrl: "https://www.cnnindonesia.com/nasional/rss", sourceName: "CNN Indonesia", defaultCountry: "Indonesia" },
+  { q: "", label: "Tempo", directUrl: "https://rss.tempo.co/nasional", sourceName: "Tempo", defaultCountry: "Indonesia" },
+  // West Papua
+  { q: "", label: "Jubi", directUrl: "https://en.jubi.id/feed/", sourceName: "Jubi", defaultCountry: "West Papua" },
+  // Papua New Guinea + Pacific (multi-country desk → Unknown default)
+  { q: "", label: "PNG Post-Courier", directUrl: "https://www.postcourier.com.pg/feed/", sourceName: "Post-Courier", defaultCountry: "Papua New Guinea" },
+  { q: "", label: "RNZ Pacific", directUrl: "https://www.rnz.co.nz/rss/pacific.xml", sourceName: "RNZ Pacific", defaultCountry: "Unknown" },
+  // Philippines
+  { q: "", label: "Inquirer", directUrl: "https://www.inquirer.net/fullfeed", sourceName: "Philippine Daily Inquirer", defaultCountry: "Philippines" },
+  { q: "", label: "Rappler", directUrl: "https://www.rappler.com/feed/", sourceName: "Rappler", defaultCountry: "Philippines" },
+  { q: "", label: "GMA News", directUrl: "https://data.gmanetwork.com/gno/rss/news/feed.xml", sourceName: "GMA News", defaultCountry: "Philippines" },
+  // Thailand
+  { q: "", label: "Bangkok Post", directUrl: "https://www.bangkokpost.com/rss/data/most-recent.xml", sourceName: "Bangkok Post", defaultCountry: "Thailand" },
+  { q: "", label: "Khaosod English", directUrl: "https://www.khaosodenglish.com/feed/", sourceName: "Khaosod English", defaultCountry: "Thailand" },
+  // Regional security / terrorism desk (multi-country → Unknown default)
+  { q: "", label: "BenarNews", directUrl: "https://www.benarnews.org/english/rss", sourceName: "BenarNews", defaultCountry: "Unknown" },
+];
+
+const APAC_LOCAL_CONFIG: NewsTopicConfig = {
+  topic: "apac_local",
+  feeds: APAC_LOCAL_FEEDS,
+  // Bilingual allow-list scoped to the six tracked categories: protest / civil
+  // unrest, crime, terrorism, security incidents, and transport disruption.
+  // The ingest gate substring-matches the RAW (Bahasa or English) title +
+  // summary, so both languages are listed. Multi-word phrases are preferred and
+  // fragile short tokens (e.g. bare "raid", "armed", "port", "npa", "ied") are
+  // avoided because hay.includes() would false-positive on "afraid", "unarmed",
+  // "report", "unpaid", "buried".
+  allow: [
+    // protest / civil unrest
+    "protest", "rally", "demonstration", "riot", "unrest", "clash", "strike",
+    "walkout", "picket", "blockade", "curfew", "martial law",
+    "state of emergency", "crackdown", "student protest",
+    "demonstrasi", "unjuk rasa", "kerusuhan", "bentrok", "rusuh", "aksi massa",
+    "mogok kerja", "aksi buruh",
+    // crime
+    "murder", "shooting", "shot dead", "robbery", "theft", "stabbing",
+    "kidnap", "kidnapping", "abduction", "homicide", "assault", "extortion",
+    "drug bust", "human trafficking", "gang war", "gang violence",
+    "pembunuhan", "penembakan", "perampokan", "begal", "pencurian",
+    "penikaman", "penculikan", "kriminal", "narkoba",
+    // terrorism
+    "terror", "terrorist", "terrorism", "suicide bomb", "bomb blast",
+    "bombing", "explosion", "improvised explosive", "insurgent", "insurgency",
+    "militant", "extremist", "abu sayyaf", "jemaah islamiyah",
+    "jamaah islamiyah", "new people's army", "separatist",
+    "teroris", "terorisme", "bom bunuh diri", "serangan bom", "ledakan bom",
+    "densus 88", "ledakan",
+    // security incidents (armed / conflict)
+    "gunmen", "gunfire", "ambush", "shootout", "firefight", "hostage",
+    "arson", "grenade", "landmine", "checkpoint", "security forces",
+    "military operation", "police operation", "manhunt", "armed men",
+    "armed group", "raid on", "attack",
+    "penyerangan", "penyanderaan", "baku tembak", "aparat keamanan",
+    "operasi keamanan",
+    // transport disruption
+    "plane crash", "boat sinks", "ferry", "capsize", "airport", "collision",
+    "derail", "train crash", "road accident", "bus crash", "flight cancel",
+    "airport closure", "port closure", "shipwreck", "runway",
+    "kecelakaan", "kapal tenggelam", "kapal karam", "pesawat jatuh",
+    "tabrakan", "bandara", "pelabuhan",
+  ],
+  deny: [
+    ...COMMON_DENY,
+    // sport
+    "football", "basketball", "volleyball", "sea games", "olympics", "match",
+    "league", "tournament", "world cup", "esports", "badminton", "motogp",
+    "sepak bola", "pertandingan", "timnas", "liga 1",
+    // entertainment / lifestyle
+    "concert", "box office", "trailer", "celebrity", "showbiz", "beauty pageant",
+    "horoscope", "giveaway", "sinetron", "selebriti", "wisata", "kuliner",
+    // markets / finance / jobs
+    "stock market", "crypto", "bitcoin", "saham", "ihsg", "bursa", "kripto",
+    "lowongan kerja",
+    // product demos (the "demo" homonym)
+    "demo produk", "demo masak",
+  ],
+  countryAliases: APAC_LOCAL_ALIASES,
+  // Direct outlets span national agencies, major dailies and small regional
+  // desks, so the source-confidence tier is meaningful (opt-in).
+  classifyConfidence: classifyNewsConfidence,
+};
+
 export function runEnergyIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(ENERGY_CONFIG, opts);
 }
@@ -688,4 +825,8 @@ export function runFuelIngest(opts: IngestOptions = {}): Promise<IngestSummary> 
 
 export function runIndonesiaLocalIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(INDONESIA_LOCAL_CONFIG, opts);
+}
+
+export function runApacLocalIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
+  return runNewsTopicIngest(APAC_LOCAL_CONFIG, opts);
 }

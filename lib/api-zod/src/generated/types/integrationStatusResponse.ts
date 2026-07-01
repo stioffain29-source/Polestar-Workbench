@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { ApacLocalSourceHealth } from './apacLocalSourceHealth';
 import type { IntegrationStatusItem } from './integrationStatusItem';
 import type { MaritimeSourceHealthItem } from './maritimeSourceHealthItem';
 
@@ -12,4 +13,5 @@ export interface IntegrationStatusResponse {
   generatedAt: Date;
   integrations: IntegrationStatusItem[];
   maritimeSources: MaritimeSourceHealthItem[];
+  apacLocal: ApacLocalSourceHealth;
 }

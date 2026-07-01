@@ -3450,9 +3450,43 @@ components:
         detail: { type: string }
         asOf: { type: ["string", "null"] }
 
+    ApacLocalFeedHealth:
+      type: object
+      required: [name, status]
+      properties:
+        name: { type: string }
+        status: { type: string }
+        lastSuccessAt: { type: ["string", "null"] }
+        lastFailureAt: { type: ["string", "null"] }
+        itemsRetained: { type: ["integer", "null"] }
+        errorMessage: { type: ["string", "null"] }
+        scrapeMethod: { type: ["string", "null"] }
+
+    ApacLocalSample:
+      type: object
+      required: [title, country]
+      properties:
+        title: { type: string }
+        country: { type: string }
+        occurredAt: { type: ["string", "null"] }
+        source: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+
+    ApacLocalSourceHealth:
+      type: object
+      required: [feeds, totalIncidents, samples]
+      properties:
+        feeds:
+          type: array
+          items: { $ref: "#/components/schemas/ApacLocalFeedHealth" }
+        totalIncidents: { type: integer }
+        samples:
+          type: array
+          items: { $ref: "#/components/schemas/ApacLocalSample" }
+
     IntegrationStatusResponse:
       type: object
-      required: [generatedAt, integrations, maritimeSources]
+      required: [generatedAt, integrations, maritimeSources, apacLocal]
       properties:
         generatedAt: { type: string, format: date-time }
         integrations:
@@ -3461,6 +3495,7 @@ components:
         maritimeSources:
           type: array
           items: { $ref: "#/components/schemas/MaritimeSourceHealthItem" }
+        apacLocal: { $ref: "#/components/schemas/ApacLocalSourceHealth" }
 
     AuthUser:
       type: object

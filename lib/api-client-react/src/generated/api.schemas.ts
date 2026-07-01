@@ -1908,10 +1908,43 @@ export interface MaritimeSourceHealthItem {
   asOf?: string | null;
 }
 
+export interface ApacLocalFeedHealth {
+  name: string;
+  status: string;
+  /** @nullable */
+  lastSuccessAt?: string | null;
+  /** @nullable */
+  lastFailureAt?: string | null;
+  /** @nullable */
+  itemsRetained?: number | null;
+  /** @nullable */
+  errorMessage?: string | null;
+  /** @nullable */
+  scrapeMethod?: string | null;
+}
+
+export interface ApacLocalSample {
+  title: string;
+  country: string;
+  /** @nullable */
+  occurredAt?: string | null;
+  /** @nullable */
+  source?: string | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+}
+
+export interface ApacLocalSourceHealth {
+  feeds: ApacLocalFeedHealth[];
+  totalIncidents: number;
+  samples: ApacLocalSample[];
+}
+
 export interface IntegrationStatusResponse {
   generatedAt: string;
   integrations: IntegrationStatusItem[];
   maritimeSources: MaritimeSourceHealthItem[];
+  apacLocal: ApacLocalSourceHealth;
 }
 
 export interface AuthUser {

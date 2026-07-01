@@ -8,6 +8,7 @@ import {
   runFuelIngest,
   runConflictIngest,
   runIndonesiaLocalIngest,
+  runApacLocalIngest,
   runMarketPricesIngest,
   runMarketSnapshotIngest,
   runMaritimeMovementIngest,
@@ -73,6 +74,7 @@ export type IngestRunResult =
       fuel: IngestSummary;
       conflict: IngestSummary;
       indonesiaLocal: IngestSummary;
+      apacLocal: IngestSummary;
       marketPrices: MarketPriceSummary;
       marketSnapshot: MarketSnapshotSummary;
       maritimeMovement: MaritimeMovementSummary;
@@ -552,6 +554,13 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const indonesiaLocal = await runIncidentIngest("indonesia_local", () =>
       runIndonesiaLocalIngest({ commit: true }),
     );
+    // Curated DIRECT-outlet RSS (not Google News) across the six tracked APAC
+    // territories. Classified/scored across protest, crime, terrorism, civil
+    // unrest, transport disruption and security incidents; West Papua rows are
+    // diverted to their own tag (never Indonesia) by the Papua-first aliases.
+    const apacLocal = await runIncidentIngest("apac_local", () =>
+      runApacLocalIngest({ commit: true }),
+    );
     // PNG per-incident structured extraction. The PNG country brief reads
     // province / category / business_impact / incident_date STRAIGHT from the
     // incidents API (the client no longer recomputes them), but only the
@@ -826,6 +835,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       fuel,
       conflict,
       indonesiaLocal,
+      apacLocal,
       marketPrices,
       marketSnapshot,
       maritimeMovement,

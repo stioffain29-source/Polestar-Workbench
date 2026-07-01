@@ -60,7 +60,8 @@ export type SeverityTopic =
   | "fertiliser"
   | "fuel"
   | "conflict"
-  | "indonesia_local";
+  | "indonesia_local"
+  | "apac_local";
 
 // Present-tense fatal headlines. News writes fatal attacks in the present tense
 // ("airstrike kills seven civilians", "gunmen kill 24 construction workers",
@@ -403,7 +404,10 @@ export function classifySeverity(
   // reaction-led headlines ("warga tuntut keadilan", "group demands justice over
   // death") are common, so it shares the flashpoint/conflict guard.
   const reactionLed =
-    (topic === "flashpoint" || topic === "conflict" || topic === "indonesia_local") &&
+    (topic === "flashpoint" ||
+      topic === "conflict" ||
+      topic === "indonesia_local" ||
+      topic === "apac_local") &&
     REACTION_LEAD_RE.test(title);
 
   // Natural-cause guard. A lightning / flood / earthquake / drowning death with

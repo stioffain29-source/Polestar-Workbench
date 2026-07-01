@@ -7,6 +7,9 @@
  */
 
 export * from './accessStatus';
+export * from './apacLocalFeedHealth';
+export * from './apacLocalSample';
+export * from './apacLocalSourceHealth';
 export * from './authorizationSessionHeaderParameter';
 export * from './authUser';
 export * from './authUserEnvelope';

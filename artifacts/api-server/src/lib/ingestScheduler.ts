@@ -131,6 +131,7 @@ const SCRAPED_LAND_TOPICS = [
   "fuel",
   "conflict",
   "indonesia_local",
+  "apac_local",
 ] as const;
 
 /**
@@ -145,7 +146,7 @@ async function hoursSinceNewestPerLandTopic(): Promise<
   const res = await db.execute(sql`
     SELECT topic, MAX(created_at) AS last
     FROM incidents
-    WHERE topic IN ('shipping', 'energy', 'fertiliser', 'fuel', 'conflict', 'indonesia_local')
+    WHERE topic IN ('shipping', 'energy', 'fertiliser', 'fuel', 'conflict', 'indonesia_local', 'apac_local')
     GROUP BY topic
   `);
   const rows = res.rows as Array<{ topic: string; last: Date | string | null }>;

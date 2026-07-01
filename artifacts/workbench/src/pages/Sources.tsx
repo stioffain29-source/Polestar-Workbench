@@ -10,6 +10,8 @@ import {
   type IntegrationStatusState,
   type MaritimeSourceHealthItem,
   type MaritimeSourceState,
+  type ApacLocalFeedHealth,
+  type ApacLocalSample,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -234,6 +236,109 @@ function MaritimeSourceHealthPanel() {
   );
 }
 
+const APAC_FEED_BADGE: Record<string, string> = {
+  operational: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  failing: "bg-red-100 text-red-800 border border-red-200",
+  pending: "bg-amber-100 text-amber-800 border border-amber-200",
+  not_configured: "bg-muted text-muted-foreground border border-border",
+};
+
+function fmtDateTime(v: string | null | undefined): string {
+  if (!v) return "—";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? "—" : d.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function ApacFeedRow({ item }: { item: ApacLocalFeedHealth }) {
+  return (
+    <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-[1.6fr_0.7fr_1fr_0.6fr] gap-3 text-sm">
+      <div>
+        <div className="font-serif font-bold text-primary">{item.name}</div>
+        <div className="mt-1 text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+          {item.scrapeMethod ?? "—"}
+        </div>
+        {item.errorMessage ? (
+          <div className="mt-1 text-xs text-red-700">{item.errorMessage}</div>
+        ) : null}
+      </div>
+      <div>
+        <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", APAC_FEED_BADGE[item.status] ?? APAC_FEED_BADGE.not_configured)}>
+          {item.status}
+        </span>
+      </div>
+      <div>
+        <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Last pull</div>
+        <div className="font-mono text-xs text-foreground">{fmtDateTime(item.lastSuccessAt)}</div>
+        {item.lastFailureAt ? (
+          <div className="font-mono text-[10px] text-red-700">fail {fmtDateTime(item.lastFailureAt)}</div>
+        ) : null}
+      </div>
+      <div>
+        <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">Retained</div>
+        <div className="font-mono text-xs text-foreground">{item.itemsRetained ?? "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function ApacSampleRow({ item }: { item: ApacLocalSample }) {
+  return (
+    <div className="px-4 py-2 grid grid-cols-1 md:grid-cols-[2.4fr_0.8fr_0.9fr] gap-3 text-sm">
+      <div className="text-foreground">
+        {item.sourceUrl ? (
+          <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="hover:underline">{item.title}</a>
+        ) : (
+          item.title
+        )}
+      </div>
+      <div className="font-sans text-xs text-muted-foreground">{item.country}</div>
+      <div className="font-mono text-xs text-foreground">{fmtDateTime(item.occurredAt)}</div>
+    </div>
+  );
+}
+
+function ApacLocalSourceHealthPanel() {
+  const { data, isLoading } = useGetIntegrationStatus();
+  const apac = data?.apacLocal;
+  const feeds = apac?.feeds ?? [];
+  const samples = apac?.samples ?? [];
+  return (
+    <div className="bg-card border border-border rounded-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+        <div className="text-sm font-serif font-bold uppercase tracking-wide text-primary">APAC Local Direct-Outlet Feeds</div>
+        <div className="text-xs text-muted-foreground ml-1">
+          Direct RSS (not Google News) across Indonesia, West Papua, Philippines, Thailand &amp; PNG — {apac?.totalIncidents ?? 0} incidents
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">Checking APAC local feeds…</div>
+      ) : feeds.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">No APAC local feed health available yet — run the apac_local ingest.</div>
+      ) : (
+        <>
+          <div className="divide-y divide-border">
+            {feeds.map((f) => (
+              <ApacFeedRow key={f.name} item={f} />
+            ))}
+          </div>
+          <div className="px-4 py-2 border-t border-border bg-muted/40 text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+            Latest sample records
+          </div>
+          {samples.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-muted-foreground">No sample records yet.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {samples.map((s, i) => (
+                <ApacSampleRow key={`${s.title}-${i}`} item={s} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function isHiddenOptionalIntegration(s: { name: string; status: string }): boolean {
   if (!isOptionalIntegrationSource(s.name)) return false;
   const eff = effectiveSourceStatus(s);
@@ -441,6 +546,8 @@ export default function Sources() {
       <IntegrationsPanel />
 
       <MaritimeSourceHealthPanel />
+
+      <ApacLocalSourceHealthPanel />
 
       <div className="bg-card border border-border rounded-sm p-3 flex gap-2">
         <Select value={topic || "all"} onValueChange={(v) => setTopic(v === "all" ? "" : v)}>

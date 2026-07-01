@@ -1405,7 +1405,26 @@ export const GetIntegrationStatusResponse = zod.object({
   "status": zod.enum(['live', 'stale', 'disabled', 'unavailable']),
   "detail": zod.string(),
   "asOf": zod.string().nullish()
+})),
+  "apacLocal": zod.object({
+  "feeds": zod.array(zod.object({
+  "name": zod.string(),
+  "status": zod.string(),
+  "lastSuccessAt": zod.string().nullish(),
+  "lastFailureAt": zod.string().nullish(),
+  "itemsRetained": zod.number().nullish(),
+  "errorMessage": zod.string().nullish(),
+  "scrapeMethod": zod.string().nullish()
+})),
+  "totalIncidents": zod.number(),
+  "samples": zod.array(zod.object({
+  "title": zod.string(),
+  "country": zod.string(),
+  "occurredAt": zod.string().nullish(),
+  "source": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish()
 }))
+})
 })
 
 

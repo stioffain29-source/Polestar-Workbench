@@ -37,6 +37,7 @@ import type {
 import { isLlmAvailable, OPENAI_ENV_VARS } from "@workspace/ingest";
 import { getLiveuamapStatus } from "./liveuamap";
 import { getMaritimeSourceHealth } from "./maritimeSources";
+import { getApacLocalSourceHealth } from "./apacLocalSources";
 import { logger } from "./logger";
 
 // ===========================================================================
@@ -921,7 +922,7 @@ function adminControlsStatus(): IntegrationStatusItem {
  * Liveuamap probe reuses its cost-bounded cache so this adds no upstream spend.
  */
 export async function getIntegrationStatuses(): Promise<IntegrationStatusResponse> {
-  const [integrations, maritimeSources] = await Promise.all([
+  const [integrations, maritimeSources, apacLocal] = await Promise.all([
     Promise.all([
       Promise.resolve(adminControlsStatus()),
       gdeltStatus(),
@@ -937,6 +938,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       Promise.resolve(xOsintStatus()),
     ]),
     getMaritimeSourceHealth(),
+    getApacLocalSourceHealth(),
   ]);
-  return { generatedAt: new Date(), integrations, maritimeSources };
+  return { generatedAt: new Date(), integrations, maritimeSources, apacLocal };
 }

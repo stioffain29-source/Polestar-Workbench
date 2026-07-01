@@ -49,6 +49,7 @@ function topicToCategory(topic: string): string {
     case "fertiliser": return "Fertiliser";
     case "protests": return "Civil Unrest";
     case "flashpoint": return "Civil Unrest";
+    case "apac_local": return "Civil Unrest";
     case "energy": return "Energy / Grid";
     case "shipping": return "Shipping";
     case "cargo_watch": return "Cargo";

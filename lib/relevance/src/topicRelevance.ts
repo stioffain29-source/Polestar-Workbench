@@ -1426,6 +1426,29 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     return { relevant: true, reason: "kept: indonesia_local in-region local coverage" };
   }
 
+  if (topic === "apac_local") {
+    // Broad DIRECT-outlet local-coverage feed spanning Indonesia + Jakarta,
+    // West Papua, the Philippines, Thailand and Papua New Guinea: protest,
+    // crime, terrorism, civil unrest, transport disruption and security
+    // incidents. Like indonesia_local the families are deliberately wide, so
+    // there is NO required incident vocabulary — the only gate is geographic.
+    // Drop a story that POSITIVELY names a non-regional theatre (the Americas /
+    // Middle East / Africa / non-APAC Europe-Eurasia) and carries no APAC
+    // anchor: that is foreign wire copy a regional outlet merely re-ran. Keyed
+    // on a positive foreign place (never a missing anchor) so a genuine
+    // hyperlocal item is always kept. The APAC anchor (FP_APAC_ANCHOR_RE)
+    // already spans all six in-scope territories. New topic — no existing rows
+    // re-evaluate, so this needs no RELEVANCE_RULE_VERSION bump.
+    const geo = mastheadStrippedGeoText(i);
+    if (FP_OFFSHORE_THEATRE_RE.test(geo) && !FP_APAC_ANCHOR_RE.test(geo)) {
+      return {
+        relevant: false,
+        reason: "excluded: apac_local out-of-region (foreign syndication, no APAC anchor)",
+      };
+    }
+    return { relevant: true, reason: "kept: apac_local in-region local coverage" };
+  }
+
   if (topic === "flashpoint" || topic === "protests") {
     // Editorial suppression FIRST — these are genuine protests the operator
     // manually removed, so they would otherwise be KEPT by the title-rescue /

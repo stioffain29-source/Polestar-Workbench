@@ -40,6 +40,20 @@ export type TopicFeed = {
   gl?: string;
   hl?: string;
   ceid?: string;
+  /**
+   * A DIRECT outlet RSS URL. When set, the Google-News query builder (`q` /
+   * gl / hl / ceid) is bypassed entirely and this URL is fetched verbatim.
+   * Direct-outlet feeds carry a clean headline with NO trailing
+   * " - Publisher" masthead, so the runner does not split the title; the
+   * source name comes from the feed channel title (falling back to
+   * `sourceName`, then the feed label). `q` may be left empty for such feeds.
+   */
+  directUrl?: string;
+  /**
+   * Preferred display source name for a DIRECT feed, used only when the feed's
+   * RSS channel title is absent. Never fabricated for Google-News feeds.
+   */
+  sourceName?: string;
 };
 
 export type NewsTopicConfig = {
@@ -260,7 +274,9 @@ export async function runNewsTopicIngest(
 
   const FEEDS: Feed[] = cfg.feeds.map((f) => ({
     ...f,
-    url: gnews(f.q, { gl: f.gl, hl: f.hl, ceid: f.ceid }),
+    // A DIRECT outlet feed supplies its own RSS URL verbatim; only a Google
+    // News feed goes through the query builder.
+    url: f.directUrl ?? gnews(f.q, { gl: f.gl, hl: f.hl, ceid: f.ceid }),
   }));
   log(
     `${topic} scraper — ${FEEDS.length} feeds, mode=${commit ? "COMMIT" : "DRY-RUN"}${
@@ -297,9 +313,20 @@ export async function runNewsTopicIngest(
           continue;
         }
 
-        const dashIdx = title.lastIndexOf(" - ");
-        const sourceName = dashIdx > 0 ? title.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
-        const cleanTitle = dashIdx > 0 ? title.slice(0, dashIdx).trim() : title;
+        // A DIRECT outlet feed's headline has no trailing " - Publisher"
+        // masthead, so the title is used verbatim and the source name is the
+        // feed channel title (falling back to the configured name, then the
+        // label). Google-News feeds keep the " - " masthead split.
+        let sourceName: string;
+        let cleanTitle: string;
+        if (feed.directUrl) {
+          cleanTitle = title;
+          sourceName = feed.sourceName ?? parsed.title ?? feed.label;
+        } else {
+          const dashIdx = title.lastIndexOf(" - ");
+          sourceName = dashIdx > 0 ? title.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
+          cleanTitle = dashIdx > 0 ? title.slice(0, dashIdx).trim() : title;
+        }
         let host = "";
         try {
           host = new URL(link).hostname.replace(/^www\./, "");
@@ -422,15 +449,30 @@ export async function runNewsTopicIngest(
   if (sortedCov.length === 0) log("  (none)");
 
   if (commit) {
+    // Direct-outlet feeds and Google-News feeds coexist in one config, so the
+    // registry name and collection method are derived PER FEED — a direct feed
+    // reads "Direct RSS — <label>" with the "Direct outlet RSS" method, a
+    // Google-News feed keeps its historical "Google News — <label>" name.
+    const anyDirect = FEEDS.some((f) => f.directUrl);
     await recordSourceHealth(
       topic,
       FEEDS.map((f) => ({
-        name: `Google News — ${f.label}`,
+        name: `${f.directUrl ? "Direct RSS" : "Google News"} — ${f.label}`,
         url: f.url,
         ok: !perFeed[f.label]?.error,
         error: perFeed[f.label]?.error ?? null,
+        collected: perFeed[f.label]?.found,
+        retained: perFeed[f.label]?.accepted,
+        rejected: perFeed[f.label]?.rejected,
       })),
-      { sourceType: "rss", reliability: 3, notes: "Live Google News feed — auto-monitored each ingest run." },
+      {
+        sourceType: "rss",
+        reliability: 3,
+        notes: anyDirect
+          ? "Live direct outlet RSS feed — auto-monitored each ingest run."
+          : "Live Google News feed — auto-monitored each ingest run.",
+        scrapeMethod: anyDirect ? "Direct outlet RSS" : "Google News RSS",
+      },
     );
   }
 
