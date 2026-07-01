@@ -305,43 +305,75 @@ export interface JakartaGazetteerEntry {
   lat: number;
   lon: number;
   zoneId: string;
+  /**
+   * Location precision of the match, feeding the evidence-provenance ledger:
+   *  - "high"   = a specific road, landmark, terminal, venue or palace — a point
+   *               that honestly pins to metres / hundreds of metres.
+   *  - "medium" = a named district / sub-district (kelurahan / kecamatan) — a
+   *               real area, but the marker sits at its centroid.
+   * BOTH precisions plot a marker (so the map is unchanged); the distinction
+   * only sets the ledger's Location-confidence column (HIGH vs MEDIUM). Coarse
+   * city-level mentions (Jakarta / Greater Jakarta / a commuter regency) never
+   * reach the gazetteer and resolve to LOW — narrative-only, never a marker.
+   */
+  precision: "high" | "medium";
 }
 
 export const JAKARTA_GAZETTEER: JakartaGazetteerEntry[] = [
   // Government / central core
-  { names: ["monumen nasional", "monas", "medan merdeka"], lat: -6.1754, lon: 106.8272, zoneId: "govt" },
-  { names: ["istana merdeka", "istana negara", "presidential palace", "istana"], lat: -6.1702, lon: 106.8243, zoneId: "govt" },
-  { names: ["gambir"], lat: -6.1766, lon: 106.8307, zoneId: "govt" },
-  { names: ["dpr/mpr", "dpr", "mpr", "parliament"], lat: -6.21, lon: 106.8, zoneId: "govt" },
-  { names: ["menteng"], lat: -6.196, lon: 106.833, zoneId: "govt" },
-  { names: ["tanah abang"], lat: -6.186, lon: 106.812, zoneId: "govt" },
-  { names: ["sawah besar"], lat: -6.158, lon: 106.832, zoneId: "govt" },
-  { names: ["senen"], lat: -6.176, lon: 106.843, zoneId: "govt" },
-  { names: ["kemayoran"], lat: -6.161, lon: 106.85, zoneId: "govt" },
+  { names: ["monumen nasional", "monas", "medan merdeka"], lat: -6.1754, lon: 106.8272, zoneId: "govt", precision: "high" },
+  { names: ["istana merdeka", "istana negara", "presidential palace", "istana"], lat: -6.1702, lon: 106.8243, zoneId: "govt", precision: "high" },
+  { names: ["gambir"], lat: -6.1766, lon: 106.8307, zoneId: "govt", precision: "medium" },
+  { names: ["dpr/mpr", "dpr", "mpr", "parliament"], lat: -6.21, lon: 106.8, zoneId: "govt", precision: "high" },
+  { names: ["menteng"], lat: -6.196, lon: 106.833, zoneId: "govt", precision: "medium" },
+  { names: ["tanah abang"], lat: -6.186, lon: 106.812, zoneId: "govt", precision: "medium" },
+  { names: ["sawah besar"], lat: -6.158, lon: 106.832, zoneId: "govt", precision: "medium" },
+  { names: ["senen"], lat: -6.176, lon: 106.843, zoneId: "govt", precision: "medium" },
+  { names: ["kemayoran"], lat: -6.161, lon: 106.85, zoneId: "govt", precision: "medium" },
   // Business / commercial / hotel
-  { names: ["bundaran hi", "bundaran hotel indonesia"], lat: -6.1935, lon: 106.823, zoneId: "sudirman-thamrin" },
-  { names: ["thamrin"], lat: -6.194, lon: 106.823, zoneId: "sudirman-thamrin" },
-  { names: ["sudirman"], lat: -6.209, lon: 106.8215, zoneId: "sudirman-thamrin" },
-  { names: ["scbd", "sudirman central business district"], lat: -6.2255, lon: 106.8075, zoneId: "scbd-senayan" },
-  { names: ["gelora bung karno", "senayan", "gbk"], lat: -6.2185, lon: 106.802, zoneId: "scbd-senayan" },
-  { names: ["kebayoran"], lat: -6.244, lon: 106.798, zoneId: "scbd-senayan" },
-  { names: ["mega kuningan", "kuningan"], lat: -6.2285, lon: 106.829, zoneId: "kuningan" },
-  { names: ["gatot subroto"], lat: -6.235, lon: 106.817, zoneId: "kuningan" },
-  { names: ["rasuna said", "setiabudi"], lat: -6.223, lon: 106.833, zoneId: "kuningan" },
-  { names: ["senopati", "kemang"], lat: -6.262, lon: 106.814, zoneId: "scbd-senayan" },
-  { names: ["tebet"], lat: -6.236, lon: 106.857, zoneId: "kuningan" },
+  { names: ["bundaran hi", "bundaran hotel indonesia"], lat: -6.1935, lon: 106.823, zoneId: "sudirman-thamrin", precision: "high" },
+  { names: ["thamrin"], lat: -6.194, lon: 106.823, zoneId: "sudirman-thamrin", precision: "high" },
+  { names: ["sudirman"], lat: -6.209, lon: 106.8215, zoneId: "sudirman-thamrin", precision: "high" },
+  { names: ["scbd", "sudirman central business district"], lat: -6.2255, lon: 106.8075, zoneId: "scbd-senayan", precision: "high" },
+  { names: ["gelora bung karno", "senayan", "gbk"], lat: -6.2185, lon: 106.802, zoneId: "scbd-senayan", precision: "high" },
+  { names: ["kebayoran"], lat: -6.244, lon: 106.798, zoneId: "scbd-senayan", precision: "medium" },
+  { names: ["mega kuningan", "kuningan"], lat: -6.2285, lon: 106.829, zoneId: "kuningan", precision: "medium" },
+  { names: ["gatot subroto"], lat: -6.235, lon: 106.817, zoneId: "kuningan", precision: "high" },
+  { names: ["rasuna said", "setiabudi"], lat: -6.223, lon: 106.833, zoneId: "kuningan", precision: "medium" },
+  { names: ["senopati", "kemang"], lat: -6.262, lon: 106.814, zoneId: "scbd-senayan", precision: "medium" },
+  { names: ["tebet"], lat: -6.236, lon: 106.857, zoneId: "kuningan", precision: "medium" },
   // North / port
-  { names: ["tanjung priok", "priok"], lat: -6.105, lon: 106.881, zoneId: "priok" },
-  { names: ["cilincing"], lat: -6.113, lon: 106.93, zoneId: "north-access" },
-  { names: ["koja"], lat: -6.11, lon: 106.9, zoneId: "north-access" },
-  { names: ["kelapa gading"], lat: -6.158, lon: 106.908, zoneId: "north-access" },
-  { names: ["penjaringan"], lat: -6.128, lon: 106.79, zoneId: "north-access" },
-  { names: ["pademangan"], lat: -6.133, lon: 106.835, zoneId: "north-access" },
-  { names: ["ancol"], lat: -6.124, lon: 106.84, zoneId: "north-access" },
-  { names: ["sunter"], lat: -6.145, lon: 106.87, zoneId: "north-access" },
+  { names: ["tanjung priok", "priok"], lat: -6.105, lon: 106.881, zoneId: "priok", precision: "high" },
+  { names: ["cilincing"], lat: -6.113, lon: 106.93, zoneId: "north-access", precision: "medium" },
+  { names: ["koja"], lat: -6.11, lon: 106.9, zoneId: "north-access", precision: "medium" },
+  { names: ["kelapa gading"], lat: -6.158, lon: 106.908, zoneId: "north-access", precision: "medium" },
+  { names: ["penjaringan"], lat: -6.128, lon: 106.79, zoneId: "north-access", precision: "medium" },
+  { names: ["pademangan"], lat: -6.133, lon: 106.835, zoneId: "north-access", precision: "medium" },
+  { names: ["ancol"], lat: -6.124, lon: 106.84, zoneId: "north-access", precision: "high" },
+  { names: ["sunter"], lat: -6.145, lon: 106.87, zoneId: "north-access", precision: "medium" },
   // Airport
-  { names: ["soekarno-hatta", "soekarno hatta", "soetta", "cengkareng", "bandara soekarno"], lat: -6.1256, lon: 106.6559, zoneId: "airport" },
-  { names: ["halim perdanakusuma", "halim"], lat: -6.2666, lon: 106.891, zoneId: "airport" },
+  { names: ["soekarno-hatta", "soekarno hatta", "soetta", "cengkareng", "bandara soekarno"], lat: -6.1256, lon: 106.6559, zoneId: "airport", precision: "high" },
+  { names: ["halim perdanakusuma", "halim"], lat: -6.2666, lon: 106.891, zoneId: "airport", precision: "high" },
+];
+
+// Coarse, greater-Jakarta-level location tokens. A record whose ONLY location
+// signal is one of these cannot be pinned to a plottable point: it resolves to
+// LOW confidence — a genuine Jakarta claim carried in the narrative and the
+// evidence ledger, but never drawn as a map marker. Bare "jakarta" also covers
+// the five administrative cities (Central / North / South / East / West Jakarta),
+// which are far too broad to mark honestly.
+export const JAKARTA_CITY_LEVEL_TOKENS: string[] = [
+  "jabodetabek",
+  "greater jakarta",
+  "dki jakarta",
+  "jakarta raya",
+  "jakarta",
+  "tangerang",
+  "south tangerang",
+  "tangsel",
+  "bekasi",
+  "depok",
+  "bogor",
 ];
 
 function escapeRegExp(s: string): string {
@@ -364,14 +396,109 @@ function tokenInText(token: string, hay: string): boolean {
 // ---------------------------------------------------------------------------
 export type JakartaGeocodeConfidence = "explicit" | "named";
 
+// Evidence-ledger location-precision tier. Orthogonal to JakartaGeocodeConfidence
+// (which records the SOURCE of the match): here HIGH = explicit coordinates or a
+// high-precision gazetteer landmark, MEDIUM = a named district centroid, LOW = a
+// coarse city-level mention or no location signal (never plotted).
+export type JakartaLocationConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+export interface JakartaLocationResolution {
+  locationConfidence: JakartaLocationConfidence;
+  /**
+   * True only for HIGH / MEDIUM — a plottable point is available. LOW is
+   * narrative-only and never carries a point (so it never becomes a marker).
+   */
+  hasPoint: boolean;
+  lat?: number;
+  lon?: number;
+  zoneId?: string | null;
+  matchedName?: string;
+  source: "explicit" | "named" | "city-level" | "none";
+}
+
 export interface JakartaGeocode {
   lat: number;
   lon: number;
   confidence: JakartaGeocodeConfidence;
+  /**
+   * Location-precision tier for the evidence ledger. Only HIGH / MEDIUM ever
+   * reach a JakartaGeocode (LOW is not plottable, so geocode returns null).
+   */
+  locationConfidence: Exclude<JakartaLocationConfidence, "LOW">;
   /** Operating zone the point was assigned to (or null). */
   zoneId: string | null;
   /** The gazetteer name that matched (for "named" confidence). */
   matchedName?: string;
+}
+
+// Single location-resolution authority for the Jakarta report: explicit
+// coordinates (HIGH) → named gazetteer match (HIGH landmark / MEDIUM district,
+// location text preferred then headline) → coarse city-level mention (LOW,
+// unplottable) → no signal at all (LOW). Pure and deterministic; both the map
+// and the evidence ledger read it so a marker and its ledger row can never
+// disagree about where — or how precisely — an incident sits.
+export function resolveJakartaIncidentLocation(
+  i: CountryFastFactsIncident,
+): JakartaLocationResolution {
+  // 1) Explicit coordinates within the plot box → HIGH precision.
+  const lat = i.latitude;
+  const lon = i.longitude;
+  if (
+    typeof lat === "number" &&
+    typeof lon === "number" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    inBbox(lat, lon, JAKARTA_MAP_PLOT_BBOX)
+  ) {
+    return {
+      locationConfidence: "HIGH",
+      hasPoint: true,
+      lat,
+      lon,
+      zoneId: nearestZoneId(lat, lon),
+      source: "explicit",
+    };
+  }
+
+  // 2) Named gazetteer match — location text preferred, then headline. The
+  //    matched entry's precision sets HIGH (landmark) vs MEDIUM (district).
+  const loc = (i.location ?? "").toLowerCase();
+  const title = stripMasthead(
+    ((i.displayTitle && i.displayTitle.trim()) || i.title || "").trim(),
+  ).toLowerCase();
+
+  for (const hay of [loc, title]) {
+    if (!hay) continue;
+    for (const entry of JAKARTA_GAZETTEER) {
+      for (const name of entry.names) {
+        if (tokenInText(name, hay)) {
+          return {
+            locationConfidence: entry.precision === "high" ? "HIGH" : "MEDIUM",
+            hasPoint: true,
+            lat: entry.lat,
+            lon: entry.lon,
+            zoneId: entry.zoneId,
+            matchedName: name,
+            source: "named",
+          };
+        }
+      }
+    }
+  }
+
+  // 3) Coarse city-level mention (Jakarta / Greater Jakarta / a commuter
+  //    regency) → LOW. A genuine Jakarta claim, but not pinnable to a point, so
+  //    it is narrative-only and never plotted.
+  const cityHay = `${loc} ${title}`;
+  for (const token of JAKARTA_CITY_LEVEL_TOKENS) {
+    if (tokenInText(token, cityHay)) {
+      return { locationConfidence: "LOW", hasPoint: false, zoneId: null, source: "city-level" };
+    }
+  }
+
+  // 4) No location signal at all. The window is Jakarta-scoped, so the record is
+  //    still a Jakarta claim, carried at LOW confidence (narrative-only).
+  return { locationConfidence: "LOW", hasPoint: false, zoneId: null, source: "none" };
 }
 
 // Nearest operating zone within ~3.5 km (used for explicit coordinates that

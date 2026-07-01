@@ -1,0 +1,264 @@
+TASK: Final 20% fix for Jakarta City Report
+
+The Jakarta report is now better, but it is still missing the final operational quality layer.
+
+The issue is no longer the report structure. The structure is mostly right.
+
+The remaining problem is that the report still mixes three different things without making the distinction clear:
+
+1. Actual incidents reported during this reporting period
+2. Indirect indicators from this reporting period
+3. Standing Jakarta operating knowledge
+
+These must be separated clearly.
+
+The report must stop reading like a generic Jakarta guide with this week’s dates on it. It must read like an evidence led operating report built from ground truth.
+
+CORE RULE
+
+Every operational claim must be tagged as one of the following:
+
+CONFIRMED THIS PERIOD
+Supported by a specific reported incident during the reporting window.
+
+INDIRECT INDICATOR THIS PERIOD
+Not a direct incident, but nearby or related reporting creates a plausible operating concern.
+
+STANDING PROFILE
+Known Jakarta operating issue, but not directly evidenced this week.
+
+Do not present standing profile issues as live incidents.
+
+GROUND TRUTH LEDGER
+
+Add a Ground Truth Ledger before the Priority Areas section.
+
+The ledger must include every relevant incident used in the report.
+
+Use this format:
+
+| ID | Date | Incident | Source | Reported location | Location confidence | Mapped | Operating relevance |
+|---|---|---|---|---|---|---|---|
+| JKT 001 | 29 Jun | Protest / policing | detikNews | Central Jakarta | Medium | Yes | Government district movement |
+| JKT 002 | 26 Jun | Fire | detikNews | Greater Jakarta | Low | No | Monitor only unless near client site |
+| JKT 003 | 25 Jun | Flooding / rain | Local media | Greater Jakarta | Medium | Area only | Commuter and access delay |
+
+The rest of the report must refer back to these IDs.
+
+Example:
+
+Central Jakarta remains the main movement concern this period due to JKT 001.
+
+This creates traceability and stops the report drifting into generic advice.
+
+LOCATION CONFIDENCE RULE
+
+Use three confidence levels:
+
+HIGH CONFIDENCE
+Specific road, building, port gate, terminal, district, station, mall, facility or named location.
+
+MEDIUM CONFIDENCE
+Named district or subdistrict only, such as Central Jakarta, North Jakarta, Kelapa Gading, Gambir, Kuningan or Tanjung Priok.
+
+LOW CONFIDENCE
+Jakarta, Greater Jakarta, Jabodetabek or vague regional reporting only.
+
+Only high and medium confidence incidents should drive tactical map markers.
+
+Low confidence incidents can be mentioned in the narrative, but should not be plotted as precise markers.
+
+PRIORITY AREAS TABLE
+
+Fix the Priority Areas table so it is evidence led.
+
+Add these columns:
+
+Evidence ID
+Status this period
+Confidence
+
+Use this format:
+
+| Priority | Area | Evidence | Status | Confidence | Business impact | Action |
+|---|---|---|---|---|---|---|
+| 1 | Gambir / Monas / Istana | JKT 001 | Confirmed this period | Medium | Possible road closures and delayed access around government district | Avoid non essential meetings during active protest activity |
+| 2 | Tanjung Priok / North Jakarta | None direct | Standing profile | Low | No confirmed disruption this period | Routine terminal and route check only |
+| 3 | Soekarno Hatta corridor | JKT 003 if rain linked | Indirect indicator | Medium | Possible transfer delay during heavy rain | Add buffer during affected rain periods |
+
+Only include an area as a live priority if there is an incident ID or an indirect indicator.
+
+Otherwise mark it clearly as standing profile.
+
+PORT SECTION FIX
+
+The port section currently reads too much like a standing Jakarta port guide.
+
+Replace it with:
+
+PORT RELEVANCE THIS PERIOD: CONFIRMED / INDIRECT / NOT INDICATED / STANDING PROFILE ONLY
+
+Definitions:
+
+CONFIRMED
+Direct reporting mentions Tanjung Priok, terminal gates, port access, trucking, customs, cargo, labour action, container movement or logistics disruption.
+
+INDIRECT
+Reporting mentions flooding, congestion, fire, police activity or security incidents in North Jakarta, Cilincing, Koja, Ancol, Kelapa Gading, Sunter, Marunda or relevant port access roads.
+
+NOT INDICATED
+No port relevant reporting this period.
+
+STANDING PROFILE ONLY
+Jakarta remains a port city and Tanjung Priok remains operationally important, but there is no direct port disruption in this week’s reporting.
+
+Example wording:
+
+Port relevance this period: Standing profile only. No direct disruption to Tanjung Priok, terminal gates, customs, trucking or port access was identified in this reporting period. Logistics teams should maintain routine checks before dispatch, but port disruption should not be reported as a confirmed issue.
+
+Only include the full Tanjung Priok impact table when evidence supports it.
+
+AIRPORT SECTION FIX
+
+Apply the same rule to airport movements.
+
+Use:
+
+AIRPORT RELEVANCE THIS PERIOD: CONFIRMED / INDIRECT / NOT INDICATED
+
+Example:
+
+Airport relevance this period: Indirect. Heavy rain and flood reporting across Greater Jakarta may affect the Soekarno Hatta toll road and Tangerang approach during affected periods. No direct airport disruption was identified.
+
+Do not include airport disruption unless the reporting period supports it.
+
+STAFF MOVEMENT SECTION FIX
+
+Staff movement claims must be tied to evidence.
+
+Bad:
+
+Staff movement may be disrupted across Jakarta.
+
+Good:
+
+Staff movement into the Central Jakarta government district is the main confirmed movement concern this period due to JKT 001. Movement between hotels in Sudirman, Thamrin, Kuningan or SCBD and meetings near Gambir, Monas or Istana Merdeka should be checked before departure during active protest or policing periods.
+
+OFFICE, HOTEL AND MEETING VENUE SECTION FIX
+
+Only mention office, hotel and meeting venue exposure if supported by incident geography.
+
+If not directly supported, say:
+
+No direct incident affecting major office, hotel or meeting districts was identified this period. Sudirman, Thamrin, SCBD and Kuningan remain standing profile areas for business movement, but no confirmed disruption was identified in this reporting window.
+
+MAP FIX
+
+The map must separate:
+
+Actual incidents this period
+Indirect exposure zones
+Standing profile zones
+
+Do not show standing profile zones with the same visual weight as actual reported incidents.
+
+Map rules:
+
+Solid markers = reported incidents this period
+Shaded corridors = indirect operating exposure
+Outlined zones = standing profile only
+Low confidence incidents = not plotted as precise markers
+
+Add this map note:
+
+Solid markers show reported incidents this period. Shaded corridors show indirect operating exposure. Outlined zones show standing profile only. Low confidence items are not plotted as precise markers.
+
+MAP SIDE PANEL FIX
+
+Replace “Operating zones this period” with:
+
+MAPPED EVIDENCE THIS PERIOD
+
+Only list actual or indirect evidence here.
+
+Below that, add a separate smaller box:
+
+STANDING PROFILE AREAS
+
+This can include:
+
+Tanjung Priok port
+Soekarno Hatta corridor
+Sudirman / Thamrin
+SCBD / Senayan
+Kuningan / Gatot Subroto
+
+Only show these as standing profile unless supported by incidents.
+
+Do not let standing profile areas look like live incidents.
+
+POLSTAR VIEW FIX
+
+The Polestar View must clearly separate live reporting from background operating conditions.
+
+Example:
+
+Jakarta remains operational this period. Confirmed reporting points to localised movement disruption around Central Jakarta government district activity, with rain and flooding acting as indirect indicators for commuter and access delays. No direct port or airport disruption was identified unless supported by the Ground Truth Ledger. Business users should treat standing profile areas such as Tanjung Priok, Soekarno Hatta, Sudirman, Thamrin, SCBD and Kuningan as routine operating considerations unless live reporting indicates a change.
+
+REMOVE FILLER LANGUAGE
+
+Reduce or remove these phrases unless tied to evidence:
+
+manageable but disruption prone
+confirm locally
+allow extra time
+routine movement can be affected
+main effect on movement and timings
+standing profile, unless clearly labelled
+movement may be disrupted
+monitor the situation
+
+Replace with:
+
+confirmed this period
+indirect indicator this period
+not directly indicated this period
+standing profile only
+monitor only
+not mapped due to low location confidence
+no direct port impact identified
+no direct airport impact identified
+action required only during affected periods
+
+ACCEPTANCE TEST
+
+Before generating the PDF, the report builder should check:
+
+Can every priority area be traced to an incident ID or clearly marked as standing profile?
+
+Are port and airport claims labelled confirmed, indirect, not indicated or standing profile only?
+
+Does the map show actual incidents differently from standing profile zones?
+
+Are low confidence incidents excluded from precise mapping?
+
+Does the Polestar View distinguish live reporting from normal Jakarta background exposure?
+
+Can a reviewer answer these questions for every operational claim:
+
+Which incident supports this?
+Where did it happen?
+How confident is the location?
+Why does it matter operationally?
+Is it mapped correctly?
+Is the action specific to the incident?
+
+FINAL OUTCOME
+
+The report must feel like this:
+
+“We reviewed this week’s reporting, mapped what can be mapped, separated live issues from background exposure, and converted that into operating actions.”
+
+It must not feel like this:
+
+“Here is a general Jakarta guide with this week’s dates on it.”
