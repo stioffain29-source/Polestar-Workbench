@@ -88,7 +88,7 @@ export function gnews(
 
 type Feed = TopicFeed & { url: string };
 
-type Classified = { kept: boolean; reason: string; country: string | null };
+export type Classified = { kept: boolean; reason: string; country: string | null };
 
 export function detectCountry(hay: string, aliases: CountryAlias[]): string | null {
   const match = aliases.find((c) => c.aliases.some((a) => hasWord(hay, a)));
@@ -217,6 +217,28 @@ function classify(
   const country = detected ?? feed.defaultCountry;
 
   return { kept: true, reason: `allow:${allowHit}`, country };
+}
+
+/**
+ * Test/diagnostic wrapper around the internal ingest `classify` gate. Runs the
+ * REAL allow/deny + country/out-of-region logic a given `NewsTopicConfig` uses
+ * during ingest, without needing a live feed. Kept thin so unit tests lock the
+ * exact production classification and catch drift when the allow/deny lists in
+ * `topicConfigs.ts` change.
+ */
+export function classifyNewsItem(
+  cfg: NewsTopicConfig,
+  title: string,
+  summary = "",
+  opts: { sourceName?: string; host?: string; defaultCountry?: string } = {},
+): Classified {
+  const feed: Feed = {
+    label: "test",
+    q: "",
+    defaultCountry: opts.defaultCountry ?? "Unknown",
+    url: "",
+  };
+  return classify(title, summary, feed, cfg, opts.sourceName ?? "", opts.host ?? "");
 }
 
 function dedupeKey(title: string, when: Date, country: string, topic: string): string {

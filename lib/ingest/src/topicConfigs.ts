@@ -742,7 +742,7 @@ const APAC_LOCAL_FEEDS: TopicFeed[] = [
   { q: "", label: "BenarNews", directUrl: "https://www.benarnews.org/english/rss", sourceName: "BenarNews", defaultCountry: "Unknown" },
 ];
 
-const APAC_LOCAL_CONFIG: NewsTopicConfig = {
+export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
   topic: "apac_local",
   feeds: APAC_LOCAL_FEEDS,
   // Bilingual allow-list scoped to the six tracked categories: protest / civil
