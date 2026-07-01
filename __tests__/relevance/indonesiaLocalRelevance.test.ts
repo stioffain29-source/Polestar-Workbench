@@ -145,3 +145,60 @@ describe("indonesia_local ingest allow/deny gate", () => {
     expect(c.reason).toMatch(/out-of-region/);
   });
 });
+
+// Indonesian local outlets increasingly write in informal slang and
+// abbreviations rather than the formal bilingual vocabulary above. These
+// fixtures lock that coverage so a future allow/deny edit cannot silently start
+// dropping genuine slang-worded incidents — or leaking the "demo" product-demo
+// homonym. See `lib/ingest/src/topicConfigs.ts` (INDONESIA_LOCAL allow/deny).
+describe("indonesia_local ingest allow/deny gate — informal slang + abbreviations", () => {
+  describe("keeps genuine slang-worded incidents", () => {
+    const kept: Array<[string, string]> = [
+      // protest slang ("demo" bound to actor/verb, "unras" = unjuk rasa, brawl)
+      ["demo mahasiswa", "Demo mahasiswa ricuh di depan gedung DPR Jakarta"],
+      ["demo buruh", "Demo buruh tolak UU Cipta Kerja di Bekasi"],
+      ["aksi demo", "Aksi demo warga tolak tambang di Sulawesi"],
+      ["unras", "Unras tolak kenaikan BBM digelar di Makassar"],
+      ["tawuran", "Tawuran antar kelompok pemuda pecah di Jakarta Timur"],
+      // crime slang / abbreviations
+      ["curanmor", "Pelaku curanmor ditangkap polisi di Surabaya"],
+      ["geng motor", "Geng motor serang warga di Bandung"],
+      ["begal", "Korban begal motor luka parah di Medan"],
+      // security abbreviation (Papua)
+      ["kkb", "KKB serang pos aparat di pedalaman Papua"],
+      // transport abbreviation
+      ["laka lantas", "Laka lantas maut di tol Cikampek tewaskan tiga orang"],
+    ];
+    it.each(kept)("keeps %s", (_label, title) => {
+      const c = classify(title);
+      expect(c.kept).toBe(true);
+      expect(c.reason).toMatch(/^allow:/);
+    });
+  });
+
+  describe("routes the 'demo' homonym correctly", () => {
+    it("keeps a student demonstration ('demo mahasiswa')", () => {
+      const c = classify("Demo mahasiswa tolak kebijakan baru di Jakarta");
+      expect(c.kept).toBe(true);
+      expect(c.reason).toMatch(/^allow:/);
+    });
+
+    it("drops a product demo ('demo produk')", () => {
+      const c = classify("Demo produk gadget terbaru meriah di Jakarta");
+      expect(c.kept).toBe(false);
+      expect(c.reason).toMatch(/^deny:/);
+    });
+
+    it("drops a cooking demo ('demo masak' / 'demo memasak')", () => {
+      expect(classify("Demo masak bareng chef selebriti di Jakarta").kept).toBe(false);
+      expect(classify("Demo memasak ramaikan festival kuliner Bandung").kept).toBe(false);
+    });
+
+    it("does not false-match 'demo' inside 'demokrasi' / 'demografi'", () => {
+      // Bare "demo" is deliberately NOT an allow token; these non-incident
+      // stories must fall through to no-allowlist-match, not leak in.
+      expect(classify("Diskusi soal demokrasi digelar di kampus Jakarta").kept).toBe(false);
+      expect(classify("Seminar demografi penduduk Indonesia di Jakarta").kept).toBe(false);
+    });
+  });
+});

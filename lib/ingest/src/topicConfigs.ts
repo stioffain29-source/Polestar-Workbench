@@ -623,10 +623,21 @@ export const INDONESIA_LOCAL_CONFIG: NewsTopicConfig = {
     // unrest / protest
     "demonstrasi", "unjuk rasa", "kerusuhan", "bentrok", "rusuh", "aksi massa",
     "protest", "riot", "unrest", "clash", "demonstration", "rally",
+    // unrest / protest — informal slang + abbreviations. "demo" alone is NOT
+    // listed (it is a substring of "demokrasi"/"demografi" and of the denied
+    // "demo produk"); instead bind it to protest actors/verbs, and add the
+    // "unjuk rasa" abbreviation "unras" plus the youth-brawl term "tawuran".
+    "unras", "tawuran",
+    "demo mahasiswa", "demo buruh", "demo warga", "demo tolak", "demo ricuh",
+    "aksi demo", "gelar demo",
     // crime
     "pembunuhan", "penembakan", "perampokan", "begal", "pencurian", "penikaman",
     "penculikan", "tindak kriminal", "kriminal",
     "murder", "shooting", "robbery", "theft", "stabbing", "kidnap", "homicide", "assault",
+    // crime / security — informal slang + abbreviations: "curanmor" (motor-
+    // vehicle theft), "geng motor" (violent bike gangs), "kkb" (armed criminal
+    // group, used for Papua security incidents).
+    "curanmor", "geng motor", "kkb",
     // natural hazard
     "banjir", "longsor", "gempa", "tsunami", "erupsi", "gunung meletus", "letusan",
     "flood", "landslide", "earthquake", "quake", "eruption", "volcano",
@@ -640,6 +651,8 @@ export const INDONESIA_LOCAL_CONFIG: NewsTopicConfig = {
     "kecelakaan", "kapal tenggelam", "kapal karam", "pesawat jatuh", "tabrakan",
     "bandara", "pelabuhan",
     "accident", "plane crash", "boat sinks", "ferry", "capsize", "airport", "collision", "derail",
+    // transport — informal abbreviation: "laka lantas" (traffic accident).
+    "laka lantas",
     // government stability
     "korupsi", "pemakzulan", "mosi tidak percaya", "krisis politik", "reshuffle",
     "corruption", "impeachment", "no-confidence", "political crisis", "cabinet reshuffle",
@@ -759,12 +772,22 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "state of emergency", "crackdown", "student protest",
     "demonstrasi", "unjuk rasa", "kerusuhan", "bentrok", "rusuh", "aksi massa",
     "mogok kerja", "aksi buruh",
+    // protest / civil unrest — informal Bahasa slang + abbreviations. Bare
+    // "demo" is avoided (substring of "demokrasi" and the denied "demo produk");
+    // bind it to protest actors/verbs. "unras" abbreviates "unjuk rasa";
+    // "tawuran" is the youth-brawl term.
+    "unras", "tawuran",
+    "demo mahasiswa", "demo buruh", "demo warga", "demo tolak", "demo ricuh",
+    "aksi demo", "gelar demo",
     // crime
     "murder", "shooting", "shot dead", "robbery", "theft", "stabbing",
     "kidnap", "kidnapping", "abduction", "homicide", "assault", "extortion",
     "drug bust", "human trafficking", "gang war", "gang violence",
     "pembunuhan", "penembakan", "perampokan", "begal", "pencurian",
     "penikaman", "penculikan", "kriminal", "narkoba",
+    // crime — informal slang + abbreviations: "curanmor" (motor-vehicle theft),
+    // "geng motor" (violent bike gangs).
+    "curanmor", "geng motor",
     // terrorism
     "terror", "terrorist", "terrorism", "suicide bomb", "bomb blast",
     "bombing", "explosion", "improvised explosive", "insurgent", "insurgency",
@@ -779,12 +802,16 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "armed group", "raid on", "attack",
     "penyerangan", "penyanderaan", "baku tembak", "aparat keamanan",
     "operasi keamanan",
+    // security — abbreviation: "kkb" (armed criminal group, used for Papua).
+    "kkb",
     // transport disruption
     "plane crash", "boat sinks", "ferry", "capsize", "airport", "collision",
     "derail", "train crash", "road accident", "bus crash", "flight cancel",
     "airport closure", "port closure", "shipwreck", "runway",
     "kecelakaan", "kapal tenggelam", "kapal karam", "pesawat jatuh",
     "tabrakan", "bandara", "pelabuhan",
+    // transport — informal abbreviation: "laka lantas" (traffic accident).
+    "laka lantas",
   ],
   deny: [
     ...COMMON_DENY,
@@ -799,7 +826,7 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "stock market", "crypto", "bitcoin", "saham", "ihsg", "bursa", "kripto",
     "lowongan kerja",
     // product demos (the "demo" homonym)
-    "demo produk", "demo masak",
+    "demo produk", "demo masak", "demo memasak",
   ],
   countryAliases: APAC_LOCAL_ALIASES,
   // Direct outlets span national agencies, major dailies and small regional
