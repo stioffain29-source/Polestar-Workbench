@@ -28,6 +28,7 @@ import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, type CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import { consolidateCountryStories } from "@/lib/countrySameStory";
 import { shouldGenerateProse } from "@/lib/countryProseGate";
+import { isCityReport, reportKindLabel } from "@/lib/reportKind";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
 import JakartaReportBody from "@/components/JakartaReportBody";
 import {
@@ -981,7 +982,7 @@ export default function CountryReport() {
   };
 
   if (isLoading) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Loading...</div>;
-  if (!country || !effective) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Country report not found.</div>;
+  if (!country || !effective) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Report not found.</div>;
 
   const windowIncidents = facts.windowIncidents;
 
@@ -989,6 +990,9 @@ export default function CountryReport() {
   // Jakarta uses a corridor & access schematic (operating-exposure graphic)
   // instead of the numbered incident-dot map; all other theatres are unchanged.
   const isJakarta = effective.name.trim().toLowerCase() === "jakarta";
+  // City reports (Jakarta today; Manila/Bangkok planned) are framed as CITY, not
+  // COUNTRY, reports — driven by the shared reportKind registry.
+  const isCity = isCityReport(effective.name);
   const mapNode = isJakarta ? (
     <JakartaCorridorMap
       incidents={windowIncidents as CountryFastFactsIncident[]}
@@ -1130,6 +1134,14 @@ export default function CountryReport() {
             paddingBottom: 28,
           }}
         >
+          {isCity && (
+            <div
+              className="uppercase"
+              style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 13, letterSpacing: "0.22em", marginBottom: 10 }}
+            >
+              CITY REPORT
+            </div>
+          )}
           <h1
             className="mb-4"
             style={{
@@ -1140,7 +1152,7 @@ export default function CountryReport() {
               textTransform: "uppercase",
             }}
           >
-            {effective.name || "Country Report"}
+            {effective.name || reportKindLabel(effective.name)}
           </h1>
           <div className="uppercase" style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 13, letterSpacing: "0.22em", marginBottom: 6 }}>
             POLESTAR INSIGHTS
@@ -1222,7 +1234,7 @@ export default function CountryReport() {
         ) : (
           <div className="text-right">
             <div style={{ fontFamily: ROBOTO, fontSize: 11, letterSpacing: "0.18em", opacity: 0.85 }} className="uppercase">
-              Polestar Insights · Country Report
+              Polestar Insights · {reportKindLabel(effective.name)}
             </div>
             <h1 style={{ fontFamily: ROBOTO, fontWeight: 700, fontSize: 30, letterSpacing: "0", lineHeight: 1.1, marginTop: 6 }} className="uppercase">
               {effective.name}
@@ -1448,10 +1460,10 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {/* Jakarta renders the dedicated 13-section TACTICAL OPERATING BRIEF; every
+      {/* Jakarta renders the dedicated 14-section TACTICAL OPERATING BRIEF; every
           other theatre — structured or generic — keeps the shared deterministic
           operating-risk brief from PngCountryReportBody. The Jakarta brief always
-          renders its corridor map inside its own §13 (Map and Area Summary), so
+          renders its corridor map inside its own §14 (Operational Map), so
           the end/inline map-placement controls do not apply to it. */}
       {pngEffectiveDataset &&
         (isJakarta ? (
@@ -1469,7 +1481,7 @@ export default function CountryReport() {
 
       {/* "End" map placement — the incident map renders here, just above the
           shared analytics block, when the analyst leaves it at the default. For
-          Jakarta the map already lives in §13, so it is suppressed here. */}
+          Jakarta the map already lives in §14, so it is suppressed here. */}
       {!isJakarta && mapPlacement === "end" && mapNode}
 
       {/* Situational Context reference layer — rendered below the written brief

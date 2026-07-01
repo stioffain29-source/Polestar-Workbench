@@ -540,6 +540,7 @@ export function geocodeJakartaIncident(
       lat,
       lon,
       confidence: "explicit",
+      locationConfidence: "HIGH",
       zoneId: nearestZoneId(lat, lon),
     };
   }
@@ -559,6 +560,7 @@ export function geocodeJakartaIncident(
             lat: entry.lat,
             lon: entry.lon,
             confidence: "named",
+            locationConfidence: entry.precision === "high" ? "HIGH" : "MEDIUM",
             zoneId: entry.zoneId,
             matchedName: name,
           };

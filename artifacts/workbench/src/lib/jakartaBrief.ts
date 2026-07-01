@@ -636,6 +636,31 @@ export interface JakartaRoleAction {
   guidance: string;
 }
 
+// Crime Trends & Business Impact (dedicated crime section). A single curated
+// STANDING business-impact row — durable analyst guidance about Jakarta's
+// enduring crime patterns, NEVER this period's live findings.
+export interface JakartaCrimeBusinessRow {
+  pattern: string;
+  businessImpact: string;
+  precaution: string;
+}
+
+// The Crime Trends & Business Impact section payload. Splits what actually
+// surfaced in reporting THIS period from Jakarta's durable standing pattern, so
+// neither reads as the other. Count-free; no numeric increase/decrease claims.
+export interface JakartaCrimeTrends {
+  // What crime surfaced in open-source reporting this period — or an honest
+  // "not reported this period" note when nothing distinct was identified.
+  reportedThisPeriod: string;
+  // Jakarta's durable, standing crime pattern (analyst baseline, not live data).
+  standingPattern: string;
+  // Qualitative read of this period against the standing pattern. Never asserts
+  // a numeric rise or fall.
+  trendRead: string;
+  // Standing business-impact table (always present).
+  businessImpact: JakartaCrimeBusinessRow[];
+}
+
 export interface JakartaTacticalBrief {
   priorityAreas: JakartaPriorityAreaRow[];
   staffMovement: JakartaStaffMovementImpact;
@@ -649,6 +674,7 @@ export interface JakartaTacticalBrief {
   routeTiming: string[];
   roleActions: JakartaRoleAction[];
   areaSummary: string;
+  crimeTrends: JakartaCrimeTrends;
 }
 
 function corridorById(
@@ -945,8 +971,108 @@ export function buildJakartaAreaSummary(
   return `Reporting this period was attributed to ${names}; the remaining areas reflect their standing operating-exposure profile. Prioritise protest, flood and access checks there before committing staff and vehicle movements.`;
 }
 
+// Jakarta's durable, standing crime picture. A curated analyst baseline (NOT
+// this period's reporting) so it can never read as fabricated live data. The
+// dominant business exposures are opportunistic and property crime, not
+// targeted attacks. Count-free; British English.
+const JAKARTA_CRIME_STANDING =
+  "Jakarta's standing crime picture is dominated by opportunistic and property crime rather than targeted attacks on business. The persistent exposures are street theft and pickpocketing around transport hubs and crowded commercial areas, vehicle crime and smash-and-grab in traffic, residential and premises break-ins in dense districts, and card or ATM fraud. Extortion and informal levies (premanisme) affect logistics around ports and industrial areas, and periodic drug-enforcement operations create legal and reputational risk for staff and visitors. Violent crime is a lower routine concern but can flare around nightlife, crowds and disputes.";
+
+// The standing business-impact table. Always present — it is the durable "why it
+// affects business" answer, independent of what surfaced this period.
+const JAKARTA_CRIME_BUSINESS_ROWS: JakartaCrimeBusinessRow[] = [
+  {
+    pattern: "Opportunistic street theft and pickpocketing",
+    businessImpact:
+      "Staff and visitors are exposed around transport hubs, markets, malls and busy streets, most of all after dark and in crowds.",
+    precaution:
+      "Keep phones, cash and valuables out of sight; use booked, tracked transport rather than street-hailing after hours.",
+  },
+  {
+    pattern: "Vehicle crime and traffic-stop theft (begal, smash-and-grab)",
+    businessImpact:
+      "Drivers and passengers are exposed at lights and in congestion on arterial roads and at night.",
+    precaution:
+      "Keep doors locked and windows up; keep bags and devices out of view; brief drivers on secure routes and stops.",
+  },
+  {
+    pattern: "Residential and premises break-ins",
+    businessImpact:
+      "Staff housing, serviced apartments and offices in dense districts face burglary and forced-entry risk, especially out of hours.",
+    precaution:
+      "Confirm guarding, alarms and access control at residences and offices; review after-hours premises cover.",
+  },
+  {
+    pattern: "Card skimming and ATM fraud",
+    businessImpact:
+      "Staff and travellers face financial loss using ATMs and card terminals in less secure locations.",
+    precaution:
+      "Use ATMs inside banks and reputable venues; monitor accounts and set transaction alerts.",
+  },
+  {
+    pattern: "Extortion and informal levies (premanisme)",
+    businessImpact:
+      "Intimidation and unofficial charges can disrupt cargo movement and site works around ports and industrial areas.",
+    precaution:
+      "Work through established operators; report demands; avoid ad-hoc roadside arrangements.",
+  },
+  {
+    pattern: "Drug-enforcement operations",
+    businessImpact:
+      "Raids and checks at venues carry legal and reputational risk for staff and visitors; penalties are severe.",
+    precaution:
+      "Brief travellers on zero-tolerance narcotics laws; avoid venues under enforcement scrutiny.",
+  },
+  {
+    pattern: "Violent crime and public disorder",
+    businessImpact:
+      "Routine business exposure is lower, but brawls, disputes and crowd flare-ups can develop around events and nightlife.",
+    precaution:
+      "Avoid confrontations and crowds; extract staff from developing disturbances early.",
+  },
+];
+
+// Build the Crime Trends & Business Impact section. `items` is the report window;
+// the this-period read is derived ONLY from crime-theme items (via the shared
+// CRIME_GROUPS / presentAreas), so it never invents crime that was not reported.
+// The standing pattern and business-impact table are curated and always shown.
+export function buildJakartaCrimeTrends(
+  items: PngReportItem[],
+): JakartaCrimeTrends {
+  const crimeItems = items.filter(
+    (it) => jakartaThemeForCategory(it.category) === "crime",
+  );
+  const crimeTypes = extractLabels(crimeItems, CRIME_GROUPS);
+  const area = joinList(presentAreas(crimeItems));
+
+  let reportedThisPeriod: string;
+  let trendRead: string;
+  // Any crime-theme item produces a this-period read: a classified crime
+  // record must never fall through to "No fresh crime-specific reporting" just
+  // because it lacked an extractable crime-type token or a resolved area.
+  if (crimeItems.length) {
+    const what = crimeTypes.length
+      ? joinList(crimeTypes)
+      : "crime and public-safety incidents";
+    const where = area ? ` in ${area}` : "";
+    reportedThisPeriod = `Open-source reporting this period featured ${what}${where}. Treat this as a partial signal of the wider picture rather than a complete crime record.`;
+    trendRead = `This period's reporting sits within Jakarta's standing pattern of opportunistic and property crime; on its own it does not indicate a city-wide shift. Read it as texture on top of the standing crime profile, which remains the working assumption for planning.`;
+  } else {
+    reportedThisPeriod = `No fresh crime-specific reporting was identified in the sources this period. This is not evidence that crime is absent — routine opportunistic and property crime is heavily under-reported — so the standing pattern continues to apply.`;
+    trendRead = `With no distinct crime reporting this period, plan against Jakarta's standing pattern of opportunistic and property crime rather than assuming a quieter environment.`;
+  }
+
+  return {
+    reportedThisPeriod,
+    standingPattern: JAKARTA_CRIME_STANDING,
+    trendRead,
+    businessImpact: JAKARTA_CRIME_BUSINESS_ROWS,
+  };
+}
+
 export function buildJakartaTacticalBrief(
   statuses: JakartaCorridorStatus[],
+  windowItems: PngReportItem[] = [],
 ): JakartaTacticalBrief {
   return {
     priorityAreas: buildJakartaPriorityAreas(statuses),
@@ -957,6 +1083,7 @@ export function buildJakartaTacticalBrief(
     routeTiming: buildJakartaRouteTiming(),
     roleActions: buildJakartaRoleActions(),
     areaSummary: buildJakartaAreaSummary(statuses),
+    crimeTrends: buildJakartaCrimeTrends(windowItems),
   };
 }
 
@@ -998,6 +1125,9 @@ export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrid
     escalationIndicators: buildJakartaEscalationIndicators(),
     incidentThemes: buildJakartaIncidentThemes(input.incidentDetailsItems),
     topThree: applyJakartaTopThree(input.topThree),
-    tactical: buildJakartaTacticalBrief(input.corridorStatuses ?? []),
+    tactical: buildJakartaTacticalBrief(
+      input.corridorStatuses ?? [],
+      input.windowItems,
+    ),
   };
 }

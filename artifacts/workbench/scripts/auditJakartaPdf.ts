@@ -5,7 +5,7 @@
 //      from BOTH the on-screen JakartaReportBody.tsx (`<Section title="...">`)
 //      and the headless renderJakartaBrief() in exportCountryReportPdf.ts
 //      (drawSectionWithProse / drawSectionHeading calls), then asserts they
-//      match each other AND the canonical 13-section order. A reorder or rename
+//      match each other AND the canonical 14-section order. A reorder or rename
 //      on either side fails the check.
 //
 //   2. FONT AUDIT — generates a real Jakarta PDF through the same exporter the
@@ -35,6 +35,7 @@ const SRC = (p: string) => resolvePath(WORKBENCH, "src", p);
 const CANONICAL_SECTIONS = [
   "Bottom Line Up Front",
   "Tactical Operating Picture",
+  "Crime Trends and Business Impact",
   "Priority Areas This Week",
   "Staff Movement Impact",
   "Airport Transfer Impact",
@@ -305,7 +306,7 @@ async function main() {
       "screenshots/font_proof/FONT_AUDIT.txt",
     );
     const existing = readFileSync(auditPath, "utf8");
-    const marker = "==== jakarta_country.pdf (Jakarta 13-section tactical brief) ====";
+    const marker = "==== jakarta_country.pdf (Jakarta 14-section tactical brief) ====";
     const lines = [
       marker,
       ...perPage.map(

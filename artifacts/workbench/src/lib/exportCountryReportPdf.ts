@@ -34,6 +34,7 @@ import {
 } from "./pdfChrome";
 import { COUNTRY_COVER_URLS } from "./coverImages";
 import { relatedIncidentsLimit } from "./reportWindow";
+import { reportKindLabel } from "./reportKind";
 import { classifyIncidentType } from "./incidentClassifier";
 import {
   computeCountryFastFacts,
@@ -76,6 +77,7 @@ import type {
   JakartaPortLogisticsRow,
   JakartaStaffMovementImpact,
   JakartaRoleAction,
+  JakartaCrimeBusinessRow,
 } from "./jakartaBrief";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 
@@ -694,7 +696,7 @@ function drawCoverageBanner(ctx: Ctx, coverage: CountryCoverageStatus) {
 }
 
 // --- Jakarta tactical-brief renderers --------------------------------------
-// The Jakarta city report carries its OWN 13-section structure (mirrors the
+// The Jakarta city report carries its OWN 14-section structure (mirrors the
 // on-screen JakartaReportBody). These headless renderers reuse the same
 // jakartaBrief.ts builders the screen uses, so the script-generated PDF and the
 // on-screen DOM-rasterised PDF stay in lockstep. Reached for Jakarta only;
@@ -902,7 +904,7 @@ function drawJakartaLabelledBlock(ctx: Ctx, label: string, text: string) {
   ctx.y += bodyLines.length * 13 + 8;
 }
 
-// The Jakarta-only 13-section tactical operating brief, rendered in the exact
+// The Jakarta-only 14-section tactical operating brief, rendered in the exact
 // order the on-screen JakartaReportBody uses. Section titles MUST stay in
 // lockstep with JakartaReportBody and auditJakartaPdf CANONICAL_SECTIONS.
 function renderJakartaBrief(
@@ -923,7 +925,18 @@ function renderJakartaBrief(
     d.executiveSummary || "Not populated.",
   );
 
-  // 3. Priority Areas This Week — ranked, data-driven table
+  // 3. Crime Trends and Business Impact — dedicated crime section
+  drawSectionHeading(ctx, "Crime Trends and Business Impact");
+  if (tactical) {
+    renderProse(ctx, tactical.crimeTrends.standingPattern);
+    renderProse(ctx, tactical.crimeTrends.reportedThisPeriod);
+    renderProse(ctx, tactical.crimeTrends.trendRead);
+    drawJakartaCrimeTable(ctx, tactical.crimeTrends.businessImpact);
+  } else {
+    renderProse(ctx, "Not populated.");
+  }
+
+  // 4. Priority Areas This Week — ranked, data-driven table
   drawSectionHeading(ctx, "Priority Areas This Week");
   if (tactical) {
     drawJakartaPriorityTable(ctx, tactical.priorityAreas);
@@ -931,7 +944,7 @@ function renderJakartaBrief(
     renderProse(ctx, "Not populated.");
   }
 
-  // 4. Staff Movement Impact — broken out by movement type
+  // 5. Staff Movement Impact — broken out by movement type
   drawSectionHeading(ctx, "Staff Movement Impact");
   if (tactical) {
     const sm = tactical.staffMovement;
@@ -949,14 +962,14 @@ function renderJakartaBrief(
     renderProse(ctx, "Not populated.");
   }
 
-  // 5. Airport Transfer Impact
+  // 6. Airport Transfer Impact
   drawSectionWithProse(
     ctx,
     "Airport Transfer Impact",
     tactical ? tactical.airportTransfer : "Not populated.",
   );
 
-  // 6. Port and Logistics Impact (intro + 4-col table + port actions)
+  // 7. Port and Logistics Impact (intro + 4-col table + port actions)
   drawSectionHeading(ctx, "Port and Logistics Impact");
   if (tactical) {
     renderProse(ctx, tactical.portLogistics.intro);
@@ -967,7 +980,7 @@ function renderJakartaBrief(
     renderProse(ctx, "Not populated.");
   }
 
-  // 7. Office, Hotel and Meeting Venue Exposure (intro + standing table)
+  // 8. Office, Hotel and Meeting Venue Exposure (intro + standing table)
   drawSectionHeading(ctx, "Office, Hotel and Meeting Venue Exposure");
   if (tactical) {
     renderProse(ctx, tactical.officeHotelVenue.intro);
@@ -976,12 +989,12 @@ function renderJakartaBrief(
     renderProse(ctx, "Not populated.");
   }
 
-  // 8. Route and Timing Guidance
+  // 9. Route and Timing Guidance
   drawSectionHeading(ctx, "Route and Timing Guidance");
   if (tactical) drawJakartaBulletList(ctx, tactical.routeTiming);
   else renderProse(ctx, "Not populated.");
 
-  // 9. Escalation Triggers
+  // 10. Escalation Triggers
   drawSectionHeading(ctx, "Escalation Triggers");
   if (d.escalationIndicators.length === 0) {
     renderProse(ctx, "No specific escalation triggers flagged this period.");
@@ -989,7 +1002,7 @@ function renderJakartaBrief(
     drawJakartaBulletList(ctx, d.escalationIndicators);
   }
 
-  // 10. Recommended Actions — role based
+  // 11. Recommended Actions — role based
   drawSectionHeading(ctx, "Recommended Actions");
   if (tactical && tactical.roleActions.length > 0) {
     for (const a of tactical.roleActions) drawJakartaLabelledBlock(ctx, a.role, a.guidance);
@@ -997,13 +1010,13 @@ function renderJakartaBrief(
     renderProse(ctx, "Not populated.");
   }
 
-  // 11. Seven Day Outlook
+  // 12. Seven Day Outlook
   drawSectionWithProse(ctx, "Seven Day Outlook", d.outlook || "Not populated.");
 
-  // 12. Polestar View
+  // 13. Polestar View
   drawSectionWithProse(ctx, "Polestar View", d.polestarView || "Not populated.");
 
-  // 13. Operational Map
+  // 14. Operational Map
   drawSectionHeading(ctx, "Operational Map");
   if (jakartaExposure.length > 0) drawJakartaExposureTable(ctx, jakartaExposure);
   renderProse(ctx, tactical ? tactical.areaSummary : "Not populated.");
@@ -1033,6 +1046,17 @@ function drawJakartaPortTable(ctx: Ctx, rows: JakartaPortLogisticsRow[]) {
     ["Area", "Operational relevance", "Possible impact", "Required action"],
     [0.22, 0.24, 0.27, 0.27],
     rows.map((r) => [r.area, r.operationalRelevance, r.possibleImpact, r.requiredAction]),
+  );
+}
+
+// The standing Crime business-impact table (Crime pattern | Business impact |
+// Precaution), the headless counterpart to the on-screen CrimeTable.
+function drawJakartaCrimeTable(ctx: Ctx, rows: JakartaCrimeBusinessRow[]) {
+  drawJakartaGridTable(
+    ctx,
+    ["Crime pattern", "Business impact", "Precaution"],
+    [0.26, 0.42, 0.32],
+    rows.map((r) => [r.pattern, r.businessImpact, r.precaution]),
   );
 }
 
@@ -1246,7 +1270,7 @@ export async function exportCountryReportPdf(
 ): Promise<void> {
   const issueDate = todayLabel();
   const ctx = createCtx({
-    kind: `${country.name} Country Report`,
+    kind: `${country.name} ${reportKindLabel(country.name)}`,
     issueDate,
   });
   await ensureRobotoLoaded(ctx.pdf);
@@ -1298,7 +1322,7 @@ export async function exportCountryReportPdf(
   // Coverage banner — only renders when the weekly window is empty.
   if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
 
-  // Jakarta carries its OWN 13-section tactical operating brief (mirrors the
+  // Jakarta carries its OWN 14-section tactical operating brief (mirrors the
   // on-screen JakartaReportBody). Build the same dataset the screen uses and
   // render those sections, then close the document and return early so the
   // generic country layout below never runs for Jakarta. Every other theatre

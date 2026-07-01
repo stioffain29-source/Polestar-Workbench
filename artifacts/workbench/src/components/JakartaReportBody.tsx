@@ -6,10 +6,11 @@ import type {
   JakartaPortLogisticsRow,
   JakartaStaffMovementImpact,
   JakartaRoleAction,
+  JakartaCrimeBusinessRow,
 } from "@/lib/jakartaBrief";
 
 // Jakarta-only TACTICAL OPERATING BRIEF body. A dedicated renderer so the Jakarta
-// city report can carry its own 13-section tactical structure (ranked Priority
+// city report can carry its own 14-section tactical structure (ranked Priority
 // Areas table, broken-out Staff Movement, a 4-column Port & Logistics table,
 // role-based Recommended Actions, …) WITHOUT touching the shared
 // PngCountryReportBody used by PNG / West Papua / Indonesia / every generic
@@ -214,7 +215,32 @@ function OpsTable({ rows }: { rows: JakartaTableRow[] }) {
   );
 }
 
-// Movement-type label order for the Staff Movement Impact section (spec §4).
+// The standing Crime business-impact table (Crime pattern | Business impact |
+// Precaution). Durable analyst guidance, not this period's findings.
+function CrimeTable({ rows }: { rows: JakartaCrimeBusinessRow[] }) {
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}>
+      <thead>
+        <tr>
+          <th style={{ ...baseHeadCell, width: "26%" }}>Crime pattern</th>
+          <th style={{ ...baseHeadCell, width: "42%" }}>Business impact</th>
+          <th style={{ ...baseHeadCell, width: "32%" }}>Precaution</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.pattern}</td>
+            <td style={baseCell}>{r.businessImpact}</td>
+            <td style={baseCell}>{r.precaution}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// Movement-type label order for the Staff Movement Impact section (spec §5).
 const STAFF_MOVEMENT_FIELDS: Array<{ label: string; key: keyof JakartaStaffMovementImpact }> = [
   { label: "Office access", key: "officeAccess" },
   { label: "Hotel to office movement", key: "hotelToOffice" },
@@ -248,9 +274,9 @@ function LabelledBlock({ label, text }: { label: string; text: string }) {
   );
 }
 
-// The Jakarta tactical operating brief body. Renders the canonical 13-section
+// The Jakarta tactical operating brief body. Renders the canonical 14-section
 // Jakarta order; the page appends its analytics block and the Disclaimer below.
-// The corridor map is injected at §13 via mapNode (the page no longer renders it
+// The corridor map is injected at §14 via mapNode (the page no longer renders it
 // at the end of the analytics block for Jakarta).
 export default function JakartaReportBody({
   dataset,
@@ -278,12 +304,26 @@ export default function JakartaReportBody({
         <Prose text={d.executiveSummary} />
       </Section>
 
-      {/* 3. Priority Areas This Week — ranked, data-driven table */}
+      {/* 3. Crime Trends and Business Impact — dedicated crime section */}
+      <Section title="Crime Trends and Business Impact">
+        {tactical ? (
+          <>
+            <Prose text={tactical.crimeTrends.standingPattern} />
+            <Prose text={tactical.crimeTrends.reportedThisPeriod} />
+            <Prose text={tactical.crimeTrends.trendRead} />
+            <CrimeTable rows={tactical.crimeTrends.businessImpact} />
+          </>
+        ) : (
+          <EmptyNote>Not populated.</EmptyNote>
+        )}
+      </Section>
+
+      {/* 4. Priority Areas This Week — ranked, data-driven table */}
       <Section title="Priority Areas This Week">
         {tactical ? <PriorityTable rows={tactical.priorityAreas} /> : <EmptyNote>Not populated.</EmptyNote>}
       </Section>
 
-      {/* 4. Staff Movement Impact — broken out by movement type */}
+      {/* 5. Staff Movement Impact — broken out by movement type */}
       <Section title="Staff Movement Impact">
         {tactical ? (
           <div>
