@@ -4,7 +4,7 @@ export { runFlashpointUnknownReattribute } from "./flashpointUnknownReattribute"
 export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
-export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, APAC_LOCAL_CONFIG } from "./topicConfigs";
+export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG } from "./topicConfigs";
 export { classifyNewsConfidence } from "./newsConfidence";
 export type { Confidence } from "./newsConfidence";
 export { runNewsTopicIngest, classifyNewsItem } from "./newsTopic";

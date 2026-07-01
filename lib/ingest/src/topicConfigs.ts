@@ -610,7 +610,7 @@ const INDONESIA_LOCAL_FEEDS: TopicFeed[] = [
   { label: "Indonesia security (EN)", q: `Indonesia (protest OR unrest OR riot OR clash OR shooting OR stabbing OR robbery OR flood OR earthquake OR landslide OR eruption OR wildfire OR haze OR "plane crash" OR "boat sinks" OR ferry OR terror OR bomb OR strike OR layoffs OR corruption)`, defaultCountry: "Indonesia", ...ID_ENGLISH },
 ];
 
-const INDONESIA_LOCAL_CONFIG: NewsTopicConfig = {
+export const INDONESIA_LOCAL_CONFIG: NewsTopicConfig = {
   topic: "indonesia_local",
   feeds: INDONESIA_LOCAL_FEEDS,
   // Bilingual allow-list. The ingest gate substring-matches the RAW (Bahasa)
