@@ -6,6 +6,9 @@ const tsJestTransformCfg = createDefaultPreset().transform;
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
+  // Clears every known integration secret from process.env before each test so
+  // no suite can silently depend on (or be masked by) ambient workspace secrets.
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testMatch: ["**/__tests__/**/*.ts?(x)", "**/?(*.)+(spec|test).ts?(x)"],
   testPathIgnorePatterns: [
     "/node_modules/",
