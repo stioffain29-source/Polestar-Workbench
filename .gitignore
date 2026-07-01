@@ -50,3 +50,8 @@ Thumbs.db
 
 # Local dev secrets (see .env.local.example)
 .env.local
+
+# Auto-generated topic font-proof PDFs (regenerated non-deterministically by
+# auditTopicFonts.sh each validation run; the tracked FONT_AUDIT.txt is the real
+# acceptance artifact). Untracked to stop perpetual rebase conflicts on PDF metadata.
+artifacts/workbench/screenshots/font_proof/*_report.pdf
