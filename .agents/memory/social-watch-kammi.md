@@ -1,23 +1,43 @@
 ---
 name: KAMMI social-media protest watch
-description: Instagram social monitoring as additive context (own table, never incidents) with promote-to-incident; where the wiring lives and the invariants. Telegram was retired (dead channel).
+description: Instagram+Telegram social monitoring as additive context (own table, never incidents) with promote-to-incident; where the wiring lives and the invariants. Telegram is manual-entry-only (scraper retired). Analyst manual-paste create path.
 ---
 
 # KAMMI / Indonesia Social Watch
 
-Public KAMMI Pusat Instagram protest monitoring. Posts are ADDITIVE CONTEXT in
-their own `social_watch_items` table — they NEVER become incidents and never
-inflate any incident count. The ONLY path into the incidents table is the
+Public KAMMI Pusat Instagram/Telegram protest monitoring. Posts are ADDITIVE
+CONTEXT in their own `social_watch_items` table — they NEVER become incidents and
+never inflate any incident count. The ONLY path into the incidents table is the
 explicit operator promote action.
 
-**Telegram retired:** the KAMMI Telegram channel was dead (last active 2016) and
-no active KAMMI Telegram channel exists anywhere, so it was removed entirely —
-ingest parser (`parseTelegramHtml`), Source Health entry
-(`social_watch_telegram` / `SOCIAL_WATCH_TG_HEALTH_NAME`), scheduler activity
-check, and the `platform` enum (now `[instagram]` only). A marker-gated boot
-migration (`delete_telegram_social_watch_v1`) purges any stored
-`platform='telegram'` rows. Do NOT re-add Telegram without the user asking.
-Instagram is the sole live path.
+**Manual-paste create path (`POST /api/social-watch`, `createSocialWatchItem`):**
+analysts add Instagram/Telegram posts BY HAND — no scraping, no API keys. Body =
+`platform`(instagram|telegram)/`url`/`caption` required; optional
+`actor`/`channel`/`postedAt`/`imageUrls`/`status`/`confidence`. Server RE-DERIVES
+status/`promotable`/location/issue/`eventDateTime`/`alertReasons`/`dedupKey`
+(client-supplied `promotable` is NOT an accepted field → stripped by zod;
+eligibility is text/status-derived). Sets `sourceName="social_watch"`,
+`country="Indonesia"`, `topic="flashpoint"`, `classification="context"`,
+`externalId="manual_<platform>_<hash>"`. `onConflictDoNothing` then re-select by
+dedupKey → 200 on dedupe / 201 created / 400 bad shape. TOKEN-GATED
+(`requireAdminToken`) — the create write follows the admin-write posture, NOT the
+public promote posture. UI: `AddWatchItemForm` in Protests.tsx SocialWatchPanel
+invalidates `getListSocialWatchItemsQueryKey()` on success.
+
+**Telegram = manual-entry-only (scraper stays retired):** the KAMMI Telegram
+channel was dead (last active 2016) so the SCRAPER was removed permanently
+(`parseTelegramHtml` gone, no `social_watch_telegram` Source Health entry, no
+scheduler check). But the `platform` enum was RE-WIDENED to `[instagram,
+telegram]` so analysts can manually paste Telegram posts. The old marker-gated
+delete migration (`delete_telegram_social_watch_v1`) was REMOVED so manually-added
+Telegram rows survive redeploys. Do NOT re-add a Telegram scraper without the
+user asking.
+
+**Source Health with no scraper credential = `working` (manual-entry mode), NOT
+`not_configured`:** when no paid Instagram scraper credential is set, the panel
+reports `working` because analyst manual-entry is a fully functional mode. Panel
+counts BOTH platforms (`socialWatchPlatformCounts("all")`). Metric "Mode" =
+"Scraper + manual" (configured) / "Manual entry" (not).
 
 **Invariants (do not break):**
 - Social posts live in their own table; incident counts must be unchanged by the

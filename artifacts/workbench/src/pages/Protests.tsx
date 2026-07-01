@@ -3,6 +3,7 @@ import {
   useListIncidents,
   useListSocialWatchItems,
   usePromoteSocialWatchItem,
+  useCreateSocialWatchItem,
   getListSocialWatchItemsQueryKey,
   useListSocialRawItems,
   usePromoteSocialRawItem,
@@ -666,6 +667,337 @@ function SocialStatusBadge({ status }: { status: string }) {
   );
 }
 
+function AddWatchItemForm() {
+  const queryClient = useQueryClient();
+  const create = useCreateSocialWatchItem();
+  const [open, setOpen] = useState(false);
+  const [platform, setPlatform] = useState<"instagram" | "telegram">("instagram");
+  const [url, setUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [postedAt, setPostedAt] = useState("");
+  const [actor, setActor] = useState("");
+  const [channel, setChannel] = useState("");
+  const [issue, setIssue] = useState("");
+  const [location, setLocation] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventTimeText, setEventTimeText] = useState("");
+  const [statusChoice, setStatusChoice] = useState("");
+  const [confidence, setConfidence] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+
+  function reset() {
+    setUrl("");
+    setCaption("");
+    setImageUrl("");
+    setPostedAt("");
+    setActor("");
+    setChannel("");
+    setIssue("");
+    setLocation("");
+    setCity("");
+    setProvince("");
+    setEventDate("");
+    setEventTimeText("");
+    setStatusChoice("");
+    setConfidence("");
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    setOk(null);
+    if (!url.trim() || !caption.trim()) {
+      setErr("Post URL and caption are both required.");
+      return;
+    }
+    try {
+      const created = await create.mutateAsync({
+        data: {
+          platform,
+          url: url.trim(),
+          caption: caption.trim(),
+          ...(imageUrl.trim() ? { imageUrls: [imageUrl.trim()] } : {}),
+          ...(postedAt.trim() ? { postedAt: new Date(postedAt).toISOString() } : {}),
+          ...(actor.trim() ? { actor: actor.trim() } : {}),
+          ...(channel.trim() ? { channel: channel.trim() } : {}),
+          ...(issue.trim() ? { issue: issue.trim() } : {}),
+          ...(location.trim() ? { location: location.trim() } : {}),
+          ...(city.trim() ? { city: city.trim() } : {}),
+          ...(province.trim() ? { province: province.trim() } : {}),
+          ...(eventDate.trim()
+            ? { eventDate: new Date(eventDate).toISOString() }
+            : {}),
+          ...(eventTimeText.trim() ? { eventTimeText: eventTimeText.trim() } : {}),
+          ...(statusChoice
+            ? {
+                status: statusChoice as
+                  | "planned"
+                  | "active"
+                  | "dispersed"
+                  | "cancelled"
+                  | "unclear",
+              }
+            : {}),
+          ...(confidence ? { confidence } : {}),
+        },
+      });
+      // Orval mutations don't auto-refetch — invalidate so the new (or existing,
+      // on a deduped re-paste) row appears in the board immediately.
+      await queryClient.invalidateQueries({
+        queryKey: getListSocialWatchItemsQueryKey(),
+      });
+      setOk(
+        `Added as context — status "${created.status}"` +
+          (created.promotable ? ", eligible to promote." : " (not promotable)."),
+      );
+      reset();
+    } catch (e) {
+      setErr(
+        e instanceof Error
+          ? e.message
+          : "Could not add the item. Check the admin token in Source Health.",
+      );
+    }
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="px-3 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-sm text-white"
+          style={{ backgroundColor: "#465bff" }}
+        >
+          Add watch item
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="bg-white border border-border rounded-sm p-4 space-y-3 font-sans"
+    >
+      <div className="flex items-center justify-between">
+        <h4 className="text-[13px] font-bold uppercase tracking-wider">
+          Add watch item (manual)
+        </h4>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-[12px] text-muted-foreground underline"
+        >
+          Close
+        </button>
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Paste a KAMMI Instagram/Telegram post by hand. Stored as ADDITIVE context
+        only — never an incident. Status and promotion eligibility are re-derived
+        from the caption on the server.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label className="text-[12px] font-medium">
+          Platform
+          <select
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value as "instagram" | "telegram")}
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          >
+            <option value="instagram">Instagram</option>
+            <option value="telegram">Telegram</option>
+          </select>
+        </label>
+        <label className="text-[12px] font-medium">
+          Post date/time (optional)
+          <input
+            type="datetime-local"
+            value={postedAt}
+            onChange={(e) => setPostedAt(e.target.value)}
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+      </div>
+
+      <label className="block text-[12px] font-medium">
+        Post URL
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://www.instagram.com/p/…"
+          className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+        />
+      </label>
+
+      <label className="block text-[12px] font-medium">
+        Caption / post text
+        <textarea
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          rows={4}
+          placeholder="Paste the post caption verbatim…"
+          className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+        />
+      </label>
+
+      <label className="block text-[12px] font-medium">
+        Image URL (optional)
+        <input
+          type="url"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="https://…/photo.jpg"
+          className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+        />
+      </label>
+
+      <p className="text-[11px] text-muted-foreground leading-snug pt-1">
+        Optional analyst details — leave blank to let the server derive them from
+        the caption.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label className="text-[12px] font-medium">
+          Organiser / actor
+          <input
+            type="text"
+            value={actor}
+            onChange={(e) => setActor(e.target.value)}
+            placeholder="KAMMI Pusat"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Channel / account
+          <input
+            type="text"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            placeholder="kammi.pusat"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Issue / campaign
+          <input
+            type="text"
+            value={issue}
+            onChange={(e) => setIssue(e.target.value)}
+            placeholder="Indonesia Darurat"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Location / venue
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Gedung DPR/MPR RI"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          City
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Jakarta"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Province
+          <input
+            type="text"
+            value={province}
+            onChange={(e) => setProvince(e.target.value)}
+            placeholder="DKI Jakarta"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Event date
+          <input
+            type="date"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Start time (text)
+          <input
+            type="text"
+            value={eventTimeText}
+            onChange={(e) => setEventTimeText(e.target.value)}
+            placeholder="13.00 WIB"
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          />
+        </label>
+        <label className="text-[12px] font-medium">
+          Status
+          <select
+            value={statusChoice}
+            onChange={(e) => setStatusChoice(e.target.value)}
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          >
+            <option value="">Auto (derive from caption)</option>
+            <option value="planned">Planned</option>
+            <option value="active">Active</option>
+            <option value="dispersed">Dispersed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="unclear">Unclear</option>
+          </select>
+        </label>
+        <label className="text-[12px] font-medium">
+          Confidence
+          <select
+            value={confidence}
+            onChange={(e) => setConfidence(e.target.value)}
+            className="mt-1 w-full border border-border rounded-sm px-2 py-1.5 text-[13px]"
+          >
+            <option value="">Default (medium)</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+      </div>
+
+      {err && (
+        <p className="text-[12px]" style={{ color: "#A33232" }}>
+          {err}
+        </p>
+      )}
+      {ok && (
+        <p className="text-[12px]" style={{ color: "#1B6B7A" }}>
+          {ok}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={create.isPending}
+          className="px-3 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
+          style={{ backgroundColor: "#465bff" }}
+        >
+          {create.isPending ? "Adding…" : "Add as context"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLoading: boolean }) {
   const promote = usePromoteSocialWatchItem();
   const queryClient = useQueryClient();
@@ -720,14 +1052,18 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
 
   if (items.length === 0) {
     return (
-      <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground">
-        No KAMMI social-media posts collected yet. Instagram requires a paid scraper key. These posts are supporting context only — they are never counted as incidents. See Source Health for the live configuration state.
+      <div className="space-y-4">
+        <AddWatchItemForm />
+        <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground">
+          No KAMMI social-media posts on file yet. Add posts by hand with "Add watch item" above (no scraper key needed), or configure the paid Instagram scraper. These posts are supporting context only — they are never counted as incidents. See Source Health for the live configuration state.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <AddWatchItemForm />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Posts on file" value={items.length} accent="#465bff" small />
         <Kpi label="Planned" value={groups.planned.length} accent="#1B6B7A" small />

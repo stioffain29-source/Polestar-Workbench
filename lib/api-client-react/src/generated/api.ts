@@ -37,6 +37,7 @@ import type {
   CountryReport,
   CountryReportInput,
   CountryReportUpdate,
+  CreateSocialWatchItemRequest,
   DashboardOverview,
   EditCountryProseInput,
   EditReportIncidentSummariesInput,
@@ -1003,6 +1004,77 @@ export function useListSocialWatchItems<TData = Awaited<ReturnType<typeof listSo
 
 
 
+
+export const getCreateSocialWatchItemUrl = () => {
+
+
+
+
+  return `/api/social-watch`
+}
+
+/**
+ * @summary Manually add a KAMMI Instagram/Telegram protest-watch item by hand (analyst paste — no scraping, no API keys). The pasted item is stored as supporting CONTEXT only: it lands in the social-watch table and NEVER becomes or inflates an incident. Its status is re-classified and its promotability, location, issue, event time and watch-alerts are all re-derived server-side from the pasted text, exactly like a scraped item. Re-pasting the same content is idempotent (deduped to one row).
+ */
+export const createSocialWatchItem = async (createSocialWatchItemRequest: CreateSocialWatchItemRequest, options?: RequestInit): Promise<SocialWatchItem> => {
+
+  return customFetch<SocialWatchItem>(getCreateSocialWatchItemUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createSocialWatchItemRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSocialWatchItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSocialWatchItem>>, TError,{data: BodyType<CreateSocialWatchItemRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSocialWatchItem>>, TError,{data: BodyType<CreateSocialWatchItemRequest>}, TContext> => {
+
+const mutationKey = ['createSocialWatchItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSocialWatchItem>>, {data: BodyType<CreateSocialWatchItemRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSocialWatchItem(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSocialWatchItemMutationResult = NonNullable<Awaited<ReturnType<typeof createSocialWatchItem>>>
+    export type CreateSocialWatchItemMutationBody = BodyType<CreateSocialWatchItemRequest>
+    export type CreateSocialWatchItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Manually add a KAMMI Instagram/Telegram protest-watch item by hand (analyst paste — no scraping, no API keys). The pasted item is stored as supporting CONTEXT only: it lands in the social-watch table and NEVER becomes or inflates an incident. Its status is re-classified and its promotability, location, issue, event time and watch-alerts are all re-derived server-side from the pasted text, exactly like a scraped item. Re-pasting the same content is idempotent (deduped to one row).
+ */
+export const useCreateSocialWatchItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSocialWatchItem>>, TError,{data: BodyType<CreateSocialWatchItemRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSocialWatchItem>>,
+        TError,
+        {data: BodyType<CreateSocialWatchItemRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateSocialWatchItemMutationOptions(options));
+    }
 
 export const getPromoteSocialWatchItemUrl = (id: number,) => {
 

@@ -621,10 +621,10 @@ async function vesselRegistryStatus(): Promise<IntegrationStatusItem> {
 }
 
 const SOCIAL_WATCH_IG_DETAIL =
-  "Monitors the KAMMI Pusat public Instagram account for planned/active protest mobilisation as ADDITIVE context. Posts are stored in their own table — never as incidents, so they never inflate any count. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
+  "Monitors KAMMI Pusat public Instagram + Telegram posts for planned/active protest mobilisation as ADDITIVE context. When no paid Instagram scraper credential is set, the source runs in analyst MANUAL-ENTRY mode: operators paste Instagram/Telegram posts by hand (no scraping, no API keys). Posts are stored in their own table — never as incidents, so they never inflate any count. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
 
 async function socialWatchPlatformCounts(
-  platform: "instagram",
+  platform: "instagram" | "telegram" | "all",
 ): Promise<{ total: number; latest: Date | null }> {
   const [row] = await db
     .select({
@@ -632,7 +632,11 @@ async function socialWatchPlatformCounts(
       latest: sql<Date | string | null>`max(${socialWatchItemsTable.postedAt})`,
     })
     .from(socialWatchItemsTable)
-    .where(eq(socialWatchItemsTable.platform, platform));
+    .where(
+      platform === "all"
+        ? undefined
+        : eq(socialWatchItemsTable.platform, platform),
+    );
   const latest = row?.latest ?? null;
   return { total: row?.n ?? 0, latest: latest ? new Date(latest) : null };
 }
@@ -665,7 +669,9 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
   let latest: Date | null = null;
   let feedStatus: string | null = null;
   try {
-    const counts = await socialWatchPlatformCounts("instagram");
+    // The panel now represents the whole social-watch source (scraped Instagram
+    // AND manually-pasted Instagram/Telegram), so count across all platforms.
+    const counts = await socialWatchPlatformCounts("all");
     total = counts.total;
     latest = counts.latest;
     feedStatus = await socialFeedStatus(SOCIAL_WATCH_IG_HEALTH_NAME);
@@ -693,9 +699,21 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
     summary =
       "Switched off (INSTAGRAM_ENABLED=false) — the Instagram social-watch source is disabled.";
   } else if (!configured) {
-    status = "not_configured";
+    // No paid Instagram scraper credential — the source runs in analyst
+    // MANUAL-ENTRY mode: operators paste KAMMI Instagram/Telegram posts by hand
+    // (no scraping, no API keys). This is a fully functional mode, so it is
+    // reported as working rather than not_configured.
+    status = "working";
+    const age = ageInDays(latest);
+    const holding =
+      total > 0
+        ? age !== null
+          ? ` Holding ${total} manually-added post(s); newest is ${age} day(s) old.`
+          : ` Holding ${total} manually-added post(s).`
+        : " No posts added yet.";
     summary =
-      "No Instagram credential (INSTAGRAM_API_KEY or APIFY_TOKEN) — the paid Instagram scraper is disabled, so no Instagram posts are collected. All incident feeds are unaffected.";
+      `Analyst manual-entry mode — no paid Instagram scraper credential, so operators add KAMMI Instagram/Telegram posts by hand (no scraping, no API keys). Stored as protest-monitoring context only, never counted as incidents.` +
+      holding;
   } else if (feedStatus === "failing") {
     status = "failing_upstream";
     summary =
@@ -725,8 +743,9 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
     optional: true,
     envVars,
     metrics: [
+      metric("Mode", configured ? "Scraper + manual" : "Manual entry"),
       metric("Account", `@${ig.handle}`),
-      metric("Provider", ig.provider),
+      metric("Provider", configured ? ig.provider : "analyst paste"),
       metric("Posts stored", total),
       metric("Latest post", fmtDate(latest)),
     ],

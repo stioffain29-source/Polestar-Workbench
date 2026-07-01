@@ -14,7 +14,7 @@ export type ListSocialWatchItemsParams = {
  */
 status?: SocialWatchStatus;
 /**
- * Filter to one platform (instagram)
+ * Filter to one platform (instagram | telegram)
  */
 platform?: ListSocialWatchItemsPlatform;
 /**

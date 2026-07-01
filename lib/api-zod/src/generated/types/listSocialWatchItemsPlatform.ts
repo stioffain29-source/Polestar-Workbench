@@ -11,4 +11,5 @@ export type ListSocialWatchItemsPlatform = typeof ListSocialWatchItemsPlatform[k
 
 export const ListSocialWatchItemsPlatform = {
   instagram: 'instagram',
+  telegram: 'telegram',
 } as const;

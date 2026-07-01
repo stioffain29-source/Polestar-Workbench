@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // CORE PRODUCT INVARIANT under test (see lib/db/src/schema/socialWatchItems.ts):
 // a KAMMI social-watch post is supporting CONTEXT, NEVER an incident. The only
@@ -61,16 +63,48 @@ function collectNumbers(node: unknown, out: number[], seen: Set<unknown>): void 
   }
 }
 
+// String bound values (mirrors collectNumbers) so the manual-create re-paste
+// lookup `where(eq(dedupKey, "…"))` can filter by the string fingerprint.
+function collectStrings(node: unknown, out: string[], seen: Set<unknown>): void {
+  if (node === null || typeof node !== "object") return;
+  if (seen.has(node)) return;
+  seen.add(node);
+  const rec = node as Record<string, unknown>;
+  if (typeof rec.value === "string") out.push(rec.value);
+  for (const v of Object.values(rec)) {
+    if (Array.isArray(v)) v.forEach((x) => collectStrings(x, out, seen));
+    else if (v && typeof v === "object") collectStrings(v, out, seen);
+  }
+}
+
 function resolveSelect(table: unknown, where: unknown): Promise<Row[]> {
   if (table === incidentsTable) return Promise.resolve(incidents.map((r) => ({ ...r })));
   if (table === incidentCorroborationsTable) return Promise.resolve([]);
   if (table === socialWatchItemsTable) {
     const ids: number[] = [];
     collectNumbers(where, ids, new Set());
-    const rows = ids.length
-      ? socialItems.filter((i) => ids.includes(i.id as number))
-      : socialItems;
-    return Promise.resolve(rows.map((r) => ({ ...r })));
+    if (ids.length) {
+      return Promise.resolve(
+        socialItems.filter((i) => ids.includes(i.id as number)).map((r) => ({ ...r })),
+      );
+    }
+    // The manual-create re-paste path re-selects by dedupKey. Only treat a
+    // bound string as a dedupKey filter when it actually matches a stored row's
+    // dedupKey — otherwise the list GET's `eq(sourceName, "social_watch")`
+    // string would wrongly filter everything out.
+    const strs: string[] = [];
+    collectStrings(where, strs, new Set());
+    const dedupHit = strs.some((s) =>
+      socialItems.some((i) => i.dedupKey === s),
+    );
+    if (dedupHit) {
+      return Promise.resolve(
+        socialItems
+          .filter((i) => strs.includes(i.dedupKey as string))
+          .map((r) => ({ ...r })),
+      );
+    }
+    return Promise.resolve(socialItems.map((r) => ({ ...r })));
   }
   return Promise.resolve([]);
 }
@@ -100,6 +134,36 @@ function selectChain(): Record<string, unknown> {
 
 function installDbStub(): void {
   jest.spyOn(db, "select").mockImplementation(() => selectChain() as never);
+
+  // Top-level insert (used by the manual-create route). Enforces the UNIQUE
+  // dedup-key invariant so re-pasting identical content returns nothing (the
+  // route then re-selects the existing row and responds 200).
+  jest.spyOn(db, "insert").mockImplementation((table: unknown) => {
+    let vals: Row = {};
+    const chain: Record<string, unknown> = {
+      values: (v: Row) => {
+        vals = v;
+        return chain;
+      },
+      onConflictDoNothing: () => chain,
+      returning: async () => {
+        if (table === socialWatchItemsTable) {
+          const dup = socialItems.find((i) => i.dedupKey === vals.dedupKey);
+          if (dup) return [];
+          const row = {
+            id: nextIncidentId++,
+            promotedIncidentId: null,
+            promotedAt: null,
+            ...vals,
+          };
+          socialItems.push(row);
+          return [{ ...row }];
+        }
+        return [];
+      },
+    };
+    return chain as never;
+  });
 
   // The only sanctioned incident write goes through promote's transaction.
   (db as unknown as { transaction: unknown }).transaction = jest.fn(
@@ -336,6 +400,163 @@ describe("social-watch posts never inflate the incident count", () => {
   });
 });
 
+async function createItem(body: Record<string, unknown>) {
+  const res = await fetch(`${baseUrl}/api/social-watch`, {
+    method: "POST",
+    headers: adminAuthHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, json: (await res.json()) as Row };
+}
+
+describe("manual-paste social-watch items are context, never incidents", () => {
+  const ACTIVE_CAPTION =
+    "Massa memadati Gedung DPR/MPR RI, aksi sedang berlangsung sekarang. #ReformasiIndonesia";
+  const PLANNED_CAPTION =
+    "Ajakan aksi besok pukul 12.00 WIB, mari bergabung di depan Gedung DPR. #ReformasiIndonesia";
+
+  it("stores a manually-added item without touching the incident count", async () => {
+    seedFlashpointIncidents(3);
+    const before = await flashpointIncidentCount();
+
+    const { status, json } = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/manual1/",
+      caption: ACTIVE_CAPTION,
+    });
+
+    expect(status).toBe(201);
+    expect(json.classification).toBe("context");
+    expect(json.topic).toBe("flashpoint");
+    expect(json.country).toBe("Indonesia");
+    // No incident was created by adding context.
+    expect(await flashpointIncidentCount()).toBe(before);
+    // It shows up on the board.
+    const list = await fetch(`${baseUrl}/api/social-watch`);
+    expect(((await list.json()) as Row[]).length).toBe(1);
+  });
+
+  it("re-derives an active item as promotable and a planned item as not", async () => {
+    const active = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/active/",
+      caption: ACTIVE_CAPTION,
+    });
+    expect(active.status).toBe(201);
+    expect(active.json.status).toBe("active");
+    expect(active.json.promotable).toBe(true);
+
+    const planned = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/planned/",
+      caption: PLANNED_CAPTION,
+    });
+    expect(planned.status).toBe(201);
+    expect(planned.json.status).toBe("planned");
+    expect(planned.json.promotable).toBe(false);
+  });
+
+  it("ignores a client-supplied promotable claim (re-derived server-side)", async () => {
+    // A client cannot mark a planned item promotable: `promotable` is not an
+    // accepted input field (stripped), and eligibility is re-derived from the
+    // classified status + caption. The planned caption yields promotable=false.
+    const { json } = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/spoof/",
+      caption: PLANNED_CAPTION,
+      promotable: true,
+    } as Record<string, unknown>);
+    expect(json.status).toBe("planned");
+    expect(json.promotable).toBe(false);
+  });
+
+  it("dedupes an identical re-paste to a single row (idempotent, 200)", async () => {
+    const first = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/dup/",
+      caption: ACTIVE_CAPTION,
+    });
+    expect(first.status).toBe(201);
+
+    const second = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/dup/",
+      caption: ACTIVE_CAPTION,
+    });
+    expect(second.status).toBe(200);
+    expect(second.json.id).toBe(first.json.id);
+
+    const list = await fetch(`${baseUrl}/api/social-watch`);
+    expect(((await list.json()) as Row[]).length).toBe(1);
+  });
+
+  it("accepts and persists a Telegram manual item (manual-entry-only platform)", async () => {
+    const { status, json } = await createItem({
+      platform: "telegram",
+      url: "https://t.me/kammipusat/123",
+      caption: ACTIVE_CAPTION,
+    });
+    expect(status).toBe(201);
+    expect(json.platform).toBe("telegram");
+
+    const list = await fetch(`${baseUrl}/api/social-watch?platform=telegram`);
+    const rows = (await list.json()) as Row[];
+    expect(rows.some((r) => r.platform === "telegram")).toBe(true);
+  });
+
+  it("round-trips explicit analyst fields (overriding caption-derived values)", async () => {
+    // A planned caption that would otherwise geo-default to Jakarta and parse a
+    // different issue — the analyst supplies authoritative details by hand.
+    const { status, json } = await createItem({
+      platform: "telegram",
+      url: "https://t.me/kammipusat/456",
+      caption: PLANNED_CAPTION,
+      actor: "BEM SI",
+      channel: "bem_si (Telegram)",
+      issue: "Tolak Kenaikan BBM",
+      location: "Balai Kota Surabaya",
+      city: "Surabaya",
+      province: "Jawa Timur",
+      eventDate: "2026-07-10T00:00:00.000Z",
+      eventTimeText: "15.30 WIB",
+      confidence: "high",
+    });
+    expect(status).toBe(201);
+    expect(json.actor).toBe("BEM SI");
+    expect(json.channel).toBe("bem_si (Telegram)");
+    expect(json.issue).toBe("Tolak Kenaikan BBM");
+    expect(json.location).toBe("Balai Kota Surabaya");
+    expect(json.city).toBe("Surabaya");
+    expect(json.province).toBe("Jawa Timur");
+    expect(json.eventTimeText).toBe("15.30 WIB");
+    expect(json.confidence).toBe("high");
+    expect((json.eventDate as string).slice(0, 10)).toBe("2026-07-10");
+    // Promotability is still text-derived, not analyst-set — planned stays false.
+    expect(json.promotable).toBe(false);
+  });
+
+  it("rejects a request with no admin token", async () => {
+    const res = await fetch(`${baseUrl}/api/social-watch`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        platform: "instagram",
+        url: "https://www.instagram.com/p/noauth/",
+        caption: ACTIVE_CAPTION,
+      }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("400s on a missing required field", async () => {
+    const { status } = await createItem({
+      platform: "instagram",
+      caption: ACTIVE_CAPTION,
+    });
+    expect(status).toBe(400);
+  });
+});
+
 describe("social-watch ingest never writes the incidents table", () => {
   const savedEnv = { ...process.env };
 
@@ -390,5 +611,37 @@ describe("social-watch ingest never writes the incidents table", () => {
       expect(call[0]).not.toBe(incidentsTable);
     }
     expect(txSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("boot migrations no longer purge Telegram social-watch rows", () => {
+  // Telegram is re-enabled as a MANUAL-ENTRY-ONLY platform, so the earlier
+  // `delete_telegram_social_watch_v1` purge (which deleted every Telegram row on
+  // boot when the automated scraper was retired) MUST be gone — otherwise
+  // hand-entered Telegram context would vanish on every redeploy.
+  const migrationsSrc = readFileSync(
+    join(
+      __dirname,
+      "..",
+      "..",
+      "artifacts",
+      "api-server",
+      "src",
+      "lib",
+      "migrations.ts",
+    ),
+    "utf8",
+  );
+
+  it("contains no active delete against the social-watch table for Telegram", () => {
+    // Strip line comments so the explanatory NOTE mentioning the old marker does
+    // not trip the assertion — only executable code is checked.
+    const code = migrationsSrc
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    expect(code).not.toMatch(/delete_telegram_social_watch_v1/);
+    expect(code).not.toMatch(/\.delete\(\s*socialWatchItemsTable/);
+    expect(code).not.toMatch(/delete\s+from\s+social_watch_items/i);
   });
 });

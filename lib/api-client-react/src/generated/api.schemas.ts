@@ -1586,6 +1586,58 @@ export const SocialWatchStatus = {
 } as const;
 
 /**
+ * The platform the post was seen on.
+ */
+export type CreateSocialWatchItemRequestPlatform = typeof CreateSocialWatchItemRequestPlatform[keyof typeof CreateSocialWatchItemRequestPlatform];
+
+
+export const CreateSocialWatchItemRequestPlatform = {
+  instagram: 'instagram',
+  telegram: 'telegram',
+} as const;
+
+/**
+ * A manually-pasted KAMMI protest-watch item (analyst hand-entry). Stored as supporting CONTEXT only — it never becomes or inflates an incident. The server sanitises the caption and RE-DERIVES status, promotability, location, issue, event date/time and watch-alerts from the pasted text; client-supplied derived fields are advisory hints, never trusted for promotion eligibility.
+ */
+export interface CreateSocialWatchItemRequest {
+  /** The platform the post was seen on. */
+  platform: CreateSocialWatchItemRequestPlatform;
+  /** Public URL of the post. */
+  url: string;
+  /** The post text / caption, pasted verbatim. Sanitised server-side. */
+  caption: string;
+  /** Organiser / account (defaults to "KAMMI Pusat"). */
+  actor?: string;
+  /** Account handle the post was read from (defaults per platform). */
+  channel?: string;
+  /**
+     * When the post was published, if known.
+     * @nullable
+     */
+  postedAt?: string | null;
+  /**
+     * Explicit protest/event date, if the analyst knows it. Overrides the best-effort date parsed from the caption when provided.
+     * @nullable
+     */
+  eventDate?: string | null;
+  /** Free-text start time, e.g. "13.00 WIB" (display only). Overrides the time parsed from the caption when provided. */
+  eventTimeText?: string;
+  /** Venue / location, e.g. "Gedung DPR/MPR RI". Overrides the location parsed from the caption when provided. */
+  location?: string;
+  /** City (defaults to Jakarta). Overrides the parsed city when provided. */
+  city?: string;
+  /** Province, when known. Overrides the parsed province when provided. */
+  province?: string;
+  /** Issue / campaign, e.g. "Indonesia Darurat". Overrides the issue parsed from the caption when provided. */
+  issue?: string;
+  /** Public image URL(s) attached to the post. */
+  imageUrls?: string[];
+  status?: SocialWatchStatus;
+  /** Analyst confidence (high | medium | low); defaults to medium. */
+  confidence?: string;
+}
+
+/**
  * A KAMMI Pusat public Instagram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.
  */
 export interface SocialWatchItem {
@@ -2024,7 +2076,7 @@ export type ListSocialWatchItemsParams = {
  */
 status?: SocialWatchStatus;
 /**
- * Filter to one platform (instagram)
+ * Filter to one platform (instagram | telegram)
  */
 platform?: ListSocialWatchItemsPlatform;
 /**
@@ -2044,6 +2096,7 @@ export type ListSocialWatchItemsPlatform = typeof ListSocialWatchItemsPlatform[k
 
 export const ListSocialWatchItemsPlatform = {
   instagram: 'instagram',
+  telegram: 'telegram',
 } as const;
 
 export type ListSocialRawItemsParams = {

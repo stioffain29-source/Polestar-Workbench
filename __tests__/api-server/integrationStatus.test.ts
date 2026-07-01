@@ -381,18 +381,36 @@ describe("social-watch instagram integration status (freshness honesty)", () => 
     expect(item.status).toBe("no_data");
   });
 
-  it("keeps not_configured when neither INSTAGRAM_API_KEY nor APIFY_TOKEN is set (freshness branch unreached)", async () => {
+  it("reports working manual-entry mode when no scraper credential is set", async () => {
     delete process.env.SOCIAL_WATCH_ENABLED;
     delete process.env.INSTAGRAM_ENABLED;
     delete process.env.INSTAGRAM_API_KEY;
     delete process.env.APIFY_TOKEN;
-    // Even with a months-stale row present, the not_configured branch wins.
+    // No scraper credential → analyst manual-entry mode (a fully functional
+    // mode, reported as working, NOT not_configured). Manually-added rows,
+    // even months old, are legitimate context.
     const byTable = new Map<unknown, Rows>([
       [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
     ]);
     const item = find(await statuses(byTable), "social_watch_instagram");
-    expect(item.status).toBe("not_configured");
+    expect(item.status).toBe("working");
     expect(item.configured).toBe(false);
+    expect(item.summary).toContain("manual-entry mode");
+    expect(item.summary).toContain("5 manually-added post");
+  });
+
+  it("reports working manual-entry mode with no rows yet", async () => {
+    delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.INSTAGRAM_ENABLED;
+    delete process.env.INSTAGRAM_API_KEY;
+    delete process.env.APIFY_TOKEN;
+    const byTable = new Map<unknown, Rows>([
+      [socialWatchItemsTable, [{ n: 0, latest: null }]],
+    ]);
+    const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("working");
+    expect(item.configured).toBe(false);
+    expect(item.summary).toContain("No posts added yet");
   });
 
   it("reports configured when only APIFY_TOKEN is set (fallback credential)", async () => {
@@ -430,6 +448,7 @@ describe("getIntegrationStatuses envelope", () => {
         "admin_controls",
         "ais_movement",
         "gdelt",
+        "gdelt_structured",
         "liveuamap",
         "openai",
         "reliefweb",

@@ -36,6 +36,8 @@ export * from './countryReport';
 export * from './countryReportInput';
 export * from './countryReportPhoto';
 export * from './countryReportUpdate';
+export * from './createSocialWatchItemRequest';
+export * from './createSocialWatchItemRequestPlatform';
 export * from './dashboardOverview';
 export * from './dashboardTopicCard';
 export * from './editCountryProseInput';

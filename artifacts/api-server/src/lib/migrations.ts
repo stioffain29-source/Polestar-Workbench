@@ -2986,40 +2986,12 @@ export async function runDataMigrations(): Promise<void> {
       logger.error({ err: sevErr }, "Severity re-rate failed");
     }
 
-    // ONE-TIME removal of the retired KAMMI Telegram social-watch feed. The
-    // Telegram channel was dead (last active 2016) and has been removed from the
-    // ingest; only the Instagram feed remains. Purge any stored Telegram rows
-    // from the isolated social_watch_items table so the public Source Health and
-    // Protests context surfaces no longer show a feed that can never refresh.
-    // These rows are CONTEXT only (never incidents), so deleting them cannot
-    // touch any incident count. Marker-gated so it runs once.
-    try {
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS app_migration_markers (
-          key text PRIMARY KEY,
-          applied_at timestamptz NOT NULL DEFAULT now()
-        )
-      `);
-      const markerKey = "delete_telegram_social_watch_v1";
-      const existingMarker = await db.execute(sql`
-        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
-      `);
-      if ((existingMarker.rowCount ?? 0) === 0) {
-        const res = await db.execute(sql`
-          DELETE FROM social_watch_items WHERE platform = 'telegram'
-        `);
-        await db.execute(sql`
-          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
-          ON CONFLICT (key) DO NOTHING
-        `);
-        logger.info(
-          { rows: res.rowCount ?? 0, marker: markerKey },
-          "One-time removal of retired KAMMI Telegram social-watch rows",
-        );
-      }
-    } catch (tgErr) {
-      logger.error({ err: tgErr }, "Telegram social-watch purge failed");
-    }
+    // NOTE: an earlier boot migration (`delete_telegram_social_watch_v1`) purged
+    // Telegram social-watch rows when the automated Telegram scraper was retired.
+    // Telegram is now re-enabled as a MANUAL-ENTRY-ONLY platform (analyst paste,
+    // no scraper), so that purge has been removed — manual Telegram rows are
+    // legitimate CONTEXT and must survive redeploys. Its marker is left in place
+    // (harmless) for environments where it already ran.
 
     try {
       await backfillRelevance();

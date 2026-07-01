@@ -266,8 +266,8 @@ paths:
           schema: { $ref: "#/components/schemas/SocialWatchStatus" }
         - name: platform
           in: query
-          description: Filter to one platform (instagram)
-          schema: { type: string, enum: [instagram] }
+          description: Filter to one platform (instagram | telegram)
+          schema: { type: string, enum: [instagram, telegram] }
         - name: promotable
           in: query
           description: Limit to items eligible for promotion to an incident
@@ -284,6 +284,38 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/SocialWatchItem" }
+    post:
+      operationId: createSocialWatchItem
+      tags: [social-watch]
+      summary: >-
+        Manually add a KAMMI Instagram/Telegram protest-watch item by hand
+        (analyst paste — no scraping, no API keys). The pasted item is stored as
+        supporting CONTEXT only: it lands in the social-watch table and NEVER
+        becomes or inflates an incident. Its status is re-classified and its
+        promotability, location, issue, event time and watch-alerts are all
+        re-derived server-side from the pasted text, exactly like a scraped item.
+        Re-pasting the same content is idempotent (deduped to one row).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/CreateSocialWatchItemRequest" }
+      responses:
+        "200":
+          description: >-
+            OK — an item with identical content already existed; the existing row
+            is returned unchanged (idempotent re-paste).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SocialWatchItem" }
+        "201":
+          description: Created — the new watch item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SocialWatchItem" }
+        "400":
+          description: Invalid request body
 
   /social-watch/{id}/promote:
     post:
@@ -3070,6 +3102,74 @@ components:
         Derived protest status of a social-watch item: planned (announced /
         mobilisation), active (confirmed under way), dispersed (broken up / clash
         / arrests), cancelled (called off / postponed), or unclear.
+
+    CreateSocialWatchItemRequest:
+      type: object
+      description: >-
+        A manually-pasted KAMMI protest-watch item (analyst hand-entry). Stored
+        as supporting CONTEXT only — it never becomes or inflates an incident.
+        The server sanitises the caption and RE-DERIVES status, promotability,
+        location, issue, event date/time and watch-alerts from the pasted text;
+        client-supplied derived fields are advisory hints, never trusted for
+        promotion eligibility.
+      required: [platform, url, caption]
+      properties:
+        platform:
+          type: string
+          enum: [instagram, telegram]
+          description: The platform the post was seen on.
+        url:
+          type: string
+          description: Public URL of the post.
+        caption:
+          type: string
+          description: The post text / caption, pasted verbatim. Sanitised server-side.
+        actor:
+          type: string
+          description: Organiser / account (defaults to "KAMMI Pusat").
+        channel:
+          type: string
+          description: Account handle the post was read from (defaults per platform).
+        postedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the post was published, if known.
+        eventDate:
+          type: ["string", "null"]
+          format: date-time
+          description: >-
+            Explicit protest/event date, if the analyst knows it. Overrides the
+            best-effort date parsed from the caption when provided.
+        eventTimeText:
+          type: string
+          description: >-
+            Free-text start time, e.g. "13.00 WIB" (display only). Overrides the
+            time parsed from the caption when provided.
+        location:
+          type: string
+          description: >-
+            Venue / location, e.g. "Gedung DPR/MPR RI". Overrides the location
+            parsed from the caption when provided.
+        city:
+          type: string
+          description: City (defaults to Jakarta). Overrides the parsed city when provided.
+        province:
+          type: string
+          description: Province, when known. Overrides the parsed province when provided.
+        issue:
+          type: string
+          description: >-
+            Issue / campaign, e.g. "Indonesia Darurat". Overrides the issue
+            parsed from the caption when provided.
+        imageUrls:
+          type: array
+          items: { type: string }
+          description: Public image URL(s) attached to the post.
+        status:
+          $ref: "#/components/schemas/SocialWatchStatus"
+        confidence:
+          type: string
+          description: Analyst confidence (high | medium | low); defaults to medium.
 
     SocialWatchItem:
       type: object
