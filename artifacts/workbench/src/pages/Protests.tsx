@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   useListIncidents,
   useListSocialWatchItems,
   usePromoteSocialWatchItem,
   useCreateSocialWatchItem,
+  useUpdateSocialWatchItem,
   useDeleteSocialWatchItem,
   getListSocialWatchItemsQueryKey,
   useListSocialRawItems,
@@ -669,26 +670,65 @@ function SocialStatusBadge({ status }: { status: string }) {
 }
 
 function AddWatchItemForm() {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="px-3 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-sm text-white"
+          style={{ backgroundColor: "#465bff" }}
+        >
+          Add watch item
+        </button>
+      </div>
+    );
+  }
+  return <WatchItemForm onClose={() => setOpen(false)} />;
+}
+
+// Shared manual-entry form for a KAMMI social-watch context row. With no
+// `editItem` it CREATES a new row; with one it EDITS that row in place (fix a
+// typo, a wrong location, a missing URL, the event date/time or status) instead
+// of deleting and re-pasting. Either way the item stays supporting CONTEXT only
+// — the server re-derives status and promotion eligibility, so this never
+// becomes or inflates an incident.
+function WatchItemForm({
+  editItem,
+  onClose,
+}: {
+  editItem?: SocialWatchItem;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const create = useCreateSocialWatchItem();
-  const [open, setOpen] = useState(false);
-  const [platform, setPlatform] = useState<"instagram" | "telegram">("instagram");
-  const [url, setUrl] = useState("");
-  const [caption, setCaption] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [postedAt, setPostedAt] = useState("");
-  const [actor, setActor] = useState("");
-  const [channel, setChannel] = useState("");
-  const [issue, setIssue] = useState("");
-  const [location, setLocation] = useState("");
-  const [city, setCity] = useState("");
-  const [province, setProvince] = useState("");
-  const [eventDate, setEventDate] = useState("");
-  const [eventTimeText, setEventTimeText] = useState("");
-  const [statusChoice, setStatusChoice] = useState("");
-  const [confidence, setConfidence] = useState("");
+  const update = useUpdateSocialWatchItem();
+  const isEdit = editItem != null;
+  const [platform, setPlatform] = useState<"instagram" | "telegram">(
+    (editItem?.platform as "instagram" | "telegram") ?? "instagram",
+  );
+  const [url, setUrl] = useState(editItem?.url ?? "");
+  const [caption, setCaption] = useState(editItem?.caption ?? "");
+  const [imageUrl, setImageUrl] = useState(editItem?.imageUrls?.[0] ?? "");
+  const [postedAt, setPostedAt] = useState(
+    editItem?.postedAt ? format(new Date(editItem.postedAt), "yyyy-MM-dd'T'HH:mm") : "",
+  );
+  const [actor, setActor] = useState(editItem?.actor ?? "");
+  const [channel, setChannel] = useState(editItem?.channel ?? "");
+  const [issue, setIssue] = useState(editItem?.issue ?? "");
+  const [location, setLocation] = useState(editItem?.location ?? "");
+  const [city, setCity] = useState(editItem?.city ?? "");
+  const [province, setProvince] = useState(editItem?.province ?? "");
+  const [eventDate, setEventDate] = useState(
+    editItem?.eventDate ? format(new Date(editItem.eventDate), "yyyy-MM-dd") : "",
+  );
+  const [eventTimeText, setEventTimeText] = useState(editItem?.eventTimeText ?? "");
+  const [statusChoice, setStatusChoice] = useState(editItem?.status ?? "");
+  const [confidence, setConfidence] = useState(editItem?.confidence ?? "");
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const pending = create.isPending || update.isPending;
 
   function reset() {
     setUrl("");
@@ -715,69 +755,57 @@ function AddWatchItemForm() {
       setErr("Post URL and caption are both required.");
       return;
     }
+    const data = {
+      platform,
+      url: url.trim(),
+      caption: caption.trim(),
+      ...(imageUrl.trim() ? { imageUrls: [imageUrl.trim()] } : {}),
+      ...(postedAt.trim() ? { postedAt: new Date(postedAt).toISOString() } : {}),
+      ...(actor.trim() ? { actor: actor.trim() } : {}),
+      ...(channel.trim() ? { channel: channel.trim() } : {}),
+      ...(issue.trim() ? { issue: issue.trim() } : {}),
+      ...(location.trim() ? { location: location.trim() } : {}),
+      ...(city.trim() ? { city: city.trim() } : {}),
+      ...(province.trim() ? { province: province.trim() } : {}),
+      ...(eventDate.trim() ? { eventDate: new Date(eventDate).toISOString() } : {}),
+      ...(eventTimeText.trim() ? { eventTimeText: eventTimeText.trim() } : {}),
+      ...(statusChoice
+        ? {
+            status: statusChoice as
+              | "planned"
+              | "active"
+              | "dispersed"
+              | "cancelled"
+              | "unclear",
+          }
+        : {}),
+      ...(confidence ? { confidence } : {}),
+    };
     try {
-      const created = await create.mutateAsync({
-        data: {
-          platform,
-          url: url.trim(),
-          caption: caption.trim(),
-          ...(imageUrl.trim() ? { imageUrls: [imageUrl.trim()] } : {}),
-          ...(postedAt.trim() ? { postedAt: new Date(postedAt).toISOString() } : {}),
-          ...(actor.trim() ? { actor: actor.trim() } : {}),
-          ...(channel.trim() ? { channel: channel.trim() } : {}),
-          ...(issue.trim() ? { issue: issue.trim() } : {}),
-          ...(location.trim() ? { location: location.trim() } : {}),
-          ...(city.trim() ? { city: city.trim() } : {}),
-          ...(province.trim() ? { province: province.trim() } : {}),
-          ...(eventDate.trim()
-            ? { eventDate: new Date(eventDate).toISOString() }
-            : {}),
-          ...(eventTimeText.trim() ? { eventTimeText: eventTimeText.trim() } : {}),
-          ...(statusChoice
-            ? {
-                status: statusChoice as
-                  | "planned"
-                  | "active"
-                  | "dispersed"
-                  | "cancelled"
-                  | "unclear",
-              }
-            : {}),
-          ...(confidence ? { confidence } : {}),
-        },
-      });
-      // Orval mutations don't auto-refetch — invalidate so the new (or existing,
-      // on a deduped re-paste) row appears in the board immediately.
+      const saved = isEdit
+        ? await update.mutateAsync({ id: editItem.id, data })
+        : await create.mutateAsync({ data });
+      // Orval mutations don't auto-refetch — invalidate so the new/edited (or
+      // existing, on a deduped re-paste) row appears in the board immediately.
       await queryClient.invalidateQueries({
         queryKey: getListSocialWatchItemsQueryKey(),
       });
+      if (isEdit) {
+        onClose();
+        return;
+      }
       setOk(
-        `Added as context — status "${created.status}"` +
-          (created.promotable ? ", eligible to promote." : " (not promotable)."),
+        `Added as context — status "${saved.status}"` +
+          (saved.promotable ? ", eligible to promote." : " (not promotable)."),
       );
       reset();
     } catch (e) {
       setErr(
         e instanceof Error
           ? e.message
-          : "Could not add the item. Check the admin token in Source Health.",
+          : `Could not ${isEdit ? "save" : "add"} the item. Check the admin token in Source Health.`,
       );
     }
-  }
-
-  if (!open) {
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="px-3 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-sm text-white"
-          style={{ backgroundColor: "#465bff" }}
-        >
-          Add watch item
-        </button>
-      </div>
-    );
   }
 
   return (
@@ -787,20 +815,20 @@ function AddWatchItemForm() {
     >
       <div className="flex items-center justify-between">
         <h4 className="text-[13px] font-bold uppercase tracking-wider">
-          Add watch item (manual)
+          {isEdit ? "Edit watch item" : "Add watch item (manual)"}
         </h4>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
           className="text-[12px] text-muted-foreground underline"
         >
-          Close
+          {isEdit ? "Cancel" : "Close"}
         </button>
       </div>
       <p className="text-[11px] text-muted-foreground leading-snug">
-        Paste a KAMMI Instagram/Telegram post by hand. Stored as ADDITIVE context
-        only — never an incident. Status and promotion eligibility are re-derived
-        from the caption on the server.
+        {isEdit
+          ? "Correct this KAMMI post in place. It stays ADDITIVE context only — never an incident. Status and promotion eligibility are re-derived from the caption on the server."
+          : "Paste a KAMMI Instagram/Telegram post by hand. Stored as ADDITIVE context only — never an incident. Status and promotion eligibility are re-derived from the caption on the server."}
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -988,11 +1016,17 @@ function AddWatchItemForm() {
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={create.isPending}
+          disabled={pending}
           className="px-3 py-1.5 text-[12px] font-bold uppercase tracking-wider rounded-sm text-white disabled:opacity-50"
           style={{ backgroundColor: "#465bff" }}
         >
-          {create.isPending ? "Adding…" : "Add as context"}
+          {isEdit
+            ? pending
+              ? "Saving…"
+              : "Save changes"
+            : pending
+              ? "Adding…"
+              : "Add as context"}
         </button>
       </div>
     </form>
@@ -1005,6 +1039,7 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
   const queryClient = useQueryClient();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const groups = useMemo(() => {
@@ -1118,6 +1153,8 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
         pendingId={pendingId}
         onRemove={onRemove}
         removingId={removingId}
+        editingId={editingId}
+        onEdit={setEditingId}
       />
       <SocialWatchGroup
         title="Active / on-street"
@@ -1127,6 +1164,8 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
         pendingId={pendingId}
         onRemove={onRemove}
         removingId={removingId}
+        editingId={editingId}
+        onEdit={setEditingId}
       />
       <SocialWatchGroup
         title="Other context (cancelled / unclear)"
@@ -1136,6 +1175,8 @@ function SocialWatchPanel({ items, isLoading }: { items: SocialWatchItem[]; isLo
         pendingId={pendingId}
         onRemove={onRemove}
         removingId={removingId}
+        editingId={editingId}
+        onEdit={setEditingId}
       />
     </div>
   );
@@ -1149,6 +1190,8 @@ function SocialWatchGroup({
   pendingId,
   onRemove,
   removingId,
+  editingId,
+  onEdit,
 }: {
   title: string;
   items: SocialWatchItem[];
@@ -1157,6 +1200,8 @@ function SocialWatchGroup({
   pendingId: number | null;
   onRemove: (id: number) => void;
   removingId: number | null;
+  editingId: number | null;
+  onEdit: (id: number | null) => void;
 }) {
   return (
     <div className="bg-white border border-border rounded-sm">
@@ -1178,6 +1223,7 @@ function SocialWatchGroup({
                 <th className="text-left p-2 font-sans font-medium">Caption</th>
                 <th className="text-left p-2 font-sans font-medium w-[70px]">Source</th>
                 <th className="text-left p-2 font-sans font-medium w-[150px]">Promote</th>
+                <th className="text-left p-2 font-sans font-medium w-[70px]">Edit</th>
                 <th className="text-left p-2 font-sans font-medium w-[90px]">Remove</th>
               </tr>
             </thead>
@@ -1192,7 +1238,8 @@ function SocialWatchGroup({
                 const where = it.location || it.city || "—";
                 const promoted = it.promotedIncidentId != null;
                 return (
-                  <tr key={it.id} className="hover:bg-muted/30 align-top">
+                  <Fragment key={it.id}>
+                  <tr className="hover:bg-muted/30 align-top">
                     <td className="p-2 text-xs capitalize whitespace-nowrap">{it.platform}</td>
                     <td className="p-2">
                       <SocialStatusBadge status={it.status} />
@@ -1240,6 +1287,20 @@ function SocialWatchGroup({
                       ) : (
                         <button
                           type="button"
+                          onClick={() => onEdit(editingId === it.id ? null : it.id)}
+                          className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm border"
+                          style={{ color: "#0B0B3D", borderColor: "#0B0B3D" }}
+                        >
+                          {editingId === it.id ? "Close" : "Edit"}
+                        </button>
+                      )}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {promoted ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <button
+                          type="button"
                           onClick={() => onRemove(it.id)}
                           disabled={removingId === it.id}
                           className="px-2 py-1 text-[11px] font-sans font-medium uppercase tracking-wider rounded-sm border disabled:opacity-50"
@@ -1250,6 +1311,14 @@ function SocialWatchGroup({
                       )}
                     </td>
                   </tr>
+                  {editingId === it.id && !promoted && (
+                    <tr>
+                      <td colSpan={9} className="p-2 bg-muted/20">
+                        <WatchItemForm editItem={it} onClose={() => onEdit(null)} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

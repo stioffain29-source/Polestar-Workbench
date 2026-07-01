@@ -100,7 +100,8 @@ import type {
   StrikeSummary,
   StrikeUpdate,
   TopicCount,
-  UpdateSocialRawReviewStatusRequest
+  UpdateSocialRawReviewStatusRequest,
+  UpdateSocialWatchItemRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1074,6 +1075,78 @@ export const useCreateSocialWatchItem = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateSocialWatchItemMutationOptions(options));
+    }
+
+export const getUpdateSocialWatchItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/social-watch/${id}`
+}
+
+/**
+ * @summary Correct a single hand-entered social-watch context row in place (fix a typo in the caption, a wrong location, a missing URL, the event date/time or status) instead of deleting and re-pasting it. The item stays supporting CONTEXT only — editing it NEVER becomes or inflates an incident, and never changes any incident count. Status, promotability, location, issue, event time and watch-alerts are all RE-DERIVED server-side from the edited text, exactly like create — a client can never claim an item is promotable. Refuses (409) once the item has been promoted to an incident; edit the incident directly instead.
+ */
+export const updateSocialWatchItem = async (id: number,
+    updateSocialWatchItemRequest: UpdateSocialWatchItemRequest, options?: RequestInit): Promise<SocialWatchItem> => {
+
+  return customFetch<SocialWatchItem>(getUpdateSocialWatchItemUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateSocialWatchItemRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSocialWatchItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSocialWatchItem>>, TError,{id: number;data: BodyType<UpdateSocialWatchItemRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSocialWatchItem>>, TError,{id: number;data: BodyType<UpdateSocialWatchItemRequest>}, TContext> => {
+
+const mutationKey = ['updateSocialWatchItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSocialWatchItem>>, {id: number;data: BodyType<UpdateSocialWatchItemRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSocialWatchItem(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSocialWatchItemMutationResult = NonNullable<Awaited<ReturnType<typeof updateSocialWatchItem>>>
+    export type UpdateSocialWatchItemMutationBody = BodyType<UpdateSocialWatchItemRequest>
+    export type UpdateSocialWatchItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Correct a single hand-entered social-watch context row in place (fix a typo in the caption, a wrong location, a missing URL, the event date/time or status) instead of deleting and re-pasting it. The item stays supporting CONTEXT only — editing it NEVER becomes or inflates an incident, and never changes any incident count. Status, promotability, location, issue, event time and watch-alerts are all RE-DERIVED server-side from the edited text, exactly like create — a client can never claim an item is promotable. Refuses (409) once the item has been promoted to an incident; edit the incident directly instead.
+ */
+export const useUpdateSocialWatchItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSocialWatchItem>>, TError,{id: number;data: BodyType<UpdateSocialWatchItemRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSocialWatchItem>>,
+        TError,
+        {id: number;data: BodyType<UpdateSocialWatchItemRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateSocialWatchItemMutationOptions(options));
     }
 
 export const getDeleteSocialWatchItemUrl = (id: number,) => {

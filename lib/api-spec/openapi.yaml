@@ -318,6 +318,44 @@ paths:
           description: Invalid request body
 
   /social-watch/{id}:
+    patch:
+      operationId: updateSocialWatchItem
+      tags: [social-watch]
+      summary: >-
+        Correct a single hand-entered social-watch context row in place (fix a
+        typo in the caption, a wrong location, a missing URL, the event
+        date/time or status) instead of deleting and re-pasting it. The item
+        stays supporting CONTEXT only — editing it NEVER becomes or inflates an
+        incident, and never changes any incident count. Status, promotability,
+        location, issue, event time and watch-alerts are all RE-DERIVED
+        server-side from the edited text, exactly like create — a client can
+        never claim an item is promotable. Refuses (409) once the item has been
+        promoted to an incident; edit the incident directly instead.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/UpdateSocialWatchItemRequest" }
+      responses:
+        "200":
+          description: OK — the updated watch item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SocialWatchItem" }
+        "400":
+          description: Invalid item id or request body
+        "404":
+          description: Item not found
+        "409":
+          description: >-
+            Item already promoted (cannot be edited as context), or the edit
+            would collide with another item's content.
     delete:
       operationId: deleteSocialWatchItem
       tags: [social-watch]
@@ -3194,6 +3232,75 @@ components:
         confidence:
           type: string
           description: Analyst confidence (high | medium | low); defaults to medium.
+
+    UpdateSocialWatchItemRequest:
+      type: object
+      description: >-
+        An in-place correction of a hand-entered KAMMI protest-watch context row
+        (fix a typo, a wrong location, a missing URL, the event date/time or
+        status). All fields are optional; omitted fields keep their stored value.
+        The row stays supporting CONTEXT only — editing it never becomes or
+        inflates an incident. The server sanitises the caption and RE-DERIVES
+        status, promotability, location, issue, event date/time and watch-alerts
+        from the edited text; client-supplied derived fields are advisory hints,
+        never trusted for promotion eligibility.
+      properties:
+        platform:
+          type: string
+          enum: [instagram, telegram]
+          description: The platform the post was seen on.
+        url:
+          type: string
+          description: Public URL of the post.
+        caption:
+          type: string
+          description: The post text / caption, pasted verbatim. Sanitised server-side.
+        actor:
+          type: string
+          description: Organiser / account.
+        channel:
+          type: string
+          description: Account handle the post was read from.
+        postedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the post was published, if known.
+        eventDate:
+          type: ["string", "null"]
+          format: date-time
+          description: >-
+            Explicit protest/event date, if the analyst knows it. Overrides the
+            best-effort date parsed from the caption when provided.
+        eventTimeText:
+          type: string
+          description: >-
+            Free-text start time, e.g. "13.00 WIB" (display only). Overrides the
+            time parsed from the caption when provided.
+        location:
+          type: string
+          description: >-
+            Venue / location, e.g. "Gedung DPR/MPR RI". Overrides the location
+            parsed from the caption when provided.
+        city:
+          type: string
+          description: City. Overrides the parsed city when provided.
+        province:
+          type: string
+          description: Province, when known. Overrides the parsed province when provided.
+        issue:
+          type: string
+          description: >-
+            Issue / campaign, e.g. "Indonesia Darurat". Overrides the issue
+            parsed from the caption when provided.
+        imageUrls:
+          type: array
+          items: { type: string }
+          description: Public image URL(s) attached to the post.
+        status:
+          $ref: "#/components/schemas/SocialWatchStatus"
+        confidence:
+          type: string
+          description: Analyst confidence (high | medium | low).
 
     SocialWatchItem:
       type: object

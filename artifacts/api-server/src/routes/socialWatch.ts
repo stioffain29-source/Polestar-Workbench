@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, socialWatchItemsTable, incidentsTable } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import {
   isPromotable,
@@ -17,7 +17,9 @@ import {
   ListSocialWatchItemsQueryParams,
   PromoteSocialWatchItemParams,
   DeleteSocialWatchItemParams,
+  UpdateSocialWatchItemParams,
   CreateSocialWatchItemBody,
+  UpdateSocialWatchItemBody,
 } from "@workspace/api-zod";
 import { requireAdminToken } from "../lib/adminAuth";
 
@@ -109,91 +111,50 @@ router.post("/social-watch", requireAdminToken, async (req, res): Promise<void> 
   }
   const body = parsed.data;
 
-  const caption = sanitiseCaption(body.caption);
-  const imageUrls = (body.imageUrls ?? []).slice(0, 6);
-  const hasImages = imageUrls.length > 0;
-
-  // Analyst-entered fields (event date/time, location, issue, etc.) are treated
-  // as authoritative when present and fall back to the same text extractors the
-  // scraper uses. Promotability is NEVER taken from the client — always
-  // re-derived from the (possibly analyst-chosen) status + caption.
-  const status: SocialWatchStatus = body.status ?? classifyStatus(caption, hasImages);
-  const parsedLoc = extractLocation(caption);
-  const loc = {
-    location: nonEmpty(body.location) ?? parsedLoc.location,
-    city: nonEmpty(body.city) ?? parsedLoc.city,
-    province: nonEmpty(body.province) ?? parsedLoc.province,
-  };
-  const issue = nonEmpty(body.issue) ?? extractIssue(caption);
   const postedAt = body.postedAt ?? new Date();
-  const parsedEvent = extractEventDateTime(caption, postedAt);
-  const eventDate = body.eventDate ? new Date(body.eventDate) : parsedEvent.eventDate;
-  const eventTimeText = nonEmpty(body.eventTimeText) ?? parsedEvent.eventTimeText;
-  // Promotability is ALWAYS re-derived server-side, never trusted from client.
-  const promotable = isPromotable(status, caption);
-  // Alert parity with the scraper: diff against the most recent prior item for
-  // the same issue so "location changed" / "start time changed" alerts fire for
-  // hand-entered items too.
-  let prior: { location: string | null; eventTimeText: string | null } | null = null;
-  if (issue) {
-    const [row] = await db
-      .select({
-        location: socialWatchItemsTable.location,
-        eventTimeText: socialWatchItemsTable.eventTimeText,
-      })
-      .from(socialWatchItemsTable)
-      .where(
-        and(
-          eq(socialWatchItemsTable.sourceName, "social_watch"),
-          eq(socialWatchItemsTable.issue, issue),
-        ),
-      )
-      .orderBy(desc(socialWatchItemsTable.postedAt))
-      .limit(1);
-    prior = row ?? null;
-  }
-  const alertReasons = detectAlertReasons(
-    caption,
-    hasImages,
-    loc,
-    eventTimeText,
-    status,
-    prior,
-  );
-  const dedupKey = makeDedupKey(caption, imageUrls);
-
-  const confidence = normaliseConfidence(body.confidence);
-  const channel =
-    body.channel?.trim() ||
-    (body.platform === "telegram" ? "kammi_pusat (Telegram)" : "kammi.pusat");
-  const externalId = `manual_${body.platform}_${hashId(body.url || caption)}`;
+  const derived = await deriveWatchFields({
+    platform: body.platform,
+    url: body.url,
+    caption: body.caption,
+    imageUrls: body.imageUrls,
+    channel: body.channel,
+    postedAt,
+    eventDate: body.eventDate,
+    eventTimeText: body.eventTimeText,
+    location: body.location,
+    city: body.city,
+    province: body.province,
+    issue: body.issue,
+    status: body.status,
+    confidence: body.confidence,
+  });
 
   const inserted = await db
     .insert(socialWatchItemsTable)
     .values({
       sourceName: "social_watch",
       platform: body.platform,
-      channel,
+      channel: derived.channel,
       actor: body.actor?.trim() || "KAMMI Pusat",
-      externalId,
+      externalId: derived.externalId,
       postedAt,
-      eventDate,
-      eventTimeText,
-      caption,
-      imageUrls,
-      location: loc.location,
-      city: loc.city,
-      province: loc.province,
-      issue,
-      status,
-      confidence,
+      eventDate: derived.eventDate,
+      eventTimeText: derived.eventTimeText,
+      caption: derived.caption,
+      imageUrls: derived.imageUrls,
+      location: derived.loc.location,
+      city: derived.loc.city,
+      province: derived.loc.province,
+      issue: derived.issue,
+      status: derived.status,
+      confidence: derived.confidence,
       url: body.url,
       country: "Indonesia",
       topic: "flashpoint",
       classification: "context",
-      dedupKey,
-      alertReasons,
-      promotable,
+      dedupKey: derived.dedupKey,
+      alertReasons: derived.alertReasons,
+      promotable: derived.promotable,
     })
     .onConflictDoNothing()
     .returning(LIST_COLUMNS);
@@ -204,7 +165,7 @@ router.post("/social-watch", requireAdminToken, async (req, res): Promise<void> 
     const [existing] = await db
       .select(LIST_COLUMNS)
       .from(socialWatchItemsTable)
-      .where(eq(socialWatchItemsTable.dedupKey, dedupKey))
+      .where(eq(socialWatchItemsTable.dedupKey, derived.dedupKey))
       .limit(1);
     if (existing) {
       res.status(200).json(existing);
@@ -216,10 +177,129 @@ router.post("/social-watch", requireAdminToken, async (req, res): Promise<void> 
   }
 
   req.log.info(
-    { socialWatchItemId: inserted[0]!.id, platform: body.platform, status },
+    { socialWatchItemId: inserted[0]!.id, platform: body.platform, status: derived.status },
     "Manually added KAMMI social-watch item (context only)",
   );
   res.status(201).json(inserted[0]);
+});
+
+// Correct a single hand-entered social-watch CONTEXT row IN PLACE (fix a typo,
+// a wrong location, a missing URL, the event date/time or status) instead of
+// deleting and re-pasting — which would lose any watch-alert history. Omitted
+// fields keep their stored value; the caption and every derived field are
+// re-sanitised / RE-DERIVED server-side exactly like create, so a client can
+// never claim an item is promotable. This only ever touches the context row —
+// it NEVER touches `incidents`, so no incident count can change. Refused (409)
+// once the item has been promoted to an incident (the incident is then the
+// source of truth). Auth mirrors the create/delete/promote actions.
+router.patch("/social-watch/:id", requireAdminToken, async (req, res): Promise<void> => {
+  const idParsed = UpdateSocialWatchItemParams.safeParse({ id: req.params.id });
+  if (!idParsed.success) {
+    res.status(400).json({ error: idParsed.error.message });
+    return;
+  }
+  const id = idParsed.data.id;
+
+  const bodyParsed = UpdateSocialWatchItemBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+  const body = bodyParsed.data;
+
+  const [existing] = await db
+    .select()
+    .from(socialWatchItemsTable)
+    .where(eq(socialWatchItemsTable.id, id))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Social-watch item not found" });
+    return;
+  }
+  if (existing.promotedIncidentId !== null) {
+    res.status(409).json({
+      error: "Item already promoted to an incident — edit the incident instead",
+      incidentId: existing.promotedIncidentId,
+    });
+    return;
+  }
+
+  // Merge the edit over the stored row: any omitted field keeps its stored
+  // value. Everything derivable is then re-derived from the merged text.
+  const platform = body.platform ?? existing.platform;
+  const url = nonEmpty(body.url) ?? existing.url;
+  const caption = body.caption !== undefined ? body.caption : (existing.caption ?? "");
+  const postedAt = body.postedAt ? new Date(body.postedAt) : (existing.postedAt ?? new Date());
+
+  // For every optional field, an OMITTED value must KEEP the stored value —
+  // never silently re-derive from the caption and overwrite a curated analyst
+  // entry. So each field falls back to `existing.*` before deriveWatchFields
+  // (which itself only re-derives from the caption when its input is blank).
+  const derived = await deriveWatchFields(
+    {
+      platform,
+      url,
+      caption,
+      imageUrls: body.imageUrls ?? existing.imageUrls,
+      channel: body.channel ?? existing.channel,
+      postedAt,
+      eventDate: body.eventDate ?? existing.eventDate,
+      eventTimeText: body.eventTimeText ?? existing.eventTimeText ?? undefined,
+      location: body.location ?? existing.location ?? undefined,
+      city: body.city ?? existing.city ?? undefined,
+      province: body.province ?? existing.province ?? undefined,
+      issue: body.issue ?? existing.issue ?? undefined,
+      status: body.status ?? (existing.status as SocialWatchStatus),
+      confidence: body.confidence ?? existing.confidence,
+    },
+    id,
+  );
+
+  let updated;
+  try {
+    [updated] = await db
+      .update(socialWatchItemsTable)
+      .set({
+        platform,
+        channel: derived.channel,
+        actor: nonEmpty(body.actor) ?? existing.actor,
+        externalId: derived.externalId,
+        postedAt,
+        eventDate: derived.eventDate,
+        eventTimeText: derived.eventTimeText,
+        caption: derived.caption,
+        imageUrls: derived.imageUrls,
+        location: derived.loc.location,
+        city: derived.loc.city,
+        province: derived.loc.province,
+        issue: derived.issue,
+        status: derived.status,
+        confidence: derived.confidence,
+        url,
+        dedupKey: derived.dedupKey,
+        alertReasons: derived.alertReasons,
+        promotable: derived.promotable,
+        updatedAt: new Date(),
+      })
+      .where(eq(socialWatchItemsTable.id, id))
+      .returning(LIST_COLUMNS);
+  } catch (e) {
+    // The edited content collides with a DIFFERENT existing row's dedup key —
+    // the same post already exists as context. Surface it rather than 500.
+    if (isUniqueViolation(e)) {
+      res.status(409).json({
+        error: "Another watch item already has this exact content",
+      });
+      return;
+    }
+    throw e;
+  }
+
+  req.log.info(
+    { socialWatchItemId: id, status: derived.status },
+    "Edited KAMMI social-watch item (context only)",
+  );
+  res.status(200).json(updated);
 });
 
 // Remove a single hand-entered social-watch CONTEXT row (wrong URL, duplicate
@@ -259,6 +339,117 @@ router.delete("/social-watch/:id", requireAdminToken, async (req, res): Promise<
   res.status(204).end();
 });
 
+// Shared re-derivation seam for BOTH create and edit so an in-place edit can
+// never behave differently from a fresh paste. Analyst-entered fields (event
+// date/time, location, issue, etc.) are treated as authoritative when present
+// and fall back to the same text extractors the scraper uses. Status,
+// promotability, location, issue, event date/time, watch-alerts and the dedup
+// key are ALWAYS re-derived server-side — a client can never claim an item is
+// promotable. `excludeId` drops the row being edited from the alert-diff prior
+// lookup so an item is never compared against itself.
+async function deriveWatchFields(
+  input: {
+    platform: string;
+    url: string;
+    caption: string;
+    imageUrls: string[] | undefined;
+    channel: string | undefined;
+    postedAt: Date;
+    eventDate: Date | null | undefined;
+    eventTimeText: string | undefined;
+    location: string | undefined;
+    city: string | undefined;
+    province: string | undefined;
+    issue: string | undefined;
+    status: SocialWatchStatus | undefined;
+    confidence: string | undefined;
+  },
+  excludeId?: number,
+): Promise<{
+  caption: string;
+  imageUrls: string[];
+  status: SocialWatchStatus;
+  loc: { location: string | null; city: string; province: string | null };
+  issue: string | null;
+  eventDate: Date | null;
+  eventTimeText: string | null;
+  promotable: boolean;
+  alertReasons: string[];
+  dedupKey: string;
+  confidence: string;
+  channel: string;
+  externalId: string;
+}> {
+  const caption = sanitiseCaption(input.caption);
+  const imageUrls = (input.imageUrls ?? []).slice(0, 6);
+  const hasImages = imageUrls.length > 0;
+
+  const status: SocialWatchStatus = input.status ?? classifyStatus(caption, hasImages);
+  const parsedLoc = extractLocation(caption);
+  const loc = {
+    location: nonEmpty(input.location) ?? parsedLoc.location,
+    city: nonEmpty(input.city) ?? parsedLoc.city,
+    province: nonEmpty(input.province) ?? parsedLoc.province,
+  };
+  const issue = nonEmpty(input.issue) ?? extractIssue(caption);
+  const parsedEvent = extractEventDateTime(caption, input.postedAt);
+  const eventDate = input.eventDate ? new Date(input.eventDate) : parsedEvent.eventDate;
+  const eventTimeText = nonEmpty(input.eventTimeText) ?? parsedEvent.eventTimeText;
+  // Promotability is ALWAYS re-derived server-side, never trusted from client.
+  const promotable = isPromotable(status, caption);
+  // Alert parity with the scraper: diff against the most recent prior item for
+  // the same issue so "location changed" / "start time changed" alerts fire for
+  // hand-entered items too. On edit, exclude the row itself.
+  let prior: { location: string | null; eventTimeText: string | null } | null = null;
+  if (issue) {
+    const conditions = [
+      eq(socialWatchItemsTable.sourceName, "social_watch"),
+      eq(socialWatchItemsTable.issue, issue),
+    ];
+    if (excludeId != null) conditions.push(ne(socialWatchItemsTable.id, excludeId));
+    const [row] = await db
+      .select({
+        location: socialWatchItemsTable.location,
+        eventTimeText: socialWatchItemsTable.eventTimeText,
+      })
+      .from(socialWatchItemsTable)
+      .where(and(...conditions))
+      .orderBy(desc(socialWatchItemsTable.postedAt))
+      .limit(1);
+    prior = row ?? null;
+  }
+  const alertReasons = detectAlertReasons(
+    caption,
+    hasImages,
+    loc,
+    eventTimeText,
+    status,
+    prior,
+  );
+  const dedupKey = makeDedupKey(caption, imageUrls);
+  const confidence = normaliseConfidence(input.confidence);
+  const channel =
+    input.channel?.trim() ||
+    (input.platform === "telegram" ? "kammi_pusat (Telegram)" : "kammi.pusat");
+  const externalId = `manual_${input.platform}_${hashId(input.url || caption)}`;
+
+  return {
+    caption,
+    imageUrls,
+    status,
+    loc,
+    issue,
+    eventDate,
+    eventTimeText,
+    promotable,
+    alertReasons,
+    dedupKey,
+    confidence,
+    channel,
+    externalId,
+  };
+}
+
 // Trim an optional analyst string input; return undefined when blank so the
 // caption-derived fallback is used instead of storing an empty string.
 function nonEmpty(raw: string | null | undefined): string | undefined {
@@ -270,6 +461,17 @@ function nonEmpty(raw: string | null | undefined): string | undefined {
 function normaliseConfidence(raw: string | undefined): string {
   const t = (raw ?? "").trim().toLowerCase();
   return t === "high" || t === "low" ? t : "medium";
+}
+
+// A Postgres unique-constraint violation (code 23505) — used to turn a dedup
+// collision on edit into a clean 409 rather than a 500.
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: unknown }).code === "23505"
+  );
 }
 
 // Small stable non-cryptographic hash so a re-paste of the same URL/caption

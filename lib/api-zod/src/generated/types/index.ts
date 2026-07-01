@@ -166,3 +166,5 @@ export * from './topicCount';
 export * from './topicProseSections';
 export * from './updateSocialRawReviewStatusRequest';
 export * from './updateSocialRawReviewStatusRequestReviewStatus';
+export * from './updateSocialWatchItemRequest';
+export * from './updateSocialWatchItemRequestPlatform';

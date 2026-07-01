@@ -659,6 +659,60 @@ export const CreateSocialWatchItemResponse = zod.object({
 
 
 /**
+ * @summary Correct a single hand-entered social-watch context row in place (fix a typo in the caption, a wrong location, a missing URL, the event date/time or status) instead of deleting and re-pasting it. The item stays supporting CONTEXT only — editing it NEVER becomes or inflates an incident, and never changes any incident count. Status, promotability, location, issue, event time and watch-alerts are all RE-DERIVED server-side from the edited text, exactly like create — a client can never claim an item is promotable. Refuses (409) once the item has been promoted to an incident; edit the incident directly instead.
+ */
+export const UpdateSocialWatchItemParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSocialWatchItemBody = zod.object({
+  "platform": zod.enum(['instagram', 'telegram']).optional().describe('The platform the post was seen on.'),
+  "url": zod.string().optional().describe('Public URL of the post.'),
+  "caption": zod.string().optional().describe('The post text \/ caption, pasted verbatim. Sanitised server-side.'),
+  "actor": zod.string().optional().describe('Organiser \/ account.'),
+  "channel": zod.string().optional().describe('Account handle the post was read from.'),
+  "postedAt": zod.coerce.date().nullish().describe('When the post was published, if known.'),
+  "eventDate": zod.coerce.date().nullish().describe('Explicit protest\/event date, if the analyst knows it. Overrides the best-effort date parsed from the caption when provided.'),
+  "eventTimeText": zod.string().optional().describe('Free-text start time, e.g. \"13.00 WIB\" (display only). Overrides the time parsed from the caption when provided.'),
+  "location": zod.string().optional().describe('Venue \/ location, e.g. \"Gedung DPR\/MPR RI\". Overrides the location parsed from the caption when provided.'),
+  "city": zod.string().optional().describe('City. Overrides the parsed city when provided.'),
+  "province": zod.string().optional().describe('Province, when known. Overrides the parsed province when provided.'),
+  "issue": zod.string().optional().describe('Issue \/ campaign, e.g. \"Indonesia Darurat\". Overrides the issue parsed from the caption when provided.'),
+  "imageUrls": zod.array(zod.string()).optional().describe('Public image URL(s) attached to the post.'),
+  "status": zod.enum(['planned', 'active', 'dispersed', 'cancelled', 'unclear']).optional().describe('Derived protest status of a social-watch item: planned (announced \/ mobilisation), active (confirmed under way), dispersed (broken up \/ clash \/ arrests), cancelled (called off \/ postponed), or unclear.'),
+  "confidence": zod.string().optional().describe('Analyst confidence (high | medium | low).')
+}).describe('An in-place correction of a hand-entered KAMMI protest-watch context row (fix a typo, a wrong location, a missing URL, the event date\/time or status). All fields are optional; omitted fields keep their stored value. The row stays supporting CONTEXT only — editing it never becomes or inflates an incident. The server sanitises the caption and RE-DERIVES status, promotability, location, issue, event date\/time and watch-alerts from the edited text; client-supplied derived fields are advisory hints, never trusted for promotion eligibility.')
+
+export const UpdateSocialWatchItemResponse = zod.object({
+  "id": zod.number(),
+  "platform": zod.string(),
+  "channel": zod.string(),
+  "actor": zod.string().nullish(),
+  "externalId": zod.string().optional(),
+  "postedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullish(),
+  "eventTimeText": zod.string().nullish(),
+  "caption": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
+  "location": zod.string().nullish(),
+  "city": zod.string().optional(),
+  "province": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "status": zod.enum(['planned', 'active', 'dispersed', 'cancelled', 'unclear']).describe('Derived protest status of a social-watch item: planned (announced \/ mobilisation), active (confirmed under way), dispersed (broken up \/ clash \/ arrests), cancelled (called off \/ postponed), or unclear.'),
+  "confidence": zod.string(),
+  "url": zod.string(),
+  "country": zod.string().optional(),
+  "topic": zod.string().optional(),
+  "classification": zod.string(),
+  "alertReasons": zod.array(zod.string()).optional(),
+  "promotable": zod.boolean(),
+  "promotedIncidentId": zod.number().nullish(),
+  "promotedAt": zod.coerce.date().nullish(),
+  "postedAtDisplay": zod.string().nullish()
+}).describe('A KAMMI Pusat public Instagram protest-watch item stored as supporting CONTEXT. NOT an incident: these rows live in their own table and never feed any incident count. The only path into incidents is the explicit promote action, which sets promotedIncidentId.')
+
+
+/**
  * @summary Remove a single hand-entered social-watch context row (wrong URL, duplicate, off-topic paste). Deletes ONLY the context row — it never touches any incident, so no incident count changes. Refuses (409) if the item was already promoted to an incident; delete the incident first.
  */
 export const DeleteSocialWatchItemParams = zod.object({
