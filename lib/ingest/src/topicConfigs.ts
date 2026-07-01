@@ -758,8 +758,9 @@ const APAC_LOCAL_FEEDS: TopicFeed[] = [
 export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
   topic: "apac_local",
   feeds: APAC_LOCAL_FEEDS,
-  // Bilingual allow-list scoped to the six tracked categories: protest / civil
-  // unrest, crime, terrorism, security incidents, and transport disruption.
+  // Bilingual allow-list scoped to the tracked categories: protest / civil
+  // unrest, crime, terrorism, security incidents, transport disruption, and
+  // natural hazards (typhoon / earthquake / flood / volcano / landslide).
   // The ingest gate substring-matches the RAW (Bahasa or English) title +
   // summary, so both languages are listed. Multi-word phrases are preferred and
   // fragile short tokens (e.g. bare "raid", "armed", "port", "npa", "ied") are
@@ -835,6 +836,24 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "laka lantas",
     // transport — Tagalog: "aksidente" (accident), "banggaan" (collision/crash).
     "aksidente", "banggaan",
+    // natural hazard — Philippine (Inquirer/Rappler/GMA) and Thai (Bangkok
+    // Post/Khaosod) outlets lead with typhoons, earthquakes and floods, but the
+    // gate previously had no hazard vocabulary so these were silently dropped
+    // despite passing the geographic relevance gate. Mirrors indonesia_local's
+    // hazard coverage. English cues cover Thai + Philippine English desks;
+    // Bahasa cues cover the Indonesian direct outlets.
+    "typhoon", "cyclone", "tropical storm", "storm surge", "earthquake",
+    "quake", "aftershock", "tsunami", "volcano", "volcanic", "eruption",
+    "landslide", "mudslide", "flood",
+    // natural hazard — Bahasa: "banjir" (flood), "longsor" (landslide),
+    // "gempa" (earthquake), "erupsi"/"letusan"/"gunung meletus" (eruption).
+    "banjir", "longsor", "gempa", "erupsi", "letusan", "gunung meletus",
+    // natural hazard — Tagalog (Philippine English outlets code-switch).
+    // "bagyo" (typhoon), "lindol" (earthquake), "bulkan" (volcano), "pagguho"
+    // (landslide). Flood is the bound forms "pagbaha"/"bumaha"/"binaha" — the
+    // bare Tagalog "baha" is a substring of "bahasa"/"bahay" (house)/"bahagi"
+    // (part) and would false-positive, so it is deliberately avoided.
+    "bagyo", "lindol", "bulkan", "pagguho", "pagbaha", "bumaha", "binaha",
   ],
   deny: [
     ...COMMON_DENY,

@@ -86,6 +86,14 @@ describe("apac_local ingest allow/deny gate", () => {
       // transport disruption
       ["EN transport", "Ferry capsizes off the coast near Bangkok"],
       ["ID transport", "Kapal tenggelam di perairan dekat Jakarta"],
+      // natural hazard (English + Bahasa)
+      ["EN typhoon", "Typhoon batters northern Luzon, thousands evacuated"],
+      ["EN earthquake", "Magnitude 6.2 earthquake jolts Davao region"],
+      ["EN flood", "Flood submerges villages in central Thailand"],
+      ["EN volcano", "Taal volcano eruption forces evacuations near Manila"],
+      ["EN landslide", "Landslide buries homes in Baguio after heavy rain"],
+      ["ID hazard flood", "Banjir bandang terjang permukiman di Sulawesi"],
+      ["ID hazard quake", "Gempa bumi guncang wilayah dekat Jakarta"],
     ];
     it.each(kept)("keeps %s", (_label, title) => {
       const c = classify(title);
@@ -234,11 +242,37 @@ describe("apac_local ingest allow/deny gate — Tagalog + Thai wording", () => {
       ["Thai protest", "Anti-government protesters rally in Bangkok"],
       ["Thai deep-south shooting", "Gunmen open fire in Narathiwat, two rangers killed"],
       ["Thai deep-south bombing", "Roadside bomb blast wounds soldiers in Pattani"],
+      ["Thai flood", "Flood inundates Chiang Mai as river bursts its banks"],
     ];
     it.each(kept)("keeps %s", (_label, title) => {
       const c = classify(title);
       expect(c.kept).toBe(true);
       expect(c.reason).toMatch(/^allow:/);
+    });
+  });
+
+  describe("keeps Tagalog-worded natural-hazard incidents", () => {
+    const kept: Array<[string, string]> = [
+      ["bagyo", "Malakas na bagyo, libong pamilya inilikas sa Bicol"],
+      ["lindol", "Magnitude 6 na lindol, naramdaman sa Davao"],
+      ["pagbaha", "Malawakang pagbaha sa Marikina, daan-daan inilikas"],
+      ["bumaha", "Bumaha sa maraming bahagi ng Maynila matapos ang bagyo"],
+      ["bulkan", "Pagputok ng bulkan Taal, ipinag-utos ang paglikas"],
+      ["pagguho", "Pagguho ng lupa, tinabunan ang mga bahay sa Baguio"],
+    ];
+    it.each(kept)("keeps %s", (_label, title) => {
+      const c = classify(title);
+      expect(c.kept).toBe(true);
+      expect(c.reason).toMatch(/^allow:/);
+    });
+  });
+
+  describe("does not false-match on the bare Tagalog flood substring 'baha'", () => {
+    it("does not read 'bahay' (house) or 'Bahasa' as a flood", () => {
+      // "baha" is deliberately NOT an allow token — only the bound verb/noun
+      // forms are — so a house or language story falls through cleanly.
+      expect(classify("Bagong bahay, ipinagmamalaki ng pamilya sa Cebu").kept).toBe(false);
+      expect(classify("Kelas Bahasa Indonesia dibuka di universitas Jakarta").kept).toBe(false);
     });
   });
 
