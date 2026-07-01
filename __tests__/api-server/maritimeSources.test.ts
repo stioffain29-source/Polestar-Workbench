@@ -147,7 +147,11 @@ describe("maritime AIS source health", () => {
   });
 
   it("reports unavailable (not a false outage) when AIS is unconfigured", async () => {
+    // resolveAisKey() reads AIS_API_KEY *or* AISSTREAM_API_KEY, so BOTH must be
+    // cleared for the probe to see no credential — otherwise a workspace with
+    // AISSTREAM_API_KEY set reads "stale" (configured, awaiting data).
     delete process.env.AIS_API_KEY;
+    delete process.env.AISSTREAM_API_KEY;
     delete process.env.AIS_ENABLED;
     stubDb(new Map());
     const item = find(await getMaritimeSourceHealth(), "ais");
