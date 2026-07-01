@@ -398,6 +398,45 @@ describe("social-watch posts never inflate the incident count", () => {
     expect(status).toBe(404);
     expect(await flashpointIncidentCount()).toBe(before);
   });
+
+  it("carries the pasted channel/actor provenance onto the promoted incident", async () => {
+    // A Telegram paste with an analyst-supplied organiser + channel. When
+    // promoted, the incident must retain that provenance (channel + actor) and
+    // the source link — it must NOT be relabelled as the default Instagram
+    // source or lose the captured channel.
+    const item = seedSocialItem({
+      status: "active",
+      promotable: true,
+      platform: "telegram",
+      channel: "bem_si (Telegram)",
+      actor: "BEM SI",
+      url: "https://t.me/bemsi/789",
+    });
+
+    const { status, json } = await promote(item.id as number);
+    expect(status).toBe(201);
+
+    // The captured channel AND organiser survive into the incident source.
+    expect(String(json.source)).toContain("bem_si (Telegram)");
+    expect(String(json.source)).toContain("BEM SI");
+    // A Telegram paste is never mislabelled as Instagram.
+    expect(String(json.source)).not.toMatch(/instagram/i);
+    // The source link is preserved too.
+    expect(json.sourceUrl).toBe("https://t.me/bemsi/789");
+  });
+
+  it("falls back to a stable Social Watch source when no channel/actor is stored", async () => {
+    const item = seedSocialItem({
+      status: "active",
+      promotable: true,
+      channel: null,
+      actor: null,
+    });
+
+    const { status, json } = await promote(item.id as number);
+    expect(status).toBe(201);
+    expect(String(json.source)).toBe("KAMMI Social Watch");
+  });
 });
 
 async function createItem(body: Record<string, unknown>) {
@@ -434,6 +473,45 @@ describe("manual-paste social-watch items are context, never incidents", () => {
     // It shows up on the board.
     const list = await fetch(`${baseUrl}/api/social-watch`);
     expect(((await list.json()) as Row[]).length).toBe(1);
+  });
+
+  it("applies per-platform channel/actor defaults when they are omitted", async () => {
+    // Instagram paste with no analyst-supplied channel/actor → KAMMI Instagram
+    // defaults.
+    const ig = await createItem({
+      platform: "instagram",
+      url: "https://www.instagram.com/p/defaults-ig/",
+      caption: ACTIVE_CAPTION,
+    });
+    expect(ig.status).toBe(201);
+    expect(ig.json.channel).toBe("kammi.pusat");
+    expect(ig.json.actor).toBe("KAMMI Pusat");
+
+    // Telegram paste with no analyst-supplied channel → Telegram-flavoured
+    // default channel, same KAMMI actor default. Distinct caption so it is not
+    // deduped against the Instagram paste above (dedup is caption-keyed).
+    const tg = await createItem({
+      platform: "telegram",
+      url: "https://t.me/kammipusat/999",
+      caption:
+        "Massa masih bertahan di depan Gedung DPR/MPR RI, aksi terus berlangsung. #ReformasiIndonesia",
+    });
+    expect(tg.status).toBe(201);
+    expect(tg.json.channel).toBe("kammi_pusat (Telegram)");
+    expect(tg.json.actor).toBe("KAMMI Pusat");
+  });
+
+  it("persists an explicitly-pasted channel and actor on the created row", async () => {
+    const { status, json } = await createItem({
+      platform: "telegram",
+      url: "https://t.me/bemsi/321",
+      caption: ACTIVE_CAPTION,
+      channel: "bem_si (Telegram)",
+      actor: "BEM SI",
+    });
+    expect(status).toBe(201);
+    expect(json.channel).toBe("bem_si (Telegram)");
+    expect(json.actor).toBe("BEM SI");
   });
 
   it("re-derives an active item as promotable and a planned item as not", async () => {

@@ -544,7 +544,10 @@ router.post("/social-watch/:id/promote", requireAdminToken, async (req, res): Pr
         occurredAt,
         severity: "Low",
         confidence: item.confidence,
-        source: "KAMMI Instagram (Social Watch)",
+        // Carry the pasted provenance (organiser + channel/account) onto the
+        // incident so a Telegram paste is not mislabelled as Instagram and the
+        // captured channel survives into published intelligence.
+        source: buildIncidentSource(item),
         sourceUrl,
         analystNotes: `Promoted from KAMMI social-watch item #${item.id} (${item.status}).`,
         relevanceStatus: rel.status,
@@ -579,6 +582,22 @@ function buildIncidentTitle(item: {
   const verb =
     item.status === "dispersed" ? "dispersed" : "under way";
   return `${subject} ${verb} — ${where}, Indonesia`;
+}
+
+// Preserve the pasted provenance (organiser + channel/account) on the promoted
+// incident's source line. A Telegram paste must not be relabelled "Instagram",
+// and the captured channel/actor must survive into published intelligence.
+// Falls back to a stable Social Watch label when neither was captured.
+function buildIncidentSource(item: {
+  channel: string | null;
+  actor: string | null;
+}): string {
+  const actor = item.actor?.trim();
+  const channel = item.channel?.trim();
+  if (actor && channel) return `${actor} — ${channel} (Social Watch)`;
+  if (channel) return `${channel} (Social Watch)`;
+  if (actor) return `${actor} (Social Watch)`;
+  return "KAMMI Social Watch";
 }
 
 function buildIncidentSummary(item: {
