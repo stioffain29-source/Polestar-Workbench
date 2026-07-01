@@ -826,6 +826,20 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "kkb",
     // security — Tagalog: "pananambang" (ambush).
     "pananambang",
+    // PNG / Pacific local security vocabulary. The generic crime/security terms
+    // above miss the way PNG (English + Tok Pisin) headlines report violence, so
+    // its own direct outlet (Post-Courier) accepted 0 of its items. "clash"
+    // above already catches "tribal clash" / "highlands clash", so these fill
+    // only the remaining gaps. Multi-word phrases preferred; the single tokens
+    // ("raskol", "sorcery", "sanguma", "machete") are distinctive PNG terms with
+    // no benign substring collision.
+    "raskol", "tribal fight", "tribal fighting", "tribal war",
+    "tribal violence", "tribal conflict", "tribal tension", "tribal clash",
+    "ethnic violence", "communal violence", "election violence", "mob violence",
+    "highlands clash", "sorcery", "sanguma", "witchcraft accusation",
+    "payback killing", "payback attack", "payback violence",
+    "pack rape", "gang rape", "machete", "bush knife",
+    "hacked to death", "beaten to death", "burnt alive",
     // transport disruption
     "plane crash", "boat sinks", "ferry", "capsize", "airport", "collision",
     "derail", "train crash", "road accident", "bus crash", "flight cancel",
