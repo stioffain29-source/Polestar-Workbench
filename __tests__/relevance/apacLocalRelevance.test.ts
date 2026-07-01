@@ -310,3 +310,52 @@ describe("apac_local ingest allow/deny gate — Tagalog + Thai wording", () => {
     });
   });
 });
+
+// PNG (Post-Courier / RNZ Pacific) headlines report violence in a distinctive
+// English + Tok Pisin vocabulary ("raskol", "tribal fighting", "sorcery",
+// "payback killing", "pack rape", "machete", "bush knife") that the generic
+// crime/security terms miss — its direct outlet accepted 0 of its items before
+// this vocabulary was added. These fixtures lock that PNG coverage so a future
+// allow/deny edit cannot silently start dropping genuine PNG local violence
+// again — without any error surfacing. See `lib/ingest/src/topicConfigs.ts`
+// (APAC_LOCAL, PNG / Pacific local security vocabulary block).
+describe("apac_local ingest allow/deny gate — PNG / Pacific local violence", () => {
+  describe("keeps genuine PNG security incidents", () => {
+    const kept: Array<[string, string]> = [
+      ["raskol", "Raskol gang robs bank in Port Moresby, one shot dead"],
+      ["tribal fighting", "Tribal fighting erupts in Enga province, dozens killed"],
+      ["tribal war", "Tribal war flares again in the Highlands near Mount Hagen"],
+      ["ethnic violence", "Ethnic violence displaces hundreds in Hela province"],
+      ["election violence", "Election violence claims lives in PNG Highlands"],
+      ["sorcery", "Woman accused of sorcery attacked in Enga"],
+      ["sanguma", "Sanguma accusation sparks mob attack in PNG village"],
+      ["witchcraft accusation", "Witchcraft accusation leads to violence near Goroka"],
+      ["payback killing", "Payback killing leaves two dead in Wewak"],
+      ["payback attack", "Payback attack burns homes in Southern Highlands"],
+      ["pack rape", "Pack rape reported in remote PNG settlement"],
+      ["machete", "Machete attack wounds several in Lae market brawl"],
+      ["bush knife", "Man killed with bush knife in Bougainville dispute"],
+      ["hacked to death", "Villager hacked to death in Highlands land dispute"],
+      ["beaten to death", "Suspected thief beaten to death by mob in Port Moresby"],
+    ];
+    it.each(kept)("keeps %s", (_label, title) => {
+      const c = classify(title);
+      expect(c.kept).toBe(true);
+      expect(c.reason).toMatch(/^allow:/);
+    });
+  });
+
+  describe("drops benign PNG stories (allow list not over-broadened)", () => {
+    const dropped: Array<[string, string]> = [
+      ["university", "University of Papua New Guinea opens new science campus"],
+      ["trade deal", "PNG and Australia sign new trade deal in Port Moresby"],
+      ["economy", "PNG budget forecasts higher growth in resource sector"],
+      ["infrastructure", "New highway upgrade completed near Mount Hagen"],
+    ];
+    it.each(dropped)("drops %s", (_label, title) => {
+      const c = classify(title);
+      expect(c.kept).toBe(false);
+      expect(c.reason).toBe("no-allowlist-match");
+    });
+  });
+});
