@@ -116,3 +116,24 @@ exp, burst CONCURRENCY 2 on the Google-News topics) to avoid bursts. **Trade-off
 slower = MORE exposure to the autoscale freeze above, so it only pays off on a Scheduled
 Deployment / always-on runner where slow-but-thorough is fine. If still throttled there,
 consider env-specific tuning or splitting ingest into short per-stage-marked jobs.
+
+## The in-request admin trigger ALSO dies if the CLIENT disconnects
+`POST /api/admin/ingest` is SYNCHRONOUS — it `await`s the whole `runIngestOnce` and responds
+only at the very end (409 fast if the advisory lock is already held). On autoscale, if the
+triggering HTTP client disconnects before it finishes (e.g. a `curl --max-time` shorter than
+the run), cloudrun tears the instance down ~30–40s later and the run dies mid-way: deployment
+log shows `ingest lock connection error (terminated mid-run)` with Postgres
+`57P01 terminating connection due to administrator command`. Market prices run AFTER the
+incident scrape (~4–5 min in), so they're exactly what gets lost.
+**Why:** request-scoped CPU only lasts while the request is in flight; no client = instance recycled.
+**How to apply — hold the connection open for the ENTIRE run:**
+- A curl backgrounded with `nohup … & disown` does NOT survive the agent bash-tool call (the
+  tool kills its process group). Use `setsid bash -c 'curl … --max-time 900 …' </dev/null &` —
+  a NEW session survives the teardown and keeps holding the connection to completion.
+- You CANNOT hold it from the code_execution sandbox: it has no `process.env` and `viewEnvVars`
+  redacts secret VALUES (returns only names under `envVars`/`secrets`), so you can't build the
+  `Authorization: Bearer` header there.
+- Verify success by polling prod `market_prices` / report `hard_numbers` via
+  `executeSql({environment:"production"})`; the curl's own stdout may be empty if it's cut at the tail.
+**Caveat:** the admin token appears in `pgrep -af` / process args — never echo full process
+listings, and rotate `INGEST_ADMIN_TOKEN` if it leaks.
