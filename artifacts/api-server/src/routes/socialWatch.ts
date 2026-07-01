@@ -588,7 +588,7 @@ function buildIncidentTitle(item: {
 // incident's source line. A Telegram paste must not be relabelled "Instagram",
 // and the captured channel/actor must survive into published intelligence.
 // Falls back to a stable Social Watch label when neither was captured.
-function buildIncidentSource(item: {
+export function buildIncidentSource(item: {
   channel: string | null;
   actor: string | null;
 }): string {
