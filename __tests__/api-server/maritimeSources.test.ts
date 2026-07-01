@@ -1,6 +1,7 @@
 import { db, maritimeMovementTable, sourcesTable } from "@workspace/db";
 import { getMaritimeSourceHealth } from "../../artifacts/api-server/src/lib/maritimeSources";
 import type { MaritimeSourceHealthItem } from "@workspace/api-zod";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // The maritime source-health board (`getMaritimeSourceHealth`) feeds the
 // `maritimeSources` array on /api/integrations/status and drives the AIS
@@ -100,6 +101,14 @@ function stubDbHonoringMovementFilter(
 }
 
 const savedEnv = { ...process.env };
+
+// Start every test from a known-clean env: clear ALL known integration secrets
+// so a real workspace secret (e.g. AISSTREAM_API_KEY as an AIS_API_KEY
+// alternate) can never leak into an assertion. Each case then sets only the
+// vars it needs.
+beforeEach(() => {
+  clearIntegrationEnv();
+});
 
 afterEach(() => {
   process.env = { ...savedEnv };

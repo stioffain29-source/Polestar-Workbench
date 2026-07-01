@@ -45,6 +45,7 @@ import type {
   IntegrationStatusItem,
   IntegrationStatusResponse,
 } from "@workspace/api-zod";
+import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 type Rows = Record<string, unknown>[];
 
@@ -76,6 +77,14 @@ function find(resp: IntegrationStatusResponse, key: string): IntegrationStatusIt
 }
 
 const savedEnv = { ...process.env };
+
+// Start every test from a known-clean env: clear ALL known integration secrets
+// so a real workspace secret (e.g. AISSTREAM_API_KEY, APIFY_TOKEN, or the
+// AI_INTEGRATIONS_* pair) can never leak into an assertion. Each case then sets
+// only the vars it needs.
+beforeEach(() => {
+  clearIntegrationEnv();
+});
 
 afterEach(() => {
   process.env = { ...savedEnv };
