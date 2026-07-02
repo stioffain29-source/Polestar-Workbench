@@ -52,6 +52,33 @@ const FETCH_TIMEOUT_MS = 20000;
 const FETCH_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 2500;
 
+// Apify async run-and-poll budget. The Instagram scraper actor run regularly
+// takes longer than a single HTTP fetch to finish, so instead of the
+// synchronous run-sync endpoint (which was always aborted at FETCH_TIMEOUT_MS
+// before results came back) we START a run, POLL its status until a terminal
+// state, then fetch the dataset. Each individual HTTP call still uses the shared
+// 20s FETCH_TIMEOUT_MS; this LONGER overall budget — provided by the polling
+// loop, NOT by raising that shared constant — is what lets a slow-but-progressing
+// run complete. A run that never reaches a terminal state within the budget is
+// aborted and reported as a timeout so it ends cleanly instead of hanging the
+// whole ingest. Both are env-overridable for operational tuning.
+const INSTAGRAM_RUN_MAX_WAIT_MS_DEFAULT = 180_000;
+const INSTAGRAM_RUN_POLL_MS_DEFAULT = 5_000;
+
+function instagramRunMaxWaitMs(): number {
+  const raw = Number(process.env.INSTAGRAM_RUN_MAX_WAIT_MS);
+  return Number.isFinite(raw) && raw > 0
+    ? Math.trunc(raw)
+    : INSTAGRAM_RUN_MAX_WAIT_MS_DEFAULT;
+}
+
+function instagramRunPollMs(): number {
+  const raw = Number(process.env.INSTAGRAM_RUN_POLL_MS);
+  return Number.isFinite(raw) && raw > 0
+    ? Math.trunc(raw)
+    : INSTAGRAM_RUN_POLL_MS_DEFAULT;
+}
+
 export interface SocialWatchConfig {
   enabled: boolean;
   instagram: {
@@ -639,25 +666,155 @@ export function isApifyAuthError(err: unknown): boolean {
   return /\bstatus 40[13]\b/.test(m);
 }
 
+/**
+ * An auth rejection (401/403) raised specifically by the run-START call, before
+ * any Apify run was created. This is the ONLY condition under which the token
+ * fallback may advance to the next candidate — a post-start auth error (during
+ * polling or dataset fetch) must NOT trigger a fallback, because a run has
+ * already been started (and paid for) with the current token, so retrying with a
+ * different token would start a second run and incur extra spend.
+ */
+export class ApifyStartAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApifyStartAuthError";
+  }
+}
+
+// Apify actor-run lifecycle. READY/RUNNING are transitional; the states below
+// are terminal (or terminal-bound and reported as such by the API once
+// reached). Only SUCCEEDED yields a usable dataset — the others mean the run
+// ended without results and must surface as an error.
+const APIFY_TERMINAL_STATES = new Set([
+  "SUCCEEDED",
+  "FAILED",
+  "ABORTED",
+  "TIMED-OUT",
+]);
+
+interface ApifyRunInfo {
+  id: string;
+  status: string;
+  datasetId: string;
+}
+
+/** Extract {id,status,defaultDatasetId} from an Apify run/actor-run response. */
+function parseApifyRun(json: unknown): ApifyRunInfo | null {
+  if (!json || typeof json !== "object") return null;
+  const data = (json as Record<string, unknown>).data;
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const id = asString(d.id);
+  if (!id) return null;
+  return {
+    id,
+    status: asString(d.status),
+    datasetId: asString(d.defaultDatasetId),
+  };
+}
+
+/**
+ * Best-effort abort of a still-running Apify run so a budget-exhausted run stops
+ * spending. NEVER throws — a failed abort must not mask the timeout that
+ * triggered it, and the ingest must degrade gracefully regardless.
+ */
+async function abortApifyRun(
+  cfg: SocialWatchConfig,
+  token: string,
+  runId: string,
+): Promise<void> {
+  try {
+    const url = `${cfg.instagram.apiBase}/v2/actor-runs/${encodeURIComponent(runId)}/abort?token=${encodeURIComponent(token)}`;
+    await fetchJson(url, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    // Swallow: abort is best-effort cleanup only.
+  }
+}
+
 async function fetchInstagramPostsWithToken(
   cfg: SocialWatchConfig,
   token: string,
 ): Promise<RawSocialPost[]> {
   const ig = cfg.instagram;
-  // Apify run-sync-get-dataset-items endpoint for the Instagram scraper actor.
-  // The token is sent as a query param per Apify's API and is NEVER stored or
-  // surfaced. Only PUBLIC profile posts are requested.
-  const url = `${ig.apiBase}/v2/acts/${encodeURIComponent(ig.actor)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
   const input = {
     directUrls: [`https://www.instagram.com/${ig.handle}/`],
     resultsType: "posts",
     resultsLimit: cfg.maxItems,
     addParentData: false,
   };
-  const json = await fetchJson(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(input),
+
+  // 1. START an asynchronous actor run (this returns as soon as the run is
+  // queued — it does NOT wait for the scrape to finish). A 401/403 here is
+  // thrown by fetchJson BEFORE any run is created, so the token fallback in
+  // fetchInstagramPosts observes the auth error promptly and starts (pays for)
+  // no run. The token is a query param per Apify's API and is NEVER stored or
+  // surfaced. Only PUBLIC profile posts are requested.
+  const startUrl = `${ig.apiBase}/v2/acts/${encodeURIComponent(ig.actor)}/runs?token=${encodeURIComponent(token)}`;
+  let startJson: unknown;
+  try {
+    startJson = await fetchJson(startUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch (err) {
+    // A 401/403 HERE means the token was rejected before any run was created, so
+    // it is safe (and free) to try the next candidate token. Tag it as a
+    // start-phase auth error so the fallback loop can distinguish it from a
+    // post-start auth error (which must NOT fall back — see below).
+    if (isApifyAuthError(err)) {
+      throw new ApifyStartAuthError(err instanceof Error ? err.message : String(err));
+    }
+    throw err;
+  }
+  let run = parseApifyRun(startJson);
+  if (!run) throw new Error("Apify run start returned no run id");
+
+  // 2. POLL the run status until it reaches a terminal state or the overall
+  // budget expires. This budget — not the 20s per-call FETCH_TIMEOUT_MS — is
+  // what lets a multi-minute scraper run finish. A run still not terminal at the
+  // deadline is aborted (to stop spend) and reported as a timeout so it ends
+  // cleanly. Note: the START above already succeeded, so a run exists and has
+  // been paid for. Any error from here on (including a 401/403 while polling or
+  // fetching the dataset) is a PLAIN error — NOT an ApifyStartAuthError — so the
+  // token fallback in fetchInstagramPosts will NOT fire and start a second run;
+  // the error is surfaced as-is and captured by the per-feed try/catch in
+  // runSocialWatchIngest.
+  const budgetMs = instagramRunMaxWaitMs();
+  const pollMs = instagramRunPollMs();
+  const deadline = Date.now() + budgetMs;
+  while (!APIFY_TERMINAL_STATES.has(run.status)) {
+    if (Date.now() >= deadline) {
+      await abortApifyRun(cfg, token, run.id);
+      throw new Error(
+        `Apify run timed out after ${Math.round(budgetMs / 1000)}s (last status ${run.status || "unknown"})`,
+      );
+    }
+    await sleep(pollMs);
+    const statusUrl = `${ig.apiBase}/v2/actor-runs/${encodeURIComponent(run.id)}?token=${encodeURIComponent(token)}`;
+    const statusJson = await fetchJson(statusUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    const next = parseApifyRun(statusJson);
+    if (next) run = next;
+  }
+
+  if (run.status !== "SUCCEEDED") {
+    throw new Error(`Apify run did not succeed (status ${run.status})`);
+  }
+  if (!run.datasetId) {
+    throw new Error("Apify run succeeded but returned no dataset id");
+  }
+
+  // 3. FETCH the succeeded run's dataset items.
+  const itemsUrl = `${ig.apiBase}/v2/datasets/${encodeURIComponent(run.datasetId)}/items?token=${encodeURIComponent(token)}&clean=true&limit=${cfg.maxItems}`;
+  const json = await fetchJson(itemsUrl, {
+    method: "GET",
+    headers: { Accept: "application/json" },
   });
   const arr = Array.isArray(json)
     ? json
@@ -680,10 +837,12 @@ export async function fetchInstagramPosts(cfg: SocialWatchConfig): Promise<RawSo
     );
   }
   // Try each candidate Apify token in order (INSTAGRAM_API_KEY first, then the
-  // APIFY_TOKEN fallback). A 401/403 means the token is bad/expired/wrong, so
-  // fall through to the next candidate; any other error (or a success) stops
-  // here. An auth rejection starts no Apify run, so the fallback never costs an
-  // extra paid run.
+  // APIFY_TOKEN fallback). Fall through to the next candidate ONLY on an
+  // ApifyStartAuthError — a 401/403 raised by the run-START call BEFORE any run
+  // was created. Any other error (a non-auth start failure, OR an auth error
+  // that surfaced after a run already started while polling/fetching) stops
+  // here: a run has already been paid for, so retrying with a different token
+  // would start (and pay for) a second run.
   const tokens = ig.apiKeys;
   if (tokens.length === 0) {
     throw new Error("no Instagram API token configured");
@@ -694,7 +853,7 @@ export async function fetchInstagramPosts(cfg: SocialWatchConfig): Promise<RawSo
       return await fetchInstagramPostsWithToken(cfg, tokens[i]!);
     } catch (err) {
       lastErr = err;
-      if (i < tokens.length - 1 && isApifyAuthError(err)) continue;
+      if (i < tokens.length - 1 && err instanceof ApifyStartAuthError) continue;
       throw err;
     }
   }

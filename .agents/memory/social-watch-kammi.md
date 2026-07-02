@@ -63,6 +63,24 @@ retry every error 3× with backoff — fixed). Plus
 `INSTAGRAM_PROVIDER`(apify)/`INSTAGRAM_ENABLED`/`INSTAGRAM_API_BASE`/`INSTAGRAM_ACTOR`/
 `KAMMI_INSTAGRAM_HANDLE`(@kammi.pusat). `SOCIAL_WATCH_MAX_ITEMS` per-platform cap.
 
+**Apify fetch is ASYNC run-and-poll, NOT run-sync (why):** an actor run takes
+longer than the shared 20s `FETCH_TIMEOUT_MS`, so the old
+`run-sync-get-dataset-items` call ALWAYS timed out and no posts ever landed. The
+run is now STARTed, POLLed to a terminal state, then its dataset FETCHed. Rules
+that must not regress:
+- Each individual HTTP call keeps the 20s per-call `FETCH_TIMEOUT_MS` — do NOT
+  raise that shared constant. The POLL LOOP is what supplies the longer overall
+  budget (`INSTAGRAM_RUN_MAX_WAIT_MS` default 180000, cadence
+  `INSTAGRAM_RUN_POLL_MS` default 5000). Budget exhausted → best-effort abort
+  (never throws) + a "timed out" error captured per-feed.
+- **Token fallback is START-ONLY.** Only a 401/403 on the run-START (no run
+  created, zero spend) may advance to the next candidate token. This is enforced
+  by a dedicated `ApifyStartAuthError` type thrown ONLY from the START call; the
+  fallback loop rolls over on that type, never on a bare `isApifyAuthError`.
+  **Why:** once a run has started it is already paid for, so a post-start 401/403
+  (while polling or fetching the dataset) must surface as-is — rolling over would
+  start a SECOND paid run. Never widen the fallback back to any auth error.
+
 **Data-source reality:** Instagram (the primary, paid Apify feed) is the live
 path — it needs a real `apify_api_` token. Without one, the feed no-ops cleanly.
 
