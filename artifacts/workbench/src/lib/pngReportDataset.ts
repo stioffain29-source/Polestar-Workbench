@@ -29,6 +29,7 @@ import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest
 import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
 import { clusterSameStoryRows, incidentTypeKey, type SameStoryRow } from "./countrySameStory";
 import { stripWireCruft } from "./incidentTitle";
+import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import { scoreClusterValue } from "./countryTopValue";
@@ -223,6 +224,15 @@ export interface StructuredTheatreConfig {
   // isDevelopmentWireItem). Set ONLY on PNG_REPORT_CONFIG; every other theatre
   // is byte-identical because the filter is inert when the flag is unset.
   filterDevelopmentWire?: boolean;
+  // PNG-only. When true, non-kinetic assistance / prevention / ceremonial PR
+  // items (e.g. "trained to stop sorcery violence", "helped displaced victims")
+  // are DEMOTED to Low severity at item build, so the brief no longer leads with
+  // — or asserts High severity from — development PR while real crime sits below
+  // it. STRICT no-fabrication: only ever demotes, never up-rates, and is
+  // veto-guarded against demoting genuine kinetic events (see
+  // isNonKineticAssistanceItem). Set ONLY on PNG_REPORT_CONFIG; every other
+  // theatre is byte-identical because the correction is inert when unset.
+  demoteNonKineticWire?: boolean;
 }
 
 export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -244,6 +254,7 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
       "field operations, project sites, secure movement, aviation-dependent travel, remote logistics and staff based near affected districts",
   },
   filterDevelopmentWire: true,
+  demoteNonKineticWire: true,
   deriveProvince: derivePngProvince,
   extractItem: extractPngItem,
   locationAugmentations: {
@@ -638,7 +649,17 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
     i.category && i.businessImpact
       ? i.businessImpact
       : ext?.businessImpact ?? DEFAULT_BUSINESS_IMPACT;
-  const sev = (i.severity ?? "").toLowerCase();
+  // PNG display-layer severity correction (no-fabrication, demote-only). The
+  // stored severity mis-rates assistance / prevention PR as High; cap those at
+  // Low here so it flows consistently into severityLabel, severityRank, every
+  // sort, both prose severity flags and clustering. Inert unless the config flag
+  // is set (PNG only), so other theatres are byte-identical.
+  const rawSev = (i.severity ?? "").toLowerCase();
+  const sev =
+    config.demoteNonKineticWire === true &&
+    isNonKineticAssistanceItem(i.title, i.summary)
+      ? correctSeverity(rawSev)
+      : rawSev;
   const reportedDate = new Date(i.occurredAt);
   const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
   const title = stripWireCruft(

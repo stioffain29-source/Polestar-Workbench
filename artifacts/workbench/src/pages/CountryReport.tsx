@@ -26,6 +26,7 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import { computeCountryFastFacts, type CountryFastFactsIncident } from "@/lib/countryFastFacts";
+import { correctPngIncidentSeverities } from "@/lib/pngSeverityCorrection";
 import { consolidateCountryStories } from "@/lib/countrySameStory";
 import { shouldGenerateProse } from "@/lib/countryProseGate";
 import { isCityReport, reportKindLabel } from "@/lib/reportKind";
@@ -449,17 +450,24 @@ export default function CountryReport() {
     [active],
   );
 
-  // Compute Fast Facts against the active window once per render.
-  const facts = useMemo(
-    () => computeCountryFastFacts({
+  // Compute Fast Facts against the active window once per render. For PNG only,
+  // demote non-kinetic assistance / PR items to Low first (the stored severity
+  // mis-rates them High) so the Fast Facts severity and the incident map agree
+  // with the corrected structured brief. No-fabrication: demote-only, inert for
+  // every other theatre. Mirrors the toItem correction in pngReportDataset.ts.
+  const facts = useMemo(() => {
+    const demote = structuredTheatre === "png";
+    const fix = <T extends { title: string; summary?: string | null; severity: string }>(
+      list: T[],
+    ): T[] => (demote ? correctPngIncidentSeverities(list) : list);
+    return computeCountryFastFacts({
       issueDate,
-      incidents: incidents as CountryFastFactsIncident[],
-      windowIncidents: dedupedWindowIncidents,
-      standingIncidents: layers.ninetyDay,
+      incidents: fix(incidents as CountryFastFactsIncident[]),
+      windowIncidents: fix(dedupedWindowIncidents),
+      standingIncidents: fix(layers.ninetyDay),
       periodLabel: active.periodShortLabel,
-    }),
-    [incidents, issueDate, dedupedWindowIncidents, active, layers],
-  );
+    });
+  }, [incidents, issueDate, dedupedWindowIncidents, active, layers, structuredTheatre]);
 
   // Auto-derived prose (executiveSummary, whatMatters, watchNext, polestarView).
   const draftedProse = useMemo(() => {
