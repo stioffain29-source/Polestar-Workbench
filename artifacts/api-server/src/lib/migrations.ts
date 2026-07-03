@@ -17,6 +17,7 @@ import {
   isJudicialDeath,
   isBiographicalOrIllnessDeath,
   hasIndonesianViolenceSignal,
+  isMaritimeVesselAttack,
   severityFromFatalities,
   maxSeverity,
   SEVERITY_RANK,
@@ -2190,6 +2191,80 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { scanned: candidates.length, upgraded, downgraded, marker: markerKey },
           "One-time severity heal: Bahasa violence upgrade + illness/biographical death downgrade",
+        );
+      }
+    }
+
+    // 3g-4) One-time UPGRADE of shipping rows the classifier historically
+    //       UNDER-rated because the shipping HIGH tier matched only WEAPON NOUNS
+    //       (missile / drone / explosion / struck), so a plain "tanker attack" /
+    //       "attack on vessel" / "US strikes Iran after tanker attack" carried no
+    //       HIGH signal and fell all the way to the INSIGNIFICANT / low default —
+    //       even reading Insignificant when the headline also used forward-looking
+    //       framing. classifySeverity now escalates an attack VERB bound to a
+    //       vessel / port OBJECT (isMaritimeVesselAttack), so NEW rows rate
+    //       correctly, but the scrapers' read-then-insert dedupe never re-touches
+    //       a stored row, so existing machine rows keep their old chip.
+    //
+    //       This pass re-rates ONLY auto-scraped / legacy shipping rows that match
+    //       the narrow maritime-attack predicate for exactly this change, setting
+    //       each to the current classifySeverity result (never below a structured
+    //       fatality floor) and ONLY when strictly higher (upgrade-only). The
+    //       predicate gate keeps it from touching rows that differ from the
+    //       classifier for unrelated reasons; it never alters analyst severities
+    //       or other topics. Marker-gated → runs once per environment.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_maritime_attack_upgrade_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              eq(incidentsTable.topic, "shipping"),
+              or(
+                like(incidentsTable.analystNotes, "auto-scraped:%"),
+                like(incidentsTable.analystNotes, "legacy:db:%"),
+              ),
+            ),
+          );
+        let upgraded = 0;
+        for (const r of candidates) {
+          if (!isMaritimeVesselAttack(r.title, r.summary ?? "")) continue;
+          const fromText = classifySeverity(r.title, r.summary ?? "", "shipping");
+          const floor = severityFromFatalities(r.fatalities);
+          const next = floor ? maxSeverity(fromText, floor) : fromText;
+          const stored = r.severity as Severity;
+          if (SEVERITY_RANK[next] > SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            upgraded++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: candidates.length, upgraded, marker: markerKey },
+          "One-time severity heal: maritime vessel/port attack upgrade (shipping)",
         );
       }
     }

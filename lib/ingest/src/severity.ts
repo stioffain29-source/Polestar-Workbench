@@ -184,6 +184,41 @@ export function hasIndonesianViolenceSignal(title: string, summary: string): boo
   return ID_FATAL_RE.test(hay) || ID_VIOLENCE_RE.test(hay);
 }
 
+// Kinetic maritime attack on a vessel or port. The shipping HIGH tier
+// historically listed only WEAPON NOUNS (missile / drone / explosion / struck),
+// so a plain "tanker attack" / "attack on vessel" / "US strikes ... after tanker
+// attack" carried no HIGH signal and fell all the way through to the
+// INSIGNIFICANT / low default — reading Insignificant when the headline also
+// used forward-looking framing. This binds an attack VERB to a maritime OBJECT
+// within a short window so a generic "attack" elsewhere in a shipping story does
+// not escalate. "strike"/"struck" are deliberately EXCLUDED from the verb list:
+// past-tense "struck" is already covered by the weapon-noun branch, and present
+// "strike" collides with a labour "port strike" (a wage walkout, not a kinetic
+// attack). The labour guard below is a further belt-and-braces exclusion.
+const MARITIME_ATTACK_VERB =
+  "attack(?:ed|ing|s)?|shell(?:ed|ing|s)?|fired?\\s+(?:on|at|upon)|firing\\s+(?:on|at|upon)|assault(?:ed|ing|s)?|rammed|torpedoed|bombard(?:ed|ing|ment)?";
+const MARITIME_OBJECT =
+  "vessels?|ships?|tankers?|freighters?|cargo ships?|merchant (?:ship|vessel)s?|bulk carriers?|container ships?|boats?|ports?|seaports?|harbou?rs?|convoys?|crew|seafarers?|sailors?|hull|oil tankers?|lng carriers?|dhows?";
+const MARITIME_ATTACK_RE = new RegExp(
+  `\\b(?:${MARITIME_ATTACK_VERB})\\b[\\s\\S]{0,30}?\\b(?:${MARITIME_OBJECT})\\b|\\b(?:${MARITIME_OBJECT})\\b[\\s\\S]{0,30}?\\b(?:${MARITIME_ATTACK_VERB})\\b`,
+  "i",
+);
+// Labour / industrial action framing — a "port strike" wage walkout is NOT a
+// kinetic attack, so cancel the maritime-attack escalation when present.
+const MARITIME_LABOUR_STRIKE_RE =
+  /\b(?:labou?r|workers?|union|wage|wages|pay dispute|salary|walkout|walk-out|industrial action|strike action|on strike|go(?:ing)? on strike|stevedores?|dock ?workers?|port workers?)\b/i;
+
+/**
+ * True if the text describes a kinetic maritime attack — an attack verb bound to
+ * a vessel / port object — and is NOT a labour "port strike". Exported so the
+ * one-time DB heal can UPGRADE machine-scraped shipping rows the old
+ * weapon-noun-only classifier under-rated.
+ */
+export function isMaritimeVesselAttack(title: string, summary: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return MARITIME_ATTACK_RE.test(hay) && !MARITIME_LABOUR_STRIKE_RE.test(hay);
+}
+
 // A mass-casualty toll: a digit count >= MASS_FATALITY_THRESHOLD (6-9, or any
 // 10-9999) or a vague large quantity (dozens / scores / hundreds). The unit
 // guard stops a non-toll number — a reward "Rs 8 lakh", an age "10-year-old",
@@ -501,6 +536,12 @@ export function classifySeverity(
     if (
       /\b(missile|drone|projectile|torpedo|rocket|explosion|explosive|blast|struck|set (on )?fire|set ablaze|ablaze|sinking|sank|sunk|limpet mine|mine attack)\b/i.test(hay)
     ) {
+      return "high";
+    }
+    // A plain attack verb bound to a vessel / port object (no weapon noun) —
+    // "tanker attack", "attack on vessel", "US strikes Iran after tanker attack"
+    // — is a high-severity maritime incident. Excludes labour "port strike".
+    if (MARITIME_ATTACK_RE.test(hay) && !MARITIME_LABOUR_STRIKE_RE.test(hay)) {
       return "high";
     }
     if (

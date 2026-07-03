@@ -25,6 +25,33 @@ describe("classifySeverity", () => {
     expect(classifySeverity("Tanker seized by naval forces", "", "shipping")).toBe("moderate");
   });
 
+  // A plain attack verb bound to a vessel/port object (no weapon noun) is a
+  // high-severity maritime incident — the old classifier let these fall through
+  // to the low/insignificant default.
+  it("rates a plain 'tanker attack' as high", () => {
+    expect(classifySeverity("Oil tanker attack reported in Gulf of Oman", "", "shipping")).toBe(
+      "high",
+    );
+  });
+
+  it("rates 'attack on vessel' as high", () => {
+    expect(classifySeverity("Armed men launch attack on cargo vessel", "", "shipping")).toBe("high");
+  });
+
+  it("rates a strike headline referencing a tanker attack as high", () => {
+    expect(
+      classifySeverity("US launches fresh strikes on Iran after tanker attack", "", "shipping"),
+    ).toBe("high");
+  });
+
+  // Labour "port strike" is a wage walkout, not a kinetic attack — it must not
+  // read High.
+  it("does not rate a labour port strike as high", () => {
+    expect(classifySeverity("Port workers strike over pay dispute", "", "shipping")).not.toBe(
+      "high",
+    );
+  });
+
   it("rates energy grid outages as moderate", () => {
     expect(classifySeverity("Nationwide blackout hits major cities", "", "energy")).toBe("moderate");
   });
