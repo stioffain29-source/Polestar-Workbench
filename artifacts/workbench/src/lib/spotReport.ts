@@ -246,3 +246,63 @@ export function checkSpotReportQuality(
 
   return { errors, warnings };
 }
+
+/**
+ * Map a spot-report mutation failure to an actionable toast (title + optional
+ * description). Spot reports are gated ONLY by the owner session (no admin
+ * token), so 401 means the sign-in lapsed. For everything else we surface the
+ * server's own `{ error }` message (photo size, validation) so the analyst
+ * knows exactly what to fix instead of a bare "Failed to save".
+ */
+export function spotReportSaveErrorMessage(
+  err: unknown,
+  action: "create" | "save" | "delete",
+): { title: string; description?: string } {
+  const status =
+    err && typeof err === "object" && typeof (err as { status?: unknown }).status === "number"
+      ? (err as { status: number }).status
+      : undefined;
+  const data = err && typeof err === "object" ? (err as { data?: unknown }).data : undefined;
+  const serverMsg =
+    data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string"
+      ? (data as { error: string }).error.trim()
+      : undefined;
+
+  const failedTitle =
+    action === "create"
+      ? "Failed to create"
+      : action === "delete"
+        ? "Failed to delete"
+        : "Failed to save";
+
+  if (status === 401 || status === 403) {
+    return {
+      title: "Session expired",
+      description: "Your sign-in has lapsed. Reload the page, sign in again, then retry.",
+    };
+  }
+  if (status === 413) {
+    return {
+      title: "Attachments too large",
+      description: "The photos exceed the upload limit. Remove or shrink some images, then save again.",
+    };
+  }
+  if (status === 404) {
+    return {
+      title: "Report not found",
+      description: "This spot report may have been deleted elsewhere. Reload the Spot Reports list.",
+    };
+  }
+  if (status === 400) {
+    return {
+      title: "Check the report before saving",
+      description: serverMsg ?? "Some fields are invalid. Check required fields and photo sizes.",
+    };
+  }
+  return {
+    title: failedTitle,
+    description:
+      serverMsg ??
+      "The server could not be reached or returned an error. Check your connection and try again.",
+  };
+}

@@ -92,7 +92,12 @@ an auth failure from a real error. This applies to the still-token-gated editors
 token as Bearer automatically, so persisting it is enough (no explicit headers on
 the orval mutations). NOTE: `SpotReportEditor.tsx` NO LONGER uses the admin token
 — spot-report saves are owner-session-only — so it has no token field; its only
-auth-failure mode is a 401 from an expired owner session.
+auth-failure mode is a 401 (session expired). It does NOT use
+`adminMutationErrorMessage`; instead its own `spotReportSaveErrorMessage(err,
+action)` in `lib/spotReport.ts` maps save failures to actionable toasts (401→
+session expired; 413→attachments too large; 404→report deleted; 400→surface the
+server's `{error}`; 5xx→server msg/connection). Do NOT swap this for the admin
+variant (that would wrongly imply a token).
 
 The rest of this file is the older lesson, still useful IF the admin-token gate
 is ever changed.

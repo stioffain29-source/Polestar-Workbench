@@ -37,6 +37,7 @@ import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import {
   checkSpotReportQuality,
   spotLocationLabel,
+  spotReportSaveErrorMessage,
   SPOT_STATUSES,
   type QualityResult,
 } from "@/lib/spotReport";
@@ -631,14 +632,7 @@ export default function SpotReportEditor() {
             setLocation(`/spot-reports/${(created as SpotReport).id}`);
           },
           onError: (err) => {
-            const status = (err as { status?: number })?.status;
-            toast({
-              title:
-                status === 401
-                  ? "Session expired — please reload and sign in"
-                  : "Failed to create",
-              variant: "destructive",
-            });
+            toast({ ...spotReportSaveErrorMessage(err, "create"), variant: "destructive" });
           },
         },
       );
@@ -652,14 +646,7 @@ export default function SpotReportEditor() {
             toast({ title: "Saved" });
           },
           onError: (err) => {
-            const status = (err as { status?: number })?.status;
-            toast({
-              title:
-                status === 401
-                  ? "Session expired — please reload and sign in"
-                  : "Failed to save",
-              variant: "destructive",
-            });
+            toast({ ...spotReportSaveErrorMessage(err, "save"), variant: "destructive" });
           },
         },
       );
@@ -692,6 +679,15 @@ export default function SpotReportEditor() {
           onSuccess: () => {
             qc.invalidateQueries({ queryKey: getGetSpotReportQueryKey(id) });
             qc.invalidateQueries({ queryKey: getListSpotReportsQueryKey() });
+          },
+          onError: () => {
+            // The file already downloaded; only the export-history record
+            // failed. Keep this low-key so a bookkeeping miss never reads as a
+            // failed export.
+            toast({
+              title: "Export saved locally",
+              description: "The file downloaded, but its export history could not be recorded.",
+            });
           },
         },
       );
@@ -809,6 +805,12 @@ export default function SpotReportEditor() {
                       onSuccess: () => {
                         qc.invalidateQueries({ queryKey: getListSpotReportsQueryKey() });
                         setLocation("/spot-reports");
+                      },
+                      onError: (err) => {
+                        toast({
+                          ...spotReportSaveErrorMessage(err, "delete"),
+                          variant: "destructive",
+                        });
                       },
                     },
                   );
