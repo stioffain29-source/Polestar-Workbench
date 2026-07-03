@@ -56,6 +56,17 @@ type Spec = {
 // six-point trajectory + one-month change) always reaches back far enough.
 const LOOKBACK_DAYS = 540;
 
+// Cadence-aware staleness escalation for the monthly fertiliser (Pink Sheet)
+// series. A monthly observation normally lags up to ~50 days (the workbook for
+// month M publishes ~5-6 weeks into month M+1), so the normal ~monthly lag must
+// stay green. Beyond this threshold the feed has failed to advance for well over
+// a full extra publication cycle: the version-stamped workbook has frozen while
+// still returning HTTP 200. At that point we escalate the fertiliser feed(s) to
+// the "stale" Source Health status so a silent freeze becomes a visible signal
+// instead of a buried WARN log line. Only fertiliser is escalated here; the
+// daily/weekly fuel + monthly energy series are out of scope for this guardrail.
+const FERTILISER_STALE_LAG_DAYS = 75;
+
 const SPECS: Spec[] = [
   // --- Fuel -----------------------------------------------------------------
   {
@@ -166,7 +177,7 @@ export async function runMarketSnapshotIngest(
   let worldBankErr: string | null = null;
   if (SPECS.some((s) => s.fetch.kind === "worldbank")) {
     try {
-      worldBank = await fetchWorldBankFertiliser(cosd);
+      worldBank = await fetchWorldBankFertiliser(cosd, log);
       log(`  World Bank Pink Sheet fetched (${Object.keys(worldBank).join(", ")})`);
     } catch (err) {
       worldBankErr = err instanceof Error ? err.message : String(err);
@@ -203,6 +214,19 @@ export async function runMarketSnapshotIngest(
       const lagDays = Math.floor((Date.parse(anchor) - Date.parse(latest.date)) / 86_400_000);
       if (lagDays > 60) {
         log(`  WARN ${spec.group}:${spec.key} latest=${latest.date} lags ${lagDays}d — feed may be stale`);
+      }
+      // Cadence-aware staleness escalation (fertiliser only): a monthly Pink
+      // Sheet series that has not advanced past a full extra publication cycle
+      // is a genuine silent freeze (HTTP 200 but stopped advancing). Flag it so
+      // recordSourceHealth surfaces it as "stale" on Source Health, not just a
+      // log line. Normal ~monthly lag (<= FERTILISER_STALE_LAG_DAYS) stays green.
+      const staleFrozen =
+        spec.group === "fertiliser" && lagDays > FERTILISER_STALE_LAG_DAYS;
+      const staleReason = staleFrozen
+        ? `Latest ${spec.label} observation ${latest.date} lags ${lagDays}d — beyond the ~monthly Pink Sheet cadence. The workbook still returns data but has stopped advancing (likely a rotated/frozen source URL). Verify the World Bank CMO landing-page discovery.`
+        : null;
+      if (staleFrozen) {
+        log(`  STALE ${spec.group}:${spec.key} latest=${latest.date} lags ${lagDays}d — escalating to Source Health`);
       }
 
       const value = round(latest.value, spec.decimals);
@@ -250,7 +274,12 @@ export async function runMarketSnapshotIngest(
       }
       upserted += 1;
       rows.push({ group: spec.group, key: spec.key, value, asOf: latest.date, change });
-      addHealth(spec.group, { name: priceFeedName(spec), url: priceFeedUrl(spec), ok: true });
+      addHealth(spec.group, {
+        name: priceFeedName(spec),
+        url: priceFeedUrl(spec),
+        ok: true,
+        ...(staleFrozen ? { stale: true, staleReason } : {}),
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push({ key: `${spec.group}:${spec.key}`, error: msg });

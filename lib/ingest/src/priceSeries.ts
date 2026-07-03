@@ -219,23 +219,58 @@ const WORLD_BANK_XLSX_FALLBACK_URLS = [
 ];
 
 /**
+ * The version-stamped doc path carries a trailing 4-digit year
+ * (…-0050012026/… → 2026). When the landing page happens to list more than one
+ * monthly-history link (e.g. the current vintage alongside an archived one), we
+ * prefer the highest year so a rotated URL is picked up rather than accidentally
+ * pinning to an older vintage that would silently freeze the cards.
+ */
+function xlsxUrlVintage(url: string): number {
+  const m = /-\d{6}(\d{4})\//.exec(url);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
  * Scrape the World Bank CMO landing page for the CURRENT monthly-history xlsx
  * link. The page always points at the freshest workbook, so this is what keeps
  * the fertiliser cards current after the URL rotates. Returns null on any
- * failure so the caller falls back to the baked-in URLs.
+ * failure so the caller falls back to the baked-in URLs. The optional `log`
+ * makes the discovery outcome observable (discovered vs. fell through to a
+ * pinned fallback) so a broken landing-page scrape is visible in ingest logs
+ * instead of silently degrading to a stale pinned link.
  */
-async function discoverWorldBankXlsxUrl(): Promise<string | null> {
+async function discoverWorldBankXlsxUrl(
+  log: (s: string) => void = () => {},
+): Promise<string | null> {
   try {
     const res = await fetch(WORLD_BANK_CMO_PAGE, {
       headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log(`  World Bank discovery: landing page HTTP ${res.status} — using pinned fallback URLs`);
+      return null;
+    }
     const html = await res.text();
-    const m = html.match(
-      /https:\/\/thedocs\.worldbank\.org\/[^"'\s)]*CMO-Historical-Data-Monthly\.xlsx/i,
-    );
-    return m ? m[0] : null;
-  } catch {
+    // Match every monthly-history link on the page (HTML entity ampersands
+    // decoded) and prefer the freshest vintage, so a rotated URL is picked up
+    // automatically even if the page lists several.
+    const matches = [
+      ...html.matchAll(
+        /https:\/\/thedocs\.worldbank\.org\/[^"'\s)<>]*CMO-Historical-Data-Monthly\.xlsx/gi,
+      ),
+    ].map((m) => m[0].replace(/&amp;/g, "&"));
+    if (!matches.length) {
+      log("  World Bank discovery: no monthly-history link on landing page — using pinned fallback URLs");
+      return null;
+    }
+    const best = [...new Set(matches)].sort(
+      (a, b) => xlsxUrlVintage(b) - xlsxUrlVintage(a),
+    )[0];
+    log(`  World Bank discovery: resolved current workbook from landing page (${best})`);
+    return best;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`  World Bank discovery: landing-page fetch failed (${msg}) — using pinned fallback URLs`);
     return null;
   }
 }
@@ -260,10 +295,13 @@ function wbMonthToIso(raw: string): string | null {
  * series (filtered to on/after `startDate`). Lazy-imports exceljs so the
  * crude/FRED path never pays for the xlsx parser.
  */
-export async function fetchWorldBankFertiliser(startDate: string): Promise<Record<string, Series>> {
+export async function fetchWorldBankFertiliser(
+  startDate: string,
+  log: (s: string) => void = () => {},
+): Promise<Record<string, Series>> {
   const ExcelJS = (await import("exceljs")).default;
   let lastErr: unknown;
-  const discovered = await discoverWorldBankXlsxUrl();
+  const discovered = await discoverWorldBankXlsxUrl(log);
   const urls = [...new Set([discovered, ...WORLD_BANK_XLSX_FALLBACK_URLS].filter((u): u is string => !!u))];
   for (const url of urls) {
     try {
@@ -330,6 +368,11 @@ export async function fetchWorldBankFertiliser(startDate: string): Promise<Recor
         }
       }
       if (!Object.keys(out).length) throw new Error("World Bank: no fertiliser columns parsed");
+      log(
+        url === discovered
+          ? "  World Bank workbook served from discovered current URL"
+          : "  World Bank workbook served from PINNED FALLBACK URL (discovery did not resolve it) — verify the landing-page scrape",
+      );
       return out;
     } catch (err) {
       lastErr = err;

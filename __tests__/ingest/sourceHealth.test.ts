@@ -111,6 +111,42 @@ describe("recordSourceHealth", () => {
     );
   });
 
+  it("records a 'stale' status (not operational) when a fetched feed's data has frozen", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("fertiliser", [
+      {
+        name: "World Bank Pink Sheet",
+        url: "http://wb.test/CMO.xlsx",
+        ok: true,
+        stale: true,
+        staleReason: "Latest urea observation 2026-01-15 lags 120d — beyond the ~monthly cadence.",
+      },
+    ]);
+
+    expect(cap.inserts).toHaveLength(1);
+    const row = cap.inserts[0];
+    // A silent freeze fetches fine but must surface as "stale", not a green
+    // "operational".
+    expect(row.status).toBe("stale");
+    expect(row.consecutiveFailures).toBe(0);
+    // The fetch succeeded, so the success stamp is set and the reason is shown.
+    expect(row.lastSuccessAt).toBeInstanceOf(Date);
+    expect(row.errorMessage).toBe(
+      "Latest urea observation 2026-01-15 lags 120d — beyond the ~monthly cadence.",
+    );
+  });
+
+  it("treats a fetched feed as operational when stale is false (data still advancing)", async () => {
+    const cap = setupDb();
+
+    await recordSourceHealth("fertiliser", [
+      { name: "World Bank Pink Sheet", url: "http://wb.test/CMO.xlsx", ok: true, stale: false },
+    ]);
+
+    expect(cap.inserts[0].status).toBe("operational");
+  });
+
   it("truncates the error message to 500 characters", async () => {
     const cap = setupDb();
 

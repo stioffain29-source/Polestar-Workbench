@@ -9,11 +9,15 @@ import { and, eq } from "drizzle-orm";
 // This is what replaces the old dead placeholder rows on the Source Health
 // page — every catalogued source is now a feed the pipeline genuinely monitors.
 //
-// Status is only ever "operational" (the feed responded, OR a single transient
+// Status is usually "operational" (the feed responded, OR a single transient
 // failure that has not yet crossed the escalation threshold) or "failing" (the
-// fetch threw on enough CONSECUTIVE runs to be a sustained outage). The other
-// enum states (stale/blocked/delayed/not_configured) are reserved for manual
-// analyst classification — the auto pipeline never fabricates them.
+// fetch threw on enough CONSECUTIVE runs to be a sustained outage). It can also
+// be "stale" when a feed FETCHES fine but its DATA has stopped advancing past
+// its expected publication cadence (a silent freeze — e.g. the version-stamped
+// World Bank fertiliser workbook still returns HTTP 200 but no new month); this
+// is set deterministically by the ingest engine via FeedHealth.stale, never
+// fabricated. The remaining enum states (blocked/delayed/not_configured beyond
+// the optional-integration path) stay reserved for manual analyst classification.
 
 // Number of CONSECUTIVE failed ingest runs a feed must accumulate before it is
 // escalated from "operational" to "failing".
@@ -33,6 +37,16 @@ export interface FeedHealth {
   /** True when the feed fetch succeeded (even if it returned zero items). */
   ok: boolean;
   error?: string | null;
+  /**
+   * True when the feed FETCHED successfully (ok) but its DATA is materially
+   * behind its expected publication cadence — a silent freeze (e.g. a monthly
+   * workbook that still returns HTTP 200 but stopped advancing to new months).
+   * Recorded as the "stale" status so it surfaces on Source Health / Action
+   * Required, distinct from a fetch failure. Only honoured when `ok` is true.
+   */
+  stale?: boolean;
+  /** Human-readable explanation shown when `stale` is set. */
+  staleReason?: string | null;
   // --- Optional per-run scrape-health telemetry (LAST-RUN snapshots) --------
   // The funnel this run observed for the feed. Supplied only by engines that
   // genuinely count it (e.g. cargo); when omitted the column is left untouched,
@@ -204,6 +218,26 @@ export async function recordSourceHealth(
           consecutiveFailures: 0,
           lastSuccessAt: null,
           lastFailureAt: null,
+        };
+      } else if (f.ok && f.stale) {
+        // The feed FETCHED fine (reachable, HTTP 200, parseable) but its latest
+        // DATA is materially behind its expected publication cadence — a silent
+        // freeze. Record the honest "stale" status so it surfaces on Source
+        // Health and Action Required instead of hiding behind a green
+        // "operational". The fetch itself succeeded, so stamp last_success_at
+        // and reset the failure streak; a later run whose data has advanced
+        // falls into the plain f.ok branch and clears it back to operational.
+        healthFields = {
+          url: f.url,
+          sourceType,
+          status: "stale",
+          errorMessage: (f.staleReason ?? "Feed data is stale (stopped advancing).").slice(0, 500),
+          consecutiveFailures: 0,
+          lastSuccessAt: now,
+        };
+        telemetry = {
+          ...runCounts,
+          failureReason: "stale_data",
         };
       } else if (f.ok) {
         // A successful fetch clears the error and the failure streak. Do NOT
