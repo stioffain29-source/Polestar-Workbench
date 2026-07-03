@@ -67,7 +67,7 @@ describe("buildJakartaCrimeTrends", () => {
     );
   });
 
-  it("crime-present branch: leads with the period's reported crime and its business consequence", () => {
+  it("crime-present branch: leads with the period's reported crime and names the real incident", () => {
     const trends = buildJakartaCrimeTrends([
       item({
         category: "Theft / break-in" as PngCategory,
@@ -78,17 +78,41 @@ describe("buildJakartaCrimeTrends", () => {
       "This period's open-source reporting featured",
     );
     expect(trends.reportedThisPeriod).toContain("theft");
-    // Property crime must surface its concrete business consequence, not a
-    // generic standing essay.
+    // The read must name the ACTUAL worst incident, not a generic essay.
+    expect(trends.reportedThisPeriod).toContain(
+      "The most serious reported was Pickpocketing reported near Thamrin",
+    );
+    expect(trends.reportedThisPeriod).toContain("assessed as Moderate severity");
     expect(trends.reportedThisPeriod).toContain("For business,");
-    expect(trends.reportedThisPeriod).toContain("property loss");
     expect(trends.reportedThisPeriod).toContain("partial signal");
+    // The old curated central-district boilerplate must never reappear.
+    expect(trends.reportedThisPeriod).not.toContain("SCBD");
     expect(trends.reportedThisPeriod).not.toContain(
       "No fresh crime-specific reporting",
     );
   });
 
-  it("violent crime adds a distinct violence consequence clause", () => {
+  it("names a setting (e.g. a transport hub) only when the reporting actually carries one", () => {
+    const withHub = buildJakartaCrimeTrends([
+      item({
+        category: "Robbery / hold-up" as PngCategory,
+        title: "Robbery reported at a bus terminal",
+      }),
+    ]);
+    // "terminal" in the source text -> "transport hubs" surfaces from data.
+    expect(withHub.reportedThisPeriod).toContain("transport hubs");
+
+    const withoutHub = buildJakartaCrimeTrends([
+      item({
+        category: "Theft / break-in" as PngCategory,
+        title: "Pickpocketing reported near Thamrin",
+      }),
+    ]);
+    // No hub in the source text -> the read must NOT invent one.
+    expect(withoutHub.reportedThisPeriod).not.toContain("transport hubs");
+  });
+
+  it("violent crime names the actual incident, not a curated-district consequence", () => {
     const trends = buildJakartaCrimeTrends([
       item({
         category: "Homicide / violent crime" as PngCategory,
@@ -96,6 +120,10 @@ describe("buildJakartaCrimeTrends", () => {
       }),
     ]);
     expect(trends.reportedThisPeriod).toContain("For business,");
-    expect(trends.reportedThisPeriod).toContain("risk of violence");
+    expect(trends.reportedThisPeriod).toContain(
+      "The most serious reported was Stabbing in a late-night brawl reported in South Jakarta",
+    );
+    expect(trends.reportedThisPeriod).not.toContain("SCBD");
+    expect(trends.reportedThisPeriod).not.toContain("Tanjung Priok");
   });
 });

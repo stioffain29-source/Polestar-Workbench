@@ -93,7 +93,7 @@ const JAKARTA_THEME_RELEVANCE: Record<JakartaTheme, string> = {
   fire:
     "A fire in Jakarta's dense commercial and residential districts can force road closures and evacuations and disrupt access to nearby offices, malls, hotels, warehouses and client sites along commuter routes; confirm the affected block and its approach roads before movement.",
   crime:
-    "Reporting supports tightened after-hours movement and secure pickup points near offices, hotels and transport hubs.",
+    "Reporting supports tightened after-hours movement and secure, pre-agreed pickup points wherever crime has surfaced; keep valuables out of sight on foot and on transfers.",
   traffic:
     "Congestion on this corridor is a planning constraint for meetings, deliveries and airport transfers; hold two viable routes on the inner and outer ring roads.",
   airport:
@@ -195,6 +195,35 @@ function severityTail(worstRank: number): string {
     return " Reporting this period reached high severity and warrants closer monitoring.";
   if (worstRank >= 3) return " Reporting this period reached moderate severity.";
   return "";
+}
+
+// The worst, then most-recent crime incident in a set, rendered as ONE concrete,
+// count-free sentence naming the real headline, the area and its assessed
+// severity. This turns the crime read from a generic template into a specific
+// account of the actual event. No fabrication: the headline, area and severity
+// label are the incident's own fields. Returns "" (no leading space) when the
+// set is empty or carries no usable headline. Mirrors leadIncidentSentence in
+// countryIncidentThemes (kept local to avoid a cross-module import cycle).
+function leadCrimeLine(items: PngReportItem[]): string {
+  const ranked = [...items].sort((a, b) => {
+    if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
+    const ad = (a.incidentDate ?? a.reportedDate).getTime();
+    const bd = (b.incidentDate ?? b.reportedDate).getTime();
+    return bd - ad;
+  });
+  const lead = ranked[0];
+  if (!lead) return "";
+  const raw = (lead.developmentTitle?.trim() || lead.title || "")
+    .replace(/\s+/g, " ")
+    .replace(/[.;,]+$/, "")
+    .trim();
+  if (!raw) return "";
+  const area = areaLabel(lead.province);
+  const loc = area && !raw.toLowerCase().includes(area.toLowerCase()) ? ` in ${area}` : "";
+  const label = lead.severityLabel?.trim();
+  const sevClause = label ? `, assessed as ${label} severity` : "";
+  const end = /[?!.]$/.test(raw) ? "" : ".";
+  return `The most serious reported was ${raw}${loc}${sevClause}${end}`;
 }
 
 // --- Incident Details theme paragraphs -------------------------------------
@@ -360,10 +389,16 @@ function themeParagraph(p: ThemePresence): string | null {
       if (crimeTypes.length || settings.length) {
         const what = crimeTypes.length ? joinList(crimeTypes) : "crime and public-safety incidents";
         const loc = area ? ` in ${area}` : "";
-        const settingPart = settings.length ? ` Exposure concentrated around ${joinList(settings)}.` : "";
-        primary = `Crime reporting${loc} involved ${what}.${settingPart} The practical concern is staff exposure around after hours movement near offices, hotels and transport hubs rather than a city-wide threat.`;
+        // The concern is tied to WHERE crime actually surfaced this period: the
+        // reported settings when we have them, otherwise a neutral statement —
+        // never a fixed claim about offices, hotels or transport hubs that saw
+        // no reporting.
+        const concern = settings.length
+          ? ` The practical concern is staff exposure on movement around ${joinList(settings)} rather than a city-wide threat.`
+          : ` The practical concern is staff exposure on after-hours and on-foot movement in the affected area rather than a city-wide threat.`;
+        primary = `Crime reporting${loc} involved ${what}.${concern}`;
       } else if (area) {
-        primary = `Crime and public-safety reporting was limited to ${area}, with the main concern staff exposure around after hours movement near offices, hotels and transport hubs.`;
+        primary = `Crime and public-safety reporting was limited to ${area}, with the main concern staff exposure on after-hours and on-foot movement rather than a city-wide threat.`;
       }
       return compose(p.worstRank, primary);
     }
@@ -1025,45 +1060,6 @@ const JAKARTA_CRIME_CONTEXT_ROWS: JakartaCrimeBusinessRow[] = [
   },
 ];
 
-// Crime-type buckets → a concise business consequence, so the this-period read
-// explains what the REPORTED crime means for business. Derived ONLY from the
-// crime types actually extracted from the window, never invented.
-const CRIME_PROPERTY_TYPES = new Set(["theft", "robbery", "burglary"]);
-const CRIME_VIOLENT_TYPES = new Set([
-  "assault",
-  "shootings",
-  "violent attacks",
-  "public disorder",
-  "kidnapping",
-]);
-const CRIME_LOGISTICS_TYPES = new Set(["extortion"]);
-const CRIME_DRUG_TYPES = new Set(["drug-related crime"]);
-
-// Compose the business-consequence clause from the crime types present this
-// period. Count-free; only names a consequence when its crime type was reported.
-function crimeBusinessConsequence(types: string[]): string {
-  const clauses: string[] = [];
-  if (types.some((t) => CRIME_PROPERTY_TYPES.has(t)))
-    clauses.push(
-      "staff face property loss and opportunistic theft during on-foot movement and after-hours transport around SCBD and the Sudirman–Thamrin corridor, and in hotel lobbies and client-meeting venues in Kuningan and Senayan",
-    );
-  if (types.some((t) => CRIME_VIOLENT_TYPES.has(t)))
-    clauses.push(
-      "there is a risk of violence around disputes, crowds and nightlife near hotels and venues, and on late transfers",
-    );
-  if (types.some((t) => CRIME_LOGISTICS_TYPES.has(t)))
-    clauses.push(
-      "informal levies and intimidation can disrupt port access and logistics around Tanjung Priok and North Jakarta industrial roads",
-    );
-  if (types.some((t) => CRIME_DRUG_TYPES.has(t)))
-    clauses.push(
-      "narcotics enforcement carries legal and reputational risk for staff and visitors at venues and on transfers",
-    );
-  if (clauses.length === 0)
-    return "The practical concern is staff exposure during airport transfers, hotel and client-meeting movement and after-hours transport around offices and transport hubs, plus port access and cross-city logistics routes, rather than a city-wide threat.";
-  return `For business, ${clauses.join("; ")}.`;
-}
-
 // Build the Crime Trends & Business Impact section. `items` is the report window;
 // the this-period read is derived ONLY from crime-theme items (via the shared
 // CRIME_GROUPS / SETTING_GROUPS / presentAreas), so it never invents crime that
@@ -1091,11 +1087,20 @@ export function buildJakartaCrimeTrends(
       ? joinList(crimeTypes)
       : "crime and public-safety incidents";
     const where = area ? ` in ${area}` : "";
+    // Name the single worst crime that actually surfaced, so the read is a
+    // concrete account of the real event rather than a generic essay.
+    const lead = leadCrimeLine(crimeItems);
+    const leadPart = lead ? ` ${lead}` : "";
     const settingPart = settings.length
       ? ` Reporting clustered around ${joinList(settings)}.`
       : "";
-    const consequence = crimeBusinessConsequence(crimeTypes);
-    reportedThisPeriod = `This period's open-source reporting featured ${what}${where}.${settingPart} ${consequence} Treat this as a partial signal of the wider picture rather than a complete crime record.`;
+    // The business consequence is tied to WHERE crime actually surfaced this
+    // period (the resolved areas and reported settings), never to a fixed list
+    // of central business districts or transport hubs that saw no reporting.
+    const consequence = settings.length
+      ? ` For business, the exposure is staff movement around ${joinList(settings)}${area ? ` in ${area}` : ""} rather than a city-wide threat.`
+      : ` For business, the exposure is staff movement${area ? ` in ${area}` : ""} — particularly after-hours and on-foot transfers — rather than a city-wide threat.`;
+    reportedThisPeriod = `This period's open-source reporting featured ${what}${where}.${leadPart}${settingPart}${consequence} Treat this as a partial signal of the wider picture rather than a complete crime record.`;
     trendRead = `This reporting sits within Jakarta's standing pattern of opportunistic and property crime rather than signalling a city-wide shift; use it to focus staff-movement and site precautions where crime actually surfaced this period.`;
   } else {
     reportedThisPeriod = `No fresh crime-specific reporting was identified in the sources this period. This is not evidence that crime is absent — routine opportunistic and property crime is heavily under-reported — so the standing pattern below continues to apply.`;
