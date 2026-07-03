@@ -170,6 +170,25 @@ export {
 } from "./gdeltStructured";
 export type { GdeltStructuredSummary } from "./gdeltStructured";
 export {
+  runGdeltPromote,
+  emptyGdeltPromoteSummary,
+  decidePromotion,
+  promotionForLane,
+  resolvePromoteCountry,
+  promoteMarker,
+  markerExternalId,
+  gdeltDedupeKey,
+  deriveActors,
+  IN_SCOPE_COUNTRIES,
+  PROMOTE_MARKER_PREFIX,
+} from "./gdeltPromote";
+export type {
+  GdeltPromoteSummary,
+  GdeltPromoteInput,
+  PromoteDecision,
+  LanePromotion,
+} from "./gdeltPromote";
+export {
   GDELT_HEALTH_NAME,
   GDELT_HEALTH_TOPIC,
   GDELT_NOT_CONFIGURED_MESSAGE,
@@ -183,7 +202,7 @@ export {
 export type { GdeltEnrichSummary } from "./gdeltEnrich";
 export { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "./sourceHealth";
 export type { FeedHealth } from "./sourceHealth";
-export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, isReactionLed, isPresentTenseFatalOrPluralStrike, isNaturalCauseDeath, isFatalKineticAttack, isJudicialDeath, isBiographicalOrIllnessDeath, hasIndonesianViolenceSignal } from "./severity";
+export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, isReactionLed, isPresentTenseFatalOrPluralStrike, isNaturalCauseDeath, isFatalKineticAttack, isJudicialDeath, isBiographicalOrIllnessDeath, hasIndonesianViolenceSignal, isMaritimeVesselAttack } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill } from "./backfillSeverity";
 export type { SeverityBackfillSummary } from "./backfillSeverity";

@@ -37,6 +37,8 @@ The application requires a Replit Auth (OIDC) session and owner authorization (`
 
 Incidents, strikes, country baselines, and reports are stored directly from API requests. The system must guarantee that only trusted operators or ingestion jobs can create, update, or delete this data. Zod validation is useful for shape checking, but it does not provide authorization or protect business integrity.
 
+The GDELT structured-event promote pass (`lib/ingest/src/gdeltPromote.ts`) is an automated INTERNAL ingestion write path into `incidents`: it runs only inside the server-side ingest runners (never a user-facing route), reads the already-fetched local `gdelt_structured_items` table (no external fetch, no attacker-controlled trigger), and derives topic/relevance/severity solely from GDELT's own lane coding — it never trusts request input. It is idempotent (marker `analyst_notes=gdelt_cloud:<externalId>` plus fuzzy news + URL dedupe), so repeated runs cannot inflate or duplicate incident data.
+
 ### Information Disclosure
 
 Draft reports, source failures, operational notes, and unpublished pipeline state are sensitive internal data. Public endpoints and UI routes must not expose these records unless the product explicitly intends them to be public. Error messages and operational metadata should be shared only with authenticated operators.

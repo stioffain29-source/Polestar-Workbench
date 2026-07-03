@@ -222,7 +222,7 @@ export function isForeignDominantContext(
 // translation (`ln`); the stored Bahasa title hides the foreign subject from
 // the English excludes that run upstream.
 const INDO_FOREIGN_SUBJECT_RE =
-  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|france|french|spain|spanish|italy|italian|portugal|netherlands|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|canada|canadian|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|haiti|beijing|shanghai|guangzhou|shenzhen|chengdu|chongqing|wuhan|tianjin|macau|macao|saigon|ho chi minh|hanoi|da nang|bangkok|phuket|pattaya|chiang mai|manila|cebu|davao|quezon city|tokyo|osaka|kyoto|nagoya|yokohama|sapporo|fukuoka|seoul|busan|incheon|pyongyang|taipei|kaohsiung|mumbai|new delhi|delhi|kolkata|chennai|bengaluru|bangalore|hyderabad|ahmedabad|pune|karachi|lahore|islamabad|rawalpindi|dhaka|chittagong|kathmandu|colombo|phnom penh|vientiane|yangon|naypyidaw|mandalay|kuala lumpur|johor bahru|penang|moscow|kyiv|kiev|london|paris|berlin|madrid|rome|tehran|baghdad|jerusalem|tel aviv|riyadh|jeddah|dubai|abu dhabi|doha|istanbul|ankara|cairo|lagos|nairobi|johannesburg|cape town|sydney|melbourne|brisbane|perth|auckland)\b/i;
+  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|france|french|spain|spanish|italy|italian|portugal|netherlands|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|missouri|canada|canadian|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|haiti|beijing|shanghai|guangzhou|shenzhen|chengdu|chongqing|wuhan|tianjin|macau|macao|saigon|ho chi minh|hanoi|da nang|bangkok|phuket|pattaya|chiang mai|manila|cebu|davao|quezon city|tokyo|osaka|kyoto|nagoya|yokohama|sapporo|fukuoka|seoul|busan|incheon|pyongyang|taipei|kaohsiung|mumbai|new delhi|delhi|kolkata|chennai|bengaluru|bangalore|hyderabad|ahmedabad|pune|karachi|lahore|islamabad|rawalpindi|dhaka|chittagong|kathmandu|colombo|phnom penh|vientiane|yangon|naypyidaw|mandalay|kuala lumpur|johor bahru|penang|moscow|kyiv|kiev|london|paris|berlin|madrid|rome|tehran|baghdad|jerusalem|tel aviv|riyadh|jeddah|dubai|abu dhabi|doha|istanbul|ankara|cairo|lagos|nairobi|johannesburg|cape town|sydney|melbourne|brisbane|perth|auckland|ubisoft|assassin'?s creed)\b/i;
 
 // Indonesian domestic geography / nationality anchors. Their presence shows the
 // record is genuinely about Indonesia even when a foreign country is also named
@@ -230,17 +230,23 @@ const INDO_FOREIGN_SUBJECT_RE =
 // place names are DELIBERATELY absent — those records are routed to the
 // dedicated West Papua brief by isIndonesianPapuaTheatreContext upstream.
 const INDO_LOCAL_ANCHOR_RE =
-  /\b(indonesia|indonesian|jakarta|surabaya|bandung|medan|semarang|makassar|palembang|depok|tangerang|bekasi|bogor|batam|pekanbaru|padang|malang|denpasar|bali|lombok|sumatra|sumatera|java|jawa|sulawesi|kalimantan|borneo|aceh|riau|lampung|yogyakarta|jogja|maluku|banten|cirebon|surakarta|manado|balikpapan|samarinda|pontianak|banjarmasin|jambi|bengkulu|gorontalo|kupang|mataram|ambon|ternate)\b/i;
+  /\b(indonesia|indonesian|jakarta|surabaya|bandung|medan|semarang|makassar|palembang|depok|tangerang|bekasi|bogor|batam|pekanbaru|padang|malang|denpasar|bali|lombok|sumatra|sumatera|java|jawa|sulawesi|kalimantan|borneo|aceh|riau|lampung|yogyakarta|jogja|maluku|banten|cirebon|surakarta|manado|balikpapan|samarinda|pontianak|banjarmasin|jambi|bengkulu|gorontalo|kupang|labuan bajo|mataram|ambon|ternate)\b/i;
 
 /**
  * True when an Indonesia-filed record is dominated by a FOREIGN subject and so
  * must not populate the Indonesia / Jakarta operating-risk brief. Pass the
- * ENGLISH text (translated `ln` + original title + summary): the foreign
- * subject is only visible once translated. A foreign nationality named in
- * passing must NOT drop a genuine domestic story, so — exactly like the
- * PNG / West Papua guard above — we decide by SIGNAL DOMINANCE: drop only when
- * foreign-country cue matches OUTNUMBER Indonesian-place cue matches across the
- * text (the same occurrence-count basis the PNG/Papua guard uses).
+ * translated `ln`/`displayTitle` + the original Bahasa title, but NOT the
+ * summary: the foreign subject is only visible once translated, and the summary
+ * carries the appended outlet masthead ("CNN Indonesia", "CNBC Indonesia")
+ * whose "Indonesia" would be a FALSE local anchor that defeats the dominance
+ * test. A foreign nationality named in passing must NOT drop a genuine domestic
+ * story, so — exactly like the PNG / West Papua guard above — we decide by
+ * SIGNAL DOMINANCE: drop only when foreign-country cue matches OUTNUMBER
+ * Indonesian-place cue matches across the text (the same occurrence-count basis
+ * the PNG/Papua guard uses). NOTE: a record whose translated title names no
+ * country or foreign entity in any language (e.g. a bare "Plane crash kills 11"
+ * syndicating a foreign crash) cannot be dropped here — inventing a foreign tag
+ * from zero evidence would breach the no-fabrication rule.
  */
 export function isForeignSubjectForIndonesia(
   text: string | null | undefined,

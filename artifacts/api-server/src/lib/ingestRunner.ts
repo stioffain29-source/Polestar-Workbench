@@ -26,6 +26,8 @@ import {
   runGdeltEnrich,
   runGdeltStructuredIngest,
   emptyGdeltStructuredSummary,
+  runGdeltPromote,
+  emptyGdeltPromoteSummary,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   type IngestSummary,
@@ -40,6 +42,7 @@ import {
   type FacebookOsintSummary,
   type GdeltEnrichSummary,
   type GdeltStructuredSummary,
+  type GdeltPromoteSummary,
   type TitleTranslationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -86,6 +89,7 @@ export type IngestRunResult =
       facebookOsint: FacebookOsintSummary;
       gdeltEnrich: GdeltEnrichSummary;
       gdeltStructured: GdeltStructuredSummary;
+      gdeltPromote: GdeltPromoteSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -96,6 +100,7 @@ export type GdeltStructuredRunResult =
       finishedAt: Date;
       durationMs: number;
       gdeltStructured: GdeltStructuredSummary;
+      gdeltPromote: GdeltPromoteSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -311,6 +316,17 @@ function emptyGdeltEnrich(err: unknown): GdeltEnrichSummary {
     fetchOk: false,
     errors: [msg],
     logLines: [`GDELT enrichment failed: ${msg}`],
+  };
+}
+
+function emptyGdeltPromote(err: unknown): GdeltPromoteSummary {
+  const base = emptyGdeltPromoteSummary();
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    mode: "commit",
+    errors: [msg],
+    logLines: [`GDELT promote pass failed: ${msg}`],
   };
 }
 
@@ -822,6 +838,29 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "GDELT structured event layer pass failed");
       gdeltStructured = emptyGdeltStructured(err);
     }
+    // GDELT Cloud promote pass. Reads the LOCAL gdelt_structured_items table the
+    // structured pass above just refreshed (0 GDELT query-units) and promotes
+    // lane-bearing EVENTS into real flashpoint/conflict incidents. This bridges
+    // the structured layer into the incident pipeline (the old "never an
+    // incident" isolation was revoked by the owner). Idempotent via the
+    // gdelt_cloud:<id> analyst-notes marker; isolated try so a failure here can
+    // never fail the wider ingest.
+    let gdeltPromote: GdeltPromoteSummary;
+    try {
+      gdeltPromote = await runGdeltPromote({ commit: true });
+      logger.info(
+        {
+          inserted: gdeltPromote.inserted,
+          promotable: gdeltPromote.promotable,
+          totalAfter: gdeltPromote.totalAfter,
+          byTopic: gdeltPromote.byTopic,
+        },
+        "GDELT promote pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "GDELT promote pass failed");
+      gdeltPromote = emptyGdeltPromote(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
@@ -847,6 +886,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       facebookOsint,
       gdeltEnrich,
       gdeltStructured,
+      gdeltPromote,
     };
   });
   if (!res.ran) return res;
@@ -872,12 +912,23 @@ export async function runGdeltStructuredOnce(): Promise<GdeltStructuredRunResult
       logger.error({ err }, "GDELT structured event layer ingest failed");
       gdeltStructured = emptyGdeltStructured(err);
     }
+    // Promote the freshly-refreshed structured events into incidents (0 QU;
+    // reads the local table). Kept in its own try so a promote failure never
+    // fails the structured refresh.
+    let gdeltPromote: GdeltPromoteSummary;
+    try {
+      gdeltPromote = await runGdeltPromote({ commit: true });
+    } catch (err) {
+      logger.error({ err }, "GDELT promote pass failed");
+      gdeltPromote = emptyGdeltPromote(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       gdeltStructured,
+      gdeltPromote,
     };
   });
   if (!res.ran) return res;

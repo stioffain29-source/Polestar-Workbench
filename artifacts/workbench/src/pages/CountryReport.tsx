@@ -234,8 +234,11 @@ export default function CountryReport() {
         if (!isJakartaScoped(i.title, i.summary, i.location)) return false;
         // Indonesian outlets also report OVERSEAS events under a domestic
         // country tag; drop foreign-subject "slop" using the English text.
+        // Feed the translated title + Bahasa title but NOT the summary — the
+        // appended outlet masthead ("CNN Indonesia", "CNBC Indonesia") would
+        // inject a false Indonesian anchor and defeat the dominance test.
         const tr = i as { ln?: string | null; displayTitle?: string | null };
-        const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`;
+        const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""}`;
         if (isForeignSubjectForIndonesia(en)) return false;
         return true;
       }
@@ -275,7 +278,9 @@ export default function CountryReport() {
       // a foreign nationality.
       if (isIndonesia) {
         const tr = i as { ln?: string | null; displayTitle?: string | null };
-        const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`;
+        // Translated title + Bahasa title only — the summary carries the outlet
+        // masthead ("CNN Indonesia" etc.), a false Indonesian anchor.
+        const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""}`;
         if (isForeignSubjectForIndonesia(en)) return false;
       }
       // Drop geocoder mis-tags: a record whose TITLE is about a distant

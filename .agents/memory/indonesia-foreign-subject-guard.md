@@ -27,8 +27,10 @@ anything keyed on the raw title can't see "Japan" / "New York".
 Indonesia path AND Jakarta branch of `CountryReport.tsx`'s `incidents` useMemo
 (which feeds Key Developments / charts / fast facts / prose). It drops a record
 only when foreign-country cue matches OUTNUMBER Indonesian-place cue matches over
-`displayTitle + title + summary`, mirroring the existing PNG/West Papua
-`isForeignDominantContext`. Dominance (not blanket-foreign) so a genuine domestic
+`displayTitle + title` — **NOT** the summary. The summary carries the appended
+outlet masthead ("CNN Indonesia", "CNBC Indonesia", "ANTARA") whose "Indonesia"
+is a FALSE local anchor that used to defeat the dominance test and leak foreign
+accidents. Mirrors the existing PNG/West Papua `isForeignDominantContext`. Dominance (not blanket-foreign) so a genuine domestic
 story that merely NAMES a foreign national survives ("Chinese investor robbed in
 Surabaya" — Surabaya anchors it).
 
@@ -41,8 +43,18 @@ Surabaya" — Surabaya anchors it).
   set (Papua records are routed to the West Papua brief upstream).
 - Extend `INDO_FOREIGN_SUBJECT_RE` / `INDO_LOCAL_ANCHOR_RE` in lockstep, then
   RE-VALIDATE against live rows (Postgres `regexp_matches` foreign-vs-local
-  dominance over `displayTitle+title+summary`) — never expand the token lists
-  without a replay; new tokens can silently change the drop-set.
+  dominance over `displayTitle+title`, NOT summary) — never expand the token
+  lists without a replay; new tokens can silently change the drop-set.
+- The foreign set now also carries unambiguous foreign ENTITIES / US states seen
+  in live slop (`ubisoft`, `assassin's creed`, `missouri`) — a foreign accident
+  often names only the company/state, not the country.
+- KNOWN RESIDUAL: a row whose translated title names NO country or foreign entity
+  in any language (bare "Plane crash kills 11" syndicating a foreign crash) is
+  indistinguishable from a domestic accident by content, so the guard leaves it.
+  Do NOT add a blanket "no local anchor → drop" rule — it over-drops genuine
+  domestic stories that omit a place name. Fabricating a foreign tag from zero
+  evidence breaches no-fabrication; cross-row event clustering (out of scope)
+  would be required.
 - **Prod dependency:** the guard can only see the foreign subject if prod rows
   have `display_title` populated (the English translation). NULL `display_title`
   → the guard is blind. See `incident-title-translation.md` /

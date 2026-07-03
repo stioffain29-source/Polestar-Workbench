@@ -23,6 +23,29 @@ const SLOP = [
   "Pilot killed and several injured in a plane crash near Beijing",
   "Building collapse in Saigon traps construction workers",
   "Deadly bus crash on a motorway outside Bangkok",
+  // Bahasa-first outlets syndicating FOREIGN accidents/disasters under a domestic
+  // country tag: the France skydiving-plane crash, the Ubisoft founder killed in
+  // that crash, a US (Missouri) crash and French wildfires. Detectable via the
+  // translated display_title (foreign country or unambiguous foreign entity).
+  "Ubisoft founder dies in plane crash",
+  "One of Ubisoft's founders dies in plane crash",
+  "Claude Guillemot, Ubisoft founder, dies in plane crash in France",
+  "Plane crash kills founder-owner of Assassin's Creed",
+  "12 people killed in plane crash in Missouri",
+  "Plane crash in Missouri, US kills 11 parachutists and 1 pilot",
+  "France hit by severe wildfires as 700 hectares burn during extreme weather",
+  "11 killed in plane crash near Tomblaine, France on Sunday",
+];
+
+// Two France-crash duplicates name NO country or foreign entity in any language
+// ("Plane crash kills 11", "Photos of a plane crashing into a densely populated
+// area"). They are indistinguishable from a domestic accident by content, so the
+// guard deliberately does NOT drop them — inventing a foreign tag from zero
+// evidence would breach the no-fabrication rule (cross-row event clustering,
+// which is out of scope, would be needed to catch them).
+const UNATTRIBUTABLE_KEPT = [
+  "Plane crash kills 11",
+  "Photos of a plane crashing vertically into a densely populated area, fatalities reported",
 ];
 
 // Genuine Indonesian security incidents — including one that names a foreign
@@ -32,11 +55,18 @@ const GENUINE = [
   "Gempa guncang Sulawesi Tengah, puluhan rumah rusak di Palu",
   "Demonstrasi buruh di Surabaya menuntut kenaikan upah",
   "Chinese investor robbed at gunpoint in Surabaya hotel",
+  // A genuine Indonesian maritime accident (Labuan Bajo, Flores) that happens to
+  // name a foreign victim's nationality — the local place anchors it, so KEEP.
+  "Ship sinks in Labuan Bajo, Russian national among the victims",
   "Bom meledak di gereja Makassar, beberapa orang terluka",
   "KKB serang pos di Papua",
   // Names a foreign city in passing but is anchored to TWO Indonesian places, so
   // the local cue count dominates and the record is RETAINED.
   "Garuda flight from Jakarta to Tokyo diverted back to Surabaya",
+  // A genuine Indonesian search-and-rescue operation (Banyuwangi, the state
+  // airport operator Angkasa Pura) names no foreign country, so it is KEPT even
+  // though its own city is not in the local-anchor list.
+  "Banyuwangi SAR and Angkasa Pura strengthen search and rescue operation",
 ];
 
 describe("isForeignSubjectForIndonesia", () => {
@@ -47,6 +77,13 @@ describe("isForeignSubjectForIndonesia", () => {
   it.each(GENUINE)("keeps the genuine Indonesian record: %s", (text) => {
     expect(isForeignSubjectForIndonesia(text)).toBe(false);
   });
+
+  it.each(UNATTRIBUTABLE_KEPT)(
+    "keeps a marker-less record the guard cannot attribute (no-fabrication): %s",
+    (text) => {
+      expect(isForeignSubjectForIndonesia(text)).toBe(false);
+    },
+  );
 
   it("keeps a domestic story that names a foreign national (local anchor wins)", () => {
     expect(

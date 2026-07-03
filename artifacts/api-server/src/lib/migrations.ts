@@ -1,6 +1,6 @@
 import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
-import { sql, eq, or, ne, isNull, inArray, and, like } from "drizzle-orm";
+import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
 import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import {
   runStrikesBackfill,
@@ -23,6 +23,7 @@ import {
   SEVERITY_RANK,
   isReliefWebConfigured,
   isGdeltConfigured,
+  PROMOTE_MARKER_PREFIX,
   GDELT_NOT_CONFIGURED_MESSAGE,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
   type Severity,
@@ -3104,9 +3105,22 @@ export async function backfillRelevance(): Promise<{
     })
     .from(incidentsTable)
     .where(
-      or(
-        isNull(incidentsTable.relevanceVersion),
-        ne(incidentsTable.relevanceVersion, RELEVANCE_RULE_VERSION),
+      and(
+        or(
+          isNull(incidentsTable.relevanceVersion),
+          ne(incidentsTable.relevanceVersion, RELEVANCE_RULE_VERSION),
+        ),
+        // NEVER re-score GDELT-promoted rows through the text relevance engine.
+        // Their relevance is fixed by GDELT's own lane coding (see gdeltPromote):
+        // Crime/Transport are deliberately stored 'irrelevant' (geography-only
+        // context), Protests/Security 'relevant'. The text rules know nothing
+        // about lanes, so a routine RELEVANCE_RULE_VERSION bump would otherwise
+        // flip these verdicts and destroy the promote semantics. NULL notes (the
+        // vast majority of rows) still evaluate normally.
+        or(
+          isNull(incidentsTable.analystNotes),
+          not(like(incidentsTable.analystNotes, `${PROMOTE_MARKER_PREFIX}%`)),
+        ),
       ),
     );
 
