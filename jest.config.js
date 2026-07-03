@@ -65,6 +65,8 @@ module.exports = {
     "^date-fns/(.*)$": "<rootDir>/artifacts/workbench/node_modules/date-fns/$1",
     "^@workspace/db$": "<rootDir>/__tests__/mocks/db.ts",
     "^@workspace/db/schema$": "<rootDir>/lib/db/src/schema/index.ts",
+    "^@workspace/db/spot-report-limits$":
+      "<rootDir>/lib/db/src/spotReportLimits.ts",
     "^@workspace/ingest$": "<rootDir>/lib/ingest/src/index.ts",
     "^@workspace/strike-targets$": "<rootDir>/lib/strike-targets/src/index.ts",
     "^@workspace/relevance$": "<rootDir>/lib/relevance/src/index.ts",

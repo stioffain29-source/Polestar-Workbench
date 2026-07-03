@@ -42,6 +42,13 @@ import {
   type QualityResult,
 } from "@/lib/spotReport";
 import { downloadSpotReportDocx, downloadSpotReportText } from "@/lib/spotReportExport";
+// Photo ceilings come from the SHARED module the api-server route also uses, so
+// the client pre-save guard and server validation can never drift apart.
+import {
+  MAX_PHOTOS,
+  MAX_PHOTO_DATAURL_BYTES,
+  MAX_PHOTOS_TOTAL_BYTES,
+} from "@workspace/db/spot-report-limits";
 import SpotReportPreview from "@/components/SpotReportPreview";
 import { useToast } from "@/hooks/use-toast";
 
@@ -163,12 +170,6 @@ function DateTime24({
     </div>
   );
 }
-
-// Photo ceilings — kept in step with the api-server spot-reports route so a
-// save never trips the server-side 400. Bytes measured on the data URL string.
-const MAX_PHOTOS = 24;
-const MAX_PHOTO_DATAURL_BYTES = 4 * 1024 * 1024;
-const MAX_PHOTOS_TOTAL_BYTES = 28 * 1024 * 1024;
 
 /**
  * Read an image file and return a resized JPEG data URL. Downscales so the
