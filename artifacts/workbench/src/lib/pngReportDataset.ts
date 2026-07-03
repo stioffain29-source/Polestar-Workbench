@@ -214,6 +214,15 @@ export interface StructuredTheatreConfig {
   // to ("Most relevant to <audience>."); the period's main issues are derived
   // from the incident mix, not from this field. Unset → a generic audience.
   audienceProfile?: { audience: string };
+  // PNG-only. When true, the window is stripped of low-value development /
+  // promotional wire copy (infrastructure ribbon-cutting, aviation partnerships,
+  // scholarships, "brings hope/joy" items, "tidbits") BEFORE any narrative
+  // surface reads it, so the brief leads with genuine security reporting rather
+  // than development PR. STRICT under-filter bias — never drops Moderate+
+  // severity or any item carrying a security / hazard term (see
+  // isDevelopmentWireItem). Set ONLY on PNG_REPORT_CONFIG; every other theatre
+  // is byte-identical because the filter is inert when the flag is unset.
+  filterDevelopmentWire?: boolean;
 }
 
 export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -234,6 +243,7 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
     audience:
       "field operations, project sites, secure movement, aviation-dependent travel, remote logistics and staff based near affected districts",
   },
+  filterDevelopmentWire: true,
   deriveProvince: derivePngProvince,
   extractItem: extractPngItem,
   locationAugmentations: {
@@ -656,6 +666,54 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
   };
 }
 
+// Low-value development / promotional wire copy that dilutes a security brief
+// (infrastructure ribbon-cutting, aviation partnerships, scholarships, "brings
+// hope/joy" community items, "tidbits" round-ups). Substring match; the strict
+// severity + security gating below is the real safety net.
+const DEVELOPMENT_WIRE_RE =
+  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade)/i;
+// A security / risk / hazard term anywhere in the text VETOES the drop, even
+// when the promotional lexicon also matches, so a genuine low-severity crime,
+// court, unrest or natural-hazard item is never removed. A veto only ever KEEPS
+// an item, so this list can be liberal without risking data loss.
+const SECURITY_TERM_RE =
+  /(robber|murder|homicide|killed|killing| kill |manslaughter|attack|assault|shoot|shot|gunman|gunmen| gun |firearm|weapon|knife|stab|violence|riot|unrest|protest|clash|tribal|sorcery|gender-based|abuse|smuggl|theft|stolen|steal|robbed|raid|kidnap|hostage|hijack|carjack|extort| gang|militant|insurg|separatist|rape|arson|bomb|explos|terror|convict|arrest|manhunt|fugitive|casualt|fatal|injur|wound| dead|death|police|earthquake|volcano|eruption|flood|landslide|outage)/i;
+
+// STRUCTURAL non-incident titles: recurring newspaper round-up / column names
+// that are categorically never a single security event (e.g. Post-Courier PNG's
+// weekly "PC Online Tidbits" miscellany). These are dropped REGARDLESS of
+// severity — a deliberate, narrow deviation from the severityRank >= 3 guardrail
+// below, justified because a round-up column carries no discrete event to lose.
+// The true defect is upstream severity misclassification (the live row is
+// mis-rated Moderate); this marker is the durable display-side hedge because the
+// column recurs weekly. Keep this set to structural column/round-up names only —
+// do NOT grow it into a second general lexicon.
+const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
+
+// Pure predicate: is this a low-value development / promotional wire item that a
+// security brief should exclude? Exported for unit tests. Strict under-filter
+// bias — a security / hazard term always vetoes the drop.
+//
+// Two paths:
+//  1. STRUCTURAL round-up columns (HARD_NON_INCIDENT_TITLE_RE) are dropped at any
+//     severity. The security-term veto here is TITLE-ONLY, matching the carve-out
+//     "a 'Tidbits: gunmen raid store' edition stays": these columns are always
+//     bare-titled after the column, never a specific event, while their grab-bag
+//     summary routinely mentions unrelated crime — so a summary-scoped veto would
+//     make the marker permanently inert. A title that names a real event is kept.
+//  2. GENERIC development / PR wire is dropped only when Low (severityRank < 3),
+//     and a security / hazard term ANYWHERE (title or summary) vetoes the drop, so
+//     a genuine low-severity crime, court, unrest or natural-hazard item stays.
+export function isDevelopmentWireItem(item: PngReportItem): boolean {
+  if (HARD_NON_INCIDENT_TITLE_RE.test(item.title)) {
+    return !SECURITY_TERM_RE.test(item.title.toLowerCase());
+  }
+  const hay = `${item.title} ${item.summary}`.toLowerCase();
+  if (SECURITY_TERM_RE.test(hay)) return false;
+  if (item.severityRank >= 3) return false;
+  return DEVELOPMENT_WIRE_RE.test(hay);
+}
+
 function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
   if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
   const da = (a.incidentDate ?? a.reportedDate).getTime();
@@ -998,10 +1056,27 @@ export function buildStructuredReportDataset(
   // Raw (pre-dedup) window size — kept so Reporting Confidence can read how much
   // syndication the dedup pass collapsed (dedup strength, spec §16).
   const rawWindowCount = windowIncidents.length;
-  const windowItems = dedupeByTitle(windowIncidents.map((i) => toItem(i, config)));
+  // PNG-only: drop low-value development / promotional wire copy so every
+  // narrative surface (Top 3, Executive Summary, BLUF, Outlook, watchlist,
+  // location sections) leads with genuine security reporting rather than
+  // development PR. Inert for every other theatre (flag unset → byte-identical).
+  // Never lets the filter empty a non-empty window, which would falsely trip the
+  // "no fresh reporting" branch below.
+  const applyWireFilter = (items: PngReportItem[]): PngReportItem[] => {
+    if (config.filterDevelopmentWire !== true) return items;
+    const kept = items.filter((it) => !isDevelopmentWireItem(it));
+    return kept.length > 0 ? kept : items;
+  };
+  // Deduped-but-unfiltered window, kept so the syndication (dedup-strength)
+  // signal below measures collapse only — never conflating the wire filter with
+  // syndication.
+  const dedupedWindowItems = dedupeByTitle(windowIncidents.map((i) => toItem(i, config)));
+  const windowItems = applyWireFilter(dedupedWindowItems);
   // Prior 7-day window, deduped the same way, for the week-on-week delta. Empty
   // when the caller supplies none (delta degrades to a "limited history" note).
-  const previousWindowItems = dedupeByTitle((previousWindowIncidents ?? []).map((i) => toItem(i, config)));
+  const previousWindowItems = applyWireFilter(
+    dedupeByTitle((previousWindowIncidents ?? []).map((i) => toItem(i, config))),
+  );
   // Distinguish "no previous window supplied at all" (week-on-week comparison
   // impossible — never assert a trend) from "previous window supplied but quiet"
   // (a valid comparison against a calm prior week).
@@ -1547,8 +1622,8 @@ export function buildStructuredReportDataset(
     //  - DEDUP strength: how much syndication the dedup pass collapsed. Heavy
     //    syndication corroborated by more than one outlet is a positive signal;
     //    it is reported in the rationale, never inflated into a count in prose.
-    const distinctShare = rawWindowCount > 0 ? windowItems.length / rawWindowCount : 1;
-    const heavilySyndicated = rawWindowCount > windowItems.length && distinctShare <= 0.6;
+    const distinctShare = rawWindowCount > 0 ? dedupedWindowItems.length / rawWindowCount : 1;
+    const heavilySyndicated = rawWindowCount > dedupedWindowItems.length && distinctShare <= 0.6;
 
     const level: ReportingConfidence["level"] =
       sourceCount <= 1 || locShare < 0.34
