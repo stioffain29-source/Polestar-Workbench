@@ -1775,7 +1775,7 @@ function MovementBlock({ movement }: { movement: MovementTheatre | null }) {
   );
 }
 
-// One of the seven spec chokepoint cards (plus an optional wider-waters bucket).
+// One of the seven spec chokepoint cards.
 function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
   const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
   return (
@@ -1953,7 +1953,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
         </p>
       </div>
 
-      {/* Seven chokepoint cards, plus an optional wider-waters bucket */}
+      {/* Seven chokepoint cards */}
       <div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
           Chokepoint Cards

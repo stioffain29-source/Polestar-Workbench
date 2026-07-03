@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import {
   buildMaritimeIntelligence,
   BOARD_CHOKEPOINTS,
-  WIDER_WATERS_KEY,
   type MaritimeIncidentInput,
 } from "../../artifacts/workbench/src/lib/maritimeIntelligence";
 import {
@@ -37,8 +36,8 @@ const EMDASH = "\u2014"; // —
 // drone strike, both inside the window and phrased so the strict vessel
 // classifier confirms them ("Missile struck a tanker" / "Drone struck a
 // vessel") — enough to push risk above L1 and mark chokepoints affected, so the
-// exec cards carry non-trivial values. Both name BOARD chokepoints, so no
-// wider-waters bucket is appended here (the second describe covers that).
+// exec cards carry non-trivial values. Both name BOARD chokepoints, so both are
+// in scope (the second describe covers off-board exclusion).
 const WINDOW_END = new Date("2026-06-18T00:00:00.000Z");
 const WINDOW_START = new Date("2026-06-11T00:00:00.000Z");
 
@@ -112,8 +111,8 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
 
   it("reports Chokepoints Affected as 'affected / total board chokepoints'", () => {
     const card = maritimeExecCards(board)[2];
-    // Denominator is the fixed board-chokepoint count, never chokepointCards.length
-    // (which grows when the wider-waters reconciliation bucket is appended).
+    // Denominator is the fixed board-chokepoint count (there are always exactly
+    // seven cards, since off-board incidents are excluded from the report).
     expect(card.value).toBe(
       `${board.chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`,
     );
@@ -160,15 +159,16 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
   });
 });
 
-describe("Maritime board reconciliation bucket (no 'Extreme over zeros')", () => {
+describe("Off-board confirmed incidents are excluded (no 'Extreme over zeros')", () => {
   // A single confirmed kinetic incident whose ONLY chokepoint is a NON-board
   // strait ("Arabian / Persian Gulf" is in the detection vocabulary but is not
   // its own card; the country stays Iran so it passes the Middle-East scope
-  // gate). Its extreme severity drives the overall risk to L5, so without the
-  // reconciliation bucket the board would read "Extreme" over seven zero cards —
-  // the exact defect the owner reported. Because it names a chokepoint (just not
-  // a board one), it also proves the predicate is "no BOARD chokepoint", not the
-  // naive "no chokepoint at all".
+  // gate). Its extreme severity WOULD drive the overall risk to L5 if it counted
+  // — the exact "Extreme over a wall of zeros" defect the owner reported. The
+  // owner's fix is to remove such wider-waters activity from the report
+  // entirely, so it must not appear as a card and must not drive the risk /
+  // BLUF. Because it names a chokepoint (just not a board one), it also proves
+  // the scope predicate is "names a BOARD chokepoint", not "names any".
   const OFF_BOARD_FIXTURE: MaritimeIncidentInput[] = [
     {
       id: 10,
@@ -188,32 +188,36 @@ describe("Maritime board reconciliation bucket (no 'Extreme over zeros')", () =>
     windowEnd: WINDOW_END,
   });
 
-  it("routes an off-board confirmed kinetic incident into the wider-waters bucket", () => {
-    const bucket = board.chokepointCards.find((c) => c.key === WIDER_WATERS_KEY);
-    expect(bucket).toBeDefined();
-    expect(bucket?.incidentCount).toBeGreaterThanOrEqual(1);
+  it("renders exactly the seven board cards and no wider-waters bucket", () => {
+    expect(maritimeChokepointTitles(board)).toEqual(BOARD_CHOKEPOINTS);
+    expect(board.chokepointCards).toHaveLength(BOARD_CHOKEPOINTS.length);
   });
 
-  it("appends the bucket strictly last, leaving the seven board cards intact", () => {
-    const keys = board.chokepointCards.map((c) => c.key);
-    expect(keys.slice(0, BOARD_CHOKEPOINTS.length)).toEqual(BOARD_CHOKEPOINTS);
-    expect(keys[keys.length - 1]).toBe(WIDER_WATERS_KEY);
+  it("excludes the off-board incident from the confirmed set entirely", () => {
+    expect(board.incidentSnapshot.total).toBe(0);
+    expect(board.confirmedIncidents).toHaveLength(0);
   });
 
   it("never shows an elevated overall risk over an all-zero chokepoint grid", () => {
-    // Core invariant (coverage, not sum): if the board risk is High or above,
-    // at least one card MUST carry a confirmed incident.
-    expect(board.risk.level).toBe(5);
-    if (board.risk.level >= 4) {
-      expect(board.chokepointCards.some((c) => c.incidentCount > 0)).toBe(true);
-    }
+    // With no in-scope confirmed incident the risk stays L1 (Insignificant), so
+    // the BLUF can never read Extreme over seven zero cards.
+    expect(board.risk.level).toBe(1);
+    expect(board.chokepointCards.every((c) => c.incidentCount === 0)).toBe(true);
   });
 
-  it("keeps 'Chokepoints Affected' scoped to named board cards (off-board excluded)", () => {
-    // The off-board incident must NOT inflate the tracked-chokepoint KPI.
+  it("keeps 'Chokepoints Affected' at 0 / 7", () => {
     expect(board.chokepointsAffected).toBe(0);
     const affectedCard = maritimeExecCards(board)[2];
     expect(affectedCard.value).toBe(`0 / ${BOARD_CHOKEPOINTS.length}`);
+  });
+
+  it("scopes the empty-week BLUF to tracked chokepoints, not an absolute negative", () => {
+    // The off-board incident may still surface in the report's other sections,
+    // so the BLUF must NOT claim a blanket "no confirmed maritime security
+    // incidents" — that would be falsifiable within the same PDF.
+    expect(board.risk.level).toBe(1);
+    expect(board.bluf).toContain("No confirmed incidents at tracked chokepoints");
+    expect(board.bluf).not.toContain("No confirmed maritime security incidents");
   });
 });
 

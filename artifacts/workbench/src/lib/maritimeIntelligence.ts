@@ -523,10 +523,12 @@ export interface IncidentSnapshot {
 // ---------------------------------------------------------------------------
 
 // The SEVEN chokepoints surfaced as their own cards on the board and in the
-// report, in display order. Gulf of Oman and Arabian / Persian Gulf stay in the
-// detection vocabulary (they enrich Hormuz context) but are not their own cards;
-// confirmed incidents that name only those — or no chokepoint at all — are
-// reconciled into the WIDER_WATERS_KEY bucket card (below).
+// report, in display order. This report is a CHOKEPOINT report: only confirmed
+// incidents that name one of these board straits are in scope. Gulf of Oman and
+// Arabian / Persian Gulf stay in the detection vocabulary (they enrich Hormuz
+// context) but are not their own cards; confirmed incidents that name only those
+// — or no chokepoint at all — are OUT OF SCOPE and excluded from the report
+// entirely (see the board-scope filter in buildMaritimeIntelligence).
 export const BOARD_CHOKEPOINTS: ChokepointKey[] = [
   "Strait of Hormuz",
   "Bab el-Mandeb",
@@ -537,19 +539,8 @@ export const BOARD_CHOKEPOINTS: ChokepointKey[] = [
   "Malacca Strait",
 ];
 
-// Reconciliation bucket key. computeMaritimeRisk / the BLUF run over ALL
-// confirmed incidents, but the per-chokepoint cards only count incidents whose
-// text names a board strait. A confirmed incident that names NO board strait
-// (e.g. a Mediterranean seizure, or a Gulf-of-Oman / Persian-Gulf attack) would
-// therefore drive the overall risk while every named card reads zero — the
-// "Extreme over a wall of zeros" contradiction. Those incidents are surfaced
-// under this pseudo-chokepoint, always rendered LAST. It states only that
-// confirmed activity occurred in wider waters no tracked chokepoint names — it
-// never fabricates a specific chokepoint.
-export const WIDER_WATERS_KEY = "Wider waters (no named chokepoint)" as const;
-
 export interface ChokepointCard {
-  key: ChokepointKey | typeof WIDER_WATERS_KEY;
+  key: ChokepointKey;
   risk: MaritimeRisk;
   /** Confirmed incidents tagged to this chokepoint in the window. */
   incidentCount: number;
@@ -585,9 +576,9 @@ export interface MaritimeIntelligence {
   movementSnapshot: MovementSnapshot | null;
   incidentSnapshot: IncidentSnapshot;
   /**
-   * The seven spec chokepoints, each with its own risk / count / movement,
-   * followed by the wider-waters reconciliation bucket when confirmed incidents
-   * name no board chokepoint.
+   * The seven spec chokepoints, each with its own risk / count / movement.
+   * Confirmed incidents naming no board chokepoint are out of scope and excluded
+   * from the board, so there are always exactly seven cards.
    */
   chokepointCards: ChokepointCard[];
   /** Number of board chokepoints with ≥1 confirmed incident in the window. */
@@ -705,6 +696,14 @@ export function buildMaritimeIntelligence(
       } as ClassifiedIncident;
     })
     .filter((x): x is ClassifiedIncident => x !== null)
+    // The report is a CHOKEPOINT report: keep ONLY confirmed incidents that name
+    // at least one tracked board strait. Confirmed maritime activity in wider
+    // waters that names no board chokepoint (e.g. a Mediterranean seizure, or a
+    // Gulf-of-Oman / Persian-Gulf attack) is OUT OF SCOPE — the owner's decision
+    // is to remove it from the report entirely rather than surface it, so it can
+    // never drive the overall risk / BLUF while every named card reads zero (the
+    // "Extreme over a wall of zeros" contradiction).
+    .filter((r) => r.chokepoints.some((cp) => BOARD_CHOKEPOINTS.includes(cp)))
     .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
 
   // 4. Incident snapshot.
@@ -780,38 +779,11 @@ export function buildMaritimeIntelligence(
       confidence: cpRisk.confidence,
     };
   });
-  // Reconciliation bucket (rendered LAST): confirmed incidents that pass the
-  // operational gate but name NO board chokepoint. Without this card such
-  // incidents drive the overall risk / BLUF while every named card reads zero
-  // (the "Extreme over a wall of zeros" contradiction). The predicate is "no
-  // BOARD chokepoint", NOT "no chokepoint at all" — Gulf of Oman and Arabian /
-  // Persian Gulf are in the detection vocabulary but are not board cards, so a
-  // kinetic Persian-Gulf incident has chokepoints.length > 0 yet still belongs
-  // here. Movement is null (the fuzzy theatre match must never bind a real
-  // theatre to this pseudo-key). r.chokepoints is NOT mutated, so
-  // chokepointFreq / topChokepoint / keyRiskIndicators / watchNext / the overall
-  // computeMaritimeRisk are untouched — no double-count.
-  const widerWatersSubset = confirmed.filter((r) =>
-    r.chokepoints.every((cp) => !BOARD_CHOKEPOINTS.includes(cp)),
-  );
-  if (widerWatersSubset.length > 0) {
-    const widerRisk = computeMaritimeRisk(widerWatersSubset);
-    chokepointCards.push({
-      key: WIDER_WATERS_KEY,
-      risk: widerRisk,
-      incidentCount: widerWatersSubset.length,
-      lastConfirmed: widerWatersSubset[0]
-        ? toLatestIncident(widerWatersSubset[0])
-        : null,
-      movement: null,
-      businessImpact: deriveBusinessImpact(widerWatersSubset),
-      confidence: widerRisk.confidence,
-    });
-  }
-  // "Chokepoints Affected" counts NAMED board cards only — the reconciliation
-  // bucket is not one of the tracked chokepoints.
+  // "Chokepoints Affected" counts board cards with at least one confirmed
+  // incident. The confirmed set is already board-scoped, so every card is a
+  // tracked chokepoint.
   const chokepointsAffected = chokepointCards.filter(
-    (c) => c.key !== WIDER_WATERS_KEY && c.incidentCount > 0,
+    (c) => c.incidentCount > 0,
   ).length;
 
   // 7. Key risk indicators — terse, no parenthetical counts. Incident-driven
@@ -901,9 +873,13 @@ export function buildMaritimeIntelligence(
   }
 
   // 9. BLUF — bottom line up front.
+  // The board is scoped to tracked chokepoints, so the empty-week BLUF must
+  // claim absence ONLY at those chokepoints — an off-board incident may still
+  // appear in the report's other sections, so an unscoped "no confirmed
+  // incidents" negative would be falsifiable within the same PDF.
   const bluf =
     risk.level === 1
-      ? "Maritime risk is Insignificant. No confirmed maritime security incidents this week; routine vigilance only."
+      ? "Maritime risk is Insignificant. No confirmed incidents at tracked chokepoints this week; routine vigilance only."
       : `Maritime risk is ${risk.label}. ${risk.rationale}${impactSentence(businessImpact)}`;
 
   // 10. Source health.

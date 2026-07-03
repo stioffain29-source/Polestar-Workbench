@@ -54,9 +54,8 @@ export function maritimeExecCards(
     { label: "Confirmed Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
     {
       label: "Chokepoints Affected",
-      // Denominator is the fixed number of tracked board chokepoints, NOT
-      // chokepointCards.length (which grows by one when the wider-waters
-      // reconciliation bucket is appended). Keeps the KPI reading "X / 7".
+      // Denominator is the fixed number of tracked board chokepoints. Keeps the
+      // KPI reading "X / 7".
       value: `${chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`,
     },
     {
@@ -86,10 +85,9 @@ export const MARITIME_POLESTAR_SUBSECTIONS = [
 
 /**
  * The chokepoint card titles, in the board's display order — the seven tracked
- * board chokepoints, plus the wider-waters reconciliation bucket when present.
- * Both surfaces iterate `board.chokepointCards` so the keys are inherently
- * shared; this helper exists so the parity test can assert the order in one
- * place.
+ * board chokepoints. Both surfaces iterate `board.chokepointCards` so the keys
+ * are inherently shared; this helper exists so the parity test can assert the
+ * order in one place.
  */
 export function maritimeChokepointTitles(
   board: MaritimeIntelligence,

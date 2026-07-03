@@ -34,22 +34,31 @@ integer in a HAND-WRITTEN route refinement (`CreateMaritimeMovementBodyStrict`
 in `routes/maritimeMovement.ts`), not the generated schema, so a decimal direct
 call returns a clean 400 instead of a Postgres 500 on the integer columns.
 
-## Board cards vs overall risk — the "Extreme over zeros" trap
-**Rule:** `computeMaritimeRisk`/BLUF run over ALL confirmed incidents, but the
-per-chokepoint cards only count confirmed incidents naming a `BOARD_CHOKEPOINTS`
-strait. A confirmed incident whose only chokepoint is OFF-board (valid detection
-key like "Arabian / Persian Gulf" / "Gulf of Oman") — or names none at all —
-feeds the elevated overall risk but lands on NO card, so the board can read a
-wall of L1·Insignificant zeros under an Extreme BLUF.
-**Fix (in place):** after the 7 board cards, append a single "Wider waters (no
-named chokepoint)" bucket (`WIDER_WATERS_KEY`) holding
-`confirmed.filter(r => r.chokepoints.every(cp => !BOARD_CHOKEPOINTS.includes(cp)))`.
-Bucket + board cards are mutually exclusive (never double-counts). Keep
-`chokepointsAffected` and every KPI denominator keyed to
-`BOARD_CHOKEPOINTS.length` (the fixed "/ 7"), NOT `chokepointCards.length`
-(grows to 8 when the bucket is present). All three surfaces iterate
-`board.chokepointCards` generically, so the bucket renders on screen==PDF for
-free (`movement:null` → existing "unavailable" path).
+## Board is chokepoint-SCOPED — off-board incidents are excluded (owner directive)
+**Rule:** the whole maritime board is scoped to tracked chokepoints. In
+`buildMaritimeIntelligence`, `confirmed` is filtered to incidents whose
+`detectChokepoints()` names ≥1 `BOARD_CHOKEPOINTS` strait
+(`r.chokepoints.some(cp => BOARD_CHOKEPOINTS.includes(cp))`) at the single point
+where `confirmed` is built, so EVERY downstream surface (risk/BLUF,
+incidentSnapshot, confirmedIncidents table, cards, chokepointsAffected, KRIs,
+watch-next) derives from the board-scoped set. A confirmed incident whose only
+chokepoint is OFF-board (valid detection key like "Arabian / Persian Gulf" /
+"Gulf of Oman"), or names none, is DROPPED from the report entirely.
+**Why:** the earlier defect was an Extreme BLUF over a wall of L1 zero cards.
+The first fix surfaced off-board incidents in a "Wider waters (no named
+chokepoint)" bucket card — the owner REJECTED it ("no. the solution is to remove
+this from the report"). Scoping at source removes the contradiction: empty board
+→ risk L1 → an accurate Insignificant BLUF. Accepted trade-off: legitimate
+off-chokepoint maritime incidents don't appear on this chokepoint-scoped board
+(they still surface in the report's other sections + the live monitor).
+**How to apply:** there are ALWAYS exactly 7 cards; `chokepointCards.key` is
+`ChokepointKey` (no bucket key). Do NOT re-add a wider-waters / reconciliation
+bucket. The empty-week (L1) BLUF must stay chokepoint-SCOPED ("No confirmed
+incidents at tracked chokepoints this week"), never a blanket "no confirmed
+maritime security incidents" — an off-board incident can still appear in the
+same PDF's vessel-threat section, so an unscoped negative is falsifiable.
+`chokepointsAffected` / KPI denominators stay keyed to `BOARD_CHOKEPOINTS.length`
+(fixed "/ 7").
 
 ## Vessel-attack CONFIRMATION needs active-voice phrasing
 **Gotcha:** `isConfirmedOperationalIncident` confirms an attack via
