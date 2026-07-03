@@ -11,7 +11,7 @@
 // surfaces consume them makes that class of drift impossible, and the parity
 // test (maritimeReportParity.test.ts) locks these definitions against a fixture.
 
-import { MARITIME_RISK_COLOR } from "./maritimeIntelligence";
+import { BOARD_CHOKEPOINTS, MARITIME_RISK_COLOR } from "./maritimeIntelligence";
 import type { MaritimeIntelligence } from "./maritimeIntelligence";
 
 /** Human label for the board confidence enum. Shared by preview + PDF. */
@@ -39,7 +39,7 @@ export interface MaritimeExecCard {
 export function maritimeExecCards(
   board: MaritimeIntelligence,
 ): MaritimeExecCard[] {
-  const { risk, incidentSnapshot, chokepointCards, chokepointsAffected } = board;
+  const { risk, incidentSnapshot, chokepointsAffected } = board;
   const namedImpacts = board.businessImpact.filter(
     (b) => b !== "No material impact",
   );
@@ -54,7 +54,10 @@ export function maritimeExecCards(
     { label: "Confirmed Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
     {
       label: "Chokepoints Affected",
-      value: `${chokepointsAffected} / ${chokepointCards.length}`,
+      // Denominator is the fixed number of tracked board chokepoints, NOT
+      // chokepointCards.length (which grows by one when the wider-waters
+      // reconciliation bucket is appended). Keeps the KPI reading "X / 7".
+      value: `${chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`,
     },
     {
       label: "Business Impact",
@@ -82,9 +85,11 @@ export const MARITIME_POLESTAR_SUBSECTIONS = [
 ] as const;
 
 /**
- * The six chokepoint card titles, in the board's display order. Both surfaces
- * iterate `board.chokepointCards` so the keys are inherently shared; this helper
- * exists so the parity test can assert the order in one place.
+ * The chokepoint card titles, in the board's display order — the seven tracked
+ * board chokepoints, plus the wider-waters reconciliation bucket when present.
+ * Both surfaces iterate `board.chokepointCards` so the keys are inherently
+ * shared; this helper exists so the parity test can assert the order in one
+ * place.
  */
 export function maritimeChokepointTitles(
   board: MaritimeIntelligence,

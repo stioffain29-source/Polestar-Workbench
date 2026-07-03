@@ -53,7 +53,14 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     impact: "Terrorism-related security threat; review physical security, access control and emergency procedures at exposed sites.",
   },
   {
-    re: /\b(armed robbery|hold[- ]?up|carjack(?:ing|ed)?|stick[- ]?up|heist|raskol|rascal gang|gang robbery|armed hold[- ]?up|begal|pembegalan|perampokan bersenjata|rampok bersenjata)\b/i,
+    // Extended with the armed-robbery vocab the Pacific briefs were missing:
+    // vehicle/truck/PMV/cargo hijackings (base rule only had "carjack"), the
+    // "at gunpoint" armed signal, and cash-in-transit / cash-van targets — the
+    // classic PNG cash-van hold-ups and highway truck hijacks that used to fall
+    // into "Other security". Hijack is transport-BOUND (never a bare "hijack")
+    // so a metaphorical "hijacked the debate" cannot false-hit. All tokens are
+    // English, so the shared Indonesia/Jakarta rulebook is unaffected.
+    re: /\b(armed robber(?:y|s)?|hold[- ]?up|carjack(?:ing|ed)?|(?:truck|lorry|vehicle|car|bus|pmv|coaster|convoy|cargo|van|taxi)[ -]hijack(?:ed|ing|ings)?|at gunpoint|cash[- ]?in[- ]?transit|cash van|stick[- ]?up|heist|raskol|rascal gang|gang robbery|armed hold[- ]?up|begal|pembegalan|perampokan bersenjata|rampok bersenjata)\b/i,
     category: "Armed robbery / hold-up",
     impact: "Direct threat to staff, cash-in-transit and premises in the affected area; review movement and security cover.",
   },
@@ -63,7 +70,18 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     impact: "Road closures, supply-chain disruption and personnel-movement risk across the affected district.",
   },
   {
-    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed|shooting|opened fire|pembunuhan|penembakan|penikaman|ditembak(?: mati| tewas)?|ditikam|tewas dibunuh|dibunuh|mutilasi|pengeroyokan)\b/i,
+    // Extended with the crime vocab the Pacific briefs were missing: the noun
+    // "killing(s)" / "kills" (the base rule only had the verb "killed"), sexual
+    // and gender-based violence, and the PNG-specific sorcery-accusation-related
+    // violence (SARV / sanguma). Gang-crime terms are MULTI-WORD-bound
+    // ("gang violence|attack|rampage", "criminal gang") — never the bare token
+    // "gang", which is Bahasa for "alley" and would false-hit the shared
+    // Indonesia/Jakarta rulebook. "sorcery ... laws" / bare "glassman" are
+    // deliberately NOT matched so a sorcery-law explainer stays out of crime.
+    // "ambush(ed)" is a violent-attack signal (PMV/cash-van ambushes, security
+    // forces ambushed) — English-only, so the Indonesia/Jakarta rulebook (which
+    // uses "penyergapan") is unaffected.
+    re: /\b(murder(?:ed|s)?|homicide|manslaughter|massacre|shot dead|stabb(?:ed|ing)|gunned down|beaten to death|found dead|fatalit(?:y|ies)|killed|killing(?:s)?|kills|shooting|opened fire|ambush(?:ed|es|ing)?|rape(?:d|s)?|sexual (?:assault|violence|abuse)|gender[- ]based violence|gbv|domestic violence|sorcery[ -](?:accusation[ -])?related violence|sorcery accusation|sarv|sanguma|gang (?:violence|attack|rampage)|criminal gang|pembunuhan|penembakan|penikaman|ditembak(?: mati| tewas)?|ditikam|tewas dibunuh|dibunuh|mutilasi|pengeroyokan)\b/i,
     category: "Homicide / violent crime",
     impact: "Heightened personal-security risk locally; review after-hours exposure and movement protocols.",
   },

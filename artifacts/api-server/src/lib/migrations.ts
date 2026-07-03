@@ -2855,9 +2855,11 @@ export async function runDataMigrations(): Promise<void> {
     //   side. The extraction is a pure, deterministic function of each row's
     //   existing title/summary/location/occurredAt, so it is idempotent and can
     //   never invent data, and it is PNG-SCOPED so it never leaks onto any
-    //   non-PNG country. Marker-gated → runs once per environment; the v2 key
-    //   re-runs the now-broadened scope once over the rows the earlier
-    //   flashpoint-only v1 left untouched. Reaches the writable prod DB only
+    //   non-PNG country. Marker-gated → runs once per environment; each bump
+    //   (v1 flashpoint-only → v2 broadened scope → v3 crime-vocab reclassify)
+    //   re-runs the current rulebook over every PNG row, so an additive
+    //   CATEGORY_RULES change reclassifies stored rows (e.g. "killing(s)" /
+    //   SARV / GBV that used to fall into "Other security"). Reaches the writable prod DB only
     //   after a republish (the deployment runtime is the only writable-prod
     //   context); new PNG rows thereafter are kept filled by the live-ingest
     //   onlyNull enrichment pass in runIngestOnce.
@@ -2868,7 +2870,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "png_extract_backfill_v2";
+      const markerKey = "png_extract_backfill_v3";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);
@@ -2910,7 +2912,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "west_papua_structured_extract_backfill_v1";
+      const markerKey = "west_papua_structured_extract_backfill_v2";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);

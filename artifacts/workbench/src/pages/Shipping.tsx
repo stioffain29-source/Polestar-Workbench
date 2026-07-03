@@ -40,6 +40,7 @@ import RedSeaDirectionalFlowPanel from "@/components/RedSeaDirectionalFlowPanel"
 import { buildGatewayFlow, RED_SEA_GATEWAYS } from "@/lib/maritimeDirectionalFlow";
 import {
   buildMaritimeIntelligence,
+  BOARD_CHOKEPOINTS,
   formatMovementSummary,
   formatMovementTotals,
   formatMovementDirection,
@@ -86,7 +87,7 @@ const SHIPPING_DEFINITIONS: { term: string; def: string }[] = [
   },
   {
     term: "Chokepoint risk",
-    def: "A record naming one of six tracked chokepoints (Strait of Hormuz, Gulf of Oman, Arabian / Persian Gulf, Red Sea, Bab el-Mandeb, Malacca). The Strait of Hormuz additionally requires an operational maritime term, so a bare 'Hormuz' mention in a price or policy headline does not qualify; the other five match on a named mention.",
+    def: "A record naming one of seven tracked chokepoints (Strait of Hormuz, Bab el-Mandeb, Red Sea, Suez Canal, Gulf of Aden, Singapore Strait, Malacca Strait). The Strait of Hormuz additionally requires an operational maritime term, so a bare 'Hormuz' mention in a price or policy headline does not qualify; the other six match on a named mention.",
   },
   {
     term: "Vessel attack / seizure",
@@ -1774,7 +1775,7 @@ function MovementBlock({ movement }: { movement: MovementTheatre | null }) {
   );
 }
 
-// One of the six spec chokepoint cards.
+// One of the seven spec chokepoint cards (plus an optional wider-waters bucket).
 function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
   const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
   return (
@@ -1929,7 +1930,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
         />
         <ExecSummaryCard
           label="Chokepoints Affected"
-          value={`${chokepointsAffected} / ${chokepointCards.length}`}
+          value={`${chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`}
           sub="With ≥1 confirmed incident"
         />
         <ExecSummaryCard
@@ -1952,7 +1953,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
         </p>
       </div>
 
-      {/* Six chokepoint cards */}
+      {/* Seven chokepoint cards, plus an optional wider-waters bucket */}
       <div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
           Chokepoint Cards

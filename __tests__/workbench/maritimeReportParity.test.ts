@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   buildMaritimeIntelligence,
   BOARD_CHOKEPOINTS,
+  WIDER_WATERS_KEY,
   type MaritimeIncidentInput,
 } from "../../artifacts/workbench/src/lib/maritimeIntelligence";
 import {
@@ -33,15 +34,18 @@ const MIDDOT = "\u00b7"; // ·
 const EMDASH = "\u2014"; // —
 
 // A fixed fixture: a kinetic Hormuz attack with casualties plus a Red Sea
-// drone strike, both inside the window — enough to push risk above L1 and mark
-// chokepoints affected, so the exec cards carry non-trivial values.
+// drone strike, both inside the window and phrased so the strict vessel
+// classifier confirms them ("Missile struck a tanker" / "Drone struck a
+// vessel") — enough to push risk above L1 and mark chokepoints affected, so the
+// exec cards carry non-trivial values. Both name BOARD chokepoints, so no
+// wider-waters bucket is appended here (the second describe covers that).
 const WINDOW_END = new Date("2026-06-18T00:00:00.000Z");
 const WINDOW_START = new Date("2026-06-11T00:00:00.000Z");
 
 const FIXTURE: MaritimeIncidentInput[] = [
   {
     id: 1,
-    title: "Tanker struck by missile in Strait of Hormuz, two crew killed",
+    title: "Missile struck a tanker in the Strait of Hormuz, two crew killed",
     severity: "extreme",
     occurredAt: "2026-06-16T08:00:00.000Z",
     country: "Iran",
@@ -51,7 +55,7 @@ const FIXTURE: MaritimeIncidentInput[] = [
   },
   {
     id: 2,
-    title: "Cargo vessel attacked by drone in the Red Sea",
+    title: "Drone struck a vessel in the Red Sea",
     severity: "high",
     occurredAt: "2026-06-14T08:00:00.000Z",
     country: "Yemen",
@@ -106,10 +110,12 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     expect(confirmedCard.value).toBe(String(board.incidentSnapshot.total));
   });
 
-  it("reports Chokepoints Affected as 'affected / total'", () => {
+  it("reports Chokepoints Affected as 'affected / total board chokepoints'", () => {
     const card = maritimeExecCards(board)[2];
+    // Denominator is the fixed board-chokepoint count, never chokepointCards.length
+    // (which grows when the wider-waters reconciliation bucket is appended).
     expect(card.value).toBe(
-      `${board.chokepointsAffected} / ${board.chokepointCards.length}`,
+      `${board.chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`,
     );
   });
 
@@ -151,6 +157,63 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
       medium: "Medium",
       high: "High",
     });
+  });
+});
+
+describe("Maritime board reconciliation bucket (no 'Extreme over zeros')", () => {
+  // A single confirmed kinetic incident whose ONLY chokepoint is a NON-board
+  // strait ("Arabian / Persian Gulf" is in the detection vocabulary but is not
+  // its own card; the country stays Iran so it passes the Middle-East scope
+  // gate). Its extreme severity drives the overall risk to L5, so without the
+  // reconciliation bucket the board would read "Extreme" over seven zero cards —
+  // the exact defect the owner reported. Because it names a chokepoint (just not
+  // a board one), it also proves the predicate is "no BOARD chokepoint", not the
+  // naive "no chokepoint at all".
+  const OFF_BOARD_FIXTURE: MaritimeIncidentInput[] = [
+    {
+      id: 10,
+      title: "Missile struck a tanker in the Persian Gulf, two crew killed",
+      severity: "extreme",
+      occurredAt: "2026-06-16T08:00:00.000Z",
+      country: "Iran",
+      source: "Reuters",
+      sourceUrl: "https://example.com/persian-gulf",
+      topic: "shipping",
+    },
+  ];
+  const board = buildMaritimeIntelligence({
+    incidents: OFF_BOARD_FIXTURE,
+    movement: [],
+    windowStart: WINDOW_START,
+    windowEnd: WINDOW_END,
+  });
+
+  it("routes an off-board confirmed kinetic incident into the wider-waters bucket", () => {
+    const bucket = board.chokepointCards.find((c) => c.key === WIDER_WATERS_KEY);
+    expect(bucket).toBeDefined();
+    expect(bucket?.incidentCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("appends the bucket strictly last, leaving the seven board cards intact", () => {
+    const keys = board.chokepointCards.map((c) => c.key);
+    expect(keys.slice(0, BOARD_CHOKEPOINTS.length)).toEqual(BOARD_CHOKEPOINTS);
+    expect(keys[keys.length - 1]).toBe(WIDER_WATERS_KEY);
+  });
+
+  it("never shows an elevated overall risk over an all-zero chokepoint grid", () => {
+    // Core invariant (coverage, not sum): if the board risk is High or above,
+    // at least one card MUST carry a confirmed incident.
+    expect(board.risk.level).toBe(5);
+    if (board.risk.level >= 4) {
+      expect(board.chokepointCards.some((c) => c.incidentCount > 0)).toBe(true);
+    }
+  });
+
+  it("keeps 'Chokepoints Affected' scoped to named board cards (off-board excluded)", () => {
+    // The off-board incident must NOT inflate the tracked-chokepoint KPI.
+    expect(board.chokepointsAffected).toBe(0);
+    const affectedCard = maritimeExecCards(board)[2];
+    expect(affectedCard.value).toBe(`0 / ${BOARD_CHOKEPOINTS.length}`);
   });
 });
 

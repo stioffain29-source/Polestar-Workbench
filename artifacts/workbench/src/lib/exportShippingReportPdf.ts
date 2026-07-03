@@ -828,9 +828,10 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
 
   drawBlufBox(ctx, bluf);
 
-  // Six chokepoint cards — rendered as compact stacked blocks (one per
-  // chokepoint) so the PDF carries the SAME six chokepoints, in the same order,
-  // as the on-screen board.
+  // Chokepoint cards — rendered as compact stacked blocks (one per chokepoint)
+  // so the PDF carries the SAME cards, in the same order, as the on-screen
+  // board: the seven tracked chokepoints plus the wider-waters reconciliation
+  // bucket when present.
   drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[0]);
   for (const card of chokepointCards) {
     ensureSpace(ctx, 20);
