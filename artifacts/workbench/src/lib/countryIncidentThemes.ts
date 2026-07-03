@@ -201,10 +201,53 @@ function topCategories(items: PngReportItem[], max = 3): string[] {
     .map(([c]) => c);
 }
 
-// Render a raw category label ("Armed robbery / hold-up") as a natural lowercase
-// noun phrase for splicing into a sentence.
-function readableCategory(label: string): string {
-  return label.toLowerCase().replace(/\s*\/\s*/g, " and ");
+// Render a category label ("Armed robbery / hold-up", or an operating-risk
+// display label like "Crime / theft / robbery") as a CLEAN single noun phrase
+// for splicing into a list. The old readableCategory expanded every "A / B"
+// slash to "A and B", so a list of two or three such labels read as an
+// "and … and … and …" run ("homicide and violent crime, theft and break-in and
+// terrorism and militancy"). Taking the first slash segment yields a clean noun
+// with no internal "and"; a small override map fixes the few first-segments that
+// read poorly on their own.
+const CATEGORY_NOUN_OVERRIDE: Record<string, string> = {
+  "tribal / communal violence": "communal violence",
+  "homicide / violent crime": "violent crime",
+  "intelligence / training": "security activity",
+  "environmental / haze": "environmental hazards",
+};
+function categoryNoun(label: string): string {
+  const k = label.trim().toLowerCase();
+  if (CATEGORY_NOUN_OVERRIDE[k]) return CATEGORY_NOUN_OVERRIDE[k]!;
+  return (k.split("/")[0] ?? k).trim();
+}
+
+// The highest-severity, then most-recent incident in a theme's item set,
+// rendered as ONE concrete, count-free sentence naming the real headline, where
+// it happened and its assessed severity. This is what turns a theme paragraph
+// from a generic template ("Crime … was reported") into a specific account
+// ("The most serious reported was …"). No fabrication: title, province and
+// severity label are the incident's own fields. Mirrors watchLine in
+// pngReportDataset (kept local to preserve this module's type-only import).
+function leadIncidentSentence(items: PngReportItem[]): string {
+  const ranked = [...items].sort((a, b) => {
+    if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
+    const ad = a.reportedDate instanceof Date ? a.reportedDate.getTime() : 0;
+    const bd = b.reportedDate instanceof Date ? b.reportedDate.getTime() : 0;
+    return bd - ad;
+  });
+  const lead = ranked[0];
+  if (!lead) return "";
+  const raw = (lead.developmentTitle?.trim() || lead.title || "")
+    .replace(/\s+/g, " ")
+    .replace(/[.;,]+$/, "")
+    .trim();
+  if (!raw) return "";
+  const prov = lead.province?.trim();
+  const loc = prov && !raw.toLowerCase().includes(prov.toLowerCase()) ? ` (${prov})` : "";
+  const label = lead.severityLabel?.trim();
+  const sevClause = label ? `, assessed as ${label} severity` : "";
+  const end = /[?!.]$/.test(raw) ? "" : ".";
+  return `The most serious reported was ${raw}${loc}${sevClause}${end}`;
 }
 
 // Highest five-tier severity index present in an item set (-1 when none).
@@ -240,7 +283,7 @@ export function buildCountryIncidentThemes(
   }).map((def) => {
     const items = byTheme.get(def.key)!;
     const provs = topProvinces(items);
-    const cats = topCategories(items).map(readableCategory);
+    const cats = topCategories(items).map(categoryNoun);
     const worst = worstSeverityIndex(items);
     const whatHappened = cats.length
       ? `${THEME_WHAT[def.key]}, including ${joinList(cats)}.`
@@ -262,10 +305,17 @@ export function buildCountryIncidentThemes(
     // operational significance.
     const catClause = cats.length ? `, including ${joinList(cats)}` : "";
     const whereClause = provs.length ? ` It concentrated in ${joinList(provs)}.` : "";
+    // Name the single most serious real incident so the paragraph is a specific
+    // account, not a generic template. The lead sentence carries the top
+    // severity ("assessed as High severity"), so the old sevPrefix is dropped
+    // from the paragraph to avoid restating it (sevPrefix is retained on
+    // whyItMatters for callers that consume the structured parts).
+    const leadClause = def.key === "fire" ? "" : leadIncidentSentence(items);
+    const leadPart = leadClause ? ` ${leadClause}` : "";
     const paragraph =
       def.key === "fire"
         ? buildFireParagraph(items, provs)
-        : `${THEME_WHAT[def.key]}${catClause}.${whereClause} ${sevPrefix}${THEME_SIGNIFICANCE[def.key]}`
+        : `${THEME_WHAT[def.key]}${catClause}.${whereClause}${leadPart} ${THEME_SIGNIFICANCE[def.key]}`
             .replace(/\s+/g, " ")
             .trim();
     return {

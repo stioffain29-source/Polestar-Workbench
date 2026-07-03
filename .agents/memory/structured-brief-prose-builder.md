@@ -55,3 +55,23 @@ Related Incidents body fallback — keep computing it in `toItem`.
 location to "the affected area", then deduped to near-identical generic lines — telling the
 reader nothing. Naming the real headline + real location + severity is the whole point; never
 revert to category-template impact lines.
+
+## SECOND category-phrasing builder — the "Incident Details" theme paragraphs
+
+`buildCountryIncidentThemes` (artifacts/workbench/src/lib/countryIncidentThemes.ts) is a SEPARATE
+deterministic builder behind the "Incident Details" theme sections (its output feeds BOTH the
+on-screen `PngCountryReportBody` and the headless `exportCountryReportPdf` from the same expression,
+so preview==PDF automatically). It has its OWN category-phrasing map — `categoryNoun()` — distinct
+from `pngReportDataset`'s `categoryPhrase()`. **When you fix category word-salad, check BOTH.**
+
+- **`categoryNoun()` replaced `readableCategory()`.** The old fn slash-expanded every `A / B` bucket
+  label to "A and B", so a theme's category list read "homicide and violent crime, theft and
+  break-in and terrorism and militancy" — an "and … and … and" run. `categoryNoun` takes the FIRST
+  slash-segment (+ a small override map) so labels are clean single nouns; the list then has at most
+  one "and" (the final conjunction).
+- **Each theme paragraph names the single most serious REAL incident** via `leadIncidentSentence`
+  (highest `severityRank`, then most recent; `developmentTitle||title`, province in parens if not
+  already in the title, "assessed as `<severityLabel>` severity") — turning generic templates into a
+  specific account. No fabrication: every field is the incident's own. **The source-safe fire theme
+  is the exception — it never gets the lead sentence** (a severity assessment could imply a cause,
+  which the fire prose must never do).

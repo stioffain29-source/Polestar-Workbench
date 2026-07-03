@@ -104,6 +104,34 @@ const PRESENT_TENSE_FATAL_RE = new RegExp(
   "i",
 );
 
+// Past-tense confirmed killing bound to a HUMAN VICTIM, in victim→verb order:
+// "American Pilot Killed in Papua", "Catholic teacher shot dead", "villager
+// gunned down". Mirrors PRESENT_TENSE_FATAL_RE (verb→victim) for the past voice
+// so a confirmed killing floors HIGH even when the headline names no separate
+// security actor or weapon. The verb list is DELIBERATELY restricted to explicit
+// killing verbs and EXCLUDES bare "died"/"dead"/"death"/"fatal" (illness,
+// found-dead and figurative collisions) — those still require the co-occurring
+// security signal on the FATAL_SIGNAL branch below.
+const PAST_TENSE_FATAL_VERB =
+  "killed|slain|shot dead|gunned down|stabbed to death|hacked to death|beaten to death|burnt to death|burned to death";
+const PAST_TENSE_FATAL_RE = new RegExp(
+  `(?:\\w+\\s+){0,2}?${FATAL_PERSON}\\s+(?:\\w+\\s+){0,2}?(?:${PAST_TENSE_FATAL_VERB})\\b`,
+  "i",
+);
+
+// Transport / industrial accident. A "driver killed in a crash", "students
+// killed in a bus accident", "workers killed in a collision" or "worker killed
+// in a factory accident" is a road-safety or industrial tragedy, not a security
+// event, so the confirmed-killing floor must not escalate it UNLESS a security
+// signal is also present (e.g. an "aircraft arson" where the plane was
+// deliberately burned, or a "building collapse after an airstrike" — both keep
+// their escalation because SECURITY_OR_CROWD_SIGNAL_RE co-occurs). Drowning /
+// electrocution are handled by NATURAL_CAUSE_RE. Structural-collapse terms are
+// bound to a structure noun so a bare "collapse" (e.g. a ceasefire collapse)
+// never matches.
+const ACCIDENTAL_DEATH_RE =
+  /\b(crash(?:ed|es)?|air ?crash|plane crash|bus (?:crash|accident)|road accident|traffic accident|collision|collided|pile[- ]?up|derail\w*|capsiz\w*|shipwreck|mishap|(?:factory|workplace|industrial|construction|mining|quarry) accident|(?:mine|building|structural|roof|wall|scaffold(?:ing)?) collapse)\b/i;
+
 // Plural strike forms ("airstrikes", "air strikes", "drone strikes") that the
 // conflict HIGH tier missed because it only listed the singular "airstrike" /
 // "drone strike". Used by the heal predicate below to scope the one-time DB
@@ -123,7 +151,7 @@ const NATURAL_CAUSE_RE =
 // so any of these present cancels the natural-cause suppression (a missed
 // downgrade is harmless; wrongly hiding a real massacre is not).
 const SECURITY_OR_CROWD_SIGNAL_RE =
-  /\b(air ?strikes?|drone|missile|rocket|shell(ed|ing|s)?|artillery|mortar|bomb\w*|blast|explos\w*|grenade|ied|landmine|land mine|gun\w*|shot|shoot\w*|firing|opened fire|ambush\w*|raid\w*|clash\w*|attack\w*|assault\w*|militant\w*|insurgent\w*|terror\w*|rebel\w*|maoist\w*|naxal\w*|separatist\w*|guerrilla\w*|junta|army|troops?|soldiers?|security forces?|paramilitar\w*|robber\w*|hijack\w*|homicide|murder\w*|kidnap\w*|abduct\w*|hostage|stab\w*|machete|arson|riot\w*|stampede|crush|trampl\w*|crowd|protest\w*|police|ditembak|penembakan|baku tembak|tembak mati|dibunuh|pembunuhan|terbunuh|penyerangan|serangan bersenjata|kekerasan|bentrok\w*|kerusuhan)\b/i;
+  /\b(air ?strikes?|drone|missile|rocket|shell(ed|ing|s)?|artillery|mortar|bomb\w*|blast|explos\w*|grenade|ied|landmine|land mine|gun\w*|shot|shoot\w*|firing|opened fire|ambush\w*|raid\w*|clash\w*|attack\w*|assault\w*|militant\w*|insurgent\w*|terror\w*|rebel\w*|maoist\w*|naxal\w*|separatist\w*|guerrilla\w*|junta|army|troops?|soldiers?|security forces?|paramilitar\w*|robber\w*|hijack\w*|homicide|murder\w*|kidnap\w*|abduct\w*|hostage|stab\w*|machete|arson|riot\w*|stampede|crush|trampl\w*|crowd|protest\w*|police|ditembak|tertembak|penembakan|baku tembak|tembak mati|dibunuh|pembunuhan|terbunuh|penyerangan|serangan bersenjata|kekerasan|bentrok\w*|kerusuhan)\b/i;
 
 /**
  * True if the text describes a natural / accidental death (lightning, flood,
@@ -167,12 +195,24 @@ export function isBiographicalOrIllnessDeath(title: string, summary: string): bo
 // Indonesian (no English homonym); the ambiguous ones are deliberately excluded
 // (bare "serangan" = also "serangan jantung"/heart attack; bare "tewas"/"korban
 // jiwa" = also disaster death tolls) so a non-security Indonesian death does not
-// reach the reserved tiers. ID_FATAL terms denote a violent killing → Extreme;
-// ID_VIOLENCE terms denote a violent/injurious act → High.
+// reach the reserved tiers. Both ID_FATAL (a violent killing) and ID_VIOLENCE (a
+// violent/injurious act) denote a real security event and are wired into the
+// HIGH tier below — a single Bahasa killing rates High, consistent with a single
+// English killing; the reserved Extreme tier still requires a mass-casualty toll.
 const ID_FATAL_RE =
-  /\b(dibunuh|pembunuhan|terbunuh|tembak mati|ditembak mati|tewas ditembak)\b/i;
+  /\b(dibunuh|pembunuhan|terbunuh|tembak mati|ditembak mati|tewas ditembak|tewas tertembak)\b/i;
 const ID_VIOLENCE_RE =
-  /\b(ditembak|penembakan|baku tembak|penyerangan|serangan bersenjata|kekerasan|bentrokan|bentrok|kerusuhan|melukai|terluka|luka tembak)\b/i;
+  /\b(ditembak|tertembak|penembakan|baku tembak|penyerangan|serangan bersenjata|kekerasan|bentrokan|bentrok|kerusuhan|melukai|terluka|luka tembak)\b/i;
+
+// Bare "tewas" (died / killed) is a HOMONYM — it also heads disaster death tolls
+// ("10 tewas akibat banjir" — 10 died in floods) — so it is EXCLUDED from the
+// fatal list above. It only denotes a security killing when a Bahasa security
+// context co-occurs (a military operation, a named armed group, the security
+// services, an armed clash). Bound as a CONJUNCTION so the disaster-toll homonym
+// never floors HIGH on its own.
+const ID_BARE_TEWAS_RE = /\btewas\b/i;
+const ID_SECURITY_CONTEXT_RE =
+  /\b(operasi militer|kkb|tpnpb|opm|aparat|tni|polri|prajurit|baku tembak|kontak tembak|penembakan|tertembak|bersenjata|densus|brimob)\b/i;
 
 /**
  * True if the text carries an Indonesian-language fatal or violence signal.
@@ -182,6 +222,24 @@ const ID_VIOLENCE_RE =
 export function hasIndonesianViolenceSignal(title: string, summary: string): boolean {
   const hay = `${title}\n${summary}`;
   return ID_FATAL_RE.test(hay) || ID_VIOLENCE_RE.test(hay);
+}
+
+/**
+ * True if the text carries a CONFIRMED KILLING signal that the pre-heal
+ * classifier under-rated to LOW: an Indonesian fatal/violence term (now wired
+ * into HIGH), a past-tense killing bound to a human victim ("Pilot Killed"), or
+ * a bare Bahasa "tewas" in a security context. Exported so the one-time DB heal
+ * can scope its UPGRADE strictly to the rows this change re-rates. The heal
+ * recomputes classifySeverity and only ever upgrades when strictly higher, so a
+ * candidate that is actually a reaction / accident / obituary is left untouched.
+ */
+export function hasConfirmedKillingSignal(title: string, summary: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return (
+    hasIndonesianViolenceSignal(title, summary) ||
+    PAST_TENSE_FATAL_RE.test(hay) ||
+    (ID_BARE_TEWAS_RE.test(hay) && ID_SECURITY_CONTEXT_RE.test(hay))
+  );
 }
 
 // Kinetic maritime attack on a vessel or port. The shipping HIGH tier
@@ -294,6 +352,7 @@ const HIGH: RegExp[] = [
   /\b(at gunpoint|armed (robbery|men|gang|hijack|heist)|gunpoint|brandish|machete|hijack(ed|ing) at|held up)\b/i,
   /\b(stormed|besieg(e|ed)|breach(ed)? the|overran)\b/i,
   ID_VIOLENCE_RE,
+  ID_FATAL_RE,
 ];
 
 // Active confrontation, arrests, blockades, operational disruption.
@@ -510,6 +569,28 @@ export function classifySeverity(
       PRESENT_TENSE_FATAL_RE.test(hay) ||
       PRESENT_TENSE_FATAL_COUNT_RE.test(hay)) &&
     SECURITY_OR_CROWD_SIGNAL_RE.test(hay)
+  )
+    return "high";
+
+  // Confirmed killing with a named HUMAN VICTIM, OR a bare Bahasa "tewas" in a
+  // security context — no separate English security keyword required. This
+  // catches "American Pilot Killed in Papua; TPNPB Calls It a Message" (victim
+  // "pilot" + "killed", but neither "pilot" nor "TPNPB" is a security keyword)
+  // and "Operasi Militer di Intan Jaya, Gembala GKII Tewas" (a pastor killed in
+  // a military operation). Bound to a killing VERB / security context and under
+  // the SAME reaction / natural-cause / judicial / biographical guards as above;
+  // a transport or industrial accident with no security signal is excluded so a
+  // road-crash death does not float up.
+  const accidentalDeath =
+    ACCIDENTAL_DEATH_RE.test(hay) && !SECURITY_OR_CROWD_SIGNAL_RE.test(hay);
+  if (
+    !reactionLed &&
+    !naturalCauseDeath &&
+    !judicialDeath &&
+    !biographicalDeath &&
+    !accidentalDeath &&
+    (PAST_TENSE_FATAL_RE.test(hay) ||
+      (ID_BARE_TEWAS_RE.test(hay) && ID_SECURITY_CONTEXT_RE.test(hay)))
   )
     return "high";
 

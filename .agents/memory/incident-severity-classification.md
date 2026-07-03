@@ -105,10 +105,21 @@ suppressed (acceptable — structured `severityFromFatalities` still floors thos
 
 The "killed in military op → low" under-rating is fixed by a confirmed-killing→**High** rule placed
 AFTER the Extreme + High scans and BEFORE Moderate, so it can only lift a sub-High row and can
-NEVER downgrade a genuine Extreme (mass-casualty is matched and returned first). It fires only when
-a fatal-signal regex matches AND `SECURITY_OR_CROWD_SIGNAL_RE` matches, gated by the four
-strip-and-retest death guards (reaction/natural/judicial/biographical). Extreme stays reserved for a
-mass toll ≥ `MASS_FATALITY_THRESHOLD` (6) — a single/low-count killing is High, by design.
+NEVER downgrade a genuine Extreme (mass-casualty is matched and returned first). Extreme stays
+reserved for a mass toll ≥ `MASS_FATALITY_THRESHOLD` (6) — a single/low-count killing is High, by
+design. There are **two entry paths**, both gated by the strip-and-retest death guards:
+- fatal-signal regex AND `SECURITY_OR_CROWD_SIGNAL_RE` both match (the original path); OR
+- a **victim→verb past-tense killing on its own** (`PAST_TENSE_FATAL_RE` = a `FATAL_PERSON` within
+  ~2 words of an explicit killing verb) — needed because "American Pilot Killed in Papua; TPNPB …"
+  names NO security-keyword noun ("pilot"/"TPNPB" aren't in the keep-list), so requiring a separate
+  security keyword missed it. `hasConfirmedKillingSignal` exports this for the heal predicate.
+
+**The victim→verb path needs a FIFTH guard — `accidentalDeath`** (`ACCIDENTAL_DEATH_RE` gated on no
+security signal). Without it, transport/workplace/industrial deaths ("driver killed in crash",
+"worker killed in factory accident", "miners killed in mine collapse") carry `FATAL_PERSON` + a kill
+verb and would over-rate to High. **Bind structural-collapse terms to a structure noun**
+(mine/building/roof/wall/scaffold collapse) so a bare "collapse" (e.g. a ceasefire collapse — a
+security event, not an accident) never matches and never suppresses a real killing.
 
 ## Cross-language gap — severity is set at INGEST, BEFORE translation
 
@@ -118,8 +129,16 @@ ditembak saat operasi militer" (student shot in a military op) read LOW. **Do NO
 classification after translation** (translation is best-effort/optional and may never run). Fix it
 with language-specific markers in the classifier itself: `ID_FATAL_RE` (violent killings → Extreme),
 `ID_VIOLENCE_RE` (violence/injury → High), surfaced via `hasIndonesianViolenceSignal`. Keep them
-TIGHTLY violence-bound and exclude cross-language homonyms — `serangan` (also "heart attack"), bare
-`tewas`/`korban jiwa` (also disaster/accident tolls) — and mirror the violent terms into
+TIGHTLY violence-bound and exclude cross-language homonyms — `serangan` (also "heart attack"),
+`korban jiwa` (also disaster/accident tolls) — and mirror the violent terms into
 `SECURITY_OR_CROWD_SIGNAL_RE` so the death guards never suppress a genuine foreign-language killing.
 The heal upgrades existing Bahasa-violence rows; other languages remain an open gap (extend the same
 way per language).
+
+**Bare `tewas` (died) is a two-sided homonym — gate it, don't blanket-exclude.** Explicit Bahasa
+killings floor High unconditionally (`ID_FATAL_RE`: `tembak mati` shot-dead, `tewas tertembak`
+died-shot, `tertembak` shot). But bare `tewas` alone is BOTH a disaster toll ("10 tewas akibat
+banjir" — flood) AND a real killing, so it escalates ONLY when a Bahasa security context co-occurs
+(`ID_BARE_TEWAS_RE` gated by `ID_SECURITY_CONTEXT_RE` — operasi militer / TNI / Polri / KKB /
+penembakan …). This admits "Operasi Militer …, Gembala GKII Tewas" (High) while leaving the flood
+toll off the floor — an earlier blanket-exclude of `tewas` dropped genuine killings.

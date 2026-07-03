@@ -17,6 +17,7 @@ import {
   isJudicialDeath,
   isBiographicalOrIllnessDeath,
   hasIndonesianViolenceSignal,
+  hasConfirmedKillingSignal,
   isMaritimeVesselAttack,
   severityFromFatalities,
   maxSeverity,
@@ -2192,6 +2193,99 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { scanned: candidates.length, upgraded, downgraded, marker: markerKey },
           "One-time severity heal: Bahasa violence upgrade + illness/biographical death downgrade",
+        );
+      }
+    }
+
+    // 3g-3b) One-time UPGRADE of machine rows the classifier historically
+    //       UNDER-rated to LOW because a CONFIRMED KILLING carried no signal the
+    //       old rules could read:
+    //         (a) a Bahasa fatal term ("tembak mati" — shot dead, "dibunuh" —
+    //             murdered) was defined but never wired into the HIGH tier, so a
+    //             single Indonesian killing collapsed to LOW.
+    //         (b) an English killing in victim→verb order with no separate
+    //             security actor / weapon ("American Pilot Killed in Papua",
+    //             "Catholic teacher shot dead") matched no HIGH keyword.
+    //         (c) a bare "tewas" (died / killed) in a Bahasa security context
+    //             ("Operasi Militer di Intan Jaya, Gembala GKII Tewas" — a pastor
+    //             killed during a military operation) — bare "tewas" alone is a
+    //             disaster-toll homonym, so it only escalates alongside a military
+    //             operation / named armed group / security service.
+    //       classifySeverity now floors all three at HIGH, but the scrapers'
+    //       read-then-insert dedupe never re-touches a stored row, so existing
+    //       machine rows keep their stale LOW chip (reported case: fatal West
+    //       Papua events reading Low in the country brief).
+    //
+    //       This pass re-rates ONLY auto-scraped / legacy rows that match the
+    //       narrow confirmed-killing predicate for exactly this change, setting
+    //       each to the current classifySeverity result (never below a structured
+    //       fatality floor) and ONLY when strictly higher (upgrade-only). GDELT
+    //       lane-derived rows (analyst_notes gdelt_cloud:%) are deliberately
+    //       EXCLUDED — their severity is owned by the GDELT layer, not text. The
+    //       predicate gate keeps it from touching rows that differ from the
+    //       classifier for unrelated reasons; it never alters analyst severities
+    //       or DOWNGRADES anything. Marker-gated → runs once per environment.
+    {
+      const markerKey = "severity_confirmed_killing_heal_v2";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, [
+                "flashpoint",
+                "conflict",
+                "strikes",
+                "indonesia_local",
+                "apac_local",
+              ]),
+              or(
+                like(incidentsTable.analystNotes, "auto-scraped:%"),
+                like(incidentsTable.analystNotes, "legacy:db:%"),
+              ),
+            ),
+          );
+        let upgraded = 0;
+        for (const r of candidates) {
+          if (!hasConfirmedKillingSignal(r.title, r.summary ?? "")) continue;
+          const topic =
+            r.topic === "conflict" || r.topic === "strikes"
+              ? "conflict"
+              : r.topic === "indonesia_local"
+                ? "indonesia_local"
+                : r.topic === "apac_local"
+                  ? "apac_local"
+                  : "flashpoint";
+          const fromText = classifySeverity(r.title, r.summary ?? "", topic);
+          const floor = severityFromFatalities(r.fatalities);
+          const next = floor ? maxSeverity(fromText, floor) : fromText;
+          const stored = r.severity as Severity;
+          if (SEVERITY_RANK[next] > SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            upgraded++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: candidates.length, upgraded, marker: markerKey },
+          "One-time severity heal: confirmed-killing upgrade (Bahasa fatal + victim→verb English + tewas-in-security-context)",
         );
       }
     }

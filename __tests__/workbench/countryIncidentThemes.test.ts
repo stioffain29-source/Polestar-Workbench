@@ -156,6 +156,67 @@ describe("buildCountryIncidentThemes", () => {
     expect(protest.paragraph).toContain("Jakarta");
     for (const g of groups) expect(g.paragraph).not.toMatch(/\d/);
   });
+
+  // Defect B(a): a category list must read as clean nouns, never the old
+  // "homicide and violent crime, theft and break-in and terrorism and militancy"
+  // run created by expanding every "A / B" slash to "A and B".
+  it("renders category labels as clean single nouns without 'and … and' runs", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Homicide / violent crime", province: "Papua" }),
+      item({ category: "Theft / break-in", province: "Papua" }),
+      item({ category: "Terrorism / militancy", province: "Papua" }),
+    ]);
+    const crime = groups.find((g) => g.key === "crime")!;
+    expect(crime.paragraph).toContain("violent crime");
+    // The slash-expanded forms must be gone.
+    expect(crime.paragraph).not.toContain("homicide and violent crime");
+    expect(crime.paragraph).not.toContain("theft and break-in");
+    // At most one "and" in the category list itself (the final list conjunction).
+    const catClause = crime.paragraph.match(/including ([^.]+)\./)?.[1] ?? "";
+    expect((catClause.match(/\band\b/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+
+  // Defect B(b): the paragraph must name the single most serious REAL incident
+  // (highest severity, then most recent) with its assessed severity — turning a
+  // generic template into a specific account. No fabrication (real title/fields).
+  it("names the most serious real incident and its assessed severity", () => {
+    const groups = buildCountryIncidentThemes([
+      item({
+        category: "Homicide / violent crime",
+        title: "Pastor shot dead during military operation in Intan Jaya",
+        province: "Papua",
+        severity: "high",
+        severityLabel: "High",
+        severityRank: 4,
+        reportedDate: new Date("2026-06-28T00:00:00Z"),
+      }),
+      item({
+        category: "Theft / break-in",
+        title: "Break-in at store",
+        province: "Papua",
+        severity: "low",
+        severityLabel: "Low",
+        severityRank: 1,
+        reportedDate: new Date("2026-06-25T00:00:00Z"),
+      }),
+    ]);
+    const crime = groups.find((g) => g.key === "crime")!;
+    expect(crime.paragraph).toContain(
+      "The most serious reported was Pastor shot dead during military operation in Intan Jaya",
+    );
+    expect(crime.paragraph).toContain("assessed as High severity");
+  });
+
+  // The lead sentence is NOT added to the source-safe fire paragraph (fire prose
+  // must never carry a severity assessment that could imply a cause).
+  it("does not add a lead sentence to the fire paragraph", () => {
+    const groups = buildCountryIncidentThemes([
+      item({ category: "Fire", title: "Fire guts market", province: "Lae" }),
+      item({ category: "Fire", title: "Blaze at depot", province: "Lae" }),
+    ]);
+    const fire = groups.find((g) => g.key === "fire")!;
+    expect(fire.paragraph).not.toContain("The most serious reported was");
+  });
 });
 
 describe("buildCountryIncidentThemes — source-safe fire paragraph", () => {

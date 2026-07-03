@@ -237,4 +237,66 @@ describe("classifySeverity", () => {
       ),
     ).toBe("extreme");
   });
+
+  // Confirmed-killing floor (reported West Papua defect: fatal events reading
+  // Low). A past-tense killing bound to a human victim reads High even when the
+  // headline names no separate security actor or weapon ("pilot" + "killed";
+  // neither "pilot" nor "TPNPB" is a security keyword).
+  it("rates a victim→verb killing with no security keyword as high", () => {
+    expect(
+      classifySeverity("American Pilot Killed in Papua; TPNPB Calls It a Message", "", "conflict"),
+    ).toBe("high");
+  });
+
+  // Bahasa fatal term ("tembak mati" — shot dead) now floors High — a single
+  // Indonesian killing rates the same as a single English killing.
+  it("rates a Bahasa 'tembak mati' killing as high", () => {
+    expect(
+      classifySeverity("TPNPB Akui Tembak Mati Anggota TNI di Intan Jaya", "", "indonesia_local"),
+    ).toBe("high");
+  });
+
+  // "tewas tertembak" (died, shot) is an explicit Bahasa killing → High.
+  it("rates a Bahasa 'tewas tertembak' killing as high", () => {
+    expect(
+      classifySeverity("Mama Muda di Deiyai Tewas Tertembak Peluru Nyasar", "", "indonesia_local"),
+    ).toBe("high");
+  });
+
+  // Bare "tewas" is a disaster-toll homonym, so it only escalates alongside a
+  // Bahasa security context — here a military operation → High.
+  it("rates a bare 'tewas' in a military-operation context as high", () => {
+    expect(
+      classifySeverity("Operasi Militer di Intan Jaya, Gembala GKII Tewas", "", "indonesia_local"),
+    ).toBe("high");
+  });
+
+  // The disaster-toll homonym must NOT escalate: bare "tewas" with a natural
+  // hazard and no security context stays off the High floor.
+  it("does not escalate a bare 'tewas' disaster toll", () => {
+    const s = classifySeverity("10 tewas akibat banjir bandang di Sentani", "", "indonesia_local");
+    expect(s).not.toBe("high");
+    expect(s).not.toBe("extreme");
+  });
+
+  // Accidental / transport death with no security signal must not float up on
+  // the confirmed-killing floor — a road-crash death is not a security event.
+  it("does not rate a road-crash death as a security killing", () => {
+    expect(classifySeverity("Bus driver killed in highway crash", "", "flashpoint")).not.toBe(
+      "high",
+    );
+  });
+
+  // Workplace / industrial accident (no security signal) must not float up on
+  // the confirmed-killing floor either — a factory-accident death is a tragedy,
+  // not a security event.
+  it("does not rate a factory-accident death as a security killing", () => {
+    expect(
+      classifySeverity("Two workers killed in factory accident", "", "flashpoint"),
+    ).not.toBe("high");
+  });
+
+  it("does not rate a structural mine collapse death as a security killing", () => {
+    expect(classifySeverity("Miners killed in mine collapse", "", "conflict")).not.toBe("high");
+  });
 });
