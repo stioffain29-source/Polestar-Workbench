@@ -179,9 +179,11 @@ const FOREIGN_LOCATION: RegExp =
 //     so "French embassy in Manila" — a Manila event — is never mis-dropped;
 //     and "to" is excluded from the preposition set so an APAC protest that
 //     merely APPEALS to a Western state ("Myanmar activists appeal to Germany")
-//     keeps its in-region tag.
+//     keeps its in-region tag. Canada (cities + provinces) rides the venue-gated
+//     tier for the same reasons — a diaspora protest "in Ottawa" about an APAC
+//     leader is a Canadian event, but a bare "Canada" is a mere actor.
 const FOREIGN_LOCATION_WEST: RegExp =
-  /\b(?:los angeles|san francisco|philadelphia|chicago|houston|seattle|minneapolis|frankfurt|hamburg|stuttgart|dusseldorf|rotterdam|marseille)\b|\b(?:in|at|outside|near|across)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:washington|new york|brooklyn|boston|atlanta|dallas|denver|phoenix|miami|detroit|las vegas|portland|sacramento|california|texas|florida|arizona|georgia|michigan|ohio|pennsylvania|wisconsin|minnesota|nevada|oregon|colorado|united states|america|usa|paris|berlin|madrid|barcelona|rome|milan|naples|munich|cologne|brussels|amsterdam|hague|vienna|warsaw|athens|lisbon|stockholm|copenhagen|oslo|helsinki|budapest|prague|zurich|geneva|france|germany|spain|italy|netherlands|belgium|portugal|greece|poland|austria|sweden|denmark|norway|finland|switzerland)\b/i;
+  /\b(?:los angeles|san francisco|philadelphia|chicago|houston|seattle|minneapolis|frankfurt|hamburg|stuttgart|dusseldorf|rotterdam|marseille)\b|\b(?:in|at|outside|near|across)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:washington|new york|brooklyn|boston|atlanta|dallas|denver|phoenix|miami|detroit|las vegas|portland|sacramento|california|texas|florida|arizona|georgia|michigan|ohio|pennsylvania|wisconsin|minnesota|nevada|oregon|colorado|united states|america|usa|ottawa|toronto|montreal|montréal|vancouver|calgary|edmonton|winnipeg|mississauga|brampton|canada|ontario|quebec|québec|alberta|british columbia|manitoba|saskatchewan|nova scotia|paris|berlin|madrid|barcelona|rome|milan|naples|munich|cologne|brussels|amsterdam|hague|vienna|warsaw|athens|lisbon|stockholm|copenhagen|oslo|helsinki|budapest|prague|zurich|geneva|france|germany|spain|italy|netherlands|belgium|portugal|greece|poland|austria|sweden|denmark|norway|finland|switzerland)\b/i;
 
 // Pacific (PNG / West Papua) civilian crime & communal-violence cues.
 // PNG's security signal is overwhelmingly violent CRIME (armed robbery,

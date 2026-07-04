@@ -535,10 +535,15 @@ const FP_CALM_LIVE_RE =
   /\b(clash|riot|kill|injur|dead|deadly|wound|tear ?gas|water cannon|arrest|detain|storm|torch|burn|arson|loot|violen|stampede|curfew|shot|opened fire)/i;
 
 // Overseas / diaspora demonstration at an unmistakably non-APAC Western venue
-// (a London / Washington solidarity protest the geocoder mis-tagged to a
-// South-Asian country). Not an in-region civil-unrest incident.
+// (a London / Washington / Ottawa solidarity protest the geocoder mis-tagged to
+// an APAC country because that country is the protest's SUBJECT). Not an
+// in-region civil-unrest incident. The Canadian venue clause is preposition-
+// gated ("protest in Ottawa"): a bare city is unsafe because the paired protest
+// cue includes the sports homonyms "rally"/"clash" (a "Toronto rally to beat"
+// would false-positive), and a bare country ("Canada condemns ...") is a mere
+// actor reference, not the event location.
 const FP_OVERSEAS_VENUE_RE =
-  /\b(oxford union|cambridge union|the white house|capitol hill|downing street|westminster hall|trafalgar square)\b/i;
+  /\b(oxford union|cambridge union|the white house|capitol hill|downing street|westminster hall|trafalgar square)\b|\b(?:in|at|outside|near|across)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:ottawa|toronto|montreal|montréal|vancouver|calgary|edmonton|winnipeg|mississauga|brampton|canada|ontario|quebec|québec|alberta|british columbia|manitoba|saskatchewan|nova scotia)\b/i;
 const FP_OVERSEAS_PROTEST_RE = /\b(protest|demonstrat|rally|clash|picket|vigil|gather)/i;
 
 // APAC regional-scope anchor — the union of every country / demonym / city /
