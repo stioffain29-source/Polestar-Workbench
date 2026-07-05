@@ -33,6 +33,27 @@ They drove a "report contradicts itself" complaint.
   country-counting surface, route it through the shared splitter or it WILL
   drift.
 
+- **`cargoCountriesFor(i)` (in `cargoAnalysis.ts`) is the ONE per-row
+  multi-country resolver for the COUNT surfaces (map + table + prose counts).**
+  It wraps `splitAttributedCountries` → `normalizeCountry` (folds city/province
+  aliases: Dubai→UAE, Hong Kong→China, West Papua & the other Indonesian New
+  Guinea provinces→Indonesia), dedupes within the row, and text-recovers a
+  country when the row is unattributed (`recoverCargoCountryFromText`, mirroring
+  `cargoCountry`). The Cargo Theft Map (`buildCargoCountryIntensity`) and the
+  Country Risk Breakdown table (`groupByCountry`/`topCountries`/`countryPicture`)
+  BOTH iterate it, so shade and count can't disagree. `cargoCountry` (singular,
+  first-country only) is still used by the monitor/other non-count surfaces.
+  **Why:** the map used to take only the FIRST country + full alias norm while
+  the table split the compound but skipped alias norm & recovery → same window,
+  different per-country numbers. **How to apply:** any NEW cargo count surface
+  goes through `cargoCountriesFor`, never a bespoke split.
+
+- **Map/table relationship is SUBSET, not equality.** The table narrows to
+  RECURRING geographies (>=2 records, when there are >=2 such) and caps at
+  `maxRows`, so its country set is a subset of the map's; the invariant is that
+  every SHARED country carries an IDENTICAL count. Test:
+  `__tests__/workbench/cargoMapTableConsistency.test.ts`.
+
 - **Subset Reads must name their scope, not contradict the headline.** The
   Cargo Security Read counts only route-side records and the Logistics Hub Read
   only hub-side records, so their leader legitimately differs from the

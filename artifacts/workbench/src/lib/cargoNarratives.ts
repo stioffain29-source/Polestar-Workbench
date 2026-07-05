@@ -20,8 +20,8 @@
 // data, not just how many records there were.
 
 import { format, parseISO } from "date-fns";
-import { isUnattributedCountry, splitAttributedCountries } from "./topicRelevance";
 import {
+  cargoCountriesFor,
   classifyIncidentType,
   classifyLocationType,
   recoverCargoPortName,
@@ -54,47 +54,20 @@ function recordDate(i: CargoNarrativeIncident): Date | null {
   }
 }
 
-// West Papua, Papua Barat and Irian Jaya are Indonesian provinces, not separate
-// countries. Records tagged with them must fold into Indonesia so the geography
-// reads consistently — otherwise the same event surfaces twice ("Indonesia" and
-// "West Papua") and the country counts double-count. Bare "Papua" is left alone:
-// it is ambiguous (Papua New Guinea is a sovereign state, kept distinct). The
-// fold is LOCAL to cargo prose so it cannot disturb the shared relevance logic.
-const INDONESIA_PROVINCE_ALIASES = new Set([
-  "west papua",
-  "papua barat",
-  "irian jaya",
-  "irian jaya barat",
-  "south papua",
-  "central papua",
-  "highland papua",
-  "southwest papua",
-]);
-function normaliseCargoCountry(c: string): string {
-  return INDONESIA_PROVINCE_ALIASES.has(c.trim().toLowerCase()) ? "Indonesia" : c;
-}
-// Split a row's attribution exactly as the shared lib does, then fold the
-// Indonesian-province aliases into Indonesia and de-duplicate WITHIN the row so
-// "Indonesia; West Papua" counts once for Indonesia rather than twice.
-function splitCargoCountries(raw: string | null | undefined): string[] {
-  const out: string[] = [];
-  for (const c of splitAttributedCountries(raw)) {
-    const n = normaliseCargoCountry(c);
-    if (!out.includes(n)) out.push(n);
-  }
-  return out;
-}
-
-// Country tokenisation (compound-string splitting + unattributed drop) lives
-// in the shared relevance lib as splitAttributedCountries, so the Reads, the
-// editor seed and the Fast Facts card normalise countries the same way and can
-// never disagree (e.g. "Indonesia; West Papua" never appears as one country).
+// Country resolution for every cargo-report count — the table, the map and the
+// prose — flows through the ONE shared cargoCountriesFor() resolver in
+// cargoAnalysis. It splits compound attributions, folds city/province aliases
+// (West Papua -> Indonesia, Dubai -> UAE, Hong Kong -> China) to their
+// canonical country, de-duplicates within the row, and recovers a provable
+// in-scope country from the text when the source left the row unattributed.
+// Using it everywhere is what keeps the Cargo Theft Map shades and the Country
+// Risk Breakdown table counts in agreement (see task: map/table consistency).
 function topCountries(rows: CargoNarrativeIncident[], n: number): { country: string; count: number }[] {
   const m = new Map<string, number>();
   for (const r of rows) {
     // "Unknown" is not a country. Counting it let the prose claim a window
     // was "led by Unknown" and contradicted the Fast Facts card.
-    for (const c of splitCargoCountries(r.country)) {
+    for (const c of cargoCountriesFor(r)) {
       m.set(c, (m.get(c) ?? 0) + 1);
     }
   }
@@ -135,7 +108,10 @@ function countryPicture(
   // identified — intentional: the record is attributed even if multi-country.
   let identified = 0;
   for (const r of rows) {
-    if (!isUnattributedCountry(r.country)) identified++;
+    // A row is "identified" when the shared resolver can name at least one
+    // country for it — stored, aliased or text-recovered — so this row-level
+    // gate stays in step with the token-level counts from cargoCountriesFor.
+    if (cargoCountriesFor(r).length > 0) identified++;
   }
   const total = rows.length;
   const strong = top.length > 0 && identified >= 2 && identified * 2 >= total;
@@ -378,7 +354,7 @@ export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]
 
   const named = (i: CargoNarrativeIncident): string => {
     const d = recordDate(i);
-    const country = splitCargoCountries(i.country)[0];
+    const country = cargoCountriesFor(i)[0];
     const where = country ? ` in ${country}` : "";
     const when = d ? `, reported ${format(d, "dd MMM yyyy")}` : "";
     return `"${i.title}"${where}${when}`;
@@ -470,7 +446,7 @@ function groupByCountry(
 ): Map<string, CargoNarrativeIncident[]> {
   const m = new Map<string, CargoNarrativeIncident[]>();
   for (const r of rows) {
-    for (const c of splitCargoCountries(r.country)) {
+    for (const c of cargoCountriesFor(r)) {
       const list = m.get(c) ?? [];
       list.push(r);
       m.set(c, list);

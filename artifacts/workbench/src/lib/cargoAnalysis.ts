@@ -3,6 +3,8 @@
 // resolver, and the Cargo Watch report all classify scope, category and
 // USD loss identically and can never drift.
 
+import { splitAttributedCountries } from "./topicRelevance";
+
 export interface CargoIncidentLike {
   title: string;
   summary?: string | null;
@@ -52,7 +54,15 @@ const COUNTRY_ALIASES: Record<string, string> = {
   "doha": "Qatar", "manama": "Bahrain", "muscat": "Oman",
   // Indonesia
   "soekarno-hatta": "Indonesia", "soekarno hatta": "Indonesia",
-  "tanjung priok": "Indonesia", "west papua": "Indonesia",
+  "tanjung priok": "Indonesia",
+  // Indonesian provinces on New Guinea fold into Indonesia — they are
+  // provinces, not sovereign states — so the same event never reads as two
+  // countries ("Indonesia" and "West Papua"). Bare "papua" is deliberately
+  // left untouched: it is ambiguous (Papua New Guinea is a separate country).
+  "west papua": "Indonesia", "papua barat": "Indonesia", "irian jaya": "Indonesia",
+  "irian jaya barat": "Indonesia", "south papua": "Indonesia",
+  "central papua": "Indonesia", "highland papua": "Indonesia",
+  "southwest papua": "Indonesia",
   // China (Hong Kong is part of the China SAR, treated as China for APAC scope)
   "hong kong": "China",
 };
@@ -495,6 +505,36 @@ export function cargoCountry(i: CargoIncidentLike): string | null {
   const stored = identifyCountry(i.country);
   if (stored) return stored;
   return recoverCargoCountryFromText(i);
+}
+
+// Canonical MULTI-country resolution for a cargo row — the single source of
+// truth for per-country counting shared by the report choropleth map
+// (buildCargoCountryIntensity) and the Country Risk Breakdown table
+// (groupByCountry / topCountries). Both used to resolve countries their own
+// way (the map took only the FIRST country via cargoCountry; the table split
+// the compound but skipped the city/alias normalisation and the text
+// recovery), so a compound "Indonesia; Malaysia" row, an aliased "Dubai" tag,
+// or an Unknown-but-recoverable row could read one count in the table and a
+// different shade on the map. Routing every count through this function makes
+// them agree by construction.
+//
+// It: (1) splits compound attributions so each named country scores on its
+// own, (2) normalises city/province aliases to their canonical country
+// (Dubai -> UAE, West Papua -> Indonesia, Hong Kong -> China), (3)
+// de-duplicates within the row so "Indonesia; West Papua" counts Indonesia
+// once, and (4) when the source left the row unattributed, recovers a provable
+// in-scope country from the incident text (mirroring cargoCountry()).
+export function cargoCountriesFor(i: CargoIncidentLike): string[] {
+  const out: string[] = [];
+  for (const c of splitAttributedCountries(i.country)) {
+    const n = normalizeCountry(c);
+    if (!out.includes(n)) out.push(n);
+  }
+  if (out.length === 0) {
+    const recovered = recoverCargoCountryFromText(i);
+    if (recovered) out.push(recovered);
+  }
+  return out;
 }
 
 export function isCargoInScope(i: CargoIncidentLike): boolean {
