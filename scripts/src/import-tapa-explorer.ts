@@ -2,7 +2,8 @@
  * TAPA Data Explorer importer (offline, upload-only).
  *
  * Parses the incident table from one or more SAVED TAPA Data Explorer HTML
- * files, combines every row into one CSV, and deduplicates identical rows.
+ * files and writes every row (NO dedupe) to a main CSV, plus a separate review
+ * CSV listing rows that are byte-identical across all 9 fields.
  *
  * It does NOT scrape TAPA, use login cookies, store credentials, or automate a
  * browser. It only reads local .html files and writes a CSV. Nothing here
@@ -13,8 +14,12 @@
  *   2. TAPA_HTML_DIR env var (a directory to scan).
  *   3. Default: scan ./attached_assets recursively for *.html / *.htm.
  *
- * Output: tapa_apac_incidents_clean.csv at the repository root
- * (override with TAPA_OUT).
+ * Output (both at the repository root, both exactly the 9 columns, no extras):
+ *   - tapa_apac_incidents_raw.csv — every row from every page, NO dedupe
+ *     (override with TAPA_RAW_OUT).
+ *   - tapa_apac_incidents_possible_duplicates.csv — every occurrence of any row
+ *     byte-identical across all 9 fields, grouped, for analyst review only
+ *     (override with TAPA_DUPES_OUT).
  *
  * Usage:
  *   pnpm --filter @workspace/scripts run import:tapa-explorer
@@ -24,7 +29,10 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..", "..");
-const OUT = process.env.TAPA_OUT ?? resolve(REPO_ROOT, "tapa_apac_incidents_clean.csv");
+const RAW_OUT = process.env.TAPA_RAW_OUT ?? resolve(REPO_ROOT, "tapa_apac_incidents_raw.csv");
+const DUPES_OUT =
+  process.env.TAPA_DUPES_OUT ??
+  resolve(REPO_ROOT, "tapa_apac_incidents_possible_duplicates.csv");
 
 /** Exact output columns, in this order. */
 const COLUMNS = [
@@ -223,23 +231,37 @@ function main(): void {
     console.log(`${file}: ${rows.length} rows`);
   }
 
-  // Deduplicate byte-identical rows, preserving first-seen order.
-  const seen = new Set<string>();
-  const deduped: string[][] = [];
-  for (const row of combined) {
-    const key = JSON.stringify(row);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(row);
-  }
+  const header = COLUMNS.map(csvCell).join(",");
+  const toCsv = (rows: string[][]) =>
+    [header, ...rows.map((r) => r.map(csvCell).join(","))].join("\n") + "\n";
 
-  const lines = [COLUMNS.map(csvCell).join(",")];
-  for (const row of deduped) lines.push(row.map(csvCell).join(","));
-  writeFileSync(OUT, lines.join("\n") + "\n", "utf8");
+  // Main output: EVERY row from EVERY page, NO dedupe, exact 9 columns.
+  writeFileSync(RAW_OUT, toCsv(combined), "utf8");
+
+  // Review output: every occurrence of any row byte-identical across all 9
+  // fields, grouped by first appearance. Analyst review only — never used to
+  // prune the main file.
+  const counts = new Map<string, number>();
+  const firstSeen = new Map<string, number>();
+  combined.forEach((row, i) => {
+    const key = JSON.stringify(row);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (!firstSeen.has(key)) firstSeen.set(key, i);
+  });
+  const dupeKeys = [...counts.entries()]
+    .filter(([, n]) => n >= 2)
+    .map(([k]) => k)
+    .sort((a, b) => (firstSeen.get(a) ?? 0) - (firstSeen.get(b) ?? 0));
+  const dupeRows: string[][] = [];
+  for (const key of dupeKeys) {
+    const row = JSON.parse(key) as string[];
+    for (let n = 0; n < (counts.get(key) ?? 0); n++) dupeRows.push(row);
+  }
+  writeFileSync(DUPES_OUT, toCsv(dupeRows), "utf8");
 
   const countryIdx = COLUMNS.indexOf("Country");
   const tally = new Map<string, number>();
-  for (const row of deduped) {
+  for (const row of combined) {
     const c = (row[countryIdx] ?? "").trim() || "(blank)";
     tally.set(c, (tally.get(c) ?? 0) + 1);
   }
@@ -247,10 +269,9 @@ function main(): void {
 
   console.log(
     `\nParsed ${parsedFiles}/${files.length} file(s).` +
-      `\nCombined rows: ${combined.length}; after dedupe: ${deduped.length} ` +
-      `(${combined.length - deduped.length} duplicates removed).` +
-      `\nCountry breakdown: ${top.map(([c, n]) => `${c}=${n}`).join(", ")}` +
-      `\nWrote ${deduped.length} rows to ${OUT}`,
+      `\nMain (no dedupe): ${combined.length} rows -> ${RAW_OUT}` +
+      `\nPossible duplicates: ${dupeRows.length} rows in ${dupeKeys.length} group(s) -> ${DUPES_OUT}` +
+      `\nCountry breakdown: ${top.map(([c, n]) => `${c}=${n}`).join(", ")}`,
   );
 }
 

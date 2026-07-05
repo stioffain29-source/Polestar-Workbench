@@ -647,3 +647,15 @@ id = "Oy8bwGGvezJ7ML3o4lqbN"
 uri = "file://tapa_apac_incidents_clean.csv"
 type = "table"
 title = "TAPA APAC incidents (deduped, from uploaded page 2)"
+
+[[outputs]]
+id = "EQCsUU9EmyEzpSuDSoR5N"
+uri = "file://tapa_apac_incidents_raw.csv"
+type = "table"
+title = "TAPA APAC incidents — RAW (all rows, no dedupe)"
+
+[[outputs]]
+id = "Fgvqyn6RXALnWx4mn-GNn"
+uri = "file://tapa_apac_incidents_possible_duplicates.csv"
+type = "table"
+title = "TAPA APAC — possible duplicates (analyst review)"

@@ -5,6 +5,7 @@ Date of incident,Incident Category,Modus Operandi,Product Category,Location Type
 24.04.2026,Counterfeit,Deception Other,Cosmetics & Hygiene,Maritime Transportation Facility,No,N/A,Ho Chi Minh,Viet Nam
 23.04.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,,India
 23.04.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,1438,Ahmedabad,India
+23.04.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,,India
 23.04.2026,Counterfeit,Deception Other,Toys/Games,Maritime Transportation Facility,No,N/A,Ho Chi Minh,Viet Nam
 23.04.2026,Fraud,Deception Other,Fuel Theft,Destination Facility,No,12987,Johor Bahru,Malaysia
 23.04.2026,Clandestine,Theft from Moving Vehicle,Tools/Building Materials,Destination Facility,No,29601,Surat,India
@@ -72,12 +73,19 @@ Date of incident,Incident Category,Modus Operandi,Product Category,Location Type
 31.03.2026,Theft from Vehicle,Intrusion,Fuel Theft,Unclassified Parking,No,140,Quezon City,Philippines
 30.03.2026,Counterfeit,Deception Other,Miscellaneous Electronics,Origin Facility,No,59413,,Thailand
 29.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Dwarka,India
+29.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Dwarka,India
 29.03.2026,Counterfeit,Deception Other,Miscellaneous,En Route,Yes,1061928,,Thailand
 29.03.2026,Counterfeit,Deception Other,Pharmaceuticals,Origin Facility,No,N/A,,India
 28.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Warangal,India
 28.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Hyderabad,India
+28.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Hyderabad,India
+28.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Warangal,India
+28.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Hyderabad,India
+28.03.2026,Counterfeit,Deception Other,Food & Drink,Origin Facility,No,N/A,Hyderabad,India
 28.03.2026,Counterfeit,Deception Other,Tobacco,Aviation Transportation Facility,No,46740,,India
 28.03.2026,Theft,Intrusion,Food & Drink,Origin Facility,No,2245,,India
+27.03.2026,Counterfeit,Deception Other,Pharmaceuticals,Origin Facility,No,N/A,New Delhi,India
+27.03.2026,Robbery,Internal,Cash,En Route,No,N/A,,India
 27.03.2026,Counterfeit,Deception Other,Pharmaceuticals,Origin Facility,No,N/A,New Delhi,India
 27.03.2026,Robbery,Internal,Cash,En Route,No,N/A,,India
 26.03.2026,Counterfeit,Deception Other,Cosmetics & Hygiene,Origin Facility,No,24967,,Hong Kong
@@ -90,3 +98,4 @@ Date of incident,Incident Category,Modus Operandi,Product Category,Location Type
 24.03.2026,Counterfeit,Deception Other,Pharmaceuticals,Retail Store,No,13975,,Hong Kong
 24.03.2026,Counterfeit,Deception Other,Clothing & Footwear,En Route,Yes,327158,,Hong Kong
 24.03.2026,Theft from Vehicle,Intrusion,Fuel Theft,Unclassified Parking,No,115,Tacloban City,Philippines
+24.03.2026,Counterfeit,Deception Other,Pharmaceuticals,Retail Store,No,13975,,Hong Kong
