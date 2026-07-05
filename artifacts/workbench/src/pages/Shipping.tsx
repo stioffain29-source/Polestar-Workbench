@@ -1037,7 +1037,12 @@ export default function Shipping() {
           ) : (
             <div className="h-[420px]">
               <MapContainer center={[15, 60]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer
+                  attribution="&copy; OpenStreetMap &copy; CARTO"
+                  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                  subdomains="abcd"
+                  maxZoom={19}
+                />
                 {withCoords.map((i) => {
                   const c = ratingColor(i.severity);
                   return (
