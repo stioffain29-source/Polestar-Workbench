@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, formatDistanceToNow, subDays } from "date-fns";
-import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
@@ -95,6 +95,46 @@ function usdAxis(v: number): string {
   if (v >= 1e6) return "$" + (v % 1e6 === 0 ? v / 1e6 : (v / 1e6).toFixed(1)) + "m";
   if (v >= 1e3) return "$" + Math.round(v / 1e3) + "k";
   return "$" + v;
+}
+
+// Word-wrap a long axis label into up to three short lines so full cargo
+// category names are never truncated on the horizontal bar chart.
+function wrapAxisLabel(s: string, maxChars = 22): string[] {
+  const words = s.split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (cur && (cur + " " + w).length > maxChars) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = cur ? cur + " " + w : w;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0, 3);
+}
+
+// Multi-line Y-axis tick for the cargo-category chart. Renders the wrapped
+// label right-aligned into the axis gutter, vertically centred on the bar.
+function CategoryAxisTick(props: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number };
+}) {
+  const { x = 0, y = 0, payload } = props;
+  const lines = wrapAxisLabel(String(payload?.value ?? ""));
+  const lineH = 11;
+  const top = y - ((lines.length - 1) * lineH) / 2;
+  return (
+    <text x={x} y={top} textAnchor="end" fontSize={10} fill="#303030">
+      {lines.map((ln, i) => (
+        <tspan key={i} x={x} dy={i === 0 ? 0 : lineH}>
+          {ln}
+        </tspan>
+      ))}
+    </text>
+  );
 }
 
 export default function CargoWatch() {
@@ -256,8 +296,7 @@ export default function CargoWatch() {
     });
     return Array.from(m.entries())
       .map(([country, count]) => ({ country, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 12);
+      .sort((a, b) => b.count - a.count);
   }, [enriched]);
 
   const byCategory = useMemo(() => {
@@ -299,9 +338,19 @@ export default function CargoWatch() {
   // Captured Incidents — country and cargo category shown as two separate
   // horizontal bar charts. The earlier single stacked chart crammed the whole
   // ~30-label taxonomy into each country bar over a 9-colour palette, so the
-  // categories were unreadable. Split, sorted, single-colour, labelled.
-  const topCountryBars = useMemo(() => byCountry.slice(0, 10), [byCountry]);
-  const topCategoryBars = useMemo(() => byCategory.slice(0, 12), [byCategory]);
+  // categories were unreadable. Split, sorted, single-colour, labelled. Both
+  // charts cap at the top 10 rows; any remainder rolls into a single honest
+  // "Other" bar so nothing is silently dropped.
+  const countryBars = useMemo(() => {
+    if (byCountry.length <= 10) return byCountry;
+    const rest = byCountry.slice(10).reduce((s, r) => s + r.count, 0);
+    return [...byCountry.slice(0, 10), { country: "Other countries", count: rest }];
+  }, [byCountry]);
+  const categoryBars = useMemo(() => {
+    if (byCategory.length <= 10) return byCategory;
+    const rest = byCategory.slice(10).reduce((s, r) => s + r.count, 0);
+    return [...byCategory.slice(0, 10), { category: "Other categories", count: rest }];
+  }, [byCategory]);
 
   // Incidents — last 30 days, one bar per day (independent of the range pill).
   const last30 = useMemo(() => {
@@ -568,17 +617,17 @@ export default function CargoWatch() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              By Country · top {topCountryBars.length}
+              By Country · top {Math.min(10, byCountry.length)}{byCountry.length > 10 ? " + other" : ""}
             </div>
-            <div className="h-[340px]">
+            <div style={{ height: Math.max(260, countryBars.length * 30 + 24) }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topCountryBars} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+                <BarChart data={countryBars} layout="vertical" margin={{ left: 8, right: 36, top: 4, bottom: 4 }}>
                   <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
-                  <YAxis type="category" dataKey="country" tickLine={false} axisLine={false} width={100} fontSize={11} interval={0} />
+                  <YAxis type="category" dataKey="country" tickLine={false} axisLine={false} width={110} fontSize={11} interval={0} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#465bff" radius={[0, 2, 2, 0]}>
-                    <LabelList dataKey="count" position="right" fontSize={10} fill="#303030" />
+                    <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -586,11 +635,11 @@ export default function CargoWatch() {
           </div>
           <div>
             <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              By Cargo Category · top {topCategoryBars.length} of {byCategory.length}
+              By Cargo Category · top {Math.min(10, byCategory.length)} of {byCategory.length}{byCategory.length > 10 ? " + other" : ""}
             </div>
-            <div className="h-[340px]">
+            <div style={{ height: Math.max(300, categoryBars.length * 46 + 24) }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topCategoryBars} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+                <BarChart data={categoryBars} layout="vertical" margin={{ left: 8, right: 36, top: 4, bottom: 4 }}>
                   <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <YAxis
@@ -598,14 +647,13 @@ export default function CargoWatch() {
                     dataKey="category"
                     tickLine={false}
                     axisLine={false}
-                    width={176}
-                    fontSize={10}
+                    width={150}
                     interval={0}
-                    tickFormatter={(v: string) => (v.length > 32 ? v.slice(0, 31) + "…" : v)}
+                    tick={<CategoryAxisTick />}
                   />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#0b0a3d" radius={[0, 2, 2, 0]}>
-                    <LabelList dataKey="count" position="right" fontSize={10} fill="#303030" />
+                    <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

@@ -659,3 +659,9 @@ id = "Fgvqyn6RXALnWx4mn-GNn"
 uri = "file://tapa_apac_incidents_possible_duplicates.csv"
 type = "table"
 title = "TAPA APAC — possible duplicates (analyst review)"
+
+[[outputs]]
+id = "jmAtmGxddhCkJUZeBm3dU"
+uri = "file://screenshots/cargo_breakdown.jpg"
+type = "image"
+title = "Cargo Watch — Captured Incidents by Country & Cargo"
