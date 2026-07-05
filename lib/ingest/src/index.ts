@@ -189,6 +189,21 @@ export type {
   LanePromotion,
 } from "./gdeltPromote";
 export {
+  runSocialPromote,
+  emptySocialPromoteSummary,
+  decideSocialPromotion,
+  buildSocialIncidentTitle,
+  buildSocialIncidentSummary,
+  socialPromoteMarker,
+  markerSocialRawId,
+  SOCIAL_PROMOTE_MARKER_PREFIX,
+} from "./socialPromote";
+export type {
+  SocialPromoteSummary,
+  SocialPromoteInput,
+  SocialPromoteDecision,
+} from "./socialPromote";
+export {
   runTapaPromote,
   emptyTapaPromoteSummary,
   decideTapaPromotion,

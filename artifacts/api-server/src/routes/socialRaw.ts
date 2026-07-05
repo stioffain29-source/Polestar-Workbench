@@ -8,6 +8,8 @@ import {
   categoryToTopic,
   normaliseSourceTier,
   classifySeverity,
+  buildSocialIncidentTitle,
+  buildSocialIncidentSummary,
   type IncidentCandidate,
   type IncidentCategory,
   type SeverityTopic,
@@ -25,13 +27,13 @@ const router: IRouter = Router();
 // Facebook OSINT monitoring items for the Papua New Guinea + Indonesian Papua
 // theatres, stored as supporting CONTEXT.
 //
-// CRITICAL PRODUCT RULE: these rows are NOT incidents — they live in their own
-// table (`social_raw`) and no incident-counting surface reads them, so a
-// Facebook post can never inflate any incident count. The ONLY path into
-// `incidents` is the explicit POST /social-raw/{id}/promote action below, which
-// the server RE-DERIVES from the stored row (never trusting a client claim):
-// the item must be security-relevant AND credible, and must not duplicate an
-// already-tracked incident.
+// PRODUCT RULE: `social_raw` rows are OSINT CONTEXT, not incidents — no
+// incident-counting surface reads this table, so a post can never inflate a
+// count on its own. Two paths turn a row into an incident, BOTH re-deriving
+// eligibility server-side from the stored row (never trusting a client claim —
+// security-relevant AND credible, and not a duplicate): this explicit
+// POST /social-raw/{id}/promote action, and the automatic scrape-time
+// promote pass (`runSocialPromote`, lib/ingest) the Apify importers run.
 //
 // Read is PUBLIC (in line with the rest of the workbench). The promote action
 // mirrors the existing public POST /incidents posture — the workbench is
@@ -303,8 +305,8 @@ router.post("/social-raw/:id/promote", requireAdminToken, async (req, res): Prom
     return;
   }
 
-  const title = buildIncidentTitle(item, category);
-  const summary = buildIncidentSummary(item);
+  const title = buildSocialIncidentTitle(item, category);
+  const summary = buildSocialIncidentSummary(item);
   const severity = classifySeverity(title, summary, topic as SeverityTopic);
   const sourceUrl = item.url;
   const sourceLabel = `${item.pageName ?? item.pageHandle} (Facebook OSINT)`;
@@ -393,37 +395,5 @@ router.post("/social-raw/:id/promote", requireAdminToken, async (req, res): Prom
 // claimed the same source item — forces a rollback so no second incident is
 // created, and is translated to a 409 by the caller.
 class AlreadyPromotedError extends Error {}
-
-function buildIncidentTitle(
-  item: {
-    location: string | null;
-    province: string | null;
-    country: string;
-  },
-  category: IncidentCategory,
-): string {
-  const where = item.location || item.province || item.country;
-  return `${category} — ${where}`;
-}
-
-function buildIncidentSummary(item: {
-  caption: string | null;
-  location: string | null;
-  province: string | null;
-  country: string;
-  businessImpact: string | null;
-}): string {
-  const parts: string[] = [];
-  const where = item.location || item.province || item.country;
-  if (item.caption) {
-    const trimmed = item.caption.replace(/\s+/g, " ").trim().slice(0, 400);
-    if (trimmed) parts.push(trimmed);
-  }
-  if (parts.length === 0) {
-    parts.push(`Security incident reported at ${where}.`);
-  }
-  if (item.businessImpact) parts.push(item.businessImpact);
-  return parts.join(" ");
-}
 
 export default router;

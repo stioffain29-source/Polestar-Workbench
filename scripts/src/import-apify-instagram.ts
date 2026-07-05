@@ -3,6 +3,7 @@ import {
   resolveApifyTaskOrActorLatestDataset,
   normaliseInstagramPost,
   persistInstagramKammiPosts,
+  runSocialPromote,
   type RawInstagramPost,
 } from "@workspace/ingest";
 import { pool } from "@workspace/db";
@@ -11,10 +12,12 @@ import { pool } from "@workspace/db";
 //
 // Pulls the items of an EXISTING Apify dataset (the output of a previously-run
 // Instagram scraper actor/task — no new actor run, no charge) and stores the
-// posts as supporting CONTEXT in `social_raw`, via the SHARED
-// persistInstagramKammiPosts pipeline. It NEVER writes incidents (only the
-// gated, server-re-derived promote action does) and never touches incident
-// ingest, reports or PDFs.
+// posts in `social_raw` via the SHARED persistInstagramKammiPosts pipeline,
+// then runs the DB→DB promote pass (runSocialPromote). Instagram rows are
+// hard-stamped non-credible at collection, so a row can promote ONLY when the
+// promote pass finds a real news incident that now corroborates it; otherwise
+// it stays context-only. With --commit both the import and the promote pass
+// write; dry-run reports what each WOULD do.
 //
 // Two source selectors (exactly one required):
 //   --datasetId <id>   import a specific dataset directly.
@@ -154,6 +157,22 @@ async function main(): Promise<void> {
       `table-total=${result.totalAfter}`,
     ].join(" "),
   );
+
+  // Promote eligible rows into real incidents (DB→DB; re-derives eligibility +
+  // live corroboration from the stored rows). Honours the same --commit flag.
+  log("import-apify-instagram — running social→incident promote pass");
+  const promote = await runSocialPromote({ commit, log });
+  log(
+    [
+      "  promote:",
+      `considered=${promote.unpromotedConsidered}`,
+      `new=${promote.newToInsert}`,
+      `inserted=${promote.inserted}`,
+      `duplicate=${promote.skippedDuplicate}`,
+      `not-credible=${promote.skippedNotCredible}`,
+    ].join(" "),
+  );
+
   if (!commit) log("  DRY-RUN — re-run with --commit to write.");
 }
 
