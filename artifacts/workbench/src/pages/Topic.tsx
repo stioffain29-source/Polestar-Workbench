@@ -253,6 +253,10 @@ export default function Topic() {
   // counts into the shared choropleth polygon-name space (applying the few DB
   // spelling aliases, e.g. "United Arab Emirates" -> "UAE").
   const useChoropleth = topic === "fertiliser" || topic === "energy";
+  // Energy/fuel/fertiliser attribute incidents worldwide (global commodity
+  // markets), so their maps use a world frame that shows the out-of-region
+  // countries; every other topic keeps the APAC + Middle-East region frame.
+  const worldScope = topic === "energy" || topic === "fuel" || topic === "fertiliser";
   const countryIntensity = useMemo(() => buildCountryIntensity(byCountry), [byCountry]);
 
   const sortedForTable = useMemo(
@@ -501,6 +505,7 @@ export default function Topic() {
           {useChoropleth ? (
             <CountryChoroplethMap
               intensity={countryIntensity}
+              scope={worldScope ? "world" : "region"}
               legendLabel={`${label} incidents`}
               caption={`Countries shaded by ${label.toLowerCase()}-incident count (${RANGE_LABEL[range]}).`}
             />
@@ -510,7 +515,7 @@ export default function Topic() {
             </div>
           ) : (
             <div className="h-[420px]">
-              <MapContainer center={[20, 80]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
+              <MapContainer center={worldScope ? [20, 10] : [20, 80]} zoom={worldScope ? 2 : 3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                 <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 {withCoords.map((i) => {
                   const c = ratingColor(i.severity);

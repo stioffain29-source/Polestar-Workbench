@@ -65,6 +65,26 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
   Laos: [19.86, 102.5],
   Canada: [56.13, -106.35],
   "United States": [37.09, -95.71],
+  // Out-of-region ("global market") centroids. The energy / fuel / fertiliser
+  // monitors serve regionally-based clients who operate in GLOBAL markets, so
+  // an out-of-region grid/refinery/fertiliser event is surfaced (shaded on the
+  // world map + listed in the country tables) rather than dropped. Only REAL
+  // countries with a matching world-choropleth polygon are added here — blocs
+  // ("Europe", "Pacific") are deliberately omitted so the map and the country
+  // tables never disagree.
+  Spain: [40.46, -3.75],
+  Portugal: [39.4, -8.22],
+  Ukraine: [48.38, 31.17],
+  Russia: [61.52, 105.32],
+  Germany: [51.17, 10.45],
+  Cuba: [21.52, -77.78],
+  Nigeria: [9.08, 8.68],
+  Niger: [17.61, 8.08],
+  Kenya: [-0.02, 37.91],
+  Ghana: [7.95, -1.02],
+  Zimbabwe: [-19.02, 29.15],
+  Zambia: [-13.13, 27.85],
+  Mongolia: [46.86, 103.85],
 };
 
 // City name -> [lat, lng]. Keys are lowercase; matched word-bounded in text.

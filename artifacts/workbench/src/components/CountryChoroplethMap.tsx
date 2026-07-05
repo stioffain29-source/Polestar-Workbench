@@ -3,6 +3,7 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { Layer, PathOptions } from "leaflet";
 import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
 import monitorChoroplethExtrasGeo from "@/assets/monitorChoroplethExtras.geo.json";
+import worldChoroplethExtrasGeo from "@/assets/worldChoroplethExtras.geo.json";
 import { COUNT_BANDS, countBandColor, featureCountryName } from "@/lib/cargoChoropleth";
 
 // DB country spellings that differ from the shared choropleth polygon names.
@@ -45,13 +46,27 @@ const MONITOR_CHOROPLETH_GEO: FeatureCollection<Geometry, { name?: string }> = {
   ],
 };
 
+// World scope for the global-market monitors (energy, fuel, fertiliser). Reuses
+// every region polygon and adds the out-of-region "global market" countries so an
+// incident attributed abroad (e.g. Spain, United States, Nigeria) shades on the
+// map exactly as it appears in the country table. worldChoroplethExtras is
+// generated from Natural Earth 110m (scripts/src/gen-world-choropleth-extras.ts)
+// and holds ONLY countries absent from the region assets, so nothing double-draws.
+const WORLD_CHOROPLETH_GEO: FeatureCollection<Geometry, { name?: string }> = {
+  ...(cargoScopeCountriesGeo as unknown as FeatureCollection<Geometry, { name?: string }>),
+  features: [
+    ...MONITOR_CHOROPLETH_GEO.features,
+    ...(worldChoroplethExtrasGeo as unknown as FeatureCollection<Geometry, { name?: string }>).features,
+  ],
+};
+
 // Country-intensity choropleth: shade each in-scope country polygon by its
 // incident count using the shared brand-blue count ramp; zero-count countries
 // are an outline only. Reuses the shared count bands so shading rules stay a
 // single source of truth across every topic map (cargo, energy, fertiliser,
 // civil unrest, conflict).
-function Choropleth({ intensity }: { intensity: Map<string, number> }) {
-  const geo = MONITOR_CHOROPLETH_GEO;
+function Choropleth({ intensity, scope }: { intensity: Map<string, number>; scope: "region" | "world" }) {
+  const geo = scope === "world" ? WORLD_CHOROPLETH_GEO : MONITOR_CHOROPLETH_GEO;
   const styleKey = Array.from(intensity.entries())
     .map(([c, n]) => `${c}:${n}`)
     .sort()
@@ -112,29 +127,35 @@ export function CountryChoroplethMap({
   intensity,
   legendLabel,
   caption,
-  center = [20, 80],
+  scope = "region",
+  center,
   emptyText = "No identified countries available for this view.",
 }: {
   intensity: Map<string, number>;
   legendLabel: string;
   caption?: string;
+  scope?: "region" | "world";
   center?: [number, number];
   emptyText?: string;
 }) {
   if (intensity.size === 0) {
     return <div className="p-8 text-center text-sm text-muted-foreground">{emptyText}</div>;
   }
+  // World scope (energy/fuel/fertiliser global-market view) pulls back to show
+  // the out-of-region countries; region scope keeps the APAC + Middle-East frame.
+  const resolvedCenter: [number, number] = center ?? (scope === "world" ? [20, 10] : [20, 80]);
+  const zoom = scope === "world" ? 2 : 3;
   return (
     <>
       <div className="relative h-[420px]">
-        <MapContainer center={center} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
+        <MapContainer center={resolvedCenter} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
           <TileLayer
             attribution="&copy; OpenStreetMap &copy; CARTO"
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             subdomains="abcd"
             maxZoom={19}
           />
-          <Choropleth intensity={intensity} />
+          <Choropleth intensity={intensity} scope={scope} />
         </MapContainer>
         <ChoroplethLegend label={legendLabel} />
       </div>

@@ -4,7 +4,7 @@ export { runFlashpointUnknownReattribute } from "./flashpointUnknownReattribute"
 export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
-export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG } from "./topicConfigs";
+export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG, COUNTRY_ALIASES, GLOBAL_EXTRA_ALIASES, GLOBAL_TOPIC_ALIASES } from "./topicConfigs";
 export { classifyNewsConfidence } from "./newsConfidence";
 export type { Confidence } from "./newsConfidence";
 export { runNewsTopicIngest, classifyNewsItem } from "./newsTopic";
@@ -256,6 +256,8 @@ export type { SeverityBackfillSummary } from "./backfillSeverity";
 export { runCargoCountryBackfill } from "./backfillCargoCountry";
 export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { runNewsCountryBackfill } from "./backfillNewsCountry";
+export { runGlobalCountryReattribution } from "./globalReattribute";
+export type { GlobalReattributionSummary } from "./globalReattribute";
 export { runPngExtractBackfill, runWestPapuaExtractBackfill } from "./backfillPngExtract";
 export type { PngExtractBackfillSummary } from "./backfillPngExtract";
 export {

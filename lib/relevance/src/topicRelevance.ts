@@ -852,25 +852,47 @@ const ENERGY_EXCLUDE: RegExp[] = [
   // hard-drop in-scope national broadcasters that share the W/K prefix —
   // KBS (South Korea), WIN (regional Australia), WION (India).
   /\b(abc\d{1,2}|wfaa|fox\d{1,2}|nbc\d{1,2}|cbs\d{1,2}|king ?5|wbal|wjz|wmar|wusa|wtop|wbz|wcvb|wsb|wgn|ktla|ktvu)\b/,
-  // US / Canadian geography markers (none collide with in-scope theatres).
-  // "georgia" is deliberately omitted (collides with the country); bare
-  // "washington" stays scoped to "washington state" (D.C. / surname noise).
-  /\b(county|township|ohio|texas|california|nevada|michigan|virginia|florida|illinois|oregon|washington state|maryland|new york|new jersey|pennsylvania|massachusetts|connecticut|north carolina|south carolina|tennessee|kentucky|indiana|wisconsin|minnesota|missouri|arizona|colorado|oklahoma|kansas|ontario|quebec|alberta|british columbia)\b/,
-  // US city names — country-edition feeds mis-attribute US storm/outage stories
-  // (esp. Texas/ERCOT, and East-Coast storms like Annapolis MD) to an in-scope
-  // byline. Curated to clearly-US cities with no in-scope APAC/ME/AU collision.
-  /\b(annapolis|austin|houston|dallas|fort worth|san antonio|el paso|denver|atlanta|seattle|sacramento|baltimore|memphis|nashville|tulsa|cleveland|milwaukee|minneapolis|detroit)\b/,
-  // Out-of-region countries that recur in the energy feed.
-  /\b(canada|canadian|kenya|kenyan|nersa|ferrochrome|nigeria|south africa|eskom|ghana|zimbabwe|zambia)\b/,
-  // Out-of-region grid stories the country-edition feeds mis-attribute to
-  // in-scope countries (Iberia/Cuba/Ukraine/US blackouts). These run BEFORE
-  // required, so broadening the grid-collapse rule above cannot leak a Cuba or
-  // Spain blackout in under a Bangladesh / Indonesia byline. Deliberately
-  // omits bare turkey/russia/europe — those collide with legitimate in-scope
-  // grid stories (e.g. an Iraq–Turkey power-line attack, a Gulf outage tied to
-  // Russian/European supply); the Russia–Ukraine war noise is already caught
-  // by the "ukraine" token.
-  /\b(spain|spanish|portugal|portuguese|iberia|iberian|cuba|cuban|ukraine|ukrainian|virgin islands|zaporizhzhia)\b/,
+  // County-feeder / township distribution noise. This is the ONE geography
+  // token kept from the former US-geography excludes: a "<somewhere> county
+  // power outage" is a distribution-level local fault with no market signal,
+  // regardless of country. Every OTHER geography exclude (US states, US cities,
+  // out-of-region countries, Iberia/Cuba/Ukraine grid) was REMOVED so the
+  // monitor now SURFACES out-of-region grid events — attributed via the global
+  // gazetteer and shaded on the world map.
+  /\b(county|township)\b/,
+  // "blackout" / "power outage" HOMONYM noise. The removed US-geography excludes
+  // were also incidentally suppressing these; bind them explicitly so
+  // re-admitting out-of-region grid events does not re-admit consumer-product,
+  // entertainment, medical, historical or how-to junk that merely shares the
+  // "blackout" / "power outage" vocabulary. (Patterns are lowercase + un-flagged
+  // because the haystack is already lower-cased.)
+  // Consumer products (blackout curtains/blinds/shades) + lifestyle homonyms.
+  /\bblackout\b[^.]{0,15}\b(curtain|curtains|blind|blinds|shade|shades|poetry|poem|tattoo|cake|wing|wings|challenge)\b/,
+  /\b(curtain|curtains|blind|blinds|shade|shades)\b[^.]{0,15}\bblackout\b/,
+  // Medical / intoxication "blackout" (memory, brain, drinking).
+  /\b(memory|brain|alcohol\w*|drunk\w*|drinking|binge|hangover)\b[^.]{0,20}\bblackout\b/,
+  /\bblackout\b[^.]{0,20}\b(memory|brain|drinking|drunk\w*|hangover)\b/,
+  // Broadcast / communications / sports "blackout" — not an electricity event.
+  /\b(media|news|press|internet|communications?|comms|social[- ]?media|tv|television|broadcast|streaming|sports?|game|match|fixture|radio) blackout\b/,
+  // Novelty licence-plate "blackout" colour scheme.
+  /\bblackout\b[^.]{0,12}\b(licen[sc]e plate|number plate|plates?)\b|\b(licen[sc]e|number) plate[^.]{0,12}\bblackout\b/,
+  // Historical blackout retrospectives ("the New York City Blackout of 1977",
+  // "the 2003 blackout"). Bound to "of <year>" / "<year> blackout" so a CURRENT
+  // "2026 blackout hits Spain" headline is NOT dropped.
+  /\bblackout of (the )?(18|19|20)\d{2}\b/,
+  /\bof the (18|19|20)\d{2} blackout\b/,
+  // Prep / how-to / product-review SEO around outages (Wirecutter tool round-ups,
+  // "keeping food safe during a power outage", survival checklists, "tips to").
+  // NOTE: bare "surviv\w*" is deliberately NOT here — it caught real war/grid
+  // features ("How Ukrainians are surviving a total blackout because of Russian
+  // attacks"). "survival kit"/"survival tips" guides are still dropped via the
+  // "survival kit" token and the second (tips|guide|…) pattern below.
+  /\b(best|top \d+|review|reviews|buying guide|how to|tips?|prepare for|preparing for|checklist|survival kit|food safe|keep(ing)? food)\b[^.]{0,25}\b(power outage|power outages|blackout)\b/,
+  /\b(power outage|power outages|blackout)\b[^.]{0,25}\b(tips?|guide|checklist|survival kit|supplies|how to|what to do)\b/,
+  // Light opinion/explainer catch: Q&A / disinformation blackout think-pieces.
+  // Analysis that reports a REAL blackout still passes (only these forms drop).
+  /^\s*q&a\s*[:\-–—]/,
+  /\bdisinformation\b[^.]{0,25}\bblackout\b|\bblackout\b[^.]{0,25}\bdisinformation\b/,
   // Planned / scheduled maintenance outages are routine, not grid stress.
   /\b(planned|scheduled) (power )?(outage|maintenance)\b/,
   /\brestored after\b.{0,30}(outage|disruption|fault)/,

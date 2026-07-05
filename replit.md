@@ -43,6 +43,7 @@ Other operational env: `DATABASE_URL` (required), `SESSION_SECRET`, `INGEST_ADMI
 - Scrapers: `scripts/src/scrape-*.ts` (run via `pnpm --filter @workspace/scripts run scrape:<name>`, add `--commit` to write).
 - Ingest engines: `lib/ingest` (`@workspace/ingest`) — shared by CLI scrapers and the api-server route.
 - Publication calendar (`/calendar`): per-topic last-published + cadence next-due; `pages/PublicationCalendar.tsx`, helpers `lib/publicationCalendar.ts`.
+- World-scope monitors (energy/fuel/fertiliser surface out-of-region "global market" incidents; STRICT map==table, real countries only, no new feeds): gazetteer `GLOBAL_TOPIC_ALIASES` (`lib/ingest/src/topicConfigs.ts`); world choropleth polygons `artifacts/workbench/src/assets/worldChoroplethExtras.geo.json` (regen: `pnpm --filter @workspace/scripts run gen:world-choropleth`); `CountryChoroplethMap` `scope="world"`; guard `__tests__/workbench/worldChoropleth.test.ts`. Details in `.agents/memory/energy-fuel-fertiliser-world-scope.md`.
 
 ## Architecture decisions
 

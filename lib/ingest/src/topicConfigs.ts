@@ -47,6 +47,41 @@ export const COUNTRY_ALIASES: CountryAlias[] = [
   { canonical: "New Zealand", aliases: ["new zealand", "auckland", "wellington", "christchurch"] },
 ];
 
+// Out-of-region ("global market") gazetteer, appended AFTER COUNTRY_ALIASES so
+// region attribution still wins (region-first) — a story naming both an in-scope
+// theatre and a global one resolves to the in-scope theatre. Used ONLY by the
+// energy / fuel / fertiliser configs (GLOBAL_TOPIC_ALIASES below), never by the
+// region-locked topics (flashpoint / conflict / shipping / cargo).
+//
+// The energy/fuel/fertiliser monitors serve regionally-based clients operating
+// in GLOBAL markets, so out-of-region grid/refinery/fertiliser events are
+// surfaced rather than dropped. Tokens are deliberately UNAMBIGUOUS single-
+// country identifiers with no in-scope collision: bare "georgia" (US state vs
+// country) and "washington" (D.C. / surname) are omitted; every canonical has a
+// matching COUNTRY_CENTROIDS entry AND a world-choropleth polygon so map==table
+// parity holds. Blocs ("Europe", "Pacific", "EU") are omitted (no polygon).
+export const GLOBAL_EXTRA_ALIASES: CountryAlias[] = [
+  { canonical: "United States", aliases: ["united states", "u.s.", "u.s.a.", "usa", "america", "american", "americans", "texas", "california", "florida", "ohio", "michigan", "illinois", "pennsylvania", "new york", "new jersey", "virginia", "north carolina", "south carolina", "wisconsin", "minnesota", "nevada", "oregon", "colorado", "arizona", "maryland", "massachusetts", "tennessee", "kentucky", "indiana", "missouri", "houston", "dallas", "austin", "denver", "atlanta", "seattle", "sacramento", "baltimore", "annapolis", "amarillo", "chicago", "detroit", "milwaukee", "minneapolis", "ercot"] },
+  { canonical: "Canada", aliases: ["canada", "canadian", "canadians", "ontario", "quebec", "québec", "alberta", "british columbia", "toronto", "vancouver", "montreal"] },
+  { canonical: "South Africa", aliases: ["south africa", "south african", "eskom", "nersa", "johannesburg", "pretoria", "cape town", "durban"] },
+  { canonical: "Nigeria", aliases: ["nigeria", "nigerian", "nigerians", "lagos", "abuja", "port harcourt"] },
+  { canonical: "Niger", aliases: ["niger republic", "niamey"] },
+  { canonical: "Kenya", aliases: ["kenya", "kenyan", "kenyans", "nairobi"] },
+  { canonical: "Ghana", aliases: ["ghana", "ghanaian", "accra", "dumsor"] },
+  { canonical: "Zimbabwe", aliases: ["zimbabwe", "zimbabwean", "harare", "zesa"] },
+  { canonical: "Zambia", aliases: ["zambia", "zambian", "lusaka", "zesco"] },
+  { canonical: "Spain", aliases: ["spain", "spanish", "madrid", "barcelona", "iberia", "iberian"] },
+  { canonical: "Portugal", aliases: ["portugal", "portuguese", "lisbon"] },
+  { canonical: "Ukraine", aliases: ["ukraine", "ukrainian", "ukrainians", "kyiv", "kiev", "zaporizhzhia", "kharkiv", "odesa", "odessa"] },
+  { canonical: "Russia", aliases: ["russia", "russian", "russians", "moscow", "rosseti"] },
+  { canonical: "Germany", aliases: ["germany", "german", "germans", "berlin", "hamburg", "munich"] },
+  { canonical: "Cuba", aliases: ["cuba", "cuban", "cubans", "havana"] },
+  { canonical: "Mongolia", aliases: ["mongolia", "mongolian", "ulaanbaatar"] },
+];
+
+// Region + global gazetteer for the three global-market topics. Region-first.
+export const GLOBAL_TOPIC_ALIASES: CountryAlias[] = [...COUNTRY_ALIASES, ...GLOBAL_EXTRA_ALIASES];
+
 // Per-country Google News edition. A country feed MUST pull that country's own
 // edition or the default US edition floods it with US-local distribution faults
 // (Duke/Dominion/Consumers Energy outages, county feeder trips, "outage
@@ -246,11 +281,12 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     "downed tree",
     "tree crew",
     "county",
-    "canada",
-    "canadian",
-    "nersa",
-    "ferrochrome",
-    "eskom",
+    // NB: geography-only denies (canada / canadian / nersa / eskom /
+    // ferrochrome) were REMOVED — the monitors now surface out-of-region grid
+    // events, so a South Africa (Eskom/NERSA) or Canada national grid story is
+    // KEPT and attributed via GLOBAL_TOPIC_ALIASES. Distribution-level noise
+    // (investor-owned utilities, county feeders, outage-tracker SEO) stays
+    // denied because it carries no market signal at any geography.
     // Coal-policy / energy-transition / climate-finance commentary that shares
     // the coal / power-plant vocabulary but is not an operational grid event.
     "coal transition",
@@ -264,7 +300,7 @@ const ENERGY_CONFIG: NewsTopicConfig = {
     "early retirement",
     "clean energy opportunit",
   ],
-  countryAliases: COUNTRY_ALIASES,
+  countryAliases: GLOBAL_TOPIC_ALIASES,
 };
 
 // ------------------------------------------------------------ fertiliser ----
@@ -309,7 +345,7 @@ const FERT_CONFIG: NewsTopicConfig = {
     "compost tips",
     "organic fertiliser tips",
   ],
-  countryAliases: COUNTRY_ALIASES,
+  countryAliases: GLOBAL_TOPIC_ALIASES,
 };
 
 // ------------------------------------------------------------------ fuel ----
@@ -376,7 +412,7 @@ const FUEL_CONFIG: NewsTopicConfig = {
     "price forecast",
     "price outlook",
   ],
-  countryAliases: COUNTRY_ALIASES,
+  countryAliases: GLOBAL_TOPIC_ALIASES,
 };
 
 // -------------------------------------------------------------- conflict ----

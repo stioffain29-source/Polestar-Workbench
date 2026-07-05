@@ -5,6 +5,7 @@ import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } fr
 import {
   runStrikesBackfill,
   runNewsCountryBackfill,
+  runGlobalCountryReattribution,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   runFlashpointMastheadRelocate,
@@ -3241,6 +3242,50 @@ export async function runDataMigrations(): Promise<void> {
     // no scraper), so that purge has been removed — manual Telegram rows are
     // legitimate CONTEXT and must survive redeploys. Its marker is left in place
     // (harmless) for environments where it already ran.
+
+    // One-time re-attribution of the GLOBAL commodity topics (energy / fuel /
+    // fertiliser). Runs BEFORE backfillRelevance so out-of-region rows are on
+    // the correct country centroid before they are re-scored relevant. Rows
+    // stored under a region feed's defaultCountry (e.g. a Spanish grid blackout
+    // tagged Myanmar) are re-stamped to the country their headline actually
+    // names + moved onto that country's centroid, preserving world-map/table
+    // parity. Idempotent (self-terminating: detected === stored after a run),
+    // but marker-gated so it only scans the whole table once per deploy.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "global_country_reattribution_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await runGlobalCountryReattribution({
+          commit: true,
+          topics: ["energy", "fuel", "fertiliser"],
+        });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            marker: markerKey,
+            scanned: res.scanned,
+            restamped: res.restamped,
+            fromUnknown: res.fromUnknown,
+            fromMisstamp: res.fromMisstamp,
+            perCountry: res.perCountry,
+          },
+          "One-time global country re-attribution (energy/fuel/fertiliser)",
+        );
+      }
+    } catch (reErr) {
+      logger.error({ err: reErr }, "Global country re-attribution failed");
+    }
 
     try {
       await backfillRelevance();

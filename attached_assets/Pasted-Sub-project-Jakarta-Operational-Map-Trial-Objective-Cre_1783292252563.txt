@@ -1,0 +1,174 @@
+Sub project: Jakarta Operational Map Trial
+
+Objective
+
+Create a trial version of the Jakarta city report map.
+
+This must be a separate test component, page, or report section. Do not replace the existing live PDF map yet.
+
+The aim is to move from an incident dot map to an operational exposure map.
+
+The map should answer:
+
+Where are the operating pressure points?
+What is the exposure level?
+What should the client do before movement?
+
+Current problem
+
+The current Jakarta map plots too many incidents and becomes cluttered around Central Jakarta.
+
+It shows data, but it does not clearly show judgement.
+
+The client should not have to decode every marker. They need a clear operating picture.
+
+Required approach
+
+Build the map around operating zones, not individual incidents.
+
+Use these Jakarta operating zones:
+
+1. Central Jakarta government district
+2. Tanjung Priok port
+3. North Jakarta access roads
+4. Sudirman and Thamrin business corridor
+5. SCBD and Senayan
+6. Kuningan and Gatot Subroto
+7. Soekarno Hatta airport corridor
+
+Each zone needs:
+
+Zone number
+Zone name
+Exposure rating
+Short reason
+Recommended movement action
+
+Exposure ratings:
+
+High
+Elevated
+Monitored
+Low
+Not assessed
+
+Map requirements
+
+Show numbered operating zones on the map.
+
+Show clear route corridors for:
+
+Airport corridor
+Port corridor
+CBD business corridor
+North Jakarta access
+
+Use simple exposure shading or outlines.
+
+Use individual incident markers only where they add operational value.
+
+Do not show every incident.
+
+Reduce clutter in the CBD.
+
+The right hand panel must match the numbered zones on the map.
+
+Right hand panel title
+
+Movement posture this period
+
+Example right hand panel format:
+
+1. Central Jakarta government district
+Rating: High
+Reason: Protest exposure around government and civic areas.
+Action: Confirm activity around Monas, Istana Merdeka and DPR/MPR before non essential movement.
+
+2. Tanjung Priok port
+Rating: High
+Reason: Port access and container movement exposure.
+Action: Confirm terminal and gate status before dispatch.
+
+3. North Jakarta access roads
+Rating: High
+Reason: Low lying access roads and flooding exposure.
+Action: Check Cilincing and Koja approaches before movement.
+
+4. Sudirman and Thamrin business corridor
+Rating: Elevated
+Reason: Business and hotel corridor with congestion and protest spillover exposure.
+Action: Confirm road status before client meetings and executive movement.
+
+5. SCBD and Senayan
+Rating: Elevated
+Reason: Office, hotel and venue cluster.
+Action: Confirm SCBD and Senayan approaches before meetings and events.
+
+6. Kuningan and Gatot Subroto
+Rating: Elevated
+Reason: Embassy and office corridor.
+Action: Confirm Gatot Subroto and Rasuna Said status before movement.
+
+7. Soekarno Hatta airport corridor
+Rating: Monitored
+Reason: City to airport transfer route.
+Action: Confirm airport toll road and Tangerang approach before departure.
+
+Legend requirements
+
+Keep the legend simple.
+
+It should show:
+
+High
+Elevated
+Monitored
+Low
+Not assessed
+Operating zone
+Movement corridor
+Major incident marker
+
+Methodology note
+
+Move long methodology notes away from the main map area.
+
+Use this short note only on the map page:
+
+Map reflects assessed operating exposure for this reporting period. Incident points are shown only where location detail is sufficient and operationally useful.
+
+Trial output required
+
+Produce one test version of the Jakarta operational map section with:
+
+Clean operational map
+Numbered operating zones
+Movement posture panel
+Clear exposure ratings
+Simple legend
+Short methodology note
+PDF safe layout
+
+The output must be suitable for insertion into the existing Jakarta city report PDF.
+
+Acceptance criteria
+
+The trial is successful if:
+
+The CBD is readable without clutter.
+The zone numbers are easy to match with the right hand panel.
+The client can understand movement posture in under 30 seconds.
+The map shows judgement, not just raw incident data.
+The design looks like a professional risk product.
+The existing live report system is not broken.
+The old map remains available for comparison.
+
+Important constraints
+
+This is a trial sub project only.
+
+Do not refactor the full Workbench.
+Do not change unrelated report sections.
+Do not alter the existing PDF export flow unless needed for a trial copy.
+Do not remove the current map.
+Do not push this into the live report until reviewed and approved.

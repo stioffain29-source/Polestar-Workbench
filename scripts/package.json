@@ -37,6 +37,7 @@
     "backfill:png-extract": "tsx ./src/backfill-png-extract.ts",
     "backfill:west-papua-extract": "tsx ./src/backfill-west-papua-extract.ts",
     "eval:gdelt": "tsx ./src/gdelt-eval.ts",
+    "gen:world-choropleth": "tsx ./src/gen-world-choropleth-extras.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -47,6 +48,9 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "tsx": "catalog:"
+    "@types/topojson-client": "^3.1.5",
+    "topojson-client": "^3.1.0",
+    "tsx": "catalog:",
+    "world-atlas": "^2.0.2"
   }
 }
