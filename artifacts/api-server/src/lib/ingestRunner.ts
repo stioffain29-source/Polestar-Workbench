@@ -28,6 +28,8 @@ import {
   emptyGdeltStructuredSummary,
   runGdeltPromote,
   emptyGdeltPromoteSummary,
+  runTapaPromote,
+  emptyTapaPromoteSummary,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   type IngestSummary,
@@ -43,6 +45,7 @@ import {
   type GdeltEnrichSummary,
   type GdeltStructuredSummary,
   type GdeltPromoteSummary,
+  type TapaPromoteSummary,
   type TitleTranslationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -111,6 +114,16 @@ export type ReliefWebReportsRunResult =
       finishedAt: Date;
       durationMs: number;
       reliefwebReports: ReliefWebReportsSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type TapaPromoteRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      tapaPromote: TapaPromoteSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -327,6 +340,17 @@ function emptyGdeltPromote(err: unknown): GdeltPromoteSummary {
     mode: "commit",
     errors: [msg],
     logLines: [`GDELT promote pass failed: ${msg}`],
+  };
+}
+
+function emptyTapaPromote(err: unknown): TapaPromoteSummary {
+  const base = emptyTapaPromoteSummary();
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    mode: "commit",
+    errors: [msg],
+    logLines: [`TAPA promote pass failed: ${msg}`],
   };
 }
 
@@ -929,6 +953,39 @@ export async function runGdeltStructuredOnce(): Promise<GdeltStructuredRunResult
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       gdeltStructured,
       gdeltPromote,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the offline TAPA Data Explorer → Cargo Watch promote pass. Reads the
+ * SAVED local HTML pages (no scrape, no network, no cookies) and promotes each
+ * row into a cargo_watch incident, deduped by an idempotency marker so re-runs
+ * never double-insert. Deliberately NOT part of the recurring scheduler — it is
+ * an operator-triggered offline import. Shares the same advisory lock so it can
+ * never collide with a full run. Pass commit=false for a dry-run.
+ */
+export async function runTapaPromoteOnce(
+  opts: { commit?: boolean } = {},
+): Promise<TapaPromoteRunResult> {
+  const commit = opts.commit ?? true;
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let tapaPromote: TapaPromoteSummary;
+    try {
+      tapaPromote = await runTapaPromote({ commit });
+    } catch (err) {
+      logger.error({ err }, "TAPA promote pass failed");
+      tapaPromote = emptyTapaPromote(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      tapaPromote,
     };
   });
   if (!res.ran) return res;

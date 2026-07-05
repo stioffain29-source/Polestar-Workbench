@@ -1,40 +1,73 @@
 ---
-name: TAPA incident import
-description: How the TAPA (TIS) incident data enters the workbench — offline, upload-only; scraping/cookies are forbidden by the owner.
+name: TAPA offline cargo-crime layer
+description: How the saved TAPA "Data Explorer" HTML is wired into Cargo Watch (offline promote pass), and the invariants that keep it no-fabrication + idempotent.
 ---
 
-# TAPA incident import
+# TAPA offline cargo-crime layer
 
-The owner explicitly REVERSED an initial "scrape the TAPA session" request and
-mandated an OFFLINE, upload-only importer. Do NOT re-introduce live scraping,
-login cookies, stored credentials, or browser automation for TAPA.
+TAPA cargo-crime data enters Cargo Watch (`topic='cargo_watch'`) from SAVED
+logged-in "Data Explorer" HTML files in `attached_assets/`. It is **offline
+only**: the parser takes an HTML string, nothing scrapes TAPA, uses a session
+cookie, stores credentials, or drives a browser.
 
-**Rule:** TAPA data comes only from SAVED TAPA Data Explorer HTML files the owner
-uploads (into `attached_assets/`). The importer parses the incident GridView
-table from each file and writes TWO files, both with the exact 9 columns (Date of
-incident, Incident Category, Modus Operandi, Product Category, Location Type, High
-Value, Value EUR, City, Country) and NO extra columns:
-`tapa_apac_incidents_raw.csv` (every row from every page, NO dedupe — the MAIN
-file; never prune rows from it) and `tapa_apac_incidents_possible_duplicates.csv`
-(every occurrence of any row byte-identical across all 9 fields, grouped, for
-analyst review only). The owner explicitly REVERSED the earlier auto-dedupe — the
-main output must keep duplicates. Script: `scripts/src/import-tapa-explorer.ts`
-(`pnpm --filter @workspace/scripts run import:tapa-explorer`).
+**Why offline:** the owner supplied saved pages and asked to wire them in as-is.
+`TAPA_SESSION_COOKIE` sits in missing_secrets for a hypothetical future online
+path that does NOT exist — do not build a scraper around it without the owner
+explicitly asking.
 
-**Why:** the public/anonymous TIS grid hard-caps at ~10 rows/page (ignores
-`per-page=100`) and returns unfiltered EMEA incidents (Bulgaria/Jordan/Hungary…),
-NOT APAC — so a scrape would be both wrong data and against the owner's explicit
-"do not scrape / no cookies / no credentials" instruction. The full member view
-(APAC scope, 100/page) only exists behind a logged-in session the workbench does
-not hold. A SAVED logged-in `incident/index?per-page=100` page IS the real APAC
-member data (India-heavy, 100 rows/page) — that is what the owner uploads.
+## Shape
 
-**How to apply:**
-- Parser selects the table whose header set best matches the 9 required columns
-  (threshold ≥5) and maps by normalised header NAME, so Data Explorer column
-  reordering/extras are tolerated. First run against a REAL saved Data Explorer
-  page is the true acceptance test (multi-row/colspan headers would break
-  positional th→td alignment).
-- It is deliberately standalone: NO database, NO `@workspace/ingest`, NOT wired to
-  Cargo Watch. Connecting it to Cargo Watch is a future task the owner deferred
-  ("not yet") — keep it isolated until asked.
+- ONE shared parser `lib/ingest/src/tapaParser.ts` (`parseTapaHtml` → `{rows,
+  missingColumns}`, `TAPA_COLUMNS` = 9 cols) feeds BOTH the CSV export CLI
+  (`scripts/src/import-tapa-explorer.ts`) and the promote pass. Never re-duplicate
+  the parser — the CSV and the incidents must read a page identically.
+- `lib/ingest/src/tapaPromote.ts` mirrors `gdeltPromote.ts`: pure
+  `decideTapaPromotion` + a `runTapaPromote` commit runner; `runTapaPromoteOnce`
+  (ingestRunner.ts) wraps it in the shared advisory lock. Token-gated
+  `POST /api/admin/tapa-promote` (`?mode=dry-run`) is the ONLY trigger — it is
+  deliberately NOT in the scheduler (offline, one-shot re-import).
+
+## Invariants (do not break)
+
+- **No fabrication:** title/summary only restate TAPA's 9 structured fields.
+  The sole derived value is EUR→USD (`TAPA_EUR_USD_RATE`, default 1.09), and it
+  carries an explicit provenance sentence. Blank/N-A fields render
+  "Unknown"/"Unspecified", never guessed.
+- **USD bridge:** the summary embeds `US$<int>` next to the word "value" so the
+  frontend `cargoAnalysis.parseUsdLoss` (first-match regex + ±45-char context
+  gate) reads it. Max source value €15.56M → ~$17M stays under parseUsdLoss's
+  $100M sanity ceiling. If you reword the summary, keep "US$<digits>" adjacent
+  to value/goods language or losses silently stop parsing.
+- **In-scope gate:** `TAPA_SCOPE_COUNTRIES` in tapaPromote MUST mirror
+  `cargoAnalysis` APAC+Middle-East sets exactly (lib cannot import workbench, so
+  it is duplicated). It sets `analystInScope`, which `classifyScope`
+  short-circuits to `in_scope` for APAC/ME BEFORE its noise gates. A country
+  added to one set but not the other silently drops from the monitor.
+- **Country canon:** `normaliseTapaCountry` files Hong Kong → China (+geoHint),
+  and canonicalises Viet Nam→Vietnam, Korea, Republic of→South Korea,
+  Taiwan, Province of China→Taiwan — must match cargoAnalysis aliases.
+- **Idempotency:** marker `analyst_notes=tapa_offline:<sha256(9 fields)>:<occurrence>`.
+  Dedupe is marker-only (TAPA rows have no URL, so gdelt's fuzzy news/URL dedupe
+  does not apply). Byte-identical rows across pages promote as DISTINCT incidents
+  via the occurrence index — expected, so an analyst may see near-identical
+  Cargo Watch rows. Re-running the route inserts 0.
+- **backfillRelevance (migrations.ts):** MUST keep excluding BOTH
+  `'gdelt_cloud:%'` AND `'tapa_offline:%'` so a `RELEVANCE_RULE_VERSION` bump
+  cannot re-score these structured rows by text.
+
+## Verified facts (this dataset, 5 saved pages)
+
+- 489 rows total; parser stable at 489 after the CLI refactor.
+- Severity split low 226 / moderate 198 / high 65 — high=65 exactly equals the
+  source's "High Value = Yes" count (a good sanity check for the classifier).
+- Country spread (post-normalisation): India 267, Philippines 61, Vietnam 45,
+  China 29 (incl. 24 Hong Kong), Indonesia 20, Malaysia 16, Thailand 16,
+  Pakistan 9, Australia 9, South Korea 6, Japan 4, Taiwan 3, Singapore 2,
+  New Zealand 1, Bangladesh 1 — all APAC, so all promote in-scope.
+- Rollback: `DELETE FROM incidents WHERE analyst_notes LIKE 'tapa_offline:%'`.
+
+## Verification path
+
+Owner-gated UI (Replit Auth) can't be screenshotted headlessly — verify via the
+unit suite (`__tests__/ingest/tapaPromote.test.ts`), the dry-run counts, and a
+direct SQL spot-check, not live app screenshots.

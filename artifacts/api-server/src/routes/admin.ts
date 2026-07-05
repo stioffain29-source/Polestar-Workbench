@@ -8,6 +8,7 @@ import {
   runIccPiracyOnce,
   runMovementOnce,
   runGdeltStructuredOnce,
+  runTapaPromoteOnce,
 } from "../lib/ingestRunner";
 import { backfillRelevance, backfillSeverity } from "../lib/migrations";
 
@@ -412,6 +413,87 @@ router.post("/admin/gdelt-structured", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin gdelt-structured failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Offline TAPA Data Explorer → Cargo Watch promote. Reads the SAVED local HTML
+// pages (no scrape / no network / no cookies) and promotes each row into a
+// cargo_watch incident, deduped by an idempotency marker so re-runs never
+// double-insert. Append ?mode=dry-run to preview counts without writing.
+router.post("/admin/tapa-promote", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin tapa-promote called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  try {
+    const dryRun = req.query["mode"] === "dry-run";
+    req.log.info({ dryRun }, "admin tapa-promote started");
+    const result = await runTapaPromoteOnce({ commit: !dryRun });
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const t = result.tapaPromote;
+    req.log.info(
+      {
+        mode: t.mode,
+        reason: t.reason,
+        htmlDir: t.htmlDir,
+        filesParsed: t.filesParsed,
+        rowsParsed: t.rowsParsed,
+        promotable: t.promotable,
+        duplicateMarker: t.duplicateMarker,
+        newToInsert: t.newToInsert,
+        inserted: t.inserted,
+        totalAfter: t.totalAfter,
+        durationMs: result.durationMs,
+      },
+      "admin tapa-promote finished",
+    );
+    res.json({
+      ok: true,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      tapaPromote: {
+        mode: t.mode,
+        reason: t.reason,
+        htmlDir: t.htmlDir,
+        filesParsed: t.filesParsed,
+        eurUsdRate: t.eurUsdRate,
+        rowsParsed: t.rowsParsed,
+        promotable: t.promotable,
+        skippedNoDate: t.skippedNoDate,
+        skippedNoCountry: t.skippedNoCountry,
+        duplicateMarker: t.duplicateMarker,
+        newToInsert: t.newToInsert,
+        inserted: t.inserted,
+        bySeverity: t.bySeverity,
+        byCountry: t.byCountry,
+        totalAfter: t.totalAfter,
+        errors: t.errors,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin tapa-promote failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

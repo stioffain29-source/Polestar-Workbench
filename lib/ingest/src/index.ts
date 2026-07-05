@@ -189,6 +189,38 @@ export type {
   LanePromotion,
 } from "./gdeltPromote";
 export {
+  runTapaPromote,
+  emptyTapaPromoteSummary,
+  decideTapaPromotion,
+  decideTapaSeverity,
+  normaliseTapaCountry,
+  parseTapaEur,
+  eurToUsd,
+  parseTapaDate,
+  readTapaEurUsdRate,
+  markTapaRows,
+  tapaInputFromRecord,
+  tapaMarker,
+  tapaRowHash,
+  isTapaMarker,
+  resolveTapaHtmlDir,
+  collectTapaHtmlFiles,
+  TAPA_SOURCE_LABEL,
+  TAPA_PROMOTE_MARKER_PREFIX,
+  TAPA_SCOPE_COUNTRIES,
+  TAPA_MODERATE_CATEGORIES,
+  TAPA_VIOLENT_MODUS,
+  DEFAULT_EUR_USD_RATE,
+  TAPA_EUR_USD_RATE_ENV,
+} from "./tapaPromote";
+export type {
+  TapaPromoteSummary,
+  TapaPromoteInput,
+  TapaPromoteDecision,
+} from "./tapaPromote";
+export { parseTapaHtml, tapaRowToRecord, TAPA_COLUMNS } from "./tapaParser";
+export type { TapaColumn, TapaRecord, TapaParseResult } from "./tapaParser";
+export {
   GDELT_HEALTH_NAME,
   GDELT_HEALTH_TOPIC,
   GDELT_NOT_CONFIGURED_MESSAGE,
