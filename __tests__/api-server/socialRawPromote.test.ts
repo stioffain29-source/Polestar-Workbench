@@ -315,6 +315,11 @@ afterAll((done) => {
 });
 
 beforeEach(() => {
+  // The global jest.setup.ts beforeEach runs clearIntegrationEnv() (which
+  // deletes INGEST_ADMIN_TOKEN) BEFORE this hook, so the beforeAll token would
+  // otherwise be wiped and every promote 503s at the admin-token gate. Re-apply
+  // it here so each test starts admin-enabled.
+  enableTestAdminToken();
   incidents = [];
   socialItems = [];
   nextIncidentId = 1;

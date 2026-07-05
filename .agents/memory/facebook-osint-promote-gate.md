@@ -3,10 +3,22 @@ name: Facebook OSINT promote gate
 description: Invariants for promoting a social_raw (Papua/PNG Facebook OSINT) post into an incident — isolation, server-side re-derive, atomic claim, dual-window dedup, URL sanitisation.
 ---
 
-Facebook OSINT posts live in the isolated `social_raw` table and are CONTEXT
-ONLY — no incident-counting surface (dashboard, topic monitors, reports) reads
-that table. The single path into `incidents` is the gated, human-in-the-loop
-promote route.
+Facebook/Instagram OSINT posts land in the isolated `social_raw` table; raw rows
+are CONTEXT and no incident-counting surface (dashboard, topic monitors, reports)
+reads that table directly. Rows reach `incidents` through a gated PROMOTE that
+re-derives eligibility server-side — via TWO paths sharing the SAME gate:
+(1) an AUTOMATIC DB→DB pass `runSocialPromote` (`lib/ingest/src/socialPromote.ts`)
+that the Apify scrapers run after each persist so eligible posts flow into the
+incident feeds UNATTENDED (mirrors gdeltPromote/tapaPromote; idempotent via an
+`analyst_notes=social_raw:<id>` marker + the `promoted_incident_id` back-link),
+and (2) the explicit human-in-the-loop promote route. **The owner REVERSED the
+earlier "never an incident / manual-only" rule** ("social media scrapes are to
+go directly into relevant feeds") — do NOT re-isolate this layer. The manual
+route + social_raw UI/tables were deliberately left functionally untouched.
+**Why NOT excluded from `backfillRelevance`** (unlike gdelt/tapa markers): social
+rows are relevance-scored by the text engine on their OWN text at promote time
+and stamped with `RELEVANCE_RULE_VERSION`, so a version-bump re-score is
+semantically consistent — only structured-lane-derived rows need the skip.
 
 **Server re-derives eligibility — never trust the client / stored flags.**
 The promote route recomputes `deriveEligibility` from the STORED row

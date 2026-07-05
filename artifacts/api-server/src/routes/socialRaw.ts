@@ -35,10 +35,10 @@ const router: IRouter = Router();
 // POST /social-raw/{id}/promote action, and the automatic scrape-time
 // promote pass (`runSocialPromote`, lib/ingest) the Apify importers run.
 //
-// Read is PUBLIC (in line with the rest of the workbench). The promote action
-// mirrors the existing public POST /incidents posture — the workbench is
-// intentionally open for view + edit; the only token-gated writes are
-// admin/ingest and source mutations.
+// This router (like every data router) sits behind `requireOwner` — the
+// workbench is OWNER-PRIVATE via Replit Auth, so both reads and the promote
+// action require the owner's signed-in session. The pre-existing admin-token
+// gate on admin/ingest and source mutations is additional and unchanged.
 const SOURCE_NAME = "facebook_osint";
 const DEFAULT_LIMIT = 100;
 const DAY_MS = 24 * 60 * 60 * 1000;

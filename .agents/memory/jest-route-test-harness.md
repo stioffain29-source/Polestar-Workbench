@@ -1,6 +1,6 @@
 ---
 name: jest route-test harness gotchas
-description: Two non-obvious traps when unit-testing an Express route in isolation in this repo — a missing req.log, and shared helper files run as empty suites.
+description: Three non-obvious traps when unit-testing an Express route in isolation in this repo — a missing req.log, shared helper files run as empty suites, and a global beforeEach that wipes a token set only in beforeAll.
 ---
 
 # Testing an Express route on a bare app

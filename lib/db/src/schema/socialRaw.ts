@@ -20,13 +20,17 @@ import {
 // so the table can hold a wider raw monitoring feed without any of it ever
 // reaching incidents.
 //
-// CRITICAL PRODUCT RULE: a social_raw item is NEVER an incident. It lives in its
-// own table precisely so a Facebook post can never inflate any incident count
-// (dashboard, topic monitors, reports). The ONLY path from this table into
-// `incidents` is an explicit, gated, human-in-the-loop PROMOTE action, and the
-// server RE-DERIVES eligibility on promote — it never trusts a client claim.
-// Once promoted, `promotedIncidentId` links the raw item back to the incident
-// it created.
+// PRODUCT RULE: social_raw is the isolated LANDING table for scraped social
+// posts — a raw row never inflates any incident count (dashboard, topic
+// monitors, reports) directly. Rows reach `incidents` ONLY through a gated
+// PROMOTE that RE-DERIVES eligibility server-side and never trusts a client
+// claim. There are TWO promote paths, both applying the SAME gate: (1) an
+// automatic DB→DB pass (`runSocialPromote`, lib/ingest) that the scrapers run
+// after each ingest so eligible posts flow into the incident feeds unattended
+// (mirrors the GDELT/TAPA promote passes; idempotent via an analyst_notes
+// marker plus the back-link), and (2) the explicit human-in-the-loop PROMOTE
+// route. Both set `promotedIncidentId` to link the raw row back to the incident
+// it created, so re-promotion is a no-op.
 //
 // PROMOTION GATE (re-derived server-side): an item is eligible only when it is
 // (a) security-relevant (a real security category, not "Other security") AND

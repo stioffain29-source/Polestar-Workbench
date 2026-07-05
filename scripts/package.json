@@ -9,6 +9,7 @@
     "import:apify-facebook": "tsx ./src/import-apify-facebook.ts",
     "import:apify-instagram": "tsx ./src/import-apify-instagram.ts",
     "import:tapa-explorer": "tsx ./src/import-tapa-explorer.ts",
+    "promote:social": "tsx ./src/promote-social.ts",
     "scrape:cargo-watch": "tsx ./src/scrape-cargo-watch.ts",
     "scrape:flashpoint": "tsx ./src/scrape-flashpoint.ts",
     "scrape:shipping": "tsx ./src/scrape-shipping.ts",
