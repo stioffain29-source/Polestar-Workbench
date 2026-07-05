@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import type { Incident } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { MapContainer, TileLayer, CircleMarker, GeoJSON, Tooltip as LeafletTooltip } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { Layer, PathOptions } from "leaflet";
@@ -15,7 +15,7 @@ import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
 import { COUNT_BANDS, countBandColor, featureCountryName } from "@/lib/cargoChoropleth";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
-import { severityBadgeStyle, ratingColor } from "@/lib/topics";
+import { severityBadgeStyle } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import {
@@ -25,7 +25,6 @@ import {
   classifyLocationType,
   classifyIncidentType,
   parseUsdLoss,
-  identifyCountry,
   cargoCountry,
   IN_SCOPE_COUNTRIES,
   type Region,
@@ -250,19 +249,6 @@ export default function CargoWatch() {
   const confirmedValue = enriched.reduce((s, i) => s + (i.usdLoss ?? 0), 0);
   const companiesNamed = enriched.filter((i) => i.company).length;
   const countriesCovered = new Set(enriched.map((i) => i.displayCountry).filter(Boolean)).size;
-  // Point markers: ONLY records that carry reliable latitude/longitude in the
-  // source data. Records with only country/city data contribute to the country
-  // choropleth shading instead — never a jittered pin that would fake a precise
-  // location. No approximate centroid markers.
-  const pointMarkers = useMemo(
-    () => enriched.flatMap((i) =>
-      i.latitude != null && i.longitude != null
-        ? [{ id: i.id, lat: i.latitude, lng: i.longitude, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.displayCountry }]
-        : [],
-    ),
-    [enriched],
-  );
-
   // Per-country choropleth aggregation: incident count and summed source-stated
   // USD loss, over the SAME windowed in-scope set the rest of the page uses.
   // Records with no identifiable in-scope country are excluded from shading.
@@ -279,7 +265,7 @@ export default function CargoWatch() {
     return m;
   }, [enriched]);
   const shadedCountryCount = countryIntensity.size;
-  const mappable = shadedCountryCount > 0 || pointMarkers.length > 0;
+  const mappable = shadedCountryCount > 0;
 
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
@@ -428,31 +414,15 @@ export default function CargoWatch() {
             </div>
           ) : (
             <>
-              <div className="relative h-[440px]">
+              <div className="relative h-[640px]">
                 <MapContainer center={[10, 100]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                   <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <CargoChoropleth intensity={countryIntensity} />
-                  {pointMarkers.map((m) => {
-                    const c = ratingColor(m.severity);
-                    return (
-                      <CircleMarker key={m.id} center={[m.lat, m.lng]} radius={6}
-                        pathOptions={{ fillColor: c, color: c, fillOpacity: 0.78, weight: 1.5 }}>
-                        <LeafletTooltip>
-                          <div className="text-xs">
-                            <div className="font-bold">{m.title}</div>
-                            <div>{identifyCountry(m.country) ?? "—"} · {m.region} · {m.category}</div>
-                          </div>
-                        </LeafletTooltip>
-                      </CircleMarker>
-                    );
-                  })}
                 </MapContainer>
                 <ChoroplethLegend />
               </div>
               <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-sans border-t border-border">
-                Countries shaded by cargo-incident count ({rangeText}). {pointMarkers.length > 0
-                  ? `${pointMarkers.length} record${pointMarkers.length === 1 ? "" : "s"} with precise coordinates also shown as ${pointMarkers.length === 1 ? "a point" : "points"}.`
-                  : "No records in this window carry precise coordinates, so no point markers are shown."}
+                Countries shaded by cargo-incident count ({rangeText}).
               </div>
             </>
           )}
