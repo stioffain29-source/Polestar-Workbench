@@ -45,7 +45,10 @@ export type Region = "Middle East" | "APAC" | "Out of scope" | "Country not iden
 
 // City / sub-region aliases per the scope spec. Mapped to canonical country
 // names so a record tagged "Dubai" or "Hong Kong" is treated as UAE / China.
-const COUNTRY_ALIASES: Record<string, string> = {
+// Exported so a test can assert every canonical target resolves to a polygon
+// name present in the choropleth GeoJSON (an alias mapping to a name with no
+// polygon would silently fail to shade any country).
+export const COUNTRY_ALIASES: Record<string, string> = {
   // UAE
   "dubai": "UAE", "abu dhabi": "UAE", "jebel ali": "UAE", "sharjah": "UAE",
   // Saudi Arabia
