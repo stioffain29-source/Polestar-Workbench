@@ -7,8 +7,11 @@ import {
 } from "@workspace/api-client-react";
 import type { Incident } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, GeoJSON, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { Layer, PathOptions } from "leaflet";
+import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
@@ -57,30 +60,31 @@ const REGION_COLOR: Record<Region, string> = {
 };
 
 
-// Country centroids for in-scope APAC + Middle East countries. Used ONLY as a
-// fallback when a record has no precise lat/long in the database, so the map
-// can place the incident at its country (clearly flagged as approximate). This
-// mirrors the ingest geocoder, which resolves a city to its country centroid.
-const COUNTRY_CENTROID: Record<string, [number, number]> = {
-  "Indonesia": [-2.5, 118], "Papua New Guinea": [-6.3, 143.9], "Vietnam": [14.1, 108.3],
-  "Australia": [-25.3, 133.8], "Malaysia": [4.2, 101.9], "India": [22.0, 79.0],
-  "Philippines": [12.9, 121.8], "Singapore": [1.35, 103.8], "Thailand": [15.1, 101.0],
-  "Cambodia": [12.6, 104.9], "Laos": [18.2, 103.9], "Myanmar": [21.9, 95.9],
-  "Pakistan": [30.4, 69.3], "Bangladesh": [23.7, 90.4], "Sri Lanka": [7.9, 80.8],
-  "China": [35.9, 104.2], "Taiwan": [23.7, 121.0], "South Korea": [36.5, 127.9],
-  "Japan": [36.2, 138.3], "New Zealand": [-41.5, 172.8],
-  "Saudi Arabia": [23.9, 45.1], "UAE": [23.4, 53.8], "United Arab Emirates": [23.4, 53.8],
-  "Oman": [21.5, 55.9], "Qatar": [25.3, 51.2], "Bahrain": [26.0, 50.5], "Kuwait": [29.3, 47.5],
-  "Jordan": [31.3, 36.2], "Iran": [32.4, 53.7], "Iraq": [33.2, 43.7], "Yemen": [15.6, 48.0],
-  "Israel": [31.0, 34.9], "Lebanon": [33.9, 35.9], "Syria": [34.8, 38.9],
-};
+// Country-intensity choropleth ramp. A single sequential brand-blue sequence
+// (light → Midnight Blue) that shades each in-scope country by how many cargo
+// incidents it holds. Deliberately DISTINCT from the reserved five-tier severity
+// colours — count concentration is a separate, neutral scale, never a risk read.
+const COUNT_BANDS: Array<{ min: number; label: string; color: string }> = [
+  { min: 1, label: "1–5", color: "#DCE0FF" },
+  { min: 6, label: "6–20", color: "#A9B2FF" },
+  { min: 21, label: "21–50", color: "#6E7BFF" },
+  { min: 51, label: "51–100", color: "#2E3BC7" },
+  { min: 101, label: "100+", color: "#0B0B3D" },
+];
 
-// Deterministic small offset so several incidents sharing a country centroid do
-// not stack on the exact same pixel. Spread only — no semantic meaning.
-function jitter(seed: number): [number, number] {
-  const a = Math.sin(seed * 12.9898) * 43758.5453;
-  const b = Math.sin(seed * 78.233) * 43758.5453;
-  return [((a - Math.floor(a)) - 0.5) * 1.4, ((b - Math.floor(b)) - 0.5) * 1.4];
+// Colour for a country's incident count. Zero incidents stay unshaded (null).
+function countBandColor(count: number): string | null {
+  let color: string | null = null;
+  for (const b of COUNT_BANDS) {
+    if (count >= b.min) color = b.color;
+  }
+  return color;
+}
+
+// Canonical name a choropleth polygon feature carries (matches the app's
+// display-country names, e.g. "UAE", "South Korea").
+function featureCountryName(f: Feature<Geometry, { name?: string }>): string {
+  return f.properties?.name ?? "";
 }
 
 type RangeKey = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
@@ -155,7 +159,6 @@ export default function CargoWatch() {
   // (isCargoInScope, all-time) instead of hiding most incidents behind a
   // 30-day window. The range pills below still let an analyst narrow the view.
   const [range, setRange] = useState<RangeKey>("all");
-  const [mapMode, setMapMode] = useState<"spot" | "density">("spot");
   const [recentTab, setRecentTab] = useState<"main" | "review">("main");
 
   // Needs Review resolution: an analyst assigns the correct country to an
@@ -269,23 +272,36 @@ export default function CargoWatch() {
   const confirmedValue = enriched.reduce((s, i) => s + (i.usdLoss ?? 0), 0);
   const companiesNamed = enriched.filter((i) => i.company).length;
   const countriesCovered = new Set(enriched.map((i) => i.displayCountry).filter(Boolean)).size;
-  // Markers: prefer precise DB coordinates; otherwise fall back to the country
-  // centroid (jittered, flagged approximate) so real incidents still appear on
-  // the map. Records with no identifiable in-scope country are dropped.
-  const markers = useMemo(
-    () => enriched.flatMap((i) => {
-      if (i.latitude != null && i.longitude != null) {
-        return [{ id: i.id, lat: i.latitude, lng: i.longitude, approx: false, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.displayCountry }];
-      }
-      const c = i.displayCountry;
-      const ctr = c ? COUNTRY_CENTROID[c] : null;
-      if (!ctr) return [];
-      const [dLat, dLng] = jitter(i.id);
-      return [{ id: i.id, lat: ctr[0] + dLat, lng: ctr[1] + dLng, approx: true, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.displayCountry }];
-    }),
+  // Point markers: ONLY records that carry reliable latitude/longitude in the
+  // source data. Records with only country/city data contribute to the country
+  // choropleth shading instead — never a jittered pin that would fake a precise
+  // location. No approximate centroid markers.
+  const pointMarkers = useMemo(
+    () => enriched.flatMap((i) =>
+      i.latitude != null && i.longitude != null
+        ? [{ id: i.id, lat: i.latitude, lng: i.longitude, severity: i.severity, title: i.title, region: i.region, category: i.category, country: i.displayCountry }]
+        : [],
+    ),
     [enriched],
   );
-  const approxCount = markers.filter((m) => m.approx).length;
+
+  // Per-country choropleth aggregation: incident count and summed source-stated
+  // USD loss, over the SAME windowed in-scope set the rest of the page uses.
+  // Records with no identifiable in-scope country are excluded from shading.
+  const countryIntensity = useMemo(() => {
+    const m = new Map<string, { count: number; usd: number }>();
+    enriched.forEach((i) => {
+      const c = i.displayCountry;
+      if (!c) return;
+      const e = m.get(c) ?? { count: 0, usd: 0 };
+      e.count += 1;
+      e.usd += i.usdLoss ?? 0;
+      m.set(c, e);
+    });
+    return m;
+  }, [enriched]);
+  const shadedCountryCount = countryIntensity.size;
+  const mappable = shadedCountryCount > 0 || pointMarkers.length > 0;
 
   const byCountry = useMemo(() => {
     const m = new Map<string, number>();
@@ -426,63 +442,40 @@ export default function CargoWatch() {
         <div className="lg:col-span-2 bg-card border border-border rounded-sm flex flex-col">
           <div className="p-3 border-b border-border bg-muted/50 flex items-center justify-between gap-2">
             <span className="font-serif font-bold uppercase text-sm text-primary">Cargo Theft Map</span>
-            <div className="flex items-center gap-px bg-border rounded-sm overflow-hidden border border-border">
-              {(["spot", "density"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMapMode(m)}
-                  className={
-                    "px-2.5 py-1 text-[11px] font-sans font-medium capitalize transition-colors " +
-                    (mapMode === m ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted")
-                  }
-                >
-                  {m === "spot" ? "Spot map" : "Density"}
-                </button>
-              ))}
-            </div>
+            <span className="text-[11px] text-muted-foreground font-sans">Country intensity · {rangeText}</span>
           </div>
-          {markers.length === 0 ? (
+          {!mappable ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               No mappable cargo incidents in this window. ({total} record{total === 1 ? "" : "s"} — none with an identifiable in-scope country.)
             </div>
           ) : (
             <>
-              <div className="h-[440px]">
+              <div className="relative h-[440px]">
                 <MapContainer center={[10, 100]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                   <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  {mapMode === "spot"
-                    ? markers.map((m) => {
-                        const c = ratingColor(m.severity);
-                        return (
-                          <CircleMarker key={m.id} center={[m.lat, m.lng]} radius={6}
-                            pathOptions={{ fillColor: c, color: c, fillOpacity: m.approx ? 0.55 : 0.78, weight: 1.5 }}>
-                            <LeafletTooltip>
-                              <div className="text-xs">
-                                <div className="font-bold">{m.title}</div>
-                                <div>{identifyCountry(m.country) ?? "—"} · {m.region} · {m.category}{m.approx ? " · country-level" : ""}</div>
-                              </div>
-                            </LeafletTooltip>
-                          </CircleMarker>
-                        );
-                      })
-                    : densityClusters(markers).map((cl) => (
-                        <CircleMarker key={cl.key} center={[cl.lat, cl.lng]} radius={6 + Math.sqrt(cl.count) * 4}
-                          pathOptions={{ fillColor: "#0b0a3d", color: "#0b0a3d", fillOpacity: 0.5, weight: 1 }}>
-                          <LeafletTooltip>
-                            <div className="text-xs">
-                              <div className="font-bold">{cl.count} incident{cl.count === 1 ? "" : "s"}</div>
-                              <div>{cl.label}</div>
-                            </div>
-                          </LeafletTooltip>
-                        </CircleMarker>
-                      ))}
+                  <CargoChoropleth intensity={countryIntensity} />
+                  {pointMarkers.map((m) => {
+                    const c = ratingColor(m.severity);
+                    return (
+                      <CircleMarker key={m.id} center={[m.lat, m.lng]} radius={6}
+                        pathOptions={{ fillColor: c, color: c, fillOpacity: 0.78, weight: 1.5 }}>
+                        <LeafletTooltip>
+                          <div className="text-xs">
+                            <div className="font-bold">{m.title}</div>
+                            <div>{identifyCountry(m.country) ?? "—"} · {m.region} · {m.category}</div>
+                          </div>
+                        </LeafletTooltip>
+                      </CircleMarker>
+                    );
+                  })}
                 </MapContainer>
+                <ChoroplethLegend />
               </div>
-              {approxCount > 0 && (
-                <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-sans border-t border-border">
-                  {approxCount} of {markers.length} marker{markers.length === 1 ? "" : "s"} placed at country level (no precise coordinates in source data).
-                </div>
-              )}
+              <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-sans border-t border-border">
+                Countries shaded by cargo-incident count ({rangeText}). {pointMarkers.length > 0
+                  ? `${pointMarkers.length} record${pointMarkers.length === 1 ? "" : "s"} with precise coordinates also shown as ${pointMarkers.length === 1 ? "a point" : "points"}.`
+                  : "No records in this window carry precise coordinates, so no point markers are shown."}
+              </div>
             </>
           )}
         </div>
@@ -788,20 +781,67 @@ export default function CargoWatch() {
   );
 }
 
-// Aggregate geocoded incidents into coarse density clusters (~0.5° grid) so the
-// Density view sizes a single solid marker by incident count — no gradient or
-// blur, per the brand spec.
-function densityClusters(rows: Array<{ lat: number; lng: number; country: string | null }>): Array<{ key: string; lat: number; lng: number; count: number; label: string }> {
-  const m = new Map<string, { lat: number; lng: number; count: number; label: string }>();
-  for (const r of rows) {
-    const gl = Math.round(r.lat * 2) / 2;
-    const gn = Math.round(r.lng * 2) / 2;
-    const key = `${gl},${gn}`;
-    const ex = m.get(key);
-    if (ex) ex.count += 1;
-    else m.set(key, { lat: r.lat, lng: r.lng, count: 1, label: identifyCountry(r.country) ?? "—" });
-  }
-  return Array.from(m.entries()).map(([key, v]) => ({ key, ...v }));
+// Country choropleth layer. Shades each in-scope country polygon by its cargo
+// incident count using the sequential brand-blue ramp; zero-count countries are
+// left unshaded (outline only). A hover tooltip reports country, count and the
+// summed source-stated USD loss. A `key` derived from the current aggregation
+// forces a clean re-style whenever the range pill changes the counts.
+function CargoChoropleth({ intensity }: { intensity: Map<string, { count: number; usd: number }> }) {
+  const geo = cargoScopeCountriesGeo as unknown as FeatureCollection<Geometry, { name?: string }>;
+  const styleKey = Array.from(intensity.entries())
+    .map(([c, v]) => `${c}:${v.count}`)
+    .sort()
+    .join("|");
+
+  const style = (feature?: Feature<Geometry, { name?: string }>): PathOptions => {
+    const name = feature ? featureCountryName(feature) : "";
+    const count = intensity.get(name)?.count ?? 0;
+    const fill = countBandColor(count);
+    return {
+      color: "#8A94A6",
+      weight: 0.8,
+      fillColor: fill ?? "#000000",
+      fillOpacity: fill ? 0.85 : 0,
+    };
+  };
+
+  const onEachFeature = (feature: Feature<Geometry, { name?: string }>, layer: Layer) => {
+    const name = featureCountryName(feature);
+    const rec = intensity.get(name);
+    const count = rec?.count ?? 0;
+    const lossLine = rec && rec.usd > 0
+      ? `Est. cargo loss: ${usd(rec.usd)}`
+      : "Est. cargo loss: not reported";
+    layer.bindTooltip(
+      `<div style="font-size:11px"><div style="font-weight:700">${name}</div>` +
+        `<div>${count} cargo incident${count === 1 ? "" : "s"}</div>` +
+        `<div>${lossLine}</div></div>`,
+      { sticky: true },
+    );
+  };
+
+  return <GeoJSON key={styleKey} data={geo} style={style} onEachFeature={onEachFeature} />;
+}
+
+// Compact legend for the count-intensity bands, overlaid on the map.
+function ChoroplethLegend() {
+  return (
+    <div className="absolute bottom-3 right-3 z-[1000] bg-card/95 border border-border rounded-sm px-2.5 py-2 text-[10px] font-sans shadow-sm">
+      <div className="font-semibold uppercase tracking-wider text-muted-foreground mb-1">Cargo incidents</div>
+      <div className="space-y-0.5">
+        {COUNT_BANDS.map((b) => (
+          <div key={b.label} className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded-[1px]" style={{ backgroundColor: b.color }} />
+            <span className="text-foreground">{b.label}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-[1px] border border-border" style={{ backgroundColor: "transparent" }} />
+          <span className="text-muted-foreground">0 (none)</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Kpi({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
