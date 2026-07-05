@@ -276,7 +276,7 @@ const SHIPPING_OPS_NOISE_RE =
 // Word-bounded, observed sub-national place names plus unambiguous large cities.
 // Consulted against title + summary only — never the source / feed label, which
 // often carries a misleading region name ("Australia Freight & Truck Theft").
-const RECOVERY_PLACES: Array<[string, RegExp]> = [
+export const RECOVERY_PLACES: Array<[string, RegExp]> = [
   ["Indonesia", /\b(tuban|sragen|ngrampal|singkawang|bengkulu|tapanuli|sumatera|sumatra|tanjung priok|priok|surabaya|bandung|semarang|makassar|bekasi|tangerang|medan|palembang|batam|bogor|depok)\b/i],
   ["Malaysia", /\b(penang|bintulu|kuching|johor|selangor|klang|sarawak|sabah|shah alam|petaling)\b/i],
   ["Philippines", /\b(bulacan|valenzuela|caloocan|quezon city|luzon|cebu|davao|cavite|laguna|pampanga|paranaque|parañaque)\b/i],
