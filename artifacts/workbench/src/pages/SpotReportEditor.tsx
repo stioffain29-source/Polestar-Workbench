@@ -48,6 +48,7 @@ import {
   MAX_PHOTOS,
   MAX_PHOTO_DATAURL_BYTES,
   MAX_PHOTOS_TOTAL_BYTES,
+  validateSpotReportPhotos,
 } from "@workspace/db/spot-report-limits";
 import SpotReportPreview from "@/components/SpotReportPreview";
 import { useToast } from "@/hooks/use-toast";
@@ -434,6 +435,17 @@ export default function SpotReportEditor() {
     };
   }, [form, report]);
 
+  const photoUsage = useMemo(() => {
+    const count = form.photos.length;
+    const bytes = form.photos.reduce((n, p) => n + (p.dataUrl?.length ?? 0), 0);
+    const countRatio = MAX_PHOTOS > 0 ? count / MAX_PHOTOS : 0;
+    const byteRatio =
+      MAX_PHOTOS_TOTAL_BYTES > 0 ? bytes / MAX_PHOTOS_TOTAL_BYTES : 0;
+    const ratio = Math.max(countRatio, byteRatio);
+    const over = count > MAX_PHOTOS || bytes > MAX_PHOTOS_TOTAL_BYTES;
+    return { count, bytes, ratio, over, warn: !over && ratio >= 0.8 };
+  }, [form.photos]);
+
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -621,6 +633,17 @@ export default function SpotReportEditor() {
   function handleSave() {
     if (!form.title.trim()) {
       toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    const photoError = validateSpotReportPhotos(
+      form.photos.filter((p) => p.dataUrl).map((p) => ({ dataUrl: p.dataUrl })),
+    );
+    if (photoError) {
+      toast({
+        title: "Photos exceed the limit",
+        description: photoError,
+        variant: "destructive",
+      });
       return;
     }
     if (isNew) {
@@ -990,6 +1013,24 @@ export default function SpotReportEditor() {
               Attach photographs — they appear after Incident Details on screen
               and in the PDF. Add several, reorder them as you wish, and give each
               an optional caption.
+            </p>
+            <p
+              className={`text-xs mb-3 ${
+                photoUsage.over
+                  ? "text-destructive font-medium"
+                  : photoUsage.warn
+                    ? "text-amber-600 font-medium"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {photoUsage.count} / {MAX_PHOTOS} photos ·{" "}
+              {(photoUsage.bytes / (1024 * 1024)).toFixed(1)} MB /{" "}
+              {Math.round(MAX_PHOTOS_TOTAL_BYTES / (1024 * 1024))} MB
+              {photoUsage.over
+                ? " — over the limit; remove or shrink some before saving"
+                : photoUsage.warn
+                  ? " — approaching the limit"
+                  : ""}
             </p>
             {form.photos.length > 0 && (
               <div className="space-y-3 mb-3">
