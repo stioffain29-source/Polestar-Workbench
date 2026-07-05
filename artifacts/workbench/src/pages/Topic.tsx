@@ -1,10 +1,8 @@
 import { useRoute } from "wouter";
 import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
-import { MapContainer, TileLayer, CircleMarker, GeoJSON, Tooltip as LeafletTooltip } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Feature, FeatureCollection, Geometry } from "geojson";
-import type { Layer, PathOptions } from "leaflet";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
@@ -23,8 +21,7 @@ import { GdeltCoding } from "@/components/GdeltCoding";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { FuelDisruptionPanel } from "@/components/FuelDisruptionPanel";
-import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
-import { COUNT_BANDS, countBandColor, featureCountryName } from "@/lib/cargoChoropleth";
+import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -60,13 +57,6 @@ function cleanCountry(c?: string | null): string | null {
   if (!t || /^unknown$/i.test(t)) return null;
   return t;
 }
-
-// DB country spellings that differ from the shared choropleth polygon names.
-// Folded in when building the choropleth intensity so those countries shade
-// instead of silently failing the name lookup.
-const CHOROPLETH_COUNTRY_ALIASES: Record<string, string> = {
-  "United Arab Emirates": "UAE",
-};
 
 export default function Topic() {
   const [, params] = useRoute("/topics/:topic");
@@ -259,18 +249,11 @@ export default function Topic() {
 
   // Fertiliser and energy use a country-level choropleth (mirrors the Cargo
   // Watch map) instead of per-incident spots: shade each in-scope country by
-  // its windowed incident count. Country names come straight from `byCountry`;
-  // a small alias map folds the few DB spellings that differ from the shared
-  // choropleth polygon names (e.g. "United Arab Emirates" -> "UAE").
+  // its windowed incident count. `buildCountryIntensity` folds the per-country
+  // counts into the shared choropleth polygon-name space (applying the few DB
+  // spelling aliases, e.g. "United Arab Emirates" -> "UAE").
   const useChoropleth = topic === "fertiliser" || topic === "energy";
-  const countryIntensity = useMemo(() => {
-    const m = new Map<string, number>();
-    byCountry.forEach(({ country, count }) => {
-      const name = CHOROPLETH_COUNTRY_ALIASES[country] ?? country;
-      m.set(name, (m.get(name) ?? 0) + count);
-    });
-    return m;
-  }, [byCountry]);
+  const countryIntensity = useMemo(() => buildCountryIntensity(byCountry), [byCountry]);
 
   const sortedForTable = useMemo(
     () => [...inWindow].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
@@ -516,29 +499,11 @@ export default function Topic() {
 
         <div className="bg-white border border-border rounded-sm overflow-hidden mt-3">
           {useChoropleth ? (
-            countryIntensity.size === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">
-                No identified countries available for this view.
-              </div>
-            ) : (
-              <>
-                <div className="relative h-[420px]">
-                  <MapContainer center={[20, 80]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                    <TileLayer
-                      attribution="&copy; OpenStreetMap &copy; CARTO"
-                      url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                      subdomains="abcd"
-                      maxZoom={19}
-                    />
-                    <TopicChoropleth intensity={countryIntensity} />
-                  </MapContainer>
-                  <TopicChoroplethLegend label={`${label} incidents`} />
-                </div>
-                <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-sans border-t border-border">
-                  Countries shaded by {label.toLowerCase()}-incident count ({RANGE_LABEL[range]}).
-                </div>
-              </>
-            )
+            <CountryChoroplethMap
+              intensity={countryIntensity}
+              legendLabel={`${label} incidents`}
+              caption={`Countries shaded by ${label.toLowerCase()}-incident count (${RANGE_LABEL[range]}).`}
+            />
           ) : withCoords.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               No geocoded records available for this view.
@@ -754,60 +719,3 @@ function GeoCard({ title, rows, empty, accent }: { title: string; rows: { label:
   );
 }
 
-// Country-intensity choropleth for the fertiliser + energy monitor maps. Mirrors the
-// Cargo Watch map: shades each in-scope country polygon by its incident count
-// using the shared brand-blue count ramp; zero-count countries are left as an
-// outline only. Reuses the shared cargoScopeCountries polygons + count bands so
-// shading rules stay a single source of truth.
-function TopicChoropleth({ intensity }: { intensity: Map<string, number> }) {
-  const geo = cargoScopeCountriesGeo as unknown as FeatureCollection<Geometry, { name?: string }>;
-  const styleKey = Array.from(intensity.entries())
-    .map(([c, n]) => `${c}:${n}`)
-    .sort()
-    .join("|");
-
-  const style = (feature?: Feature<Geometry, { name?: string }>): PathOptions => {
-    const name = feature ? featureCountryName(feature) : "";
-    const count = intensity.get(name) ?? 0;
-    const fill = countBandColor(count);
-    return {
-      color: "#8A94A6",
-      weight: 0.8,
-      fillColor: fill ?? "#000000",
-      fillOpacity: fill ? 0.85 : 0,
-    };
-  };
-
-  const onEachFeature = (feature: Feature<Geometry, { name?: string }>, layer: Layer) => {
-    const name = featureCountryName(feature);
-    const count = intensity.get(name) ?? 0;
-    layer.bindTooltip(
-      `<div style="font-size:11px"><div style="font-weight:700">${name}</div>` +
-        `<div>${count} incident${count === 1 ? "" : "s"}</div></div>`,
-      { sticky: true },
-    );
-  };
-
-  return <GeoJSON key={styleKey} data={geo} style={style} onEachFeature={onEachFeature} />;
-}
-
-// Compact legend for the count-intensity bands, overlaid on the map.
-function TopicChoroplethLegend({ label }: { label: string }) {
-  return (
-    <div className="absolute bottom-3 right-3 z-[1000] bg-card/95 border border-border rounded-sm px-2.5 py-2 text-[10px] font-sans shadow-sm">
-      <div className="font-semibold uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
-      <div className="space-y-0.5">
-        {COUNT_BANDS.map((b) => (
-          <div key={b.label} className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded-[1px]" style={{ backgroundColor: b.color }} />
-            <span className="text-foreground">{b.label}</span>
-          </div>
-        ))}
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-[1px] border border-border" style={{ backgroundColor: "transparent" }} />
-          <span className="text-muted-foreground">0 (none)</span>
-        </div>
-      </div>
-    </div>
-  );
-}

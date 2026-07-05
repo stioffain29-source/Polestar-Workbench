@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
+import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
 import {
@@ -155,6 +155,8 @@ export default function Conflict() {
       .sort((a, b) => b.count - a.count);
   }, [inWindow]);
 
+  const countryIntensity = useMemo(() => buildCountryIntensity(byCountry), [byCountry]);
+
   const countriesAffected = byCountry.length;
   const topCountry = byCountry[0] ?? null;
 
@@ -241,7 +243,6 @@ export default function Conflict() {
   }, [inWindow]);
 
   const byCountryTop12 = byCountry.slice(0, 12);
-  const withCoords = inWindow.filter((i) => i.latitude != null && i.longitude != null);
 
   // --- Operational impact aggregation ------------------------------------
   const impactRows = useMemo(() => {
@@ -461,38 +462,12 @@ export default function Conflict() {
         </div>
 
         <div className="bg-white border border-border rounded-sm overflow-hidden mt-3">
-          {withCoords.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              No geocoded records available for this view.
-            </div>
-          ) : (
-            <div className="h-[420px]">
-              <MapContainer center={[5, 115]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {withCoords.map((i) => {
-                  const c = ratingColor(i.severity);
-                  return (
-                    <CircleMarker
-                      key={i.id}
-                      center={[i.latitude!, i.longitude!]}
-                      radius={6}
-                      pathOptions={{ fillColor: c, color: darken(c), fillOpacity: FILL_OPACITY, weight: STROKE_WIDTH }}
-                    >
-                      <LeafletTooltip>
-                        <div className="text-xs">
-                          <div className="font-bold">
-                            {displayTitle(i)}
-                            <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
-                          </div>
-                          <div>{i.country ?? "Location not identified"} · {i.category}</div>
-                        </div>
-                      </LeafletTooltip>
-                    </CircleMarker>
-                  );
-                })}
-              </MapContainer>
-            </div>
-          )}
+          <CountryChoroplethMap
+            intensity={countryIntensity}
+            legendLabel="Conflict incidents"
+            caption={`Countries shaded by conflict incident count (${RANGE_LABEL[range]}).`}
+            center={[5, 105]}
+          />
         </div>
       </Section>
 
