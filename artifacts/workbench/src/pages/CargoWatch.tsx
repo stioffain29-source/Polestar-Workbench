@@ -510,7 +510,12 @@ export default function CargoWatch() {
             <>
               <div className="relative h-[560px]">
                 <MapContainer center={[10, 100]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                  <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <TileLayer
+                    attribution="&copy; OpenStreetMap &copy; CARTO"
+                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                    subdomains="abcd"
+                    maxZoom={19}
+                  />
                   <CargoChoropleth intensity={countryIntensity} />
                 </MapContainer>
                 <ChoroplethLegend />
