@@ -155,22 +155,67 @@ export function featurePath(
   return "";
 }
 
-/** Visual centroid (bbox centre) of a feature in projected pixel space. */
+// Signed area (shoelace) and area-weighted centroid of a single polygon outer
+// ring, in lon/lat space. Returns null for degenerate rings.
+function ringCentroid(
+  ring: number[][],
+): { lon: number; lat: number; area: number } | null {
+  if (!Array.isArray(ring) || ring.length < 3) return null;
+  let twiceArea = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[i + 1];
+    if (
+      typeof x0 !== "number" ||
+      typeof y0 !== "number" ||
+      typeof x1 !== "number" ||
+      typeof y1 !== "number"
+    ) {
+      continue;
+    }
+    const cross = x0 * y1 - x1 * y0;
+    twiceArea += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+  }
+  const area = twiceArea / 2;
+  if (area === 0) return null;
+  return { lon: cx / (3 * twiceArea), lat: cy / (3 * twiceArea), area: Math.abs(area) };
+}
+
+/**
+ * Label anchor for a feature in projected pixel space.
+ *
+ * Uses the area-weighted centroid of the feature's LARGEST polygon (by area)
+ * rather than the whole-feature bounding-box centre. For multi-island / spread
+ * out countries (Indonesia, Philippines) the bbox centre can fall in open water
+ * between islands; anchoring on the biggest landmass keeps the count label on
+ * land.
+ */
 export function featureCenter(
   feature: Feature<Geometry, { name?: string }>,
   project: (lon: number, lat: number) => [number, number],
 ): [number, number] | null {
-  const box: BBox = {
-    minLon: Infinity,
-    maxLon: -Infinity,
-    minLat: Infinity,
-    maxLat: -Infinity,
-  };
-  const g = feature.geometry as { coordinates?: unknown } | null;
-  if (!g || !("coordinates" in g)) return null;
-  extendBBoxFromCoords(g.coordinates, box);
-  if (!Number.isFinite(box.minLon)) return null;
-  const [x1, y1] = project(box.minLon, box.maxLat);
-  const [x2, y2] = project(box.maxLon, box.minLat);
-  return [(x1 + x2) / 2, (y1 + y2) / 2];
+  const g = feature.geometry as
+    | { type: string; coordinates: number[][][] | number[][][][] }
+    | null;
+  if (!g) return null;
+
+  // Collect each polygon's outer ring (index 0), keyed by its centroid + area.
+  const rings: number[][][] =
+    g.type === "Polygon"
+      ? [(g.coordinates as number[][][])[0]]
+      : g.type === "MultiPolygon"
+        ? (g.coordinates as number[][][][]).map((poly) => poly[0])
+        : [];
+
+  let best: { lon: number; lat: number; area: number } | null = null;
+  for (const ring of rings) {
+    const c = ringCentroid(ring);
+    if (c && (!best || c.area > best.area)) best = c;
+  }
+  if (!best) return null;
+  return project(best.lon, best.lat);
 }
