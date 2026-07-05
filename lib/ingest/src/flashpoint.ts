@@ -132,6 +132,15 @@ const FLASHPOINT_DENY: RegExp[] = [
   // video-id signature, so normal proper nouns like "(Highlands)" or
   // "(Bougainville)" are NOT denied. These are channel uploads, not reporting.
   /\([A-Za-z0-9_-]{0,14}[a-z][A-Z][A-Za-z0-9_-]{0,14}\)/,
+  // Military skills-display / graduation / enlistment homonyms — a "demonstration
+  // of close-quarter battle skills" or a "recruits enter Army service" milestone
+  // is a troop-training event, not civil unrest, yet the bare word
+  // "demonstration"/"march" trips the public-order cue. Mirrors the
+  // FLASHPOINT_EXCLUDE military-homonym patterns in @workspace/relevance so the
+  // ingest gate and the relevance verdict stay in lockstep.
+  /\bdemonstration of (?:close[- ]?quarter|combat|weapon\w*|firepower|military|martial|drill\w*|skill\w*|readiness|capabilit\w*|prowess|marksmanship|arms|tactical|hostage rescue|self[- ]?defen[cs]e|force|strength)\b/i,
+  /\b(?:new(?:ly)? )?(?:recruits?|enlist(?:ee|ees|ed)?|cadets?|privates?|trainees?|conscripts?)\b[^.]{0,45}\b(?:enter\w* (?:the )?(?:army|military|service|force|ranks)|complet\w* [^.]{0,20}(?:course|training)|graduat\w*|passing[- ]out|closing ceremony|orientation course|training school|took (?:the )?oath|oath[- ]taking)\b/i,
+  /\b(?:passing[- ]out|passing out parade|graduation (?:ceremony|parade)|closing ceremony|orientation course|training school|oath[- ]taking)\b[^.]{0,45}\b(?:recruits?|cadets?|privates?|troops?|soldiers?|army|military|infantry|division|battalion|regiment)\b/i,
 ];
 
 // Out-of-region (UK / Ireland) location guard. Country-edition Google-News

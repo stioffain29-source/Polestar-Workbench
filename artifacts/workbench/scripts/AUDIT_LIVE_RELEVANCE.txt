@@ -1,40 +1,51 @@
 
 ==============================================================================
-TOPIC: flashpoint   total=877  KEPT=478  DROPPED=399
+TOPIC: flashpoint   total=877  KEPT=448  DROPPED=429
 ==============================================================================
 
 DROP REASON SUMMARY:
-   205  excluded: flashpoint homonym (…pattern…)
-   171  dropped: ambiguous token (rally/strike) without public-order cue
-    23  dropped: no flashpoint public-order signal
+   214  excluded: flashpoint homonym (…pattern…)
+   120  dropped: ambiguous token (rally/strike) without public-order cue
+    19  dropped: no flashpoint public-order signal
+    16  excluded: 'protest'/'crackdown' in non-civil-unrest sense (diplomatic/gesture/interstate/enforcement)
+    15  excluded: out-of-region theatre (foreign syndication, no APAC anchor)
+    13  excluded: flashpoint homonym in headline (…pattern…)
+     8  excluded: diplomatic/interstate formal protest (not civil unrest)
+     7  excluded: editorial format (listicle/digest/gallery/think-piece), not a single event
+     7  excluded: court/judicial process (legal outcome, not a civil-unrest event)
+     4  excluded: editorial label (opinion/analysis/explainer), not a civil-unrest event
+     2  excluded: sports-governance protest (not security-relevant civil unrest)
+     2  excluded: cancelled/suspended industrial action (non-event)
+     1  excluded: general-news noise (…pattern…)
+     1  excluded: security-deployment preparation (not a civil-unrest event)
 
 CLIENT-FLAGGED NOISE IN THIS TOPIC:
   [DROPPED] "Taklimakan Rally 2026: GWM TANK Dominates the Unforgiving Desert - The Manila Times"
             reason: excluded: flashpoint homonym (/\b(taklimakan|silk way|gobi|kunlun|baja|china grand|rally raid|rally[- ]raid|cross[- ]country) rally\b/)
   [DROPPED] "ArenaPlus, NBA strike sports betting deal in Philippines - Philstar.com"
-            reason: excluded: flashpoint homonym (/\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/)
+            reason: excluded: flashpoint homonym in headline (/\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/)
 
-INCLUDED RECORDS (showing up to 12 of 478, newest first):
-  KEEP  2026-05-30  [Bangladesh]  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
+INCLUDED RECORDS (showing up to 12 of 448, newest first):
   KEEP  2026-05-30  [China]  Myanmar’s junta chief turned president heads to India, with an eye on China
+  KEEP  2026-05-30  [Japan]  Tokyo rally demands return of Japanese abductees in N Korea - Nation Thailand
+  KEEP  2026-05-30  [Japan]  Thousands rally in Tokyo against Takaichi moves under 'No War' banner - news.cgtn.com
+  KEEP  2026-05-30  [China]  Thousands rally in Tokyo against Takaichi government's dangerous policy moves - China Daily
+  KEEP  2026-05-30  [Japan]  Thousands rally in Tokyo against Takaichi government's dangerous policy moves - Xinhua
   KEEP  2026-05-29  [Nepal]  Nepal Rights Body Urges Charges Against Ex-PM Over Gen Z Protest Deaths - Organized Crime and Corruption Reporting Project | OCCRP
   KEEP  2026-05-29  [Bangladesh]  Hasina’s Lawyer Urges UN to Retract Bangladesh Protest Death Toll Report - UNITED NEWS OF INDIA
   KEEP  2026-05-29  [Bangladesh]  "Highly Inaccurate": Sheikh Hasina On UN Report On Bangladesh Protest Death Count - NDTV
-  KEEP  2026-05-29  [Japan]  Japan passes bill to raise co-payments for prescription drugs similar to OTC counterparts
   KEEP  2026-05-28  [Nepal]  Peaceful Polling underway in Nepal after countrywide GenZ protest - Newsonair
   KEEP  2026-05-28  [Bangladesh]  Bangladesh Editors, Media Owners to Protest Mob Attacks on Press and Cultural Institutions - News On AIR
   KEEP  2026-05-28  [Philippines]  Fisherfolk protest rising commercial fishing in municipal waters - The Manila Times
   KEEP  2026-05-28  [Nepal]  Use of lethal force, Oli & Lamichhane under lens—Nepal’s NHRC on Gen Z protest that toppled govt - ThePrint
-  KEEP  2026-05-28  [Nepal]  Can Nepal actually enforce its Human Rights Commission’s findings?
-  KEEP  2026-05-28  [Bangladesh]  Violence Erupts in Bangladesh as Police Clash with Dhaka University Students During Quota Reform Protest - Newsonair
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 399, newest first):
+REJECTED RECORDS WITH REASONS (showing up to 20 of 429, newest first):
   DROP  2026-05-30  [Japan]  Gauff’s French Open title defence ends, Sabalenka, Osaka set up last-16 clash
-        -> dropped: no flashpoint public-order signal
+        -> excluded: sports-governance protest (not security-relevant civil unrest)
   DROP  2026-05-30  [Japan]  Paddon 7th as Evans leads Ogier into FORUM8 Rally Japan finale - Talk Motorsport
         -> excluded: flashpoint homonym (/\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/)
-  DROP  2026-05-30  [Japan]  Tokyo rally demands return of Japanese abductees in N Korea - Nation Thailand
-        -> dropped: ambiguous token (rally/strike) without public-order cue
+  DROP  2026-05-30  [Bangladesh]  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
+        -> excluded: 'protest'/'crackdown' in non-civil-unrest sense (diplomatic/gesture/interstate/enforcement)
   DROP  2026-05-30  [Philippines]  Lightning strike kills Cebuano fisherman - Manila Bulletin
         -> excluded: flashpoint homonym (/\b(lightning|thunder|storm|rain|hail|snow|blizzard|cyclone|typhoon|hurricane|tornado|tsunami|earthquake|quake|flood|monsoon|heatwave|cold wave) (strike|strikes|struck|striking)/)
   DROP  2026-05-30  [Japan]  Evans tightens WRC Rally Japan grip after a closing Solberg crashes out - RACER - Racing News
@@ -59,8 +70,6 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 399, newest first):
         -> excluded: flashpoint homonym (/\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/)
   DROP  2026-05-30  [Japan]  WRC Rally Japan: Oliver Solberg crashes out while fighting for the lead - Motorsport.com
         -> excluded: flashpoint homonym (/\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/)
-  DROP  2026-05-30  [Japan]  Thousands rally in Tokyo against Takaichi moves under 'No War' banner - news.cgtn.com
-        -> dropped: ambiguous token (rally/strike) without public-order cue
   DROP  2026-05-30  [Japan]  Oliver Solberg crashes out of Rally Japan - Motorsport Week
         -> excluded: flashpoint homonym (/\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/)
   DROP  2026-05-30  [Japan]  Ogier slams Solberg who crashed out of Rally Japan - DirtFish
@@ -69,35 +78,36 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 399, newest first):
         -> excluded: flashpoint homonym (/\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/)
   DROP  2026-05-30  [Japan]  Rally Japan: Oliver Solberg turns up pressure on Elfyn Evans - Motorsport.com
         -> excluded: flashpoint homonym (/\brally (japan|finland|sweden|portugal|mexico|argentina|chile|spain|italy|monte[- ]carlo|kenya|safari|estonia|croatia|acropolis|catalunya|wales|gb|australia|new zealand)\b/)
+  DROP  2026-05-30  [Indonesia]  Barito Group Rally Helps Limit JCI Losses - Jakarta Globe
+        -> excluded: flashpoint homonym (/\b(stock|stocks|share|shares|equity|equities|market|markets|index|nifty|sensex|nikkei|kospi|hang seng|shanghai composite|kse[- ]?100|psx|bursa|jci|ftse|s&p|nasdaq|dow|asx|set index|pse(i)?|vn[- ]index|wall street|wall[- ]?st|main street) .{0,60}rally\b/)
 
 ------------------------------------------------------------------------------
 FULL REPORT PIPELINE — Flashpoint/Protests merged (gate -> operational -> report set)
 ------------------------------------------------------------------------------
-  relevance-kept=615 (flashpoint+protests buckets)  ->  in window+deduped, minus kinetic(0) court(0) dedupe(1) weak/novelty(13)  =>  FINAL REPORT SET=7
+  relevance-kept=573 (flashpoint+protests buckets)  ->  in window+deduped, minus kinetic(0) court(0) dedupe(1) weak/novelty(12)  =>  FINAL REPORT SET=7
 
 FINAL REPORT RECORDS (what cards/prose/tables share, up to 15 of 7, newest first):
-  IN   2026-05-28  [Bangladesh]  Bangladesh Editors, Media Owners to Protest Mob Attacks on Press and Cultural Institutions - News On AIR
-  IN   2026-05-28  [Philippines]  Fisherfolk protest rising commercial fishing in municipal waters - The Manila Times
-  IN   2026-05-28  [Bangladesh]  Violence Erupts in Bangladesh as Police Clash with Dhaka University Students During Quota Reform Protest - Newsonair
-  IN   2026-05-26  [Bangladesh]  Video shows procession in Bangladesh, not protest over West Bengal's roadside prayer ban - Yahoo
-  IN   2026-05-26  [Philippines]  Protest vs tree cutting in Manila - Daily Tribune
-  IN   2026-05-26  [Philippines]  Protest held vs tree cutting in Manila | Photos | GMA News Online - GMA Network
-  IN   2026-05-25  [Malaysia]  Malaysia awarded takraw title after Thailand protest referee’s call - Thai PBS World
+  IN   2026-05-30  [Japan]  Tokyo rally demands return of Japanese abductees in N Korea
+  IN   2026-05-30  [Japan]  Thousands rally in Tokyo against Takaichi moves under 'No War' banner
+  IN   2026-05-30  [China]  Thousands rally in Tokyo against Takaichi government's dangerous policy moves
+  IN   2026-05-28  [Bangladesh]  Bangladesh Editors, Media Owners to Protest Mob Attacks on Press and Cultural Institutions
+  IN   2026-05-28  [Philippines]  Fisherfolk protest rising commercial fishing in municipal waters
+  IN   2026-05-28  [Bangladesh]  Violence Erupts in Bangladesh as Police Clash with Dhaka University Students During Quota Reform Protest
+  IN   2026-05-26  [Philippines]  Protest vs tree cutting in Manila
 
-SECOND-STAGE DROPS (relevance-kept but removed before the report; up to 20 of 608):
-  CUT  2026-05-30  [Bangladesh]  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
+SECOND-STAGE DROPS (relevance-kept but removed before the report; up to 20 of 566):
   CUT  2026-05-30  [China]  Myanmar’s junta chief turned president heads to India, with an eye on China
+  CUT  2026-05-30  [Japan]  Thousands rally in Tokyo against Takaichi government's dangerous policy moves - Xinhua
   CUT  2026-05-29  [Nepal]  Nepal Rights Body Urges Charges Against Ex-PM Over Gen Z Protest Deaths - Organized Crime and Corruption Reporting Project | OCCRP
   CUT  2026-05-29  [Bangladesh]  Hasina’s Lawyer Urges UN to Retract Bangladesh Protest Death Toll Report - UNITED NEWS OF INDIA
   CUT  2026-05-29  [Bangladesh]  "Highly Inaccurate": Sheikh Hasina On UN Report On Bangladesh Protest Death Count - NDTV
-  CUT  2026-05-29  [Japan]  Japan passes bill to raise co-payments for prescription drugs similar to OTC counterparts
   CUT  2026-05-28  [Nepal]  Peaceful Polling underway in Nepal after countrywide GenZ protest - Newsonair
   CUT  2026-05-28  [Nepal]  Use of lethal force, Oli & Lamichhane under lens—Nepal’s NHRC on Gen Z protest that toppled govt - ThePrint
   CUT  2026-05-28  [Nepal]  Can Nepal actually enforce its Human Rights Commission’s findings?
   CUT  2026-05-27  [Nepal]  NHRC recommends action against Oli, Lekhak, Gurung over Gen Z protest rights violations - The Kathmandu Post
   CUT  2026-05-27  [Philippines]  BAYAN, labor leaders face raps over May 1 rally in Manila - ABS-CBN
   CUT  2026-05-27  [Nepal]  Former Nepal PM K P Sharma Oli arrested over Gen Z protest crackdown | Akashvani News - Newsonair
-  CUT  2026-05-26  [Bangladesh]  Video shows procession in Bangladesh, not protest over West Bengal's roadside prayer ban - Yahoo News Malaysia
+  CUT  2026-05-26  [Malaysia]  Thousands rally for EU on Georgia’s independence day - Free Malaysia Today
   CUT  2026-05-25  [Sri Lanka]  Former Sri Lankan IGP arrested in connection with May 2022 attack on protest site in Colombo - Newsonair
   CUT  2026-05-24  [Philippines]  Benguet students protest against Villanueva as Senate education chair - The Manila Times
   CUT  2026-05-22  [Bangladesh]  Licensable picture: Protest Against Child Rape In Dhaka, Bangladesh - reutersconnect.com
@@ -105,19 +115,24 @@ SECOND-STAGE DROPS (relevance-kept but removed before the report; up to 20 of 60
   CUT  2026-05-22  [India]  Bangladesh Anti India Protest BJP TMC , बांग्लादेश में भारत विरोधी प्रदर्शन , पश्चिम बंगाल में BJP की जीत से खफा कट्टरपंथियों ने उगला जहर , वीडियो - anti india procession in bangladesh comment bjp vic
   CUT  2026-05-21  [Indonesia]  Licensable picture: Protest in solidarity with Palestinians and Global Sumud Flotilla in Jakarta - reutersconnect.com
   CUT  2026-05-21  [Malaysia]  Top UN court says right to strike protected in key labour treaty - Free Malaysia Today
+  CUT  2026-05-21  [Australia]  ACT public schools : May 22 strike to delay morning traffic | The Canberra Times
 
 ==============================================================================
-TOPIC: protests   total=427  KEPT=137  DROPPED=290
+TOPIC: protests   total=427  KEPT=125  DROPPED=302
 ==============================================================================
 
 DROP REASON SUMMARY:
-   272  dropped: no flashpoint public-order signal
-     8  dropped: ambiguous token (rally/strike) without public-order cue
+   271  dropped: no flashpoint public-order signal
+     8  excluded: court/judicial process (legal outcome, not a civil-unrest event)
      6  excluded: flashpoint homonym (…pattern…)
+     6  dropped: ambiguous token (rally/strike) without public-order cue
+     4  excluded: 'protest'/'crackdown' in non-civil-unrest sense (diplomatic/gesture/interstate/enforcement)
      3  excluded: student non-mobilisation (attack/crime/policy, not protest)
+     2  excluded: out-of-region theatre (foreign syndication, no APAC anchor)
      1  excluded: general-news noise (…pattern…)
+     1  excluded: press-freedom/coverage-suppression (reporting subject, not a civil-unrest event)
 
-INCLUDED RECORDS (showing up to 12 of 137, newest first):
+INCLUDED RECORDS (showing up to 12 of 125, newest first):
   KEEP  2026-05-23  [Pakistan]  PTI launches protest drive for Imran’s release
   KEEP  2026-05-22  [South Korea]  (LEAD) Ex-NIS deputy chief denies allegations of delivering message backing Yoon's martial law
   KEEP  2026-05-22  [Pakistan]  PTI workers stage protests in various cities, defy Section 144 in Islamabad
@@ -126,20 +141,24 @@ INCLUDED RECORDS (showing up to 12 of 137, newest first):
   KEEP  2026-05-21  [Pakistan]  Imran’s cases will be fixed after Eid, CJP assures PTI
   KEEP  2026-05-21  [Papua New Guinea]  Lae armed robbery leaves three dead, two wounded; child hit by stray bullet
   KEEP  2026-05-21  [China]  Young Indians protest through parody ‘cockroach’ party
-  KEEP  2026-05-21  [South Korea]  (LEAD) Ex-spy chief Cho Tae-yong sentenced to 1 1/2 yrs in prison for perjury in martial law trial
-  KEEP  2026-05-20  [China]  Bolivia’s capital under siege as protests and blockades deepen crisis for president
   KEEP  2026-05-20  [India]  Chemists strike on May 20: Why Indian pharmacists are protesting e-pharmacies over rules, pricing and safety
   KEEP  2026-05-20  [Pakistan]  Afridi, Aleema claim shots were fired at Adiala sit-in participants
+  KEEP  2026-05-19  [Pakistan]  Over 200 protesting metro bus employees demand salaries in Rawalpindi
+  KEEP  2026-05-19  [Pakistan]  Teachers protest abduction of Gwadar University VC, others
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 290, newest first):
+REJECTED RECORDS WITH REASONS (showing up to 20 of 302, newest first):
   DROP  2026-05-22  [Myanmar]  Two civilians killed as Myanmar junta escalates offensives north of Monywa - Myanmar Now
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-21  [Pakistan]  Quadcopter attack kills two school children in KP's Bajaur
         -> excluded: student non-mobilisation (attack/crime/policy, not protest)
   DROP  2026-05-21  [Pakistan]  Quadcopter attack kills two schoolchildren in KP's Bajaur
         -> excluded: student non-mobilisation (attack/crime/policy, not protest)
+  DROP  2026-05-21  [South Korea]  (LEAD) Ex-spy chief Cho Tae-yong sentenced to 1 1/2 yrs in prison for perjury in martial law trial
+        -> excluded: court/judicial process (legal outcome, not a civil-unrest event)
   DROP  2026-05-21  [Papua New Guinea]  Armed robbery at Manu Cash and Carry; one suspect shot by police during pursuit
         -> dropped: no flashpoint public-order signal
+  DROP  2026-05-20  [China]  Bolivia’s capital under siege as protests and blockades deepen crisis for president
+        -> excluded: out-of-region theatre (foreign syndication, no APAC anchor)
   DROP  2026-05-19  [Papua]  TPNPB claims retaliatory attack killed 1 Indonesian soldier in Yahukimo after 2 fighters die
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-19  [Myanmar]  Buddhist abbot detained, beaten for defying Myanmar junta ally in Kachin State - myanmar-now.org
@@ -148,6 +167,8 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 290, newest first):
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-18  [Papua]  Intan Jaya regent calls for protection of civilians after church compound shooting
         -> dropped: no flashpoint public-order signal
+  DROP  2026-05-18  [India]  Supreme Court disapproves own ruling denying bail to Umar Khalid in Delhi riots case - ‘Bail is rule, jail exception’
+        -> excluded: court/judicial process (legal outcome, not a civil-unrest event)
   DROP  2026-05-18  [Papua]  Two TPNPB fighters killed in clash; group claims retaliatory killing of one soldier in Yahukimo
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-18  [Pakistan]  35 terrorists killed during action in hills around Quetta
@@ -156,22 +177,16 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 290, newest first):
         -> excluded: flashpoint homonym (/\b(intelligence[- ]based operation|\bibo\b|counter[- ]?terror(ism)? (operation|raid|action)|search (and|&) (cordon|destroy) operation|cordon and search)/)
   DROP  2026-05-15  [Myanmar]  Myanmar junta intensifies attacks along Chin-Magway border - Myanmar Now
         -> dropped: no flashpoint public-order signal
+  DROP  2026-05-15  [South Korea]  Special counsel seeks 5-yr prison term for former Army officer linked to martial law
+        -> excluded: court/judicial process (legal outcome, not a civil-unrest event)
   DROP  2026-05-15  [Pakistan]  In setback for SPSC, Sindh High Court suspends competitive exam results
         -> excluded: student non-mobilisation (attack/crime/policy, not protest)
   DROP  2026-05-14  [India]  Is Modi ‘coup-proofing’ India’s military?
         -> dropped: no flashpoint public-order signal
   DROP  2026-05-14  [India]  Red Fort area blast case: NIA’s 7,500-page chargesheet says all 10 accused were linked to Al-Qaida offshoot
         -> dropped: no flashpoint public-order signal
-  DROP  2026-05-14  [Philippines]  Chaos after gunfire in Philippines Senate - Australian Broadcasting Corporation
-        -> dropped: no flashpoint public-order signal
-  DROP  2026-05-14  [Myanmar]  Rival resistance forces launch joint attacks to repel junta advance in southern Magway - Myanmar Now
-        -> dropped: no flashpoint public-order signal
-  DROP  2026-05-14  [Papua]  TNI-TPNPB armed contact in Sugapa and Hitadipa leaves civilians wounded
-        -> dropped: no flashpoint public-order signal
-  DROP  2026-05-13  [Philippines]  Philippine Senate rocked by gunfire during arrest attempt of ICC-wanted senator Ronald dela Rosa
-        -> dropped: no flashpoint public-order signal
-  DROP  2026-05-13  [Australia; Papua New Guinea]  PNG Chiefs eye cross-code coup with Pritchard brothers
-        -> dropped: no flashpoint public-order signal
+  DROP  2026-05-14  [Philippines]  Political tension in the Philippines escalates after Senate gunfire
+        -> excluded: 'protest'/'crackdown' in non-civil-unrest sense (diplomatic/gesture/interstate/enforcement)
 
 ==============================================================================
 TOPIC: strikes   total=336  KEPT=333  DROPPED=3
@@ -203,15 +218,15 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 3, newest first):
         -> excluded: general-news noise (/\bnews live\b/)
 
 ==============================================================================
-TOPIC: fuel   total=756  KEPT=314  DROPPED=442
+TOPIC: fuel   total=756  KEPT=336  DROPPED=420
 ==============================================================================
 
 DROP REASON SUMMARY:
-   406  dropped: no required topic phrase matched
+   384  dropped: no required topic phrase matched
     27  excluded: fuel off-topic (…pattern…)
      9  excluded: general-news noise (…pattern…)
 
-INCLUDED RECORDS (showing up to 12 of 314, newest first):
+INCLUDED RECORDS (showing up to 12 of 336, newest first):
   KEEP  2026-05-23  [India]  Petrol, Diesel prices hiked for third time: Check latest fuel rates in Delhi, Mumbai, Bengaluru on 23 May
   KEEP  2026-05-23  [Unknown]  Third fuel price hike in 2 weeks: Petrol price raised by 87 paise, diesel by 91 paise
   KEEP  2026-05-22  [Japan; Saudi Arabia; Iran]  Japan to Welcome First Crude Cargo via Hormuz Since War Began
@@ -221,11 +236,11 @@ INCLUDED RECORDS (showing up to 12 of 314, newest first):
   KEEP  2026-05-22  [Australia]  Australian government plans for ‘worst-case scenario’ retail fuel rationing, documents reveal
   KEEP  2026-05-22  [Pakistan]  Govt cuts petrol price by Rs6/Litre, HSD by Rs6.80 ahead of Eid ul Adha
   KEEP  2026-05-22  [Iran]  Colombia's Natural Gas Crisis Deepens as Strait of Hormuz Closure Cuts Supply
+  KEEP  2026-05-22  [Unknown]  Pacific leaders warned of 'prolonged' fuel crisis as new plan endorsed - Australian Broadcasting Corporation
   KEEP  2026-05-22  [Iran]  Govt reduces petrol by Rs6 per litre, high-speed diesel by Rs6.8
   KEEP  2026-05-21  [India]  Delhi-NCR taxi, auto strike over fuel price hike begins — Check demands, how it affects you
-  KEEP  2026-05-21  [Iran]  StanChart Says Record SPR Withdrawals Are Tightening U.S. Oil Buffers
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 442, newest first):
+REJECTED RECORDS WITH REASONS (showing up to 20 of 420, newest first):
   DROP  2026-05-22  [Unknown]  Kazakhstan Court Upholds $1.4 Billion Award Against Gazprom
         -> dropped: no required topic phrase matched
   DROP  2026-05-22  [Australia]  News live: Australian tourist who died hiking Inca Trail identified; CBA analysis shows petrol prices could jump by 50c
@@ -239,8 +254,6 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 442, newest first):
   DROP  2026-05-22  [United Arab Emirates]  UAE Left OPEC to Pump More as End of Oil Era Looms, Presidential Adviser Says
         -> dropped: no required topic phrase matched
   DROP  2026-05-22  [India; China; Japan; South Korea; Taiwan; Saudi Arabia; Iran]  Why Saudi Arabia Is Losing Asia’s Oil Buyers
-        -> dropped: no required topic phrase matched
-  DROP  2026-05-22  [Unknown]  Pacific leaders warned of 'prolonged' fuel crisis as new plan endorsed - Australian Broadcasting Corporation
         -> dropped: no required topic phrase matched
   DROP  2026-05-22  [Iran]  Oil Prices Rise as Traders Grow Skeptical of U.S.-Iran Deal
         -> excluded: fuel off-topic (/\b(oil futures|crude futures|brent futures|wti futures|futures contract|options trading|hedge fund|speculat(or|ors|ion|ive))/)
@@ -266,31 +279,37 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 442, newest first):
         -> dropped: no required topic phrase matched
   DROP  2026-05-21  [United Arab Emirates]  ADNOC Warns Gulf Oil Disruptions Could Last Until 2027
         -> dropped: no required topic phrase matched
+  DROP  2026-05-21  [Iran]  U.S. Marines board Iranian oil tanker in Gulf of Oman
+        -> dropped: no required topic phrase matched
 
 ==============================================================================
-TOPIC: shipping   total=469  KEPT=246  DROPPED=223
+TOPIC: shipping   total=469  KEPT=237  DROPPED=232
 ==============================================================================
 
 DROP REASON SUMMARY:
-   212  dropped: no required topic phrase matched
-     9  excluded: shipping off-topic (…pattern…)
+   199  dropped: no required topic phrase matched
+    31  excluded: shipping off-topic (…pattern…)
      2  excluded: general-news noise (…pattern…)
 
-INCLUDED RECORDS (showing up to 12 of 246, newest first):
-  KEEP  2026-05-22  [Unknown]  Freight rate recovery ‘more about demand than blanked sailings’
-  KEEP  2026-05-22  [Unknown]  Drewry: World Container Index Up 6%
+INCLUDED RECORDS (showing up to 12 of 237, newest first):
   KEEP  2026-05-22  [Iran]  Strait of Hormuz closure risks greatest global energy supply shock in decades, Wood Mackenzie warns
   KEEP  2026-05-22  [Iran]  Iran proposes permanent toll for Strait of Hormuz shipping
   KEEP  2026-05-21  [China; Iran]  First coordinated VLCC transits through Hormuz raise cautious hopes of a thaw
-  KEEP  2026-05-21  [Unknown]  Drewry: Container Spot Rates Continue Climb as Early Peak Season Gains Momentum
   KEEP  2026-05-21  [Iran]  Strait of Hormuz disruption helps drive 8% rise in Panama Canal transits
   KEEP  2026-05-20  [South Korea; Iran]  FM Cho says probe into Hormuz Strait vessel attack in final stage
   KEEP  2026-05-19  [South Korea; Iran]  S. Korea, Iran continue 'close, serious' discussions regarding recent vessel attack: foreign ministry
   KEEP  2026-05-18  [Iran]  Iran to unveil Strait of Hormuz traffic plans, will collect tolls
   KEEP  2026-05-17  [Iran]  Bulk carrier attacked by multiple small craft off Iran, UKMTO says - MSN
-  KEEP  2026-05-15  [China]  China in new crackdown on carriers for ‘freight rate violations’
+  KEEP  2026-05-15  [Pakistan; India; Thailand; Singapore; Iran]  11 Pakistanis, 20 Iranians aboard US-seized vessels repatriated, says DPM Dar
+  KEEP  2026-05-15  [Iran]  UKMTO Reports Vessel Seized by Unauthorized Personnel Near Strait of Hormuz - News and Statistics - IndexBox
+  KEEP  2026-05-14  [South Korea; Iran]  S. Korea to conduct additional probe into vessel attack in Hormuz, push for diplomatic response: FM
+  KEEP  2026-05-14  [United Arab Emirates; Iran]  Vessel seized off UAE and heading toward Iranian waters: UKMTO - The New Arab
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 223, newest first):
+REJECTED RECORDS WITH REASONS (showing up to 20 of 232, newest first):
+  DROP  2026-05-22  [Unknown]  Freight rate recovery ‘more about demand than blanked sailings’
+        -> dropped: no required topic phrase matched
+  DROP  2026-05-22  [Unknown]  Drewry: World Container Index Up 6%
+        -> dropped: no required topic phrase matched
   DROP  2026-05-22  [Unknown]  CMA CGM delivered resilient results and demonstrated its ability to adapt in the context of heightened geopolitical tensions and a volatile market environment
         -> dropped: no required topic phrase matched
   DROP  2026-05-22  [Iran]  Strait of Hormuz closure may trigger ‘severe’ food price crisis: FAO
@@ -300,18 +319,20 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 223, newest first):
   DROP  2026-05-22  [Unknown]  VHBS New ConTex Container Ship Time Charter Assessment Index Week 21
         -> dropped: no required topic phrase matched
   DROP  2026-05-22  [Unknown]  Baltic Dry Index climbs to 2991 up 27 points
-        -> dropped: no required topic phrase matched
+        -> excluded: shipping off-topic (/\bbaltic (dry|exchange|capesize|panamax|supramax) index\b/)
   DROP  2026-05-22  [Unknown]  Frontline cashes in on ageing suezmax pair
         -> excluded: shipping off-topic (/\b(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership) (pair|trio|duo|disposal|sale|resale)\b/)
   DROP  2026-05-22  [China]  Peter Georgiopoulos returns to VLCC arena with up to 10 newbuilds at Wison
         -> dropped: no required topic phrase matched
   DROP  2026-05-21  [Unknown]  Baltic Dry Index Falls to Over 2-Week Low
-        -> dropped: no required topic phrase matched
+        -> excluded: shipping off-topic (/\bbaltic (dry|exchange|capesize|panamax|supramax) index\b/)
   DROP  2026-05-21  [Unknown]  Redundancies as Maersk green think tank feels the squeeze
         -> dropped: no required topic phrase matched
   DROP  2026-05-21  [Unknown]  Cargo carriers split on freighter strategy as Boeing delays extend
         -> dropped: no required topic phrase matched
   DROP  2026-05-21  [Unknown]  Maritime Association of the Port of New York and New Jersey Honors Industry Leaders at Sold-Out International Maritime Hall Of Fame Awards Dinner
+        -> dropped: no required topic phrase matched
+  DROP  2026-05-21  [Unknown]  Drewry: Container Spot Rates Continue Climb as Early Peak Season Gains Momentum
         -> dropped: no required topic phrase matched
   DROP  2026-05-21  [Indonesia; Vietnam; Cambodia]  CMA CGM Strengthens Vietnam-U.S. West Coast Network with Mekong Transpacific Express
         -> dropped: no required topic phrase matched
@@ -322,15 +343,9 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 223, newest first):
   DROP  2026-05-20  [New Zealand]  Maersk expands methanol fleet with new delivery
         -> dropped: no required topic phrase matched
   DROP  2026-05-20  [Unknown]  Baltic Dry Index falls to 3005 down 49 points
-        -> dropped: no required topic phrase matched
+        -> excluded: shipping off-topic (/\bbaltic (dry|exchange|capesize|panamax|supramax) index\b/)
   DROP  2026-05-20  [Unknown]  Dynacom lands $65m for ageing suezmax
         -> excluded: shipping off-topic (/\b(cashes? in|pockets?|nets?|bags?|lands?|snaps? up|offloads?|disposes?|sells?|buys?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/)
-  DROP  2026-05-20  [Unknown]  Baltic Dry Index Falls for 4th Day
-        -> dropped: no required topic phrase matched
-  DROP  2026-05-19  [Unknown]  Cavotec renews service agreement with Port of Salalah in Oman
-        -> dropped: no required topic phrase matched
-  DROP  2026-05-19  [Iran]  Maintenance work and weather threatens to boost Panama Canal congestion
-        -> dropped: no required topic phrase matched
 
 ==============================================================================
 TOPIC: cargo_watch   total=301  KEPT=247  DROPPED=54
@@ -397,33 +412,36 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 54, newest first):
         -> dropped: no required topic phrase matched
 
 ==============================================================================
-TOPIC: energy   total=108  KEPT=54  DROPPED=54
+TOPIC: energy   total=108  KEPT=51  DROPPED=57
 ==============================================================================
 
 DROP REASON SUMMARY:
-    54  dropped: no required topic phrase matched
+    51  dropped: no required topic phrase matched
+     6  excluded: energy off-topic (…pattern…)
 
-INCLUDED RECORDS (showing up to 12 of 54, newest first):
+INCLUDED RECORDS (showing up to 12 of 51, newest first):
   KEEP  2026-05-23  [Unknown]  Gurugram power outage: What caused massive blackout on Friday — from oil leakage in transformer to blast
   KEEP  2026-05-22  [Unknown]  New power tariff may raise bills for homes using over 400 units from July - Nation Thailand
   KEEP  2026-05-21  [Sri Lanka]  Govt. will not seek electricity tariff hike until September  Minister
   KEEP  2026-05-20  [Pakistan]  Power tariff likely to rise by Rs1.72/unit under April FCA
   KEEP  2026-05-19  [Pakistan]  Electricity prices may drop by Rs1.93 per unit
-  KEEP  2026-05-16  [Pakistan]  Sindh Assembly reverberates with heated discussion over ‘drug menace’
   KEEP  2026-05-12  [Pakistan]  Storm topples 12 grid towers, sparks power crisis in Lahore’s heartland
   KEEP  2026-05-10  [Unknown]  Increased electricity tariffs to take effect from tomorrow amid public backlash
   KEEP  2026-05-09  [Sri Lanka]  PUCSL to announce decision on special electricity tariff revision today
   KEEP  2026-05-09  [Unknown]  18% electricity tariff hike on consumers exceeding 180 units is extortion  - Sajith
   KEEP  2026-05-09  [Sri Lanka]  PUCSL approves 18% electricity tariff increase for consumers exceeding 180 units
   KEEP  2026-05-08  [Pakistan]  Karachi Power Crisis | Long Load Shedding | Electricity Shortage Heatwave - Aaj Pakistan News - Aaj News
+  KEEP  2026-05-08  [Indonesia]  Indonesia pushes ASEAN cross-border power grid expansion
 
-REJECTED RECORDS WITH REASONS (showing up to 20 of 54, newest first):
+REJECTED RECORDS WITH REASONS (showing up to 20 of 57, newest first):
   DROP  2026-05-22  [Pakistan]  FBR suspends K-Electric’s sales tax registration
         -> dropped: no required topic phrase matched
   DROP  2026-05-22  [Unknown]  TEPCO employees recorded civil trials in violation of court rules
         -> dropped: no required topic phrase matched
   DROP  2026-05-20  [Pakistan]  Biogas will not be used to fuel buses on Red Line corridor, Sindh Assembly told
         -> dropped: no required topic phrase matched
+  DROP  2026-05-16  [Pakistan]  Sindh Assembly reverberates with heated discussion over ‘drug menace’
+        -> excluded: energy off-topic (/\bno load[- ]?shedding\b/)
   DROP  2026-05-15  [Pakistan]  Nepra approves tariff for 204MW electricity imports from Iran, warns CPPA-G over violations
         -> dropped: no required topic phrase matched
   DROP  2026-05-14  [Pakistan]  Nepra allows digital payments for regulatory fees through new amendments
@@ -441,8 +459,6 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 54, newest first):
   DROP  2026-05-09  [Pakistan]  Nepra approves ₨42.6 billion investment plan for PESCO, cuts proposed spending by two-thirds
         -> dropped: no required topic phrase matched
   DROP  2026-05-08  [Pakistan]  Nepra questions plan to expand Pakistan’s power generation capacity to 64,000 megawatts by 2035
-        -> dropped: no required topic phrase matched
-  DROP  2026-05-08  [Indonesia]  Indonesia pushes ASEAN cross-border power grid expansion
         -> dropped: no required topic phrase matched
   DROP  2026-05-07  [South Korea]  KEPCO, KHNP uncooperative with each other: state auditor
         -> dropped: no required topic phrase matched
@@ -524,6 +540,6 @@ REJECTED RECORDS WITH REASONS (showing up to 20 of 42, newest first):
         -> dropped: no required topic phrase matched
 
 ##############################################################################
-GRAND TOTAL  KEPT=1846  DROPPED=1507  of 3353
+GRAND TOTAL  KEPT=1814  DROPPED=1539  of 3353
 CLIENT-FLAGGED SURVIVORS: NONE (all flagged noise dropped)
 ##############################################################################

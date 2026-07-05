@@ -1,7 +1,7 @@
 import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
-import { evaluateIncidentRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
+import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import {
   runStrikesBackfill,
   runNewsCountryBackfill,
@@ -1434,6 +1434,82 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { rows: res.rowCount ?? 0, marker: markerKey },
           "One-time purge of out-of-region mis-stamped fuel/energy/fertiliser rows",
+        );
+      }
+    }
+
+    // 3d-1a-i2) ONE-TIME re-clean of GDELT-promoted incidents against the new
+    //     Option-A slop gate. The RELEVANCE_RULE_VERSION backfill deliberately
+    //     SKIPS gdelt_cloud:/tapa_offline: rows (the lane/marker already vouched
+    //     them), so a rules bump can never re-score these lane-derived rows by
+    //     text — which means the new op-ed / metaphor / homonym slop excludes
+    //     would NOT otherwise reach the GDELT rows already in the table. This
+    //     pass applies hitsSlopExclude (the SAME predicate the promote pass now
+    //     runs) to existing gdelt_cloud flashpoint/conflict rows and DEMOTES a
+    //     slop hit to relevance='irrelevant' (kept as geography-only context,
+    //     hidden from the monitors) — it never deletes. Uses the JS predicate,
+    //     not SQL, so parity with the runtime rule is exact. Marker-gated: bump
+    //     the marker suffix if the slop rules change again and need re-applying.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "gdelt_cloud_slop_reclean_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const rows = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            source: incidentsTable.source,
+            sourceUrl: incidentsTable.sourceUrl,
+            location: incidentsTable.location,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              like(incidentsTable.analystNotes, `${PROMOTE_MARKER_PREFIX}%`),
+              eq(incidentsTable.relevanceStatus, "relevant"),
+              inArray(incidentsTable.topic, ["flashpoint", "conflict"]),
+            ),
+          );
+        let demoted = 0;
+        for (const r of rows) {
+          const verdict = hitsSlopExclude(r.topic, {
+            topic: r.topic,
+            title: r.title ?? "",
+            summary: r.summary,
+            source: r.source,
+            sourceUrl: r.sourceUrl,
+            location: r.location,
+          });
+          if (!verdict.relevant) {
+            await db
+              .update(incidentsTable)
+              .set({
+                relevanceStatus: "irrelevant",
+                relevanceScore: 0,
+                relevanceReason: `slop-reclean: ${verdict.reason}`,
+                relevanceEvaluatedAt: new Date(),
+              })
+              .where(eq(incidentsTable.id, r.id));
+            demoted++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: rows.length, demoted, marker: markerKey },
+          "One-time slop re-clean of GDELT-promoted flashpoint/conflict incidents",
         );
       }
     }

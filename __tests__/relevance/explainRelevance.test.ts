@@ -1,4 +1,4 @@
-import { explainRelevance, type RelevanceInput } from "@workspace/relevance";
+import { explainRelevance, hitsSlopExclude, type RelevanceInput } from "@workspace/relevance";
 
 function input(overrides: Partial<RelevanceInput> & Pick<RelevanceInput, "topic" | "title">): RelevanceInput {
   return {
@@ -615,5 +615,82 @@ describe("explainRelevance", () => {
         ).relevant,
       ).toBe(true);
     });
+  });
+});
+
+// Slop-only gate for externally-vouched (GDELT lane-coded) rows: runs the
+// topic's noise EXCLUDE stages ONLY, never the REQUIRED allow gate, so a
+// lane-vouched genuine event survives while a shared-vocabulary homonym /
+// op-ed / metaphor is dropped.
+describe("hitsSlopExclude", () => {
+  describe("flashpoint", () => {
+    it("keeps a lane-vouched public-order headline even when the body carries an ambiguous 'air strike' token", () => {
+      // Regression lock: the title-rescue must front-run the body FLASHPOINT_EXCLUDE
+      // homonym scan, or an anti-air-strike demonstration is wrongly demoted.
+      const r = hitsSlopExclude(
+        "flashpoint",
+        input({
+          topic: "flashpoint",
+          title: "Thousands join demonstration against air strikes in Sanaa",
+          summary: "An air strike on the district killed civilians, protesters said",
+        }),
+      );
+      expect(r.relevant).toBe(true);
+      expect(r.reason).toMatch(/title-rescue/);
+    });
+
+    it("drops a market-rally homonym with no public-order title cue", () => {
+      const r = hitsSlopExclude(
+        "flashpoint",
+        input({ topic: "flashpoint", title: "Stocks extend rally as markets surge" }),
+      );
+      expect(r.relevant).toBe(false);
+      expect(r.reason).toMatch(/slop: flashpoint/);
+    });
+
+    it("drops unambiguous title-noise (sports 'protest') outright", () => {
+      const r = hitsSlopExclude(
+        "flashpoint",
+        input({
+          topic: "flashpoint",
+          title: "Malaysia awarded takraw title after Thailand protest referee's call",
+        }),
+      );
+      expect(r.relevant).toBe(false);
+      expect(r.reason).toMatch(/slop: flashpoint title noise/);
+    });
+  });
+
+  describe("conflict", () => {
+    it("drops a political metaphor op-ed ('minefield of coalition politics')", () => {
+      const r = hitsSlopExclude(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "The minefield of coalition politics deepens after the vote",
+        }),
+      );
+      expect(r.relevant).toBe(false);
+      expect(r.reason).toMatch(/slop: conflict op-ed\/metaphor/);
+    });
+
+    it("keeps a real kinetic event even when it names a relief/peace context word (violence override)", () => {
+      const r = hitsSlopExclude(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Troops ambushed escorting relief convoy, three soldiers killed",
+        }),
+      );
+      expect(r.relevant).toBe(true);
+    });
+  });
+
+  it("returns relevant for a topic with no slop rule (keeps the lane verdict)", () => {
+    const r = hitsSlopExclude(
+      "shipping",
+      input({ topic: "shipping", title: "Anything at all" }),
+    );
+    expect(r.relevant).toBe(true);
   });
 });

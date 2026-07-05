@@ -58,6 +58,46 @@ promote failure can never fail the wider ingest.
   fuzzy key (byte-identical to `dedupeKey` in newsTopic.ts) + source/resolved URL.
   In-run guard sets grow so two same-run events can't double-insert.
 
+## Promoted rows still pass the SLOP-EXCLUDE gate (Option A)
+
+A lane vouches that an event is GENUINE, but it does NOT vouch that the event is
+on-topic *noise-free* — GDELT lanes still carry stock-photo wires, sports-media
+"protests", suspended strikes, market "rallies", relief/diplomacy copy, etc. So a
+promoted row is gated through the topic's SLOP EXCLUDES ONLY — never the full
+REQUIRED gate (the lane already earned the keep; re-running REQUIRED would
+re-drop genuine lane events on text alone). `hitsSlopExclude(topic, i)` (exported
+from `@workspace/relevance`) is the ONE shared slop-only predicate: for flashpoint
+it runs `FLASHPOINT_EXCLUDE` + `FLASHPOINT_TITLE_HARD_EXCLUDE`; for conflict it
+runs `CONFLICT_EXCLUDE` + `CONFLICT_HARD_EXCLUDE`. A slop hit in `decidePromotion`
+DEMOTES the row (relevance='irrelevant', score 0, reason) — it is never deleted
+(context stays visible to country reports via `includeIrrelevant`).
+
+Flashpoint branch ORDER matters: title-HARD-exclude → `FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE`
+(returns relevant) → body `FLASHPOINT_EXCLUDE`. The rescue MUST front-run the body
+homonym scan, else a lane-vouched public-order headline whose body carries an
+ambiguous token (e.g. an anti-"air strike" demonstration; "air strike" is a
+FLASHPOINT_EXCLUDE homonym) is wrongly demoted. Conflict branch order:
+CONFLICT_HARD_EXCLUDE → violence override → CONFLICT_EXCLUDE.
+
+**Known residual (low-sev, needs GDELT lane MISCODING to bite):** `hitsSlopExclude`
+runs the TOPIC slop excludes only, NOT the GLOBAL `EXCLUDE_PHRASES`. Sports
+"shoot-out"/"penalty shootout" lives in EXCLUDE_PHRASES precisely because
+`CONFLICT_VIOLENCE_OVERRIDE` re-admits bare "shootout" past CONFLICT_EXCLUDE — so a
+"Security incidents"-laned sports shoot-out headline would survive the slop gate.
+Only matters on a double failure (lane miscodes AND sports headline). Future
+hardening: prepend `firstMatch(text, EXCLUDE_PHRASES)` in `hitsSlopExclude` behind
+a fresh reclean marker (per the marker-gated-reclean invariant above).
+
+**A one-time marker-gated reclean was required** because `backfillRelevance`
+permanently SKIPS `gdelt_cloud:%` / `tapa_offline:%` markers (see below), so a
+`RELEVANCE_RULE_VERSION` bump can NEVER re-clean already-promoted rows. New/changed
+slop excludes therefore need a fresh idempotent boot-migration block (mirror
+`gdelt_cloud_slop_reclean_v1`) that replays `hitsSlopExclude` over the stored
+promoted flashpoint/conflict `relevant` rows and demotes-only. **Why:** the two
+design invariants collide — promoted rows are lane-scored not text-scored, yet a
+new slop rule must reach them; the only safe bridge is a marker-gated one-shot,
+not the version backfill.
+
 **CRITICAL — the relevance backfill must EXCLUDE promoted rows.** `backfillRelevance`
 (migrations.ts) re-scores every incident whose `relevanceVersion != RELEVANCE_RULE_VERSION`
 through the TEXT relevance engine, which knows nothing about lanes. On the next

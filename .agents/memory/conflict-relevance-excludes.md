@@ -78,3 +78,21 @@ rows. Lock both the drops and the protected keeps into
   companion gating, no violence override), so an over-broad entry there silently
   kills real events across EVERY topic. Verify the protected keep with a test +
   full replay before bumping RELEVANCE_RULE_VERSION.
+
+## CONFLICT_HARD_EXCLUDE + the slop-only predicate for vouched rows
+- `CONFLICT_EXCLUDE` runs BEFORE REQUIRED and is skipped by the violence override
+  (so a genuine kinetic event survives). `CONFLICT_HARD_EXCLUDE` is a SEPARATE,
+  smaller list of UNAMBIGUOUS conflict noise that must drop even when a violence
+  word co-occurs (e.g. sports/photo/market homonyms that a bare kill/attack token
+  would otherwise rescue) — it mirrors flashpoint's `FLASHPOINT_TITLE_HARD_EXCLUDE`
+  role. Keep it curated to noise that can NEVER be a real armed event; anything
+  ambiguous belongs in `CONFLICT_EXCLUDE` (override-gated), not here.
+- Both feed the shared `hitsSlopExclude(topic, i)` (exported from
+  `@workspace/relevance`): the SLOP-EXCLUDE-ONLY predicate used to gate externally
+  vouched rows (GDELT lane-promoted incidents) without re-running the full REQUIRED
+  gate. For conflict it runs `CONFLICT_EXCLUDE` + `CONFLICT_HARD_EXCLUDE`; for
+  flashpoint `FLASHPOINT_EXCLUDE` + `FLASHPOINT_TITLE_HARD_EXCLUDE`. See
+  `gdelt-structured-layer.md` for the promote/reclean wiring.
+- **Why:** a lane proves genuineness, not topical cleanliness; the excludes are the
+  reusable "noise" half of the relevance rules, split out so both the text gate and
+  the promote pass share ONE definition of slop and can never drift.

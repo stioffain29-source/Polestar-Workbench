@@ -8,7 +8,11 @@ import {
   type SeverityTopic,
 } from "./severity";
 import { geocode } from "./geocode";
-import { RELEVANCE_RULE_VERSION, type RelevanceStatus } from "@workspace/relevance";
+import {
+  RELEVANCE_RULE_VERSION,
+  hitsSlopExclude,
+  type RelevanceStatus,
+} from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
 
 // GDELT Cloud structured-event → incident PROMOTE pass.
@@ -226,6 +230,32 @@ export function decidePromotion(item: GdeltPromoteInput): PromoteDecision {
     severityFromFatalities(item.fatalities ?? undefined) ?? "insignificant",
   );
 
+  // Option A slop gate. Even a lane-vouched GDELT event must clear the SAME
+  // noise EXCLUDE rules as scraped news (op-ed / metaphor / homonym). The lane
+  // already vouches genuineness, so we deliberately do NOT re-apply the REQUIRED
+  // allow gate — only hitsSlopExclude. A slop hit does NOT drop the row: it is
+  // demoted to relevance='irrelevant' so it survives as geography-only context
+  // (visible to country reports via includeIrrelevant) but is hidden from the
+  // flashpoint/conflict monitors.
+  const slop =
+    mapping.status === "relevant"
+      ? hitsSlopExclude(mapping.topic, {
+          topic: mapping.topic,
+          title,
+          summary,
+          source: "GDELT Cloud",
+          sourceUrl: item.primaryStoryUrl ?? item.url ?? null,
+          location: item.location ?? null,
+        })
+      : { relevant: true, reason: "" };
+  const relevanceStatus: RelevanceStatus = slop.relevant
+    ? mapping.status
+    : "irrelevant";
+  const relevanceScore = slop.relevant ? mapping.score : 0;
+  const relevanceReason = slop.relevant
+    ? `gdelt lane: ${item.lane}`
+    : `gdelt lane: ${item.lane} — slop-gated (${slop.reason})`;
+
   const row: InsertIncident = {
     topic: mapping.topic,
     title,
@@ -243,9 +273,9 @@ export function decidePromotion(item: GdeltPromoteInput): PromoteDecision {
     fatalities: item.fatalities ?? null,
     actors: deriveActors(item.actors),
     analystNotes: promoteMarker(item.externalId),
-    relevanceStatus: mapping.status,
-    relevanceScore: mapping.score,
-    relevanceReason: `gdelt lane: ${item.lane}`,
+    relevanceStatus,
+    relevanceScore,
+    relevanceReason,
     relevanceVersion: RELEVANCE_RULE_VERSION,
     relevanceEvaluatedAt: new Date(),
   };

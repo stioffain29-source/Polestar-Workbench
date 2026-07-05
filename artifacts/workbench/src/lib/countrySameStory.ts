@@ -11,7 +11,7 @@
 // of being the same event, so two genuinely distinct incidents that merely
 // share a few words are never collapsed (no over-merge, no data loss).
 //
-// Four independent merge paths, strongest first:
+// Five independent merge paths, strongest first:
 //   PATH 0  identical canonical (masthead-stripped) title — same story, any
 //           date or place (pure syndication).
 //   PATH 1  same province + compatible type + same/adjacent day + strong title
@@ -28,8 +28,19 @@
 //           rebels" vs "AMA Air pilot, US citizen, shot dead by OPM"). Requires
 //           a strong entity, never generic words, so distinct incidents that
 //           merely share common vocabulary are never collapsed.
+//   PATH 4  compatible type + BOTH headlines carry an ARMED-CLASH cue (gunfight
+//           / firefight / cordon-and-search / forces surround) AND share a
+//           DISTINCTIVE PLACE token (the town/premises, not a generic clash or
+//           security word) within a tight 2-day window. An armed clash is
+//           re-reported across outlets and days as the gunfight, then the
+//           cordon, then the "forces surround" update, worded so differently
+//           that Jaccard falls below the PATH-1 floor with no foreign-national
+//           strong entity to anchor PATH 3 ("Gunfight rages in Shopian" vs
+//           "Army, police surround two militants in Shopian as gunfight
+//           continues"). The shared place anchor plus the short window keeps a
+//           different town, or the same town more than two days apart, separate.
 //
-// The province gate on PATHS 1-3 is relaxed only for a SINGLE-THEATRE report
+// The province gate on PATHS 1-4 is relaxed only for a SINGLE-THEATRE report
 // (crossProvince), where sibling sub-provinces of the one theatre (e.g. Papua
 // Pegunungan / Papua Tengah / Papua) are the same area; multi-city reports
 // (Jakarta / Indonesia) keep the gate so distinct cities are never merged.
@@ -204,6 +215,77 @@ export function storyEntities(title: string): StoryEntities {
   return { strong, classes };
 }
 
+// ---------------------------------------------------------------------------
+// Armed-clash syndication features (PATH 4)
+// ---------------------------------------------------------------------------
+// An armed clash (a gunfight / firefight / cordon-and-search operation) is
+// re-reported by many outlets and across days — the gunfight, then the cordon,
+// then the "forces surround the hideout" update — worded so differently that
+// bag-of-words Jaccard drops below the PATH-1 floor and there is no foreign-
+// national strong entity for PATH 3. The DISTINCTIVE PLACE (the town/premises)
+// plus a tight window is what identifies the single operation.
+
+// Both headlines must carry one of these cues before PATH 4 will consider them.
+const ARMED_CLASH_RE =
+  /\b(gun[- ]?fight|gun[- ]?battle|fire[- ]?fight|shoot[- ]?out|exchange of fire|encounter|cordon(?:[- ]and[- ]search)?|besieged?|siege|surround(?:ed|s|ing)?|trapped|holed up|clash(?:es)?|ambush(?:ed)?)\b/i;
+
+// Generic clash / security / operational / count / broad-geography tokens that
+// can NEVER anchor a PATH-4 merge: they recur across every unrelated clash, so
+// only a token OUTSIDE this set (a specific town or premises name) counts as a
+// distinctive place anchor. Deliberately over-inclusive on broad-geography
+// words (directions, region names, generic terrain) so two DIFFERENT towns in
+// the same region are never merged on the region name alone — missing a merge
+// is safer here than a false one.
+const CLASH_GENERIC_TOKENS = new Set([
+  // clash / kinetic vocabulary
+  "gunfight", "gunbattle", "battle", "firefight", "shootout", "shoot", "shot",
+  "encounter", "encounters", "cordon", "siege", "besieged", "surround",
+  "surrounded", "surrounds", "surrounding", "trapped", "holed", "gunfire",
+  "gun", "guns", "firing", "fire", "exchange", "clash", "clashes", "ambush",
+  "ambushed", "raid", "raids", "crackdown", "operation", "operations", "search",
+  "blast", "attack", "attacks",
+  // forces / actors
+  "security", "forces", "force", "army", "navy", "air", "police", "crpf",
+  "cisf", "itbp", "bsf", "ssb", "jawan", "jawans", "troops", "troop", "soldier",
+  "soldiers", "militant", "militants", "militia", "terrorist", "terrorists",
+  "terror", "gunman", "gunmen", "insurgent", "insurgents", "rebel", "rebels",
+  "fighter", "fighters", "let", "linked", "group", "outfit", "cadre", "cadres",
+  // outcome / temporal / status filler
+  "kill", "killed", "killing", "killings", "dead", "death", "deaths", "injured",
+  "wounded", "hurt", "hiding", "continues", "continue", "continued", "ongoing",
+  "underway", "rages", "raging", "tighten", "tightens", "tightened", "hours",
+  "hour", "day", "days", "live", "updates", "update", "breaking", "reported",
+  "report", "amid",
+  // counts
+  "one", "two", "three", "four", "five", "several", "many",
+  // armed-group / actor NAMES — an org name recurs across every unrelated
+  // operation, so it can never anchor a merge (two DIFFERENT towns' Lashkar
+  // encounters remain two events). Bare "let" is already listed above.
+  "lashkar", "toiba", "taiba", "jaish", "mohammed", "muhammad", "hizbul",
+  "hizb", "mujahideen", "jem", "jkm", "tpnpb", "opm", "bla", "bra", "ttp",
+  "isis", "isil", "daesh", "taliban", "naxal", "naxals", "naxalite",
+  "naxalites", "maoist", "maoists", "plga", "hamas", "hezbollah",
+  // role / status of the combatant (recurs across operations, not a place)
+  "commander", "commanders", "chief", "leader", "leaders", "hideout",
+  "hideouts", "operative", "operatives", "associate", "associates", "handler",
+  "handlers", "ultra", "ultras", "overground", "wanted", "aide", "aides",
+  // additional kinetic / outcome status
+  "armed", "contact", "contacts", "martyr", "martyred", "martyrs", "gunned",
+  "neutralised", "neutralized", "eliminated", "nabbed", "arrested", "detained",
+  "apprehended", "held", "surrendered", "surrender",
+  // broad geography / generic terrain (never a distinctive place anchor)
+  "south", "north", "east", "west", "central", "region", "regions", "district",
+  "districts", "area", "areas", "village", "villages", "town", "city", "valley",
+  "forest", "forests", "field", "fields", "orchard", "orchards", "border",
+  "hills", "hill", "range", "sector", "zone", "kashmir", "jammu",
+  // broad regions / provinces / theatres (never a distinctive TOWN anchor) so
+  // two different towns of the same theatre never merge on the theatre name.
+  "papua", "balochistan", "baluchistan", "mindanao", "manipur", "nagaland",
+  "assam", "tripura", "mizoram", "meghalaya", "sindh", "punjab", "waziristan",
+  "khyber", "pakhtunkhwa", "aceh", "sulawesi", "sulu", "bastar", "highlands",
+  "highland",
+]);
+
 export interface SameStoryRow {
   title: string;
   // Geographic anchor. Both-null counts as a match (national items). Callers
@@ -241,12 +323,22 @@ export function clusterSameStoryRows(
       return rows[b].severityRank - rows[a].severityRank;
     return rows[b].dateMs - rows[a].dateMs;
   });
-  const feats = rows.map((r) => ({
-    toks: storyTokens(r.title),
-    prem: namedPremises(r.title),
-    canon: canonicalTitleKey(r.title),
-    ent: storyEntities(r.title),
-  }));
+  const feats = rows.map((r) => {
+    const toks = storyTokens(r.title);
+    return {
+      toks,
+      prem: namedPremises(r.title),
+      canon: canonicalTitleKey(r.title),
+      ent: storyEntities(r.title),
+      // PATH 4: whether the headline reports an armed clash, and its DISTINCTIVE
+      // place tokens (content tokens minus the generic clash/security/geography
+      // vocabulary) — the specific town/premises that identifies one operation.
+      clash: ARMED_CLASH_RE.test(r.title),
+      placeToks: new Set(
+        [...toks].filter((t) => !CLASH_GENERIC_TOKENS.has(t)),
+      ),
+    };
+  });
   interface Cluster {
     repIdx: number;
     members: number[];
@@ -301,6 +393,20 @@ export function clusterSameStoryRows(
       const sharedStrong = [...f.ent.strong].some((e) => ff.ent.strong.has(e));
       const sharedClass = [...f.ent.classes].some((cl) => ff.ent.classes.has(cl));
       if (dd <= 3 * DAY && sharedStrong && sharedClass) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
+      // PATH 4: armed-clash syndication. BOTH headlines report an armed clash
+      // (gunfight / firefight / cordon-and-search / forces surround) AND share a
+      // DISTINCTIVE PLACE token — the specific town or premises, never a generic
+      // clash/security/broad-geography word — within a tight 2-day window and a
+      // compatible type. The place anchor plus the short window keeps a
+      // different town, or the same town more than two days apart, separate; a
+      // small Jaccard floor guards against a single fluke token collapsing two
+      // long unrelated headlines.
+      const sharedPlace = [...f.placeToks].some((p) => ff.placeToks.has(p));
+      if (dd <= 2 * DAY && ff.clash && f.clash && sharedPlace && jac >= 0.1) {
         c.members.push(i);
         placed = true;
         break;

@@ -200,6 +200,62 @@ describe("clusterSameStoryRows", () => {
   });
 });
 
+describe("clusterSameStoryRows PATH 4 (armed-clash syndication)", () => {
+  // One gunfight/cordon operation re-reported by several outlets across two days,
+  // worded so differently that Jaccard falls below the PATH-1 floor. The shared
+  // DISTINCTIVE TOWN ("Shopian") plus a tight window is what identifies it.
+  it("collapses the same Shopian operation across differently-worded reports", () => {
+    const rows = [
+      row({ title: "Gunfight erupts in Shopian, two militants trapped", dateMs: base, severityRank: 4 }),
+      row({ title: "Security forces tighten cordon in Shopian as gunfight rages", dateMs: base + DAY, severityRank: 3 }),
+      row({ title: "Two LeT militants killed in Shopian gunfight", dateMs: base + DAY, severityRank: 3 }),
+      row({ title: "Army and police surround militants in Shopian orchard", dateMs: base + 2 * DAY, severityRank: 3 }),
+    ];
+    const clusters = clusterSameStoryRows(rows);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("does NOT merge two DIFFERENT towns that share only an armed-group NAME", () => {
+    // The architect's counterexample: both name Lashkar and both are gunfights
+    // within two days, but Kulgam and Shopian are distinct operations. An org
+    // name must never anchor a merge (it is generic across every clash).
+    const rows = [
+      row({ title: "Two Lashkar militants killed in Kulgam gunfight", dateMs: base }),
+      row({ title: "Lashkar commander trapped in Shopian encounter", dateMs: base + DAY }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("does NOT merge the same town when the reports are more than two days apart", () => {
+    const rows = [
+      row({ title: "Gunfight erupts in Shopian", dateMs: base }),
+      row({ title: "Forces besiege holed-up militants in Shopian", dateMs: base + 4 * DAY }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("does NOT merge two Papua clashes in different regencies that share only the group name (crossProvince)", () => {
+    // crossProvince disables the province gate, so PATH 4 relies wholly on the
+    // place anchor. Sharing "TPNPB" must not merge Nduga and Ilaga operations.
+    const rows = [
+      row({
+        title: "TPNPB rebels clash with troops in Nduga",
+        province: "Papua Pegunungan",
+        category: "Conflict",
+        dateMs: base,
+      }),
+      row({
+        title: "TPNPB gunmen ambush road workers in Ilaga",
+        province: "Papua Tengah",
+        category: "Conflict",
+        dateMs: base + DAY,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows, { crossProvince: true })).toHaveLength(2);
+  });
+});
+
 describe("storyEntities", () => {
   it("anchors on the foreign-national victim; the actor is only a corroborator", () => {
     const a = storyEntities("American pilot's body killed by Papua rebels");

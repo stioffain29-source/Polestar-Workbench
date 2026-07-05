@@ -184,6 +184,29 @@ const FUEL_EXCLUDE: RegExp[] = [
 // Each pattern below kills a recognised homonym so the relevance
 // gate can keep the legitimate public-order meaning of those words.
 const FLASHPOINT_EXCLUDE: RegExp[] = [
+  // --- Military display / recruitment homonyms (not civil unrest) ---
+  // "A demonstration of close-quarter battle and hostage rescue skills" — the
+  // word "demonstration" here means a military SKILLS DISPLAY, not a protest
+  // gathering, yet it satisfies the unambiguous public-order tier. Bound to a
+  // combat/skills object so a genuine street demonstration is never touched.
+  /\bdemonstration of (?:close[- ]?quarter|combat|weapon\w*|firepower|military|martial|drill\w*|skill\w*|readiness|capabilit\w*|prowess|marksmanship|arms|tactical|hostage rescue|self[- ]?defen[cs]e|force|strength)\b/,
+  // Military graduation / enlistment / orientation milestones — "135 newly
+  // enlisted Army privates completed their Operations Orientation Course",
+  // "recruits enter Army service", "passing-out parade". A troop-training
+  // milestone, not a protest.
+  /\b(?:new(?:ly)? )?(?:recruits?|enlist(?:ee|ees|ed)?|cadets?|privates?|trainees?|conscripts?)\b[^.]{0,45}\b(?:enter\w* (?:the )?(?:army|military|service|force|ranks)|complet\w* [^.]{0,20}(?:course|training)|graduat\w*|passing[- ]out|closing ceremony|orientation course|training school|took (?:the )?oath|oath[- ]taking)\b/,
+  /\b(?:passing[- ]out|passing out parade|graduation (?:ceremony|parade)|closing ceremony|orientation course|training school|oath[- ]taking)\b[^.]{0,45}\b(?:recruits?|cadets?|privates?|troops?|soldiers?|army|military|infantry|division|battalion|regiment)\b/,
+  // Geological "unrest" — "volcanic/seismic unrest" is a hazard-monitoring term
+  // (magma/tremor activity), not civil unrest.
+  /\b(?:volcanic|seismic|geological|magmatic|tectonic|magma) unrest\b/,
+  // Electoral metaphor — a "protest vote" is a ballot cast in protest, not a
+  // street demonstration.
+  /\bprotest vote(?:s|r|rs)?\b/,
+  // Hypothetical think-piece — "Inside Taiwan's nightmare scenario: a Chinese
+  // blockade … civil unrest … invasion". A war-game / worst-case essay, not a
+  // reported event, even though it names "civil unrest".
+  /\b(?:nightmare|doomsday|worst[- ]case|worst case|hypothetical|imagined|dystopian|apocalyptic) scenario\b/,
+  /\bwar[- ]?game(?:s|d|ing)?\b/,
   // Sports: baseball/cricket/football "rally", "rally past", "rally to
   // beat", "rally to win", "wins after rally", "late rally", "ninth-
   // inning rally", "tournament rally", "racing rally", motorsport
@@ -432,6 +455,10 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // + an explicit year + protest/crackdown, so a current live protest
   // ("2026 protest erupts in Dhaka") is untouched.
   /\b(punish\w*|disciplin\w*|sack\w*|suspend\w*|sentenc\w*|convict\w*|jail\w*|verdict|tribunal|probe|inquiry|commission|anniversary|aftermath)\b[^.!?]{0,45}\b(19|20)\d{2}\b[^.!?]{0,25}\b(protest|crackdown|riot|unrest|uprising|movement)\b/,
+  // Electoral metaphor — a "protest vote" is a ballot cast in protest, not a
+  // demonstration. Runs before the title-rescue so the bare word "protest"
+  // cannot rescue it.
+  /\bprotest vote(?:s|r|rs)?\b/,
 ];
 
 // Editorial suppression — specific genuine-protest headlines an operator has
@@ -914,6 +941,28 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // ambush, or "junta airstrike" during a state visit).
   /\b(roll(s|ed)? out [^.]{0,20}welcome|unprecedented welcome|warm welcome|lavish welcome|red[- ]carpet|state visit|official visit|state reception|state banquet|bilateral (talks|meeting|ties|summit)|diplomatic (welcome|visit|ties|push)|courtesy call)\b[^.]{0,70}\b(military leader|junta (chief|leader|head)|regime|senior general|min aung hlaing|head of state|military ruler|military chief|strongman)\b/,
   /\b(military leader|junta (chief|leader|head)|regime|senior general|min aung hlaing|head of state|military ruler|military chief|strongman)\b[^.]{0,70}\b(roll(s|ed)? out [^.]{0,20}welcome|unprecedented welcome|warm welcome|lavish welcome|red[- ]carpet|state visit|official visit|state reception|state banquet|bilateral (talks|meeting|ties|summit)|diplomatic (welcome|visit|ties|push)|courtesy call)\b/,
+  // Financial-crime / enforcement probe filed in a conflict-hit area used only
+  // as GEOGRAPHY ("ED seeks CBI ... over use of foreign debit cards in Naxal
+  // belt"; "ED to seek CBI probe into US Christian mission for alleged illegal
+  // funding"). An enforcement/funding probe is a governance story, not an
+  // armed-violence event. Bound to a financial-probe cue adjacent to a
+  // conflict-area/actor token; the violence override above still re-admits any
+  // genuine kinetic event.
+  /(enforcement directorate|\bed (?:seeks|to seek|files|raids|attaches|books|summons|registers|probe|case|chargesheet)|\bcbi\b|\bncb\b|foreign (?:debit|credit) cards?|money laundering|hawala|illegal (?:fund|funding|financ\w*)|terror (?:fund|financ\w*)|proceeds of crime|\bpmla\b)[^.]{0,90}\b(naxal\w*|maoist|insurgen\w*|militan\w*|separatis\w*|christian mission\w*|missionar\w*|conversion)\b/,
+  /\b(naxal\w*|maoist|insurgen\w*|militan\w*|separatis\w*|christian mission\w*|missionar\w*|conversion)\b[^.]{0,90}(enforcement directorate|\bed (?:seeks|to seek|files|raids|attaches|books|summons|registers|probe|case|chargesheet)|\bcbi\b|\bncb\b|foreign (?:debit|credit) cards?|money laundering|hawala|illegal (?:fund|funding|financ\w*)|proceeds of crime|\bpmla\b|probe into|orders? (?:a |an )?probe)/,
+  // Administrative probe / suspension over BOOKS or curriculum "glorifying"
+  // separatists/militancy ("L-G orders probe, suspends eight officials over
+  // books allegedly glorifying separatists"). A censorship/vetting action, not
+  // a live armed event. Tightly bound to a book/curriculum noun so a probe into
+  // a genuine attack is never dropped.
+  /\b(orders? (?:a |an )?probe|suspend(?:s|ed))\b[^.]{0,55}\b(?:book|books|textbook|textbooks|curriculum|syllabus)\b[^.]{0,45}\b(?:glorif\w*|separatis\w*|militan\w*|terror\w*|proscrib\w*)\b/,
+  // Symbolic destruction of a statue / monument / memorial / mural / plaque /
+  // bust / effigy ("junta forces destroy two General Aung San bronze statues").
+  // Property/heritage vandalism, not a kinetic attack on people. Bound to the
+  // symbolic OBJECT so "airstrike destroys village" (a real event, also caught
+  // by the violence override) is never dropped.
+  /\b(?:destroy\w*|demolish\w*|topple[sd]?|toppling|vandali[sz]\w*|deface[sd]?|defacing|pull(?:s|ed)? down|pulling down|bulldoze[sd]?|tear(?:s|ing)? down|tore down|blow (?:up|n up)|blew up)\b[^.]{0,45}\b(?:statue|statues|monument|monuments|memorial|memorials|mural|murals|plaque|plaques|bust|busts|effig(?:y|ies)|shrine|shrines|signage|billboard|hoarding|portrait|portraits)\b/,
+  /\b(?:statue|statues|monument|monuments|memorial|memorials|mural|murals|plaque|plaques|bust|busts|effig(?:y|ies))\b[^.]{0,45}\b(?:destroy\w*|demolish\w*|topple[sd]?|vandali[sz]\w*|deface[sd]?|pull(?:s|ed)? down|bulldoze[sd]?|torn down|blown up)\b/,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are
@@ -924,6 +973,19 @@ const CONFLICT_EXCLUDE: RegExp[] = [
 // ("earthquake kills 30"), which would re-open the relief noise this fix closes.
 const CONFLICT_VIOLENCE_OVERRIDE: RegExp =
   /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
+
+// Conflict OP-ED / METAPHOR hard-exclude. Unlike CONFLICT_EXCLUDE, this runs
+// BEFORE the violence override so a kinetic word used as a POLITICAL/ABSTRACT
+// metaphor ("The Ambush Within Kashmir's Politics", "a minefield of coalition
+// politics") can no longer re-admit the think-piece as if it were a real event.
+// The editorial-label pattern anchors at the start of the haystack (title is
+// first). The metaphor patterns bind a kinetic noun to an abstract-domain noun
+// so a literal ambush/crossfire report is never dropped.
+const CONFLICT_HARD_EXCLUDE: RegExp[] = [
+  /^\s*(comment|opinion|analysis|editorial|explainer|explained|viewpoint|perspective|column|blog|essay|op[- ]?ed)\b\s*[:|\-–—]/i,
+  /\b(ambush|minefield|crossfire|cross[- ]fire|tightrope|powder keg|powder[- ]keg)\b[^.]{0,45}\b(politic\w*|democra\w*|econom\w*|budget|election\w*|elector\w*|diploma\w*|parliament\w*|boardroom|classroom|courtroom|narrative|discourse|debate|identity|ideolog\w*)\b/i,
+  /\b(politic\w*|democra\w*|econom\w*|budget|election\w*|elector\w*|diploma\w*|parliament\w*|ideolog\w*)\b[^.]{0,30}\b(ambush|minefield|crossfire|cross[- ]fire|tightrope|powder keg)\b/i,
+];
 
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
@@ -1349,6 +1411,44 @@ function firstMatch(text: string, patterns: RegExp[]): RegExp | null {
 }
 
 /**
+ * SLOP-EXCLUDE-ONLY predicate for externally-vouched rows (e.g. GDELT
+ * lane-coded events promoted into incidents). Runs ONLY the topic's noise
+ * EXCLUDE stages — never the REQUIRED allow gate — so a genuine lane-vouched
+ * event is kept while an op-ed / homonym / metaphor that shares the vocabulary
+ * is dropped. Mirrors the exclude stages of `explainRelevance` for the
+ * flashpoint and conflict families (the only GDELT promote targets). Unknown
+ * topics return relevant (no slop rule) so the caller keeps the lane verdict.
+ */
+export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResult {
+  const text = haystack(i);
+  if (topic === "flashpoint") {
+    const t = firstMatch(titleHaystack(i), FLASHPOINT_TITLE_HARD_EXCLUDE);
+    if (t) return { relevant: false, reason: `slop: flashpoint title noise (/${t.source}/)` };
+    // A headline that is itself an unmistakable public-order event is a genuine
+    // flashpoint story even when its BODY shares an ambiguous FLASHPOINT_EXCLUDE
+    // token (an anti-"air strike" protest, a disaster-response demonstration).
+    // Mirror the main text gate, where the title-rescue runs BEFORE the body
+    // homonym scan — otherwise a lane-vouched "Thousands protest air strikes"
+    // event is wrongly demoted (the whole point of the exclude staying in
+    // FLASHPOINT_EXCLUDE is that the rescue front-runs it).
+    if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
+      return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
+    }
+    const m = firstMatch(text, FLASHPOINT_EXCLUDE);
+    if (m) return { relevant: false, reason: `slop: flashpoint homonym (/${m.source}/)` };
+  }
+  if (topic === "conflict") {
+    const hard = firstMatch(text, CONFLICT_HARD_EXCLUDE);
+    if (hard) return { relevant: false, reason: `slop: conflict op-ed/metaphor (/${hard.source}/)` };
+    if (!CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
+      const m = firstMatch(text, CONFLICT_EXCLUDE);
+      if (m) return { relevant: false, reason: `slop: conflict off-topic (/${m.source}/)` };
+    }
+  }
+  return { relevant: true, reason: "no slop-exclude match" };
+}
+
+/**
  * Decide AND explain whether a record is genuinely about the report's
  * topic. Returns the keep/drop verdict plus a human-readable reason that
  * names the rule (and pattern) that fired. This is the single source of
@@ -1390,6 +1490,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     if (m) return { relevant: false, reason: `excluded: energy off-topic (/${m.source}/)` };
   }
   if (topic === "conflict") {
+    // Op-ed / metaphor HARD exclude — runs BEFORE the violence override so a
+    // metaphorical "ambush"/"minefield" in a political think-piece can no
+    // longer re-admit the piece as if it were a real kinetic event.
+    const hard = firstMatch(text, CONFLICT_HARD_EXCLUDE);
+    if (hard) return { relevant: false, reason: `excluded: conflict op-ed/metaphor (/${hard.source}/)` };
     if (!CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
       const m = firstMatch(text, CONFLICT_EXCLUDE);
       if (m) return { relevant: false, reason: `excluded: conflict off-topic relief/peace (/${m.source}/)` };
