@@ -3,6 +3,7 @@ import {
   incidentTypeKey,
   storyTokens,
   tokenJaccard,
+  storyEntities,
   clusterSameStoryRows,
   consolidateCountryStories,
   type SameStoryRow,
@@ -113,6 +114,110 @@ describe("clusterSameStoryRows", () => {
       row({ title: "Flooding closes coastal highway", category: "Natural hazard" }),
     ];
     expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  // The Papua pilot story: one real-world event carried by three outlets that
+  // (a) geocode it to three different Papua sub-provinces and (b) phrase it so
+  // differently that bag-of-words Jaccard falls well below the 0.5 floor.
+  const pilotRows = () => [
+    row({
+      title: "Indonesia confirms evacuation of American pilot's body killed by Papua rebels",
+      province: "Papua",
+      category: "Conflict",
+      dateMs: base,
+      severityRank: 4,
+    }),
+    row({
+      title: "Body of American pilot killed in Yahukimo shooting evacuated to Timika",
+      province: "Papua Tengah",
+      category: "Conflict",
+      dateMs: base + DAY,
+      severityRank: 4,
+    }),
+    row({
+      title:
+        "Indonesian military: AMA Air pilot, US citizen, allegedly shot dead by OPM at Ipdeheik Airport",
+      province: "Papua Pegunungan",
+      category: "Conflict",
+      dateMs: base + 2 * DAY,
+      severityRank: 4,
+    }),
+  ];
+
+  it("collapses the same pilot story across sibling Papua sub-provinces (PATH 3, crossProvince)", () => {
+    const clusters = clusterSameStoryRows(pilotRows(), { crossProvince: true });
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].sort()).toEqual([0, 1, 2]);
+  });
+
+  it("keeps the province gate when crossProvince is off (multi-city safety)", () => {
+    // With the gate on, the three different provinces block the merge, proving
+    // the relaxation is what enables the collapse — not an over-eager PATH 3.
+    const clusters = clusterSameStoryRows(pilotRows());
+    expect(clusters).toHaveLength(3);
+  });
+
+  it("does NOT merge two DISTINCT Papua incidents that merely share common words", () => {
+    // Both name Papua rebels + a death, but they are different events on
+    // different subjects (a soldier vs civilian roadworkers). No shared STRONG
+    // distinctive victim entity, so PATH 3 must not collapse them.
+    const rows = [
+      row({
+        title: "Soldier killed in clash with Papua rebels in Nduga",
+        province: "Papua Pegunungan",
+        category: "Conflict",
+        dateMs: base,
+      }),
+      row({
+        title: "Two road workers shot dead by separatists in Yahukimo",
+        province: "Papua Tengah",
+        category: "Conflict",
+        dateMs: base + DAY,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows, { crossProvince: true })).toHaveLength(2);
+  });
+
+  it("does NOT merge a foreign-national victim story that shares no event-nature class", () => {
+    // Same victim entity (American pilot) but one is a fatal shooting and the
+    // other an unrelated visa/administrative item — no shared fatal/evacuation
+    // class, so a shared entity alone must not merge them.
+    const rows = [
+      row({
+        title: "American pilot shot dead by OPM in Papua highlands",
+        province: "Papua Pegunungan",
+        category: "Conflict",
+        dateMs: base,
+      }),
+      row({
+        title: "American pilot praised for charity flights across Papua",
+        province: "Papua",
+        category: "Conflict",
+        dateMs: base + DAY,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows, { crossProvince: true })).toHaveLength(2);
+  });
+});
+
+describe("storyEntities", () => {
+  it("anchors on the foreign-national victim; the actor is only a corroborator", () => {
+    const a = storyEntities("American pilot's body killed by Papua rebels");
+    expect(a.strong.has("victim:us-pilot")).toBe(true);
+    expect(a.classes.has("actor:opm")).toBe(true);
+    expect(a.classes.has("fatal")).toBe(true);
+    // The recurring actor must NOT be a strong anchor on its own.
+    expect(a.strong.has("actor:opm")).toBe(false);
+
+    const b = storyEntities("AMA Air pilot, US citizen, shot dead by OPM");
+    expect(b.strong.has("victim:us-pilot")).toBe(true);
+    expect(b.classes.has("actor:opm")).toBe(true);
+  });
+
+  it("emits no strong entity for a generic local headline", () => {
+    const e = storyEntities("Two killed in tribal clash in the highlands");
+    expect(e.strong.size).toBe(0);
+    expect(e.classes.has("fatal")).toBe(true);
   });
 });
 

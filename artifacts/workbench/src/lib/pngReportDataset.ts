@@ -211,6 +211,13 @@ export interface StructuredTheatreConfig {
   // Heading for the priority-incidents section. Falls back in the renderer to
   // the default "Top 3 Incidents This Week" when unset.
   topIncidentsHeading?: string;
+  // When true, the same-story clusterer treats sibling sub-provinces of this ONE
+  // theatre as clusterable, so the same event tagged to different Papua
+  // sub-provinces (Papua Pegunungan / Papua Tengah / Papua) is not blocked by the
+  // exact-province gate. Set ONLY on the compact single-theatre reports (PNG /
+  // West Papua); the nationwide multi-region reports (Indonesia / Jakarta) leave
+  // it unset so distinct cities are never merged.
+  crossProvinceDedup?: boolean;
   // Optional Customer Relevance audience. Names who the brief is most relevant
   // to ("Most relevant to <audience>."); the period's main issues are derived
   // from the incident mix, not from this field. Unset → a generic audience.
@@ -255,6 +262,7 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
   },
   filterDevelopmentWire: true,
   demoteNonKineticWire: true,
+  crossProvinceDedup: true,
   deriveProvince: derivePngProvince,
   extractItem: extractPngItem,
   locationAugmentations: {
@@ -303,6 +311,7 @@ export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
     audience:
       "field operations, project sites, secure movement, aviation-dependent travel, remote logistics and staff based near affected districts",
   },
+  crossProvinceDedup: true,
   deriveProvince: deriveWestPapuaProvince,
   extractItem: extractWestPapuaItem,
 };
@@ -879,7 +888,10 @@ function dedupeByTitle(items: PngReportItem[]): PngReportItem[] {
 // different days), while staying conservative enough that two genuinely distinct
 // incidents are never collapsed. Items are processed worst-severity-then-newest
 // first, so each returned cluster's first member is its representative.
-function clusterSameStory(items: PngReportItem[]): PngReportItem[][] {
+function clusterSameStory(
+  items: PngReportItem[],
+  crossProvince: boolean,
+): PngReportItem[][] {
   const rows: SameStoryRow[] = items.map((it) => ({
     title: it.title,
     province: it.province ?? null,
@@ -889,7 +901,9 @@ function clusterSameStory(items: PngReportItem[]): PngReportItem[][] {
     category: it.category,
     displayCategory: it.displayCategory,
   }));
-  return clusterSameStoryRows(rows).map((cluster) => cluster.map((i) => items[i]));
+  return clusterSameStoryRows(rows, { crossProvince }).map((cluster) =>
+    cluster.map((i) => items[i]),
+  );
 }
 
 function capitaliseFirst(s: string): string {
@@ -1134,7 +1148,7 @@ export function buildStructuredReportDataset(
   // EXCLUDED from the location buckets and Incident Details below, so a
   // syndicated re-run of a Top 3 story never reappears lower down. Aggregate
   // sections (Executive Summary, Outlook, diagnostics) still use full windowItems.
-  const storyClusters = clusterSameStory(windowItems);
+  const storyClusters = clusterSameStory(windowItems, config.crossProvinceDedup ?? false);
   // Rank by ANALYST VALUE (casualties, evacuation, a major fire, transport or
   // road disruption, a security deployment, protest disruption, regulatory
   // action with business impact, commercial proximity) rather than by the bare

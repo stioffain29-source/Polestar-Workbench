@@ -11,7 +11,7 @@
 // of being the same event, so two genuinely distinct incidents that merely
 // share a few words are never collapsed (no over-merge, no data loss).
 //
-// Three independent merge paths, strongest first:
+// Four independent merge paths, strongest first:
 //   PATH 0  identical canonical (masthead-stripped) title — same story, any
 //           date or place (pure syndication).
 //   PATH 1  same province + compatible type + same/adjacent day + strong title
@@ -20,6 +20,19 @@
 //           ("sandal factory" -> "sandal") within a wider 3-day window and a
 //           modest title overlap — consolidates the same premises event even
 //           when phrased differently or reported a few days apart.
+//   PATH 3  compatible type + a SHARED STRONG DISTINCTIVE ENTITY (a named armed
+//           actor, or a foreign-national victim in a distinctive role) AND a
+//           shared event-nature class, within a 3-day window — merges the same
+//           event even when outlets phrase it so differently that bag-of-words
+//           Jaccard falls below the floor ("American pilot killed by Papua
+//           rebels" vs "AMA Air pilot, US citizen, shot dead by OPM"). Requires
+//           a strong entity, never generic words, so distinct incidents that
+//           merely share common vocabulary are never collapsed.
+//
+// The province gate on PATHS 1-3 is relaxed only for a SINGLE-THEATRE report
+// (crossProvince), where sibling sub-provinces of the one theatre (e.g. Papua
+// Pegunungan / Papua Tengah / Papua) are the same area; multi-city reports
+// (Jakarta / Indonesia) keep the gate so distinct cities are never merged.
 
 import { canonicalTitleKey } from "./monitorDedupe";
 
@@ -119,6 +132,78 @@ export function incidentTypeKey(
   return (category ?? "").trim().toLowerCase() || "other";
 }
 
+// ---------------------------------------------------------------------------
+// Entity / synonym-anchored features (PATH 3)
+// ---------------------------------------------------------------------------
+// Bag-of-words Jaccard misses the same event when outlets phrase it very
+// differently. This recognises a small set of synonym classes and STRONG
+// DISTINCTIVE ENTITIES so the same event can be merged on shared meaning rather
+// than shared wording — while still refusing to merge on generic words.
+
+// Corroborating synonym classes (the "what happened" + a recurring named actor).
+// Overlap in one of these is required ALONGSIDE a shared strong entity before
+// PATH 3 merges, so a shared entity alone never collapses two distinct events.
+// The armed actor (OPM / Papua rebels / separatists) is only a CORROBORATOR, not
+// a strong anchor — it is a recurring actor across many separate Papua incidents,
+// so it cannot on its own identify a single event.
+const CLASS_PATTERNS: Array<[string, RegExp]> = [
+  ["fatal", /\b(killed|kill|shot\s+dead|gunned\s+down|dead|deaths?|slain|murder\w*|fatal\w*|died|bodies|body)\b/i],
+  ["evacuation", /\b(evacuat\w*|repatriat\w*|airlift\w*|flown\s+out)\b/i],
+  ["abduction", /\b(abduct\w*|kidnap\w*|hostage\w*|held\s+captive|taken\s+captive)\b/i],
+  ["injury", /\b(injured|wounded|hurt)\b/i],
+  [
+    "actor:opm",
+    /\b(opm|tpnpb|west\s+papua\s+liberation(?:\s+army)?|papuan?\s+(?:rebels?|separatists?|insurgents?|militants?|gunmen)|separatist\s+(?:rebels?|fighters?|gunmen))\b/i,
+  ],
+];
+
+// Foreign nationalities -> canonical code (kept small; extend as needed). A
+// foreign national in a distinctive role is a strong, event-identifying entity.
+const NATIONALITY_PATTERNS: Array<[string, RegExp]> = [
+  ["us", /\b(american|u\.?s\.?\s+citizen|us\s+national|american\s+citizen)\b/i],
+  ["au", /\b(australian)\b/i],
+  ["uk", /\b(british|briton)\b/i],
+  ["nz", /\b(new\s+zealand(?:er)?)\b/i],
+];
+
+// Distinctive victim roles. A foreign national in one of these roles is a strong
+// enough entity to anchor a cross-province / below-Jaccard merge.
+const ROLE_PATTERNS: Array<[string, RegExp]> = [
+  ["pilot", /\b(pilot|aircrew|airman|co-?pilot)\b/i],
+  ["missionary", /\b(missionar\w*|pastor|priest)\b/i],
+  ["worker", /\b(worker|labourer|laborer|contractor|engineer|technician)\b/i],
+  ["teacher", /\b(teacher|lecturer)\b/i],
+  ["tourist", /\b(tourist|traveller|traveler|trekker|climber)\b/i],
+  ["medic", /\b(nurse|doctor|medic|health\s+worker)\b/i],
+];
+
+export interface StoryEntities {
+  // Strong, EVENT-IDENTIFYING entities: a foreign-national victim in a
+  // distinctive role ("victim:us-pilot"). Only these anchor a PATH 3 merge — a
+  // single foreign national is killed/abducted once, so it names one event.
+  strong: Set<string>;
+  // Corroborating classes: event-nature (fatal / evacuation / abduction /
+  // injury) plus the recurring named actor ("actor:opm"). A shared class is
+  // required alongside a shared strong entity, never sufficient on its own.
+  classes: Set<string>;
+}
+
+// Extract the strong distinctive entities and corroborating classes from a
+// headline. Pure and count-free. Used only by the PATH 3 entity-anchored merge.
+export function storyEntities(title: string): StoryEntities {
+  const hay = ` ${(title ?? "").toLowerCase()} `;
+  const strong = new Set<string>();
+  const classes = new Set<string>();
+  for (const [name, re] of CLASS_PATTERNS) if (re.test(hay)) classes.add(name);
+  const nat = NATIONALITY_PATTERNS.find(([, re]) => re.test(hay))?.[0] ?? null;
+  if (nat) {
+    for (const [role, re] of ROLE_PATTERNS) {
+      if (re.test(hay)) strong.add(`victim:${nat}-${role}`);
+    }
+  }
+  return { strong, classes };
+}
+
 export interface SameStoryRow {
   title: string;
   // Geographic anchor. Both-null counts as a match (national items). Callers
@@ -138,7 +223,19 @@ const DAY = 86_400_000;
 // Cluster rows describing the same real-world event. Returns clusters of input
 // INDICES; within each cluster the FIRST index is the representative (highest
 // severity, then newest), because rows are processed in that order.
-export function clusterSameStoryRows(rows: SameStoryRow[]): number[][] {
+export interface ClusterOptions {
+  // When true (a SINGLE-THEATRE country report, e.g. Papua / West Papua), the
+  // province gate on PATHS 1-3 is relaxed: sibling sub-provinces of the one
+  // theatre are treated as the same area, so the same event tagged to Papua
+  // Pegunungan / Papua Tengah / Papua is not blocked from merging. Multi-city
+  // reports (Jakarta / Indonesia) leave it false so distinct cities never merge.
+  crossProvince?: boolean;
+}
+
+export function clusterSameStoryRows(
+  rows: SameStoryRow[],
+  options: ClusterOptions = {},
+): number[][] {
   const order = rows.map((_, i) => i).sort((a, b) => {
     if (rows[b].severityRank !== rows[a].severityRank)
       return rows[b].severityRank - rows[a].severityRank;
@@ -148,6 +245,7 @@ export function clusterSameStoryRows(rows: SameStoryRow[]): number[][] {
     toks: storyTokens(r.title),
     prem: namedPremises(r.title),
     canon: canonicalTitleKey(r.title),
+    ent: storyEntities(r.title),
   }));
   interface Cluster {
     repIdx: number;
@@ -168,8 +266,10 @@ export function clusterSameStoryRows(rows: SameStoryRow[]): number[][] {
         placed = true;
         break;
       }
-      // Both-null province counts as a match; one-null is a mismatch.
-      if ((rr.province ?? null) !== (r.province ?? null)) continue;
+      // Province gate (skipped for a single-theatre report, where sibling
+      // sub-provinces are the same area). Both-null counts as a match; one-null
+      // is a mismatch.
+      if (!options.crossProvince && (rr.province ?? null) !== (r.province ?? null)) continue;
       const compatType =
         rr.typeKey === r.typeKey ||
         (!!rr.category && rr.category === r.category) ||
@@ -188,6 +288,19 @@ export function clusterSameStoryRows(rows: SameStoryRow[]): number[][] {
       // very different headlines cannot merge two distinct events.
       const sharedPrem = [...f.prem].some((p) => ff.prem.has(p));
       if (dd <= 3 * DAY && sharedPrem && jac >= 0.25) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
+      // PATH 3: entity/synonym-anchored merge for the same event phrased so
+      // differently across outlets that Jaccard falls below the floor. Requires
+      // a shared STRONG DISTINCTIVE ENTITY (named armed actor, or foreign-
+      // national victim in a distinctive role) AND a shared event-nature class,
+      // within a 3-day window and compatible type — never generic words alone,
+      // so distinct incidents that merely share common vocabulary never merge.
+      const sharedStrong = [...f.ent.strong].some((e) => ff.ent.strong.has(e));
+      const sharedClass = [...f.ent.classes].some((cl) => ff.ent.classes.has(cl));
+      if (dd <= 3 * DAY && sharedStrong && sharedClass) {
         c.members.push(i);
         placed = true;
         break;
