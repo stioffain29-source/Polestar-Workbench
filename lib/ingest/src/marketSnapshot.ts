@@ -50,22 +50,39 @@ type Spec = {
   trajCount: number;
   decimals: number;
   fetch: CrudeSpec | FredSpec | WorldBankSpec;
+  /**
+   * Cadence-aware staleness threshold (days). Set ONLY on the monthly series
+   * whose upstream can return HTTP 200 while its data silently stops advancing.
+   * When the latest observation lags more than this, the feed is escalated to
+   * the "stale" Source Health status. Left unset on the daily/weekly series
+   * (fuel + Henry Hub), which lag only a few days and have no monthly cadence.
+   */
+  staleLagDays?: number;
 };
 
 // Look-back window for every series. Generous so the monthly series (with a
 // six-point trajectory + one-month change) always reaches back far enough.
 const LOOKBACK_DAYS = 540;
 
-// Cadence-aware staleness escalation for the monthly fertiliser (Pink Sheet)
-// series. A monthly observation normally lags up to ~50 days (the workbook for
-// month M publishes ~5-6 weeks into month M+1), so the normal ~monthly lag must
-// stay green. Beyond this threshold the feed has failed to advance for well over
-// a full extra publication cycle: the version-stamped workbook has frozen while
-// still returning HTTP 200. At that point we escalate the fertiliser feed(s) to
-// the "stale" Source Health status so a silent freeze becomes a visible signal
-// instead of a buried WARN log line. Only fertiliser is escalated here; the
-// daily/weekly fuel + monthly energy series are out of scope for this guardrail.
+// Cadence-aware staleness escalation for the MONTHLY market series. These feeds
+// can return HTTP 200 while their data silently stops advancing (e.g. a
+// version-stamped workbook URL that rotated, or an upstream that froze). A
+// fetch-failure signal never fires, so the only tell is the data not advancing.
+// Each monthly group gets a threshold tuned to ITS normal lag: beyond it the
+// feed has failed to advance for well over a full extra publication cycle, so we
+// escalate to the "stale" Source Health status (a visible signal) instead of a
+// buried WARN log line. The daily/weekly series (fuel + Henry Hub) lag only a
+// few days and are out of scope — they carry no `staleLagDays`.
+//
+// Fertiliser (World Bank Pink Sheet): a monthly observation normally lags up to
+// ~50 days (the workbook for month M publishes ~5-6 weeks into month M+1), so 75
+// = a full extra missed cycle. UNCHANGED.
 const FERTILISER_STALE_LAG_DAYS = 75;
+// Monthly energy (IMF/BLS FRED series eu_gas/coal/electricity): these publish
+// later than the Pink Sheet and routinely lag ~60-62 days, so the threshold sits
+// above that normal cadence — today's normally-lagging data stays green, while a
+// freeze that misses a further full monthly cycle (~90+ days) escalates.
+const ENERGY_STALE_LAG_DAYS = 90;
 
 const SPECS: Spec[] = [
   // --- Fuel -----------------------------------------------------------------
@@ -107,32 +124,38 @@ const SPECS: Spec[] = [
   {
     group: "energy", key: "eu_gas", label: "Natural Gas (Europe)", unit: "USD/MMBtu",
     benchmark: "EU import natural gas", changeMode: "prev", trajCount: 6, decimals: 2,
+    staleLagDays: ENERGY_STALE_LAG_DAYS,
     fetch: { kind: "fred", id: "PNGASEUUSDM", source: "IMF / FRED (PNGASEUUSDM)" },
   },
   {
     group: "energy", key: "coal", label: "Thermal Coal (Australia)", unit: "USD/mt",
     benchmark: "Australian thermal coal", changeMode: "prev", trajCount: 6, decimals: 2,
+    staleLagDays: ENERGY_STALE_LAG_DAYS,
     fetch: { kind: "fred", id: "PCOALAUUSDM", source: "IMF / FRED (PCOALAUUSDM)" },
   },
   {
     group: "energy", key: "electricity", label: "Electricity (US City Avg)", unit: "USD/kWh",
     benchmark: "US city average retail electricity", changeMode: "prev", trajCount: 6, decimals: 3,
+    staleLagDays: ENERGY_STALE_LAG_DAYS,
     fetch: { kind: "fred", id: "APU000072610", source: "BLS / FRED (APU000072610)" },
   },
   // --- Fertiliser (World Bank Pink Sheet, monthly) --------------------------
   {
     group: "fertiliser", key: "urea", label: "Urea", unit: "USD/mt",
     benchmark: "Urea (Black Sea / fob)", changeMode: "prev", trajCount: 6, decimals: 1,
+    staleLagDays: FERTILISER_STALE_LAG_DAYS,
     fetch: { kind: "worldbank", commodity: "urea" },
   },
   {
     group: "fertiliser", key: "dap", label: "DAP", unit: "USD/mt",
     benchmark: "Diammonium phosphate", changeMode: "prev", trajCount: 6, decimals: 1,
+    staleLagDays: FERTILISER_STALE_LAG_DAYS,
     fetch: { kind: "worldbank", commodity: "dap" },
   },
   {
     group: "fertiliser", key: "potash", label: "Potash", unit: "USD/mt",
     benchmark: "Potassium chloride (muriate of potash)", changeMode: "prev", trajCount: 6, decimals: 1,
+    staleLagDays: FERTILISER_STALE_LAG_DAYS,
     fetch: { kind: "worldbank", commodity: "potash" },
   },
 ];
@@ -215,15 +238,20 @@ export async function runMarketSnapshotIngest(
       if (lagDays > 60) {
         log(`  WARN ${spec.group}:${spec.key} latest=${latest.date} lags ${lagDays}d — feed may be stale`);
       }
-      // Cadence-aware staleness escalation (fertiliser only): a monthly Pink
-      // Sheet series that has not advanced past a full extra publication cycle
-      // is a genuine silent freeze (HTTP 200 but stopped advancing). Flag it so
+      // Cadence-aware staleness escalation (monthly series only): a monthly
+      // series that has not advanced past a full extra publication cycle is a
+      // genuine silent freeze (HTTP 200 but stopped advancing). Flag it so
       // recordSourceHealth surfaces it as "stale" on Source Health, not just a
-      // log line. Normal ~monthly lag (<= FERTILISER_STALE_LAG_DAYS) stays green.
+      // log line. Normal ~monthly lag (<= spec.staleLagDays) stays green. Daily/
+      // weekly series (no staleLagDays) never escalate here.
       const staleFrozen =
-        spec.group === "fertiliser" && lagDays > FERTILISER_STALE_LAG_DAYS;
+        spec.staleLagDays != null && lagDays > spec.staleLagDays;
+      const staleHint =
+        spec.group === "fertiliser"
+          ? "The workbook still returns data but has stopped advancing (likely a rotated/frozen source URL). Verify the World Bank CMO landing-page discovery."
+          : "The upstream still returns data but has stopped advancing (likely a frozen or discontinued FRED series). Verify the source series still publishes.";
       const staleReason = staleFrozen
-        ? `Latest ${spec.label} observation ${latest.date} lags ${lagDays}d — beyond the ~monthly Pink Sheet cadence. The workbook still returns data but has stopped advancing (likely a rotated/frozen source URL). Verify the World Bank CMO landing-page discovery.`
+        ? `Latest ${spec.label} observation ${latest.date} lags ${lagDays}d — beyond the expected ~monthly cadence for this feed. ${staleHint}`
         : null;
       if (staleFrozen) {
         log(`  STALE ${spec.group}:${spec.key} latest=${latest.date} lags ${lagDays}d — escalating to Source Health`);
