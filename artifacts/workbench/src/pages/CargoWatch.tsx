@@ -298,6 +298,30 @@ export default function CargoWatch() {
       .sort((a, b) => b.count - a.count);
   }, [enriched]);
 
+  // Region tally strip above the map — regions present in the window, with share.
+  const regionStrip = useMemo(() => {
+    const m = new Map<Region, number>();
+    enriched.forEach((i) => m.set(i.region, (m.get(i.region) ?? 0) + 1));
+    const order: Region[] = ["APAC", "Middle East", "Country not identified", "Out of scope"];
+    const denom = enriched.length;
+    return order
+      .filter((rg) => (m.get(rg) ?? 0) > 0)
+      .map((rg) => ({ region: rg, count: m.get(rg) ?? 0, pct: denom > 0 ? ((m.get(rg) ?? 0) / denom) * 100 : 0 }));
+  }, [enriched]);
+
+  const countryDenom = useMemo(() => byCountry.reduce((s, r) => s + r.count, 0), [byCountry]);
+
+  // Single largest source-stated cargo loss in the window — a spot-report candidate.
+  const biggestLoss = useMemo(() => {
+    let best: (typeof enriched)[number] | null = null;
+    for (const i of enriched) {
+      const v = i.usdLoss ?? 0;
+      if (v <= 0) continue;
+      if (best == null || v > (best.usdLoss ?? 0)) best = i;
+    }
+    return best;
+  }, [enriched]);
+
   const byCategory = useMemo(() => {
     const m = new Map<string, number>();
     enriched.forEach((i) => m.set(i.category, (m.get(i.category) ?? 0) + 1));
@@ -460,20 +484,31 @@ export default function CargoWatch() {
         </div>
       </div>
 
-      {/* Map + Recent Incidents */}
+      {/* Map + Incident reports by country */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-card border border-border rounded-sm flex flex-col">
           <div className="p-3 border-b border-border bg-muted/50 flex items-center justify-between gap-2">
             <span className="font-serif font-bold uppercase text-sm text-primary">Cargo Theft Map</span>
             <span className="text-[11px] text-muted-foreground font-sans">Country intensity · {rangeText}</span>
           </div>
+          {regionStrip.length > 0 && (
+            <div className="flex border-b border-border divide-x divide-border">
+              {regionStrip.map((r) => (
+                <div key={r.region} className="flex-1 px-3 py-2">
+                  <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground truncate">{r.region}</div>
+                  <div className="font-serif font-bold text-primary text-lg leading-none mt-1">{r.count}</div>
+                  <div className="text-[10px] text-muted-foreground font-sans mt-1 tabular-nums">{r.pct.toFixed(1)}%</div>
+                </div>
+              ))}
+            </div>
+          )}
           {!mappable ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               No mappable cargo incidents in this window. ({total} record{total === 1 ? "" : "s"} — none with an identifiable in-scope country.)
             </div>
           ) : (
             <>
-              <div className="relative h-[640px]">
+              <div className="relative h-[560px]">
                 <MapContainer center={[10, 100]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                   <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <CargoChoropleth intensity={countryIntensity} />
@@ -487,10 +522,38 @@ export default function CargoWatch() {
           )}
         </div>
 
+        {/* Incident reports by country — ranked list beside the map */}
         <div className="bg-card border border-border rounded-sm flex flex-col">
-          <div className="p-3 border-b border-border bg-muted/50 font-serif font-bold uppercase text-sm text-primary">
-            Recent Incidents
+          <div className="p-3 border-b border-border bg-muted/50 flex items-center justify-between gap-2">
+            <span className="font-serif font-bold uppercase text-sm text-primary">Incident Reports by Country</span>
+            <span className="text-[11px] text-muted-foreground font-sans">{rangeText}</span>
           </div>
+          {byCountry.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No country-attributed incidents in this window.</div>
+          ) : (
+            <div className="overflow-y-auto divide-y divide-border" style={{ maxHeight: 636 }}>
+              {byCountry.map((r) => {
+                const pct = countryDenom > 0 ? (r.count / countryDenom) * 100 : 0;
+                return (
+                  <div key={r.country} className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/30">
+                    <span className="text-sm text-foreground truncate">{r.country}</span>
+                    <span className="flex items-baseline gap-2 shrink-0">
+                      <span className="font-serif font-bold text-primary text-sm tabular-nums">{r.count}</span>
+                      <span className="w-11 text-right text-[10px] text-muted-foreground font-sans tabular-nums">{pct.toFixed(1)}%</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Incidents — full width */}
+      <div className="bg-card border border-border rounded-sm flex flex-col">
+        <div className="p-3 border-b border-border bg-muted/50 font-serif font-bold uppercase text-sm text-primary">
+          Recent Incidents
+        </div>
           <div className="flex border-b border-border text-xs font-sans">
             <button
               onClick={() => setRecentTab("main")}
@@ -573,7 +636,6 @@ export default function CargoWatch() {
             )}
           </div>
         </div>
-      </div>
 
       {/* Requested trend charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -774,10 +836,28 @@ export default function CargoWatch() {
       <CargoClusterPanel grouped={cargoGrouped} rangeText={rangeText} />
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border p-px rounded-sm overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · ${rangeText}`} />
         <Kpi label="Confirmed Value Stolen" value={confirmedValue > 0 ? usd(confirmedValue) : "—"} sub="Source-stated USD only" />
         <Kpi label="Incidents With Companies Named" value={companiesNamed} sub="Named commercial entity in source" />
+        <Kpi
+          label="Biggest Single Loss"
+          value={biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? usd(biggestLoss.usdLoss ?? 0) : "—"}
+          sub={
+            biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? (
+              <span>
+                {biggestLoss.displayCountry ?? "—"} ·{" "}
+                {incidentSourceUrl(biggestLoss) ? (
+                  <a href={incidentSourceUrl(biggestLoss)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">spot-report candidate</a>
+                ) : (
+                  "spot-report candidate"
+                )}
+              </span>
+            ) : (
+              "No source-stated loss in window"
+            )
+          }
+        />
       </div>
 
       <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2 space-y-1">
@@ -910,7 +990,7 @@ function ChoroplethLegend() {
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function Kpi({ label, value, sub }: { label: string; value: string | number; sub?: React.ReactNode }) {
   return (
     <div className="bg-card p-4">
       <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
