@@ -641,3 +641,9 @@ id = "Yk17-Yw55F9siLlnmt73M"
 uri = "file://attached_assets/download_1782711875187.png"
 type = "image"
 title = "Your confirmed target"
+
+[[outputs]]
+id = "Oy8bwGGvezJ7ML3o4lqbN"
+uri = "file://tapa_apac_incidents_clean.csv"
+type = "table"
+title = "TAPA APAC incidents (deduped, from uploaded page 2)"
