@@ -39,6 +39,8 @@ import {
 } from "@/lib/fuelWatchReport";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import CargoTrendChart from "@/components/CargoTrendChart";
+import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
+import { buildCargoCountryIntensity } from "@/lib/cargoReportChoropleth";
 import {
   buildCargoReportExtras,
   formatCargoUsd,
@@ -679,6 +681,20 @@ export default function ReportPreview({
       )
     : null;
   const cargoCountry = isCargo ? buildCargoCountryBreakdown(cargoWindow) : null;
+  // Country-intensity choropleth — same per-country counting the monitor uses,
+  // over the report's in-scope window. Drives the static "Cargo Theft Map".
+  const cargoIntensity = isCargo
+    ? buildCargoCountryIntensity(
+        cargoWindow.map((i) => ({
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          location: i.location ?? null,
+          country: i.country ?? null,
+          occurredAt: i.occurredAt,
+        })),
+      )
+    : null;
   const cargoPorts = isCargo ? buildCargoPortBreakdown(cargoWindow) : null;
   // Cargo Incident Clusters dataset — the regrouped/clustered view shared with
   // the PDF (exportTopicReportPdf rebuilds it from the identical windowed set).
@@ -960,6 +976,12 @@ export default function ReportPreview({
             <Section title="Fast Facts">
               <FastFactsGrid cards={fastFacts} />
             </Section>
+
+            {isCargo && cargoIntensity && cargoIntensity.size > 0 && (
+              <Section title="Cargo Theft Map">
+                <CargoChoroplethStatic intensity={cargoIntensity} />
+              </Section>
+            )}
 
             {isCargo && cargoExtras && cargoExtras.trend.length >= 2 && (
               <Section title="Cargo Theft Trend">

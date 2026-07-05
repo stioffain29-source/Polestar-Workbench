@@ -12,6 +12,7 @@ import "leaflet/dist/leaflet.css";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { Layer, PathOptions } from "leaflet";
 import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
+import { COUNT_BANDS, countBandColor, featureCountryName } from "@/lib/cargoChoropleth";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
@@ -60,32 +61,9 @@ const REGION_COLOR: Record<Region, string> = {
 };
 
 
-// Country-intensity choropleth ramp. A single sequential brand-blue sequence
-// (light → Midnight Blue) that shades each in-scope country by how many cargo
-// incidents it holds. Deliberately DISTINCT from the reserved five-tier severity
-// colours — count concentration is a separate, neutral scale, never a risk read.
-const COUNT_BANDS: Array<{ min: number; label: string; color: string }> = [
-  { min: 1, label: "1–5", color: "#DCE0FF" },
-  { min: 6, label: "6–20", color: "#A9B2FF" },
-  { min: 21, label: "21–50", color: "#6E7BFF" },
-  { min: 51, label: "51–100", color: "#2E3BC7" },
-  { min: 101, label: "100+", color: "#0B0B3D" },
-];
-
-// Colour for a country's incident count. Zero incidents stay unshaded (null).
-function countBandColor(count: number): string | null {
-  let color: string | null = null;
-  for (const b of COUNT_BANDS) {
-    if (count >= b.min) color = b.color;
-  }
-  return color;
-}
-
-// Canonical name a choropleth polygon feature carries (matches the app's
-// display-country names, e.g. "UAE", "South Korea").
-function featureCountryName(f: Feature<Geometry, { name?: string }>): string {
-  return f.properties?.name ?? "";
-}
+// Country-intensity choropleth bands, legend colours and the polygon-name
+// lookup now live in the shared lib/cargoChoropleth module so the interactive
+// monitor map and the static report/PDF choropleth read one source of truth.
 
 type RangeKey = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
 const RANGE_DAYS: Record<RangeKey, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "180d": 180, "1y": 365, "all": Infinity };

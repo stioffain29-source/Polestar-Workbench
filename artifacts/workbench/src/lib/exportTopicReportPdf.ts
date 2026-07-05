@@ -2,6 +2,8 @@ import { createElement } from "react";
 import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import CargoTrendChart from "@/components/CargoTrendChart";
+import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
+import { buildCargoCountryIntensity } from "./cargoReportChoropleth";
 import {
   createCtx,
   newPage,
@@ -1142,6 +1144,19 @@ export async function exportTopicReportPdf(
         country: i.country ?? null,
         occurredAt: i.occurredAt,
       }));
+      // Country-intensity choropleth — the static SVG mirror of the monitor's
+      // Leaflet map, rasterised into the PDF from the SAME shared component the
+      // preview renders (preview == PDF). Same country counting + bands.
+      const cargoIntensity = buildCargoCountryIntensity(cargoTrendSource);
+      if (cargoIntensity.size > 0) {
+        drawSectionHeading(ctx, "Cargo Theft Map");
+        ensureSpace(ctx, 260);
+        await embedReactChartInPdf(
+          ctx,
+          createElement(CargoChoroplethStatic, { intensity: cargoIntensity }),
+        );
+      }
+
       const cargoExtras = buildCargoReportExtras(cargoTrendSource);
       if (cargoExtras.trend.length >= 2) {
         drawSectionHeading(ctx, "Cargo Theft Trend");
