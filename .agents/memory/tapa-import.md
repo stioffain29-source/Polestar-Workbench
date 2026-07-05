@@ -54,6 +54,17 @@ explicitly asking.
 - **backfillRelevance (migrations.ts):** MUST keep excluding BOTH
   `'gdelt_cloud:%'` AND `'tapa_offline:%'` so a `RELEVANCE_RULE_VERSION` bump
   cannot re-score these structured rows by text.
+- **Monitor dedupe MUST exempt TAPA rows.** TAPA titles are synthesised
+  (`"<Category> of <Product> — <City, Country>"`). The Cargo Watch monitor's
+  `dedupeMonitorRows` masthead-stripping key (`canonicalTitleKey`) treats the
+  trailing "— City, Country" as a masthead and strips it, collapsing dozens of
+  distinct TAPA incidents into one key (observed ~489 → ~97, an ~80% undercount
+  that also skewed the map/loss totals). TAPA rows are already idempotency-deduped
+  at ingest, so partition them out via `isTapaIncident` (marker prefix OR source
+  `"TAPA EMEA (APAC)"`), dedupe NEWS rows only, then concat. Any future
+  structured layer with synthesised titles needs the same exemption.
+  **Why:** the dedupe's premise (collapse syndicated wire copies) does not hold
+  for structured records that legitimately share a title stem.
 
 ## Verified facts (this dataset, 5 saved pages)
 

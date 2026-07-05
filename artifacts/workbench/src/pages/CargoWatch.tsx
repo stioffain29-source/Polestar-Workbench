@@ -118,6 +118,16 @@ function CategoryAxisTick(props: {
   );
 }
 
+// TAPA rows are offline-imported, structured cargo-crime records already
+// deduplicated at ingest (occurrence-indexed idempotency markers) — NOT
+// syndicated wire copies. Identified by the promote marker prefix or the unique
+// source label. Used to (a) exempt them from the monitor's syndication dedupe,
+// whose masthead-stripping key wrongly collapses their synthesised titles, and
+// (b) scope the Modus Operandi / Origin panel to the consistent TAPA taxonomy.
+function isTapaIncident(i: { analystNotes?: string | null; source?: string | null }): boolean {
+  return !!i.analystNotes?.startsWith("tapa_offline:") || i.source === "TAPA EMEA (APAC)";
+}
+
 export default function CargoWatch() {
   // includeIrrelevant=true: Cargo Watch MUST NOT inherit the server's persisted
   // relevance verdict. That verdict is the general TOPIC classifier, which marks
@@ -188,6 +198,10 @@ export default function CargoWatch() {
         displayCountry,
         region,
         category: classifyCategory(i),
+        // Raw stored incident-category (the TAPA "Incident Category" / modus
+        // operandi taxonomy). Preserved separately because `category` above is
+        // overwritten with the derived cargo-product category.
+        moType: (i.category ?? "").trim() || null,
         scope: classifyScope(i, rawRegion),
         locationType: classifyLocationType(i),
         incidentType: classifyIncidentType(i),
@@ -215,14 +229,19 @@ export default function CargoWatch() {
   // events — not the number of outlets. Prefer the in-scope copy, then higher
   // severity, then the newest. The raw DB tallies above stay un-deduped, since
   // they describe the source data, not the working set.
-  const deduped = useMemo(
-    () =>
-      dedupeMonitorRows(
-        allEnriched.map((i) => ({ ...i, date: new Date(i.occurredAt) })),
-        (i) => (i.scope === "in_scope" ? 2 : i.scope === "country_review" ? 1 : 0),
-      ),
-    [allEnriched],
-  );
+  const deduped = useMemo(() => {
+    const withDate = allEnriched.map((i) => ({ ...i, date: new Date(i.occurredAt) }));
+    // Collapse syndication among NEWS-sourced rows only. TAPA rows are already
+    // distinct at ingest and their synthesised titles would be mis-merged by the
+    // masthead-stripping dedupe key, so pass them through untouched.
+    const tapa = withDate.filter(isTapaIncident);
+    const news = withDate.filter((i) => !isTapaIncident(i));
+    const dedupedNews = dedupeMonitorRows(
+      news,
+      (i) => (i.scope === "in_scope" ? 2 : i.scope === "country_review" ? 1 : 0),
+    );
+    return [...dedupedNews, ...tapa];
+  }, [allEnriched]);
 
   // All in-scope records (no time filter) — used by the long-range trend chart.
   const inScope = useMemo(() => deduped.filter((i) => i.scope === "in_scope"), [deduped]);
@@ -331,6 +350,46 @@ export default function CargoWatch() {
     const rest = byCategory.slice(10).reduce((s, r) => s + r.count, 0);
     return [...byCategory.slice(0, 10), { category: "Other categories", count: rest }];
   }, [byCategory]);
+
+  // TAPA Modus Operandi & Origin — a SEPARATE breakdown of the offline-imported
+  // TAPA cargo-crime records, the only rows that carry a structured incident
+  // category (modus operandi) plus a country of origin. Scoped to TAPA rows
+  // only so the taxonomy stays consistent: scraped-news rows use a different,
+  // sparser category vocabulary and would pollute the split. Each chart caps at
+  // the top 10 with an honest "Other" rollup, mirroring the country/cargo split.
+  const tapaRows = useMemo(() => enriched.filter(isTapaIncident), [enriched]);
+  const tapaTotal = tapaRows.length;
+  const byModusOperandi = useMemo(() => {
+    const m = new Map<string, number>();
+    tapaRows.forEach((i) => {
+      const label = i.moType ?? "Unknown";
+      m.set(label, (m.get(label) ?? 0) + 1);
+    });
+    return Array.from(m.entries())
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [tapaRows]);
+  const byTapaOrigin = useMemo(() => {
+    const m = new Map<string, number>();
+    tapaRows.forEach((i) => {
+      const c = i.displayCountry;
+      if (c == null) return;
+      m.set(c, (m.get(c) ?? 0) + 1);
+    });
+    return Array.from(m.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [tapaRows]);
+  const modusBars = useMemo(() => {
+    if (byModusOperandi.length <= 10) return byModusOperandi;
+    const rest = byModusOperandi.slice(10).reduce((s, r) => s + r.count, 0);
+    return [...byModusOperandi.slice(0, 10), { type: "Other types", count: rest }];
+  }, [byModusOperandi]);
+  const tapaOriginBars = useMemo(() => {
+    if (byTapaOrigin.length <= 10) return byTapaOrigin;
+    const rest = byTapaOrigin.slice(10).reduce((s, r) => s + r.count, 0);
+    return [...byTapaOrigin.slice(0, 10), { country: "Other countries", count: rest }];
+  }, [byTapaOrigin]);
 
   // Incidents — last 30 days, one bar per day (independent of the range pill).
   const last30 = useMemo(() => {
@@ -602,6 +661,65 @@ export default function CargoWatch() {
           </div>
         </div>
       </div>
+
+      {/* TAPA Cargo Crime — Modus Operandi & Origin (TAPA-scoped, separate) */}
+      {tapaTotal > 0 && (
+        <div className="bg-card border border-border rounded-sm p-4">
+          <div className="flex items-baseline justify-between mb-1">
+            <h2 className="font-serif font-bold uppercase text-primary text-sm tracking-wide">TAPA Cargo Crime — Modus Operandi &amp; Origin</h2>
+            <span className="text-[11px] text-muted-foreground font-sans">{tapaTotal} TAPA-recorded incident{tapaTotal === 1 ? "" : "s"} · {rangeText}</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground font-sans mb-3">
+            Offline-imported TAPA records, which alone carry a structured incident category (modus operandi) and a country of origin. A subset of Cargo Watch.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                By Incident Type · top {Math.min(10, byModusOperandi.length)} of {byModusOperandi.length}{byModusOperandi.length > 10 ? " + other" : ""}
+              </div>
+              <div style={{ height: Math.max(300, modusBars.length * 46 + 24) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={modusBars} layout="vertical" margin={{ left: 8, right: 36, top: 4, bottom: 4 }}>
+                    <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                    <YAxis
+                      type="category"
+                      dataKey="type"
+                      tickLine={false}
+                      axisLine={false}
+                      width={150}
+                      interval={0}
+                      tick={<CategoryAxisTick />}
+                    />
+                    <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                    <Bar dataKey="count" fill="#465bff" radius={[0, 2, 2, 0]}>
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                By Origin · top {Math.min(10, byTapaOrigin.length)} of {byTapaOrigin.length}{byTapaOrigin.length > 10 ? " + other" : ""}
+              </div>
+              <div style={{ height: Math.max(300, tapaOriginBars.length * 46 + 24) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={tapaOriginBars} layout="vertical" margin={{ left: 8, right: 36, top: 4, bottom: 4 }}>
+                    <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                    <YAxis type="category" dataKey="country" tickLine={false} axisLine={false} width={110} fontSize={11} interval={0} />
+                    <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                    <Bar dataKey="count" fill="#0b0a3d" radius={[0, 2, 2, 0]}>
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Named Port Breakdown — same builder as report preview + PDF */}
       <div className="bg-card border border-border rounded-sm">
