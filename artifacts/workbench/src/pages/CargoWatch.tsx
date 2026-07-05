@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, formatDistanceToNow, subDays } from "date-fns";
-import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { severityBadgeStyle, ratingColor } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
@@ -56,7 +56,6 @@ const REGION_COLOR: Record<Region, string> = {
   "Out of scope": "#B8C2CC",
 };
 
-const CAT_PALETTE = ["#0b0a3d", "#2A9D8F", "#E67E22", "#465bff", "#F4D35E", "#6FB872", "#B8C2CC", "#363636", "#7A8FA6"];
 
 // Country centroids for in-scope APAC + Middle East countries. Used ONLY as a
 // fallback when a record has no precise lat/long in the database, so the map
@@ -297,21 +296,12 @@ export default function CargoWatch() {
     [enriched],
   );
 
-  // Captured Incidents by Country & Cargo — stacked bars (cargo categories
-  // stacked per country), matching the requested layout.
-  const stacked = useMemo(() => {
-    const topCountries = byCountry.slice(0, 10).map((c) => c.country);
-    const categories = byCategory.map((c) => c.category);
-    return topCountries.map((country) => {
-      const row: Record<string, string | number> = { country };
-      categories.forEach((cat) => { row[cat] = 0; });
-      enriched
-        .filter((i) => i.displayCountry === country)
-        .forEach((i) => { row[i.category] = (row[i.category] as number) + 1; });
-      return row;
-    });
-  }, [enriched, byCountry, byCategory]);
-  const stackCategories = byCategory.map((c) => c.category);
+  // Captured Incidents — country and cargo category shown as two separate
+  // horizontal bar charts. The earlier single stacked chart crammed the whole
+  // ~30-label taxonomy into each country bar over a 9-colour palette, so the
+  // categories were unreadable. Split, sorted, single-colour, labelled.
+  const topCountryBars = useMemo(() => byCountry.slice(0, 10), [byCountry]);
+  const topCategoryBars = useMemo(() => byCategory.slice(0, 12), [byCategory]);
 
   // Incidents — last 30 days, one bar per day (independent of the range pill).
   const last30 = useMemo(() => {
@@ -575,19 +565,52 @@ export default function CargoWatch() {
           <h2 className="font-serif font-bold uppercase text-primary text-sm tracking-wide">Captured Incidents by Country &amp; Cargo</h2>
           <span className="text-[11px] text-muted-foreground font-sans">{total} incidents across {countriesCovered} countries · {rangeText}</span>
         </div>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stacked} margin={{ left: 8, right: 16, bottom: 40 }}>
-              <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" />
-              <XAxis dataKey="country" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={10} angle={-35} textAnchor="end" interval={0} height={60} />
-              <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              {stackCategories.map((cat, idx) => (
-                <Bar key={cat} dataKey={cat} stackId="cat" fill={CAT_PALETTE[idx % CAT_PALETTE.length]} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              By Country · top {topCountryBars.length}
+            </div>
+            <div className="h-[340px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topCountryBars} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                  <YAxis type="category" dataKey="country" tickLine={false} axisLine={false} width={100} fontSize={11} interval={0} />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Bar dataKey="count" fill="#465bff" radius={[0, 2, 2, 0]}>
+                    <LabelList dataKey="count" position="right" fontSize={10} fill="#303030" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              By Cargo Category · top {topCategoryBars.length} of {byCategory.length}
+            </div>
+            <div className="h-[340px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topCategoryBars} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+                  <CartesianGrid stroke="#e2e2e2" strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="category"
+                    tickLine={false}
+                    axisLine={false}
+                    width={176}
+                    fontSize={10}
+                    interval={0}
+                    tickFormatter={(v: string) => (v.length > 32 ? v.slice(0, 31) + "…" : v)}
+                  />
+                  <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
+                  <Bar dataKey="count" fill="#0b0a3d" radius={[0, 2, 2, 0]}>
+                    <LabelList dataKey="count" position="right" fontSize={10} fill="#303030" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </div>
 
