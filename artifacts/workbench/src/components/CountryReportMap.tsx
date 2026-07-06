@@ -67,7 +67,7 @@ function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: numbe
 // text at all, landing on a generic country centroid), so plotting them as
 // exact dots is misleading. Instead, for a configured country we aggregate the
 // window into a handful of named risk zones, drop ONE numbered, severity-
-// coloured marker on each ACTIVE zone, and list "n. Zone — Severity (count)"
+// coloured marker on each ACTIVE zone, and list "n. Zone — Severity"
 // in the legend. Empty zones are omitted entirely (no "not reported" filler);
 // records that match no zone are counted in an explicit note, never invented
 // onto the map. Countries with no zone config fall back to the per-coordinate
@@ -467,7 +467,7 @@ export function aggregateZones(
  * Two rendering modes:
  *  - AREA-RISK (numbered callout) for countries with a configured zone list
  *    (e.g. Papua / West Papua): one numbered, severity-coloured marker per
- *    ACTIVE risk zone, with a "n. Zone — Severity (count)" legend. This is the
+ *    ACTIVE risk zone, with a "n. Zone — Severity" legend. This is the
  *    standard-preferred country-report map — it shows risk AREAS rather than
  *    raw database points, which is honest about the province-centroid geocoding.
  *  - PER-COORDINATE DOTS for all other countries (unchanged): one dot per
@@ -638,7 +638,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.textContent = String(z.number);
         marker.title =
           z.count > 0
-            ? `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey} (${z.count})`
+            ? `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey}`
             : `${z.number}. ${z.def.name} — no records this period`;
 
         overlay.appendChild(marker);
@@ -808,7 +808,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         />
         {active.length > 0 ? (
           <>
-            {/* Numbered risk-zone legend: "n. Zone — Severity (count)". The
+            {/* Numbered risk-zone legend: "n. Zone — Severity". The
                 numbered markers above are HTML <div> overlays, so they appear
                 in BOTH the on-screen view and the rasterised PDF. */}
             <div className="mt-3" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -840,7 +840,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
                     {z.count > 0 ? (
                       <>
                         {" "}
-                        — {SEV_LABEL[z.worstKey] ?? z.worstKey} ({z.count})
+                        — {SEV_LABEL[z.worstKey] ?? z.worstKey}
                       </>
                     ) : null}
                     {z.def.description ? (
@@ -872,7 +872,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
                 <>
                   Each marker shows a risk area, numbered and coloured by the highest severity recorded there this period.
                   {zoneAgg.unattributed > 0
-                    ? ` ${zoneAgg.unattributed} record${zoneAgg.unattributed === 1 ? "" : "s"} could not be tied to a specific area and ${zoneAgg.unattributed === 1 ? "is" : "are"} included in totals and tables but not plotted.`
+                    ? " Some records could not be tied to a specific area and are included in the totals and tables but not plotted."
                     : ""}
                 </>
               )}
