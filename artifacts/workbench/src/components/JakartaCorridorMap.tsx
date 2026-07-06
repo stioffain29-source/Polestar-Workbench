@@ -2,63 +2,53 @@ import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
+import type { JakartaExposureLevel } from "@/lib/jakartaCorridors";
 import {
-  buildJakartaCorridorStatuses,
-  type JakartaCorridorStatus,
-  type JakartaExposureLevel,
-} from "@/lib/jakartaCorridors";
-import {
-  buildJakartaMapModel,
-  JAKARTA_MAP_CATEGORIES,
-  JAKARTA_MAP_CATEGORY_META,
-  JAKARTA_MAP_CORRIDORS,
-  JAKARTA_MAP_OPS_BBOX,
-  JAKARTA_OPERATING_ZONES,
-  type JakartaMapCategoryMeta,
-  type JakartaMarkerShape,
-} from "@/lib/jakartaMapModel";
+  buildJakartaPostureModel,
+  JAKARTA_POSTURE_CORRIDORS,
+  POSTURE_EXPOSURE_ACCENT,
+  POSTURE_EXPOSURE_FILL,
+  POSTURE_EXPOSURE_LABEL,
+  POSTURE_EXPOSURE_ORDER,
+} from "@/lib/jakartaOperatingPosture";
+import { JAKARTA_MAP_OPS_BBOX } from "@/lib/jakartaMapModel";
 
 const NAVY = "#0B0B3D";
 const DUSK = "#303030";
-const POLAR = "#E2E2E2";
+// Electric Blue (brand) for the route corridors.
+const MOVEMENT_COLOR = "#4655FF";
 
-// Operating-exposure tints for the right-hand panel badges. Deliberately
-// distinct from the incident-severity ramp, and never the reserved A33232
-// (Extreme) or 1B6B7A (Insignificant) hexes.
-const EXPOSURE_FILL: Record<JakartaExposureLevel, string> = {
-  high: "#E2ADAD",
-  elevated: "#EAC59B",
-  monitored: "#EDDCA4",
-  low: "#C9DBB0",
-  "not-assessed": "#D8DADD",
-};
-const EXPOSURE_ACCENT: Record<JakartaExposureLevel, string> = {
-  high: "#9A3B3B",
-  elevated: "#B26A2B",
-  monitored: "#8F7A2E",
-  low: "#5C7B3F",
-  "not-assessed": "#888E96",
-};
-const EXPOSURE_LABEL: Record<JakartaExposureLevel, string> = {
-  high: "High",
-  elevated: "Elevated",
-  monitored: "Monitored",
-  low: "Low",
-  "not-assessed": "Not Assessed",
-};
-const EXPOSURE_ORDER: JakartaExposureLevel[] = [
-  "high",
-  "elevated",
-  "monitored",
-  "low",
-  "not-assessed",
+// All four required route corridors are drawn (task: Airport, Port, CBD
+// business, North Jakarta access), kept quiet as thin dashed lines.
+const DRAWN_CORRIDOR_IDS = new Set([
+  "airport",
+  "port",
+  "cbd-business",
+  "north-access",
+]);
+
+// Three short overall-posture actions, rendered as compact cards.
+const OVERALL_POSTURE: { step: string; text: string }[] = [
+  { step: "Verify", text: "Proceed with local verification." },
+  {
+    step: "Buffer",
+    text: "Build buffer time into CBD, port and airport transfers.",
+  },
+  {
+    step: "Fallback",
+    text: "Hold fallback routes for Central Jakarta and North Jakarta.",
+  },
 ];
-const SEV_RANK: Record<JakartaExposureLevel, number> = {
-  high: 4,
-  elevated: 3,
-  monitored: 2,
-  low: 1,
-  "not-assessed": 0,
+
+// Soft blob fill opacity per exposure tier — gentle washes so the map stays
+// quiet, with the hierarchy still legible (High strongest, Not assessed
+// faintest).
+const BLOB_ALPHA: Record<JakartaExposureLevel, number> = {
+  high: 0.26,
+  elevated: 0.22,
+  monitored: 0.18,
+  low: 0.15,
+  "not-assessed": 0.1,
 };
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -70,18 +60,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
-// Stable 32-bit FNV-1a hash — drives the deterministic collision offset so a
-// re-render never reshuffles overlapping markers.
-function hashStr(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-const MONTHS = [
+const FULL_MONTHS = [
   "January",
   "February",
   "March",
@@ -96,27 +75,32 @@ const MONTHS = [
   "December",
 ];
 
-function weeklyRangeLabel(issueDate?: string): string {
+// Reporting-period label — the same 7-day window as the live Jakarta report
+// (end = issue date), rendered COMPACTLY ("24 – 30 June 2026" when the window
+// sits in one month). All-UTC math so an evening-UTC issue date never rolls a
+// day for eastern viewers.
+function periodLabel(issueDate?: string): string {
   if (!issueDate || !/^\d{4}-\d{2}-\d{2}$/.test(issueDate)) {
     return "This reporting period";
   }
   const end = new Date(`${issueDate}T00:00:00Z`);
   if (Number.isNaN(end.getTime())) return "This reporting period";
-  const start = new Date(end);
+  const start = new Date(end.getTime());
   start.setUTCDate(start.getUTCDate() - 6);
+
   const sd = start.getUTCDate();
   const ed = end.getUTCDate();
   const sm = start.getUTCMonth();
   const em = end.getUTCMonth();
   const sy = start.getUTCFullYear();
   const ey = end.getUTCFullYear();
-  if (sy === ey && sm === em) {
-    return `${sd} to ${ed} ${MONTHS[em]} ${ey}`;
+
+  if (sm === em && sy === ey) {
+    return `${sd} – ${ed} ${FULL_MONTHS[em]} ${ey}`;
   }
-  if (sy === ey) {
-    return `${sd} ${MONTHS[sm]} to ${ed} ${MONTHS[em]} ${ey}`;
-  }
-  return `${sd} ${MONTHS[sm]} ${sy} to ${ed} ${MONTHS[em]} ${ey}`;
+  const startStr =
+    sy === ey ? `${sd} ${FULL_MONTHS[sm]}` : `${sd} ${FULL_MONTHS[sm]} ${sy}`;
+  return `${startStr} – ${ed} ${FULL_MONTHS[em]} ${ey}`;
 }
 
 const legendHeadStyle: CSSProperties = {
@@ -139,93 +123,61 @@ const legendTextStyle: CSSProperties = {
   color: DUSK,
 };
 
-// Neutral slate for the movement-corridor lines and their labels — operating
-// exposure is shown by the panel badges, never by corridor colour.
-const CORRIDOR_COLOR = "#64748B";
-const CORRIDOR_LABEL_COLOR = "#475569";
-// Hollow navy ring marks a named operating zone (distinct from filled incident
-// markers).
-const ZONE_RING = NAVY;
-
 export interface JakartaCorridorMapProps {
   incidents: CountryFastFactsIncident[];
-  /** Report issue date (YYYY-MM-DD) — drives the figure's weekly date range. */
   issueDate?: string;
-  /** Optional DOM id (kept for parity with CountryReportMap callers). */
   domId?: string;
 }
 
 /**
- * Jakarta operational map — a clean, client-grade tactical figure: a REAL light
- * Leaflet basemap (CartoDB Positron) framed to Jakarta proper plus the airport
- * approach and port strip, carrying:
+ * The live Jakarta city report "Operational Map" (§13). A QUIET movement-posture
+ * design:
  *
- *   • categorised per-incident markers (five operational lanes), placed ONLY
- *     where a record carries explicit coordinates or matches a named Jakarta
- *     gazetteer location — "no named location, no operational claim";
- *   • named operating-zone label points (hollow navy rings);
- *   • the airport, port and business movement corridors as route lines;
- *   • a full legend and an operating-zone guidance panel with live exposure.
+ *   • seven exposure-shaded operating zones (1–7, fixed order), each washed by
+ *     its OWN live rating (High / Elevated / Monitored / Low / Not assessed) —
+ *     1:1 with the numbered pins and the panel;
+ *   • four Electric-Blue dashed route corridors (airport, port, CBD, north
+ *     access), no arrowheads or labels;
+ *   • small dark-diamond major-incident markers, only where a record resolves
+ *     to a real Jakarta location + recognised type (no callout box);
+ *   • seven small numbered pins at the zone centres, coloured by rating;
+ *   • a right-hand "Movement posture this period" panel (zones 1–7, name,
+ *     rating, and the zone's period reason + action);
+ *   • a full-width "Overall posture" strip.
  *
- * Records that cannot be honestly placed (or whose type is outside the legend)
- * are NOT plotted — they are surfaced in the "not mapped" note below the figure.
- *
- * PDF parity: the basemap is crossOrigin <img> tiles and every overlay (corridor
- * lines, zone labels, incident markers) is a single offscreen-canvas → data-URL
- * <img> layered over the tiles — both are layers html2canvas rasterises
- * faithfully, so the on-screen preview and the DOM-rasterised in-app PDF stay
- * identical (a live <canvas> or Leaflet SVG layer would be dropped on clone).
+ * Rendered on screen and in the in-app PDF (DOM-rasterised, so screen == PDF).
+ * The headless jsPDF path renders the equivalent seven-zone posture table via
+ * buildJakartaPostureZones in exportCountryReportPdf. PDF parity: crossOrigin
+ * <img> tiles + a single offscreen-canvas → data-URL <img> overlay, both
+ * html2canvas-safe.
  */
 export default function JakartaCorridorMap({
   incidents,
   issueDate,
   domId,
 }: JakartaCorridorMapProps) {
-  const model = useMemo(() => buildJakartaMapModel(incidents), [incidents]);
-  const corridor = useMemo(
-    () => buildJakartaCorridorStatuses(incidents),
-    [incidents],
-  );
-  const rangeLabel = useMemo(() => weeklyRangeLabel(issueDate), [issueDate]);
+  const model = useMemo(() => buildJakartaPostureModel(incidents), [incidents]);
+  const rangeLabel = useMemo(() => periodLabel(issueDate), [issueDate]);
 
-  // Live exposure per corridor area, used for the operating-zone panel badges.
-  const statusByArea = useMemo(() => {
-    const m = new Map<string, JakartaCorridorStatus>();
-    for (const s of corridor.statuses) m.set(s.area.id, s);
-    return m;
-  }, [corridor]);
-
-  // Operating zones with their live status, sorted worst-exposure first so the
-  // panel leads with what matters; stable on declared order within a tier.
-  const zoneRows = useMemo(() => {
-    return JAKARTA_OPERATING_ZONES.map((zone, i) => {
-      const st = statusByArea.get(zone.corridorAreaId) ?? null;
-      const level: JakartaExposureLevel = st ? st.displayExposure : "not-assessed";
-      const elevated = st ? st.elevated : false;
-      return { zone, level, elevated, i };
-    }).sort(
-      (a, b) =>
-        SEV_RANK[b.level] - SEV_RANK[a.level] ||
-        Number(b.elevated) - Number(a.elevated) ||
-        a.i - b.i,
-    );
-  }, [statusByArea]);
-
-  // Redraw the overlay only when the plotted set or any zone level changes.
   const drawKey = useMemo(
-    () =>
-      [
-        model.points.map((p) => `${p.id}:${p.category}`).join(","),
-        JAKARTA_OPERATING_ZONES.map(
-          (z) => `${z.id}:${statusByArea.get(z.corridorAreaId)?.displayExposure ?? "-"}`,
-        ).join(","),
-      ].join("|"),
-    [model, statusByArea],
+    () => model.zones.map((z) => `${z.number}:${z.rating}`).join(","),
+    [model],
   );
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const overlayImgRef = useRef<HTMLImageElement | null>(null);
+
+  // Tear the Leaflet instance down on unmount so switching reports never leaves
+  // a detached map bound to a recycled container.
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapElRef.current) return;
@@ -247,10 +199,6 @@ export default function JakartaCorridorMap({
       });
       mapRef.current = map;
 
-      // Clean light basemap — CartoDB Positron (coastline, the Java Sea, the
-      // road network and place labels, washed back so the markers dominate).
-      // @2x tiles keep it crisp at the fractional zoom; crossOrigin so
-      // html2canvas can rasterise it into the in-app PDF.
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
         {
@@ -283,158 +231,143 @@ export default function JakartaCorridorMap({
     );
     map.fitBounds(bounds, { padding: [6, 6] });
 
-    // Soft movement band along a projected polyline, neutral slate, with
-    // outward arrowheads (movement, both directions).
-    const drawCorridorLine = (
+    type Pt = { x: number; y: number };
+    const mid = (p: Pt, q: Pt): Pt => ({
+      x: (p.x + q.x) / 2,
+      y: (p.y + q.y) / 2,
+    });
+
+    // Smooth OPEN polyline through its points (quadratic via midpoints).
+    const traceSmooth = (ctx: CanvasRenderingContext2D, pts: Pt[]) => {
+      ctx.beginPath();
+      if (pts.length < 3) {
+        pts.forEach((p, i) =>
+          i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
+        );
+        return;
+      }
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const m = mid(pts[i], pts[i + 1]);
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, m.x, m.y);
+      }
+      const last = pts[pts.length - 1];
+      ctx.lineTo(last.x, last.y);
+    };
+
+    // Soft, organic tier-tinted operating area. Derives an ellipse from the
+    // projected bounding box, then a gently wobbly closed curve around it
+    // (seeded so it's stable across redraws). No gradient / shadow.
+    const drawBlob = (
       ctx: CanvasRenderingContext2D,
-      pts: { x: number; y: number }[],
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      rating: JakartaExposureLevel,
+      seed: number,
     ) => {
+      const N = 28;
+      const pts: Pt[] = [];
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        const wob =
+          1 +
+          0.1 * Math.sin(a * 3 + seed) +
+          0.06 * Math.cos(a * 5 + seed * 1.7) +
+          0.04 * Math.sin(a * 7 + seed * 0.5);
+        pts.push({
+          x: cx + rx * wob * Math.cos(a),
+          y: cy + ry * wob * Math.sin(a),
+        });
+      }
+      ctx.save();
+      ctx.beginPath();
+      const m0 = mid(pts[N - 1], pts[0]);
+      ctx.moveTo(m0.x, m0.y);
+      for (let i = 0; i < N; i++) {
+        const cur = pts[i];
+        const nxt = pts[(i + 1) % N];
+        const m = mid(cur, nxt);
+        ctx.quadraticCurveTo(cur.x, cur.y, m.x, m.y);
+      }
+      ctx.closePath();
+      const fill = hexToRgb(POSTURE_EXPOSURE_FILL[rating]);
+      ctx.fillStyle = `rgba(${fill.r},${fill.g},${fill.b},${BLOB_ALPHA[rating]})`;
+      ctx.fill();
+      const acc = hexToRgb(POSTURE_EXPOSURE_ACCENT[rating]);
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = `rgba(${acc.r},${acc.g},${acc.b},0.45)`;
+      ctx.setLineDash(rating === "not-assessed" ? [5, 4] : []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    };
+
+    // A single Electric-Blue dashed route corridor with a soft halo — no
+    // arrowhead, no label (quiet redesign).
+    const drawCorridor = (ctx: CanvasRenderingContext2D, pts: Pt[]) => {
       if (pts.length < 2) return;
-      const { r, g, b } = hexToRgb(CORRIDOR_COLOR);
-      const trace = () => {
-        ctx.beginPath();
-        if (pts.length < 3) {
-          pts.forEach((p, i) =>
-            i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
-          );
-          return;
-        }
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length - 1; i++) {
-          const xc = (pts[i].x + pts[i + 1].x) / 2;
-          const yc = (pts[i].y + pts[i + 1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
-        }
-        const last = pts[pts.length - 1];
-        ctx.lineTo(last.x, last.y);
-      };
+      const { r, g, b } = hexToRgb(MOVEMENT_COLOR);
+      ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.setLineDash([]);
-      trace();
-      ctx.lineWidth = 4.6;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.22)`;
+      traceSmooth(ctx, pts);
+      ctx.lineWidth = 4.5;
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.14)`;
       ctx.stroke();
-      trace();
-      ctx.lineWidth = 1.7;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.95)`;
-      ctx.setLineDash([10, 7]);
+      traceSmooth(ctx, pts);
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = MOVEMENT_COLOR;
+      ctx.setLineDash([8, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
-    };
-
-    const drawArrow = (
-      ctx: CanvasRenderingContext2D,
-      from: { x: number; y: number },
-      to: { x: number; y: number },
-      color: string,
-    ) => {
-      const ang = Math.atan2(to.y - from.y, to.x - from.x);
-      const s = 7;
-      ctx.beginPath();
-      ctx.moveTo(to.x, to.y);
-      ctx.lineTo(
-        to.x - s * Math.cos(ang - Math.PI / 7),
-        to.y - s * Math.sin(ang - Math.PI / 7),
-      );
-      ctx.lineTo(
-        to.x - s * Math.cos(ang + Math.PI / 7),
-        to.y - s * Math.sin(ang + Math.PI / 7),
-      );
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
-    };
-
-    // Single-line text with a soft white halo so labels stay legible.
-    const label = (
-      ctx: CanvasRenderingContext2D,
-      str: string,
-      x: number,
-      y: number,
-      opts: {
-        font: string;
-        color: string;
-        align?: CanvasTextAlign;
-        spacing?: string;
-        halo?: number;
-      },
-    ) => {
-      ctx.save();
-      ctx.font = opts.font;
-      ctx.textAlign = opts.align ?? "center";
-      ctx.textBaseline = "middle";
-      ctx.letterSpacing = opts.spacing ?? "0em";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = opts.halo ?? 3.2;
-      ctx.strokeStyle = "rgba(255,255,255,0.94)";
-      ctx.strokeText(str, x, y);
-      ctx.fillStyle = opts.color;
-      ctx.fillText(str, x, y);
       ctx.restore();
     };
 
-    // Filled category-marker shape (white ring), distinct per lane.
-    const drawCategoryMarker = (
+    // Small numbered colour pin at the zone centre (fill = tier accent, white
+    // ring + white number).
+    const drawPin = (
       ctx: CanvasRenderingContext2D,
       x: number,
       y: number,
-      meta: JakartaMapCategoryMeta,
-    ) => {
-      const r = 6;
-      ctx.save();
-      ctx.setLineDash([]);
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      const shape: JakartaMarkerShape = meta.shape;
-      if (shape === "circle") {
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-      } else if (shape === "square") {
-        ctx.rect(x - r * 0.92, y - r * 0.92, r * 1.84, r * 1.84);
-      } else if (shape === "diamond") {
-        ctx.moveTo(x, y - r * 1.18);
-        ctx.lineTo(x + r * 1.18, y);
-        ctx.lineTo(x, y + r * 1.18);
-        ctx.lineTo(x - r * 1.18, y);
-        ctx.closePath();
-      } else if (shape === "triangle") {
-        ctx.moveTo(x, y - r * 1.22);
-        ctx.lineTo(x + r * 1.12, y + r * 0.88);
-        ctx.lineTo(x - r * 1.12, y + r * 0.88);
-        ctx.closePath();
-      } else {
-        // pentagon
-        for (let i = 0; i < 5; i++) {
-          const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
-          const px = x + Math.cos(a) * r * 1.12;
-          const py = y + Math.sin(a) * r * 1.12;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-      }
-      ctx.fillStyle = meta.color;
-      ctx.fill();
-      ctx.lineWidth = 1.6;
-      ctx.strokeStyle = "#ffffff";
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    // Hollow ring for a named operating zone.
-    const drawZoneRing = (
-      ctx: CanvasRenderingContext2D,
-      x: number,
-      y: number,
+      rating: JakartaExposureLevel,
+      num: number,
     ) => {
       ctx.save();
       ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
+      ctx.arc(x, y, 9.5, 0, Math.PI * 2);
+      ctx.fillStyle = POSTURE_EXPOSURE_ACCENT[rating];
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = ZONE_RING;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 11px 'Roboto Condensed', Roboto, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(num), x, y + 0.5);
+      ctx.restore();
+    };
+
+    // Small dark diamond for a major incident marker — a quiet point (no red
+    // star, no callout box), used only where a record geocodes to a real
+    // Jakarta location and a recognised operational type.
+    const drawMarker = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 4);
+      const s = 4.5;
+      ctx.beginPath();
+      ctx.rect(-s, -s, s * 2, s * 2);
+      ctx.fillStyle = DUSK;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#ffffff";
       ctx.stroke();
       ctx.restore();
     };
@@ -460,501 +393,355 @@ export default function JakartaCorridorMap({
       const proj = (lat: number, lon: number) =>
         map.latLngToContainerPoint([lat, lon]);
 
-      // 1) Movement corridors (lines + outward arrowheads + label).
-      const CORR_FONT = "700 10.5px 'Roboto Condensed', Roboto, sans-serif";
-      for (const c of JAKARTA_MAP_CORRIDORS) {
-        const pts = c.path.map((p) => proj(p[0], p[1]));
-        drawCorridorLine(ctx, pts);
-        drawArrow(ctx, pts[1], pts[0], CORRIDOR_COLOR);
-        drawArrow(ctx, pts[pts.length - 2], pts[pts.length - 1], CORRIDOR_COLOR);
-        const at = pts[Math.min(c.labelAt ?? Math.floor(pts.length / 2), pts.length - 1)];
-        label(ctx, c.label.toUpperCase(), at.x, at.y - 11, {
-          font: CORR_FONT,
-          color: CORRIDOR_LABEL_COLOR,
-          spacing: "0.04em",
-        });
+      // 1) Seven exposure-shaded operating zones (weakest first so stronger
+      // tiers sit on top), each derived from its OWN projected bounding box and
+      // washed by that zone's live rating — 1:1 with the numbered pins + panel.
+      const shadedZones = model.zones
+        .map((z, i) => ({ zone: z, seed: (i + 1) * 12.9898 }))
+        .sort(
+          (a, b) =>
+            POSTURE_EXPOSURE_ORDER.indexOf(b.zone.rating) -
+            POSTURE_EXPOSURE_ORDER.indexOf(a.zone.rating),
+        );
+      for (const { zone, seed } of shadedZones) {
+        const ring = zone.polygon.map((p) => proj(p[0], p[1]));
+        const xs = ring.map((p) => p.x);
+        const ys = ring.map((p) => p.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        const rx = Math.max((maxX - minX) / 2, 24);
+        const ry = Math.max((maxY - minY) / 2, 22);
+        drawBlob(ctx, cx, cy, rx, ry, zone.rating, seed);
       }
 
-      // 2) Named operating-zone rings + labels.
-      const ZONE_FONT = "700 10.5px 'Roboto Condensed', Roboto, sans-serif";
-      for (const z of JAKARTA_OPERATING_ZONES) {
-        const p = proj(z.lat, z.lon);
-        drawZoneRing(ctx, p.x, p.y);
-        const off = 9;
-        const side = z.labelSide ?? "top";
-        let tx = p.x;
-        let ty = p.y;
-        let align: CanvasTextAlign = "center";
-        if (side === "right") {
-          tx = p.x + off;
-          align = "left";
-        } else if (side === "left") {
-          tx = p.x - off;
-          align = "right";
-        } else if (side === "top") {
-          ty = p.y - off - 2;
-        } else {
-          ty = p.y + off + 2;
-        }
-        label(ctx, z.label, tx, ty, {
-          font: ZONE_FONT,
-          color: NAVY,
-          align,
-        });
+      // 2) Four route corridors (over the blobs), dashed, no arrows/labels.
+      for (const c of JAKARTA_POSTURE_CORRIDORS) {
+        if (!DRAWN_CORRIDOR_IDS.has(c.id)) continue;
+        drawCorridor(
+          ctx,
+          c.path.map((p) => proj(p[0], p[1])),
+        );
       }
 
-      // 3) Categorised incident markers, with a deterministic radial offset for
-      //    co-located markers of the same category (no random jitter).
-      const seen = new Map<string, number>();
-      for (const pt of model.points) {
-        const meta = JAKARTA_MAP_CATEGORY_META[pt.category];
-        const base = proj(pt.lat, pt.lon);
-        const key = `${Math.round(base.x / 5)}:${Math.round(base.y / 5)}:${pt.category}`;
-        const k = seen.get(key) ?? 0;
-        seen.set(key, k + 1);
-        let x = base.x;
-        let y = base.y;
-        if (k > 0) {
-          const ang = ((hashStr(pt.id) % 360) * Math.PI) / 180;
-          const rad = Math.min(6 + (k - 1) * 4, 14);
-          x += Math.cos(ang) * rad;
-          y += Math.sin(ang) * rad;
-        }
-        drawCategoryMarker(ctx, x, y, meta);
+      // 3) Major incident markers (small dark diamonds), drawn beneath the
+      // numbered zone pins. Only resolvable + recognised records reach here.
+      for (const m of model.markers) {
+        const c = proj(m.lat, m.lon);
+        drawMarker(ctx, c.x, c.y);
       }
 
+      // 4) Seven numbered colour pins.
+      for (const z of model.zones) {
+        const c = proj(z.center[0], z.center[1]);
+        drawPin(ctx, c.x, c.y, z.rating, z.number);
+      }
+
+      img.width = canvas.width;
+      img.height = canvas.height;
       img.src = canvas.toDataURL("image/png");
     };
 
-    map.whenReady(draw);
-    const t = window.setTimeout(draw, 80);
-    const t2 = window.setTimeout(draw, 700);
-    map.on("resize moveend zoomend viewreset", draw);
-    if (typeof document !== "undefined" && document.fonts?.ready) {
-      void document.fonts.ready.then(() => draw());
-    }
-    return () => {
-      window.clearTimeout(t);
-      window.clearTimeout(t2);
-      map.off("resize moveend zoomend viewreset", draw);
-    };
-  }, [drawKey, model, statusByArea]);
-
-  useEffect(() => {
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-      overlayImgRef.current = null;
-    };
-  }, []);
-
-  // If the reporting window loses every plottable location (e.g. the editor
-  // switches to a report/window with no located incidents), the conditional map
-  // DOM below unmounts. Tear the Leaflet instance down here so that a later
-  // window which DOES resolve points rebuilds a fresh map on the remounted node
-  // instead of reusing an instance still bound to the detached container.
-  useEffect(() => {
-    if (model.points.length > 0) return;
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
-    overlayImgRef.current = null;
-  }, [model]);
-
-  // When nothing in the window resolves to a plottable location, the Leaflet
-  // canvas would render empty. Show an explicit "map unavailable" panel in its
-  // place instead — the legend and operating-zone cards still carry the standing
-  // guidance, and no marker is ever invented (strict no-fabrication).
-  const hasMappablePoints = model.points.length > 0;
-
-  const notMappedParts: string[] = [];
-  if (model.notMapped.insufficientLocation > 0) {
-    notMappedParts.push(
-      `insufficient location detail: ${model.notMapped.insufficientLocation}`,
-    );
-  }
-  if (model.notMapped.typeNotMapped > 0) {
-    notMappedParts.push(
-      `incident type outside the legend: ${model.notMapped.typeNotMapped}`,
-    );
-  }
+    const t = window.setTimeout(draw, 60);
+    return () => window.clearTimeout(t);
+  }, [drawKey, model]);
 
   return (
-    <div>
-      {/* Figure title. */}
-      <div style={{ marginBottom: 10 }}>
+    <figure
+      id={domId}
+      style={{
+        margin: 0,
+        fontFamily: "Roboto, sans-serif",
+        color: DUSK,
+      }}
+    >
+      <figcaption style={{ marginBottom: 10 }}>
         <div
           style={{
             fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+            fontSize: 18,
             fontWeight: 700,
-            fontSize: 19,
             letterSpacing: "0.02em",
             textTransform: "uppercase",
             color: NAVY,
           }}
         >
-          Jakarta — Operational Map
+          Jakarta city movement posture
         </div>
-        <div
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontSize: 11.5,
-            color: DUSK,
-            marginTop: 2,
-          }}
-        >
-          Reported incidents this period by type and location, with named
-          operating zones and movement corridors · {rangeLabel}
+        <div style={{ fontSize: 12, color: DUSK, marginTop: 2 }}>
+          Reporting period: {rangeLabel}
         </div>
-      </div>
+      </figcaption>
 
-      {/* Map (~65%) on the left, operating-zone panel (~35%) on the right. */}
-      <div style={{ display: "flex", gap: 18, alignItems: "stretch" }}>
-        <div style={{ flex: "65 1 0", minWidth: 0 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0,13fr) minmax(0,7fr)",
+          gap: 14,
+          alignItems: "stretch",
+        }}
+      >
+        {/* Left: quiet map + legend */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
           <div
-            id={domId}
+            ref={mapElRef}
             style={{
+              position: "relative",
               width: "100%",
-              border: `1px solid ${POLAR}`,
-              borderRadius: 2,
-              background: "#ffffff",
-              boxSizing: "border-box",
+              height: 380,
+              border: `1px solid ${NAVY}`,
+              background: "#f4f5f7",
               overflow: "hidden",
             }}
-          >
-            {hasMappablePoints ? (
-              <div
-                ref={mapElRef}
-                style={{
-                  width: "100%",
-                  height: 440,
-                  position: "relative",
-                  background: "#EAEAEA",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: 440,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  padding: 24,
-                  boxSizing: "border-box",
-                  background: "#F6F6F6",
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: "'Roboto Condensed', Roboto, sans-serif",
-                    fontWeight: 700,
-                    fontSize: 15,
-                    letterSpacing: "0.02em",
-                    textTransform: "uppercase",
-                    color: NAVY,
-                    marginBottom: 6,
-                  }}
-                >
-                  Operational map unavailable
-                </div>
-                <div
-                  style={{
-                    fontFamily: "Roboto, sans-serif",
-                    fontSize: 12.5,
-                    lineHeight: 1.55,
-                    color: DUSK,
-                    maxWidth: 420,
-                  }}
-                >
-                  Insufficient location detail this period to plot incidents. The
-                  operating-zone guidance and exposure legend below still apply.
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Legend: incident types, map references and operating exposure. */}
+          />
           <div
             style={{
-              marginTop: 10,
-              padding: "10px 13px",
-              border: `1px solid ${POLAR}`,
-              borderRadius: 2,
-              background: "#ffffff",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 8,
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px 18px",
-              }}
-            >
-              <div style={legendHeadStyle}>Incident type</div>
-              {JAKARTA_MAP_CATEGORIES.map((c) => (
-                <span key={c.id} style={legendRowStyle}>
-                  <MarkerSwatch meta={c} />
-                  <span style={legendTextStyle}>{c.label}</span>
-                </span>
-              ))}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px 18px",
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: `1px solid ${POLAR}`,
-              }}
-            >
-              <div style={legendHeadStyle}>Reference</div>
-              <span style={legendRowStyle}>
+            <span style={legendHeadStyle}>Exposure</span>
+            {POSTURE_EXPOSURE_ORDER.map((lvl) => (
+              <span key={lvl} style={legendRowStyle}>
                 <span
                   style={{
                     display: "inline-block",
                     width: 12,
                     height: 12,
-                    borderRadius: "50%",
-                    background: "#ffffff",
-                    border: `2px solid ${ZONE_RING}`,
-                    boxSizing: "border-box",
+                    background: POSTURE_EXPOSURE_ACCENT[lvl],
+                    border: `1px solid ${NAVY}`,
                   }}
                 />
-                <span style={legendTextStyle}>Operating zone</span>
+                <span style={legendTextStyle}>{POSTURE_EXPOSURE_LABEL[lvl]}</span>
               </span>
-              <span style={legendRowStyle}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 20,
-                    height: 0,
-                    borderTop: `2px dashed ${CORRIDOR_COLOR}`,
-                  }}
-                />
-                <span style={legendTextStyle}>
-                  Movement corridor (airport · port · business)
-                </span>
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px 18px",
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: `1px solid ${POLAR}`,
-              }}
-            >
-              <div style={legendHeadStyle}>Operating exposure</div>
-              {EXPOSURE_ORDER.map((lvl) => (
-                <span key={lvl} style={legendRowStyle}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 15,
-                      height: 10,
-                      borderRadius: 2,
-                      background: EXPOSURE_FILL[lvl],
-                      border: `1px solid ${EXPOSURE_ACCENT[lvl]}`,
-                    }}
-                  />
-                  <span style={legendTextStyle}>{EXPOSURE_LABEL[lvl]}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Operating-zone guidance panel. */}
-        <div style={{ flex: "35 1 0", minWidth: 0 }}>
-          <ZonePanel rows={zoneRows} />
-        </div>
-      </div>
-
-      {/* Mapping-rule caption + honest "not mapped" note. */}
-      <div
-        style={{
-          fontFamily: "Roboto, sans-serif",
-          fontSize: 11,
-          color: DUSK,
-          lineHeight: 1.55,
-          marginTop: 12,
-        }}
-      >
-        Markers are placed only where a record carries explicit coordinates or
-        matches a named Jakarta gazetteer location; no named location, no plotted
-        marker.
-        {notMappedParts.length > 0 ? (
-          <>
-            {" "}
-            Not mapped this period — {notMappedParts.join("; ")}.
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function MarkerSwatch({ meta }: { meta: JakartaMapCategoryMeta }) {
-  const common: CSSProperties = {
-    display: "inline-block",
-    width: 12,
-    height: 12,
-    background: meta.color,
-    border: "1.5px solid #ffffff",
-    boxSizing: "border-box",
-    boxShadow: `0 0 0 1px ${meta.color}`,
-  };
-  if (meta.shape === "circle") {
-    return <span style={{ ...common, borderRadius: "50%" }} />;
-  }
-  if (meta.shape === "diamond") {
-    return <span style={{ ...common, transform: "rotate(45deg)" }} />;
-  }
-  if (meta.shape === "triangle") {
-    return (
-      <span
-        style={{
-          display: "inline-block",
-          width: 0,
-          height: 0,
-          borderLeft: "7px solid transparent",
-          borderRight: "7px solid transparent",
-          borderBottom: `12px solid ${meta.color}`,
-        }}
-      />
-    );
-  }
-  if (meta.shape === "pentagon") {
-    return (
-      <span
-        style={{
-          ...common,
-          clipPath: "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)",
-        }}
-      />
-    );
-  }
-  // square
-  return <span style={{ ...common, borderRadius: 2 }} />;
-}
-
-function ZonePanel({
-  rows,
-}: {
-  rows: {
-    zone: (typeof JAKARTA_OPERATING_ZONES)[number];
-    level: JakartaExposureLevel;
-    elevated: boolean;
-  }[];
-}) {
-  return (
-    <div
-      style={{
-        border: `1px solid ${POLAR}`,
-        borderRadius: 2,
-        overflow: "hidden",
-        background: "#ffffff",
-        boxSizing: "border-box",
-        height: "100%",
-      }}
-    >
-      <div
-        style={{
-          background: NAVY,
-          color: "#ffffff",
-          fontFamily: "'Roboto Condensed', Roboto, sans-serif",
-          fontWeight: 700,
-          fontSize: 11.5,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          padding: "10px 13px",
-        }}
-      >
-        Operating zones this period
-      </div>
-      {rows.map(({ zone, level, elevated }, i) => {
-        const accent = EXPOSURE_ACCENT[level];
-        return (
-          <div
-            key={zone.id}
-            style={{
-              padding: "10px 13px",
-              borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "'Roboto Condensed', Roboto, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  color: NAVY,
-                  lineHeight: 1.2,
-                  minWidth: 0,
-                }}
-              >
-                {zone.panelTitle}
-              </div>
+            ))}
+            <span style={legendRowStyle}>
               <span
                 style={{
-                  flex: "0 0 auto",
-                  fontFamily: "Roboto, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 9,
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase",
-                  color: "#ffffff",
-                  background: accent,
-                  borderRadius: 2,
-                  padding: "2px 6px 3px",
+                  display: "inline-block",
+                  width: 13,
+                  height: 13,
+                  borderRadius: 7,
+                  background: NAVY,
+                  border: "1.5px solid #ffffff",
+                  outline: `1px solid ${NAVY}`,
+                  boxSizing: "border-box",
+                }}
+              />
+              <span style={legendTextStyle}>Operating zone</span>
+            </span>
+            <span style={legendRowStyle}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 18,
+                  height: 0,
+                  borderTop: `2px dashed ${MOVEMENT_COLOR}`,
+                }}
+              />
+              <span style={legendTextStyle}>Movement corridor</span>
+            </span>
+            <span style={legendRowStyle}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 10,
+                  height: 10,
+                  background: DUSK,
+                  transform: "rotate(45deg)",
+                  border: "1px solid #ffffff",
+                  outline: `1px solid ${DUSK}`,
+                }}
+              />
+              <span style={legendTextStyle}>Major incident marker</span>
+            </span>
+          </div>
+          <div
+            style={{
+              fontSize: 10.5,
+              color: DUSK,
+              marginTop: 8,
+              lineHeight: 1.4,
+            }}
+          >
+            Map reflects assessed operating exposure for this reporting period.
+            Incident points are shown only where location detail is sufficient
+            and operationally useful.
+          </div>
+        </div>
+
+        {/* Right: movement posture panel */}
+        <div
+          style={{
+            border: `1px solid ${NAVY}`,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              background: NAVY,
+              color: "#ffffff",
+              fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              padding: "6px 10px",
+            }}
+          >
+            Movement posture this period
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {model.zones.map((z, i) => (
+              <div
+                key={z.id}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  padding: "7px 10px",
+                  borderTop: i === 0 ? "none" : `1px solid ${NAVY}22`,
                 }}
               >
-                {EXPOSURE_LABEL[level]}
+                <span
+                  style={{
+                    flex: "0 0 auto",
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    background: POSTURE_EXPOSURE_ACCENT[z.rating],
+                    color: "#ffffff",
+                    fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: 1,
+                  }}
+                >
+                  {z.number}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        color: NAVY,
+                      }}
+                    >
+                      {z.name}
+                    </span>
+                    <span
+                      style={{
+                        flex: "0 0 auto",
+                        fontFamily: "Roboto, sans-serif",
+                        fontSize: 9.5,
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        color: "#ffffff",
+                        background: POSTURE_EXPOSURE_ACCENT[z.rating],
+                        padding: "1px 5px",
+                      }}
+                    >
+                      {POSTURE_EXPOSURE_LABEL[z.rating]}
+                    </span>
+                  </div>
+                  <div
+                    style={{ fontSize: 11, color: DUSK, marginTop: 2 }}
+                  >
+                    {z.reason}
+                  </div>
+                  <div
+                    style={{ fontSize: 11, color: NAVY, marginTop: 1 }}
+                  >
+                    {z.action}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom: overall posture action cards */}
+      <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: NAVY,
+            marginBottom: 8,
+          }}
+        >
+          Overall posture
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0,1fr))",
+            gap: 12,
+          }}
+        >
+          {OVERALL_POSTURE.map((card) => (
+            <div
+              key={card.step}
+              style={{
+                border: `1px solid ${NAVY}`,
+                borderTop: `3px solid ${MOVEMENT_COLOR}`,
+                padding: "10px 12px 12px",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Roboto Condensed', Roboto, sans-serif",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: MOVEMENT_COLOR,
+                }}
+              >
+                {card.step}
+              </span>
+              <span
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontSize: 12.5,
+                  lineHeight: 1.4,
+                  color: NAVY,
+                  fontWeight: 500,
+                }}
+              >
+                {card.text}
               </span>
             </div>
-            <div
-              style={{
-                fontFamily: "Roboto, sans-serif",
-                fontSize: 9.5,
-                color: "#7a828e",
-                marginTop: 3,
-              }}
-            >
-              {elevated ? "Raised this period" : "Standing profile"}
-            </div>
-            <div
-              style={{
-                fontFamily: "Roboto, sans-serif",
-                fontSize: 11,
-                color: DUSK,
-                lineHeight: 1.4,
-                marginTop: 5,
-              }}
-            >
-              {zone.meaning}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          ))}
+        </div>
+      </div>
+    </figure>
   );
 }

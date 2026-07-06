@@ -1,17 +1,16 @@
 import {
-  JAKARTA_TRIAL_CORRIDORS,
-  JAKARTA_TRIAL_ZONES,
-  TRIAL_EXPOSURE_LABEL,
-  buildJakartaTrialModel,
-} from "../../artifacts/workbench/src/lib/jakartaTrialMap";
+  JAKARTA_POSTURE_CORRIDORS,
+  JAKARTA_POSTURE_ZONES,
+  POSTURE_EXPOSURE_LABEL,
+  buildJakartaPostureModel,
+} from "../../artifacts/workbench/src/lib/jakartaOperatingPosture";
 import type { CountryFastFactsIncident } from "../../artifacts/workbench/src/lib/countryFastFacts";
 
-// Pins the TRIAL Jakarta operational-exposure map model (Task #290) — SEPARATE
-// from the live Jakarta city report. Proves: the seven zones render in the fixed
-// task order (1–7), ratings derive from the shared honest exposure model (a
-// quiet zone never alarms above "Monitored"), live reporting elevates the right
-// zone with live-derived reason/action, and the four route corridors are the
-// required set.
+// Pins the live Jakarta operating-posture map model (Operational Map §13).
+// Proves: the seven zones render in the fixed order (1–7), ratings derive from
+// the shared honest exposure model (a quiet zone never alarms above
+// "Monitored"), live reporting elevates the right zone with live-derived
+// reason/action, and the four route corridors are the required set.
 
 function inc(p: Partial<CountryFastFactsIncident>): CountryFastFactsIncident {
   return {
@@ -24,12 +23,12 @@ function inc(p: Partial<CountryFastFactsIncident>): CountryFastFactsIncident {
   };
 }
 
-describe("Jakarta trial exposure map model", () => {
+describe("Jakarta operating-posture map model", () => {
   it("emits the seven zones in the fixed task order 1–7", () => {
-    expect(JAKARTA_TRIAL_ZONES.map((z) => z.number)).toEqual([
+    expect(JAKARTA_POSTURE_ZONES.map((z) => z.number)).toEqual([
       1, 2, 3, 4, 5, 6, 7,
     ]);
-    expect(JAKARTA_TRIAL_ZONES.map((z) => z.id)).toEqual([
+    expect(JAKARTA_POSTURE_ZONES.map((z) => z.id)).toEqual([
       "govt",
       "priok",
       "north-access",
@@ -41,7 +40,7 @@ describe("Jakarta trial exposure map model", () => {
   });
 
   it("offers the four required route corridors", () => {
-    expect(JAKARTA_TRIAL_CORRIDORS.map((c) => c.label)).toEqual([
+    expect(JAKARTA_POSTURE_CORRIDORS.map((c) => c.label)).toEqual([
       "Airport corridor",
       "Port corridor",
       "CBD business corridor",
@@ -50,13 +49,13 @@ describe("Jakarta trial exposure map model", () => {
   });
 
   it("uses the exact five rating labels", () => {
-    expect(Object.values(TRIAL_EXPOSURE_LABEL).sort()).toEqual(
+    expect(Object.values(POSTURE_EXPOSURE_LABEL).sort()).toEqual(
       ["Elevated", "High", "Low", "Monitored", "Not assessed"].sort(),
     );
   });
 
   it("keeps a quiet map capped at Monitored (no fabricated alarm)", () => {
-    const model = buildJakartaTrialModel([]);
+    const model = buildJakartaPostureModel([]);
     expect(model.zones).toHaveLength(7);
     for (const z of model.zones) {
       expect(["monitored", "low", "not-assessed"]).toContain(z.rating);
@@ -68,7 +67,7 @@ describe("Jakarta trial exposure map model", () => {
   });
 
   it("elevates the government district on a live high-severity protest", () => {
-    const model = buildJakartaTrialModel([
+    const model = buildJakartaPostureModel([
       inc({
         title:
           "Protesters rally near Monas in Central Jakarta government district",
@@ -85,8 +84,8 @@ describe("Jakarta trial exposure map model", () => {
   });
 
   it("gives every zone distinct standing wording (no generic repetition)", () => {
-    const reasons = JAKARTA_TRIAL_ZONES.map((z) => z.standingReason);
-    const actions = JAKARTA_TRIAL_ZONES.map((z) => z.standingAction);
+    const reasons = JAKARTA_POSTURE_ZONES.map((z) => z.standingReason);
+    const actions = JAKARTA_POSTURE_ZONES.map((z) => z.standingAction);
     expect(new Set(reasons).size).toBe(reasons.length);
     expect(new Set(actions).size).toBe(actions.length);
   });
@@ -94,7 +93,7 @@ describe("Jakarta trial exposure map model", () => {
   it("keeps wording zone-specific even when zones share a corridor tie", () => {
     // Zones 4/5/6 all tie to the commercial-hotels corridor; a live commercial
     // incident must NOT collapse them to identical panel text.
-    const model = buildJakartaTrialModel([
+    const model = buildJakartaPostureModel([
       inc({
         title: "Robbery reported near offices in SCBD business district",
         location: "SCBD",
@@ -111,12 +110,12 @@ describe("Jakarta trial exposure map model", () => {
   });
 
   it("plots a marker only for a resolvable-location record", () => {
-    const withLoc = buildJakartaTrialModel([
+    const withLoc = buildJakartaPostureModel([
       inc({ title: "Robbery near Sudirman offices", location: "Sudirman" }),
     ]);
     expect(withLoc.map.points.length).toBeGreaterThanOrEqual(1);
 
-    const noLoc = buildJakartaTrialModel([
+    const noLoc = buildJakartaPostureModel([
       inc({ title: "Nationwide policy update reported across Jakarta" }),
     ]);
     expect(noLoc.map.points).toHaveLength(0);

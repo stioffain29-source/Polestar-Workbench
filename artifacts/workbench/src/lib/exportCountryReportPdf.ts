@@ -58,6 +58,12 @@ import {
   type JakartaCorridorStatus,
 } from "./jakartaCorridors";
 import {
+  buildJakartaPostureZones,
+  POSTURE_EXPOSURE_ACCENT,
+  POSTURE_EXPOSURE_LABEL,
+  type JakartaPostureZone,
+} from "./jakartaOperatingPosture";
+import {
   buildJakartaReportDataset,
   buildPngReportDataset,
   buildWestPapuaReportDataset,
@@ -1016,10 +1022,88 @@ function renderJakartaBrief(
   // 13. Polestar View
   drawSectionWithProse(ctx, "Polestar View", d.polestarView || "Not populated.");
 
-  // 14. Operational Map
+  // 14. Operational Map — the headless counterpart to the seven-zone posture
+  // map: the same zones, ratings and reason/action text the on-screen map shows.
   drawSectionHeading(ctx, "Operational Map");
-  if (jakartaExposure.length > 0) drawJakartaExposureTable(ctx, jakartaExposure);
+  if (jakartaExposure.length > 0) {
+    drawJakartaPostureTable(ctx, buildJakartaPostureZones(jakartaExposure));
+  }
   renderProse(ctx, tactical ? tactical.areaSummary : "Not populated.");
+}
+
+// Headless seven-zone movement-posture table — the offline counterpart to the
+// on-screen JakartaCorridorMap posture panel (ZONE | EXPOSURE | REASON | ACTION),
+// built from the SAME buildJakartaPostureZones derivation so both agree.
+function drawJakartaPostureTable(ctx: Ctx, zones: JakartaPostureZone[]) {
+  const { pdf, MX, CW } = ctx;
+  const colZoneW = 150;
+  const colExpW = 78;
+  const restW = CW - colZoneW - colExpW;
+  const colReaW = Math.round(restW / 2);
+  const colActW = restW - colReaW;
+  const rowH = 20;
+
+  const header = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("ZONE", MX + 6, ctx.y + 13);
+    pdf.text("EXPOSURE", MX + colZoneW + 6, ctx.y + 13);
+    pdf.text("REASON", MX + colZoneW + colExpW + 6, ctx.y + 13);
+    pdf.text("ACTION", MX + colZoneW + colExpW + colReaW + 6, ctx.y + 13);
+    ctx.y += rowH;
+  };
+
+  ensureSpace(ctx, rowH * 3);
+  header();
+
+  for (const z of zones) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8.5);
+    const zoneLines: string[] = pdf.splitTextToSize(
+      sanitize(`${z.number}. ${z.name}`),
+      colZoneW - 8,
+    );
+    const reaLines: string[] = pdf.splitTextToSize(sanitize(z.reason), colReaW - 8);
+    const actLines: string[] = pdf.splitTextToSize(sanitize(z.action), colActW - 8);
+    const ratingLabel = (POSTURE_EXPOSURE_LABEL[z.rating] ?? z.rating).toUpperCase();
+    const rh = Math.max(
+      rowH,
+      zoneLines.length * 12 + 22,
+      reaLines.length * 12 + 10,
+      actLines.length * 12 + 10,
+    );
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      header();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(8.5);
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.3);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+
+    const textOpts = { lineHeightFactor: 1.4 };
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.text(zoneLines, MX + 6, ctx.y + 14, textOpts);
+
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    setText(pdf, POSTURE_EXPOSURE_ACCENT[z.rating] ?? DUSK);
+    pdf.text(sanitize(ratingLabel), MX + colZoneW + 6, ctx.y + 14);
+    pdf.setFontSize(8.5);
+
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.text(reaLines, MX + colZoneW + colExpW + 6, ctx.y + 14, textOpts);
+    pdf.text(actLines, MX + colZoneW + colExpW + colReaW + 6, ctx.y + 14, textOpts);
+
+    ctx.y += rh;
+  }
+  ctx.y += 4;
 }
 
 // The ranked Priority Areas table (# | Area | Driver | Business impact | Action).

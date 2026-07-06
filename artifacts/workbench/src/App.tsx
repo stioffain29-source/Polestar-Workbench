@@ -30,7 +30,6 @@ import Cards from "./pages/Cards";
 import CardBuilder from "./pages/CardBuilder";
 import BrandSettings from "./pages/BrandSettings";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
-import JakartaTrialMapPage from "./pages/JakartaTrialMapPage";
 
 const queryClient = new QueryClient();
 
@@ -215,7 +214,6 @@ function Router() {
         <Route path="/card-builder" component={Cards} />
         <Route path="/card-builder/:id" component={CardBuilder} />
         <Route path="/card-settings" component={BrandSettings} />
-        <Route path="/jakarta-trial-map" component={JakartaTrialMapPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -1,15 +1,16 @@
 // ===========================================================================
-// TRIAL Jakarta operational-exposure map — pure model (no React, no Leaflet)
+// Jakarta operating-posture map — pure model (no React, no Leaflet)
 // ===========================================================================
 //
-// THROWAWAY TRIAL surface (Task #290). This is SEPARATE from the live Jakarta
-// city report / JakartaCorridorMap / JakartaReportBody. It reuses the honest,
-// no-fabrication exposure model (buildJakartaCorridorStatuses) and the honest
-// geocoder (buildJakartaMapModel), but re-frames the picture as SEVEN numbered
-// operating zones (fixed task order), FOUR route corridors, a right-hand
-// "Movement posture this period" panel and a shaded-zone map.
+// The live Jakarta city report "Operational Map" (§13) model. It reuses the
+// honest, no-fabrication exposure model (buildJakartaCorridorStatuses) and the
+// honest geocoder (buildJakartaMapModel), and frames the picture as SEVEN
+// numbered operating zones (fixed order 1–7), FOUR route corridors, a
+// right-hand "Movement posture this period" panel and a shaded-zone map.
+// Rendered by JakartaCorridorMap (screen + in-app PDF) and, as a headless
+// posture table, by renderJakartaBrief in exportCountryReportPdf.
 //
-// Nothing here changes relevance rules, ingestion, or any live-report code.
+// Nothing here changes relevance rules, ingestion, or any other report code.
 
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import {
@@ -30,21 +31,21 @@ import {
 // the live map's tints but with the EXACT rating vocabulary the task requires
 // ("Not assessed", not "Not Assessed").
 // ---------------------------------------------------------------------------
-export const TRIAL_EXPOSURE_FILL: Record<JakartaExposureLevel, string> = {
+export const POSTURE_EXPOSURE_FILL: Record<JakartaExposureLevel, string> = {
   high: "#D98A8A",
   elevated: "#E4B073",
   monitored: "#E8CE7A",
   low: "#B9CE96",
   "not-assessed": "#D0D3D8",
 };
-export const TRIAL_EXPOSURE_ACCENT: Record<JakartaExposureLevel, string> = {
+export const POSTURE_EXPOSURE_ACCENT: Record<JakartaExposureLevel, string> = {
   high: "#8F2F2F",
   elevated: "#A85B1B",
   monitored: "#7E6A1E",
   low: "#4F6E32",
   "not-assessed": "#7C828B",
 };
-export const TRIAL_EXPOSURE_LABEL: Record<JakartaExposureLevel, string> = {
+export const POSTURE_EXPOSURE_LABEL: Record<JakartaExposureLevel, string> = {
   high: "High",
   elevated: "Elevated",
   monitored: "Monitored",
@@ -52,7 +53,7 @@ export const TRIAL_EXPOSURE_LABEL: Record<JakartaExposureLevel, string> = {
   "not-assessed": "Not assessed",
 };
 // Legend order (five ratings, worst first).
-export const TRIAL_EXPOSURE_ORDER: JakartaExposureLevel[] = [
+export const POSTURE_EXPOSURE_ORDER: JakartaExposureLevel[] = [
   "high",
   "elevated",
   "monitored",
@@ -67,10 +68,10 @@ export const TRIAL_EXPOSURE_ORDER: JakartaExposureLevel[] = [
 // and zone-specific reason/action text (standing + elevated variants) so the
 // panel never repeats generic wording across zones.
 // ---------------------------------------------------------------------------
-export type JakartaTrialIcon = "monument" | "anchor" | "plane";
-export type JakartaTrialLabelSide = "top" | "bottom" | "left" | "right";
+export type JakartaPostureIcon = "monument" | "anchor" | "plane";
+export type JakartaPostureLabelSide = "top" | "bottom" | "left" | "right";
 
-export interface JakartaTrialZoneDef {
+export interface JakartaPostureZoneDef {
   number: number;
   id: string;
   /** Panel + map name. */
@@ -82,9 +83,9 @@ export interface JakartaTrialZoneDef {
   /** Rectangular outline ring [lat, lon] — source geometry for the soft blob. */
   polygon: [number, number][];
   /** Optional on-map glyph near the pin (govt monument / port anchor / plane). */
-  icon?: JakartaTrialIcon;
+  icon?: JakartaPostureIcon;
   /** Preferred side to place the pin's name + rating chip (auto-clamped). */
-  labelSide: JakartaTrialLabelSide;
+  labelSide: JakartaPostureLabelSide;
   /** Zone-specific reason shown when NO live reporting elevates the zone. */
   standingReason: string;
   /** Zone-specific movement action for the standing (quiet) case. */
@@ -111,7 +112,7 @@ function rect(
   ];
 }
 
-export const JAKARTA_TRIAL_ZONES: JakartaTrialZoneDef[] = [
+export const JAKARTA_POSTURE_ZONES: JakartaPostureZoneDef[] = [
   {
     number: 1,
     id: "govt",
@@ -226,14 +227,14 @@ export const JAKARTA_TRIAL_ZONES: JakartaTrialZoneDef[] = [
 // Four route corridors (task order): Airport, Port, CBD business, North Jakarta
 // access. Ordered [lat, lon] waypoints drawn as movement lines.
 // ---------------------------------------------------------------------------
-export interface JakartaTrialCorridor {
+export interface JakartaPostureCorridor {
   id: string;
   label: string;
   path: [number, number][];
   labelAt?: number;
 }
 
-export const JAKARTA_TRIAL_CORRIDORS: JakartaTrialCorridor[] = [
+export const JAKARTA_POSTURE_CORRIDORS: JakartaPostureCorridor[] = [
   {
     id: "airport",
     label: "Airport corridor",
@@ -294,7 +295,7 @@ export const JAKARTA_TRIAL_CORRIDORS: JakartaTrialCorridor[] = [
 // ---------------------------------------------------------------------------
 // Assembled trial model
 // ---------------------------------------------------------------------------
-export interface JakartaTrialZone extends JakartaTrialZoneDef {
+export interface JakartaPostureZone extends JakartaPostureZoneDef {
   /** Live-derived operating exposure this period ("not-assessed" when quiet). */
   rating: JakartaExposureLevel;
   /** True when live reporting elevated the zone above its standing baseline. */
@@ -310,8 +311,8 @@ export interface JakartaTrialZone extends JakartaTrialZoneDef {
 // classifier the live map uses, so a marker appears ONLY where a record carries
 // a resolvable Jakarta location and a recognised operational type. It still
 // carries a short category label + occurrence date on the model (kept for
-// future use), but the trial map draws a single quiet point style.
-export interface JakartaTrialMarker {
+// future use), but the map draws a single quiet point style.
+export interface JakartaPostureMarker {
   id: string;
   lat: number;
   lon: number;
@@ -322,14 +323,14 @@ export interface JakartaTrialMarker {
   severity: string;
 }
 
-export interface JakartaTrialModel {
-  zones: JakartaTrialZone[];
+export interface JakartaPostureModel {
+  zones: JakartaPostureZone[];
   map: JakartaMapModel;
-  markers: JakartaTrialMarker[];
+  markers: JakartaPostureMarker[];
 }
 
 // Short operational category label per map category (kept on the model only).
-const TRIAL_MARKER_LABEL: Record<JakartaMapCategory, string> = {
+const POSTURE_MARKER_LABEL: Record<JakartaMapCategory, string> = {
   "protest-policing": "Protest / rally",
   "flooding-weather": "Flooding",
   "crime-safety": "Crime / safety",
@@ -337,7 +338,7 @@ const TRIAL_MARKER_LABEL: Record<JakartaMapCategory, string> = {
   "port-logistics": "Traffic disruption",
 };
 
-const TRIAL_MONTHS = [
+const POSTURE_MONTHS = [
   "Jan",
   "Feb",
   "Mar",
@@ -352,17 +353,17 @@ const TRIAL_MONTHS = [
   "Dec",
 ];
 
-function trialShortDate(iso?: string): string {
+function postureShortDate(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return `${d.getUTCDate()} ${TRIAL_MONTHS[d.getUTCMonth()]}`;
+  return `${d.getUTCDate()} ${POSTURE_MONTHS[d.getUTCMonth()]}`;
 }
 
-function buildTrialMarkers(
+function buildPostureMarkers(
   incidents: CountryFastFactsIncident[],
-): JakartaTrialMarker[] {
-  const out: JakartaTrialMarker[] = [];
+): JakartaPostureMarker[] {
+  const out: JakartaPostureMarker[] = [];
   for (let idx = 0; idx < incidents.length; idx++) {
     const i = incidents[idx];
     const geo = geocodeJakartaIncident(i);
@@ -373,8 +374,8 @@ function buildTrialMarkers(
       id: i.id != null ? String(i.id) : `idx-${idx}`,
       lat: geo.lat,
       lon: geo.lon,
-      label: TRIAL_MARKER_LABEL[cat],
-      dateLabel: trialShortDate(i.occurredAt),
+      label: POSTURE_MARKER_LABEL[cat],
+      dateLabel: postureShortDate(i.occurredAt),
       severity: (i.severity ?? "").toLowerCase(),
     });
   }
@@ -388,14 +389,16 @@ function buildTrialMarkers(
 // actually elevated by reporting; otherwise the zone-specific standing profile
 // text is shown. No invented incidents — the text describes the zone's
 // exposure character, gated on a real elevation flag.
-export function buildJakartaTrialModel(
-  incidents: CountryFastFactsIncident[],
-): JakartaTrialModel {
-  const corridor = buildJakartaCorridorStatuses(incidents);
+// Pure zone derivation from already-computed corridor statuses. Shared by the
+// on-screen model builder AND the headless PDF posture table so both surfaces
+// render the identical seven-zone rating/reason/action set.
+export function buildJakartaPostureZones(
+  statuses: JakartaCorridorStatus[],
+): JakartaPostureZone[] {
   const byArea = new Map<string, JakartaCorridorStatus>();
-  for (const s of corridor.statuses) byArea.set(s.area.id, s);
+  for (const s of statuses) byArea.set(s.area.id, s);
 
-  const zones: JakartaTrialZone[] = JAKARTA_TRIAL_ZONES.map((z) => {
+  return JAKARTA_POSTURE_ZONES.map((z) => {
     const st = byArea.get(z.corridorAreaId) ?? null;
     const rating: JakartaExposureLevel = st ? st.displayExposure : "not-assessed";
     const elevated = st ? st.elevated : false;
@@ -407,10 +410,15 @@ export function buildJakartaTrialModel(
       action: elevated ? z.elevatedAction : z.standingAction,
     };
   });
+}
 
+export function buildJakartaPostureModel(
+  incidents: CountryFastFactsIncident[],
+): JakartaPostureModel {
+  const corridor = buildJakartaCorridorStatuses(incidents);
   return {
-    zones,
+    zones: buildJakartaPostureZones(corridor.statuses),
     map: buildJakartaMapModel(incidents),
-    markers: buildTrialMarkers(incidents),
+    markers: buildPostureMarkers(incidents),
   };
 }
