@@ -167,11 +167,14 @@ export default function DataCentreRegistry() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
   // Deep link from the facility overlay map: `?facility=<id>` opens that
   // facility's full record. Guarded so it only fires once the target row is
   // loaded, and never re-fires after the analyst navigates within the page.
   const deepLinkHandledRef = useRef<number | null>(null);
+  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const requested = Number(new URLSearchParams(search).get("facility"));
     if (!Number.isFinite(requested) || requested <= 0) return;
@@ -183,7 +186,21 @@ export default function DataCentreRegistry() {
     setForm(facilityToForm(target));
     setError(null);
     setShowForm(true);
+    // Scroll the matching row into view and briefly highlight it so the
+    // analyst gets visual confirmation of which record they landed on.
+    setHighlightedId(target.id);
+    requestAnimationFrame(() => {
+      rowRefs.current.get(target.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => setHighlightedId(null), 2600);
   }, [search, facilities]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: getListDataCentreFacilitiesQueryKey() });
@@ -445,7 +462,16 @@ export default function DataCentreRegistry() {
               </thead>
               <tbody>
                 {facilities.map((f) => (
-                  <tr key={f.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
+                  <tr
+                    key={f.id}
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(f.id, el);
+                      else rowRefs.current.delete(f.id);
+                    }}
+                    className={`border-b border-border/60 last:border-0 hover:bg-muted/30 transition-colors duration-700 ${
+                      highlightedId === f.id ? "bg-accent/15" : ""
+                    }`}
+                  >
                     <td className="px-4 py-2.5">
                       <div className="font-medium text-foreground">{f.name}</div>
                       <div className="text-xs text-muted-foreground">
