@@ -5,14 +5,17 @@ import {
   CircleMarker,
   Polyline,
   Tooltip as LeafletTooltip,
+  Popup as LeafletPopup,
   useMap,
 } from "react-leaflet";
+import { Link } from "wouter";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { format, parseISO } from "date-fns";
 import type { DataCentreFacility } from "@workspace/api-client-react";
 import { SEVERITY_LABELS, ratingColor } from "@/lib/topics";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
+import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 
 // Purpose-built Data-Centre facility overlay map.
 //
@@ -63,6 +66,8 @@ export type OverlayIncident = {
   occurredAt: string;
   latitude?: number | null;
   longitude?: number | null;
+  resolvedUrl?: string | null;
+  sourceUrl?: string | null;
 };
 
 function hasCoords<T extends { latitude?: number | null; longitude?: number | null }>(
@@ -176,6 +181,15 @@ export function DataCentreFacilityMap({
           {incidentsWithCoords.map((i) => {
             const c = ratingColor(i.severity);
             const linked = linkedIncidentIds.has(i.id);
+            const title = displayIncidentTitle(i.title, i.displayTitle);
+            const when = (() => {
+              try {
+                return format(parseISO(i.occurredAt), "dd MMM yyyy");
+              } catch {
+                return "Date not reported";
+              }
+            })();
+            const url = incidentSourceUrl(i);
             return (
               <CircleMarker
                 key={`inc-${i.id}`}
@@ -190,21 +204,38 @@ export function DataCentreFacilityMap({
               >
                 <LeafletTooltip>
                   <div style={{ fontSize: 11 }}>
-                    <div style={{ fontWeight: 700 }}>{displayIncidentTitle(i.title, i.displayTitle)}</div>
+                    <div style={{ fontWeight: 700 }}>{title}</div>
                     <div>{i.country || "Country not reported"}</div>
                     <div>Severity: {SEVERITY_LABELS[i.severity] ?? i.severity}</div>
-                    <div>
-                      {(() => {
-                        try {
-                          return format(parseISO(i.occurredAt), "dd MMM yyyy");
-                        } catch {
-                          return "Date not reported";
-                        }
-                      })()}
-                    </div>
+                    <div>{when}</div>
                     {linked && <div style={{ fontWeight: 700, color: "#4655FF" }}>Linked to a tracked facility</div>}
                   </div>
                 </LeafletTooltip>
+                <LeafletPopup>
+                  <div style={{ fontSize: 12, minWidth: 180 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 2 }}>{title}</div>
+                    <div>{i.country || "Country not reported"}</div>
+                    <div>Severity: {SEVERITY_LABELS[i.severity] ?? i.severity}</div>
+                    <div>{when}</div>
+                    {linked && (
+                      <div style={{ fontWeight: 700, color: "#4655FF" }}>Linked to a tracked facility</div>
+                    )}
+                    {url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: "inline-block", marginTop: 6, color: "#4655FF", fontWeight: 600 }}
+                      >
+                        Open source article ↗
+                      </a>
+                    ) : (
+                      <div style={{ marginTop: 6, fontStyle: "italic", color: "#8A94A6" }}>
+                        Source link not reported
+                      </div>
+                    )}
+                  </div>
+                </LeafletPopup>
               </CircleMarker>
             );
           })}
@@ -246,6 +277,41 @@ export function DataCentreFacilityMap({
                       {f.capacityMw != null && <div>Capacity: {f.capacityMw} MW</div>}
                     </div>
                   </LeafletTooltip>
+                  <LeafletPopup>
+                    <div style={{ fontSize: 12, minWidth: 190 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 2 }}>{f.name}</div>
+                      <div>{f.operator || "Operator not reported"}</div>
+                      <div>{f.city ? `${f.city}, ` : ""}{f.country}</div>
+                      <div>Status: {f.status}</div>
+                      {f.statusChanged && (
+                        <div style={{ fontWeight: 700, color: "#4655FF" }}>
+                          Recent status change{f.previousStatus ? ` (from ${f.previousStatus})` : ""}
+                        </div>
+                      )}
+                      {f.planningRisk !== "No known issue" && f.planningRisk !== "Unknown" && (
+                        <div>Planning risk: {f.planningRisk}</div>
+                      )}
+                      {f.capacityMw != null && <div>Capacity: {f.capacityMw} MW</div>}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                        <Link
+                          href={`/registry/data-centres?facility=${f.id}`}
+                          style={{ color: "#4655FF", fontWeight: 600 }}
+                        >
+                          Open in registry →
+                        </Link>
+                        {f.sourceUrl && (
+                          <a
+                            href={f.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "#4655FF", fontWeight: 600 }}
+                          >
+                            Open source ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </LeafletPopup>
                 </CircleMarker>
               </div>
             );

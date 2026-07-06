@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListDataCentreFacilities,
@@ -160,11 +161,29 @@ const selectCls = inputCls;
 export default function DataCentreRegistry() {
   const queryClient = useQueryClient();
   const { data: facilities = [], isLoading } = useListDataCentreFacilities();
+  const search = useSearch();
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
+
+  // Deep link from the facility overlay map: `?facility=<id>` opens that
+  // facility's full record. Guarded so it only fires once the target row is
+  // loaded, and never re-fires after the analyst navigates within the page.
+  const deepLinkHandledRef = useRef<number | null>(null);
+  useEffect(() => {
+    const requested = Number(new URLSearchParams(search).get("facility"));
+    if (!Number.isFinite(requested) || requested <= 0) return;
+    if (deepLinkHandledRef.current === requested) return;
+    const target = facilities.find((f) => f.id === requested);
+    if (!target) return;
+    deepLinkHandledRef.current = requested;
+    setEditingId(target.id);
+    setForm(facilityToForm(target));
+    setError(null);
+    setShowForm(true);
+  }, [search, facilities]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: getListDataCentreFacilitiesQueryKey() });
