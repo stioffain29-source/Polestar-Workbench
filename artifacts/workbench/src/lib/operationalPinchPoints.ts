@@ -1,27 +1,27 @@
 // ---------------------------------------------------------------------------
-// Operational-map posture model (GLOBAL country-report standard).
+// Operational-map impact-level model (GLOBAL country-report standard).
 //
 // Country-report maps are REPORTING-DRIVEN, not standing: a location is only
 // mapped when the current reporting window carries a specific operationally
 // relevant event there. This module is the single source of truth for the
-// posture rating, its colours, the deterministic "business relevance" label and
-// the fixed map wording, shared by BOTH render paths in CountryReportMap.tsx
+// impact-level rating, its colours, the deterministic "business relevance" label
+// and the fixed map wording, shared by BOTH render paths in CountryReportMap.tsx
 // (the configured-zone mode and the per-coordinate dot mode) so the two never
 // drift. It is pure/deterministic (no React, no Leaflet) and unit-tested.
 // ---------------------------------------------------------------------------
 
-export type Posture = "Primary" | "Secondary" | "Watch";
+export type ImpactLevel = "Direct impact" | "Possible impact" | "Monitor only";
 
-export const POSTURE_ORDER: Posture[] = ["Primary", "Secondary", "Watch"];
+export const IMPACT_ORDER: ImpactLevel[] = ["Direct impact", "Possible impact", "Monitor only"];
 
-// Brand-safe posture palette. Midnight Blue and Electric Blue are the two
-// brand accents; Watch uses a neutral mid-grey. The reserved tiers
+// Brand-safe impact-level palette. Midnight Blue and Electric Blue are the two
+// brand accents; "Monitor only" uses a neutral mid-grey. The reserved tiers
 // (petrol #1B6B7A = Insignificant, subdued red #A33232 = Extreme) are NEVER
-// reused here, so posture can never be confused with a severity chip.
-export const POSTURE_COLOR: Record<Posture, string> = {
-  Primary: "#0B0B3D",
-  Secondary: "#4655FF",
-  Watch: "#6B7280",
+// reused here, so an impact level can never be confused with a severity chip.
+export const IMPACT_COLOR: Record<ImpactLevel, string> = {
+  "Direct impact": "#0B0B3D",
+  "Possible impact": "#4655FF",
+  "Monitor only": "#6B7280",
 };
 
 export const SEV_RANK: Record<string, number> = {
@@ -33,8 +33,8 @@ export const SEV_RANK: Record<string, number> = {
 };
 
 // Highest severity present in a set of incidents, as a lower-case key ("" when
-// the set is empty). Mirrors the zone/dot aggregation so posture reads the same
-// worst-severity signal everywhere.
+// the set is empty). Mirrors the zone/dot aggregation so the impact level reads
+// the same worst-severity signal everywhere.
 export function worstSeverityKey(incidents: Array<{ severity?: string }>): string {
   let key = "";
   let rank = 0;
@@ -49,20 +49,24 @@ export function worstSeverityKey(incidents: Array<{ severity?: string }>): strin
   return key;
 }
 
-// Posture from FREQUENCY + BUSINESS IMPACT (the owner's global rule):
-//  - PRIMARY  : multiple relevant reports in one area (count >= 2), OR a single
-//               event with clear direct business impact (worst severity
-//               high/extreme).
-//  - SECONDARY: a single report with plausible but limited impact (moderate).
-//  - WATCH    : low-frequency, limited current impact (single low/insignificant),
-//               mapped only because it is operationally relevant.
+// Impact level from FREQUENCY + BUSINESS IMPACT (the owner's global rule). One
+// incident does NOT automatically read as Direct impact — the label reflects
+// both how often an area is reported and how clear the business effect is:
+//  - DIRECT IMPACT  : multiple relevant reports in one area (count >= 2), OR a
+//                     single event with a clear direct business effect (worst
+//                     severity high/extreme).
+//  - POSSIBLE IMPACT: a single report that is relevant but limited, indirect or
+//                     not yet confirmed (moderate).
+//  - MONITOR ONLY   : relevant but no clear current disruption (a single
+//                     low/insignificant report), mapped only because it is
+//                     operationally relevant.
 // count === 0 must never reach here (unmapped locations are dropped upstream);
-// it is treated as Watch defensively.
-export function postureFor(count: number, worstKey: string): Posture {
+// it is treated as "Monitor only" defensively.
+export function impactLevelFor(count: number, worstKey: string): ImpactLevel {
   const rank = SEV_RANK[(worstKey ?? "").toLowerCase()] ?? 0;
-  if (count >= 2 || rank >= 4) return "Primary";
-  if (rank === 3) return "Secondary";
-  return "Watch";
+  if (count >= 2 || rank >= 4) return "Direct impact";
+  if (rank === 3) return "Possible impact";
+  return "Monitor only";
 }
 
 // Deterministic OPERATIONAL read of a reported event — never a prediction and
@@ -137,8 +141,8 @@ export function businessRelevance(i: RelevanceInput): string {
 // Fixed map wording (owner brief, verbatim). Any "risk map" language is
 // replaced by these across every country report.
 export const OPERATIONAL_MAP_HEADING = "Operational Map";
-export const OPERATIONAL_MAP_SUBTITLE = "Reported operational pinch points for this period";
+export const OPERATIONAL_MAP_SUBTITLE = "Reported operational issues this period";
 export const OPERATIONAL_MAP_READ =
-  "This map shows reported operational pinch points for the current reporting period. " +
+  "This map shows reported operational issues for the current reporting period. " +
   "Locations are included only where reporting indicates a relevant event, issue or disruption. " +
-  "Posture is based on likely business impact combined with reporting frequency, not standing background risk.";
+  "Impact level is based on likely business impact and reporting frequency, not standing background risk.";

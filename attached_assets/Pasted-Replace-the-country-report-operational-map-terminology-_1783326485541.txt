@@ -1,0 +1,79 @@
+Replace the country report operational map terminology.
+
+Remove the terms:
+- Posture
+- Primary operational pinch point
+- Secondary operational pinch point
+- Watch item
+
+These terms are unclear and sound like invented internal language.
+
+Use plain business language instead:
+
+1. Direct impact
+Use only where current reporting shows an issue that can realistically affect business operations now.
+Examples:
+- road closure
+- protest blocking access
+- fire affecting an industrial area
+- port access disruption
+- airport access disruption
+- security incident near a site or route
+- utility outage affecting operations
+
+2. Possible impact
+Use where current reporting is relevant to business operations but the impact is limited, indirect or not yet confirmed.
+Examples:
+- protest planned near a business district
+- crime incident near a movement route
+- local disruption that may affect access
+- regulatory action that may affect a site or sector
+
+3. Monitor only
+Use where reporting is relevant but there is no clear current business disruption.
+Examples:
+- isolated low impact incident
+- early warning report
+- issue outside main operating areas
+- situation that could develop but has not yet affected movement, access or operations
+
+Core rule:
+Only map locations where the current reporting window contains a specific operationally relevant issue.
+
+Do not map places just because they are generally important.
+
+Do not infer:
+- port congestion unless there is current reporting of port congestion or port access disruption
+- airport disruption unless there is current reporting affecting the airport or airport access
+- CBD disruption unless there is current protest, police, road closure or access reporting
+- crime exposure unless there is a specific crime incident in that location
+- government district exposure unless there is current protest, policing or access reporting
+
+One incident does not automatically create Direct impact.
+The label must reflect both:
+- frequency of reporting
+- likely business impact
+
+Marker card format:
+Location
+What happened this period
+Business relevance
+Impact level: Direct impact / Possible impact / Monitor only
+
+Map title:
+Operational Map
+
+Map subtitle:
+Reported operational issues this period
+
+Map note:
+This map shows reported operational issues for the current reporting period. Locations are included only where reporting indicates a relevant event, issue or disruption. Impact level is based on likely business impact and reporting frequency, not standing background risk.
+
+Acceptance criteria:
+- No use of posture, primary, secondary or watch terminology.
+- Every map marker must be tied to a current reporting item.
+- No generic standing locations.
+- No unsupported port, airport, CBD or road warnings.
+- One isolated low impact incident must not be labelled Direct impact unless the business effect is clear.
+- Map labels, cards and narrative must use the same terminology.
+- Preview and PDF export must match.

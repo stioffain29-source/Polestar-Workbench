@@ -5,7 +5,7 @@
  * mapped ONLY where the current reporting window carries a specific relevant
  * event. Indonesia therefore no longer paints six fixed "standing High" macro
  * regions — with an empty window it shows the empty-state note, and with a
- * reported event it renders one Operational-Map pinch-point card per area that
+ * reported event it renders one Operational-Map impact card per area that
  * was actually reported this period.
  *
  * The app is owner-gated, so there are no live screenshots: `renderToStaticMarkup`
@@ -47,8 +47,8 @@ describe("Indonesia operational (reporting-driven) map", () => {
       <CountryReportMap domId="idn" countryName="Indonesia" incidents={[]} />,
     );
     expect(markup).toContain("Operational Map");
-    expect(markup).toContain("Reported operational pinch points for this period");
-    expect(markup).toContain("No reported operational pinch point resolved to a mapped area this period");
+    expect(markup).toContain("Reported operational issues this period");
+    expect(markup).toContain("No reported operational issue resolved to a mapped area this period");
     // Map Read note is now on EVERY country map, and disclaims standing risk.
     expect(markup).toContain("Map Read");
     expect(markup).toContain("not standing background risk");
@@ -71,20 +71,20 @@ describe("Indonesia operational (reporting-driven) map", () => {
         ]}
       />,
     );
-    // Card names the reported area, the reported issue, business relevance and posture.
+    // Card names the reported area, what happened, business relevance and impact level.
     expect(markup).toContain(esc("Greater Jakarta & West Java"));
-    expect(markup).toContain("Reported issue this period:");
+    expect(markup).toContain("What happened this period:");
     expect(markup).toContain("Fire at Jakarta warehouse");
     expect(markup).toContain("Business relevance:");
     expect(markup).toContain("Site, asset and business-continuity exposure");
-    // A single high-severity report is Primary posture.
-    expect(markup).toContain("Posture: Primary");
+    // A single high-severity report is Direct impact.
+    expect(markup).toContain("Impact level: Direct impact");
     // Areas with NO reporting this period are absent (not painted).
     expect(markup).not.toContain("Sumatra");
     expect(markup).not.toContain(esc("Kalimantan / Borneo"));
   });
 
-  it("grades posture down for a single low-severity report (Watch)", () => {
+  it("grades impact down for a single low-severity report (Monitor only)", () => {
     const markup = renderToStaticMarkup(
       <CountryReportMap
         domId="idn"
@@ -99,7 +99,7 @@ describe("Indonesia operational (reporting-driven) map", () => {
       />,
     );
     expect(markup).toContain("Sumatra");
-    expect(markup).toContain("Posture: Watch");
-    expect(markup).not.toContain("Posture: Primary");
+    expect(markup).toContain("Impact level: Monitor only");
+    expect(markup).not.toContain("Impact level: Direct impact");
   });
 });

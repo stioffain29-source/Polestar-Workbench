@@ -1,41 +1,41 @@
 import {
-  POSTURE_COLOR,
-  POSTURE_ORDER,
+  IMPACT_COLOR,
+  IMPACT_ORDER,
   SEV_RANK,
   worstSeverityKey,
-  postureFor,
+  impactLevelFor,
   businessRelevance,
   OPERATIONAL_MAP_HEADING,
   OPERATIONAL_MAP_SUBTITLE,
   OPERATIONAL_MAP_READ,
 } from "../../artifacts/workbench/src/lib/operationalPinchPoints";
 
-describe("operationalPinchPoints — posture model", () => {
-  it("orders and colours postures with brand-safe, non-severity hues", () => {
-    expect(POSTURE_ORDER).toEqual(["Primary", "Secondary", "Watch"]);
-    expect(POSTURE_COLOR.Primary).toBe("#0B0B3D"); // Midnight Blue
-    expect(POSTURE_COLOR.Secondary).toBe("#4655FF"); // Electric Blue
-    expect(POSTURE_COLOR.Watch).toBe("#6B7280"); // neutral grey
-    // Reserved severity tiers must never be reused as a posture colour.
-    const hues = Object.values(POSTURE_COLOR).map((h) => h.toUpperCase());
+describe("operationalPinchPoints — impact-level model", () => {
+  it("orders and colours impact levels with brand-safe, non-severity hues", () => {
+    expect(IMPACT_ORDER).toEqual(["Direct impact", "Possible impact", "Monitor only"]);
+    expect(IMPACT_COLOR["Direct impact"]).toBe("#0B0B3D"); // Midnight Blue
+    expect(IMPACT_COLOR["Possible impact"]).toBe("#4655FF"); // Electric Blue
+    expect(IMPACT_COLOR["Monitor only"]).toBe("#6B7280"); // neutral grey
+    // Reserved severity tiers must never be reused as an impact-level colour.
+    const hues = Object.values(IMPACT_COLOR).map((h) => h.toUpperCase());
     expect(hues).not.toContain("#A33232"); // Extreme-only
     expect(hues).not.toContain("#1B6B7A"); // Insignificant-only
   });
 
-  it("derives posture from frequency + business impact", () => {
-    // count >= 2 → Primary regardless of severity
-    expect(postureFor(2, "low")).toBe("Primary");
-    expect(postureFor(3, "insignificant")).toBe("Primary");
-    // single high/extreme → Primary
-    expect(postureFor(1, "high")).toBe("Primary");
-    expect(postureFor(1, "extreme")).toBe("Primary");
-    // single moderate → Secondary
-    expect(postureFor(1, "moderate")).toBe("Secondary");
-    // single low/insignificant → Watch
-    expect(postureFor(1, "low")).toBe("Watch");
-    expect(postureFor(1, "insignificant")).toBe("Watch");
-    // defensive: count 0 → Watch (unmapped locations are dropped upstream)
-    expect(postureFor(0, "")).toBe("Watch");
+  it("derives impact level from frequency + business impact", () => {
+    // count >= 2 → Direct impact regardless of severity
+    expect(impactLevelFor(2, "low")).toBe("Direct impact");
+    expect(impactLevelFor(3, "insignificant")).toBe("Direct impact");
+    // single high/extreme → Direct impact
+    expect(impactLevelFor(1, "high")).toBe("Direct impact");
+    expect(impactLevelFor(1, "extreme")).toBe("Direct impact");
+    // single moderate → Possible impact
+    expect(impactLevelFor(1, "moderate")).toBe("Possible impact");
+    // single low/insignificant → Monitor only
+    expect(impactLevelFor(1, "low")).toBe("Monitor only");
+    expect(impactLevelFor(1, "insignificant")).toBe("Monitor only");
+    // defensive: count 0 → Monitor only (unmapped locations are dropped upstream)
+    expect(impactLevelFor(0, "")).toBe("Monitor only");
   });
 
   it("reads the worst severity key from a set", () => {
@@ -70,7 +70,7 @@ describe("operationalPinchPoints — posture model", () => {
 
   it("pins the fixed owner-brief map wording", () => {
     expect(OPERATIONAL_MAP_HEADING).toBe("Operational Map");
-    expect(OPERATIONAL_MAP_SUBTITLE).toBe("Reported operational pinch points for this period");
+    expect(OPERATIONAL_MAP_SUBTITLE).toBe("Reported operational issues this period");
     expect(OPERATIONAL_MAP_READ).toMatch(/not standing background risk\.$/);
   });
 });

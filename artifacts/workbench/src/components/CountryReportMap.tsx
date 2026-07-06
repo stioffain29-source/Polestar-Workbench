@@ -5,15 +5,15 @@ import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import { classifyLocationConfidence } from "@/lib/countryLocationConfidence";
 import { stripWireCruft } from "@/lib/incidentTitle";
 import {
-  postureFor,
+  impactLevelFor,
   businessRelevance,
   worstSeverityKey,
-  POSTURE_COLOR,
-  POSTURE_ORDER,
+  IMPACT_COLOR,
+  IMPACT_ORDER,
   OPERATIONAL_MAP_HEADING,
   OPERATIONAL_MAP_SUBTITLE,
   OPERATIONAL_MAP_READ,
-  type Posture,
+  type ImpactLevel,
 } from "@/lib/operationalPinchPoints";
 
 const SEV_LABEL: Record<string, string> = {
@@ -497,7 +497,7 @@ export function aggregateZones(
 // ---------------------------------------------------------------------------
 
 // The single reporting-driven marker/card unit for both modes.
-interface PinchPoint {
+interface ImpactPoint {
   key: string;
   // Numbered cross-reference to the on-map marker (zone mode); null in dot mode,
   // where markers are located by name rather than numbered.
@@ -505,7 +505,7 @@ interface PinchPoint {
   location: string;
   issue: string;
   relevance: string;
-  posture: Posture;
+  impact: ImpactLevel;
 }
 
 // A per-coordinate dot group in the non-zone ("all other countries") mode.
@@ -515,7 +515,7 @@ interface DotGroup {
   members: CountryFastFactsIncident[];
   count: number;
   worstKey: string;
-  posture: Posture;
+  impact: ImpactLevel;
   location: string;
   lead: CountryFastFactsIncident;
 }
@@ -564,12 +564,12 @@ function OperationalMapHeader() {
   );
 }
 
-function PostureChip({ posture }: { posture: Posture }) {
+function ImpactChip({ impact }: { impact: ImpactLevel }) {
   return (
     <span
       style={{
         display: "inline-block",
-        background: POSTURE_COLOR[posture],
+        background: IMPACT_COLOR[impact],
         color: "#fff",
         fontFamily: "Roboto, sans-serif",
         fontSize: 10,
@@ -580,15 +580,15 @@ function PostureChip({ posture }: { posture: Posture }) {
         whiteSpace: "nowrap",
       }}
     >
-      Posture: {posture}
+      Impact level: {impact}
     </span>
   );
 }
 
-function PostureLegend() {
+function ImpactLegend() {
   return (
     <div className="mt-3" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-      {POSTURE_ORDER.map((p) => (
+      {IMPACT_ORDER.map((p) => (
         <div key={p} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
@@ -596,7 +596,7 @@ function PostureLegend() {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: POSTURE_COLOR[p],
+              background: IMPACT_COLOR[p],
               border: `1px solid ${POLAR}`,
             }}
           />
@@ -631,7 +631,7 @@ function MapReadNote() {
   );
 }
 
-function PinchCard({ point }: { point: PinchPoint }) {
+function ImpactCard({ point }: { point: ImpactPoint }) {
   return (
     <div
       style={{
@@ -640,7 +640,7 @@ function PinchCard({ point }: { point: PinchPoint }) {
         gap: 8,
         background: "#ffffff",
         border: `1px solid ${POLAR}`,
-        borderLeft: `3px solid ${POSTURE_COLOR[point.posture]}`,
+        borderLeft: `3px solid ${IMPACT_COLOR[point.impact]}`,
         borderRadius: 2,
         padding: "8px 10px",
       }}
@@ -655,7 +655,7 @@ function PinchCard({ point }: { point: PinchPoint }) {
             width: 20,
             height: 20,
             borderRadius: "50%",
-            background: POSTURE_COLOR[point.posture],
+            background: IMPACT_COLOR[point.impact],
             color: "#fff",
             fontFamily: "Roboto, sans-serif",
             fontSize: 11,
@@ -674,7 +674,7 @@ function PinchCard({ point }: { point: PinchPoint }) {
             width: 12,
             height: 12,
             borderRadius: "50%",
-            background: POSTURE_COLOR[point.posture],
+            background: IMPACT_COLOR[point.impact],
             border: `1px solid ${POLAR}`,
             marginTop: 3,
           }}
@@ -685,10 +685,10 @@ function PinchCard({ point }: { point: PinchPoint }) {
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}
         >
           <span style={{ fontSize: 12.5, fontWeight: 700, color: NAVY }}>{point.location}</span>
-          <PostureChip posture={point.posture} />
+          <ImpactChip impact={point.impact} />
         </div>
         <div style={{ fontSize: 11.5, color: DUSK, marginTop: 4 }}>
-          <span style={{ fontWeight: 600 }}>Reported issue this period: </span>
+          <span style={{ fontWeight: 600 }}>What happened this period: </span>
           {point.issue}
         </div>
         <div style={{ fontSize: 11.5, color: DUSK, marginTop: 2 }}>
@@ -700,7 +700,7 @@ function PinchCard({ point }: { point: PinchPoint }) {
   );
 }
 
-function PinchCardGrid({ points }: { points: PinchPoint[] }) {
+function ImpactCardGrid({ points }: { points: ImpactPoint[] }) {
   return (
     <div
       className="mt-3"
@@ -711,7 +711,7 @@ function PinchCardGrid({ points }: { points: PinchPoint[] }) {
       }}
     >
       {points.map((p) => (
-        <PinchCard key={p.key} point={p} />
+        <ImpactCard key={p.key} point={p} />
       ))}
     </div>
   );
@@ -812,7 +812,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         members: gm,
         count: gm.length,
         worstKey,
-        posture: postureFor(gm.length, worstKey),
+        impact: impactLevelFor(gm.length, worstKey),
         location: rawLoc ? titleCaseLocation(rawLoc) : "Reported location",
         lead: leadIncident(gm),
       });
@@ -905,14 +905,14 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         // reported event there; empty areas are never drawn.
         if (z.count === 0) continue;
         const [lat, lng] = z.def.center;
-        const posture = postureFor(z.count, z.worstKey);
-        const color = POSTURE_COLOR[posture];
+        const impact = impactLevelFor(z.count, z.worstKey);
+        const color = IMPACT_COLOR[impact];
         const size = 28;
         const half = size / 2;
 
         // Plain absolutely-positioned numbered <div> marker (html2canvas-safe),
-        // coloured by operational POSTURE (frequency + business impact), never
-        // raw severity or a standing assessment.
+        // coloured by operational IMPACT LEVEL (frequency + business impact),
+        // never raw severity or a standing assessment.
         const marker = document.createElement("div");
         marker.style.position = "absolute";
         marker.style.width = `${size}px`;
@@ -936,7 +936,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.dataset.mapNumeral = "true";
         marker.style.pointerEvents = "auto";
         marker.textContent = String(z.number);
-        marker.title = `${z.number}. ${z.def.name} — ${posture}`;
+        marker.title = `${z.number}. ${z.def.name} — ${impact}`;
 
         overlay.appendChild(marker);
         dotsRef.current.push({ el: marker, lat, lng, half });
@@ -977,12 +977,12 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     const latLngs: L.LatLngExpression[] = [];
 
     // One dot per distinct coordinate (many records share a city/country
-    // centroid). The dot is coloured by operational POSTURE (frequency + worst
-    // business impact at that point) and badged with the incident COUNT; a plain
-    // <div> so html2canvas rasterises it into the PDF unchanged. Each dot stays
-    // exactly on land and no reported incident is obscured.
+    // centroid). The dot is coloured by operational IMPACT LEVEL (frequency +
+    // worst business impact at that point) and badged with the incident COUNT; a
+    // plain <div> so html2canvas rasterises it into the PDF unchanged. Each dot
+    // stays exactly on land and no reported incident is obscured.
     for (const g of dotGroups) {
-      const color = POSTURE_COLOR[g.posture];
+      const color = IMPACT_COLOR[g.impact];
       const size = g.count > 1 ? 22 : 14;
       const half = size / 2;
 
@@ -1075,11 +1075,11 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       />
     );
 
-    // Reporting-driven pinch points: only zones carrying a reported event this
+    // Reporting-driven impact points: only zones carrying a reported event this
     // period are plotted (built in the marker effect) and carded here. Cards are
     // rendered in the JSX body so screen == rasterised in-app PDF, and each card
     // mirrors its numbered on-map marker.
-    const points: PinchPoint[] = active
+    const points: ImpactPoint[] = active
       .filter((z) => z.count > 0)
       .map((z) => {
         const lead = leadIncident(z.incidents);
@@ -1089,7 +1089,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           location: z.def.name,
           issue: cleanIssue(lead),
           relevance: businessRelevance(lead),
-          posture: postureFor(z.count, z.worstKey),
+          impact: impactLevelFor(z.count, z.worstKey),
         };
       });
 
@@ -1099,8 +1099,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         {mapContainer}
         {points.length > 0 ? (
           <>
-            <PostureLegend />
-            <PinchCardGrid points={points} />
+            <ImpactLegend />
+            <ImpactCardGrid points={points} />
             {zoneAgg.unattributed > 0 ? (
               <div
                 style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
@@ -1113,7 +1113,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
-            No reported operational pinch point resolved to a mapped area this period.
+            No reported operational issue resolved to a mapped area this period.
           </div>
         )}
         <MapReadNote />
@@ -1124,13 +1124,13 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   // ---- PER-COORDINATE OPERATIONAL MAP (all other countries) ------------
   // One card per plotted coordinate, mirroring the on-map dots. Reporting-driven:
   // a point exists only where the window carries a reported event.
-  const dotPoints: PinchPoint[] = dotGroups.map((g) => ({
+  const dotPoints: ImpactPoint[] = dotGroups.map((g) => ({
     key: `${g.lat},${g.lng}`,
     marker: null,
     location: g.location,
     issue: cleanIssue(g.lead),
     relevance: businessRelevance(g.lead),
-    posture: g.posture,
+    impact: g.impact,
   }));
 
   return (
@@ -1150,8 +1150,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       />
       {dotPoints.length > 0 ? (
         <>
-          <PostureLegend />
-          <PinchCardGrid points={dotPoints} />
+          <ImpactLegend />
+          <ImpactCardGrid points={dotPoints} />
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
@@ -1168,7 +1168,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         <div
           style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
         >
-          No reported operational pinch point carries a precise location this period; the map reflects country operating context only.
+          No reported operational issue carries a precise location this period; the map reflects country operating context only.
         </div>
       )}
       <MapReadNote />
