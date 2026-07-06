@@ -108,8 +108,22 @@ const NON_CARGO_RE = /\b(trailer.*film|heist film|movie review|HAM Berat|kekeras
 // Required cargo / logistics incident vocabulary.
 const CARGO_INCIDENT_RE = /\b(cargo|freight|container|truck|lorry|hijack|warehouse|godown|depot|pilfer|seal[- ]?tamper|consignment|shipment|parcel|logistic|theft|stolen|stole|robbery|burglar|raid|loot|siphon|smuggl|fraud|busted)\b/i;
 
-// Non-cargo "fish/lobster/oyster" pattern unless cargo framing is present.
-const NON_CARGO_FISH_RE = /\b(lobster|oyster|fish theft)\b/i;
+// Non-cargo seafood pattern (a caught/retail fish, prawn, crab, etc.) unless
+// genuine cargo framing is present. Bare "fish" is safe — the word boundary
+// after it means "fishing", "fisheries", "shellfish" and "catfish" do NOT
+// match, only the standalone catch/commodity word. Salted / dried / frozen fish
+// are petty-theft retail goods, not freight, so they are dropped unless a real
+// freight anchor (container, lorry, cold storage, etc.) rescues them below.
+const NON_CARGO_FISH_RE = /\b(lobsters?|oysters?|prawns?|shrimps?|crabs?|clams?|squids?|salted fish|dried fish|frozen fish|fish)\b/i;
+
+// An official's oversight / follow-up TOUR is a governance-response story, not a
+// fresh cargo incident, even when it recounts a truck robbery in passing (e.g.
+// "'Big Tai' flies urgently south to monitor a bombing and a goods-truck
+// robbery, ordering lessons to be drawn"). Match a travel verb bound tightly to
+// an ADMINISTRATIVE oversight purpose only — never a bare "inspect/review", so a
+// genuine "police recover stolen cargo" investigation is not caught.
+const NON_CARGO_OVERSIGHT_VISIT_RE =
+  /\b(flies|flew|fly|rushed|rushes|heads?|headed|travel(?:s|led|ed)?|dispatched|deployed)\b[^.]{0,60}\b(to monitor|to oversee|to follow up|follow[- ]?up on|following up on|order(?:s|ing|ed)? lessons|lessons to be drawn)\b/i;
 
 // Bahasa-Indonesia cargo-crime vocabulary. Many genuine APAC incidents are
 // local-language reports the English CARGO_INCIDENT_RE never matched (gudang =
@@ -437,10 +451,16 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   const portSec = hasPortCargoSecurity(text);
   // Reject non-cargo / civic / film / etc. content first.
   if (NON_CARGO_RE.test(text)) return "excluded_non_cargo";
-  // Fish/lobster/oyster only counts as cargo if cargo verbs are also present.
-  if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|warehouse|depot|consignment|shipment|logistic)\b/i.test(text)) {
+  // Seafood only counts as cargo when a genuine freight anchor is also present
+  // (a bare "7-kg parcel of salted fish" retail theft is not Cargo Watch). The
+  // load-context "kg"/"goods"/"parcel" tokens deliberately do NOT rescue it —
+  // only a real freight noun does.
+  if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|lorry|warehouse|godown|depot|consignment|shipment|logistic|pallet|reefer|cold storage|hijack)\b/i.test(text)) {
     return "excluded_non_cargo";
   }
+  // An official oversight / follow-up tour is a governance-response story, not a
+  // cargo incident, even when it recounts a truck robbery.
+  if (NON_CARGO_OVERSIGHT_VISIT_RE.test(text)) return "excluded_non_cargo";
   // Commercial-shipping / port-OPERATIONS noise (congestion, throughput, rates,
   // expansion, dwell time) is dropped HERE, ahead of the analyst override, so it
   // is treated like the other hard non-cargo rejects: an analyst "Add to lane"

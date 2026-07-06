@@ -80,6 +80,44 @@ describe("cargoScope — generic crime is dropped", () => {
       cargoScope({ title: "Pencurian motor di Bekasi", country: "Indonesia" }),
     ).toBe("excluded_non_cargo");
   });
+
+  it("drops a retail salted-fish parcel theft (seafood, no freight anchor)", () => {
+    expect(
+      cargoScope({
+        title:
+          "Police fire to stop vehicle of disruptive drunk woman who stole a 7-kg parcel of salted fish and broke guard barrier to escape",
+        country: "Thailand",
+      }),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("still keeps a genuine seafood FREIGHT theft (freight anchor present)", () => {
+    expect(
+      cargoScope({
+        title: "Reefer container of frozen fish stolen from cold storage depot",
+        country: "Thailand",
+      }),
+    ).toBe("in_scope");
+  });
+
+  it("drops an official oversight / follow-up tour that recounts a truck robbery", () => {
+    expect(
+      cargoScope({
+        title:
+          "'Big Tai' flies urgently south to monitor petrol-station bombing and robbery of goods transport truck",
+        country: "Thailand",
+      }),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("still keeps a real cargo-truck robbery with no oversight-tour framing", () => {
+    expect(
+      cargoScope({
+        title: "Goods transport truck robbed of its consignment on the southern highway",
+        country: "Thailand",
+      }),
+    ).toBe("in_scope");
+  });
 });
 
 describe("classifyScope — unattributed-country recovery uses the genuine-cargo gate", () => {
