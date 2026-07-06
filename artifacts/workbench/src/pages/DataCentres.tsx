@@ -3,10 +3,7 @@ import { Link } from "wouter";
 import {
   useListIncidents,
   useListDataCentreFacilities,
-  type DataCentreFacility,
 } from "@workspace/api-client-react";
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import { format, differenceInDays, parseISO } from "date-fns";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList,
@@ -18,6 +15,7 @@ import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
+import { DataCentreFacilityMap } from "@/components/DataCentreFacilityMap";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { ExternalLink, Server } from "lucide-react";
@@ -134,11 +132,6 @@ export default function DataCentres() {
   );
 
   // --- Registry (facilities) ------------------------------------------------
-  const facilitiesWithCoords = useMemo(
-    () => facilities.filter((f) => f.latitude != null && f.longitude != null),
-    [facilities],
-  );
-
   const facByStatus = useMemo(() => {
     const m = new Map<string, number>();
     facilities.forEach((f) => m.set(f.status, (m.get(f.status) ?? 0) + 1));
@@ -274,9 +267,9 @@ export default function DataCentres() {
         </div>
       </Section>
 
-      {/* 3. Geography — incident choropleth + facility markers */}
+      {/* 3. Geography — incident choropleth + purpose-built facility overlay */}
       <Section title="Geography">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="bg-white border border-border rounded-sm overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
               Incident Density by Country ({RANGE_LABEL[range]})
@@ -291,46 +284,12 @@ export default function DataCentres() {
 
           <div className="bg-white border border-border rounded-sm overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
-              Tracked Facilities Map
+              Facility &amp; Incident Overlay ({RANGE_LABEL[range]})
             </div>
-            {facilitiesWithCoords.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">
-                {facLoading ? "Loading…" : "No facilities with coordinates on file."}
-              </div>
+            {facLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading…</div>
             ) : (
-              <div className="relative h-[420px]">
-                <MapContainer center={[20, 100]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                  <TileLayer
-                    attribution="&copy; OpenStreetMap &copy; CARTO"
-                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                    subdomains="abcd"
-                    maxZoom={19}
-                  />
-                  {facilitiesWithCoords.map((f) => {
-                    const c = statusColor(f.status);
-                    return (
-                      <CircleMarker
-                        key={f.id}
-                        center={[f.latitude as number, f.longitude as number]}
-                        radius={6}
-                        pathOptions={{ color: darken(c), fillColor: c, fillOpacity: FILL_OPACITY, weight: STROKE_WIDTH }}
-                      >
-                        <LeafletTooltip>
-                          <div style={{ fontSize: 11 }}>
-                            <div style={{ fontWeight: 700 }}>{f.name}</div>
-                            <div>{f.operator || "Operator not reported"}</div>
-                            <div>{f.city ? `${f.city}, ` : ""}{f.country}</div>
-                            <div>Status: {f.status}</div>
-                            {f.planningRisk !== "No known issue" && f.planningRisk !== "Unknown" && (
-                              <div>Planning risk: {f.planningRisk}</div>
-                            )}
-                          </div>
-                        </LeafletTooltip>
-                      </CircleMarker>
-                    );
-                  })}
-                </MapContainer>
-              </div>
+              <DataCentreFacilityMap facilities={facilities} incidents={inWindow} />
             )}
           </div>
         </div>
