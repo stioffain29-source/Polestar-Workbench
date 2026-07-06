@@ -130,6 +130,7 @@ export function CountryChoroplethMap({
   scope = "region",
   center,
   emptyText = "No identified countries available for this view.",
+  heightClass = "h-[420px]",
 }: {
   intensity: Map<string, number>;
   legendLabel: string;
@@ -137,6 +138,7 @@ export function CountryChoroplethMap({
   scope?: "region" | "world";
   center?: [number, number];
   emptyText?: string;
+  heightClass?: string;
 }) {
   if (intensity.size === 0) {
     return <div className="p-8 text-center text-sm text-muted-foreground">{emptyText}</div>;
@@ -147,7 +149,7 @@ export function CountryChoroplethMap({
   const zoom = scope === "world" ? 2 : 3;
   return (
     <>
-      <div className="relative h-[420px]">
+      <div className={`relative ${heightClass}`}>
         <MapContainer center={resolvedCenter} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
           <TileLayer
             attribution="&copy; OpenStreetMap &copy; CARTO"

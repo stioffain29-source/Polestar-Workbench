@@ -507,6 +507,7 @@ export default function Topic() {
               intensity={countryIntensity}
               scope={worldScope ? "world" : "region"}
               legendLabel={`${label} incidents`}
+              heightClass="h-[600px]"
               caption={`Countries shaded by ${label.toLowerCase()}-incident count (${RANGE_LABEL[range]}).`}
             />
           ) : withCoords.length === 0 ? (
@@ -514,7 +515,7 @@ export default function Topic() {
               No geocoded records available for this view.
             </div>
           ) : (
-            <div className="h-[420px]">
+            <div className="h-[600px]">
               <MapContainer center={worldScope ? [20, 10] : [20, 80]} zoom={worldScope ? 2 : 3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                 <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 {withCoords.map((i) => {
