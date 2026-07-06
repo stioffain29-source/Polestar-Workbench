@@ -56,6 +56,7 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Papua", href: "/countries/papua", icon: Flag },
         { label: "Indonesia", href: "/countries/indonesia", icon: Flag },
         { label: "Jakarta", href: "/countries/jakarta", icon: Flag },
+        { label: "Jakarta Operational Map (trial)", href: "/jakarta-trial-map", icon: MapIcon },
         { label: "All Countries", href: "/countries", icon: Database },
       ]
     },
