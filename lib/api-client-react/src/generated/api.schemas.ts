@@ -21,6 +21,7 @@ export const Topic = {
   shipping: 'shipping',
   cargo_watch: 'cargo_watch',
   conflict: 'conflict',
+  data_centres: 'data_centres',
 } as const;
 
 export type Severity = typeof Severity[keyof typeof Severity];

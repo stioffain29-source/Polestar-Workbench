@@ -44,7 +44,7 @@ function cleanCountry(c?: string | null): string | null {
 // registry list and the facility map can never drift apart.
 
 export default function DataCentres() {
-  const { data: rawIncidents = [], isLoading } = useListIncidents({ topic: "data_centres" as never });
+  const { data: rawIncidents = [], isLoading } = useListIncidents({ topic: "data_centres" });
   const { data: facilities = [], isLoading: facLoading } = useListDataCentreFacilities();
 
   const [range, setRange] = useState<RangeKey>("2y");

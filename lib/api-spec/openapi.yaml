@@ -1739,6 +1739,7 @@ components:
         - shipping
         - cargo_watch
         - conflict
+        - data_centres
 
     Severity:
       type: string
