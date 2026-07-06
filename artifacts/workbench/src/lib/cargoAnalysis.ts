@@ -548,7 +548,8 @@ export function isCargoInScope(i: CargoIncidentLike): boolean {
 // generic freight/container/truck wording so that "Other" is reserved for
 // genuinely unclear records. Order matters — more specific rules first.
 const CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
-  { label: "Cash / High Value Goods", pattern: /\b(cash|currency|bullion|gold|silver|jewell?ery|diamond|atm|valuables|high[- ]value)\b/i },
+  { label: "Metals / Precious Metals", pattern: /\b(copper|steel|aluminium|aluminum|scrap metal|scrap|metal|metals|ore|nickel|zinc|iron|brass|bronze|gold|silver|bullion|platinum|palladium)\b/i },
+  { label: "Cash / High Value Goods", pattern: /\b(cash|currency|jewell?ery|diamond|atm|valuables|high[- ]value)\b/i },
   { label: "Electronics", pattern: /\b(electronic|electronics|smartphone|smartphones|mobile phone|mobile phones|cellphone|laptop|laptops|semiconductor|semiconductors|chip|chips|tv|television|tablet|tablets|gadget|consumer electronics|appliance|appliances)\b/i },
   { label: "Pharmaceuticals", pattern: /\b(pharma|pharmaceutical|pharmaceuticals|medicine|medicines|medical supplies|medical supply|vaccine|vaccines|drug|drugs)\b/i },
   { label: "Tobacco", pattern: /\b(tobacco|cigarette|cigarettes|cigar|cigars|vape|vapes|e-cigarette|e-cigarettes)\b/i },

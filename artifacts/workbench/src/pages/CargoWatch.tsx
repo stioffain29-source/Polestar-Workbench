@@ -361,19 +361,13 @@ export default function CargoWatch() {
   // Captured Incidents — country and cargo category shown as two separate
   // horizontal bar charts. The earlier single stacked chart crammed the whole
   // ~30-label taxonomy into each country bar over a 9-colour palette, so the
-  // categories were unreadable. Split, sorted, single-colour, labelled. Both
-  // charts cap at the top 10 rows; any remainder rolls into a single honest
-  // "Other" bar so nothing is silently dropped.
-  const countryBars = useMemo(() => {
-    if (byCountry.length <= 10) return byCountry;
-    const rest = byCountry.slice(10).reduce((s, r) => s + r.count, 0);
-    return [...byCountry.slice(0, 10), { country: "Other countries", count: rest }];
-  }, [byCountry]);
-  const categoryBars = useMemo(() => {
-    if (byCategory.length <= 10) return byCategory;
-    const rest = byCategory.slice(10).reduce((s, r) => s + r.count, 0);
-    return [...byCategory.slice(0, 10), { category: "Other categories", count: rest }];
-  }, [byCategory]);
+  // categories were unreadable. Split, sorted, single-colour, labelled.
+  // Every country in the window is scope-filtered to the tracked region, so name
+  // each one individually rather than hiding the tail under "Other countries".
+  const countryBars = byCountry;
+  // The commodity taxonomy is small, so show every category named — the only
+  // "Other" bar is the literal uncategorised bucket from classifyCategory.
+  const categoryBars = byCategory;
 
   // TAPA Modus Operandi & Origin — a SEPARATE breakdown of the offline-imported
   // TAPA cargo-crime records, the only rows that carry a structured incident
@@ -684,7 +678,7 @@ export default function CargoWatch() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              By Country · top {Math.min(10, byCountry.length)}{byCountry.length > 10 ? " + other" : ""}
+              By Country · all {byCountry.length} {byCountry.length === 1 ? "country" : "countries"}
             </div>
             <div style={{ height: Math.max(260, countryBars.length * 30 + 24) }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -702,7 +696,7 @@ export default function CargoWatch() {
           </div>
           <div>
             <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              By Cargo Category · top {Math.min(10, byCategory.length)} of {byCategory.length}{byCategory.length > 10 ? " + other" : ""}
+              By Cargo Category · all {byCategory.length} {byCategory.length === 1 ? "category" : "categories"}
             </div>
             <div style={{ height: Math.max(300, categoryBars.length * 46 + 24) }}>
               <ResponsiveContainer width="100%" height="100%">

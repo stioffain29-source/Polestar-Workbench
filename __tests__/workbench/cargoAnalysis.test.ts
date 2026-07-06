@@ -3,6 +3,7 @@ import {
   classifyScope,
   classifyRegion,
   recoverCargoPortName,
+  classifyCategory,
   classifyCargoCategory,
   cargoCategoryGroup,
   hasPortCargoSecurity,
@@ -345,5 +346,46 @@ describe("hasPortCargoSecurity — port-security anchor gate", () => {
   });
   it("does not match a bare city robbery with no port/cargo anchor", () => {
     expect(hasPortCargoSecurity("Robbery reported in the city centre")).toBe(false);
+  });
+});
+
+// The commodity taxonomy (classifyCategory / CATEGORY_RULES) drives the "By
+// Cargo Category" chart. A dedicated "Metals / Precious Metals" category now
+// captures base and precious metal theft; precious-metal tokens (gold, silver,
+// bullion) moved OUT of "Cash / High Value Goods" into it. "Other" stays
+// reserved for genuinely unclassified text.
+describe("classifyCategory — commodity taxonomy", () => {
+  it("classifies base-metal theft (copper) as Metals / Precious Metals", () => {
+    expect(classifyCategory({ title: "Copper cable theft ring busted at the depot" })).toBe(
+      "Metals / Precious Metals",
+    );
+  });
+
+  it("classifies scrap-metal / steel loads as Metals / Precious Metals", () => {
+    expect(classifyCategory({ title: "Truck of scrap steel stolen on the highway" })).toBe(
+      "Metals / Precious Metals",
+    );
+  });
+
+  it("classifies a gold/silver bullion theft as Metals, not Cash / High Value Goods", () => {
+    expect(classifyCategory({ title: "Gold and silver bullion stolen from armoured cargo" })).toBe(
+      "Metals / Precious Metals",
+    );
+  });
+
+  it("keeps cash / currency / ATM in Cash / High Value Goods", () => {
+    expect(classifyCategory({ title: "Cash and currency taken in ATM heist" })).toBe(
+      "Cash / High Value Goods",
+    );
+  });
+
+  it("keeps jewellery and diamonds in Cash / High Value Goods", () => {
+    expect(classifyCategory({ title: "Jewellery and diamonds seized from the consignment" })).toBe(
+      "Cash / High Value Goods",
+    );
+  });
+
+  it("returns Other only for genuinely unclassified cargo text", () => {
+    expect(classifyCategory({ title: "Unknown item reported missing" })).toBe("Other");
   });
 });
