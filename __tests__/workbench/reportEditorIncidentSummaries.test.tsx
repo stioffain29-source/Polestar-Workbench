@@ -58,6 +58,7 @@ jest.mock("@workspace/api-client-react", () => ({
   }),
   useGenerateReportProse: () => ({ mutate: jest.fn(), isPending: false }),
   getListMaritimeMovementQueryKey: () => ["maritime-movement"],
+  getListIncidentsQueryKey: (p?: unknown) => ["incidents", p],
   getGetReportQueryKey: () => ["report"],
   getListReportsQueryKey: () => ["reports"],
   getGetDashboardOverviewQueryKey: () => ["overview"],

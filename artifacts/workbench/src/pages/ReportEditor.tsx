@@ -12,6 +12,7 @@ import {
   useEditReportIncidentSummaries,
   useGenerateReportProse,
   getListMaritimeMovementQueryKey,
+  getListIncidentsQueryKey,
   getGetReportQueryKey,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
@@ -190,7 +191,31 @@ export default function ReportEditor() {
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [exporting, setExporting] = useState(false);
-  const { data: incidents } = useListIncidents({});
+  const { data: rawIncidents } = useListIncidents({});
+  // Cargo Watch's authoritative scope gate is isCargoInScope (APAC/ME cargo
+  // crime) — NOT the server's general text-relevance gate, which wrongly marks
+  // most genuine cargo theft "irrelevant". The cargo monitor and CountryReport
+  // both fetch includeIrrelevant for exactly this reason; the generic report
+  // fetch above is relevance-gated, so those rows never reached the cargo report
+  // and its record count collapsed to the handful the general gate let through.
+  // Fetch the raw cargo set (only while editing a cargo report) and splice it in
+  // over the gated cargo subset. Every downstream builder re-applies
+  // filterTopicReportIncidents → isCargoInScope, so this admits exactly the rows
+  // the monitor shows and leaves all other topics byte-identical.
+  const isCargoReport = form.topic === "cargo_watch";
+  const cargoRawParams = { topic: "cargo_watch", includeIrrelevant: true };
+  const { data: rawCargoIncidents } = useListIncidents(cargoRawParams as never, {
+    query: {
+      enabled: isCargoReport,
+      queryKey: getListIncidentsQueryKey(cargoRawParams as never),
+    },
+  });
+  const incidents = useMemo(() => {
+    if (!isCargoReport || !rawIncidents) return rawIncidents;
+    if (!rawCargoIncidents) return rawIncidents;
+    const nonCargo = rawIncidents.filter((i) => i.topic !== "cargo_watch");
+    return [...nonCargo, ...rawCargoIncidents];
+  }, [isCargoReport, rawIncidents, rawCargoIncidents]);
   // Maritime movement (AIS) context for the Shipping Watch report. Context
   // only — never an incident; the board degrades to "movement data
   // unavailable" when empty.

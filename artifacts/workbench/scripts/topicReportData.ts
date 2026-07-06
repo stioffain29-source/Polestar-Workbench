@@ -63,12 +63,20 @@ async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
 
 // Mirror of defaultRelevanceCondition() in lib/relevanceFilter.ts: drop rows
 // marked 'irrelevant'; NULL status (not yet backfilled) fails OPEN.
+// EXCEPTION — cargo_watch: the authoritative gate for Cargo Watch is the scope
+// classifier (isCargoInScope), not the general text-relevance gate, which marks
+// most genuine cargo theft 'irrelevant'. The screen + in-app PDF fetch cargo
+// with includeIrrelevant (ReportEditor.tsx) and rely on filterTopicReportIncidents
+// to re-apply scope. This headless loader must admit cargo rows the same way or
+// the headless cargo PDF starves to ~1 record while the screen shows many —
+// violating the preview==PDF rule. Scope is re-applied downstream, so it is safe.
 async function loadIncidents(): Promise<unknown[]> {
   const rows = await db
     .select()
     .from(incidentsTable)
     .where(
       or(
+        eq(incidentsTable.topic, "cargo_watch"),
         isNull(incidentsTable.relevanceStatus),
         ne(incidentsTable.relevanceStatus, "irrelevant"),
       ),

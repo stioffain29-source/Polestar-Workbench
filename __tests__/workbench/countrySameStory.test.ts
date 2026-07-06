@@ -4,6 +4,7 @@ import {
   storyTokens,
   tokenJaccard,
   storyEntities,
+  storySimilarity,
   clusterSameStoryRows,
   consolidateCountryStories,
   type SameStoryRow,
@@ -11,6 +12,30 @@ import {
 
 const DAY = 86_400_000;
 const base = Date.parse("2026-06-20T08:00:00.000Z");
+
+describe("storySimilarity — 3-day fold window", () => {
+  // The Top-3 fold (isStrongSameTopStory) REMOVES a duplicate from the location
+  // buckets, so it must require within3d. Formulaic PNG tribal-violence headlines
+  // let two genuinely distinct clashes weeks apart hit jaccard>=0.5; without the
+  // window the later one would be silently dropped.
+  const title = "Tribal clash in Enga province leaves several dead";
+  it("flags within3d true and high jaccard inside the window", () => {
+    const s = storySimilarity(
+      { title, dateMs: base },
+      { title, dateMs: base + 2 * DAY },
+    );
+    expect(s.jaccard).toBeGreaterThanOrEqual(0.5);
+    expect(s.within3d).toBe(true);
+  });
+  it("flags within3d false beyond the window even when headlines are identical", () => {
+    const s = storySimilarity(
+      { title, dateMs: base },
+      { title, dateMs: base + 10 * DAY },
+    );
+    expect(s.jaccard).toBeGreaterThanOrEqual(0.5);
+    expect(s.within3d).toBe(false);
+  });
+});
 
 function row(over: Partial<SameStoryRow> & { title: string }): SameStoryRow {
   return {
@@ -150,11 +175,36 @@ describe("clusterSameStoryRows", () => {
     expect(clusters[0].sort()).toEqual([0, 1, 2]);
   });
 
-  it("keeps the province gate when crossProvince is off (multi-city safety)", () => {
-    // With the gate on, the three different provinces block the merge, proving
-    // the relaxation is what enables the collapse — not an over-eager PATH 3.
+  it("collapses the same pilot story even with crossProvince OFF (PATH 3 bypasses the province gate)", () => {
+    // A shared STRONG DISTINCTIVE ENTITY (US-national pilot) + shared fatal class
+    // identifies ONE event, so PATH 3 now runs BEFORE the province / category
+    // gates — the same foreign-national casualty story is collapsed on a
+    // NATIONWIDE report (Indonesia, crossProvince off) too, not only on the
+    // single-theatre Papua report.
     const clusters = clusterSameStoryRows(pilotRows());
-    expect(clusters).toHaveLength(3);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].sort((a, b) => a - b)).toEqual([0, 1, 2]);
+  });
+
+  it("STILL keeps the province gate for WEAK paths with no strong entity (crossProvince off)", () => {
+    // No foreign-national victim, so PATH 3 cannot fire. Two same-category
+    // clashes in different provinces must NOT merge with the gate on — proving
+    // the PATH 3 reorder did not open the weak paths across provinces.
+    const rows = [
+      row({
+        title: "Five killed in tribal clash in Enga province",
+        province: "Enga",
+        category: "Tribal violence",
+        dateMs: base,
+      }),
+      row({
+        title: "Five killed in tribal clash in Hela province",
+        province: "Hela",
+        category: "Tribal violence",
+        dateMs: base + DAY,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
   });
 
   it("does NOT merge two DISTINCT Papua incidents that merely share common words", () => {

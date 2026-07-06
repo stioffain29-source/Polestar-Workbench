@@ -43,6 +43,26 @@ const CASUALTY_COUNT_RE =
 // "held up" / "opened fire" as multi-word act phrases (word-boundary-safe).
 const KINETIC_PHRASE_RE = /(?:held up|opened fire|armed men)/i;
 
+// Prevention-context carve-out. A violent term that appears ONLY as the OBJECT
+// of a prevention verb ("workshop to combat armed robbery", "training to prevent
+// tribal fighting", "campaign against gun violence") is a PREVENTION programme,
+// not a real event — yet the kinetic veto above would fire on the crime noun
+// ("robbery", "fighting") and block demotion. This matches those prevention →
+// violent-object spans so they can be stripped BEFORE the veto runs. Tightly
+// bound: a small optional adjective set and a fixed crime-noun set, so militarised
+// phrasing where the noun is NOT a prevention object ("combat troops killed",
+// "attacked by gunmen") is left intact and still vetoes.
+const PREVENTION_VERB =
+  "(?:stop|prevent(?:ing)?|curb(?:ing)?|tackl(?:e|es|ing)|combat(?:s|ing|ting|ted)?|counter(?:s|ing)?|reduc(?:e|es|ing)|deter(?:s|ring|red)?|eradicat(?:e|es|ing)|clamp\\s+down\\s+on|crack\\s+down\\s+on|fight\\s+against|against)";
+const PREVENTION_ADJ =
+  "(?:armed|tribal|gang|gun|gender[-\\s]?based|domestic|sorcery|violent|ethnic|communal|family|street|petty|organis(?:e|ed)|organiz(?:e|ed)|sexual|drug|alcohol[-\\s]?related)";
+const PREVENTION_OBJECT_NOUN =
+  "(?:violence|robber(?:y|ies)|crimes?|killings?|murders?|manslaughter|fighting|attacks?|abuse|thefts?|assaults?|stabbings?|shootings?|lawlessness|banditry|kidnapp?ings?|abductions?|arson)";
+const PREVENTION_CONTEXT_RE = new RegExp(
+  `\\b${PREVENTION_VERB}\\s+(?:the\\s+|a\\s+)?(?:${PREVENTION_ADJ}\\s+){0,2}${PREVENTION_OBJECT_NOUN}\\b`,
+  "gi",
+);
+
 /**
  * True when the incident is non-kinetic assistance / prevention / PR copy that
  * should not carry a severity above Low. Veto-guarded: any concrete kinetic act
@@ -54,10 +74,15 @@ export function isNonKineticAssistanceItem(
   summary?: string | null,
 ): boolean {
   const text = `${title ?? ""} ${summary ?? ""}`;
+  // Strip prevention → violent-object spans so the crime noun inside them cannot
+  // trigger the kinetic veto. Demote-only: removing a veto can never RAISE
+  // severity, and the item is still demoted only if the assistance lexicon (read
+  // from the ORIGINAL text) also hits.
+  const vetoText = text.replace(PREVENTION_CONTEXT_RE, " ");
   if (
-    KINETIC_ACT_RE.test(text) ||
-    CASUALTY_COUNT_RE.test(text) ||
-    KINETIC_PHRASE_RE.test(text)
+    KINETIC_ACT_RE.test(vetoText) ||
+    CASUALTY_COUNT_RE.test(vetoText) ||
+    KINETIC_PHRASE_RE.test(vetoText)
   ) {
     return false;
   }

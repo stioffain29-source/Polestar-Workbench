@@ -170,11 +170,22 @@ const CLASS_PATTERNS: Array<[string, RegExp]> = [
 
 // Foreign nationalities -> canonical code (kept small; extend as needed). A
 // foreign national in a distinctive role is a strong, event-identifying entity.
+// Matched case-INSENSITIVELY against the lower-cased headline.
 const NATIONALITY_PATTERNS: Array<[string, RegExp]> = [
-  ["us", /\b(american|u\.?s\.?\s+citizen|us\s+national|american\s+citizen)\b/i],
+  ["us", /\b(american|u\.?s\.?\s+citizen|us\s+national|us\s+citizen|american\s+citizen)\b/i],
   ["au", /\b(australian)\b/i],
   ["uk", /\b(british|briton)\b/i],
   ["nz", /\b(new\s+zealand(?:er)?)\b/i],
+];
+
+// Case-SENSITIVE nationality cues, matched against the ORIGINAL-case headline so
+// the bare uppercase abbreviation "US" / "U.S." reads as the country while the
+// lower-case English pronoun "us" ("shot us", "attacked us") never does. This is
+// why the abbreviation is deliberately absent from NATIONALITY_PATTERNS above
+// (which runs against lower-cased text). A distinctive victim role is still
+// required alongside it, so "kills us" with no role yields no strong entity.
+const NATIONALITY_CASE_SENSITIVE: Array<[string, RegExp]> = [
+  ["us", /\bU\.?S\.?\b/],
 ];
 
 // Distinctive victim roles. A foreign national in one of these roles is a strong
@@ -202,11 +213,17 @@ export interface StoryEntities {
 // Extract the strong distinctive entities and corroborating classes from a
 // headline. Pure and count-free. Used only by the PATH 3 entity-anchored merge.
 export function storyEntities(title: string): StoryEntities {
-  const hay = ` ${(title ?? "").toLowerCase()} `;
+  const raw = ` ${title ?? ""} `;
+  const hay = raw.toLowerCase();
   const strong = new Set<string>();
   const classes = new Set<string>();
   for (const [name, re] of CLASS_PATTERNS) if (re.test(hay)) classes.add(name);
-  const nat = NATIONALITY_PATTERNS.find(([, re]) => re.test(hay))?.[0] ?? null;
+  // Prefer the case-insensitive cue ("American", "US citizen"); fall back to the
+  // case-sensitive uppercase abbreviation ("US" / "U.S.") tested on raw text.
+  const nat =
+    NATIONALITY_PATTERNS.find(([, re]) => re.test(hay))?.[0] ??
+    NATIONALITY_CASE_SENSITIVE.find(([, re]) => re.test(raw))?.[0] ??
+    null;
   if (nat) {
     for (const [role, re] of ROLE_PATTERNS) {
       if (re.test(hay)) strong.add(`victim:${nat}-${role}`);
@@ -358,16 +375,37 @@ export function clusterSameStoryRows(
         placed = true;
         break;
       }
+      const dd = Math.abs(rr.dateMs - r.dateMs);
+      // PATH 3: entity/synonym-anchored merge for the same event phrased so
+      // differently across outlets that Jaccard falls below the floor. Requires
+      // a shared STRONG DISTINCTIVE ENTITY (foreign-national victim in a
+      // distinctive role) AND a shared event-nature class, within a 3-day window
+      // — never generic words alone, so distinct incidents that merely share
+      // common vocabulary never merge. Evaluated BEFORE the province and
+      // compatible-type gates (like PATH 0): a shared strong entity identifies
+      // ONE event even when outlets file it under different categories (Homicide
+      // / Aviation / Other security) or geocode it to different sub-provinces, so
+      // those gates must not block it. This mirrors the crossProvince relaxation
+      // but derives it from event identity rather than a per-theatre flag, so the
+      // nationwide reports (Indonesia) also collapse a single foreign-national
+      // casualty story that outlets split across provinces and categories.
+      const sharedStrong = [...f.ent.strong].some((e) => ff.ent.strong.has(e));
+      const sharedClass = [...f.ent.classes].some((cl) => ff.ent.classes.has(cl));
+      if (dd <= 3 * DAY && sharedStrong && sharedClass) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
       // Province gate (skipped for a single-theatre report, where sibling
       // sub-provinces are the same area). Both-null counts as a match; one-null
-      // is a mismatch.
+      // is a mismatch. PATH 3 above has already run, so a strong-entity event is
+      // never blocked here; this gate guards only the weaker PATHS 1/2/4.
       if (!options.crossProvince && (rr.province ?? null) !== (r.province ?? null)) continue;
       const compatType =
         rr.typeKey === r.typeKey ||
         (!!rr.category && rr.category === r.category) ||
         (!!rr.displayCategory && rr.displayCategory === r.displayCategory);
       if (!compatType) continue;
-      const dd = Math.abs(rr.dateMs - r.dateMs);
       const jac = tokenJaccard(ff.toks, f.toks);
       // PATH 1: strong title overlap, same/adjacent day.
       if (dd <= DAY && ff.toks.size >= 3 && f.toks.size >= 3 && jac >= 0.5) {
@@ -380,19 +418,6 @@ export function clusterSameStoryRows(
       // very different headlines cannot merge two distinct events.
       const sharedPrem = [...f.prem].some((p) => ff.prem.has(p));
       if (dd <= 3 * DAY && sharedPrem && jac >= 0.25) {
-        c.members.push(i);
-        placed = true;
-        break;
-      }
-      // PATH 3: entity/synonym-anchored merge for the same event phrased so
-      // differently across outlets that Jaccard falls below the floor. Requires
-      // a shared STRONG DISTINCTIVE ENTITY (named armed actor, or foreign-
-      // national victim in a distinctive role) AND a shared event-nature class,
-      // within a 3-day window and compatible type — never generic words alone,
-      // so distinct incidents that merely share common vocabulary never merge.
-      const sharedStrong = [...f.ent.strong].some((e) => ff.ent.strong.has(e));
-      const sharedClass = [...f.ent.classes].some((cl) => ff.ent.classes.has(cl));
-      if (dd <= 3 * DAY && sharedStrong && sharedClass) {
         c.members.push(i);
         placed = true;
         break;
@@ -440,4 +465,64 @@ export function consolidateCountryStories<
     category: r.category ?? null,
   }));
   return clusterSameStoryRows(sr).map((cluster) => rows[cluster[0]]);
+}
+
+// ---------------------------------------------------------------------------
+// Selection-time story-similarity (Layer B: Top-3 diversity guard)
+// ---------------------------------------------------------------------------
+// The same-story clusterer above is deliberately CONSERVATIVE at ingest, so a
+// syndicated event can still survive as two clusters when outlets file it under
+// different categories / sub-provinces or word it below the merge floor. The
+// Top-3 selector needs a slightly broader, symmetric "are these the same story?"
+// check to avoid showing one real-world event twice among the three headline
+// developments. This exposes the same primitives the clusterer uses so both
+// surfaces stay consistent; it never mutates or merges data — it only informs
+// selection.
+
+// The distinctive PLACE tokens of a headline: content tokens minus the generic
+// clash / security / broad-geography vocabulary. The specific town or premises
+// that identifies one operation. Exported for the Top-3 diversity guard.
+export function placeTokens(title: string): Set<string> {
+  return new Set([...storyTokens(title)].filter((t) => !CLASH_GENERIC_TOKENS.has(t)));
+}
+
+export interface StorySimInput {
+  title: string;
+  dateMs: number;
+}
+
+export interface StorySimilarity {
+  // A shared STRONG DISTINCTIVE ENTITY (foreign-national victim in a role) —
+  // event-identifying on its own.
+  sharedStrong: boolean;
+  // Bag-of-words Jaccard over the two headlines.
+  jaccard: number;
+  // A shared distinctive place token AND a shared event-nature class within a
+  // 3-day window — the same operation re-reported.
+  sharedPlaceClass: boolean;
+  // The two representatives fall within a 3-day window. Exposed so the REMOVAL
+  // (fold) path can require it: PNG tribal-violence headlines are formulaic, so
+  // two genuinely distinct clashes weeks apart can hit jaccard>=0.5; folding the
+  // second out of the buckets on that alone would silently drop a real incident.
+  within3d: boolean;
+}
+
+// Symmetric story-similarity signals between two headline representatives, for
+// the Top-3 diversity guard. Pure and count-free.
+export function storySimilarity(a: StorySimInput, b: StorySimInput): StorySimilarity {
+  const ea = storyEntities(a.title);
+  const eb = storyEntities(b.title);
+  const sharedStrong = [...ea.strong].some((e) => eb.strong.has(e));
+  const jaccard = tokenJaccard(storyTokens(a.title), storyTokens(b.title));
+  const pa = placeTokens(a.title);
+  const pb = placeTokens(b.title);
+  const sharedPlace = [...pa].some((p) => pb.has(p));
+  const sharedClass = [...ea.classes].some((c) => eb.classes.has(c));
+  const within3d = Math.abs(a.dateMs - b.dateMs) <= 3 * DAY;
+  return {
+    sharedStrong,
+    jaccard,
+    sharedPlaceClass: sharedPlace && sharedClass && within3d,
+    within3d,
+  };
 }

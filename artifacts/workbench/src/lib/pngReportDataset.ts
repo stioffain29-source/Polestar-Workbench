@@ -27,7 +27,13 @@ import { derivePngProvince, extractPngItem } from "@workspace/ingest/pngExtract"
 import { deriveWestPapuaProvince, extractWestPapuaItem } from "@workspace/ingest/westPapuaExtract";
 import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest/indonesiaExtract";
 import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
-import { clusterSameStoryRows, incidentTypeKey, type SameStoryRow } from "./countrySameStory";
+import {
+  clusterSameStoryRows,
+  incidentTypeKey,
+  storySimilarity,
+  type SameStoryRow,
+  type StorySimInput,
+} from "./countrySameStory";
 import { stripWireCruft } from "./incidentTitle";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
@@ -751,49 +757,96 @@ function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
   return db - da;
 }
 
-// Jakarta-only Top-3 selection (gated by config.jakartaProse; the generic path
-// just takes the three highest analyst-value clusters). The input clusters are
-// already value-sorted. On top of that value ordering we (a) enforce Jakarta-
-// theme diversity so two same-theme developments — most visibly two separate
-// fires — never both lead unless the window is too quiet to fill three distinct
-// themes, and (b) apply an all-Low guard so the Top 3 never defaults to three
-// Low items when a credible Moderate-or-worse development exists. Pure; returns
-// the existing cluster arrays (never mutates members).
-function selectJakartaTopClusters(clusters: PngReportItem[][]): PngReportItem[][] {
-  if (clusters.length <= 1) return clusters.slice(0, 3);
-  // (a) Greedy theme-diverse pick over the value-sorted clusters.
+// A cluster's representative headline + date, for selection-time story matching.
+function clusterStoryInput(c: PngReportItem[]): StorySimInput {
+  const it = c[0];
+  return { title: it.title, dateMs: (it.incidentDate ?? it.reportedDate).getTime() };
+}
+
+// Two clusters describe the SAME real-world story (Top-3 diversity threshold):
+// a shared strong distinctive entity, high token overlap, or a shared
+// distinctive place + event class within three days. Broader than the ingest
+// clusterer's merge floor because outlets that filed one event under different
+// categories / sub-provinces survived as two clusters.
+function isSameTopStory(a: PngReportItem[], b: PngReportItem[]): boolean {
+  const s = storySimilarity(clusterStoryInput(a), clusterStoryInput(b));
+  return s.sharedStrong || s.jaccard >= 0.4 || s.sharedPlaceClass;
+}
+
+// STRONG same-story evidence — safe to fold a skipped duplicate's members into
+// the Top-3 id set so the event never reappears in a location bucket. Weaker
+// evidence (0.4 <= jaccard < 0.5 or place+class only) leaves the members in the
+// buckets, so a possibly-distinct event is shown once, never silently dropped.
+// The fold REMOVES data, so it is gated on the SAME 3-day window the ingest
+// clusterer requires to merge: formulaic PNG tribal-violence headlines let two
+// genuinely distinct clashes weeks apart hit jaccard>=0.5 (or share a strong
+// entity), and folding the later one out on that alone would silently drop a
+// real incident. Outside the window the event stays visible in its bucket.
+function isStrongSameTopStory(a: PngReportItem[], b: PngReportItem[]): boolean {
+  const s = storySimilarity(clusterStoryInput(a), clusterStoryInput(b));
+  return (s.sharedStrong || s.jaccard >= 0.5) && s.within3d;
+}
+
+// Top-3 development selection for EVERY theatre. The input clusters are already
+// value-sorted. A STORY-diversity guard (all theatres) skips a candidate whose
+// representative is the same real-world story as one already picked, so the three
+// developments shown are three DISTINCT events even when a syndicated story
+// survived the conservative ingest clusterer as two clusters. For Jakarta
+// (config.jakartaProse) an additional theme-diversity pass and an all-Low guard
+// run on top, unchanged. Returns the picked clusters plus the member ids of
+// STRONG-evidence duplicates to fold out of the location buckets. Pure; never
+// mutates cluster members.
+export function selectTopStoryClusters(
+  clusters: PngReportItem[][],
+  opts: { jakarta: boolean },
+): { top: PngReportItem[][]; foldMemberIds: Set<string> } {
+  const foldMemberIds = new Set<string>();
+  if (clusters.length <= 1) {
+    return { top: clusters.slice(0, 3), foldMemberIds };
+  }
   const picked: PngReportItem[][] = [];
   const usedThemes = new Set<JakartaTheme>();
+  const distinctStory = (c: PngReportItem[]) => !picked.some((p) => isSameTopStory(p, c));
+  // (a) Greedy pick over the value-sorted clusters: story-distinct always, plus
+  // Jakarta theme-distinct when applicable.
   for (const c of clusters) {
     if (picked.length >= 3) break;
-    const theme = jakartaThemeForCategory(c[0].category);
-    if (usedThemes.has(theme)) continue;
-    usedThemes.add(theme);
+    if (!distinctStory(c)) continue;
+    if (opts.jakarta) {
+      const theme = jakartaThemeForCategory(c[0].category);
+      if (usedThemes.has(theme)) continue;
+      usedThemes.add(theme);
+    }
     picked.push(c);
   }
-  // Fill any remaining slots (window too quiet for three distinct themes) with
-  // the next best clusters regardless of theme.
+  // (b) Fill remaining slots with the next story-distinct clusters, relaxing the
+  // Jakarta theme constraint (window too quiet for three distinct themes). Story
+  // distinctness is NEVER relaxed — if fewer than three distinct stories exist,
+  // fewer than three developments are shown rather than repeating one.
   if (picked.length < 3) {
     for (const c of clusters) {
       if (picked.length >= 3) break;
-      if (!picked.includes(c)) picked.push(c);
+      if (picked.includes(c)) continue;
+      if (!distinctStory(c)) continue;
+      picked.push(c);
     }
   }
-  // (b) All-Low guard: if every chosen development is Low-or-below but a
-  // Moderate-or-worse cluster exists, swap the weakest chosen Low for the most
-  // serious available candidate (preferring a swap that keeps theme diversity).
+  // (c) Jakarta all-Low guard: if every chosen development is Low-or-below but a
+  // story-distinct Moderate-or-worse cluster exists, swap the weakest chosen Low
+  // for the most serious available candidate (preferring a same-theme swap so
+  // theme diversity is preserved).
   const isLowOrBelow = (c: PngReportItem[]) => c[0].severityRank <= 2;
-  if (picked.length > 0 && picked.every(isLowOrBelow)) {
+  if (opts.jakarta && picked.length > 0 && picked.every(isLowOrBelow)) {
     const candidate = clusters
-      .filter((c) => !picked.includes(c) && c[0].severityRank >= 3)
+      .filter(
+        (c) => !picked.includes(c) && c[0].severityRank >= 3 && distinctStory(c),
+      )
       .sort((a, b) => {
         if (b[0].severityRank !== a[0].severityRank) return b[0].severityRank - a[0].severityRank;
         return scoreClusterValue(b) - scoreClusterValue(a);
       })[0];
     if (candidate) {
       const candTheme = jakartaThemeForCategory(candidate[0].category);
-      // Prefer replacing a same-theme pick (keeps diversity); otherwise replace
-      // the lowest-value Low, which is last in the value-sorted picks.
       let replaceIdx = picked.length - 1;
       for (let i = picked.length - 1; i >= 0; i--) {
         if (jakartaThemeForCategory(picked[i]![0].category) === candTheme) {
@@ -804,13 +857,22 @@ function selectJakartaTopClusters(clusters: PngReportItem[][]): PngReportItem[][
       picked[replaceIdx] = candidate;
     }
   }
+  // (d) Fold STRONG-evidence duplicates of any picked cluster out of the location
+  // buckets, so a syndicated re-run of a Top-3 story never reappears lower down.
+  for (const c of clusters) {
+    if (picked.includes(c)) continue;
+    if (picked.some((p) => isStrongSameTopStory(p, c))) {
+      for (const it of c) foldMemberIds.add(it.id);
+    }
+  }
   // Display strongest analyst value first (severity-then-recency breaks ties),
   // matching the generic path's ordering intent.
-  return picked.sort((a, b) => {
+  const top = picked.sort((a, b) => {
     const v = scoreClusterValue(b) - scoreClusterValue(a);
     if (v !== 0) return v;
     return sortBySeverityThenRecency(a[0], b[0]);
   });
+  return { top, foldMemberIds };
 }
 
 // Strand assignment for an augmented location section (currently PNG NCD).
@@ -1160,11 +1222,16 @@ export function buildStructuredReportDataset(
     if (vb !== va) return vb - va;
     return sortBySeverityThenRecency(a[0], b[0]);
   });
-  const topClusters = config.jakartaProse
-    ? selectJakartaTopClusters(storyClusters)
-    : storyClusters.slice(0, 3);
+  const topSelection = selectTopStoryClusters(storyClusters, {
+    jakarta: config.jakartaProse ?? false,
+  });
+  const topClusters = topSelection.top;
   let topThree = topClusters.map((c) => c[0]);
   const topThreeMemberIds = new Set(topClusters.flatMap((c) => c.map((it) => it.id)));
+  // Fold STRONG-evidence syndication duplicates of a Top-3 story out of the
+  // location buckets so one real-world event never appears both in Top 3 and
+  // lower down (weak-evidence duplicates stay in the buckets, shown once).
+  for (const id of topSelection.foldMemberIds) topThreeMemberIds.add(id);
   const bucketableItems = windowItems.filter((it) => !topThreeMemberIds.has(it.id));
   // Incident Details analyses every remaining (non-Top-3) incident.
   const incidentDetailsItems = bucketableItems;
