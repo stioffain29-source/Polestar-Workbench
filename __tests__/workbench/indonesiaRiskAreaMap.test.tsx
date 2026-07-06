@@ -51,7 +51,8 @@ describe("Indonesia operational (reporting-driven) map", () => {
     expect(markup).toContain("No reported operational issue resolved to a mapped area this period");
     // Map Read note is now on EVERY country map, and disclaims standing risk.
     expect(markup).toContain("Map Read");
-    expect(markup).toContain("not standing background risk");
+    expect(markup).toContain("This map shows reported operationally relevant issues");
+    expect(markup).toContain("Monitor only unless they affect operations directly");
     // No fixed "standing High" chips survive.
     expect(markup).not.toContain(">High<");
     expect(markup).not.toContain("standing risk areas");
@@ -76,15 +77,18 @@ describe("Indonesia operational (reporting-driven) map", () => {
     expect(markup).toContain("What happened this period:");
     expect(markup).toContain("Fire at Jakarta warehouse");
     expect(markup).toContain("Business relevance:");
-    expect(markup).toContain("Site, asset and business-continuity exposure");
-    // A single report is Possible impact, however severe (indirect until repeated).
-    expect(markup).toContain("Impact level: Possible impact");
+    expect(markup).toContain("Site, asset and business-continuity disruption");
+    // A fire at a warehouse is a confirmed operational effect → Direct impact.
+    expect(markup).toContain("Impact level: Direct impact");
     // Areas with NO reporting this period are absent (not painted).
     expect(markup).not.toContain("Sumatra");
     expect(markup).not.toContain(esc("Kalimantan / Borneo"));
   });
 
-  it("grades impact down for a single low-severity report (Monitor only)", () => {
+  it("grades an isolated crime report down to Monitor only, whatever its severity", () => {
+    // Impact is content-driven, not severity/count driven: an isolated crime with
+    // no unrest, security or operational-disruption dimension is Monitor only even
+    // when the row is graded "high".
     const markup = renderToStaticMarkup(
       <CountryReportMap
         domId="idn"
@@ -92,8 +96,8 @@ describe("Indonesia operational (reporting-driven) map", () => {
         incidents={[
           incident({
             location: "Medan",
-            severity: "low",
-            title: "Minor road protest clears in Medan",
+            severity: "high",
+            title: "Man arrested for theft in Medan",
           }),
         ]}
       />,

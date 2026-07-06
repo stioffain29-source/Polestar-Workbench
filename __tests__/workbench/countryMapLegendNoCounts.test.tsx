@@ -52,7 +52,9 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
   });
 
   it("carries an impact level and NOT a severity chip", () => {
-    expect(markup).toContain("Impact level: Possible impact");
+    // A fire at a warehouse is a confirmed operational effect → Direct impact,
+    // even though the row's severity is graded "high".
+    expect(markup).toContain("Impact level: Direct impact");
     // Severity chips (">High<" etc.) are gone from the operational map.
     expect(markup).not.toContain(">High<");
   });
@@ -71,7 +73,8 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
     expect(markup).toContain("Operational Map");
     expect(markup).toContain("Reported operational issues this period");
     expect(markup).toContain("Map Read");
-    expect(markup).toContain("not standing background risk");
+    expect(markup).toContain("This map shows reported operationally relevant issues");
+    expect(markup).toContain("Monitor only unless they affect operations directly");
   });
 });
 
@@ -105,6 +108,7 @@ describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too
   it("carries the same Operational Map header and Map Read note on every country", () => {
     expect(markup).toContain("Operational Map");
     expect(markup).toContain("Map Read");
-    expect(markup).toContain("not standing background risk");
+    expect(markup).toContain("This map shows reported operationally relevant issues");
+    expect(markup).toContain("Monitor only unless they affect operations directly");
   });
 });

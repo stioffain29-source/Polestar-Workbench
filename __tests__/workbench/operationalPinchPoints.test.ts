@@ -1,9 +1,11 @@
 import {
   IMPACT_COLOR,
   IMPACT_ORDER,
+  IMPACT_RANK,
   SEV_RANK,
   worstSeverityKey,
-  impactLevelFor,
+  impactForIncident,
+  impactLevelForSet,
   businessRelevance,
   OPERATIONAL_MAP_HEADING,
   OPERATIONAL_MAP_SUBTITLE,
@@ -20,22 +22,44 @@ describe("operationalPinchPoints — impact-level model", () => {
     const hues = Object.values(IMPACT_COLOR).map((h) => h.toUpperCase());
     expect(hues).not.toContain("#A33232"); // Extreme-only
     expect(hues).not.toContain("#1B6B7A"); // Insignificant-only
+    // Direct is the highest-ranked impact level.
+    expect(IMPACT_RANK["Direct impact"]).toBeGreaterThan(IMPACT_RANK["Possible impact"]);
+    expect(IMPACT_RANK["Possible impact"]).toBeGreaterThan(IMPACT_RANK["Monitor only"]);
   });
 
-  it("derives impact level from frequency + business impact", () => {
-    // count >= 2 → Direct impact regardless of severity
-    expect(impactLevelFor(2, "low")).toBe("Direct impact");
-    expect(impactLevelFor(3, "insignificant")).toBe("Direct impact");
-    // a SINGLE report is never Direct impact, however severe — indirect until repeated
-    expect(impactLevelFor(1, "high")).toBe("Possible impact");
-    expect(impactLevelFor(1, "extreme")).toBe("Possible impact");
-    // single moderate → Possible impact
-    expect(impactLevelFor(1, "moderate")).toBe("Possible impact");
-    // single low/insignificant → Monitor only
-    expect(impactLevelFor(1, "low")).toBe("Monitor only");
-    expect(impactLevelFor(1, "insignificant")).toBe("Monitor only");
-    // defensive: count 0 → Monitor only (unmapped locations are dropped upstream)
-    expect(impactLevelFor(0, "")).toBe("Monitor only");
+  it("derives ONE incident's impact level from its own words, not severity/count", () => {
+    // Confirmed operational effect (fire at a site, closed road) → Direct impact,
+    // regardless of how the row was severity-graded.
+    expect(impactForIncident({ title: "Fire at Jakarta warehouse", severity: "low" })).toBe(
+      "Direct impact",
+    );
+    expect(impactForIncident({ title: "Protesters block the toll road" })).toBe("Direct impact");
+    // Unrest / security activity with no confirmed disruption → Possible impact.
+    expect(impactForIncident({ title: "Gunmen ambush a convoy" })).toBe("Possible impact");
+    expect(impactForIncident({ title: "Protest rally clears in Medan" })).toBe("Possible impact");
+    // A natural hazard is indirect → Possible impact.
+    expect(impactForIncident({ title: "Flood hits the district" })).toBe("Possible impact");
+    // Isolated crime / policing with no unrest or security dimension → Monitor only,
+    // however severe the wording sounds.
+    expect(impactForIncident({ title: "Man arrested for theft" })).toBe("Monitor only");
+    expect(impactForIncident({ title: "Quarterly economic update" })).toBe("Monitor only");
+  });
+
+  it("reads the worst impact level from a set (highest-impact event leads)", () => {
+    expect(
+      impactLevelForSet([
+        { title: "Man arrested for theft" }, // Monitor only
+        { title: "Gunmen ambush a convoy" }, // Possible impact
+      ]),
+    ).toBe("Possible impact");
+    expect(
+      impactLevelForSet([
+        { title: "Gunmen ambush a convoy" }, // Possible impact
+        { title: "Fire at Jakarta warehouse" }, // Direct impact
+      ]),
+    ).toBe("Direct impact");
+    // Empty set defaults to the conservative floor.
+    expect(impactLevelForSet([])).toBe("Monitor only");
   });
 
   it("reads the worst severity key from a set", () => {
@@ -44,33 +68,38 @@ describe("operationalPinchPoints — impact-level model", () => {
     expect(worstSeverityKey([])).toBe("");
   });
 
-  it("labels business relevance from the headline first, topic as fallback", () => {
-    expect(businessRelevance({ title: "Fire at Jakarta warehouse" })).toBe(
-      "Site, asset and business-continuity exposure",
+  it("labels business relevance to MATCH the reported event and its impact", () => {
+    // Direct impact wording is confirmed, event-specific.
+    expect(businessRelevance({ title: "Fire at Jakarta warehouse" }, "Direct impact")).toBe(
+      "Site, asset and business-continuity disruption",
     );
-    expect(businessRelevance({ title: "Protesters block the toll road" })).toBe(
-      "Movement and site-access disruption",
+    expect(businessRelevance({ title: "Protesters block the toll road" }, "Direct impact")).toBe(
+      "Confirmed movement and access disruption",
     );
-    expect(businessRelevance({ title: "Gunmen ambush a convoy" })).toBe(
-      "Security and personnel-safety exposure",
+    // Possible impact wording is hedged (near / if operating nearby).
+    expect(businessRelevance({ title: "Protest rally near the plant" }, "Possible impact")).toBe(
+      "Possible movement disruption near protest area",
     );
-    // No headline cue → topic fallback.
-    expect(businessRelevance({ topic: "shipping", title: "Quarterly update" })).toBe(
-      "Logistics and movement disruption",
+    expect(businessRelevance({ title: "Gunmen ambush a convoy" }, "Possible impact")).toBe(
+      "Possible staff movement concern if operating nearby",
     );
-    // Unknown topic and no cue → generic monitoring label (never fabricated risk).
-    expect(businessRelevance({ topic: "mystery", title: "Quarterly update" })).toBe(
-      "Operational monitoring relevance",
+    expect(businessRelevance({ title: "Flood hits the district" }, "Possible impact")).toBe(
+      "Possible site or utility disruption if operating nearby",
     );
-    // displayTitle (translated) is considered too.
-    expect(
-      businessRelevance({ topic: "flashpoint", title: "banjir bandang", displayTitle: "Flash flood hits district" }),
-    ).toBe("Utilities and site-continuity disruption");
+    // Monitor only — isolated crime carries a security-awareness note only, and
+    // non-violent monitoring items carry no commercial-impact claim (no fabrication).
+    expect(businessRelevance({ title: "Shooting suspect arrested" }, "Monitor only")).toBe(
+      "Local security awareness only",
+    );
+    expect(businessRelevance({ topic: "shipping", title: "Quarterly update" }, "Monitor only")).toBe(
+      "No reported commercial impact",
+    );
   });
 
   it("pins the fixed owner-brief map wording", () => {
     expect(OPERATIONAL_MAP_HEADING).toBe("Operational Map");
     expect(OPERATIONAL_MAP_SUBTITLE).toBe("Reported operational issues this period");
-    expect(OPERATIONAL_MAP_READ).toMatch(/not standing background risk\.$/);
+    expect(OPERATIONAL_MAP_READ).toMatch(/^This map shows reported operationally relevant issues/);
+    expect(OPERATIONAL_MAP_READ).toMatch(/Monitor only unless they affect operations directly\.$/);
   });
 });
