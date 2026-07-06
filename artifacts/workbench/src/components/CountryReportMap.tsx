@@ -6,6 +6,7 @@ import { classifyLocationConfidence } from "@/lib/countryLocationConfidence";
 import { stripWireCruft } from "@/lib/incidentTitle";
 import {
   impactForIncident,
+  impactLevelForSet,
   businessRelevance,
   worstSeverityKey,
   IMPACT_COLOR,
@@ -820,7 +821,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         members: gm,
         count: gm.length,
         worstKey,
-        impact: impactLevelFor(gm.length, worstKey),
+        impact: impactLevelForSet(gm),
         location: rawLoc ? titleCaseLocation(rawLoc) : "Reported location",
         lead: leadIncident(gm),
       });
@@ -913,7 +914,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         // reported event there; empty areas are never drawn.
         if (z.count === 0) continue;
         const [lat, lng] = z.def.center;
-        const impact = impactLevelFor(z.count, z.worstKey);
+        const impact = impactLevelForSet(z.incidents);
         const color = IMPACT_COLOR[impact];
         const size = 28;
         const half = size / 2;
@@ -1091,13 +1092,14 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       .filter((z) => z.count > 0)
       .map((z) => {
         const lead = leadIncident(z.incidents);
+        const impact = impactLevelForSet(z.incidents);
         return {
           key: z.def.name,
           marker: String(z.number),
           location: z.def.name,
           issue: cleanIssue(lead),
-          relevance: businessRelevance(lead),
-          impact: impactLevelFor(z.count, z.worstKey),
+          relevance: businessRelevance(lead, impact),
+          impact,
         };
       });
 
@@ -1137,7 +1139,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     marker: null,
     location: g.location,
     issue: cleanIssue(g.lead),
-    relevance: businessRelevance(g.lead),
+    relevance: businessRelevance(g.lead, g.impact),
     impact: g.impact,
   }));
 
