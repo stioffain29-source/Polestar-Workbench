@@ -665,3 +665,15 @@ id = "jmAtmGxddhCkJUZeBm3dU"
 uri = "file://screenshots/cargo_breakdown.jpg"
 type = "image"
 title = "Cargo Watch — Captured Incidents by Country & Cargo"
+
+[[outputs]]
+id = "wemQzbuov4FADqJd8omMO"
+uri = "file://screenshots/jakarta-trial-map.jpg"
+type = "image"
+title = "Jakarta operational-exposure map — trial (second revision)"
+
+[[outputs]]
+id = "OEPfnXOrvUgxnx8xHzmWz"
+uri = "file://screenshots/jakarta_trial_map.jpg"
+type = "image"
+title = "Jakarta City Movement Posture — trial map"

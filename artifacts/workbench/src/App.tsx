@@ -30,6 +30,7 @@ import Cards from "./pages/Cards";
 import CardBuilder from "./pages/CardBuilder";
 import BrandSettings from "./pages/BrandSettings";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
+import JakartaTrialMapPage from "./pages/JakartaTrialMapPage";
 
 const queryClient = new QueryClient();
 
@@ -214,6 +215,7 @@ function Router() {
         <Route path="/card-builder" component={Cards} />
         <Route path="/card-builder/:id" component={CardBuilder} />
         <Route path="/card-settings" component={BrandSettings} />
+        <Route path="/jakarta-trial-map" component={JakartaTrialMapPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -278,11 +280,11 @@ function JakartaMapSample() {
 }
 
 function App() {
-  if (
-    typeof window !== "undefined" &&
-    window.location.pathname.replace(/\/$/, "").endsWith("__jakarta-sample")
-  ) {
-    return <JakartaMapSample />;
+  if (typeof window !== "undefined") {
+    const p = window.location.pathname.replace(/\/$/, "");
+    if (p.endsWith("__jakarta-sample")) {
+      return <JakartaMapSample />;
+    }
   }
   return (
     <QueryClientProvider client={queryClient}>
