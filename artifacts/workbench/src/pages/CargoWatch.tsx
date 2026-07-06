@@ -322,6 +322,14 @@ export default function CargoWatch() {
     return best;
   }, [enriched]);
 
+  // A spot report is for fresh incidents only — the candidate tag shows only
+  // when the biggest-loss incident occurred within the last 7 days. Rolling
+  // 168-hour window keeps the boundary tz-drift-free.
+  const biggestLossIsRecent = useMemo(() => {
+    if (!biggestLoss) return false;
+    return new Date(biggestLoss.occurredAt) >= subDays(new Date(), 7);
+  }, [biggestLoss]);
+
   const byCategory = useMemo(() => {
     const m = new Map<string, number>();
     enriched.forEach((i) => m.set(i.category, (m.get(i.category) ?? 0) + 1));
@@ -845,12 +853,17 @@ export default function CargoWatch() {
           sub={
             biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? (
               <span>
-                {biggestLoss.displayCountry ?? "—"} ·{" "}
-                {incidentSourceUrl(biggestLoss) ? (
-                  <a href={incidentSourceUrl(biggestLoss)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">spot-report candidate</a>
-                ) : (
-                  "spot-report candidate"
-                )}
+                {biggestLoss.displayCountry ?? "—"}
+                {biggestLossIsRecent ? (
+                  <>
+                    {" · "}
+                    {incidentSourceUrl(biggestLoss) ? (
+                      <a href={incidentSourceUrl(biggestLoss)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">spot-report candidate</a>
+                    ) : (
+                      "spot-report candidate"
+                    )}
+                  </>
+                ) : null}
               </span>
             ) : (
               "No source-stated loss in window"
