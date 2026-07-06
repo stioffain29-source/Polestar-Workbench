@@ -39,6 +39,9 @@ import type {
   CountryReportUpdate,
   CreateSocialWatchItemRequest,
   DashboardOverview,
+  DataCentreFacility,
+  DataCentreFacilityInput,
+  DataCentreFacilityUpdate,
   EditCountryProseInput,
   EditReportIncidentSummariesInput,
   EditReportProseInput,
@@ -56,6 +59,7 @@ import type {
   IncidentInput,
   IncidentUpdate,
   IntegrationStatusResponse,
+  ListDataCentreFacilitiesParams,
   ListGdeltStructuredItemsParams,
   ListIncidentsParams,
   ListLiveuamapEventsParams,
@@ -3720,6 +3724,350 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getAppendSpotReportExportMutationOptions(options));
+    }
+
+export const getListDataCentreFacilitiesUrl = (params?: ListDataCentreFacilitiesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/data-centre-facilities?${stringifiedParams}` : `/api/data-centre-facilities`
+}
+
+export const listDataCentreFacilities = async (params?: ListDataCentreFacilitiesParams, options?: RequestInit): Promise<DataCentreFacility[]> => {
+
+  return customFetch<DataCentreFacility[]>(getListDataCentreFacilitiesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDataCentreFacilitiesQueryKey = (params?: ListDataCentreFacilitiesParams,) => {
+    return [
+    `/api/data-centre-facilities`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDataCentreFacilitiesQueryOptions = <TData = Awaited<ReturnType<typeof listDataCentreFacilities>>, TError = ErrorType<unknown>>(params?: ListDataCentreFacilitiesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDataCentreFacilities>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDataCentreFacilitiesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDataCentreFacilities>>> = ({ signal }) => listDataCentreFacilities(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDataCentreFacilities>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDataCentreFacilitiesQueryResult = NonNullable<Awaited<ReturnType<typeof listDataCentreFacilities>>>
+export type ListDataCentreFacilitiesQueryError = ErrorType<unknown>
+
+
+
+export function useListDataCentreFacilities<TData = Awaited<ReturnType<typeof listDataCentreFacilities>>, TError = ErrorType<unknown>>(
+ params?: ListDataCentreFacilitiesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDataCentreFacilities>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDataCentreFacilitiesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDataCentreFacilityUrl = () => {
+
+
+
+
+  return `/api/data-centre-facilities`
+}
+
+export const createDataCentreFacility = async (dataCentreFacilityInput: DataCentreFacilityInput, options?: RequestInit): Promise<DataCentreFacility> => {
+
+  return customFetch<DataCentreFacility>(getCreateDataCentreFacilityUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dataCentreFacilityInput,)
+  }
+);}
+
+
+
+
+export const getCreateDataCentreFacilityMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDataCentreFacility>>, TError,{data: BodyType<DataCentreFacilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDataCentreFacility>>, TError,{data: BodyType<DataCentreFacilityInput>}, TContext> => {
+
+const mutationKey = ['createDataCentreFacility'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDataCentreFacility>>, {data: BodyType<DataCentreFacilityInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDataCentreFacility(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDataCentreFacilityMutationResult = NonNullable<Awaited<ReturnType<typeof createDataCentreFacility>>>
+    export type CreateDataCentreFacilityMutationBody = BodyType<DataCentreFacilityInput>
+    export type CreateDataCentreFacilityMutationError = ErrorType<unknown>
+
+    export const useCreateDataCentreFacility = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDataCentreFacility>>, TError,{data: BodyType<DataCentreFacilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDataCentreFacility>>,
+        TError,
+        {data: BodyType<DataCentreFacilityInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDataCentreFacilityMutationOptions(options));
+    }
+
+export const getGetDataCentreFacilityUrl = (id: number,) => {
+
+
+
+
+  return `/api/data-centre-facilities/${id}`
+}
+
+export const getDataCentreFacility = async (id: number, options?: RequestInit): Promise<DataCentreFacility> => {
+
+  return customFetch<DataCentreFacility>(getGetDataCentreFacilityUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDataCentreFacilityQueryKey = (id: number,) => {
+    return [
+    `/api/data-centre-facilities/${id}`
+    ] as const;
+    }
+
+
+export const getGetDataCentreFacilityQueryOptions = <TData = Awaited<ReturnType<typeof getDataCentreFacility>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDataCentreFacility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDataCentreFacilityQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDataCentreFacility>>> = ({ signal }) => getDataCentreFacility(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDataCentreFacility>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDataCentreFacilityQueryResult = NonNullable<Awaited<ReturnType<typeof getDataCentreFacility>>>
+export type GetDataCentreFacilityQueryError = ErrorType<unknown>
+
+
+
+export function useGetDataCentreFacility<TData = Awaited<ReturnType<typeof getDataCentreFacility>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDataCentreFacility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDataCentreFacilityQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateDataCentreFacilityUrl = (id: number,) => {
+
+
+
+
+  return `/api/data-centre-facilities/${id}`
+}
+
+export const updateDataCentreFacility = async (id: number,
+    dataCentreFacilityUpdate: DataCentreFacilityUpdate, options?: RequestInit): Promise<DataCentreFacility> => {
+
+  return customFetch<DataCentreFacility>(getUpdateDataCentreFacilityUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dataCentreFacilityUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateDataCentreFacilityMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDataCentreFacility>>, TError,{id: number;data: BodyType<DataCentreFacilityUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDataCentreFacility>>, TError,{id: number;data: BodyType<DataCentreFacilityUpdate>}, TContext> => {
+
+const mutationKey = ['updateDataCentreFacility'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDataCentreFacility>>, {id: number;data: BodyType<DataCentreFacilityUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDataCentreFacility(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDataCentreFacilityMutationResult = NonNullable<Awaited<ReturnType<typeof updateDataCentreFacility>>>
+    export type UpdateDataCentreFacilityMutationBody = BodyType<DataCentreFacilityUpdate>
+    export type UpdateDataCentreFacilityMutationError = ErrorType<unknown>
+
+    export const useUpdateDataCentreFacility = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDataCentreFacility>>, TError,{id: number;data: BodyType<DataCentreFacilityUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDataCentreFacility>>,
+        TError,
+        {id: number;data: BodyType<DataCentreFacilityUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateDataCentreFacilityMutationOptions(options));
+    }
+
+export const getDeleteDataCentreFacilityUrl = (id: number,) => {
+
+
+
+
+  return `/api/data-centre-facilities/${id}`
+}
+
+export const deleteDataCentreFacility = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteDataCentreFacilityUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDataCentreFacilityMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDataCentreFacility>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDataCentreFacility>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteDataCentreFacility'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDataCentreFacility>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDataCentreFacility(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDataCentreFacilityMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDataCentreFacility>>>
+
+    export type DeleteDataCentreFacilityMutationError = ErrorType<unknown>
+
+    export const useDeleteDataCentreFacility = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDataCentreFacility>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDataCentreFacility>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDataCentreFacilityMutationOptions(options));
     }
 
 export const getListCardDraftsUrl = () => {

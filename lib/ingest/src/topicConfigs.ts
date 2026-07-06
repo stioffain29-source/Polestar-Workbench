@@ -415,6 +415,71 @@ const FUEL_CONFIG: NewsTopicConfig = {
   countryAliases: GLOBAL_TOPIC_ALIASES,
 };
 
+// ----------------------------------------------------------- data_centres ----
+// Data-centre coverage: operational disruption AND build-out / planning risk.
+// A world-scope market topic (like energy/fertiliser/fuel) — the choropleth
+// paints countries globally — but the news feed leans on the major DC markets.
+// Two signal families: (1) operational incidents (outage, cooling/power
+// failure, fire, flood, downtime, cyber disruption) and (2) planning / build-
+// out risk (planning refused, moratorium, water/power constraint, community
+// opposition, grid-connection block). Business M&A / earnings noise is denied.
+const DATA_CENTRE_COUNTRIES = [
+  ...SOUTH_APAC,
+  "Malaysia",
+  "Singapore",
+  "China",
+  "Japan",
+  "South Korea",
+  "Taiwan",
+  "Australia",
+  "New Zealand",
+  "United States",
+  "United Kingdom",
+  "Ireland",
+  "Netherlands",
+  "Germany",
+  "France",
+  "Saudi Arabia",
+  "United Arab Emirates",
+];
+
+const DATA_CENTRE_TERMS = `("data centre" OR "data center" OR "data centres" OR "data centers" OR "server farm" OR "hyperscale" OR "colocation" OR "cloud region") (outage OR "power failure" OR "cooling failure" OR fire OR flood OR downtime OR disruption OR "planning refused" OR moratorium OR "grid connection" OR "water use" OR opposition OR blackout OR cyberattack OR "power constraint")`;
+
+const DATA_CENTRE_CONFIG: NewsTopicConfig = {
+  topic: "data_centres",
+  feeds: [
+    ...countryFeeds(DATA_CENTRE_COUNTRIES, DATA_CENTRE_TERMS),
+    { label: "DC outage (region)", q: `("data centre" OR "data center" OR hyperscale OR colocation) (outage OR "cooling failure" OR "power failure" OR downtime OR fire OR flood) (Singapore OR Malaysia OR Indonesia OR India OR Japan OR Australia)`, defaultCountry: "Unknown" },
+    { label: "DC planning risk (region)", q: `("data centre" OR "data center" OR hyperscale) ("planning refused" OR moratorium OR "grid connection" OR "water constraint" OR "power constraint" OR opposition OR "environmental review")`, defaultCountry: "Unknown" },
+  ],
+  allow: [
+    "data centre",
+    "data center",
+    "data centres",
+    "data centers",
+    "server farm",
+    "hyperscale",
+    "colocation",
+    "cloud region",
+    "cloud facility",
+    "hosting provider",
+  ],
+  deny: [
+    ...COMMON_DENY,
+    "data center market",
+    "data centre market",
+    "market size",
+    "market report",
+    "cagr",
+    "forecast to 20",
+    "research report",
+    "job openings",
+    "hiring",
+    "career",
+  ],
+  countryAliases: GLOBAL_TOPIC_ALIASES,
+};
+
 // -------------------------------------------------------------- conflict ----
 // War / armed conflict / insurgency / armed crime. This is a SEPARATE topic
 // from `flashpoint` (which stays strictly activism / protests / strikes / civil
@@ -940,6 +1005,10 @@ export function runFertiliserIngest(opts: IngestOptions = {}): Promise<IngestSum
 
 export function runFuelIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(FUEL_CONFIG, opts);
+}
+
+export function runDataCentresIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
+  return runNewsTopicIngest(DATA_CENTRE_CONFIG, opts);
 }
 
 export function runIndonesiaLocalIngest(opts: IngestOptions = {}): Promise<IngestSummary> {

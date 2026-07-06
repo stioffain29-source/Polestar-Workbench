@@ -16,6 +16,7 @@
     "scrape:energy": "tsx ./src/scrape-energy.ts",
     "scrape:fertiliser": "tsx ./src/scrape-fertiliser.ts",
     "scrape:fuel": "tsx ./src/scrape-fuel.ts",
+    "scrape:data-centres": "tsx ./src/scrape-data-centres.ts",
     "scrape:conflict": "tsx ./src/scrape-conflict.ts",
     "scrape:indonesia-local": "tsx ./src/scrape-indonesia-local.ts",
     "scrape:apac-local": "tsx ./src/scrape-apac-local.ts",

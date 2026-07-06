@@ -109,6 +109,8 @@ const TOPIC_SCOPE: Record<string, string> = {
     "Civil protest and unrest covers public order activity, disruption to transport and access, and escalation risk.",
   flashpoint:
     "Flashpoint reads as a short operational warning derived from civil unrest data. Keep it tight and actionable.",
+  data_centres:
+    "Data Centres covers build-out, planning, power and water constraint, community opposition and operational risk to data-centre facilities. Facility records sit in the Registry; this report reads the incident feed.",
 };
 
 function scopeFor(topic: string): string | null {

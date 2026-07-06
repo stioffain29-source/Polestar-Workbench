@@ -1051,6 +1051,86 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SpotReport" }
 
+  /data-centre-facilities:
+    get:
+      operationId: listDataCentreFacilities
+      tags: [dataCentreFacilities]
+      parameters:
+        - name: country
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/DataCentreStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DataCentreFacility" }
+    post:
+      operationId: createDataCentreFacility
+      tags: [dataCentreFacilities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataCentreFacilityInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCentreFacility" }
+
+  /data-centre-facilities/{id}:
+    get:
+      operationId: getDataCentreFacility
+      tags: [dataCentreFacilities]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCentreFacility" }
+    patch:
+      operationId: updateDataCentreFacility
+      tags: [dataCentreFacilities]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataCentreFacilityUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCentreFacility" }
+    delete:
+      operationId: deleteDataCentreFacility
+      tags: [dataCentreFacilities]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
   /card-drafts:
     get:
       operationId: listCardDrafts
@@ -2430,6 +2510,117 @@ components:
       properties:
         dataUrl: { type: string }
         caption: { type: string }
+
+    DataCentreStatus:
+      type: string
+      enum:
+        - Operational
+        - Under construction
+        - Approved
+        - Proposed
+        - Planning submitted
+        - Planning refused
+        - Delayed
+        - Suspended
+        - Cancelled
+        - Unknown
+
+    DataCentrePlanningRisk:
+      type: string
+      enum:
+        - No known issue
+        - Planning pending
+        - Environmental review
+        - Water constraint
+        - Power constraint
+        - Community opposition
+        - Legal challenge
+        - Political scrutiny
+        - Permit refused
+        - Moratorium
+        - Unknown
+
+    DataCentreFacility:
+      type: object
+      required:
+        - id
+        - name
+        - country
+        - status
+        - planningRisk
+        - statusChanged
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        operator: { type: ["string", "null"] }
+        country: { type: string }
+        region: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        status: { $ref: "#/components/schemas/DataCentreStatus" }
+        planningRisk: { $ref: "#/components/schemas/DataCentrePlanningRisk" }
+        capacityMw: { type: ["number", "null"] }
+        itLoadMw: { type: ["number", "null"] }
+        announcedDate: { type: ["string", "null"], format: date-time }
+        expectedOnlineDate: { type: ["string", "null"], format: date-time }
+        commissionedDate: { type: ["string", "null"], format: date-time }
+        notes: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        linkedIncidentId: { type: ["integer", "null"] }
+        statusChanged: { type: boolean }
+        previousStatus: { type: ["string", "null"] }
+        statusChangedAt: { type: ["string", "null"], format: date-time }
+        createdBy: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    DataCentreFacilityInput:
+      type: object
+      required: [name, country]
+      properties:
+        name: { type: string, minLength: 1 }
+        operator: { type: string }
+        country: { type: string, minLength: 1 }
+        region: { type: string }
+        city: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        status: { $ref: "#/components/schemas/DataCentreStatus" }
+        planningRisk: { $ref: "#/components/schemas/DataCentrePlanningRisk" }
+        capacityMw: { type: number }
+        itLoadMw: { type: number }
+        announcedDate: { type: string, format: date-time }
+        expectedOnlineDate: { type: string, format: date-time }
+        commissionedDate: { type: string, format: date-time }
+        notes: { type: string }
+        sourceUrl: { type: string }
+        linkedIncidentId: { type: integer }
+        createdBy: { type: string }
+
+    DataCentreFacilityUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        operator: { type: ["string", "null"] }
+        country: { type: string, minLength: 1 }
+        region: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        status: { $ref: "#/components/schemas/DataCentreStatus" }
+        planningRisk: { $ref: "#/components/schemas/DataCentrePlanningRisk" }
+        capacityMw: { type: ["number", "null"] }
+        itLoadMw: { type: ["number", "null"] }
+        announcedDate: { type: ["string", "null"], format: date-time }
+        expectedOnlineDate: { type: ["string", "null"], format: date-time }
+        commissionedDate: { type: ["string", "null"], format: date-time }
+        notes: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        linkedIncidentId: { type: ["integer", "null"] }
+        createdBy: { type: string }
 
     CardTemplateKey:
       type: string

@@ -474,6 +474,56 @@ export async function runDataMigrations(): Promise<void> {
         ON maritime_movement (theatre, data_as_of DESC)
     `);
 
+    // Schema: analyst-maintained Data Centre facility REGISTRY. A curated
+    // catalogue of tracked data-centre facilities — DELIBERATELY separate from
+    // the incidents pipeline. CRITICAL PRODUCT RULE: a registry facility is
+    // NEVER an incident and can never inflate any incident count; its only link
+    // to the stream is an OPTIONAL analyst-drawn `linked_incident_id`. status /
+    // planning_risk are constrained to fixed vocabularies at the API layer (not
+    // the DB) so a vocab extension is a code change, not a migration. drizzle
+    // push only reaches dev, so the prod primary gains the table here on boot.
+    // All idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS data_centre_facilities (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        operator text,
+        country text NOT NULL,
+        region text,
+        city text,
+        latitude double precision,
+        longitude double precision,
+        status text NOT NULL DEFAULT 'Unknown',
+        planning_risk text NOT NULL DEFAULT 'Unknown',
+        capacity_mw double precision,
+        it_load_mw double precision,
+        announced_date timestamptz,
+        expected_online_date timestamptz,
+        commissioned_date timestamptz,
+        notes text,
+        source_url text,
+        linked_incident_id integer,
+        status_changed boolean NOT NULL DEFAULT false,
+        previous_status text,
+        status_changed_at timestamptz,
+        created_by text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS data_centre_facilities_country_idx
+        ON data_centre_facilities (country)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS data_centre_facilities_status_idx
+        ON data_centre_facilities (status)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS data_centre_facilities_linked_incident_idx
+        ON data_centre_facilities (linked_incident_id)
+    `);
+
     // Schema: per-vessel AIS sighting state, kept ACROSS sample windows so a
     // vessel's transmission GAP can be measured (the live receive stream only
     // shows vessels that ARE transmitting, so an "AIS-dark" vessel is detectable

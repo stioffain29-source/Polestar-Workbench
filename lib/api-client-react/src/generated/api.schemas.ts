@@ -858,6 +858,141 @@ export interface SpotReportExportInput {
   exportedBy?: string;
 }
 
+export type DataCentreStatus = typeof DataCentreStatus[keyof typeof DataCentreStatus];
+
+
+export const DataCentreStatus = {
+  Operational: 'Operational',
+  Under_construction: 'Under construction',
+  Approved: 'Approved',
+  Proposed: 'Proposed',
+  Planning_submitted: 'Planning submitted',
+  Planning_refused: 'Planning refused',
+  Delayed: 'Delayed',
+  Suspended: 'Suspended',
+  Cancelled: 'Cancelled',
+  Unknown: 'Unknown',
+} as const;
+
+export type DataCentrePlanningRisk = typeof DataCentrePlanningRisk[keyof typeof DataCentrePlanningRisk];
+
+
+export const DataCentrePlanningRisk = {
+  No_known_issue: 'No known issue',
+  Planning_pending: 'Planning pending',
+  Environmental_review: 'Environmental review',
+  Water_constraint: 'Water constraint',
+  Power_constraint: 'Power constraint',
+  Community_opposition: 'Community opposition',
+  Legal_challenge: 'Legal challenge',
+  Political_scrutiny: 'Political scrutiny',
+  Permit_refused: 'Permit refused',
+  Moratorium: 'Moratorium',
+  Unknown: 'Unknown',
+} as const;
+
+export interface DataCentreFacility {
+  id: number;
+  name: string;
+  /** @nullable */
+  operator?: string | null;
+  country: string;
+  /** @nullable */
+  region?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  status: DataCentreStatus;
+  planningRisk: DataCentrePlanningRisk;
+  /** @nullable */
+  capacityMw?: number | null;
+  /** @nullable */
+  itLoadMw?: number | null;
+  /** @nullable */
+  announcedDate?: string | null;
+  /** @nullable */
+  expectedOnlineDate?: string | null;
+  /** @nullable */
+  commissionedDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
+  linkedIncidentId?: number | null;
+  statusChanged: boolean;
+  /** @nullable */
+  previousStatus?: string | null;
+  /** @nullable */
+  statusChangedAt?: string | null;
+  /** @nullable */
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DataCentreFacilityInput {
+  /** @minLength 1 */
+  name: string;
+  operator?: string;
+  /** @minLength 1 */
+  country: string;
+  region?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  status?: DataCentreStatus;
+  planningRisk?: DataCentrePlanningRisk;
+  capacityMw?: number;
+  itLoadMw?: number;
+  announcedDate?: string;
+  expectedOnlineDate?: string;
+  commissionedDate?: string;
+  notes?: string;
+  sourceUrl?: string;
+  linkedIncidentId?: number;
+  createdBy?: string;
+}
+
+export interface DataCentreFacilityUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  operator?: string | null;
+  /** @minLength 1 */
+  country?: string;
+  /** @nullable */
+  region?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  status?: DataCentreStatus;
+  planningRisk?: DataCentrePlanningRisk;
+  /** @nullable */
+  capacityMw?: number | null;
+  /** @nullable */
+  itLoadMw?: number | null;
+  /** @nullable */
+  announcedDate?: string | null;
+  /** @nullable */
+  expectedOnlineDate?: string | null;
+  /** @nullable */
+  commissionedDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
+  linkedIncidentId?: number | null;
+  createdBy?: string;
+}
+
 export type CardTemplateKey = typeof CardTemplateKey[keyof typeof CardTemplateKey];
 
 
@@ -2300,6 +2435,11 @@ status?: ReportStatus;
 
 export type ListSpotReportsParams = {
 status?: SpotReportStatus;
+};
+
+export type ListDataCentreFacilitiesParams = {
+country?: string;
+status?: DataCentreStatus;
 };
 
 export type BeginBrowserLoginParams = {

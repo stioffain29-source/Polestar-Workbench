@@ -6,6 +6,7 @@ export * from "./strikes";
 export * from "./sources";
 export * from "./reports";
 export * from "./spotReports";
+export * from "./dataCentreFacilities";
 export * from "./countryReports";
 export * from "./countryReportProse";
 export * from "./reportIncidentSummaries";

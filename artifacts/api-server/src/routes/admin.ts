@@ -110,6 +110,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       energyInserted: result.energy.inserted,
       fertiliserInserted: result.fertiliser.inserted,
       fuelInserted: result.fuel.inserted,
+      dataCentresInserted: result.dataCentres.inserted,
       indonesiaLocalInserted: result.indonesiaLocal.inserted,
       apacLocalInserted: result.apacLocal.inserted,
       strikesInserted: result.strikes.inserted,
@@ -133,6 +134,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
         result.energy.inserted +
         result.fertiliser.inserted +
         result.fuel.inserted +
+        result.dataCentres.inserted +
         result.indonesiaLocal.inserted +
         result.apacLocal.inserted +
         result.strikes.inserted,
@@ -142,6 +144,7 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
       energy: trimmedSummary(result.energy),
       fertiliser: trimmedSummary(result.fertiliser),
       fuel: trimmedSummary(result.fuel),
+      dataCentres: trimmedSummary(result.dataCentres),
       indonesiaLocal: trimmedSummary(result.indonesiaLocal),
       apacLocal: trimmedSummary(result.apacLocal),
       strikes: {

@@ -1087,6 +1087,14 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\bcoal (supply )?(shortage|crunch|crisis|shortfall|disruption|squeeze)\b/,
     /\bcoal supply (concern|concerns|problem|problems)\b/,
   ],
+  data_centres: [
+    // Operational disruption at a data centre / hyperscale / colocation site.
+    /\b(data cent(?:re|er)s?|server farm|hyperscale|colocation|colo facility|cloud region) .{0,40}(outage|down(?:time)?|offline|power (?:failure|cut|outage|loss)|cooling (?:failure|loss|issue)|overheat|fire|flood|blackout|disruption|breach|cyber|ransomware|attack|sabotage|explosion|shutdown|evacuat)/,
+    /\b(outage|down(?:time)?|power (?:failure|cut|outage|loss)|cooling (?:failure|loss)|fire|flood|blackout|disruption|breach|cyberattack|ransomware|sabotage|explosion|shutdown) .{0,40}(data cent(?:re|er)s?|server farm|hyperscale|colocation|colo facility|cloud region)/,
+    // Planning / build-out risk bound to a data-centre object.
+    /\b(data cent(?:re|er)s?|server farm|hyperscale|colocation|cloud region) .{0,50}(planning (?:refused|rejected|denied|pending|permission)|moratorium|grid (?:connection|access)|water (?:use|constraint|shortage|scarcity)|power (?:constraint|shortage)|community (?:opposition|objection)|environmental (?:review|objection)|legal challenge|permit (?:refused|denied)|halt|paus(?:e|ed)|suspend|blocked|scrapp?ed|delay)/,
+    /\b(planning (?:refused|rejected|denied)|moratorium|grid (?:connection|access) (?:block|refus|denied)|water (?:constraint|shortage|scarcity)|community (?:opposition|objection)|environmental (?:review|objection)|permit (?:refused|denied)) .{0,50}(data cent(?:re|er)s?|server farm|hyperscale|colocation|cloud region)/,
+  ],
   shipping: [
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,
     /\battack (on|against) (a |an |the )?(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew)/,

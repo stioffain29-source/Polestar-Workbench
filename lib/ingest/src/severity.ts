@@ -61,7 +61,8 @@ export type SeverityTopic =
   | "fuel"
   | "conflict"
   | "indonesia_local"
-  | "apac_local";
+  | "apac_local"
+  | "data_centres";
 
 // Present-tense fatal headlines. News writes fatal attacks in the present tense
 // ("airstrike kills seven civilians", "gunmen kill 24 construction workers",

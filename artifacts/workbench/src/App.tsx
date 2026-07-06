@@ -15,6 +15,8 @@ import Protests from "./pages/Protests";
 import Conflict from "./pages/Conflict";
 import CargoWatch from "./pages/CargoWatch";
 import Shipping from "./pages/Shipping";
+import DataCentres from "./pages/DataCentres";
+import DataCentreRegistry from "./pages/DataCentreRegistry";
 import Strikes from "./pages/Strikes";
 import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
@@ -199,6 +201,8 @@ function Router() {
         <Route path="/topics/shipping" component={Shipping} />
         <Route path="/topics/protests" component={Protests} />
         <Route path="/topics/conflict" component={Conflict} />
+        <Route path="/topics/data-centres" component={DataCentres} />
+        <Route path="/registry/data-centres" component={DataCentreRegistry} />
         <Route path="/topics/:topic" component={Topic} />
         <Route path="/strikes/backfill" component={StrikesBackfill} />
         <Route path="/strikes/:theatre" component={Strikes} />

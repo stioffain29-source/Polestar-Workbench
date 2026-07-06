@@ -6,6 +6,7 @@ import {
   runEnergyIngest,
   runFertiliserIngest,
   runFuelIngest,
+  runDataCentresIngest,
   runConflictIngest,
   runIndonesiaLocalIngest,
   runApacLocalIngest,
@@ -78,6 +79,7 @@ export type IngestRunResult =
       energy: IngestSummary;
       fertiliser: IngestSummary;
       fuel: IngestSummary;
+      dataCentres: IngestSummary;
       conflict: IngestSummary;
       indonesiaLocal: IngestSummary;
       apacLocal: IngestSummary;
@@ -582,6 +584,13 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const fuel = await runIncidentIngest("fuel", () =>
       runFuelIngest({ commit: true }),
     );
+    // Data-centre coverage — a world-scope market topic (operational disruption
+    // + build-out / planning risk). Its analyst-maintained facility REGISTRY is
+    // a SEPARATE table and never touched here; this pass only writes news
+    // incidents under topic=data_centres.
+    const dataCentres = await runIncidentIngest("data_centres", () =>
+      runDataCentresIngest({ commit: true }),
+    );
     // War / armed conflict / insurgency / armed crime — a SEPARATE topic from
     // flashpoint (which stays activism / protests / strikes / civil disorder).
     const conflict = await runIncidentIngest("conflict", () =>
@@ -896,6 +905,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       energy,
       fertiliser,
       fuel,
+      dataCentres,
       conflict,
       indonesiaLocal,
       apacLocal,

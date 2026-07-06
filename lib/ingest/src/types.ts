@@ -5,6 +5,7 @@ export type IngestTopic =
   | "energy"
   | "fertiliser"
   | "fuel"
+  | "data_centres"
   | "conflict"
   | "indonesia_local"
   | "apac_local";

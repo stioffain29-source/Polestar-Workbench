@@ -2598,6 +2598,160 @@ export const AppendSpotReportExportResponse = zod.object({
 })
 
 
+export const ListDataCentreFacilitiesQueryParams = zod.object({
+  "country": zod.coerce.string().optional(),
+  "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']).optional()
+})
+
+export const ListDataCentreFacilitiesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "operator": zod.string().nullish(),
+  "country": zod.string(),
+  "region": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']),
+  "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']),
+  "capacityMw": zod.number().nullish(),
+  "itLoadMw": zod.number().nullish(),
+  "announcedDate": zod.coerce.date().nullish(),
+  "expectedOnlineDate": zod.coerce.date().nullish(),
+  "commissionedDate": zod.coerce.date().nullish(),
+  "notes": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "linkedIncidentId": zod.number().nullish(),
+  "statusChanged": zod.boolean(),
+  "previousStatus": zod.string().nullish(),
+  "statusChangedAt": zod.coerce.date().nullish(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListDataCentreFacilitiesResponse = zod.array(ListDataCentreFacilitiesResponseItem)
+
+
+
+
+
+
+export const CreateDataCentreFacilityBody = zod.object({
+  "name": zod.string().min(1),
+  "operator": zod.string().optional(),
+  "country": zod.string().min(1),
+  "region": zod.string().optional(),
+  "city": zod.string().optional(),
+  "latitude": zod.number().optional(),
+  "longitude": zod.number().optional(),
+  "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']).optional(),
+  "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']).optional(),
+  "capacityMw": zod.number().optional(),
+  "itLoadMw": zod.number().optional(),
+  "announcedDate": zod.coerce.date().optional(),
+  "expectedOnlineDate": zod.coerce.date().optional(),
+  "commissionedDate": zod.coerce.date().optional(),
+  "notes": zod.string().optional(),
+  "sourceUrl": zod.string().optional(),
+  "linkedIncidentId": zod.number().optional(),
+  "createdBy": zod.string().optional()
+})
+
+
+export const GetDataCentreFacilityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDataCentreFacilityResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "operator": zod.string().nullish(),
+  "country": zod.string(),
+  "region": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']),
+  "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']),
+  "capacityMw": zod.number().nullish(),
+  "itLoadMw": zod.number().nullish(),
+  "announcedDate": zod.coerce.date().nullish(),
+  "expectedOnlineDate": zod.coerce.date().nullish(),
+  "commissionedDate": zod.coerce.date().nullish(),
+  "notes": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "linkedIncidentId": zod.number().nullish(),
+  "statusChanged": zod.boolean(),
+  "previousStatus": zod.string().nullish(),
+  "statusChangedAt": zod.coerce.date().nullish(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const UpdateDataCentreFacilityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const UpdateDataCentreFacilityBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "operator": zod.string().nullish(),
+  "country": zod.string().min(1).optional(),
+  "region": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']).optional(),
+  "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']).optional(),
+  "capacityMw": zod.number().nullish(),
+  "itLoadMw": zod.number().nullish(),
+  "announcedDate": zod.coerce.date().nullish(),
+  "expectedOnlineDate": zod.coerce.date().nullish(),
+  "commissionedDate": zod.coerce.date().nullish(),
+  "notes": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "linkedIncidentId": zod.number().nullish(),
+  "createdBy": zod.string().optional()
+})
+
+export const UpdateDataCentreFacilityResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "operator": zod.string().nullish(),
+  "country": zod.string(),
+  "region": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']),
+  "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']),
+  "capacityMw": zod.number().nullish(),
+  "itLoadMw": zod.number().nullish(),
+  "announcedDate": zod.coerce.date().nullish(),
+  "expectedOnlineDate": zod.coerce.date().nullish(),
+  "commissionedDate": zod.coerce.date().nullish(),
+  "notes": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "linkedIncidentId": zod.number().nullish(),
+  "statusChanged": zod.boolean(),
+  "previousStatus": zod.string().nullish(),
+  "statusChangedAt": zod.coerce.date().nullish(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const DeleteDataCentreFacilityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const ListCardDraftsResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
