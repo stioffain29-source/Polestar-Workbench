@@ -59,6 +59,22 @@ export { loadDevEnv } from "./loadDevEnv";
 export { runResolveGoogleNewsUrls, resolveGoogleNewsUrl, isGoogleNewsRedirect } from "./googleNewsUrl";
 export type { ResolveUrlSummary } from "./googleNewsUrl";
 export {
+  runOsmFacilityRegistryImport,
+  normaliseOsmElement,
+  buildOverpassQuery,
+  osmElementUrl,
+  dedupeBySourceUrl,
+  findProximityWarnings,
+  OSM_DC_COUNTRIES,
+} from "./osmDataCentres";
+export type {
+  OsmImportSummary,
+  OsmImportOptions,
+  OsmCountryResult,
+  NormalisedFacility,
+  NormaliseResult,
+} from "./osmDataCentres";
+export {
   runReliefWebCorroboration,
   isReliefWebConfigured,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
