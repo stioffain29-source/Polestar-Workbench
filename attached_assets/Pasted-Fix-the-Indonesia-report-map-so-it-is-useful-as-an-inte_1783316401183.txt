@@ -1,0 +1,48 @@
+Fix the Indonesia report map so it is useful as an intelligence map, not just numbered dots.
+
+Current problem:
+The map uses red numbered markers, but the numbers do not explain anything on the map itself. The reader has to look elsewhere to understand what each marker means. This is not good enough for a customer-facing Polestar report.
+
+Required change:
+Replace the numbered marker approach with labelled risk-area callouts on or beside the map.
+
+Use these labels:
+
+1. Greater Jakarta & West Java — High
+   Fire, protest, regulatory and business continuity exposure
+
+2. Central & East Java — High
+   Fire, industrial disruption and movement risk
+
+3. Sumatra — High
+   Resource, transport and local disruption exposure
+
+4. Kalimantan / Borneo — High
+   Operational, access and site continuity risk
+
+5. Sulawesi — High
+   Localised disruption and security monitoring area
+
+6. Bali, Nusa Tenggara & Maluku — High
+   Tourism, logistics and access disruption exposure
+
+Map design requirements:
+- Do not use red numbered dots on their own.
+- Each map marker must either be directly labelled or connected to a readable callout.
+- Keep labels short and readable.
+- Use Polestar styling: clean white background, navy text, electric blue accent lines, severity colour only where needed.
+- If the map becomes crowded, place callout cards around the map with thin connector lines to the locations.
+- The reader must understand the risk areas without needing a separate numbered legend.
+
+Add a short “Map Read” box directly below the map:
+
+Map Read:
+Indonesia’s current risk picture is not concentrated in one city. The watch areas stretch from Greater Jakarta and Java through Sumatra, Kalimantan, Sulawesi and eastern island groups. The main business exposure is localised disruption to movement, site access, utilities, regulatory activity and business continuity rather than a single national crisis.
+
+Acceptance criteria:
+- No standalone numbered dots.
+- Every plotted location has a visible label or callout.
+- The map can be understood without cross-referencing a legend.
+- The Map Read box appears below the map.
+- PDF export and preview must both show the same labelled map.
+- Do not change unrelated report sections.

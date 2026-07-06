@@ -33,6 +33,8 @@ const SEV_RANK: Record<string, number> = {
 
 const POLAR = "#e2e2e2";
 const DUSK = "#363636";
+const NAVY = "#0B0B3D";
+const ELECTRIC = "#4655FF";
 
 export interface CountryReportMapProps {
   incidents: CountryFastFactsIncident[];
@@ -95,6 +97,13 @@ interface RiskZoneDef {
   // stable 1–6 order; other theatres leave it unset and keep the active-only
   // (count>0) behaviour, so their maps are unchanged.
   alwaysShow?: boolean;
+  // Indonesia standing-map only: a short label drawn DIRECTLY on the map beside
+  // the marker (falls back to `name`), and which side of the marker it sits on.
+  // The six macro-region labels are anchored so the tight Java-cluster pills fan
+  // apart and never overlap on the fixed-zoom Indonesia view. Other theatres
+  // leave these unset and render no on-map label.
+  mapLabel?: string;
+  labelAnchor?: "left" | "right" | "top" | "bottom";
 }
 
 // Indonesian Papua (West Papua) risk zones, in display order. Shared by the
@@ -197,14 +206,25 @@ const PAPUA_ZONES: RiskZoneDef[] = [
   },
 ];
 
-// National Indonesia risk zones, mirroring the six regional buckets the
-// Indonesia operating-risk brief groups incidents into (Papua is routed to the
-// dedicated West Papua brief upstream, so it has no zone here). Province names
-// and major city names are the place keywords; "java" alone is deliberately
-// absent so West Java and Central/East Java never collide.
-const INDONESIA_ZONES: RiskZoneDef[] = [
+// National Indonesia risk zones — the six macro-regions the Indonesia
+// operating-risk brief groups incidents into (Papua is routed to the dedicated
+// West Papua brief upstream, so it has no zone here). Province names and major
+// city names are the place keywords; "java" alone is deliberately absent so West
+// Java and Central/East Java never collide.
+//
+// For Indonesia these are rendered as a POLESTAR-ASSESSED STANDING risk-area
+// overlay: all six ALWAYS show, each is fixed at High (the owner's standing
+// assessment, not this period's data), each carries a short description shown in
+// a callout card, and each carries a short on-map label (mapLabel) anchored so
+// the Java cluster never overlaps. The standing High is applied purely at the
+// render layer (keyed on the Indonesia flag), so aggregateZones is unchanged.
+export const INDONESIA_ZONES: RiskZoneDef[] = [
   {
     name: "Greater Jakarta & West Java",
+    description: "Fire, protest, regulatory and business continuity exposure",
+    mapLabel: "Jakarta & W. Java",
+    labelAnchor: "left",
+    alwaysShow: true,
     center: [-6.5, 107.2],
     places: [
       "jakarta", "dki jakarta", "jabodetabek", "bekasi", "depok",
@@ -215,6 +235,10 @@ const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Central & East Java",
+    description: "Fire, industrial disruption and movement risk",
+    mapLabel: "C. & E. Java",
+    labelAnchor: "bottom",
+    alwaysShow: true,
     center: [-7.5, 111.6],
     places: [
       "central java", "jawa tengah", "semarang", "solo", "surakarta",
@@ -225,6 +249,10 @@ const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Sumatra",
+    description: "Resource, transport and local disruption exposure",
+    mapLabel: "Sumatra",
+    labelAnchor: "right",
+    alwaysShow: true,
     center: [-0.5, 101.5],
     places: [
       "sumatra", "sumatera", "medan", "north sumatra", "west sumatra",
@@ -234,7 +262,11 @@ const INDONESIA_ZONES: RiskZoneDef[] = [
     ],
   },
   {
-    name: "Kalimantan (Borneo)",
+    name: "Kalimantan / Borneo",
+    description: "Operational, access and site continuity risk",
+    mapLabel: "Kalimantan",
+    labelAnchor: "top",
+    alwaysShow: true,
     center: [0.0, 114.0],
     places: [
       "kalimantan", "borneo", "pontianak", "banjarmasin", "balikpapan",
@@ -243,6 +275,10 @@ const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Sulawesi",
+    description: "Localised disruption and security monitoring area",
+    mapLabel: "Sulawesi",
+    labelAnchor: "left",
+    alwaysShow: true,
     center: [-2.0, 120.5],
     places: [
       "sulawesi", "makassar", "manado", "palu", "kendari", "gorontalo",
@@ -251,6 +287,10 @@ const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Bali, Nusa Tenggara & Maluku",
+    description: "Tourism, logistics and access disruption exposure",
+    mapLabel: "Bali–NT–Maluku",
+    labelAnchor: "left",
+    alwaysShow: true,
     center: [-7.5, 119.5],
     places: [
       "bali", "denpasar", "nusa tenggara", "lombok", "mataram", "kupang",
@@ -488,11 +528,22 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const basemapStyleRef = useRef<"jakarta" | "standard" | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const dotsRef = useRef<Array<{ el: HTMLElement; lat: number; lng: number; half: number }>>([]);
+  const dotsRef = useRef<
+    Array<{
+      el: HTMLElement;
+      lat: number;
+      lng: number;
+      half: number;
+      // Custom placement, used by the Indonesia on-map label pills, which sit
+      // BESIDE (not centred on) their marker. When unset the element is centred.
+      place?: (p: L.Point, el: HTMLElement) => void;
+    }>
+  >([]);
 
   const zonesDef = resolveRiskZones(countryName);
   const zoneMode = zonesDef !== null;
   const isJakarta = (countryName ?? "").trim().toLowerCase() === "jakarta";
+  const isIndonesia = (countryName ?? "").trim().toLowerCase() === "indonesia";
 
   // A record is plotted as a PRECISE marker only when it carries a coordinate
   // AND the title/location text shows we actually know where it happened below
@@ -583,6 +634,10 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     const positionDots = () => {
       for (const d of dotsRef.current) {
         const p = map.latLngToContainerPoint([d.lat, d.lng]);
+        if (d.place) {
+          d.place(p, d.el);
+          continue;
+        }
         d.el.style.left = `${p.x - d.half}px`;
         d.el.style.top = `${p.y - d.half}px`;
       }
@@ -605,10 +660,16 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       const latLngs: L.LatLngExpression[] = [];
       for (const z of active) {
         const [lat, lng] = z.def.center;
-        // Zero-count alwaysShow zones (worstKey "") draw a soft neutral marker —
-        // a deliberate "monitored, no incidents this period" chip, not the
-        // alarming mid-grey that reads as missing/broken data (spec §6).
-        const color = z.count > 0 ? (SEV_COLOR[z.worstKey] ?? "#999999") : "#CED3DB";
+        // Indonesia is a standing risk-area overlay: every macro-region is fixed
+        // at High (the owner's standing assessment), never data-derived. Other
+        // zone maps (Papua) keep the data-driven colour; their zero-count
+        // alwaysShow zones draw a soft neutral marker rather than the alarming
+        // mid-grey that reads as missing/broken data (spec §6).
+        const color = isIndonesia
+          ? SEV_COLOR.high
+          : z.count > 0
+            ? SEV_COLOR[z.worstKey] ?? "#999999"
+            : "#CED3DB";
         const size = 28;
         const half = size / 2;
 
@@ -625,8 +686,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.alignItems = "center";
         marker.style.justifyContent = "center";
         // Dark numeral on the soft neutral zero-count chip stays readable; white
-        // numeral on the saturated severity colours.
-        marker.style.color = z.count > 0 ? "#ffffff" : "#36404f";
+        // numeral on the saturated severity colours (Indonesia is always High).
+        marker.style.color = isIndonesia || z.count > 0 ? "#ffffff" : "#36404f";
         marker.style.fontFamily = "Roboto, sans-serif";
         marker.style.fontWeight = "700";
         marker.style.fontSize = "13px";
@@ -636,17 +697,72 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.paddingBottom = "2px";
         marker.style.pointerEvents = "auto";
         marker.textContent = String(z.number);
-        marker.title =
-          z.count > 0
+        marker.title = isIndonesia
+          ? `${z.number}. ${z.def.name} — High`
+          : z.count > 0
             ? `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey}`
             : `${z.number}. ${z.def.name} — no records this period`;
 
         overlay.appendChild(marker);
         dotsRef.current.push({ el: marker, lat, lng, half });
         latLngs.push([lat, lng]);
+
+        // Indonesia standing map: attach a short name-label pill DIRECTLY beside
+        // the marker so the map is self-explanatory (no bare numbered dots). The
+        // pill is a plain white <div> (navy text, Polar border) — html2canvas-safe,
+        // so screen == in-app PDF. Its side is fixed per zone (labelAnchor) so the
+        // Java-cluster labels fan apart and never overlap on the fixed-zoom view.
+        if (isIndonesia) {
+          const anchor = z.def.labelAnchor ?? "right";
+          const gap = 6;
+          const label = document.createElement("div");
+          label.style.position = "absolute";
+          label.style.background = "#ffffff";
+          label.style.color = NAVY;
+          label.style.border = `1px solid ${POLAR}`;
+          label.style.borderRadius = "2px";
+          label.style.padding = "1px 5px";
+          label.style.fontFamily = "Roboto, sans-serif";
+          label.style.fontSize = "10.5px";
+          label.style.fontWeight = "600";
+          label.style.lineHeight = "1.3";
+          label.style.whiteSpace = "nowrap";
+          label.style.pointerEvents = "none";
+          label.style.boxSizing = "border-box";
+          label.textContent = z.def.mapLabel ?? z.def.name;
+          overlay.appendChild(label);
+          dotsRef.current.push({
+            el: label,
+            lat,
+            lng,
+            half,
+            place: (p, el) => {
+              const w = el.offsetWidth;
+              const h = el.offsetHeight;
+              let left = p.x + half + gap;
+              let top = p.y - h / 2;
+              if (anchor === "left") {
+                left = p.x - half - gap - w;
+              } else if (anchor === "top") {
+                left = p.x - w / 2;
+                top = p.y - half - gap - h;
+              } else if (anchor === "bottom") {
+                left = p.x - w / 2;
+                top = p.y + half + gap;
+              }
+              el.style.left = `${left}px`;
+              el.style.top = `${top}px`;
+            },
+          });
+        }
       }
 
-      if (latLngs.length === 1) {
+      if (isIndonesia) {
+        // Fixed view so the six macro-region markers land at deterministic pixel
+        // offsets — the on-map label anchors are tuned to this scale so the
+        // Java-cluster pills never overlap regardless of container width.
+        map.setView([-3.5, 111], 5);
+      } else if (latLngs.length === 1) {
         map.setView(latLngs[0] as L.LatLngTuple, 6);
       } else {
         map.fitBounds(L.latLngBounds(latLngs), { padding: [36, 36], maxZoom: 7 });
@@ -792,20 +908,158 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   // ---- AREA-RISK legend ------------------------------------------------
   if (zoneMode) {
     const active = zoneAgg.active;
+    const mapContainer = (
+      <div
+        id={domId}
+        ref={containerRef}
+        style={{
+          height: 360,
+          width: "100%",
+          position: "relative",
+          border: `1px solid ${POLAR}`,
+          borderRadius: 2,
+          background: "#fafafa",
+        }}
+      />
+    );
+
+    // Indonesia: a Polestar-assessed STANDING risk-area overlay. Six macro-region
+    // callout cards (each fixed at High, with its description) plus a "Map Read"
+    // box, rendered in the JSX body so they appear identically on screen and in
+    // the rasterised in-app PDF. The on-map markers each carry a short name label
+    // (built in the marker effect above), so the map reads without a legend.
+    if (isIndonesia) {
+      return (
+        <div>
+          {mapContainer}
+          <div
+            className="mt-3"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: 8,
+            }}
+          >
+            {active.map((z) => (
+              <div
+                key={z.def.name}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  background: "#ffffff",
+                  border: `1px solid ${POLAR}`,
+                  borderLeft: `3px solid ${ELECTRIC}`,
+                  borderRadius: 2,
+                  padding: "8px 10px",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flex: "0 0 auto",
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: SEV_COLOR.high,
+                    color: "#fff",
+                    fontFamily: "Roboto, sans-serif",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    marginTop: 1,
+                  }}
+                >
+                  {z.number}
+                </span>
+                <div style={{ fontFamily: "Roboto, sans-serif", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: NAVY }}>
+                      {z.def.name}
+                    </span>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: SEV_COLOR.high,
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        padding: "2px 6px",
+                        borderRadius: 2,
+                      }}
+                    >
+                      High
+                    </span>
+                  </div>
+                  {z.def.description ? (
+                    <div style={{ fontSize: 11.5, color: DUSK, marginTop: 3 }}>
+                      {z.def.description}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            className="mt-3"
+            style={{
+              background: "#ffffff",
+              border: `1px solid ${POLAR}`,
+              borderLeft: `3px solid ${ELECTRIC}`,
+              borderRadius: 2,
+              padding: "10px 12px",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontSize: 12,
+                fontWeight: 700,
+                color: NAVY,
+                marginBottom: 4,
+              }}
+            >
+              Map Read
+            </div>
+            <div
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontSize: 12,
+                color: DUSK,
+                lineHeight: 1.5,
+              }}
+            >
+              Indonesia’s current risk picture is not concentrated in one city. The watch areas
+              stretch from Greater Jakarta and Java through Sumatra, Kalimantan, Sulawesi and
+              eastern island groups. The main business exposure is localised disruption to
+              movement, site access, utilities, regulatory activity and business continuity rather
+              than a single national crisis.
+            </div>
+          </div>
+
+          <div
+            style={{
+              fontFamily: "Roboto, sans-serif",
+              fontSize: 11,
+              color: DUSK,
+              marginTop: 8,
+              fontStyle: "italic",
+            }}
+          >
+            Markers show Polestar-assessed standing risk areas; all six are currently rated High.
+            Each area is labelled on the map and summarised in the cards above.
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div>
-        <div
-          id={domId}
-          ref={containerRef}
-          style={{
-            height: 360,
-            width: "100%",
-            position: "relative",
-            border: `1px solid ${POLAR}`,
-            borderRadius: 2,
-            background: "#fafafa",
-          }}
-        />
+        {mapContainer}
         {active.length > 0 ? (
           <>
             {/* Numbered risk-zone legend: "n. Zone — Severity". The
