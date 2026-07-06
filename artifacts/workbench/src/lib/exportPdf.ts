@@ -177,6 +177,13 @@ function applySeverityBadgeExportLayout(root: HTMLElement): void {
     );
   });
 
+  // Operational-map posture markers keep their numeral dead-centre on screen
+  // (symmetric flex). html2canvas renders text a touch low, so re-add the small
+  // bottom pad ONLY in the export clone so screen and PDF still agree.
+  root.querySelectorAll<HTMLElement>("[data-map-numeral]").forEach((node) => {
+    node.style.paddingBottom = "2px";
+  });
+
   const labels = new Set(["EXTREME", "HIGH", "MODERATE", "LOW", "INSIGNIFICANT"]);
   root.querySelectorAll<HTMLElement>("span").forEach((node) => {
     const label = (node.textContent ?? "").trim().toUpperCase();

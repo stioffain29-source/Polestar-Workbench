@@ -36,6 +36,13 @@ not painted geography. Do NOT re-introduce a standing overlay for any country.
   `MapReadNote`) live in the render BODY and feed BOTH modes, so screen == in-app
   PDF (DOM-rasterise) and the two modes never drift. No `RELEVANCE_RULE_VERSION`
   bump (display-only).
+- On-map MARKERS are TRANSLUCENT (owner rejected the solid dark-blue discs):
+  fill `withAlpha(POSTURE_COLOR, 0.35)`, solid same-hue 2px ring, solid same-hue
+  numeral. The legend dots / card left-borders / posture chips stay SOLID
+  `POSTURE_COLOR` (crisp key + labels). Numerals centre on screen via symmetric
+  flex + `line-height:1` (NO on-screen bottom pad — that made them read high);
+  the html2canvas export re-adds the 2px bottom pad ONLY in the clone, keyed off
+  `data-map-numeral` in `exportPdf.applySeverityBadgeExportLayout`, so screen==PDF.
 - Verify via `renderToStaticMarkup` tests (owner-gated app → no live screenshots):
   `operationalPinchPoints.test.ts`, `indonesiaRiskAreaMap.test.tsx`,
   `countryMapLegendNoCounts.test.tsx`; `jakartaMapZones.test.ts` pins the

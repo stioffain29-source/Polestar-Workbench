@@ -65,6 +65,18 @@ function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: numbe
   return COUNTRY_VIEW[key] ?? null;
 }
 
+// Translucent fill from a solid posture hex, so the on-map markers read as light
+// coloured bubbles (owner preference) rather than heavy solid discs, while the
+// solid hue is kept for the crisp ring and numeral.
+function withAlpha(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return hex;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // ---------------------------------------------------------------------------
 // Area-risk ("numbered callout") zones.
 //
@@ -906,20 +918,22 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.width = `${size}px`;
         marker.style.height = `${size}px`;
         marker.style.borderRadius = "50%";
-        marker.style.background = color;
-        marker.style.border = "2px solid #ffffff";
+        marker.style.background = withAlpha(color, 0.35);
+        marker.style.border = `2px solid ${color}`;
         marker.style.boxSizing = "border-box";
         marker.style.display = "flex";
         marker.style.alignItems = "center";
         marker.style.justifyContent = "center";
-        marker.style.color = "#ffffff";
+        marker.style.color = color;
         marker.style.fontFamily = "Roboto, sans-serif";
         marker.style.fontWeight = "700";
         marker.style.fontSize = "13px";
         marker.style.lineHeight = "1";
-        // html2canvas renders text slightly low; a small bottom pad re-centres
-        // the numeral in the exported PDF without shifting it on screen much.
-        marker.style.paddingBottom = "2px";
+        // Centred on screen via flex + line-height:1. html2canvas renders text a
+        // touch low, so the export clone re-adds a small bottom pad on
+        // [data-map-numeral]; on screen we keep it symmetric so the numeral sits
+        // dead-centre.
+        marker.dataset.mapNumeral = "true";
         marker.style.pointerEvents = "auto";
         marker.textContent = String(z.number);
         marker.title = `${z.number}. ${z.def.name} — ${posture}`;
@@ -977,8 +991,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       dot.style.width = `${size}px`;
       dot.style.height = `${size}px`;
       dot.style.borderRadius = "50%";
-      dot.style.background = color;
-      dot.style.border = "2px solid #ffffff";
+      dot.style.background = withAlpha(color, 0.35);
+      dot.style.border = `2px solid ${color}`;
       dot.style.boxSizing = "border-box";
       // The overlay is pointer-events:none; re-enable on the dot so the native
       // hover tooltip (dot.title) listing the incidents at this point fires.
@@ -987,14 +1001,14 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         dot.style.display = "flex";
         dot.style.alignItems = "center";
         dot.style.justifyContent = "center";
-        dot.style.color = "#ffffff";
+        dot.style.color = color;
         dot.style.fontFamily = "Roboto, sans-serif";
         dot.style.fontWeight = "700";
         dot.style.fontSize = "11px";
         dot.style.lineHeight = "1";
-        // html2canvas renders text slightly low; a small bottom pad re-centres
-        // the numeral in the exported PDF without shifting it on screen much.
-        dot.style.paddingBottom = "2px";
+        // Centred on screen (flex + line-height:1); the export clone re-adds a
+        // small bottom pad on [data-map-numeral] to counter html2canvas.
+        dot.dataset.mapNumeral = "true";
         dot.textContent = String(g.count);
       }
 
