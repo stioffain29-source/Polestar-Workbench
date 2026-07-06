@@ -1,0 +1,89 @@
+Apply this operational map logic across all Polestar country reports.
+
+This is a global reporting rule, not an Indonesia only fix.
+
+Country report maps must not show generic standing risk, assumed congestion, assumed protest exposure, assumed port disruption, assumed airport disruption, assumed crime risk or fixed weekly locations unless the current reporting supports it.
+
+Core rule:
+Only map locations where the current reporting window contains a specific operationally relevant issue.
+
+A location may be mapped only if there is a reported event, disruption, crime incident, protest, fire, regulatory action, transport issue, access issue, industrial action, utility disruption, security incident or other development in that exact area during the reporting period.
+
+Do not infer:
+
+* Port congestion unless there is current reporting of port congestion, gate delay, port access disruption, labour disruption, cargo movement impact or port related road disruption.
+* Airport disruption unless there is current reporting of flight disruption, airport access disruption, protest activity, road closure, security incident or access restriction affecting the airport route.
+* CBD disruption unless there is current reporting of protests, police activity, road closures, access restrictions, major event disruption or security incidents in that area.
+* Crime exposure unless there is a specific crime incident in that location during the reporting window.
+* Government district exposure unless there is current reporting of protest activity, policing, road closure, access control or security activity affecting that district.
+* Industrial disruption unless there is current reporting of fire, explosion, labour action, regulatory action, outage, plant disruption or access issue.
+
+One incident does not automatically make an area High or Primary.
+
+Assessment logic:
+Each mapped location must be assessed using both:
+
+1. Frequency
+   How many relevant events occurred in that location or area during the reporting window?
+
+2. Business impact
+   What could those events realistically do to business operations, such as movement, site access, staff safety, logistics, utilities, regulatory compliance, production, warehousing, customer delivery or continuity?
+
+Posture must be based on frequency plus business impact, not on the presence of a single event or the importance of the location.
+
+Use this posture model:
+
+Primary operational pinch point:
+Multiple relevant reports in the same area, or one event with clear direct business impact.
+
+Secondary operational pinch point:
+One or more reports with plausible but limited business impact.
+
+Watch item:
+Low frequency reporting with limited current impact, included only because it is operationally relevant.
+
+Do not map:
+
+* Generic business districts with no current reporting.
+* Ports with no reported port issue.
+* Airports or airport corridors with no reported airport or route issue.
+* Roads with no reported disruption.
+* Government districts with no current protest, policing or access issue.
+* Crime areas with no current crime incident.
+* Standing risk locations that appear every week by default.
+
+Map output requirements:
+The map must change week by week based on the reporting. It should not repeat the same standing locations unless the current reporting supports those locations.
+
+Every marker must answer:
+
+* What happened here?
+* Why does it matter operationally?
+* What should a business user do about it?
+
+Marker card format:
+Location
+Reported issue this period
+Business relevance
+Posture: Primary / Secondary / Watch
+
+Replace any “risk map” wording with:
+Operational Map
+Reported operational pinch points for this period
+
+Use this standard map note:
+
+Map Read:
+This map shows reported operational pinch points for the current reporting period. Locations are included only where reporting indicates a relevant event, issue or disruption. Posture is based on likely business impact combined with reporting frequency, not standing background risk.
+
+Acceptance criteria:
+
+* Applies to all country reports.
+* The map must not look the same every week unless reporting supports it.
+* Every marker must be linked to a current reporting item.
+* No location is shown purely because it is generally important.
+* No port, airport, CBD, government district or road corridor is flagged without current reporting.
+* One isolated low impact incident must not create a High or Primary rating.
+* Map labels, cards and narrative must match.
+* Preview and PDF export must show the same map and labels.
+* Do not change unrelated report sections.

@@ -1,63 +1,105 @@
 /**
  * @jest-environment jsdom
  *
- * The Indonesia Country report replaces bare numbered dots with a Polestar
- * STANDING risk-area overlay: six fixed macro-regions (1–6), every one rated
- * High, each labelled on the map, summarised in a callout card, and read out in
- * a "Map Read" box below. The standing High is applied at the render layer only,
- * so `aggregateZones` still returns the six zones from an EMPTY incident set.
+ * Country-report maps are REPORTING-DRIVEN, not standing overlays: a location is
+ * mapped ONLY where the current reporting window carries a specific relevant
+ * event. Indonesia therefore no longer paints six fixed "standing High" macro
+ * regions — with an empty window it shows the empty-state note, and with a
+ * reported event it renders one Operational-Map pinch-point card per area that
+ * was actually reported this period.
  *
  * The app is owner-gated, so there are no live screenshots: `renderToStaticMarkup`
- * exercises the reader-facing render body (cards + Map Read), the same DOM the
- * in-app "Download PDF" rasterises, so screen == PDF by construction.
+ * exercises the reader-facing render body (heading, cards, Map Read note), the
+ * same DOM the in-app "Download PDF" rasterises, so screen == PDF by construction.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import CountryReportMap, {
   aggregateZones,
   INDONESIA_ZONES,
 } from "../../artifacts/workbench/src/components/CountryReportMap";
+import type { CountryFastFactsIncident } from "../../artifacts/workbench/src/lib/countryFastFacts";
 
 // renderToStaticMarkup escapes "&" to "&amp;" in text content.
 const esc = (s: string) => s.replace(/&/g, "&amp;");
 
-describe("Indonesia standing risk-area map", () => {
-  it("keeps the six fixed regions numbered 1–6 with an empty incident set", () => {
+function incident(
+  fields: Partial<CountryFastFactsIncident>,
+): CountryFastFactsIncident {
+  return {
+    topic: "flashpoint",
+    title: "Untitled",
+    severity: "low",
+    occurredAt: "2026-07-05T00:00:00.000Z",
+    ...fields,
+  };
+}
+
+describe("Indonesia operational (reporting-driven) map", () => {
+  it("returns NO active zones for an empty window (no standing overlay)", () => {
+    // The old contract fixed six always-shown High regions; reporting-driven maps
+    // must have nothing to plot when nothing was reported.
     const { active } = aggregateZones([], INDONESIA_ZONES);
-    expect(active).toHaveLength(6);
-    expect(active.map((z) => z.number)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(active.map((z) => z.def.name)).toEqual([
-      "Greater Jakarta & West Java",
-      "Central & East Java",
-      "Sumatra",
-      "Kalimantan / Borneo",
-      "Sulawesi",
-      "Bali, Nusa Tenggara & Maluku",
-    ]);
+    expect(active).toHaveLength(0);
   });
 
-  it("renders a High callout card with description for every region", () => {
+  it("shows the Operational Map header and empty-state note with no reporting", () => {
     const markup = renderToStaticMarkup(
       <CountryReportMap domId="idn" countryName="Indonesia" incidents={[]} />,
     );
-    for (const z of INDONESIA_ZONES) {
-      expect(markup).toContain(esc(z.name));
-      expect(markup).toContain(esc(z.description ?? ""));
-    }
-    // Six ">High<" chips, one per callout card.
-    const highChips = (markup.match(/>High</g) ?? []).length;
-    expect(highChips).toBeGreaterThanOrEqual(6);
-    // Electric-blue left rule brands the cards + Map Read box.
-    expect(markup).toContain("#4655FF");
-    // Map Read prose, exactly as supplied.
+    expect(markup).toContain("Operational Map");
+    expect(markup).toContain("Reported operational pinch points for this period");
+    expect(markup).toContain("No reported operational pinch point resolved to a mapped area this period");
+    // Map Read note is now on EVERY country map, and disclaims standing risk.
     expect(markup).toContain("Map Read");
-    expect(markup).toContain("current risk picture is not concentrated in one city");
-    expect(markup).toContain("single national crisis");
+    expect(markup).toContain("not standing background risk");
+    // No fixed "standing High" chips survive.
+    expect(markup).not.toContain(">High<");
+    expect(markup).not.toContain("standing risk areas");
   });
 
-  it("does not attach the Map Read box to other countries", () => {
+  it("renders a pinch-point card for the area actually reported this period", () => {
     const markup = renderToStaticMarkup(
-      <CountryReportMap domId="mys" countryName="Malaysia" incidents={[]} />,
+      <CountryReportMap
+        domId="idn"
+        countryName="Indonesia"
+        incidents={[
+          incident({
+            location: "Jakarta",
+            severity: "high",
+            title: "Fire at Jakarta warehouse",
+          }),
+        ]}
+      />,
     );
-    expect(markup).not.toContain("Map Read");
+    // Card names the reported area, the reported issue, business relevance and posture.
+    expect(markup).toContain(esc("Greater Jakarta & West Java"));
+    expect(markup).toContain("Reported issue this period:");
+    expect(markup).toContain("Fire at Jakarta warehouse");
+    expect(markup).toContain("Business relevance:");
+    expect(markup).toContain("Site, asset and business-continuity exposure");
+    // A single high-severity report is Primary posture.
+    expect(markup).toContain("Posture: Primary");
+    // Areas with NO reporting this period are absent (not painted).
+    expect(markup).not.toContain("Sumatra");
+    expect(markup).not.toContain(esc("Kalimantan / Borneo"));
+  });
+
+  it("grades posture down for a single low-severity report (Watch)", () => {
+    const markup = renderToStaticMarkup(
+      <CountryReportMap
+        domId="idn"
+        countryName="Indonesia"
+        incidents={[
+          incident({
+            location: "Medan",
+            severity: "low",
+            title: "Minor road protest clears in Medan",
+          }),
+        ]}
+      />,
+    );
+    expect(markup).toContain("Sumatra");
+    expect(markup).toContain("Posture: Watch");
+    expect(markup).not.toContain("Posture: Primary");
   });
 });

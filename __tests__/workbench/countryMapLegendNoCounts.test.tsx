@@ -1,19 +1,18 @@
 /**
  * @jest-environment jsdom
  *
- * The Indonesia Country-report map is a Polestar-assessed STANDING risk-area
- * overlay: six fixed macro-regions, every one rated High, each labelled on the
- * map, summarised in a callout card, and read out in a "Map Read" box beneath.
- * Raw per-zone record tallies ("High (273)") are internal dashboard figures that
- * mean nothing to a report reader, so they must NOT appear. The severity label
- * ("High") itself stays.
+ * The country-report Operational Map is REPORTING-DRIVEN: it plots a location
+ * only where the current window carries a specific reported event, and reads it
+ * out as a pinch-point card (Location / Reported issue / Business relevance /
+ * Posture). Raw per-zone record tallies ("High (273)") are internal dashboard
+ * figures that mean nothing to a report reader, so they must NOT appear — and the
+ * map now carries no severity chips at all, only a posture rating.
  *
- * `renderToStaticMarkup` runs the component's render body (where the callout
- * cards, Map Read box and caption JSX live) but not its `useEffect` — so the
- * Leaflet map never mounts, yet the reader-facing markup is produced for
- * assertion. This is the owner-gated-safe substitute for a live screenshot: the
- * map + on-map labels are rasterised into the PDF as an image, so `pdftotext`
- * cannot see them.
+ * `renderToStaticMarkup` runs the component's render body (where the cards, Map
+ * Read note and caption JSX live) but not its `useEffect` — so the Leaflet map
+ * never mounts, yet the reader-facing markup is produced for assertion. This is
+ * the owner-gated-safe substitute for a live screenshot: the map + on-map markers
+ * are rasterised into the PDF as an image, so `pdftotext` cannot see them.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import CountryReportMap from "../../artifacts/workbench/src/components/CountryReportMap";
@@ -31,9 +30,9 @@ function incident(
   };
 }
 
-describe("CountryReportMap — Indonesia standing risk-area overlay, no reader-facing counts", () => {
+describe("CountryReportMap — Indonesia operational map, no reader-facing counts", () => {
   // One incident lands in the Greater Jakarta & West Java zone (severity High);
-  // one matches no zone. The standing overlay shows all six regions regardless.
+  // one matches no zone (so the unattributed honesty note fires).
   const markup = renderToStaticMarkup(
     <CountryReportMap
       domId="test-map"
@@ -45,39 +44,40 @@ describe("CountryReportMap — Indonesia standing risk-area overlay, no reader-f
     />,
   );
 
-  it("labels each of the six standing regions", () => {
+  it("plots ONLY the area reported this period, as a pinch-point card", () => {
     expect(markup).toContain("Greater Jakarta &amp; West Java");
-    expect(markup).toContain("Central &amp; East Java");
-    expect(markup).toContain("Sumatra");
-    expect(markup).toContain("Kalimantan / Borneo");
-    expect(markup).toContain("Sulawesi");
-    expect(markup).toContain("Bali, Nusa Tenggara &amp; Maluku");
+    // Unreported macro-regions are absent (no standing overlay).
+    expect(markup).not.toContain("Sumatra");
+    expect(markup).not.toContain("Sulawesi");
   });
 
-  it("marks every region High", () => {
-    // Six callout chips (plus any inline caption use) read exactly ">High<".
-    const chipCount = (markup.match(/>High</g) ?? []).length;
-    expect(chipCount).toBeGreaterThanOrEqual(6);
+  it("carries a posture rating and NOT a severity chip", () => {
+    expect(markup).toContain("Posture: Primary");
+    // Severity chips (">High<" etc.) are gone from the operational map.
+    expect(markup).not.toContain(">High<");
   });
 
-  it("does not print a parenthetical record count after the severity", () => {
-    // e.g. "— High (273)". The standing overlay carries no digits-in-parens.
+  it("does not print a parenthetical or bare record count", () => {
     expect(markup).not.toMatch(/(High|Moderate|Low|Extreme|Insignificant)\s*\(\d+\)/);
     expect(markup).not.toMatch(/\(\d+\)/);
   });
 
-  it("carries the standing-risk caption and Map Read box", () => {
-    expect(markup).toContain("standing risk areas");
+  it("keeps the unattributed-records honesty note but prints no raw number", () => {
+    expect(markup).toContain("Some records could not be tied to a specific area");
+    expect(markup).not.toMatch(/\d+\s+records?\s+could not be tied/);
+  });
+
+  it("carries the Operational Map header and reporting-driven Map Read note", () => {
+    expect(markup).toContain("Operational Map");
+    expect(markup).toContain("Reported operational pinch points for this period");
     expect(markup).toContain("Map Read");
-    expect(markup).toContain("current risk picture is not concentrated in one city");
+    expect(markup).toContain("not standing background risk");
   });
 });
 
-describe("CountryReportMap area-risk legend — generic (Papua) zone mode is unchanged", () => {
-  // Papua is a data-driven zone map (no standing overlay). One incident matches
-  // the Jayapura zone (so a zone is active); one matches no zone (so the
-  // unattributed honesty note fires). It must keep that note, carry NO raw
-  // record counts, and NEVER borrow Indonesia's "Map Read" box.
+describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too", () => {
+  // Papua is a data-driven zone map. One incident matches the Jayapura zone (so a
+  // zone is active); one matches no zone (so the unattributed honesty note fires).
   const markup = renderToStaticMarkup(
     <CountryReportMap
       domId="papua-map"
@@ -89,13 +89,22 @@ describe("CountryReportMap area-risk legend — generic (Papua) zone mode is unc
     />,
   );
 
+  it("renders a pinch-point card for the reported area with a posture", () => {
+    expect(markup).toContain("Jayapura");
+    expect(markup).toContain("Reported issue this period:");
+    expect(markup).toContain("Business relevance:");
+    expect(markup).toContain("Posture: Primary");
+  });
+
   it("keeps the unattributed-records honesty note but prints no raw number", () => {
     expect(markup).toContain("Some records could not be tied to a specific area");
     expect(markup).not.toMatch(/\d+\s+records?\s+could not be tied/);
     expect(markup).not.toMatch(/\(\d+\)/);
   });
 
-  it("does not render Indonesia's Map Read box", () => {
-    expect(markup).not.toContain("Map Read");
+  it("carries the same Operational Map header and Map Read note on every country", () => {
+    expect(markup).toContain("Operational Map");
+    expect(markup).toContain("Map Read");
+    expect(markup).toContain("not standing background risk");
   });
 });

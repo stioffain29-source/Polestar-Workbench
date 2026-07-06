@@ -3,14 +3,18 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import { classifyLocationConfidence } from "@/lib/countryLocationConfidence";
-
-const SEV_COLOR: Record<string, string> = {
-  extreme: "#A33232",
-  high: "#C0392B",
-  moderate: "#E67E22",
-  low: "#6FB872",
-  insignificant: "#1B6B7A",
-};
+import { stripWireCruft } from "@/lib/incidentTitle";
+import {
+  postureFor,
+  businessRelevance,
+  worstSeverityKey,
+  POSTURE_COLOR,
+  POSTURE_ORDER,
+  OPERATIONAL_MAP_HEADING,
+  OPERATIONAL_MAP_SUBTITLE,
+  OPERATIONAL_MAP_READ,
+  type Posture,
+} from "@/lib/operationalPinchPoints";
 
 const SEV_LABEL: Record<string, string> = {
   extreme: "Extreme",
@@ -52,6 +56,7 @@ const COUNTRY_VIEW: Record<string, { center: L.LatLngTuple; zoom: number }> = {
   png: { center: [-6.31, 143.96], zoom: 5 },
   papua: { center: [-4.0, 138.0], zoom: 5 },
   "west papua": { center: [-2.5, 138.0], zoom: 5 },
+  indonesia: { center: [-2.5, 118.0], zoom: 4 },
 };
 
 function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: number } | null {
@@ -97,13 +102,6 @@ interface RiskZoneDef {
   // stable 1–6 order; other theatres leave it unset and keep the active-only
   // (count>0) behaviour, so their maps are unchanged.
   alwaysShow?: boolean;
-  // Indonesia standing-map only: a short label drawn DIRECTLY on the map beside
-  // the marker (falls back to `name`), and which side of the marker it sits on.
-  // The six macro-region labels are anchored so the tight Java-cluster pills fan
-  // apart and never overlap on the fixed-zoom Indonesia view. Other theatres
-  // leave these unset and render no on-map label.
-  mapLabel?: string;
-  labelAnchor?: "left" | "right" | "top" | "bottom";
 }
 
 // Indonesian Papua (West Papua) risk zones, in display order. Shared by the
@@ -212,19 +210,14 @@ const PAPUA_ZONES: RiskZoneDef[] = [
 // city names are the place keywords; "java" alone is deliberately absent so West
 // Java and Central/East Java never collide.
 //
-// For Indonesia these are rendered as a POLESTAR-ASSESSED STANDING risk-area
-// overlay: all six ALWAYS show, each is fixed at High (the owner's standing
-// assessment, not this period's data), each carries a short description shown in
-// a callout card, and each carries a short on-map label (mapLabel) anchored so
-// the Java cluster never overlaps. The standing High is applied purely at the
-// render layer (keyed on the Indonesia flag), so aggregateZones is unchanged.
+// These are REPORTING-DRIVEN, like every other country map: a macro-region is
+// only plotted when the current window carries a reported event there, and its
+// posture is derived from that reporting (frequency + business impact), never a
+// standing assessment. No alwaysShow, no standing description, no fixed label —
+// aggregateZones returns only the regions with records this period.
 export const INDONESIA_ZONES: RiskZoneDef[] = [
   {
     name: "Greater Jakarta & West Java",
-    description: "Fire, protest, regulatory and business continuity exposure",
-    mapLabel: "Jakarta & W. Java",
-    labelAnchor: "left",
-    alwaysShow: true,
     center: [-6.5, 107.2],
     places: [
       "jakarta", "dki jakarta", "jabodetabek", "bekasi", "depok",
@@ -235,10 +228,6 @@ export const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Central & East Java",
-    description: "Fire, industrial disruption and movement risk",
-    mapLabel: "C. & E. Java",
-    labelAnchor: "bottom",
-    alwaysShow: true,
     center: [-7.5, 111.6],
     places: [
       "central java", "jawa tengah", "semarang", "solo", "surakarta",
@@ -249,10 +238,6 @@ export const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Sumatra",
-    description: "Resource, transport and local disruption exposure",
-    mapLabel: "Sumatra",
-    labelAnchor: "right",
-    alwaysShow: true,
     center: [-0.5, 101.5],
     places: [
       "sumatra", "sumatera", "medan", "north sumatra", "west sumatra",
@@ -263,10 +248,6 @@ export const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Kalimantan / Borneo",
-    description: "Operational, access and site continuity risk",
-    mapLabel: "Kalimantan",
-    labelAnchor: "top",
-    alwaysShow: true,
     center: [0.0, 114.0],
     places: [
       "kalimantan", "borneo", "pontianak", "banjarmasin", "balikpapan",
@@ -275,10 +256,6 @@ export const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Sulawesi",
-    description: "Localised disruption and security monitoring area",
-    mapLabel: "Sulawesi",
-    labelAnchor: "left",
-    alwaysShow: true,
     center: [-2.0, 120.5],
     places: [
       "sulawesi", "makassar", "manado", "palu", "kendari", "gorontalo",
@@ -287,10 +264,6 @@ export const INDONESIA_ZONES: RiskZoneDef[] = [
   },
   {
     name: "Bali, Nusa Tenggara & Maluku",
-    description: "Tourism, logistics and access disruption exposure",
-    mapLabel: "Bali–NT–Maluku",
-    labelAnchor: "left",
-    alwaysShow: true,
     center: [-7.5, 119.5],
     places: [
       "bali", "denpasar", "nusa tenggara", "lombok", "mataram", "kupang",
@@ -451,6 +424,9 @@ interface ActiveZone {
   number: number;
   count: number;
   worstKey: string;
+  // The incidents that matched this zone this period — used to derive the
+  // reporting-driven "reported issue" headline, business relevance and posture.
+  incidents: CountryFastFactsIncident[];
 }
 
 // Aggregate the window into active zones (count + worst severity each, numbered
@@ -461,6 +437,7 @@ export function aggregateZones(
   zones: RiskZoneDef[],
 ): { active: ActiveZone[]; unattributed: number } {
   const counts = zones.map(() => ({ count: 0, worstRank: 0, worstKey: "" }));
+  const members: CountryFastFactsIncident[][] = zones.map(() => []);
   let unattributed = 0;
   for (const i of incidents) {
     const z = zoneIndexForIncident(i, zones);
@@ -470,6 +447,7 @@ export function aggregateZones(
     }
     const c = counts[z];
     c.count += 1;
+    members[z].push(i);
     const k = (i.severity ?? "").toLowerCase();
     const r = SEV_RANK[k] ?? 0;
     if (r > c.worstRank) {
@@ -493,9 +471,238 @@ export function aggregateZones(
       number: active.length + 1,
       count: c.count,
       worstKey: c.count > 0 ? c.worstKey : "",
+      incidents: members[idx],
     });
   });
   return { active, unattributed };
+}
+
+// ---------------------------------------------------------------------------
+// Shared Operational-Map render helpers + derivation (used by BOTH the zone and
+// dot render paths so screen == in-app PDF and the two modes never diverge).
+// These reader-facing pieces MUST live in the render body — renderToStaticMarkup
+// (the owner-gated test substitute for a screenshot) runs the body, not effects.
+// ---------------------------------------------------------------------------
+
+// The single reporting-driven marker/card unit for both modes.
+interface PinchPoint {
+  key: string;
+  // Numbered cross-reference to the on-map marker (zone mode); null in dot mode,
+  // where markers are located by name rather than numbered.
+  marker: string | null;
+  location: string;
+  issue: string;
+  relevance: string;
+  posture: Posture;
+}
+
+// A per-coordinate dot group in the non-zone ("all other countries") mode.
+interface DotGroup {
+  lat: number;
+  lng: number;
+  members: CountryFastFactsIncident[];
+  count: number;
+  worstKey: string;
+  posture: Posture;
+  location: string;
+  lead: CountryFastFactsIncident;
+}
+
+// Clean a headline for the "reported issue" line: drop the masthead tail and any
+// wire/video cruft. Display-only, no fabrication.
+function cleanIssue(i: CountryFastFactsIncident): string {
+  const raw = ((i.displayTitle && i.displayTitle.trim()) || i.title || "").trim();
+  const cleaned = stripWireCruft(stripMasthead(raw)).trim();
+  return cleaned || "Reported incident";
+}
+
+// Re-case a free-text location for the card without inventing precision — only
+// the text the record already carries is capitalised.
+function titleCaseLocation(s: string): string {
+  return s
+    .split(/\s+/)
+    .map((w) => (w.length > 2 && w === w.toLowerCase() ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+// The incident that leads a location's card: highest severity, then most recent.
+function leadIncident(list: CountryFastFactsIncident[]): CountryFastFactsIncident {
+  let lead = list[0];
+  let leadRank = SEV_RANK[(lead?.severity ?? "").toLowerCase()] ?? 0;
+  for (const i of list) {
+    const r = SEV_RANK[(i.severity ?? "").toLowerCase()] ?? 0;
+    const t = Date.parse(i.occurredAt ?? "") || 0;
+    const lt = Date.parse(lead.occurredAt ?? "") || 0;
+    if (r > leadRank || (r === leadRank && t > lt)) {
+      lead = i;
+      leadRank = r;
+    }
+  }
+  return lead;
+}
+
+function OperationalMapHeader() {
+  return (
+    <div style={{ fontFamily: "Roboto, sans-serif", marginBottom: 8 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, lineHeight: 1.2 }}>
+        {OPERATIONAL_MAP_HEADING}
+      </div>
+      <div style={{ fontSize: 12, color: DUSK, marginTop: 2 }}>{OPERATIONAL_MAP_SUBTITLE}</div>
+    </div>
+  );
+}
+
+function PostureChip({ posture }: { posture: Posture }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        background: POSTURE_COLOR[posture],
+        color: "#fff",
+        fontFamily: "Roboto, sans-serif",
+        fontSize: 10,
+        fontWeight: 700,
+        lineHeight: 1,
+        padding: "3px 7px",
+        borderRadius: 2,
+        whiteSpace: "nowrap",
+      }}
+    >
+      Posture: {posture}
+    </span>
+  );
+}
+
+function PostureLegend() {
+  return (
+    <div className="mt-3" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+      {POSTURE_ORDER.map((p) => (
+        <div key={p} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: POSTURE_COLOR[p],
+              border: `1px solid ${POLAR}`,
+            }}
+          />
+          <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>{p}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MapReadNote() {
+  return (
+    <div
+      className="mt-3"
+      style={{
+        background: "#ffffff",
+        border: `1px solid ${POLAR}`,
+        borderLeft: `3px solid ${ELECTRIC}`,
+        borderRadius: 2,
+        padding: "10px 12px",
+      }}
+    >
+      <div
+        style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, fontWeight: 700, color: NAVY, marginBottom: 4 }}
+      >
+        Map Read
+      </div>
+      <div style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, lineHeight: 1.5 }}>
+        {OPERATIONAL_MAP_READ}
+      </div>
+    </div>
+  );
+}
+
+function PinchCard({ point }: { point: PinchPoint }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 8,
+        background: "#ffffff",
+        border: `1px solid ${POLAR}`,
+        borderLeft: `3px solid ${POSTURE_COLOR[point.posture]}`,
+        borderRadius: 2,
+        padding: "8px 10px",
+      }}
+    >
+      {point.marker ? (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: "0 0 auto",
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: POSTURE_COLOR[point.posture],
+            color: "#fff",
+            fontFamily: "Roboto, sans-serif",
+            fontSize: 11,
+            fontWeight: 700,
+            lineHeight: 1,
+            marginTop: 1,
+          }}
+        >
+          {point.marker}
+        </span>
+      ) : (
+        <span
+          style={{
+            display: "inline-block",
+            flex: "0 0 auto",
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: POSTURE_COLOR[point.posture],
+            border: `1px solid ${POLAR}`,
+            marginTop: 3,
+          }}
+        />
+      )}
+      <div style={{ fontFamily: "Roboto, sans-serif", minWidth: 0, flex: "1 1 auto" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}
+        >
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: NAVY }}>{point.location}</span>
+          <PostureChip posture={point.posture} />
+        </div>
+        <div style={{ fontSize: 11.5, color: DUSK, marginTop: 4 }}>
+          <span style={{ fontWeight: 600 }}>Reported issue this period: </span>
+          {point.issue}
+        </div>
+        <div style={{ fontSize: 11.5, color: DUSK, marginTop: 2 }}>
+          <span style={{ fontWeight: 600 }}>Business relevance: </span>
+          {point.relevance}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PinchCardGrid({ points }: { points: PinchPoint[] }) {
+  return (
+    <div
+      className="mt-3"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+        gap: 8,
+      }}
+    >
+      {points.map((p) => (
+        <PinchCard key={p.key} point={p} />
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -534,16 +741,12 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       lat: number;
       lng: number;
       half: number;
-      // Custom placement, used by the Indonesia on-map label pills, which sit
-      // BESIDE (not centred on) their marker. When unset the element is centred.
-      place?: (p: L.Point, el: HTMLElement) => void;
     }>
   >([]);
 
   const zonesDef = resolveRiskZones(countryName);
   const zoneMode = zonesDef !== null;
   const isJakarta = (countryName ?? "").trim().toLowerCase() === "jakarta";
-  const isIndonesia = (countryName ?? "").trim().toLowerCase() === "indonesia";
 
   // A record is plotted as a PRECISE marker only when it carries a coordinate
   // AND the title/location text shows we actually know where it happened below
@@ -573,6 +776,37 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     () => (zonesDef ? aggregateZones(incidents, zonesDef) : { active: [], unattributed: 0 }),
     [incidents, zonesDef],
   );
+
+  // Per-coordinate dot groups (non-zone "all other countries" mode). One group
+  // per distinct lat/lng, carrying its incidents, worst severity, derived
+  // posture and a display location. Memoised so the marker effect and the card
+  // grid render from one consistent, reporting-driven result.
+  const dotGroups = useMemo<DotGroup[]>(() => {
+    if (zoneMode) return [];
+    const groups = new Map<string, CountryFastFactsIncident[]>();
+    for (const i of plottable) {
+      const key = `${i.latitude},${i.longitude}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(i);
+      else groups.set(key, [i]);
+    }
+    const out: DotGroup[] = [];
+    for (const gm of groups.values()) {
+      const worstKey = worstSeverityKey(gm);
+      const rawLoc = (gm.find((m) => (m.location ?? "").trim())?.location ?? "").trim();
+      out.push({
+        lat: gm[0].latitude as number,
+        lng: gm[0].longitude as number,
+        members: gm,
+        count: gm.length,
+        worstKey,
+        posture: postureFor(gm.length, worstKey),
+        location: rawLoc ? titleCaseLocation(rawLoc) : "Reported location",
+        lead: leadIncident(gm),
+      });
+    }
+    return out;
+  }, [plottable, zoneMode]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -634,10 +868,6 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     const positionDots = () => {
       for (const d of dotsRef.current) {
         const p = map.latLngToContainerPoint([d.lat, d.lng]);
-        if (d.place) {
-          d.place(p, d.el);
-          continue;
-        }
         d.el.style.left = `${p.x - d.half}px`;
         d.el.style.top = `${p.y - d.half}px`;
       }
@@ -659,21 +889,18 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
 
       const latLngs: L.LatLngExpression[] = [];
       for (const z of active) {
+        // Reporting-driven: an area is only plotted when the window carries a
+        // reported event there; empty areas are never drawn.
+        if (z.count === 0) continue;
         const [lat, lng] = z.def.center;
-        // Indonesia is a standing risk-area overlay: every macro-region is fixed
-        // at High (the owner's standing assessment), never data-derived. Other
-        // zone maps (Papua) keep the data-driven colour; their zero-count
-        // alwaysShow zones draw a soft neutral marker rather than the alarming
-        // mid-grey that reads as missing/broken data (spec §6).
-        const color = isIndonesia
-          ? SEV_COLOR.high
-          : z.count > 0
-            ? SEV_COLOR[z.worstKey] ?? "#999999"
-            : "#CED3DB";
+        const posture = postureFor(z.count, z.worstKey);
+        const color = POSTURE_COLOR[posture];
         const size = 28;
         const half = size / 2;
 
-        // Plain absolutely-positioned numbered <div> marker (html2canvas-safe).
+        // Plain absolutely-positioned numbered <div> marker (html2canvas-safe),
+        // coloured by operational POSTURE (frequency + business impact), never
+        // raw severity or a standing assessment.
         const marker = document.createElement("div");
         marker.style.position = "absolute";
         marker.style.width = `${size}px`;
@@ -685,9 +912,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.display = "flex";
         marker.style.alignItems = "center";
         marker.style.justifyContent = "center";
-        // Dark numeral on the soft neutral zero-count chip stays readable; white
-        // numeral on the saturated severity colours (Indonesia is always High).
-        marker.style.color = isIndonesia || z.count > 0 ? "#ffffff" : "#36404f";
+        marker.style.color = "#ffffff";
         marker.style.fontFamily = "Roboto, sans-serif";
         marker.style.fontWeight = "700";
         marker.style.fontSize = "13px";
@@ -697,72 +922,20 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         marker.style.paddingBottom = "2px";
         marker.style.pointerEvents = "auto";
         marker.textContent = String(z.number);
-        marker.title = isIndonesia
-          ? `${z.number}. ${z.def.name} — High`
-          : z.count > 0
-            ? `${z.number}. ${z.def.name} — ${SEV_LABEL[z.worstKey] ?? z.worstKey}`
-            : `${z.number}. ${z.def.name} — no records this period`;
+        marker.title = `${z.number}. ${z.def.name} — ${posture}`;
 
         overlay.appendChild(marker);
         dotsRef.current.push({ el: marker, lat, lng, half });
         latLngs.push([lat, lng]);
-
-        // Indonesia standing map: attach a short name-label pill DIRECTLY beside
-        // the marker so the map is self-explanatory (no bare numbered dots). The
-        // pill is a plain white <div> (navy text, Polar border) — html2canvas-safe,
-        // so screen == in-app PDF. Its side is fixed per zone (labelAnchor) so the
-        // Java-cluster labels fan apart and never overlap on the fixed-zoom view.
-        if (isIndonesia) {
-          const anchor = z.def.labelAnchor ?? "right";
-          const gap = 6;
-          const label = document.createElement("div");
-          label.style.position = "absolute";
-          label.style.background = "#ffffff";
-          label.style.color = NAVY;
-          label.style.border = `1px solid ${POLAR}`;
-          label.style.borderRadius = "2px";
-          label.style.padding = "1px 5px";
-          label.style.fontFamily = "Roboto, sans-serif";
-          label.style.fontSize = "10.5px";
-          label.style.fontWeight = "600";
-          label.style.lineHeight = "1.3";
-          label.style.whiteSpace = "nowrap";
-          label.style.pointerEvents = "none";
-          label.style.boxSizing = "border-box";
-          label.textContent = z.def.mapLabel ?? z.def.name;
-          overlay.appendChild(label);
-          dotsRef.current.push({
-            el: label,
-            lat,
-            lng,
-            half,
-            place: (p, el) => {
-              const w = el.offsetWidth;
-              const h = el.offsetHeight;
-              let left = p.x + half + gap;
-              let top = p.y - h / 2;
-              if (anchor === "left") {
-                left = p.x - half - gap - w;
-              } else if (anchor === "top") {
-                left = p.x - w / 2;
-                top = p.y - half - gap - h;
-              } else if (anchor === "bottom") {
-                left = p.x - w / 2;
-                top = p.y + half + gap;
-              }
-              el.style.left = `${left}px`;
-              el.style.top = `${top}px`;
-            },
-          });
-        }
       }
 
-      if (isIndonesia) {
-        // Fixed view so the six macro-region markers land at deterministic pixel
-        // offsets — the on-map label anchors are tuned to this scale so the
-        // Java-cluster pills never overlap regardless of container width.
-        map.setView([-3.5, 111], 5);
-      } else if (latLngs.length === 1) {
+      if (latLngs.length === 0) {
+        const view = resolveCountryView(countryName);
+        map.setView(view ? view.center : [-3.5, 138.0], view ? view.zoom : 5);
+        map.off("move zoom resize viewreset zoomanim", positionDots);
+        return;
+      }
+      if (latLngs.length === 1) {
         map.setView(latLngs[0] as L.LatLngTuple, 6);
       } else {
         map.fitBounds(L.latLngBounds(latLngs), { padding: [36, 36], maxZoom: 7 });
@@ -776,7 +949,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     }
 
     // ---- PER-COORDINATE DOT mode (all other countries) ------------------
-    if (plottable.length === 0) {
+    if (dotGroups.length === 0) {
       const view = resolveCountryView(countryName);
       if (view) {
         map.setView(view.center, view.zoom);
@@ -787,51 +960,18 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       return;
     }
 
-    // Many country-report records geocode to the SAME city or country centroid,
-    // so several incidents legitimately share one coordinate. We deliberately do
-    // NOT stack them (which hides all but the top dot) and do NOT fan them out in
-    // screen space (a fixed pixel ring pushes coastal-city markers off the
-    // coastline into the sea, implying maritime incidents that never happened and
-    // there is no reliable client-side way to know which direction is inland).
-    // Instead we render ONE dot per distinct coordinate, coloured by the
-    // HIGHEST severity present there and badged with the incident COUNT. Each
-    // dot therefore stays exactly on land, every incident is accounted for, and
-    // an Extreme record is never obscured by a lower-severity dot.
-    const groups = new Map<string, number[]>();
-    plottable.forEach((i, idx) => {
-      const key = `${i.latitude},${i.longitude}`;
-      const arr = groups.get(key);
-      if (arr) arr.push(idx);
-      else groups.set(key, [idx]);
-    });
-
     const latLngs: L.LatLngExpression[] = [];
 
-    for (const idxs of groups.values()) {
-      const members = idxs.map((gi) => plottable[gi]);
-      const lat = members[0].latitude as number;
-      const lng = members[0].longitude as number;
-      const count = members.length;
-
-      // Highest severity present at this coordinate drives the marker colour.
-      let worst = members[0];
-      let worstRank = SEV_RANK[(worst.severity ?? "").toLowerCase()] ?? 0;
-      for (const m of members) {
-        const r = SEV_RANK[(m.severity ?? "").toLowerCase()] ?? 0;
-        if (r > worstRank) {
-          worst = m;
-          worstRank = r;
-        }
-      }
-      const color = SEV_COLOR[(worst.severity ?? "").toLowerCase()] ?? "#999999";
-
-      const size = count > 1 ? 22 : 14;
+    // One dot per distinct coordinate (many records share a city/country
+    // centroid). The dot is coloured by operational POSTURE (frequency + worst
+    // business impact at that point) and badged with the incident COUNT; a plain
+    // <div> so html2canvas rasterises it into the PDF unchanged. Each dot stays
+    // exactly on land and no reported incident is obscured.
+    for (const g of dotGroups) {
+      const color = POSTURE_COLOR[g.posture];
+      const size = g.count > 1 ? 22 : 14;
       const half = size / 2;
 
-      // Plain absolutely-positioned <div> dot — html2canvas rasterises these
-      // faithfully (a standalone <canvas> marker is silently dropped from the
-      // exported PDF, breaking screen==PDF parity). When several incidents share
-      // the coordinate the dot carries the count as a centred white numeral.
       const dot = document.createElement("div");
       dot.style.position = "absolute";
       dot.style.width = `${size}px`;
@@ -843,7 +983,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       // The overlay is pointer-events:none; re-enable on the dot so the native
       // hover tooltip (dot.title) listing the incidents at this point fires.
       dot.style.pointerEvents = "auto";
-      if (count > 1) {
+      if (g.count > 1) {
         dot.style.display = "flex";
         dot.style.alignItems = "center";
         dot.style.justifyContent = "center";
@@ -855,23 +995,22 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         // html2canvas renders text slightly low; a small bottom pad re-centres
         // the numeral in the exported PDF without shifting it on screen much.
         dot.style.paddingBottom = "2px";
-        dot.textContent = String(count);
+        dot.textContent = String(g.count);
       }
 
-      const loc = (members.find((m) => (m.location ?? "").trim())?.location ?? "").trim();
-      const lines = members.map((m) => {
-        const t = ((m.displayTitle && m.displayTitle.trim()) || m.title || "Incident").trim();
+      const lines = g.members.map((m) => {
+        const t = cleanIssue(m);
         const sd = SEV_LABEL[(m.severity ?? "").toLowerCase()] ?? m.severity ?? "";
         return sd ? `${t} (${sd})` : t;
       });
       dot.title = [
-        loc ? `${loc} — ${count} incident${count === 1 ? "" : "s"}` : `${count} incident${count === 1 ? "" : "s"}`,
+        `${g.location} — ${g.count} incident${g.count === 1 ? "" : "s"}`,
         ...lines,
       ].join("\n");
 
       overlay.appendChild(dot);
-      dotsRef.current.push({ el: dot, lat, lng, half });
-      latLngs.push([lat, lng]);
+      dotsRef.current.push({ el: dot, lat: g.lat, lng: g.lng, half });
+      latLngs.push([g.lat, g.lng]);
     }
 
     if (latLngs.length === 1) {
@@ -887,7 +1026,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     return () => {
       map.off("move zoom resize viewreset zoomanim", positionDots);
     };
-  }, [plottable, countryName, zoneMode, zoneAgg]);
+  }, [countryName, zoneMode, zoneAgg, dotGroups]);
 
   useEffect(() => {
     return () => {
@@ -903,7 +1042,6 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   }, []);
 
   const unplotted = incidents.length - plottable.length;
-  const hasPlotted = plottable.length > 0;
 
   // ---- AREA-RISK legend ------------------------------------------------
   if (zoneMode) {
@@ -923,231 +1061,67 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       />
     );
 
-    // Indonesia: a Polestar-assessed STANDING risk-area overlay. Six macro-region
-    // callout cards (each fixed at High, with its description) plus a "Map Read"
-    // box, rendered in the JSX body so they appear identically on screen and in
-    // the rasterised in-app PDF. The on-map markers each carry a short name label
-    // (built in the marker effect above), so the map reads without a legend.
-    if (isIndonesia) {
-      return (
-        <div>
-          {mapContainer}
-          <div
-            className="mt-3"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: 8,
-            }}
-          >
-            {active.map((z) => (
-              <div
-                key={z.def.name}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  background: "#ffffff",
-                  border: `1px solid ${POLAR}`,
-                  borderLeft: `3px solid ${ELECTRIC}`,
-                  borderRadius: 2,
-                  padding: "8px 10px",
-                }}
-              >
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flex: "0 0 auto",
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    background: SEV_COLOR.high,
-                    color: "#fff",
-                    fontFamily: "Roboto, sans-serif",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    marginTop: 1,
-                  }}
-                >
-                  {z.number}
-                </span>
-                <div style={{ fontFamily: "Roboto, sans-serif", minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: NAVY }}>
-                      {z.def.name}
-                    </span>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        background: SEV_COLOR.high,
-                        color: "#fff",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        padding: "2px 6px",
-                        borderRadius: 2,
-                      }}
-                    >
-                      High
-                    </span>
-                  </div>
-                  {z.def.description ? (
-                    <div style={{ fontSize: 11.5, color: DUSK, marginTop: 3 }}>
-                      {z.def.description}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div
-            className="mt-3"
-            style={{
-              background: "#ffffff",
-              border: `1px solid ${POLAR}`,
-              borderLeft: `3px solid ${ELECTRIC}`,
-              borderRadius: 2,
-              padding: "10px 12px",
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "Roboto, sans-serif",
-                fontSize: 12,
-                fontWeight: 700,
-                color: NAVY,
-                marginBottom: 4,
-              }}
-            >
-              Map Read
-            </div>
-            <div
-              style={{
-                fontFamily: "Roboto, sans-serif",
-                fontSize: 12,
-                color: DUSK,
-                lineHeight: 1.5,
-              }}
-            >
-              Indonesia’s current risk picture is not concentrated in one city. The watch areas
-              stretch from Greater Jakarta and Java through Sumatra, Kalimantan, Sulawesi and
-              eastern island groups. The main business exposure is localised disruption to
-              movement, site access, utilities, regulatory activity and business continuity rather
-              than a single national crisis.
-            </div>
-          </div>
-
-          <div
-            style={{
-              fontFamily: "Roboto, sans-serif",
-              fontSize: 11,
-              color: DUSK,
-              marginTop: 8,
-              fontStyle: "italic",
-            }}
-          >
-            Markers show Polestar-assessed standing risk areas; all six are currently rated High.
-            Each area is labelled on the map and summarised in the cards above.
-          </div>
-        </div>
-      );
-    }
+    // Reporting-driven pinch points: only zones carrying a reported event this
+    // period are plotted (built in the marker effect) and carded here. Cards are
+    // rendered in the JSX body so screen == rasterised in-app PDF, and each card
+    // mirrors its numbered on-map marker.
+    const points: PinchPoint[] = active
+      .filter((z) => z.count > 0)
+      .map((z) => {
+        const lead = leadIncident(z.incidents);
+        return {
+          key: z.def.name,
+          marker: String(z.number),
+          location: z.def.name,
+          issue: cleanIssue(lead),
+          relevance: businessRelevance(lead),
+          posture: postureFor(z.count, z.worstKey),
+        };
+      });
 
     return (
       <div>
+        <OperationalMapHeader />
         {mapContainer}
-        {active.length > 0 ? (
+        {points.length > 0 ? (
           <>
-            {/* Numbered risk-zone legend: "n. Zone — Severity". The
-                numbered markers above are HTML <div> overlays, so they appear
-                in BOTH the on-screen view and the rasterised PDF. */}
-            <div className="mt-3" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {active.map((z) => (
-                <div key={z.def.name} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flex: "0 0 auto",
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      background: z.count > 0 ? (SEV_COLOR[z.worstKey] ?? "#999999") : "#CED3DB",
-                      color: z.count > 0 ? "#fff" : "#36404f",
-                      fontFamily: "Roboto, sans-serif",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      border: `1px solid ${POLAR}`,
-                      marginTop: 1,
-                    }}
-                  >
-                    {z.number}
-                  </span>
-                  <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK }}>
-                    <span style={{ fontWeight: 700, color: "#0b0a3d" }}>{z.def.name}</span>
-                    {z.count > 0 ? (
-                      <>
-                        {" "}
-                        — {SEV_LABEL[z.worstKey] ?? z.worstKey}
-                      </>
-                    ) : null}
-                    {z.def.description ? (
-                      <span style={{ color: DUSK, opacity: 0.75 }}> · {z.def.description}</span>
-                    ) : null}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div
-              style={{
-                fontFamily: "Roboto, sans-serif",
-                fontSize: isJakarta ? 10.5 : 11,
-                color: DUSK,
-                marginTop: 8,
-                fontStyle: "italic",
-              }}
-            >
-              {isJakarta ? (
-                <>
-                  Numbered markers show Jakarta business areas, shaded by the highest severity
-                  recorded there this period; a neutral marker is a monitored area with no incidents
-                  this period.
-                  {zoneAgg.unattributed > 0
-                    ? " Some records were retained in the assessment but not plotted due to insufficient location detail."
-                    : ""}
-                </>
-              ) : (
-                <>
-                  Each marker shows a risk area, numbered and coloured by the highest severity recorded there this period.
-                  {zoneAgg.unattributed > 0
-                    ? " Some records could not be tied to a specific area and are included in the totals and tables but not plotted."
-                    : ""}
-                </>
-              )}
-            </div>
+            <PostureLegend />
+            <PinchCardGrid points={points} />
+            {zoneAgg.unattributed > 0 ? (
+              <div
+                style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
+              >
+                Some records could not be tied to a specific area and are included in the totals and tables but not plotted.
+              </div>
+            ) : null}
           </>
         ) : (
-          // No record in the window resolves to a defined risk zone: present the
-          // basemap as country context only, with an explicit note.
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
-            Map reflects country operating context only. No incident in this period resolves to a defined risk area.
+            No reported operational pinch point resolved to a mapped area this period.
           </div>
         )}
+        <MapReadNote />
       </div>
     );
   }
 
-  // ---- PER-COORDINATE DOT legend (all other countries) -----------------
+  // ---- PER-COORDINATE OPERATIONAL MAP (all other countries) ------------
+  // One card per plotted coordinate, mirroring the on-map dots. Reporting-driven:
+  // a point exists only where the window carries a reported event.
+  const dotPoints: PinchPoint[] = dotGroups.map((g) => ({
+    key: `${g.lat},${g.lng}`,
+    marker: null,
+    location: g.location,
+    issue: cleanIssue(g.lead),
+    relevance: businessRelevance(g.lead),
+    posture: g.posture,
+  }));
+
   return (
     <div>
+      <OperationalMapHeader />
       <div
         id={domId}
         ref={containerRef}
@@ -1160,38 +1134,17 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           background: "#fafafa",
         }}
       />
-      {hasPlotted ? (
+      {dotPoints.length > 0 ? (
         <>
-          {/* Severity legend is shown ONLY when markers are actually plotted, so
-              the map never implies incident plotting on an empty/no-coordinate
-              window. The HTML dot overlay above guarantees the plotted points
-              are present in BOTH the on-screen view and the rasterised PDF, so
-              the legend never accompanies a point-less map. */}
-          <div className="flex flex-wrap items-center gap-3 mt-3">
-            {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((k) => (
-              <div key={k} className="flex items-center gap-1.5">
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: SEV_COLOR[k],
-                    border: `1px solid ${POLAR}`,
-                  }}
-                />
-                <span style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK }}>
-                  {SEV_LABEL[k]}
-                </span>
-              </div>
-            ))}
-          </div>
+          <PostureLegend />
+          <PinchCardGrid points={dotPoints} />
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
-            Markers show only incidents with a confirmed local location. Where several share a location, one marker shows the incident count and is coloured by the highest severity recorded there.
-            {" "}City- or province-level records, and records without coordinates, are included in totals and tables but not plotted as precise points.
-            {unplotted > 0 ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} not plotted.` : ""}
+            Points show reported events with a confirmed local location; where several share a location one marker carries the count.
+            {unplotted > 0
+              ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} without a precise location are included in the totals and tables but not plotted.`
+              : ""}
           </div>
         </>
       ) : (
@@ -1201,9 +1154,10 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         <div
           style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
         >
-          Map reflects country operating context only. Incident records in this period do not contain sufficient coordinates for reliable plotting.
+          No reported operational pinch point carries a precise location this period; the map reflects country operating context only.
         </div>
       )}
+      <MapReadNote />
     </div>
   );
 }

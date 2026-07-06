@@ -1,0 +1,83 @@
+Fix the Indonesia operational map logic.
+
+The map must not show generic standing risk, assumed congestion, assumed protest exposure, assumed port disruption or assumed crime risk.
+
+The map must only show locations where the current reporting window contains a relevant operational issue.
+
+Core rule:
+Do not create a location marker unless there is a specific reported event, issue, disruption, crime incident, protest, fire, regulatory action, transport issue, access issue or other operationally relevant development in that exact area during the reporting period.
+
+Do not infer congestion at Tanjung Priok unless there is reporting of port congestion, port access disruption, labour disruption, gate delay, road disruption or cargo movement impact in the reporting window.
+
+Do not infer CBD disruption unless there is reporting of protest activity, police activity, road closure, access restriction, major event disruption or security incident in the reporting window.
+
+Do not infer crime exposure unless there is a specific crime incident in that location during the reporting window.
+
+One incident does not automatically make an area High.
+
+Assessment logic:
+Each mapped location should be assessed using both:
+
+1. Frequency
+   How many relevant events occurred in that location or area during the reporting window?
+
+2. Business impact
+   What could those events realistically do to business operations, such as movement, site access, staff safety, logistics, utilities, regulatory compliance or continuity?
+
+Severity or posture should be based on frequency plus business impact, not on the presence of a single event.
+
+Use this logic:
+
+Primary operational pinch point:
+Multiple relevant reports in the same area, or one event with clear direct business impact.
+
+Secondary operational pinch point:
+One or more reports with plausible but limited business impact.
+
+Watch item:
+Low frequency reporting with limited current impact, included only because it is operationally relevant.
+
+Do not map:
+Generic business districts with no current reporting.
+Ports with no reported port issue.
+Roads with no reported disruption.
+Crime areas with no current crime incident.
+Airport routes with no reported airport access issue.
+Government districts with no current protest, police or access issue.
+
+Map output requirements:
+The map should change week by week based on the reporting, not repeat the same standing locations.
+
+Each marker must answer:
+What happened here?
+Why does it matter operationally?
+What should a business user do about it?
+
+Marker card format:
+Location
+Reported issue this period
+Business relevance
+Posture: Primary / Secondary / Watch
+
+Remove:
+Generic standing locations.
+Unsupported High labels.
+Unsupported port congestion.
+Unsupported airport corridor warnings.
+Unsupported CBD warnings.
+Unexplained black markers.
+Any wording that implies disruption where there is no current reporting.
+
+Replace the note below the map with:
+
+Map Read:
+This map shows reported operational pinch points for the current reporting period. Locations are included only where reporting indicates a relevant event, issue or disruption. Posture is based on the likely business impact of the reporting, combined with frequency, not on standing background risk.
+
+Acceptance criteria:
+The map must not look the same every week unless the reporting supports it.
+Every marker must be linked to a current reporting item.
+No location is shown purely because it is generally important.
+No port, airport, CBD or road corridor is flagged without current reporting.
+One isolated low impact incident must not create a High or Primary rating.
+Preview and PDF export must match.
+Do not change unrelated report sections.

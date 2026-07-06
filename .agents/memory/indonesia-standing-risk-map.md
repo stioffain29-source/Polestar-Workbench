@@ -1,29 +1,42 @@
 ---
-name: Indonesia country-report standing risk-area map
-description: Why the Indonesia country map shows six fixed regions all rated High — it is an owner-authored standing overlay, not a data bug.
+name: Country-report Operational Map (reporting-driven, all countries)
+description: Country maps map a location ONLY where the current window reported a specific event; posture from frequency+business impact. Reverses the old Indonesia "standing High overlay".
 ---
 
-The Indonesia COUNTRY report map (`CountryReportMap.tsx`, gated on `isIndonesia`)
-is a Polestar-assessed STANDING risk-area overlay: six fixed macro-regions
-(Greater Jakarta & West Java; Central & East Java; Sumatra; Kalimantan / Borneo;
-Sulawesi; Bali, Nusa Tenggara & Maluku), EVERY one rendered "High", each with an
-on-map name-label pill plus a callout card and a "Map Read" box beneath.
+Country-report maps (`CountryReportMap.tsx`, BOTH the configured-zone mode and
+the per-coordinate dot mode) are REPORTING-DRIVEN. A location is plotted/carded
+ONLY where the current reporting window carries a specific operationally relevant
+event there. Heading is "Operational Map" / subtitle "Reported operational pinch
+points for this period"; the "Map Read" note ends "...combined with reporting
+frequency, not standing background risk." Every card reads Location / Reported
+issue this period / Business relevance / Posture.
 
-**Why:** The owner authored this as a standing assessment (not fabrication). The
-High rating is deliberate and does NOT come from the incident data.
+**Why:** The owner REVERSED the earlier decision (this file used to document a
+Polestar "standing High" six-region overlay for Indonesia). No standing risk
+picture, no fixed always-High regions — an empty window shows an empty-state note,
+not painted geography. Do NOT re-introduce a standing overlay for any country.
 
 **How to apply:**
-- The standing High is applied at the RENDER layer only (keyed on the Indonesia
-  flag). `aggregateZones` is UNCHANGED and still returns zero-count zones from an
-  empty incident set — do NOT "fix" all-High Indonesia by re-scoring zones or
-  touching `aggregateZones` (that would break the Jakarta/Papua zone contracts).
-- Only Indonesia gets the standing overlay + Map Read box. Papua / West Papua
-  stay data-driven (severity-coloured, unattributed honesty note); other
-  countries stay per-coordinate dots. Keep those branches byte-identical.
-- Screen == in-app PDF for free: the in-app Download PDF rasterises the
-  `.print-report` DOM, so any render-body JSX (cards, Map Read) is captured. The
-  headless jsPDF `exportCountryReportPdf` omits the Indonesia map and is not
-  user-facing — leave it alone.
-- Verify via `renderToStaticMarkup` tests (owner-gated app → no live
-  screenshots): `countryMapLegendNoCounts.test.tsx` (Indonesia standing overlay +
-  Papua generic-caption control) and `indonesiaRiskAreaMap.test.tsx`.
+- Posture (`lib/operationalPinchPoints.ts`, pure + unit-tested) = frequency +
+  business impact: `count>=2` OR one high/extreme → **Primary**; one moderate →
+  **Secondary**; single low/insignificant → **Watch**. `POSTURE_COLOR`
+  Primary `#0B0B3D` / Secondary `#4655FF` / Watch `#6B7280` — never reuse the
+  reserved severity hues (petrol `#1B6B7A`=Insignificant, red `#A33232`=Extreme),
+  so a posture chip can't be mistaken for a severity chip. The map now carries NO
+  severity chips at all.
+- `businessRelevance()` reads the reported event's own words (headline first,
+  topic fallback) into operational terms (movement/site-access/security/logistics/
+  utilities/regulatory/continuity). It interprets the reported item, never
+  fabricates standing risk.
+- INDONESIA_ZONES lost its `alwaysShow`/`description` — it is now an ordinary
+  gazetteer, so `aggregateZones([], INDONESIA_ZONES)` returns `[]`. JAKARTA_ZONES
+  KEEPS `alwaysShow` (its six business areas stay fixed 1–6) — that contract and
+  the Papua zone contract are untouched.
+- Shared render helpers (`OperationalMapHeader`, `PostureLegend`, `PinchCard(Grid)`,
+  `MapReadNote`) live in the render BODY and feed BOTH modes, so screen == in-app
+  PDF (DOM-rasterise) and the two modes never drift. No `RELEVANCE_RULE_VERSION`
+  bump (display-only).
+- Verify via `renderToStaticMarkup` tests (owner-gated app → no live screenshots):
+  `operationalPinchPoints.test.ts`, `indonesiaRiskAreaMap.test.tsx`,
+  `countryMapLegendNoCounts.test.tsx`; `jakartaMapZones.test.ts` pins the
+  unchanged Jakarta alwaysShow contract.
