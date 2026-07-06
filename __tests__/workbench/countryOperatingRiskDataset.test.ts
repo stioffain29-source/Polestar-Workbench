@@ -161,6 +161,30 @@ describe("buildCountryOperatingRiskDataset — no-count prose", () => {
   }
 });
 
+describe("buildCountryOperatingRiskDataset — operational recommendations", () => {
+  const ds = build(POPULATED);
+
+  it("keys each recommended action to a location, an action and an escalation trigger", () => {
+    expect(ds.businessImpact.length).toBeGreaterThan(0);
+    for (const line of ds.businessImpact) {
+      // Shape: "<Location>: <action>. Escalation trigger — <trigger>."
+      expect(line).toMatch(/^.+?: .+ Escalation trigger — .+\.$/);
+      const loc = line.slice(0, line.indexOf(":")).trim();
+      expect(loc.length).toBeGreaterThan(0);
+      const marker = "Escalation trigger —";
+      const trigger = line.slice(line.indexOf(marker) + marker.length).trim();
+      expect(trigger.length).toBeGreaterThan(10); // a real forward-looking condition
+    }
+  });
+
+  it("carries no incident-count annotation in the recommendations", () => {
+    for (const line of ds.businessImpact) {
+      expect(line).not.toMatch(/\(\s*\d/);
+      expect(line).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
+    }
+  });
+});
+
 describe("buildCountryOperatingRiskDataset — heading / render invariants", () => {
   const ds = build(POPULATED);
 

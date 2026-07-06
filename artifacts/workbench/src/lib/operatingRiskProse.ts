@@ -101,6 +101,44 @@ export function operatingRiskAction(label: string): string {
   return DISPLAY_CATEGORY_ACTION[label.trim().toLowerCase()] ?? DEFAULT_ACTION;
 }
 
+// Per-category escalation trigger — the concrete, forward-looking condition that
+// would raise exposure for a business. Framed as a watch condition ("if this
+// happens"), never a prediction, so it stays within no-fabrication. Each is a
+// noun phrase with no trailing full stop; the caller supplies punctuation.
+const DISPLAY_CATEGORY_TRIGGER: Record<string, string> = {
+  "protest / civil unrest":
+    "a call for mass mobilisation, a march on government or company premises, or clashes with police",
+  "labour action":
+    "a strike notice affecting ports, airports, fuel distribution or a named employer",
+  "crime / theft / robbery":
+    "a shift to armed or violent robbery, or repeat targeting of the same premises or route",
+  "armed robbery / violent crime":
+    "repeat armed incidents in the same area, or targeting of staff, vehicles or commercial premises",
+  "fire / explosion":
+    "a fire or blast at an industrial, fuel or utility site, or one forcing an evacuation nearby",
+  "natural hazard":
+    "an official flood, storm or seismic warning upgrade, or an airport or port closure",
+  "transport disruption":
+    "a full closure of a road, terminal or airport, or disruption lasting beyond a single day",
+  "utilities / infrastructure disruption":
+    "a prolonged or wide-area power, water, fuel or telecoms outage",
+  "regulatory / corruption / governance":
+    "a new regulation, licence suspension or enforcement action affecting operations",
+  "security force activity":
+    "a large security operation, curfew or new checkpoint regime near operating sites",
+  "community tension / land dispute":
+    "escalation to violence, road blockades, or damage to company or contractor assets",
+  "terrorism / militancy":
+    "a specific threat, a foiled plot, or an attack on a public or commercial site",
+};
+
+const DEFAULT_TRIGGER =
+  "a higher-severity or casualty-bearing incident, or repeat activity in the same area";
+
+export function operatingRiskTrigger(label: string): string {
+  return DISPLAY_CATEGORY_TRIGGER[label.trim().toLowerCase()] ?? DEFAULT_TRIGGER;
+}
+
 // ---------------------------------------------------------------------------
 // Local text helpers (kept here to avoid a runtime import cycle with the
 // builder; mirror joinList / capitaliseFirst in pngReportDataset.ts).
@@ -249,9 +287,11 @@ export function buildOperatingRiskPolestarView(i: OperatingRiskPolestarInput): s
   return `${judgement}${driver}. ${relevance}. ${exposure}. ${change}. ${action}.`;
 }
 
-// Priorities This Week: short, action-focused points keyed by location rather
-// than restated incident titles. Each group is the dominant display category at
-// a location; deduplicated and capped.
+// Priorities This Week: short, operational points keyed by location rather than
+// restated incident titles. Each line names WHERE (the location bucket), WHAT to
+// do (the category action) and the ESCALATION TRIGGER to watch — the concrete
+// condition that would raise exposure. Each group is the dominant display
+// category at a location; deduplicated and capped.
 export function buildOperatingRiskPriorities(
   groups: { location: string; dominantDisplayCat: string }[],
 ): string[] {
@@ -260,7 +300,9 @@ export function buildOperatingRiskPriorities(
   for (const g of groups) {
     const loc = g.location.trim();
     if (!loc) continue;
-    const line = `${loc}: ${operatingRiskAction(g.dominantDisplayCat)}`;
+    const action = operatingRiskAction(g.dominantDisplayCat);
+    const trigger = operatingRiskTrigger(g.dominantDisplayCat);
+    const line = `${loc}: ${action} Escalation trigger — ${trigger}.`;
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

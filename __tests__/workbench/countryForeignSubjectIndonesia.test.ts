@@ -35,6 +35,14 @@ const SLOP = [
   "Plane crash in Missouri, US kills 11 parachutists and 1 pilot",
   "France hit by severe wildfires as 700 hectares burn during extreme weather",
   "11 killed in plane crash near Tomblaine, France on Sunday",
+  // Bahasa-titled coverage of the YEMEN war under a domestic country tag, with no
+  // English translation available. The English "yemen" was listed but the Bahasa
+  // spelling "Yaman" and the theatre actor/port ("Houthi", "Hodeidah") were not,
+  // so this Yemen story leaked into the Indonesia weekly and named "Yemeni
+  // soldiers / Houthis near Hodeidah" — a credibility-destroying misclassification.
+  "Belasan Tentara Yaman Tewas dalam Bentrokan dengan Houthi di Dekat Hodeidah",
+  "Serangan Houthi di Laut Merah hantam kapal tanker dekat Hodeidah",
+  "Yemeni forces clash with Houthis near Hodeidah, dozens killed",
 ];
 
 // Two France-crash duplicates name NO country or foreign entity in any language
@@ -89,6 +97,14 @@ describe("isForeignSubjectForIndonesia", () => {
     expect(
       isForeignSubjectForIndonesia(
         "American tourist arrested in Bali drug bust",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps a domestic story that merely names the Houthi/Red Sea theatre (local anchor wins)", () => {
+    expect(
+      isForeignSubjectForIndonesia(
+        "Kapal Indonesia hindari serangan Houthi, tiba dengan selamat di Jakarta",
       ),
     ).toBe(false);
   });

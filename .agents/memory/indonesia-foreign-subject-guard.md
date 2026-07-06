@@ -48,6 +48,15 @@ Surabaya" — Surabaya anchors it).
 - The foreign set now also carries unambiguous foreign ENTITIES / US states seen
   in live slop (`ubisoft`, `assassin's creed`, `missouri`) — a foreign accident
   often names only the company/state, not the country.
+- **Add BAHASA foreign spellings + theatre actors/ports, not just the English
+  country word.** A Yemen-war row (`country=Indonesia`, `display_title` NULL) with
+  the Bahasa title "…Tentara **Yaman** … **Houthi** … Hodeidah" leaked because the
+  set had English `yemen` but not Bahasa `yaman`, nor the theatre actor/port
+  `houthi`/`hodeidah`. When `display_title` is NULL the guard's ONLY haystack is
+  the raw Bahasa title, so English-only country words never match — extend with
+  the local-language spelling AND the distinctive proper nouns (group/port/city)
+  that stay identical across languages. These are the highest-value tokens because
+  they survive the missing-translation case.
 - KNOWN RESIDUAL: a row whose translated title names NO country or foreign entity
   in any language (bare "Plane crash kills 11" syndicating a foreign crash) is
   indistinguishable from a domestic accident by content, so the guard leaves it.

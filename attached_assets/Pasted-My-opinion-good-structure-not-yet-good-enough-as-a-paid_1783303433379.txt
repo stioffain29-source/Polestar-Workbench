@@ -1,0 +1,21 @@
+My opinion: good structure, not yet good enough as a paid weekly report. It has the right bones, but there are some credibility issues that need fixing before it goes to customers.
+
+What works well:
+
+The flow is right. BLUF, Top 3 Developments, Incident Details, Current Situation, Operational Impact, Recommended Actions, Outlook, Polestar View and map is a solid weekly report structure. It feels more useful than a long country brief because it gets to the operational picture quickly.
+
+The length is about right. Three content pages plus a cover is digestible for a weekly customer product. The map on the final page is a good close because it gives the reader a geographic memory of the report.
+
+What needs fixing:
+
+The data QA is the big issue. On page 2, one Indonesia section appears to mention Yemeni soldiers and Houthis near Hodeidah. That cannot be in an Indonesia weekly without destroying confidence. That looks like source bleed, bad classification or a location tagging issue.
+
+The recommendations are too generic. “Check nearby site exposure” and “monitor warnings” are sensible, but they need to feel more client specific. A paying customer wants: what sites, what routes, what cities, what trigger, what action.
+
+It needs week-on-week movement. A weekly report should say what changed from last week: better, worse, stable, new hotspot, repeated hotspot, fading issue. Without that, it reads like a snapshot rather than a watch product.
+
+The Top 3 needs a stronger business filter. At the moment it is incident-led. Better would be: “Top 3 developments affecting movement, sites, staff or supply chain.” That makes the value clearer.
+
+The map is useful but should be sharper. The numbered regional markers are good, but I would add a small table beside it: Area, risk level, main issue, business concern, next trigger.
+
+Overall: keep the format, tighten the engine. This is close to being a strong weekly country product, but I would not send it to a paying customer until the classification errors are fixed and the recommended actions become more operational.
