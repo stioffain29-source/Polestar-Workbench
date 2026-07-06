@@ -5,11 +5,12 @@ import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
 import { classifyLocationConfidence } from "@/lib/countryLocationConfidence";
 import { stripWireCruft } from "@/lib/incidentTitle";
 import {
-  impactLevelFor,
+  impactForIncident,
   businessRelevance,
   worstSeverityKey,
   IMPACT_COLOR,
   IMPACT_ORDER,
+  IMPACT_RANK,
   OPERATIONAL_MAP_HEADING,
   OPERATIONAL_MAP_SUBTITLE,
   OPERATIONAL_MAP_READ,
@@ -537,17 +538,24 @@ function titleCaseLocation(s: string): string {
     .join(" ");
 }
 
-// The incident that leads a location's card: highest severity, then most recent.
+// The incident that leads (and drives the impact level of) a location's card:
+// highest operational IMPACT first, then highest severity, then most recent. This
+// keeps the card internally consistent — the headline shown is the very event
+// that justifies the impact level and business-relevance line.
 function leadIncident(list: CountryFastFactsIncident[]): CountryFastFactsIncident {
   let lead = list[0];
+  let leadImp = IMPACT_RANK[impactForIncident(lead)] ?? 0;
   let leadRank = SEV_RANK[(lead?.severity ?? "").toLowerCase()] ?? 0;
+  let leadTime = Date.parse(lead?.occurredAt ?? "") || 0;
   for (const i of list) {
+    const imp = IMPACT_RANK[impactForIncident(i)] ?? 0;
     const r = SEV_RANK[(i.severity ?? "").toLowerCase()] ?? 0;
     const t = Date.parse(i.occurredAt ?? "") || 0;
-    const lt = Date.parse(lead.occurredAt ?? "") || 0;
-    if (r > leadRank || (r === leadRank && t > lt)) {
+    if (imp > leadImp || (imp === leadImp && (r > leadRank || (r === leadRank && t > leadTime)))) {
       lead = i;
+      leadImp = imp;
       leadRank = r;
+      leadTime = t;
     }
   }
   return lead;

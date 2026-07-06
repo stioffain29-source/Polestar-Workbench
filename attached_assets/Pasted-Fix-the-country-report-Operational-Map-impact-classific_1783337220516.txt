@@ -1,0 +1,87 @@
+Fix the country report Operational Map impact classification.
+
+The map structure is improving, but the impact levels are still wrong.
+
+Current problem:
+Several crime or security incidents are being labelled “Direct impact” even though they do not show a direct commercial business impact. A murder case, shooting, drug raid, arrest, local clash, or general criminal incident should not be marked Direct impact unless the reporting shows a clear operational effect on business activity.
+
+Core rule:
+Direct impact means the incident is affecting, or is very likely to affect, commercial operations now.
+
+Use Direct impact only when reporting shows one or more of the following:
+- road closure or access restriction
+- protest blocking access
+- port, airport, warehouse, factory or site disruption
+- utility outage affecting operations
+- fire or explosion affecting an industrial, commercial or logistics area
+- labour action affecting production, transport, port access or site access
+- regulatory enforcement affecting operations, permits, movement, inspections or site activity
+- security incident directly affecting a business site, staff, contractor movement, delivery route or transport corridor
+- confirmed disruption to logistics, production, warehousing, customer delivery or staff movement
+
+Use Possible impact when:
+- the incident is near an operating area, route, industrial zone or business district but no actual disruption is confirmed
+- the incident could affect staff confidence, local movement, security posture or monitoring requirements
+- the issue is relevant, but the operational effect is indirect or uncertain
+- the reporting indicates security or crime activity but no business interruption is reported
+
+Use Monitor only when:
+- the incident is isolated
+- the incident is mainly criminal, political or localised with no clear business consequence
+- the event is outside key commercial areas or routes
+- no movement, access, site, logistics, utility or continuity impact is reported
+
+Specific classification corrections for the current Indonesia map:
+
+Greater Jakarta & West Java:
+Current issue: Fugitive in Tragrah murder case terrorized victim’s family; police pursue to Bandung.
+Change impact level to: Monitor only
+Reason: Crime and policing issue, but no reported commercial disruption, access restriction or business continuity impact.
+
+Central & East Java:
+Current issue: Mystery of young man murdered with slashed neck in Kebonsari, Pekalongan.
+Change impact level to: Monitor only
+Reason: Serious local crime, but no reported business impact.
+
+Sumatra:
+Current issue: Alleged shooting suspect arrested in Riau.
+Change impact level to: Monitor only
+Reason: Security and policing issue, but no reported business disruption.
+
+Kalimantan / Borneo:
+Current issue: Three suspects stole three officers during a drug raid in Katingan, Central Kalimantan.
+Change impact level to: Monitor only
+Reason: Law enforcement and crime issue, but no commercial operational impact stated.
+
+Sulawesi:
+Current issue: Bloody clash in Mamuju leaves one dead and a TNI member wounded.
+Change impact level to: Possible impact
+Reason: Violent local incident with potential staff movement and local security relevance, but no confirmed business disruption.
+
+Bali, Nusa Tenggara & Maluku:
+Current issue: Hundreds protest DPRD and governor office over MBG and trash.
+Change impact level to: Possible impact
+Reason: Protest activity around government offices may affect local movement and access, but only mark Direct impact if road closures, site access disruption or business interruption are reported.
+
+Business relevance wording:
+Do not write “regulatory and compliance exposure” unless the incident is actually regulatory or compliance related.
+Do not write “operational monitoring relevance” unless there is a clear reason to monitor it.
+Do not inflate local crime into business impact.
+
+Replace generic “Business relevance” text with practical wording:
+- No reported commercial impact
+- Local security awareness only
+- Possible movement disruption near protest area
+- Possible staff movement concern if operating nearby
+- Monitor for escalation or repeat activity
+
+Map Read replacement:
+This map shows reported operationally relevant issues for the current reporting period. Not every security or crime incident creates commercial impact. Direct impact is used only where reporting indicates a current effect on movement, access, sites, logistics, utilities, production or business continuity. Isolated crime and policing incidents are normally Monitor only unless they affect operations directly.
+
+Acceptance criteria:
+- No murder, arrest, drug raid or isolated crime incident is labelled Direct impact unless a commercial operational effect is stated.
+- Direct impact is reserved for actual business disruption or clear immediate operational effect.
+- Possible impact is used for relevant but indirect issues.
+- Monitor only is used for isolated security or crime reporting with no business disruption.
+- Business relevance wording must match the incident.
+- Preview and PDF export must match.
