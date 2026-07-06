@@ -15,7 +15,7 @@ import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
-import { DataCentreFacilityMap } from "@/components/DataCentreFacilityMap";
+import { DataCentreFacilityMap, statusColor } from "@/components/DataCentreFacilityMap";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { ExternalLink, Server } from "lucide-react";
@@ -39,25 +39,9 @@ function cleanCountry(c?: string | null): string | null {
   return t;
 }
 
-// Registry status → a brand-safe marker colour. Operational reads petrol-blue
-// (the Insignificant accent, reserved but appropriate for a "settled" state);
-// planning/refused/cancelled read the subdued red reserved for adverse states;
-// in-build reads Electric Blue; everything else Dusk Gray. No gradients/shadows.
-const STATUS_COLOR: Record<string, string> = {
-  Operational: "#1B6B7A",
-  "Under construction": "#4655FF",
-  Approved: "#4655FF",
-  Proposed: "#303030",
-  "Planning submitted": "#303030",
-  "Planning refused": "#A33232",
-  Delayed: "#303030",
-  Suspended: "#A33232",
-  Cancelled: "#A33232",
-  Unknown: "#8A94A6",
-};
-function statusColor(s: string): string {
-  return STATUS_COLOR[s] ?? "#8A94A6";
-}
+// Registry status → marker colour is the single source of truth exported from
+// DataCentreFacilityMap.tsx (STATUS_COLOR / statusColor), imported above so the
+// registry list and the facility map can never drift apart.
 
 export default function DataCentres() {
   const { data: rawIncidents = [], isLoading } = useListIncidents({ topic: "data_centres" as never });
