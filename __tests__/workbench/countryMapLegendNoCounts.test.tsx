@@ -52,7 +52,7 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
   });
 
   it("carries an impact level and NOT a severity chip", () => {
-    expect(markup).toContain("Impact level: Direct impact");
+    expect(markup).toContain("Impact level: Possible impact");
     // Severity chips (">High<" etc.) are gone from the operational map.
     expect(markup).not.toContain(">High<");
   });
@@ -93,7 +93,7 @@ describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too
     expect(markup).toContain("Jayapura");
     expect(markup).toContain("What happened this period:");
     expect(markup).toContain("Business relevance:");
-    expect(markup).toContain("Impact level: Direct impact");
+    expect(markup).toContain("Impact level: Possible impact");
   });
 
   it("keeps the unattributed-records honesty note but prints no raw number", () => {

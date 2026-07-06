@@ -57,6 +57,15 @@ Surabaya" — Surabaya anchors it).
   the local-language spelling AND the distinctive proper nouns (group/port/city)
   that stay identical across languages. These are the highest-value tokens because
   they survive the missing-translation case.
+- **Local anchors double-count across BOTH languages, so foreign tokens must too.**
+  A place named in the English `displayTitle` AND its Bahasa `title` (e.g. "Maluku"
+  / "Warga Maluku") counts TWICE on the LOCAL side. An English-only foreign token
+  list can therefore only TIE such a row (foreign 2 vs local 2), and the dominance
+  test is STRICT `>` so a tie never drops — the row leaks. Adding the Bahasa
+  foreign spellings (`belanda`=Netherlands, `jerman`=Germany) makes the foreign
+  side count in both languages too, breaking the tie (4 > 2). Confirmed live: every
+  belanda/jerman row filed `country=Indonesia` is foreign slop (German shootings/
+  wildfires, Netherlands strikes, Morocco-fan riots), so no domestic over-drop.
 - KNOWN RESIDUAL: a row whose translated title names NO country or foreign entity
   in any language (bare "Plane crash kills 11" syndicating a foreign crash) is
   indistinguishable from a domestic accident by content, so the guard leaves it.

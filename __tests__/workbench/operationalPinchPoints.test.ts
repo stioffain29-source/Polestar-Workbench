@@ -26,9 +26,9 @@ describe("operationalPinchPoints — impact-level model", () => {
     // count >= 2 → Direct impact regardless of severity
     expect(impactLevelFor(2, "low")).toBe("Direct impact");
     expect(impactLevelFor(3, "insignificant")).toBe("Direct impact");
-    // single high/extreme → Direct impact
-    expect(impactLevelFor(1, "high")).toBe("Direct impact");
-    expect(impactLevelFor(1, "extreme")).toBe("Direct impact");
+    // a SINGLE report is never Direct impact, however severe — indirect until repeated
+    expect(impactLevelFor(1, "high")).toBe("Possible impact");
+    expect(impactLevelFor(1, "extreme")).toBe("Possible impact");
     // single moderate → Possible impact
     expect(impactLevelFor(1, "moderate")).toBe("Possible impact");
     // single low/insignificant → Monitor only

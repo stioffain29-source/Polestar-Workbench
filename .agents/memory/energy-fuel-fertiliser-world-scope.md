@@ -54,3 +54,16 @@ dropping them. The fix is to widen attribution + map framing, not add sources.
   DB-spelling→polygon-name bridge, not a place to fix world scope.
 - Region topics (flashpoint, conflict, cargo, shipping, protests, …) must stay
   byte-identical: they never pass `scope`, so they default to region.
+- **Antimeridian band (Russia).** Natural Earth 110m stores Russia UNSPLIT across
+  the antimeridian — one ring holds points near +180 AND near −180. When that
+  country is SHADED (the energy/fertiliser world choropleth paints Russia),
+  Leaflet draws the ring as a full-width horizontal BAND across the whole map.
+  The generator's `unwrapAntimeridian` fixes it: any ring that genuinely crosses
+  (a point >170 AND a point <−170) has its western-hemisphere (<0) points shifted
+  +360 (Chukotka −170 → +190) so the ring stays contiguous just east of +180 and
+  never spans the map; ordinary western-hemisphere countries (Canada/US/Cuba) are
+  untouched because no ring of theirs crosses. **Why fertiliser looked clean but
+  energy didn't:** SAME asset — the band only appears on whichever country is
+  actually shaded, and the two maps shade a different value set. After ANY regen,
+  verify no ring has both a point >170 and a point <−170 (Russia lon range should
+  read ~20..191, never a full −180..180 span).

@@ -77,8 +77,8 @@ describe("Indonesia operational (reporting-driven) map", () => {
     expect(markup).toContain("Fire at Jakarta warehouse");
     expect(markup).toContain("Business relevance:");
     expect(markup).toContain("Site, asset and business-continuity exposure");
-    // A single high-severity report is Direct impact.
-    expect(markup).toContain("Impact level: Direct impact");
+    // A single report is Possible impact, however severe (indirect until repeated).
+    expect(markup).toContain("Impact level: Possible impact");
     // Areas with NO reporting this period are absent (not painted).
     expect(markup).not.toContain("Sumatra");
     expect(markup).not.toContain(esc("Kalimantan / Borneo"));

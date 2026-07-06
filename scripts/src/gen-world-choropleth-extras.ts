@@ -46,6 +46,39 @@ const NE_TO_APP: Record<string, string> = {
 // adding a GLOBAL_EXTRA canonical without a polygon fails CI.
 const INCLUDE = new Set(GLOBAL_EXTRA_ALIASES.map((a) => a.canonical));
 
+// Natural Earth stores some countries (Russia) UNSPLIT across the antimeridian:
+// a single ring holds points near +180 AND near -180. Leaflet then renders that
+// ring as a full-width horizontal band across the map whenever the country is
+// shaded (e.g. the energy world map, which paints Russia). Unwrap each crossing
+// ring by shifting its western-hemisphere points +360 so the ring stays
+// contiguous east of +180 (Chukotka -170 -> +190) and never spans the map. Only
+// rings that GENUINELY cross (a point >170 AND a point <-170) are touched, so
+// ordinary western-hemisphere countries (Canada, the US, Cuba) are untouched.
+type Ring = number[][];
+function unwrapAntimeridian(geometry: unknown): unknown {
+  const g = geometry as { type?: string; coordinates?: unknown };
+  const fixRing = (ring: Ring): Ring => {
+    let hasEast = false;
+    let hasWest = false;
+    for (const p of ring) {
+      if (p[0] > 170) hasEast = true;
+      if (p[0] < -170) hasWest = true;
+    }
+    if (!(hasEast && hasWest)) return ring;
+    return ring.map((p) => [p[0] < 0 ? p[0] + 360 : p[0], p[1]]);
+  };
+  if (g?.type === "Polygon") {
+    return { ...g, coordinates: (g.coordinates as Ring[]).map(fixRing) };
+  }
+  if (g?.type === "MultiPolygon") {
+    return {
+      ...g,
+      coordinates: (g.coordinates as Ring[][]).map((poly) => poly.map(fixRing)),
+    };
+  }
+  return geometry;
+}
+
 const fc = feature(
   worldAtlas as never,
   worldAtlas.objects.countries as never,
@@ -62,7 +95,7 @@ const features: GeoFeature[] = fc.features
     (x: { name: string; geometry: unknown }): GeoFeature => ({
       type: "Feature",
       properties: { name: x.name },
-      geometry: x.geometry,
+      geometry: unwrapAntimeridian(x.geometry),
     }),
   );
 

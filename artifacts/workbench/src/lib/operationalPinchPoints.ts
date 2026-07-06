@@ -49,23 +49,24 @@ export function worstSeverityKey(incidents: Array<{ severity?: string }>): strin
   return key;
 }
 
-// Impact level from FREQUENCY + BUSINESS IMPACT (the owner's global rule). One
-// incident does NOT automatically read as Direct impact — the label reflects
-// both how often an area is reported and how clear the business effect is:
-//  - DIRECT IMPACT  : multiple relevant reports in one area (count >= 2), OR a
-//                     single event with a clear direct business effect (worst
-//                     severity high/extreme).
-//  - POSSIBLE IMPACT: a single report that is relevant but limited, indirect or
-//                     not yet confirmed (moderate).
-//  - MONITOR ONLY   : relevant but no clear current disruption (a single
-//                     low/insignificant report), mapped only because it is
-//                     operationally relevant.
+// Impact level from FREQUENCY + BUSINESS IMPACT (the owner's global rule). A
+// SINGLE reported event is never "Direct impact" on its own — however severe,
+// one isolated report is an INDIRECT signal for operations until the area is
+// reported more than once. Direct impact is reserved for a repeatedly-reported
+// area (a corroborated hotspot), so a lone violent crime reads Possible, not
+// Direct:
+//  - DIRECT IMPACT  : the area carries multiple relevant reports this period
+//                     (count >= 2) — a genuine, corroborated operational hotspot.
+//  - POSSIBLE IMPACT: a single relevant report of moderate-or-worse effect — a
+//                     credible but indirect signal (one event, not yet repeated).
+//  - MONITOR ONLY   : a single low/insignificant report, mapped only because it
+//                     is operationally relevant.
 // count === 0 must never reach here (unmapped locations are dropped upstream);
 // it is treated as "Monitor only" defensively.
 export function impactLevelFor(count: number, worstKey: string): ImpactLevel {
   const rank = SEV_RANK[(worstKey ?? "").toLowerCase()] ?? 0;
-  if (count >= 2 || rank >= 4) return "Direct impact";
-  if (rank === 3) return "Possible impact";
+  if (count >= 2) return "Direct impact";
+  if (rank >= 3) return "Possible impact";
   return "Monitor only";
 }
 
