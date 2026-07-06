@@ -247,12 +247,12 @@ export default function Topic() {
 
   const withCoords = inWindow.filter((i) => i.latitude != null && i.longitude != null);
 
-  // Fertiliser and energy use a country-level choropleth (mirrors the Cargo
-  // Watch map) instead of per-incident spots: shade each in-scope country by
-  // its windowed incident count. `buildCountryIntensity` folds the per-country
+  // Fertiliser, energy and fuel use a country-level choropleth (mirrors the
+  // Cargo Watch map) instead of per-incident spots: shade each in-scope country
+  // by its windowed incident count. `buildCountryIntensity` folds the per-country
   // counts into the shared choropleth polygon-name space (applying the few DB
   // spelling aliases, e.g. "United Arab Emirates" -> "UAE").
-  const useChoropleth = topic === "fertiliser" || topic === "energy";
+  const useChoropleth = topic === "fertiliser" || topic === "energy" || topic === "fuel";
   // Energy/fuel/fertiliser attribute incidents worldwide (global commodity
   // markets), so their maps use a world frame that shows the out-of-region
   // countries; every other topic keeps the APAC + Middle-East region frame.
