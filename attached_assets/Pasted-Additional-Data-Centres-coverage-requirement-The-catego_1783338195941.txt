@@ -1,0 +1,87 @@
+Additional Data Centres coverage requirement:
+
+The category should include known and emerging data centre locations, including live facilities, major campuses, planned developments and proposed sites where publicly available.
+
+The system should track location level detail wherever possible:
+
+Country
+City or province
+Industrial park, technology park or business zone
+Specific site name where available
+Operator, developer or tenant where publicly reported
+Project status
+Approximate coordinates where available
+Operational, under construction, proposed, approved, delayed, suspended or rejected
+
+Planning and regulatory coverage should include:
+
+Planning applications
+Planning approvals
+Planning refusals
+Environmental impact assessments
+Water use approvals
+Power connection approvals
+Grid capacity issues
+Land acquisition
+Zoning decisions
+Construction permits
+Building permits
+Government moratoriums
+Foreign investment scrutiny
+Data localisation rules
+Tax incentives
+Special economic zone approvals
+Community objections
+Legal challenges
+Environmental objections
+Public consultation periods
+Political statements affecting data centre development
+
+The category should also flag changes in project status, especially where a data centre moves from proposed to approved, approved to under construction, delayed, cancelled or operational.
+
+Suggested additional Workbench fields:
+
+Facility or project name
+Operator or developer
+Location
+Coordinates
+Status
+Planning stage
+Regulatory issue
+Power requirement
+Water requirement
+Known customers or tenants
+Source confidence
+Last updated
+Operational relevance
+
+Suggested project status values:
+
+Operational
+Under construction
+Approved
+Proposed
+Planning submitted
+Planning refused
+Delayed
+Suspended
+Cancelled
+Unknown
+
+Suggested planning risk values:
+
+No known issue
+Planning pending
+Environmental review
+Water constraint
+Power constraint
+Community opposition
+Legal challenge
+Political scrutiny
+Permit refused
+Moratorium
+Unknown
+
+Suggested Polestar View angle:
+
+Data centre development is increasingly shaped by power availability, water access, planning approval, land use politics, environmental scrutiny and local community tolerance. For operators, investors, insurers and suppliers, the risk is no longer just whether a facility can be built, but whether the surrounding infrastructure, regulation and social licence can support it.
