@@ -169,8 +169,13 @@ export function dropSyndicatedRehashes<
 export function buildCountryLayers(
   incidents: CountryFastFactsIncident[],
   issueDate: string,
+  opts?: { preFiltered?: boolean },
 ): CountryLayerBuckets {
-  const relevant = filterCountryRelevant(incidents);
+  // When the caller has already applied `filterCountryRelevant` (the country
+  // report page does, to also derive the issue-date anchor), skip the second
+  // identical pass — relevance-filtering a 6k+ Indonesia set twice per render
+  // was a material contributor to the page freeze. Output is byte-identical.
+  const relevant = opts?.preFiltered ? incidents : filterCountryRelevant(incidents);
 
   const win = resolveReportWindow("country", issueDate);
   const end = win.end;

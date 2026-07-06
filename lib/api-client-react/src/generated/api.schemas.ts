@@ -2376,6 +2376,10 @@ severity?: Severity;
  */
 days?: number;
 search?: string;
+/**
+ * Superset country pre-filter: comma-separated tokens. Returns rows whose country field contains ANY token (case-insensitive substring). Distinct from the exact `country` match — this is a loose OR filter used by the country report to scope the fetch (cutting payload and the corroboration join) without changing the client-side country match, which stays the authoritative gate.
+ */
+countryLike?: string;
 };
 
 export type GetRecentIncidentsParams = {

@@ -61,7 +61,7 @@ router.get("/incidents", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { topic, country, severity, days, search } = parsed.data;
+  const { topic, country, severity, days, search, countryLike } = parsed.data;
   const conditions = [];
   if (topic) conditions.push(eq(incidentsTable.topic, topic));
   if (country) conditions.push(eq(incidentsTable.country, country));
@@ -78,6 +78,29 @@ router.get("/incidents", async (req, res): Promise<void> => {
         ilike(incidentsTable.country, `%${search}%`),
       )!,
     );
+  }
+  // Superset country pre-filter: an OR of case-insensitive substring matches on
+  // the `country` field for each comma-separated token. DISTINCT from the exact
+  // `country` param above — the country field is a semicolon-compound list
+  // ("South Korea; Iran"), so an exact eq is useless for the country report.
+  // Every token the caller sends is, by construction, an exact segment the
+  // client's incidentMatchesCountry accepts, so this returns a guaranteed
+  // SUPERSET of the rows the page keeps: it only trims payload (and the
+  // corroboration join), never the authoritative client-side country gate.
+  // LIKE metacharacters are stripped so a stray token can't widen the pattern.
+  // (Assumes country names contain no LIKE metachars — true for every group name
+  // today; a name that did would NARROW below the exact client match and starve
+  // that brief, so escape rather than strip if that ever changes.)
+  if (countryLike) {
+    const tokens = countryLike
+      .split(",")
+      .map((t) => t.trim().replace(/[%_\\]/g, ""))
+      .filter(Boolean);
+    if (tokens.length > 0) {
+      conditions.push(
+        or(...tokens.map((t) => ilike(incidentsTable.country, `%${t}%`)))!,
+      );
+    }
   }
   if (!wantsRaw(req.query)) conditions.push(defaultRelevanceCondition());
   const rows = await db

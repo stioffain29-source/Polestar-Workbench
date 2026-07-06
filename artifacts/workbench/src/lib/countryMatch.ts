@@ -76,6 +76,23 @@ export function competingSupersetTokens(reportName: string): string[] {
 }
 
 /**
+ * Tokens used to SCOPE a server-side superset pre-fetch for a country report
+ * (the `countryLike` query param). Returns the country's own accepted tokens,
+ * EXCEPT the Jakarta city brief: Jakarta records carry the country field
+ * "Indonesia" (never "Jakarta") and the page matches them against the Indonesia
+ * group, so the fetch must be scoped to the Indonesia tokens or the brief is
+ * starved to zero. Each returned token is, by construction, an exact segment
+ * that {@link incidentMatchesCountry} accepts, so a `country ILIKE %token%`
+ * per token returns a guaranteed SUPERSET of the rows the page keeps — trimming
+ * payload without touching the authoritative client-side country gate.
+ */
+export function countryFetchTokens(reportName: string): string[] {
+  const tokens = acceptedCountryTokens(reportName);
+  if (tokens.includes("jakarta")) return acceptedCountryTokens("indonesia");
+  return tokens;
+}
+
+/**
  * True when an incident's `country` field contains at least one token that
  * is an exact member of the report's accepted-token set. Cross-border
  * records (tokens from more than one group) match every group they touch.

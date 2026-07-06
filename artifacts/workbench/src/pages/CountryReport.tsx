@@ -44,6 +44,7 @@ import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 import {
   incidentMatchesCountry,
   acceptedCountryTokens,
+  countryFetchTokens,
   isIndonesianWestPapuaContext,
   isPapuaNewGuineaDominantContext,
   isIndonesianPapuaTheatreContext,
@@ -187,16 +188,29 @@ export default function CountryReport() {
   // page's own `isCountryRelevant` gate (applied in buildCountryLayers) be the
   // single source of truth, so the report is self-consistent and identical in
   // dev and prod regardless of how each DB persisted relevance.
+  // Server-side SUPERSET pre-filter: scope the 90-day fetch to rows whose
+  // country field contains one of this report's accepted tokens. Without it the
+  // server returned the ENTIRE 90-day incidents table (~16k rows) for EVERY
+  // country and joined corroborations over all of them — the root cause of the
+  // Indonesia tab freeze. countryFetchTokens guarantees a superset of the rows
+  // this page keeps (Jakarta scoped to the Indonesia group), so the client
+  // isCountryRelevant gate below remains the authoritative filter.
+  const incidentFetchParams = useMemo(() => {
+    if (!country) return {};
+    const tokens = countryFetchTokens(country.name ?? "");
+    return {
+      days: 90,
+      includeIrrelevant: true,
+      ...(tokens.length ? { countryLike: tokens.join(",") } : {}),
+    };
+  }, [country]);
   const {
     data: incidentsData,
     isSuccess: incidentsSuccess,
     isError: incidentsError,
-  } = useListIncidents(
-    country ? ({ days: 90, includeIrrelevant: true } as never) : {},
-    {
-      query: { enabled: !!country },
-    } as never,
-  );
+  } = useListIncidents(incidentFetchParams as never, {
+    query: { enabled: !!country },
+  } as never);
   // Source health feeds the coverage-status determination for an empty
   // weekly window (always a coverage-problem; the detail explains which).
   // Gate the banner only
@@ -348,9 +362,20 @@ export default function CountryReport() {
   // Also strip syndicated rehashes (an aggregator re-running a months-old
   // event with a fresh publication date) so a recycled headline can't drag
   // the issue date onto an empty current week ahead of the genuine cluster.
-  const relevantIncidents = useMemo(
-    () => dropSyndicatedRehashes(filterCountryRelevant(incidents as CountryFastFactsIncident[])),
+  // Country-relevant records (drops economic/PR/sports noise via
+  // isCountryRelevant). Computed ONCE here and reused for both the issue-date
+  // anchor and the lookback layers, so the ~6k-row Indonesia set is
+  // relevance-filtered a single time per render instead of twice.
+  const countryRelevant = useMemo(
+    () => filterCountryRelevant(incidents as CountryFastFactsIncident[]),
     [incidents],
+  );
+  // Issue-date anchor ONLY: additionally strip syndicated rehashes so a
+  // recycled headline can't drag the date onto an empty week. This
+  // rehash-dropped set is NEVER used for display — only to pick the date.
+  const relevantIncidents = useMemo(
+    () => dropSyndicatedRehashes(countryRelevant),
+    [countryRelevant],
   );
   const issueDate = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -399,8 +424,10 @@ export default function CountryReport() {
   }, [country]);
   const isStructured = structuredTheatre !== null;
   const layers: CountryLayerBuckets = useMemo(
-    () => buildCountryLayers(incidents as CountryFastFactsIncident[], issueDate),
-    [incidents, issueDate],
+    // countryRelevant is already relevance-filtered, so tell buildCountryLayers
+    // to skip its internal re-filter (preFiltered) — same buckets, one pass.
+    () => buildCountryLayers(countryRelevant, issueDate, { preFiltered: true }),
+    [countryRelevant, issueDate],
   );
 
   // Active reporting window. Country reports are a WEEKLY brief, so the headline
