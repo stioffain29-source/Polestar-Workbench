@@ -31,8 +31,11 @@ import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
 
+// Fallback marker colour for any status not explicitly mapped below.
+export const STATUS_FALLBACK_COLOR = "#8A94A6";
+
 // Registry status → brand-safe marker colour (mirrors DataCentres.tsx).
-const STATUS_COLOR: Record<string, string> = {
+export const STATUS_COLOR: Record<string, string> = {
   Operational: "#1B6B7A",
   "Under construction": "#4655FF",
   Approved: "#4655FF",
@@ -44,8 +47,8 @@ const STATUS_COLOR: Record<string, string> = {
   Cancelled: "#A33232",
   Unknown: "#8A94A6",
 };
-function statusColor(s: string): string {
-  return STATUS_COLOR[s] ?? "#8A94A6";
+export function statusColor(s: string): string {
+  return STATUS_COLOR[s] ?? STATUS_FALLBACK_COLOR;
 }
 
 function darken(hex: string, amount = 0.18): string {
@@ -325,6 +328,7 @@ export function DataCentreFacilityMap({
         <LegendSwatch color={STATUS_COLOR["Under construction"]} label="Under construction / Approved" />
         <LegendSwatch color={STATUS_COLOR.Proposed} label="Proposed / Planning / Delayed" />
         <LegendSwatch color={STATUS_COLOR.Cancelled} label="Refused / Suspended / Cancelled" />
+        <LegendSwatch color={STATUS_FALLBACK_COLOR} label="Unknown / unclassified" />
         <LegendRing />
         <LegendIncident />
         <LegendLink />
