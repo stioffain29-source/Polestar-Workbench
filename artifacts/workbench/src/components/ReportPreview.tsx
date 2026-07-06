@@ -38,6 +38,8 @@ import {
   FUEL_MISSING_REQUIRED_NOTE,
 } from "@/lib/fuelWatchReport";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import { MarketPricesReportSection } from "@/components/MarketPrices";
+import type { MarketPrice } from "@workspace/api-client-react";
 import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import { buildCargoCountryIntensity } from "@/lib/cargoReportChoropleth";
@@ -640,11 +642,13 @@ export default function ReportPreview({
   incidents = [],
   incidentSummaries = {},
   aiProse,
+  marketPrices,
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
   incidentSummaries?: Record<string, string>;
   aiProse?: TopicAiProse | null;
+  marketPrices?: MarketPrice[];
 }) {
   void canonicalTopic; void format; void parseISO;
   const resolvedTitle = report.topic
@@ -976,6 +980,12 @@ export default function ReportPreview({
             <Section title="Fast Facts">
               <FastFactsGrid cards={fastFacts} />
             </Section>
+
+            {report.topic === "energy" && (
+              <Section title="Market Prices">
+                <MarketPricesReportSection rows={marketPrices ?? []} />
+              </Section>
+            )}
 
             {isCargo && cargoIntensity && cargoIntensity.size > 0 && (
               <Section title="Cargo Theft Map">

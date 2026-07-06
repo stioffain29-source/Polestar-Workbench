@@ -4,6 +4,8 @@ import {
   useGetReport,
   useUpdateReport,
   useListIncidents,
+  useListMarketPrices,
+  getListMarketPricesQueryKey,
   useListLatestMaritimeMovement,
   useListMaritimeMovement,
   useListMaritimeSecurityEvents,
@@ -204,6 +206,15 @@ export default function ReportEditor() {
   // over the gated cargo subset. Every downstream builder re-applies
   // filterTopicReportIncidents → isCargoInScope, so this admits exactly the rows
   // the monitor shows and leaves all other topics byte-identical.
+  const isEnergyReport = form.topic === "energy";
+  const energyMarketParams = { group: "energy" };
+  const { data: energyMarketPrices = [] } = useListMarketPrices(energyMarketParams, {
+    query: {
+      enabled: isEnergyReport,
+      queryKey: getListMarketPricesQueryKey(energyMarketParams),
+    },
+  });
+
   const isCargoReport = form.topic === "cargo_watch";
   const cargoRawParams = { topic: "cargo_watch", includeIrrelevant: true };
   const { data: rawCargoIncidents } = useListIncidents(cargoRawParams as never, {
@@ -701,6 +712,7 @@ export default function ReportEditor() {
             allowMissingMarketData: allow,
             incidentSummaries: effectiveSummaries,
             aiProse: aiProseSections,
+            marketPrices: energyMarketPrices,
           },
         );
       }
@@ -2250,6 +2262,7 @@ export default function ReportEditor() {
               incidents={incidentsForExport}
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
+              marketPrices={energyMarketPrices}
             />
           )}
         </div>

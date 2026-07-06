@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
+import type { MarketPrice } from "@workspace/api-client-react";
 import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import { buildCargoCountryIntensity } from "./cargoReportChoropleth";
@@ -125,6 +127,10 @@ export interface ExportTopicReportPdfOptions {
   /** Cached AI narrative for the report. Sits beneath any analyst edit
    *  and above the deterministic draft, mirroring the on-screen preview. */
   aiProse?: TopicAiProse | null;
+  /** Live commodity-price rows for the Energy Watch report's Market Prices
+   *  section. Fetched once by the caller from /api/market-prices?group=energy
+   *  so preview and PDF read the identical dataset. */
+  marketPrices?: MarketPrice[];
 }
 
 export interface TopicReportData {
@@ -1121,6 +1127,19 @@ export async function exportTopicReportPdf(
         topicLabel: topicLabels[data.topic] ?? data.topic,
       }) as KpiCardData[],
     );
+
+    if (data.topic === "energy") {
+      drawSectionHeading(ctx, "Market Prices");
+      const rows = options.marketPrices ?? [];
+      if (rows.length === 0) {
+        renderProse(ctx, MARKET_PRICES_REPORT_EMPTY_TEXT);
+      } else {
+        await embedReactChartInPdf(
+          ctx,
+          createElement(MarketPricesReportGrid, { rows }),
+        );
+      }
+    }
 
     const isCargo = data.topic === "cargo_watch";
     const pickProse = (
