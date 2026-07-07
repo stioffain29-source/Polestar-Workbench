@@ -2885,6 +2885,47 @@ export async function runDataMigrations(): Promise<void> {
       logger.error({ err: delErr }, "Dead placeholder source removal failed");
     }
 
+    // 7b) One-time removal of orphaned jet-fuel Source Health rows left behind
+    //     by a past source rename. The live jet feed now self-registers as
+    //     "EIA U.S. Gulf Coast jet fuel (FRED DJFUELUSGULF)" (marketPrices.ts)
+    //     and reads operational, but two earlier-named rows are never written
+    //     by any current code, so they sit frozen at an old date and make the
+    //     fuel feed list look stale. Deleted BY EXACT NAME ONLY — neither name
+    //     collides with a live feed the current code writes. Marker-gated: a
+    //     source legitimately re-added later with the same name is never
+    //     re-deleted on a future boot.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "orphaned_jet_fuel_sources_removed_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const ORPHANED_JET_FUEL_SOURCES = [
+          "US Gulf Coast Jet Fuel (EIA / FRED)",
+          "NY Harbor ULSD jet proxy (Yahoo HO=F / FRED fallback)",
+        ];
+        const res = await db
+          .delete(sourcesTable)
+          .where(inArray(sourcesTable.name, ORPHANED_JET_FUEL_SOURCES));
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "Removed orphaned jet-fuel source rows (renamed feed self-registers under new name)",
+        );
+      }
+    } catch (delErr) {
+      logger.error({ err: delErr }, "Orphaned jet-fuel source removal failed");
+    }
+
     // Card builder: seed the four built-in card templates and ensure the
     // singleton brand-settings row exists. Marker-gated so an analyst who later
     // edits a built-in's defaults is never overwritten on the next boot.
