@@ -251,9 +251,26 @@ export default function DataCentres() {
         </div>
       </Section>
 
-      {/* 3. Geography — incident choropleth + purpose-built facility overlay */}
-      <Section title="Geography">
+      {/* 3. Operational map — interactive facility map (incident layer toggles
+          separately) leads, incident-density choropleth follows. */}
+      <Section title="Operational Map">
         <div className="grid grid-cols-1 gap-4">
+          <div className="bg-white border border-border rounded-sm overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
+                Data-Centre Facility Map — {facilities.length} facilit{facilities.length === 1 ? "y" : "ies"} · incidents ({RANGE_LABEL[range]})
+              </span>
+              <span className="text-[10px] text-muted-foreground font-sans normal-case">
+                Scroll to zoom · hover a point for detail · toggle the incident layer below
+              </span>
+            </div>
+            {facLoading || isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading…</div>
+            ) : (
+              <DataCentreFacilityMap facilities={facilities} incidents={inWindow} />
+            )}
+          </div>
+
           <div className="bg-white border border-border rounded-sm overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
               Incident Density by Country ({RANGE_LABEL[range]})
@@ -264,17 +281,6 @@ export default function DataCentres() {
               scope="world"
               emptyText="No identified incident countries in this window."
             />
-          </div>
-
-          <div className="bg-white border border-border rounded-sm overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground font-sans">
-              Facility &amp; Incident Overlay ({RANGE_LABEL[range]})
-            </div>
-            {facLoading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Loading…</div>
-            ) : (
-              <DataCentreFacilityMap facilities={facilities} incidents={inWindow} />
-            )}
           </div>
         </div>
       </Section>

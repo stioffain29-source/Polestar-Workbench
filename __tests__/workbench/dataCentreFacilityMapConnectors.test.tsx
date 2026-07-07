@@ -285,7 +285,27 @@ describe("DataCentreFacilityMap — recent status mover ring", () => {
 });
 
 describe("DataCentreFacilityMap — STRICT no-fabrication (coordinateless omission)", () => {
-  it("shows the empty state when no facility carries coordinates", () => {
+  it("shows the empty state only when NEITHER facilities nor incidents carry coordinates", () => {
+    const host = parse(
+      renderToStaticMarkup(
+        <DataCentreFacilityMap
+          facilities={[facility({ id: 1, latitude: null, longitude: null })]}
+          incidents={[incident({ id: 100, latitude: null, longitude: null })]}
+        />,
+      ),
+    );
+    expect(host.textContent).toContain(
+      "No facilities or incidents with coordinates on file",
+    );
+    // Nothing is plotted: no markers, no connector.
+    expect(host.querySelectorAll('[data-testid="circle-marker"]')).toHaveLength(0);
+    expect(connectors(host)).toHaveLength(0);
+  });
+
+  it("renders the incident layer on its own when a plotted incident exists but no facility carries coordinates", () => {
+    // Incidents are an independently toggleable layer, so a coordinate-bearing
+    // incident maps even when every facility is coordinateless — the map is NOT
+    // suppressed to the honest empty state.
     const host = parse(
       renderToStaticMarkup(
         <DataCentreFacilityMap
@@ -294,12 +314,17 @@ describe("DataCentreFacilityMap — STRICT no-fabrication (coordinateless omissi
         />,
       ),
     );
-    expect(host.textContent).toContain(
-      "No facilities with coordinates on file",
+    expect(host.textContent).not.toContain(
+      "No facilities or incidents with coordinates on file",
     );
-    // Nothing is plotted: no markers, no connector.
-    expect(host.querySelectorAll('[data-testid="circle-marker"]')).toHaveLength(0);
-    expect(connectors(host)).toHaveLength(0);
+    // The incident marker (radius 5) is plotted; the coordinateless facility pin
+    // (radius 7) is not.
+    expect(
+      host.querySelectorAll('[data-testid="circle-marker"][data-radius="5"]'),
+    ).toHaveLength(1);
+    expect(
+      host.querySelectorAll('[data-testid="circle-marker"][data-radius="7"]'),
+    ).toHaveLength(0);
   });
 
   it("omits a coordinateless incident from the map while plotting the facility", () => {
