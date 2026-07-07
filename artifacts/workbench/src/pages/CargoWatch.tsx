@@ -486,6 +486,46 @@ export default function CargoWatch() {
         </div>
       </div>
 
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border p-px rounded-sm overflow-hidden">
+        <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · ${rangeText}`} />
+        <Kpi label="Confirmed Value Stolen" value={confirmedValue > 0 ? usd(confirmedValue) : "—"} sub="Source-stated USD only" />
+        <Kpi label="Incidents With Companies Named" value={companiesNamed} sub="Named commercial entity in source" />
+        <Kpi
+          label="Biggest Single Loss"
+          value={biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? usd(biggestLoss.usdLoss ?? 0) : "—"}
+          sub={
+            biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? (
+              <span>
+                {biggestLoss.displayCountry ?? "—"}
+                {biggestLossIsRecent ? (
+                  <>
+                    {" · "}
+                    {incidentSourceUrl(biggestLoss) ? (
+                      <a href={incidentSourceUrl(biggestLoss)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">spot-report candidate</a>
+                    ) : (
+                      "spot-report candidate"
+                    )}
+                  </>
+                ) : null}
+              </span>
+            ) : (
+              "No source-stated loss in window"
+            )
+          }
+        />
+      </div>
+
+      <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2 space-y-1">
+        <div>
+          Showing {total} distinct in-scope cargo / logistics crime record{total === 1 ? "" : "s"} ({rangeText}). Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
+        </div>
+        <div>
+          Source data holds {totalInDb} cargo record{totalInDb === 1 ? "" : "s"} in total, every one accounted for: {inScopeRaw} in scope
+          {collapsedCopies > 0 ? ` (merged to ${distinctInScope} distinct after collapsing ${collapsedCopies} syndicated ${collapsedCopies === 1 ? "copy" : "copies"})` : ""}; {outOfScopeCount} out-of-scope location (outside APAC / Middle East); {excludedNonCargoCount} non-cargo (governance, civil affairs, film reviews, electricity theft, port congestion, freight rates, etc.); {reviewCount} unidentified country — needs review (see the Needs Review tab).
+        </div>
+      </div>
+
       {/* Map + Incident reports by country */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-card border border-border rounded-sm flex flex-col">
@@ -841,46 +881,6 @@ export default function CargoWatch() {
 
       {/* Cargo Incident Clusters — shared grouping module (== report preview + PDF) */}
       <CargoClusterPanel grouped={cargoGrouped} rangeText={rangeText} />
-
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border p-px rounded-sm overflow-hidden">
-        <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · ${rangeText}`} />
-        <Kpi label="Confirmed Value Stolen" value={confirmedValue > 0 ? usd(confirmedValue) : "—"} sub="Source-stated USD only" />
-        <Kpi label="Incidents With Companies Named" value={companiesNamed} sub="Named commercial entity in source" />
-        <Kpi
-          label="Biggest Single Loss"
-          value={biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? usd(biggestLoss.usdLoss ?? 0) : "—"}
-          sub={
-            biggestLoss && (biggestLoss.usdLoss ?? 0) > 0 ? (
-              <span>
-                {biggestLoss.displayCountry ?? "—"}
-                {biggestLossIsRecent ? (
-                  <>
-                    {" · "}
-                    {incidentSourceUrl(biggestLoss) ? (
-                      <a href={incidentSourceUrl(biggestLoss)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">spot-report candidate</a>
-                    ) : (
-                      "spot-report candidate"
-                    )}
-                  </>
-                ) : null}
-              </span>
-            ) : (
-              "No source-stated loss in window"
-            )
-          }
-        />
-      </div>
-
-      <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2 space-y-1">
-        <div>
-          Showing {total} distinct in-scope cargo / logistics crime record{total === 1 ? "" : "s"} ({rangeText}). Scope: APAC + Middle East cargo theft, hijack, pilferage, warehouse, depot and container crime only.
-        </div>
-        <div>
-          Source data holds {totalInDb} cargo record{totalInDb === 1 ? "" : "s"} in total, every one accounted for: {inScopeRaw} in scope
-          {collapsedCopies > 0 ? ` (merged to ${distinctInScope} distinct after collapsing ${collapsedCopies} syndicated ${collapsedCopies === 1 ? "copy" : "copies"})` : ""}; {outOfScopeCount} out-of-scope location (outside APAC / Middle East); {excludedNonCargoCount} non-cargo (governance, civil affairs, film reviews, electricity theft, port congestion, freight rates, etc.); {reviewCount} unidentified country — needs review (see the Needs Review tab).
-        </div>
-      </div>
 
       {/* Captured incidents table */}
       <div className="bg-card border border-border rounded-sm">
