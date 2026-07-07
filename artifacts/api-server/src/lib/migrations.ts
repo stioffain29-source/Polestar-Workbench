@@ -533,6 +533,16 @@ export async function runDataMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS facility_type text NOT NULL DEFAULT 'Unknown / not reported'
     `);
 
+    // Additive: per-field enrichment provenance (see EnrichmentSources). Nullable
+    // jsonb keyed by enriched field name -> { provider, sourceRef, asOf, value }.
+    // Written ONLY by the supervised provider-agnostic enrichment run; a blank
+    // column reads as "no external field ever imported". Idempotent (IF NOT
+    // EXISTS); no backfill (all pre-existing rows correctly start NULL).
+    await db.execute(sql`
+      ALTER TABLE data_centre_facilities
+      ADD COLUMN IF NOT EXISTS enrichment_sources jsonb
+    `);
+
     // Schema: per-country DATA-CENTRE RISK FRAMEWORK — one row per country with a
     // 16-dimension analyst-maintained assessment (jsonb `dimensions`). Ratings
     // may be auto-seeded from cited public indices then analyst-overridden; a

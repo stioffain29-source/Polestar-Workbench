@@ -91,6 +91,37 @@ export type {
   PeeringDbNormaliseResult,
 } from "./peeringdbFacilities";
 export {
+  runDataCentreEnrichment,
+  parseEnrichmentFile,
+  normaliseRecord,
+  parseCsv,
+  parsePowerMw,
+  matchRecordToFacilities,
+  normaliseFacilityName,
+  haversineMetres,
+  computeFacilityDiff,
+  buildFieldCoverage,
+  getProviderProfile,
+  GENERIC_PROFILE,
+  PROVIDER_PROFILES,
+  ENRICHABLE_FIELDS,
+  COVERAGE_FIELDS,
+} from "./dataCentreEnrichment";
+export type {
+  ProviderProfile,
+  ProviderColumnMap,
+  EnrichmentRecord,
+  EnrichmentSummary,
+  EnrichmentOptions,
+  FieldDiff,
+  FieldCoverage,
+  MatchResult,
+  MatchableFacility,
+  DiffableFacility,
+  EnrichableField,
+  CoverageField,
+} from "./dataCentreEnrichment";
+export {
   runReliefWebCorroboration,
   isReliefWebConfigured,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,

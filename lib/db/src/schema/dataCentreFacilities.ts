@@ -6,6 +6,7 @@ import {
   boolean,
   doublePrecision,
   timestamp,
+  jsonb,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -74,6 +75,27 @@ export const DATA_CENTRE_TYPES = [
 ] as const;
 export type DataCentreType = (typeof DATA_CENTRE_TYPES)[number];
 
+// Per-field enrichment provenance. When a supervised, provider-agnostic
+// enrichment run writes an operational field (status / facilityType /
+// capacityMw / itLoadMw) from an external source, it records WHICH source and
+// WHICH value it wrote here, keyed by the enriched field name. This satisfies
+// the "store the source reference against every updated field" rule and lets
+// re-runs stay idempotent (a field is never re-imposed if the exact same value
+// was already imported once — respecting any later analyst override).
+export interface EnrichmentFieldSource {
+  // Provider display name, e.g. "Baxtel". Never a secret / key.
+  provider: string;
+  // The source's own reference for this fact (URL or record id) if it supplies
+  // one; null when the source carries no per-record reference.
+  sourceRef: string | null;
+  // The "as of" date the source stated for this fact, verbatim; null if none.
+  asOf: string | null;
+  // The exact value written to the column (string for status/type, number for
+  // capacity). Used as the idempotency marker for re-runs.
+  value: string | number;
+}
+export type EnrichmentSources = Record<string, EnrichmentFieldSource>;
+
 export const dataCentreFacilitiesTable = pgTable(
   "data_centre_facilities",
   {
@@ -127,6 +149,11 @@ export const dataCentreFacilitiesTable = pgTable(
     statusChanged: boolean("status_changed").notNull().default(false),
     previousStatus: text("previous_status"),
     statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+
+    // Per-field enrichment provenance (see EnrichmentSources). Nullable — only
+    // set when a supervised enrichment run writes an operational field from an
+    // external source. Never touched by manual analyst edits.
+    enrichmentSources: jsonb("enrichment_sources").$type<EnrichmentSources>(),
 
     // Analyst-entered authorship (NOT authenticated identity).
     createdBy: text("created_by"),
