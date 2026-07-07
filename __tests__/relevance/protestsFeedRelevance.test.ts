@@ -720,6 +720,77 @@ const FIXTURES: Fixture[] = [
     title: "Mass protests erupt after activist handed life sentence",
     verdict: "KEEP",
   },
+
+  // ---- Product / technology "demonstration" homonym (Task #325): DROP --
+  // "demonstration" here is a product/tech DEMO, not a protest, yet the bare
+  // word title-rescues it. Caught before the rescue.
+  {
+    title:
+      "Incheon Startup Park TRYOUT Public and Private Demonstration Kick-Off Held with Participation from 42 Companies",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  {
+    title:
+      "AI Protects Airport Safety: Sage Launches Demonstration of AI Control for Incheon Airport Shuttle Train",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  // A genuine public demonstration (no launch/kick-off/of-tech/private cue)
+  // must SURVIVE the tech-demo exclude: KEEP.
+  {
+    title: "Thousands hold a public demonstration outside parliament",
+    verdict: "KEEP",
+  },
+
+  // ---- Entertainment / fandom "protest" (Task #325): DROP --------------
+  // A fan grievance about concerts / tours / tickets is entertainment colour,
+  // not security-relevant civil unrest.
+  {
+    title: "BTS fans protest Chile's block on concerts",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  // A real street protest that merely mentions a concert venue must SURVIVE.
+  {
+    title: "Protesters clash with police outside the stadium concert venue in Manila",
+    verdict: "KEEP",
+  },
+
+  // ---- Market / investor grievance over a trading loss (Task #325): DROP
+  // An investor complaint about a brokerage glitch / forced sell-off is a
+  // markets story, not civil unrest.
+  {
+    title:
+      "Kiwoom system glitch triggers forced sell-offs, investors protest in South Korea",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  // A genuine street protest by workers is untouched by the markets exclude.
+  {
+    title: "Workers protest outside the stock exchange over unpaid wages, clash with police",
+    verdict: "KEEP",
+  },
+
+  // ---- Internet / website regulatory "crackdown" homonym (Task #325): DROP
+  // A crackdown on fake sites / domains / online scams is a regulatory story,
+  // not civil unrest — routed through the negative-sense crackdown gate.
+  {
+    title:
+      "World's biggest domain seller fears India's fake site crackdown could damage internet",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  {
+    title: "Philippines launches crackdown on scam websites and phishing domains",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  // A police crackdown ON PROTESTERS still keeps (unrest companion present).
+  {
+    title: "Police crackdown on protesters intensifies as clashes spread in Jakarta",
+    verdict: "KEEP",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {

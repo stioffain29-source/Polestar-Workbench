@@ -487,6 +487,25 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // Over Dearness Allowance". A dearness-allowance / arrears staff pay claim is
   // a routine administrative grievance, not security-relevant civil unrest.
   /\bdearness allowance\b/i,
+  // Product / technology "demonstration" homonym — "Startup Park … Demonstration
+  // Kick-Off", "Sage Launches Demonstration of AI Control", "public and private
+  // demonstration". Here "demonstration" is a product/tech DEMO, not a protest,
+  // yet the bare word title-rescues it. Gated on a launch/kick-off event or a
+  // "demonstration of <tech>" so a genuine "public demonstration turns violent"
+  // (which never says kick-off / launch / of-AI / private demonstration) is safe.
+  /\bdemonstration\b[^.!?]{0,25}\bkick[- ]?off\b|\b(launch\w*|unveil\w*|showcase\w*|pilot\w*|debut\w*|host\w*)\b[^.!?]{0,20}\bdemonstration\b[^.!?]{0,20}\bof\b[^.!?]{0,25}\b(ai|artificial intelligence|technology|tech|system|robot\w*|drone|vehicle|train|5g|platform|software|solution|product|prototype)\b|\b(public and private|private and public)\s+demonstration\b/i,
+  // Entertainment / fandom "protest" — "BTS fans protest Chile's block on
+  // concerts". A fan grievance about concerts / tours / tickets / albums is
+  // entertainment colour, not security-relevant civil unrest. Gated on a fandom
+  // subject AND an entertainment-event object either side of "protest", so a
+  // genuine street protest is never touched.
+  /\bfans?\b[^.!?]{0,30}\bprotest\w*\b[^.!?]{0,30}\b(concert|gig|album|tour|ticket|show|band|idol|debut|comeback|fixture)\w*|\b(concert|gig|album|tour|ticket)\w*[^.!?]{0,30}\bfans?\b[^.!?]{0,30}\bprotest\w*/i,
+  // Market / investor grievance over a trading loss — "Kiwoom system glitch
+  // triggers forced sell-offs, investors protest". An investor / trader / client
+  // complaint about a brokerage glitch, forced sell-off or trading loss is a
+  // markets story, not civil unrest. Gated on the financial actor + protest +
+  // a trading-loss context either side, so a street protest is untouched.
+  /\b(investors?|traders?|shareholders?|depositors?|clients?|account holders?)\b[^.!?]{0,45}\bprotest\w*\b[^.!?]{0,50}\b(glitch|sell-?offs?|forced (sale|sales|liquidation|sell)|margin call|trading (halt|loss|losses|error|system)|brokerage|broker|share price|stock crash|ponzi)\b|\b(glitch|sell-?offs?|forced (sale|sales|liquidation|sell)|margin call|trading (halt|loss|losses|error|system)|brokerage)\b[^.!?]{0,50}\b(investors?|traders?|shareholders?|depositors?|clients?|account holders?)\b[^.!?]{0,20}\bprotest\w*\b/i,
 ];
 
 // Editorial suppression — specific genuine-protest headlines an operator has
@@ -1298,7 +1317,7 @@ const FP_NEG_INTERSTATE = new RegExp(
   "i",
 );
 const FP_NEG_CRACKDOWN =
-  /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft|safety|eviction|evict|demolition|encroach\w*|squatter|unauthori[sz]ed|vendor|hawker|busker|street performer|sidewalk|noise|helmet|jaywalk|chip|semiconductor|export control)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+|safety|eviction|demolition|encroachment|vendor|hawker|chip|semiconductor) crackdown\b|\btiananmen\b/i;
+  /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|internet|website|web ?sites?|domains?|online|app|apps|platform|e-?commerce|streaming|fake site|scam site|phishing|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft|safety|eviction|evict|demolition|encroach\w*|squatter|unauthori[sz]ed|vendor|hawker|busker|street performer|sidewalk|noise|helmet|jaywalk|chip|semiconductor|export control)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|internet|website|web ?site|domain|online|app|apps|platform|e-?commerce|streaming|fake site|scam site|phishing|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+|safety|eviction|demolition|encroachment|vendor|hawker|chip|semiconductor) crackdown\b|\btiananmen\b/i;
 // Financial / markets / regulatory context. A "crackdown" or "clampdown" set in
 // this vocabulary (banks, insurers, investment, capital flows, money flows,
 // securities, the bourse) is a MARKETS story, not civil unrest — "Beijing's

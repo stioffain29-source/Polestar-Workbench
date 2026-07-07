@@ -34,3 +34,34 @@ needs a companion to mean anything).
 backfill re-cleans stored rows. Verify by re-querying the offending incident's
 `relevance_status` after an api-server restart, and confirm the country's monitor
 severity drops.
+
+## Regulatory crackdown now also covers internet/website/domain/scam-site
+
+The `FP_NEG_CRACKDOWN` negative-sense list (the OTHER crackdown gate, distinct
+from `FP_NEG_FINANCIAL`) gained internet/website/domain/online/app/platform/
+e-commerce/streaming/fake-site/scam-site/phishing vocab so a "fake site
+crackdown" / "crackdown on scam domains" routes to the non-civil-unrest verdict.
+A crackdown ON PROTESTERS still keeps (unrest companion present).
+
+## Product/tech "demonstration", fandom, and investor-glitch homonyms (title hard-exclude)
+
+Three homonym classes that TITLE-RESCUE into KEEP are dropped by
+`FLASHPOINT_TITLE_HARD_EXCLUDE` (runs BEFORE title-rescue), each gated so a real
+street protest survives:
+- product/tech DEMO — "demonstration" + kick-off / launch-of-<tech> / "public
+  and private demonstration". A bare "public demonstration outside parliament"
+  has none of those cues so it keeps.
+- entertainment/fandom — "fans protest <concert/tour/ticket/album>". A protest
+  merely near a concert venue keeps.
+- markets — investor/trader "protest" + brokerage glitch / forced sell-off /
+  margin call. Workers protesting outside a stock exchange over wages keep.
+
+**Regex trap:** a trailing `\b` after an alternation group like
+`(concert|gig)\b` fails on the plural "concerts" — the group matches "concert"
+then `\b` sees "s" (both word chars, no boundary). Use `\w*` (or `s?`) instead
+of a trailing `\b` when the object word can be plural.
+
+**Harness:** `artifacts/workbench/scripts/replayFlashpointRelevance.ts` replays
+the shipped gate over an 800-row prod snapshot (query in its header), printing
+per-topic KEEP/DROP + a drop-reason histogram + survivors carrying a homonym
+marker — the triage loop for spotting the NEXT leak class.
