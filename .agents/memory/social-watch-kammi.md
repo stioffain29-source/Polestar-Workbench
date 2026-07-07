@@ -46,7 +46,9 @@ counts BOTH platforms (`socialWatchPlatformCounts("all")`). Metric "Mode" =
 - Promote re-derives `isPromotable` server-side (never trusts the client), inserts
   the incident in a transaction setting `promotedIncidentId`/`promotedAt`, returns
   409 if already promoted / not eligible, 404 if missing. Promoted incident is
-  topic=flashpoint, country=Indonesia, links back to the source post URL.
+  topic=flashpoint, links back to the source post URL. Its `country`/`province` are
+  GEOGRAPHY-RESOLVED (see below), NOT hard-coded Indonesia — a West-Papua post
+  becomes a `country="West Papua"` incident so it lands in the Papua report.
 - Promote follows the PUBLIC incidents-POST auth posture (no token) — consistent
   with the user's "workbench is public" decision. Only admin/ingest + sources
   mutations stay token-gated.
@@ -84,6 +86,15 @@ that must not regress:
 **Data-source reality:** Instagram (the primary, paid Apify feed) is the live
 path — it needs a real `apify_api_` token. Without one, the feed no-ops cleanly.
 
+**Credential-hygiene tell:** a valid Apify token starts with `apify_api_`. A
+primary `INSTAGRAM_API_KEY` whose value does NOT start with that prefix is
+malformed — every pull then auth-fails on it and silently falls back to
+`APIFY_TOKEN`, burning a pointless failed sign-in and masking the config problem
+(if the fallback is ever removed, the feed breaks with no obvious cause). Fix by
+REMOVING the bad primary secret (in the Secrets pane — the agent can't delete a
+user-supplied secret) so the deduped candidate list collapses to the single valid
+`APIFY_TOKEN`. Verify prefixes only (never log the value) from a FRESH process.
+
 **Boot freshness gate:** the pass runs inside `runIngestOnce`; the scheduler's
 boot catch-up gates on `socialWatchStale` ONLY when Instagram is active
 (`socialWatchActive()` → `igActive()`), scoped to this table — same pattern as
@@ -98,6 +109,22 @@ IS a trigger (initial population).
 planned/active/other group tables, Promote button (hooks
 `useListSocialWatchItems` / `usePromoteSocialWatchItem`). `1B6B7A`=planned,
 `A33232`=active, per brand reservations.
+
+**Country-report context panel + shared geography resolver:** KAMMI posts also
+surface as read-only, SCREEN-ONLY context on the geographic country report
+(`CountrySocialWatchContext.tsx`, heading EXACTLY "KAMMI protest monitoring
+context", wired into `CountryReport.tsx` after `CountryReportVisuals`, passed
+`structuredTheatre`). Renders nothing where no post matches (PNG/other/generic/
+null = empty). Both the panel AND the promote route decide geography through ONE
+pure resolver `lib/ingest/src/kammiGeography.ts`
+(`@workspace/ingest/kammiGeography`): `resolveKammiTheatre(item)` →
+westPapua|jakarta|indonesia + countryTag, precedence **West Papua BEFORE Jakarta**
+(city defaults to "Jakarta" on every row, so a real WP post would otherwise be
+swallowed), PNG-guarded; Jakarta via `isJakartaScoped` over caption/province/
+location (NOT the defaulted city). `kammiItemInReportTheatre` gates the panel:
+Papua report=WP posts, Jakarta brief=Jakarta posts, Indonesia national=everything
+EXCEPT WP. Add geography logic THERE only or the panel and the promoted incident
+will disagree about where a post belongs. Still context-only + manual-promote-only.
 
 **Privacy:** captions sanitised; no phone numbers / personal accounts / WhatsApp
 / member data stored (`sanitiseCaption`).

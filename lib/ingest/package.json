@@ -10,6 +10,7 @@
     "./westPapuaExtract": "./src/westPapuaExtract.ts",
     "./indonesiaExtract": "./src/indonesiaExtract.ts",
     "./jakartaExtract": "./src/jakartaExtract.ts",
+    "./kammiGeography": "./src/kammiGeography.ts",
     "./optionalIntegrations": "./src/optionalIntegrations.ts"
   },
   "dependencies": {

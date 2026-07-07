@@ -13,6 +13,7 @@ import {
   makeDedupKey,
   type SocialWatchStatus,
 } from "@workspace/ingest";
+import { resolveKammiTheatre } from "@workspace/ingest/kammiGeography";
 import {
   ListSocialWatchItemsQueryParams,
   PromoteSocialWatchItemParams,
@@ -521,6 +522,12 @@ router.post("/social-watch/:id/promote", requireAdminToken, async (req, res): Pr
   const occurredAt = item.eventDate ?? item.postedAt ?? new Date();
   const sourceUrl = item.url;
 
+  // Derive the incident's geography from the SAME resolver the read-only context
+  // panel uses, so a promoted post lands in the country report it appeared under.
+  // A West-Papua post becomes a "West Papua"-tagged incident (Papua report);
+  // everything else stays "Indonesia". The item's province is carried through.
+  const geo = resolveKammiTheatre(item);
+
   const rel = evaluateIncidentRelevance("flashpoint", {
     topic: "flashpoint",
     title,
@@ -539,7 +546,8 @@ router.post("/social-watch/:id/promote", requireAdminToken, async (req, res): Pr
         topic: "flashpoint",
         title,
         summary,
-        country: "Indonesia",
+        country: geo.countryTag,
+        province: item.province,
         location: item.location,
         occurredAt,
         severity: "Low",

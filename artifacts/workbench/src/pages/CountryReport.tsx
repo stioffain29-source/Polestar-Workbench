@@ -56,6 +56,7 @@ import {
 import CountryReportMap from "@/components/CountryReportMap";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
 import CountryReportVisuals from "@/components/CountryReportVisuals";
+import CountrySocialWatchContext from "@/components/CountrySocialWatchContext";
 import type {
   CountryMapPlacement,
   CountryPhotoPlacement,
@@ -1532,6 +1533,12 @@ export default function CountryReport() {
         countryName={effective.name}
         situationalReports={situationalReports}
       />
+
+      {/* KAMMI protest monitoring context — screen-only additive context, routed
+          to whichever Indonesian theatre (national / Jakarta / West Papua) each
+          post belongs to. Renders nothing where no KAMMI post matches. Never an
+          incident, never in the exported PDF. */}
+      <CountrySocialWatchContext reportTheatre={structuredTheatre} />
 
       {/* Internal Source Coverage — screen-only, never in the PDF.
           Surfaces the layer counts and any thin-data signal for the
