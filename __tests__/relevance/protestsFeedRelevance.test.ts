@@ -452,6 +452,48 @@ const FIXTURES: Fixture[] = [
     reason: "diplomatic/interstate",
   },
 
+  // ---- Defence-test interstate protest (a complaint, not unrest): DROP -
+  {
+    title: "China protests submarine test in disputed waters",
+    verdict: "DROP",
+    reason: "non-civil-unrest sense",
+  },
+  {
+    title: "Japan protests missile test amid rising tensions",
+    verdict: "DROP",
+    reason: "non-civil-unrest sense",
+  },
+  // A genuine anti-nuclear STREET protest against a test must still be KEPT.
+  {
+    title: "Anti-nuclear protesters march against missile test as thousands rally in Tokyo",
+    verdict: "KEEP",
+  },
+  {
+    title: "Activists stage sit-in against submarine test outside naval base",
+    verdict: "KEEP",
+  },
+
+  // ---- Zoo / animal novelty "protest" (not civil unrest): DROP ---------
+  {
+    title: "Leader vows croc protest at Australia Zoo",
+    verdict: "DROP",
+    reason: "zoo/animal novelty",
+  },
+  {
+    title: "Panda stages protest at Chengdu zoo, refuses to eat bamboo",
+    verdict: "DROP",
+    reason: "zoo/animal novelty",
+  },
+  // A genuine animal-welfare STREET protest must still be KEPT.
+  {
+    title: "Activists protest elephant captivity outside Jakarta zoo, clash with police",
+    verdict: "KEEP",
+  },
+  {
+    title: "Zoo keepers strike over pay, stage walkout at Manila zoo",
+    verdict: "KEEP",
+  },
+
   // ---- Sports-governance protest (not civil unrest): DROP --------------
   {
     title: "Protest demands resignation of Sri Lanka Cricket Board",

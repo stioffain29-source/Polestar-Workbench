@@ -595,6 +595,21 @@ const FP_DIPLOMATIC_PROTEST_RE =
 const FP_SPORTS_GOV_RE =
   /\b(cricket board|cricket head\s?quarters?|sports mafia|french open|wimbledon|grand slam|prize money|olympic committee|football federation|formula 1|premier league|la liga|test match|odi series)\b/i;
 
+// Zoo / animal novelty "protest" — a captive-animal or wildlife-park novelty
+// item where the animal itself is cast as the "protester" ("Leader vows croc
+// protest at Australia Zoo", "Panda stages protest at Chengdu zoo"). Not a
+// civil-unrest event. Gated on a zoo/wildlife-park/aquarium venue AND an animal
+// noun sitting next to "protest", so it fires ONLY on the animal-as-subject
+// novelty. A genuine animal-welfare STREET protest (activists/keepers/cruelty/
+// captivity/cage/rally-against/clash/arrest) overrides via FP_ANIMAL_WELFARE_RE,
+// so "Activists protest elephant captivity outside Jakarta zoo" is kept.
+const FP_ANIMAL_NOVELTY_VENUE_RE =
+  /\b(zoo|zoos|aquarium|safari park|wildlife park|animal park|theme park|petting zoo)\b/i;
+const FP_ANIMAL_NOVELTY_SUBJECT_RE =
+  /\b(croc|crocs|crocodile|elephant|tiger|lion|panda|koala|kangaroo|wallaby|monkey|ape|gorilla|orangutan|chimp|penguin|seal|dolphin|otter|rhino|hippo|giraffe|zebra|bear|meerkat|sloth|parrot|cockatoo)s?\b[^.!?]{0,20}\bprotest(s|ers?|ing|ed)?\b|\bprotest(s|ers?|ing|ed)?\b[^.!?]{0,20}\b(croc|crocs|crocodile|elephant|tiger|lion|panda|koala|kangaroo|wallaby|monkey|ape|gorilla|orangutan|chimp|penguin|seal|dolphin|otter|rhino|hippo|giraffe|zebra|bear|meerkat|sloth|parrot|cockatoo)s?\b/i;
+const FP_ANIMAL_WELFARE_RE =
+  /\b(activ(ist|ists|ism)|welfare|cruelt(y|ies)|captiv(e|ity)|caged?|cages|abuse|neglect|rights?|peta|keepers?|zookeepers?|staff|workers?|union|cull|culling|euthan\w*|slaughter|poach\w*|petition|demand\w*|march\w*|rally against|clash\w*|arrest\w*|detain\w*|street|effigy|placards?|banners?)\b/i;
+
 // Appeal for calm / restraint by authorities — a preventive statement, not a
 // civil-unrest event ("PNP calls for calm as Congress convenes"). Dropped only
 // when the headline is purely the appeal (no event word in the title) AND the
@@ -1311,7 +1326,7 @@ const FP_NEG_DIPLOMATIC =
 const FP_NEG_INTERSTATE_NAT =
   "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|seoul|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
 const FP_NEG_INTERSTATE_TERR =
-  "(lipulekh|kalapani|limpiyadhura|arunachal|aksai chin|doklam|kashmir|tawang|south china sea|west philippine sea|senkaku|spratly|scarborough|panatag|bajo de masinloc|masinloc|sabah|disputed (border|island|islets|temple|territory|waters|shoal)|border (dispute|area|encroach)|sanctions|missile launch|aircraft incursion|naval activit|maritime law|textbook|floating structure|territorial)";
+  "(lipulekh|kalapani|limpiyadhura|arunachal|aksai chin|doklam|kashmir|tawang|south china sea|west philippine sea|senkaku|spratly|scarborough|panatag|bajo de masinloc|masinloc|sabah|disputed (border|island|islets|temple|territory|waters|shoal)|border (dispute|area|encroach)|sanctions|missile launch|aircraft incursion|naval activit|maritime law|textbook|floating structure|territorial|(nuclear|missile|submarine|hypersonic|weapons?|rocket|torpedo|defen[cs]e|military) (test|trial|drill|exercise|manoeuvre|maneuver|war ?game)s?)";
 const FP_NEG_INTERSTATE = new RegExp(
   `\\b${FP_NEG_INTERSTATE_NAT}\\b(?:\\s+\\w+){0,2}\\s+protest(s|ed|ing)?\\b\\s*(to|over|against|with|at)?\\s*(the\\s+)?(${FP_NEG_INTERSTATE_NAT}|${FP_NEG_INTERSTATE_TERR})|\\bprotest(s|ed|ing)?\\s+(to|with)\\s+(the\\s+)?${FP_NEG_INTERSTATE_NAT}\\b|\\b(files?|lodge[sd]?|registers?) (a |another |formal |strong |diplomatic )*protest\\b`,
   "i",
@@ -1715,6 +1730,19 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Sports-governance protest (cricket board / prize money / stadium fans).
     if (FP_SPORTS_GOV_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: sports-governance protest (not security-relevant civil unrest)" };
+    }
+    // Zoo / animal novelty "protest" (the captive animal cast as the protester),
+    // with an animal-welfare STREET-protest override so a genuine welfare demo is
+    // kept.
+    {
+      const th = titleHaystack(i);
+      if (
+        FP_ANIMAL_NOVELTY_VENUE_RE.test(th) &&
+        FP_ANIMAL_NOVELTY_SUBJECT_RE.test(th) &&
+        !FP_ANIMAL_WELFARE_RE.test(th)
+      ) {
+        return { relevant: false, reason: "excluded: zoo/animal novelty protest (not civil unrest)" };
+      }
     }
     // Appeal for calm / restraint by authorities (preventive statement, not an
     // event). Title-bound, with a live-unrest override so a real "calm after

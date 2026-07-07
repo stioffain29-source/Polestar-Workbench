@@ -8,6 +8,8 @@ import { severityBadgeStyle } from "@/lib/topics";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { CorroborationBadge } from "@/components/CorroborationBadge";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
+import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 
 // The "Protests & Civil Unrest" card is backed by the flashpoint data topic.
 function dataTopicFor(topic: string): string {
@@ -159,7 +161,8 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <h4 className="font-sans font-medium text-foreground group-hover:text-accent transition-colors flex items-center gap-1.5">
-                          <span>{incident.title}</span>
+                          <span>{displayIncidentTitle(incident.title, incident.displayTitle)}</span>
+                          <UntranslatedBadge title={incident.title} displayTitle={incident.displayTitle} />
                           <CorroborationBadge corroborations={incident.corroborations} />
                         </h4>
                       </div>
