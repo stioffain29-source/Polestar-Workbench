@@ -113,6 +113,109 @@ describe("decideXIncident", () => {
   });
 });
 
+// Fixture-driven precedence ladder. Each fixture is a representative, realistic
+// (if ambiguous) post that MUST route to the tier named as `want`. The engine
+// order is data-centre → conflict → flashpoint → shipping → cargo_watch: the
+// first tier whose own rules judge the post relevant wins. These lock the full
+// ladder so a keyword-set or RELEVANCE_RULE_VERSION change that quietly reorders
+// precedence is caught.
+type RouteFixture = {
+  name: string;
+  text: string;
+  want: "conflict" | "flashpoint" | "shipping" | "cargo_watch";
+};
+
+const ROUTE_FIXTURES: RouteFixture[] = [
+  {
+    name: "insurgent ambush → conflict",
+    text: "Insurgent militants ambush an army patrol in a deadly firefight in Mindanao, Philippines.",
+    want: "conflict",
+  },
+  {
+    name: "labour protest rally → flashpoint",
+    text: "Workers stage a protest rally in Jakarta, Indonesia over fuel prices.",
+    want: "flashpoint",
+  },
+  {
+    name: "tanker sea robbery → shipping",
+    text: "Pirates boarded a tanker in the Singapore Strait near Indonesia in a sea robbery.",
+    want: "shipping",
+  },
+  {
+    name: "warehouse cargo theft → cargo_watch",
+    text: "Thieves carried out a cargo theft from a warehouse in Jakarta, Indonesia.",
+    want: "cargo_watch",
+  },
+];
+
+describe("routeTopic — full precedence ladder", () => {
+  it.each(ROUTE_FIXTURES)("$name", ({ text, want }) => {
+    const r = routeTopic({
+      title: text,
+      summary: text,
+      source: "X",
+      sourceUrl: "https://x.com/i/status/1",
+    });
+    expect(r).toEqual({ kind: "topic", topic: want });
+  });
+
+  it("decideXIncident stamps the same topic the router chose", () => {
+    for (const { text, want } of ROUTE_FIXTURES) {
+      const d = decideXIncident(tweet({ text }));
+      expect(d.insert).toBe(true);
+      if (!d.insert) return;
+      expect(d.topic).toBe(want);
+      expect(d.row.topic).toBe(want);
+    }
+  });
+
+  it("a higher tier wins when a post satisfies more than one tier", () => {
+    // Contains both maritime (tanker/strait) AND conflict (armed men, seized)
+    // cues; conflict outranks shipping so conflict must win.
+    const r = routeTopic({
+      title: "Oil tanker seized by armed militants in the Singapore Strait near Indonesia.",
+      summary: "Oil tanker seized by armed militants in the Singapore Strait near Indonesia.",
+      source: "X",
+      sourceUrl: "https://x.com/i/status/1",
+    });
+    expect(r).toEqual({ kind: "topic", topic: "conflict" });
+  });
+});
+
+describe("no-fabrication regression guards", () => {
+  it("a data-centre post ALWAYS holds and never inserts, whatever else it says", () => {
+    const dcTexts = [
+      "Company opens a hyperscale data centre in Jakarta, Indonesia",
+      "Militants clash near the new data centre in Mindanao, Philippines",
+      "Protest rally outside a colocation facility in Bangkok, Thailand",
+      "Cargo theft reported at a server farm site in Manila, Philippines",
+    ];
+    for (const text of dcTexts) {
+      expect(matchesDataCentre(text)).toBe(true);
+      const r = routeTopic({ title: text, summary: text, source: "X", sourceUrl: "https://x.com/i/status/1" });
+      expect(r.kind).toBe("data_centre_candidate");
+      const d = decideXIncident(tweet({ text }));
+      expect(d).toEqual({ insert: false, reason: "data-centre-hold" });
+    }
+  });
+
+  it("a country-less post is ALWAYS skipped (never stamped on a guessed centroid)", () => {
+    // One routable post per tier, each with NO tracked country in its text.
+    const countryLessByTier = [
+      "Insurgent militants ambush an army patrol in a deadly firefight downtown.",
+      "Workers stage a protest rally over fuel prices in the city centre.",
+      "Pirates boarded a tanker in a sea robbery off the coast.",
+      "Thieves carried out a cargo theft from a warehouse overnight.",
+    ];
+    for (const text of countryLessByTier) {
+      const route = routeTopic({ title: text, summary: text, source: "X", sourceUrl: "https://x.com/i/status/1" });
+      expect(route.kind).toBe("topic");
+      const d = decideXIncident(tweet({ text }));
+      expect(d).toEqual({ insert: false, reason: "no-country" });
+    }
+  });
+});
+
 describe("marker idempotency (dedupe dim 1)", () => {
   it("round-trips the post id through the marker", () => {
     const notes = xMarker("1900000000000000001", "observer", "flashpoint");
