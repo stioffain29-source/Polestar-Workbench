@@ -326,6 +326,35 @@ const FIXTURES: Fixture[] = [
     verdict: "KEEP",
   },
 
+  // ---- Embassy / aggregator safety-advisory BULLETIN (Task #327): DROP -----
+  // A "Demonstration Alert:" / "Security Alert:" notice heading the headline is
+  // an embassy heads-up about a POSSIBLE future gathering, not an event report.
+  // Distinct from the AVOID gate — these carry no "avoid" instruction.
+  {
+    title:
+      "Demonstration Alert: U.S. Consulate General, Sydney (July 5 – July 10, 2026) - U.S. Embassy & Consulates in Australia (.gov)",
+    verdict: "DROP",
+    reason: "forward-looking safety-advisory bulletin",
+  },
+  {
+    title:
+      "Demonstration Alert: White Ribbon March Rally in Quezon City on Sunday, June 28, 2026 - U.S. Embassy in the Philippines (.gov)",
+    verdict: "DROP",
+    reason: "forward-looking safety-advisory bulletin",
+  },
+  {
+    title: "Security Alert: Demonstrations planned in central Jakarta this weekend - U.S. Embassy",
+    verdict: "DROP",
+    reason: "forward-looking safety-advisory bulletin",
+  },
+  // A genuine event whose headline merely CONTAINS the word "alert" mid-sentence
+  // (police on alert) must SURVIVE — the bulletin gate only fires on a leading
+  // "<...> Alert:" label.
+  {
+    title: "Police on full alert as protesters clash in central Jakarta",
+    verdict: "KEEP",
+  },
+
   // ---- Editorial LABEL leading the headline (commentary): DROP ---------
   {
     title: "Analysis: Nepal's protests are being closely watched in Vietnam",

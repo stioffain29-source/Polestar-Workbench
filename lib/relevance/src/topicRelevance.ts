@@ -565,6 +565,18 @@ const FP_ADVISORY_ISSUER_RE =
 const FP_ADVISORY_TARGET_RE =
   /\b(protest|demonstration|rally|unrest|area|district|downtown|gathering|zone)/i;
 
+// Forward-looking safety-advisory BULLETIN — distinct from the AVOID gate
+// above (these carry no "avoid" instruction). Two shapes leak past the AVOID
+// gate: (a) an embassy/consulate "Demonstration Alert:" / "Security Alert:"
+// notice heading the headline (a heads-up about a POSSIBLE future gathering),
+// and (b) a travel-safety aggregator saying a demo "will" happen so "expect
+// … disruptions". Both are guidance, not a report of a civil-unrest event.
+const FP_ADVISORY_BULLETIN_LABEL_RE =
+  /^\s*(demonstration|security|protest|safety)\s+alert\b/i;
+const FP_ADVISORY_FORWARD_RE = /\bexpect (travel |traffic )?disruptions?\b/i;
+const FP_ADVISORY_AGGREGATOR_RE =
+  /\b(safeabroad|safe abroad|gardaworld|garda world|crisis24|osac|\.gov)\b/i;
+
 // Editorial LABEL leading the headline (opinion / analysis / commentary /
 // explainer). A think-piece about unrest, not a report of a discrete event.
 const FP_EDITORIAL_LABEL_RE =
@@ -1708,6 +1720,19 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       const th = titleHaystack(i);
       if (FP_ADVISORY_AVOID_RE.test(th) && FP_ADVISORY_ISSUER_RE.test(th) && FP_ADVISORY_TARGET_RE.test(th)) {
         return { relevant: false, reason: "excluded: travel/safety advisory to avoid protest areas (not a civil-unrest event)" };
+      }
+    }
+    // Forward-looking safety-advisory bulletin (no "avoid" instruction): an
+    // embassy "Demonstration Alert:" heading, or an aggregator's "expect …
+    // disruptions" heads-up about a demo that WILL happen — guidance, not an
+    // event report.
+    {
+      const th = titleHaystack(i);
+      if (
+        FP_ADVISORY_BULLETIN_LABEL_RE.test(i.title ?? "") ||
+        (FP_ADVISORY_FORWARD_RE.test(th) && FP_ADVISORY_AGGREGATOR_RE.test(th))
+      ) {
+        return { relevant: false, reason: "excluded: forward-looking safety-advisory bulletin (not a civil-unrest event)" };
       }
     }
     // Editorial LABEL leading the headline (opinion/analysis/explainer) — runs on

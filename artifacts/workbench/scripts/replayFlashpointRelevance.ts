@@ -16,10 +16,15 @@
 // lib/relevance/src/topicRelevance.ts.
 //
 // ---------------------------------------------------------------------------
-// STEP 1 — refresh the snapshot from the read-only production replica.
-// The prod DB is READ-ONLY from the workspace; pull recent rows via
-// executeSql(environment:"production") with this query and save the CSV to
-// the path in REPLAY_CSV (default /tmp/prod.csv):
+// SNAPSHOT — the harness runs with NO manual export step out of the box: it
+// falls back to a committed sample fixture (scripts/fixtures/protestsSample.csv)
+// when neither REPLAY_CSV nor /tmp/prod.csv is present, so
+//
+//   cd artifacts/workbench && npx tsx scripts/replayFlashpointRelevance.ts
+//
+// works immediately. To triage against CURRENT production instead, refresh the
+// snapshot with ONE command from the code-execution sandbox — run this query
+// via executeSql(environment:"production") and write r.output to /tmp/prod.csv:
 //
 //   SELECT id, topic, title, summary, country, occurred_at
 //   FROM incidents
@@ -28,15 +33,30 @@
 //   ORDER BY occurred_at DESC
 //   LIMIT 800;
 //
-// STEP 2 — run the harness from the workbench package:
-//   cd artifacts/workbench && npx tsx scripts/replayFlashpointRelevance.ts
-//   (override the snapshot with REPLAY_CSV=/path/to/rows.csv)
+// (or point REPLAY_CSV=/path/to/rows.csv at any exported CSV). Snapshot
+// resolution order: REPLAY_CSV → /tmp/prod.csv → committed sample fixture.
 // ---------------------------------------------------------------------------
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { explainRelevance, type RelevanceInput } from "../src/lib/topicRelevance";
 
-const CSV_PATH = process.env.REPLAY_CSV ?? "/tmp/prod.csv";
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SAMPLE_FIXTURE = join(HERE, "fixtures", "protestsSample.csv");
+
+function resolveCsvPath(): string {
+  if (process.env.REPLAY_CSV) return process.env.REPLAY_CSV;
+  if (existsSync("/tmp/prod.csv")) return "/tmp/prod.csv";
+  return SAMPLE_FIXTURE;
+}
+
+const CSV_PATH = resolveCsvPath();
+if (CSV_PATH === SAMPLE_FIXTURE) {
+  console.log(
+    `[replay] no REPLAY_CSV / /tmp/prod.csv found — using committed sample fixture:\n         ${SAMPLE_FIXTURE}\n`,
+  );
+}
 
 // Homonym markers whose presence in a KEPT row is worth a manual look — these
 // are the word families that most often carry a non-protest sense.
