@@ -27,7 +27,6 @@ import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
 import cardsRouter from "./cards";
-import peeringdbTestRouter from "./peeringdbTest";
 import { requireOwner } from "../lib/ownerAccess";
 
 const router: IRouter = Router();
@@ -70,7 +69,5 @@ router.use(socialRawRouter);
 router.use(maritimeSecurityEventsRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
-// TEMPORARY: PeeringDB connectivity test (owner-gated; writes nothing).
-router.use(peeringdbTestRouter);
 
 export default router;

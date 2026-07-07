@@ -75,6 +75,22 @@ export type {
   NormaliseResult,
 } from "./osmDataCentres";
 export {
+  runPeeringDbFacilityRegistryImport,
+  normalisePeeringDbFac,
+  buildPeeringDbFacUrl,
+  peeringDbFacUrl,
+  dedupePeeringDbBySourceUrl,
+  findPeeringDbProximityWarnings,
+  PEERINGDB_DC_COUNTRIES,
+} from "./peeringdbFacilities";
+export type {
+  PeeringDbImportSummary,
+  PeeringDbImportOptions,
+  PeeringDbCountryResult,
+  PeeringDbNormalisedFacility,
+  PeeringDbNormaliseResult,
+} from "./peeringdbFacilities";
+export {
   runReliefWebCorroboration,
   isReliefWebConfigured,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
