@@ -33,6 +33,23 @@ export type {
   XDecision,
   NormalisedTweet,
 } from "./xSearch";
+export {
+  runInstagramSourceIngest,
+  emptyInstagramSourceSummary,
+  decideInstagramIncident,
+  readInstagramSourceConfig,
+  isInstagramSourceConfigured,
+  instagramMarker,
+  instagramMarkerPostId,
+  INSTAGRAM_MARKER_PREFIX,
+} from "./instagramSource";
+export type {
+  InstagramSourceSummary,
+  InstagramSourceOptions,
+  InstagramSourceConfig,
+  NormalisedIgPost,
+  IgDecision,
+} from "./instagramSource";
 export { runMarketPricesIngest } from "./marketPrices";
 export type { MarketPriceSummary } from "./marketPrices";
 export { runMarketSnapshotIngest } from "./marketSnapshot";

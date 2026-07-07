@@ -24,6 +24,7 @@
     "scrape:data-centres": "tsx ./src/scrape-data-centres.ts",
     "scrape:conflict": "tsx ./src/scrape-conflict.ts",
     "scrape:x": "tsx ./src/scrape-x.ts",
+    "scrape:instagram": "tsx ./src/scrape-instagram.ts",
     "scrape:indonesia-local": "tsx ./src/scrape-indonesia-local.ts",
     "scrape:apac-local": "tsx ./src/scrape-apac-local.ts",
     "scrape:prices": "tsx ./src/scrape-prices.ts",
