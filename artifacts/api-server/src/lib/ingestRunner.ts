@@ -31,6 +31,8 @@ import {
   emptyGdeltPromoteSummary,
   runTapaPromote,
   emptyTapaPromoteSummary,
+  runXSearchIngest,
+  emptyXSearchSummary,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   type IngestSummary,
@@ -47,6 +49,7 @@ import {
   type GdeltStructuredSummary,
   type GdeltPromoteSummary,
   type TapaPromoteSummary,
+  type XSearchSummary,
   type TitleTranslationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
@@ -126,6 +129,16 @@ export type TapaPromoteRunResult =
       finishedAt: Date;
       durationMs: number;
       tapaPromote: TapaPromoteSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type XSearchRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      xSearch: XSearchSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -353,6 +366,17 @@ function emptyTapaPromote(err: unknown): TapaPromoteSummary {
     mode: "commit",
     errors: [msg],
     logLines: [`TAPA promote pass failed: ${msg}`],
+  };
+}
+
+function emptyXSearch(err: unknown): XSearchSummary {
+  const base = emptyXSearchSummary();
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    mode: "commit",
+    errors: [msg],
+    logLines: [`X search ingest failed: ${msg}`],
   };
 }
 
@@ -996,6 +1020,43 @@ export async function runTapaPromoteOnce(
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       tapaPromote,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the X (Twitter) recent-search source provider once. Fetches recent
+ * posts, routes them into existing incident topics, relevance-gates, dedupes
+ * (x_search: marker + fuzzy key + URL) and — with commit=true — inserts the new
+ * rows into `incidents`. Deliberately NOT part of the recurring scheduler — it
+ * is an operator-triggered, reviewed promote path. Shares the same advisory
+ * lock so it can never collide with a full run. Pass commit=false for a dry-run.
+ */
+export async function runXSearchOnce(
+  opts: { commit?: boolean; queryLabel?: string; maxResults?: number } = {},
+): Promise<XSearchRunResult> {
+  const commit = opts.commit ?? false;
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let xSearch: XSearchSummary;
+    try {
+      xSearch = await runXSearchIngest({
+        commit,
+        queryLabel: opts.queryLabel,
+        maxResults: opts.maxResults,
+      });
+    } catch (err) {
+      logger.error({ err }, "X search ingest failed");
+      xSearch = emptyXSearch(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      xSearch,
     };
   });
   if (!res.ran) return res;

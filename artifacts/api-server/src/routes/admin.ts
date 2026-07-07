@@ -9,6 +9,7 @@ import {
   runMovementOnce,
   runGdeltStructuredOnce,
   runTapaPromoteOnce,
+  runXSearchOnce,
 } from "../lib/ingestRunner";
 import { backfillRelevance, backfillSeverity } from "../lib/migrations";
 
@@ -497,6 +498,111 @@ router.post("/admin/tapa-promote", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin tapa-promote failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// X (Twitter) recent-search source provider → reviewed incident promote.
+// Fetches recent posts, routes them into existing incident topics, relevance-
+// gates and dedupes (x_search: marker + fuzzy key + URL), then inserts the new
+// rows into `incidents`. Deliberately NOT part of the automatic scheduler — this
+// is an operator-triggered, reviewed path that mirrors /admin/tapa-promote.
+// Append ?mode=dry-run to preview counts without writing. Optional ?query=<label>
+// restricts to a single query and ?max=<n> caps results per query (10..100).
+router.post("/admin/x-search", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin x-search called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  try {
+    const dryRun = req.query["mode"] === "dry-run";
+    const queryLabelRaw = req.query["query"];
+    const queryLabel =
+      typeof queryLabelRaw === "string" && queryLabelRaw.trim().length > 0
+        ? queryLabelRaw.trim()
+        : undefined;
+    const maxRaw = req.query["max"];
+    let maxResults: number | undefined;
+    if (typeof maxRaw === "string" && maxRaw.trim().length > 0) {
+      const n = Number(maxRaw);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 10 || n > 100) {
+        res.status(400).json({
+          error: "invalid_max",
+          message: "max must be an integer between 10 and 100.",
+        });
+        return;
+      }
+      maxResults = n;
+    }
+    req.log.info({ dryRun, queryLabel, maxResults }, "admin x-search started");
+    const result = await runXSearchOnce({
+      commit: !dryRun,
+      queryLabel,
+      maxResults,
+    });
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const x = result.xSearch;
+    req.log.info(
+      {
+        mode: x.mode,
+        configured: x.configured,
+        fetched: x.fetched,
+        routable: x.routable,
+        duplicateMarker: x.duplicateMarker,
+        duplicateKey: x.duplicateKey,
+        duplicateUrl: x.duplicateUrl,
+        newToInsert: x.newToInsert,
+        inserted: x.inserted,
+        durationMs: result.durationMs,
+      },
+      "admin x-search finished",
+    );
+    res.json({
+      ok: true,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      xSearch: {
+        mode: x.mode,
+        configured: x.configured,
+        fetched: x.fetched,
+        skippedNoText: x.skippedNoText,
+        skippedNoDate: x.skippedNoDate,
+        skippedUnroutable: x.skippedUnroutable,
+        skippedNoCountry: x.skippedNoCountry,
+        dataCentreHeld: x.dataCentreHeld,
+        routable: x.routable,
+        duplicateMarker: x.duplicateMarker,
+        duplicateKey: x.duplicateKey,
+        duplicateUrl: x.duplicateUrl,
+        newToInsert: x.newToInsert,
+        inserted: x.inserted,
+        byTopic: x.byTopic,
+        errors: x.errors,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin x-search failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }
