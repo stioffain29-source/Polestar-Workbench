@@ -26,6 +26,34 @@ import { Plus, Pencil, Trash2, X, ExternalLink } from "lucide-react";
 // STRICT no-fabrication: blank fields stay blank ("not reported" on read
 // surfaces). Status + planning risk are the fixed constrained vocabularies.
 
+// TEMPORARY — shape of the PeeringDB connectivity-test response.
+type PeeringDbTestRow = {
+  name: string | null;
+  orgName: string | null;
+  city: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: string | null;
+  updated: string | null;
+};
+type PeeringDbTestResult = {
+  ok: boolean;
+  fetchedAt?: string;
+  count?: number;
+  facilities?: PeeringDbTestRow[];
+  error?: string;
+};
+
+function safeDate(v: string | null | undefined, fmt: string): string {
+  if (!v) return "—";
+  try {
+    return format(parseISO(v), fmt);
+  } catch {
+    return v;
+  }
+}
+
 const STATUSES = Object.values(DataCentreStatus);
 const PLANNING_RISKS = Object.values(DataCentrePlanningRisk);
 const TYPES = Object.values(DataCentreType);
@@ -175,6 +203,11 @@ export default function DataCentreRegistry() {
   const [error, setError] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
+  // TEMPORARY PeeringDB feed connectivity test — reads the public API via an
+  // owner-gated server proxy and displays the first records. Saves nothing.
+  const [pdbTesting, setPdbTesting] = useState(false);
+  const [pdbResult, setPdbResult] = useState<PeeringDbTestResult | null>(null);
+
   // Deep link from the facility overlay map: `?facility=<id>` opens that
   // facility's full record. Guarded so it only fires once the target row is
   // loaded, and never re-fires after the analyst navigates within the page.
@@ -273,6 +306,23 @@ export default function DataCentreRegistry() {
     }
   }
 
+  async function runPeeringDbTest() {
+    setPdbTesting(true);
+    setPdbResult(null);
+    try {
+      const res = await fetch("/api/peeringdb-test", { credentials: "include" });
+      const data = (await res.json()) as PeeringDbTestResult;
+      setPdbResult(data);
+    } catch (e) {
+      setPdbResult({
+        ok: false,
+        error: String((e as Error)?.message ?? "Request failed"),
+      });
+    } finally {
+      setPdbTesting(false);
+    }
+  }
+
   const saving = createMut.isPending || updateMut.isPending;
 
   // Registry summary — counts only, never fabricated.
@@ -325,6 +375,80 @@ export default function DataCentreRegistry() {
         <SummaryTile label="Countries" value={summary.countries} accent="#363636" />
         <SummaryTile label="Operational" value={summary.operational} accent="#1B6B7A" />
         <SummaryTile label="Recent Status Movers" value={summary.movers} accent="#A33232" />
+      </div>
+
+      {/* TEMPORARY — PeeringDB feed connectivity test. Reads the public
+          PeeringDB API server-side and shows the first 5 facilities. Writes
+          nothing to the database. Remove once the connection is confirmed. */}
+      <div className="bg-white border border-border rounded-sm p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-serif font-bold text-primary uppercase tracking-wide">
+              PeeringDB Feed — Connection Test
+            </h2>
+            <p className="text-xs text-muted-foreground font-sans mt-1 max-w-3xl">
+              Temporary check that the workbench can read the PeeringDB API.
+              Fetches the first 5 facilities live; nothing is saved to the
+              database.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={runPeeringDbTest}
+            disabled={pdbTesting}
+            className="flex items-center gap-2 h-9 px-4 bg-accent text-accent-foreground rounded-sm text-sm font-medium font-sans hover:opacity-90 disabled:opacity-50"
+          >
+            {pdbTesting ? "Testing…" : "Test PeeringDB Feed"}
+          </button>
+        </div>
+
+        {pdbResult && !pdbResult.ok && (
+          <div className="mt-4 px-3 py-2 text-sm text-[#A33232] bg-[#A33232]/10 border border-[#A33232]/30 rounded-sm font-sans">
+            {pdbResult.error || "PeeringDB request failed."}
+          </div>
+        )}
+
+        {pdbResult && pdbResult.ok && (
+          <div className="mt-4 space-y-2">
+            <div className="text-[11px] uppercase tracking-widest text-muted-foreground font-sans">
+              Connection OK · {pdbResult.count ?? 0} record
+              {(pdbResult.count ?? 0) === 1 ? "" : "s"} · fetched{" "}
+              {safeDate(pdbResult.fetchedAt, "d MMM yyyy HH:mm")}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm font-sans">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border">
+                    <th className="px-3 py-2 font-medium">Facility</th>
+                    <th className="px-3 py-2 font-medium">Organisation</th>
+                    <th className="px-3 py-2 font-medium">City</th>
+                    <th className="px-3 py-2 font-medium">Country</th>
+                    <th className="px-3 py-2 font-medium">Latitude</th>
+                    <th className="px-3 py-2 font-medium">Longitude</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(pdbResult.facilities ?? []).map((f, i) => (
+                    <tr key={i} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2.5 text-foreground">{f.name ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{f.orgName ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{f.city ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{f.country ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{f.latitude ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{f.longitude ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{f.status ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">
+                        {safeDate(f.updated, "d MMM yyyy")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Form */}
