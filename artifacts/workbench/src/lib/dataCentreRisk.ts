@@ -46,6 +46,12 @@ export const RISK_RATINGS = [
 ] as const;
 export type RiskRating = (typeof RISK_RATINGS)[number];
 
+// Evidence confidence / coverage vocab (mirrors DATA_CENTRE_RISK_CONFIDENCE in
+// lib/db). Distinct from the risk tier: it grades how well-sourced the
+// assessment is. Blank = "not reported".
+export const RISK_CONFIDENCE = ["Low", "Medium", "High"] as const;
+export type RiskConfidence = (typeof RISK_CONFIDENCE)[number];
+
 // Brand five-tier ramp (mirrors SPOT_SEV_COLOR): petrol #1B6B7A is reserved for
 // Insignificant only and subdued red #A33232 for Extreme only.
 export const RISK_RATING_COLOR: Record<RiskRating, string> = {

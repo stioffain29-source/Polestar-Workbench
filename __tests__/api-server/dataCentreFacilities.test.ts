@@ -199,3 +199,204 @@ describe("Data Centre facility registry — status transition stamping", () => {
     expect(status).toBe(404);
   });
 });
+
+// --- Per-field analyst LOCK maintenance (import never overwrites a lock) ------
+
+describe("Data Centre facility registry — enrichment lock maintenance", () => {
+  it("auto-locks an enrichable field the analyst changes", async () => {
+    stubSelect([
+      { id: 11, name: "DC11", country: "Singapore", status: "Operational", capacityMw: null, enrichmentLocks: null },
+    ]);
+    stubUpdate([{ id: 11 }]);
+
+    const { status } = await patch(11, { capacityMw: 30 });
+    expect(status).toBe(200);
+
+    const v = capturedUpdateValues as Record<string, Record<string, { lockedAt: unknown }>>;
+    expect(v.enrichmentLocks.capacityMw.lockedAt).toBeTruthy();
+    expect(v.enrichmentLocks.status).toBeUndefined();
+  });
+
+  it("does not touch locks when an enrichable field is unchanged", async () => {
+    stubSelect([
+      { id: 12, name: "DC12", country: "Singapore", status: "Operational", capacityMw: 30, enrichmentLocks: null },
+    ]);
+    stubUpdate([{ id: 12 }]);
+
+    const { status } = await patch(12, { capacityMw: 30, notes: "same" });
+    expect(status).toBe(200);
+    const v = capturedUpdateValues as Record<string, unknown>;
+    expect(v.enrichmentLocks).toBeUndefined();
+  });
+
+  it("replaces the lock map from an explicit body (unlock by omission)", async () => {
+    stubSelect([
+      {
+        id: 13,
+        name: "DC13",
+        country: "Singapore",
+        status: "Operational",
+        capacityMw: 30,
+        enrichmentLocks: { capacityMw: { lockedAt: "2026-01-01T00:00:00.000Z" }, status: { lockedAt: "2026-01-01T00:00:00.000Z" } },
+      },
+    ]);
+    stubUpdate([{ id: 13 }]);
+
+    const { status } = await patch(13, {
+      enrichmentLocks: { status: { lockedAt: "2026-01-01T00:00:00.000Z" } },
+    });
+    expect(status).toBe(200);
+    const v = capturedUpdateValues as Record<string, Record<string, unknown>>;
+    expect(v.enrichmentLocks.status).toBeTruthy();
+    expect(v.enrichmentLocks.capacityMw).toBeUndefined();
+  });
+
+  it("clears all locks when the body sends null", async () => {
+    stubSelect([
+      {
+        id: 14,
+        name: "DC14",
+        country: "Singapore",
+        status: "Operational",
+        capacityMw: 30,
+        enrichmentLocks: { capacityMw: { lockedAt: "2026-01-01T00:00:00.000Z" } },
+      },
+    ]);
+    stubUpdate([{ id: 14 }]);
+
+    const { status } = await patch(14, { enrichmentLocks: null });
+    expect(status).toBe(200);
+    const v = capturedUpdateValues as Record<string, unknown>;
+    expect(v.enrichmentLocks).toBeNull();
+  });
+});
+
+// --- Provider-agnostic enrichment endpoints ----------------------------------
+
+async function getJson(path: string) {
+  const res = await fetch(`${baseUrl}${path}`);
+  let json: unknown = undefined;
+  try {
+    json = await res.json();
+  } catch {
+    json = undefined;
+  }
+  return { status: res.status, json, res };
+}
+
+async function enrich(path: string, body: Record<string, unknown>) {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  let json: Record<string, unknown> = {};
+  try {
+    json = (await res.json()) as Record<string, unknown>;
+  } catch {
+    json = {};
+  }
+  return { status: res.status, json };
+}
+
+const GENERIC_CSV = [
+  "name,operator,country,city,latitude,longitude,status,facility_type,capacity_mw,it_load_mw,source_ref,as_of",
+  "Jakarta JK1,,Indonesia,,,,Operational,,50,,ProviderRef,2026-01-01",
+].join("\n");
+
+function jakartaFacility(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    name: "Jakarta JK1",
+    country: "Indonesia",
+    city: null,
+    latitude: null,
+    longitude: null,
+    status: "Unknown",
+    facilityType: "Unknown / not reported",
+    capacityMw: null,
+    itLoadMw: null,
+    enrichmentSources: null,
+    enrichmentLocks: null,
+    ...overrides,
+  };
+}
+
+describe("Data Centre enrichment endpoints", () => {
+  it("lists the generic provider", async () => {
+    const { status, json } = await getJson("/data-centre-enrichment/providers");
+    expect(status).toBe(200);
+    const providers = json as { token: string; columns: string[] }[];
+    const generic = providers.find((p) => p.token === "generic");
+    expect(generic).toBeDefined();
+    expect(generic!.columns).toContain("capacity_mw");
+  });
+
+  it("serves a downloadable CSV template with the canonical header", async () => {
+    const res = await fetch(`${baseUrl}/data-centre-enrichment/template.csv`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/csv");
+    const text = await res.text();
+    expect(text.split("\n")[0]).toContain("name,operator,country");
+  });
+
+  it("400s an unknown provider on preview", async () => {
+    const { status } = await enrich("/data-centre-enrichment/preview", {
+      provider: "nope",
+      fileContent: GENERIC_CSV,
+    });
+    expect(status).toBe(400);
+  });
+
+  it("400s a missing fileContent on preview", async () => {
+    const { status } = await enrich("/data-centre-enrichment/preview", {
+      provider: "generic",
+    });
+    expect(status).toBe(400);
+  });
+
+  it("previews per-field diffs without writing (dry-run)", async () => {
+    stubSelect([jakartaFacility()]);
+    const updateSpy = jest.spyOn(db, "update");
+    const { status, json } = await enrich("/data-centre-enrichment/preview", {
+      provider: "generic",
+      fileContent: GENERIC_CSV,
+    });
+    expect(status).toBe(200);
+    expect(json.commit).toBe(false);
+    expect(json.updatedRows).toBe(0);
+    const fields = (json.diffs as { field: string }[]).map((d) => d.field);
+    expect(fields).toContain("capacityMw");
+    expect(fields).toContain("status");
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it("respects an analyst lock — a locked field is never proposed", async () => {
+    stubSelect([
+      jakartaFacility({ enrichmentLocks: { capacityMw: { lockedAt: "2026-01-01T00:00:00.000Z" } } }),
+    ]);
+    const { json } = await enrich("/data-centre-enrichment/preview", {
+      provider: "generic",
+      fileContent: GENERIC_CSV,
+    });
+    const fields = (json.diffs as { field: string }[]).map((d) => d.field);
+    expect(fields).not.toContain("capacityMw");
+    expect(fields).toContain("status");
+  });
+
+  it("commits writes with provenance but never writes locks", async () => {
+    stubSelect([jakartaFacility()]);
+    stubUpdate([{ id: 1 }]);
+    const { status, json } = await enrich("/data-centre-enrichment/commit", {
+      provider: "generic",
+      fileContent: GENERIC_CSV,
+    });
+    expect(status).toBe(200);
+    expect(json.commit).toBe(true);
+    expect(json.updatedRows).toBe(1);
+    const v = capturedUpdateValues as Record<string, unknown>;
+    expect(v.enrichmentSources).toBeDefined();
+    expect(v.capacityMw).toBe(50);
+    expect("enrichmentLocks" in v).toBe(false);
+  });
+});

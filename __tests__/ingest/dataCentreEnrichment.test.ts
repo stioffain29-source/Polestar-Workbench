@@ -41,6 +41,7 @@ function facility(overrides: Partial<DataCentreFacility>): DataCentreFacility {
     previousStatus: null,
     statusChangedAt: null,
     enrichmentSources: null,
+    enrichmentLocks: null,
     createdBy: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -195,6 +196,7 @@ describe("computeFacilityDiff — no-fabrication + idempotency", () => {
       capacityMw: null,
       itLoadMw: null,
       enrichmentSources: null,
+      enrichmentLocks: null,
     });
     const fields = diffs.map((d) => d.field).sort();
     expect(fields).toEqual(["capacityMw", "facilityType", "status"]);
@@ -215,6 +217,7 @@ describe("computeFacilityDiff — no-fabrication + idempotency", () => {
         facilityType: { provider: "Generic", sourceRef: null, asOf: null, value: "Hyperscale" },
         capacityMw: { provider: "Generic", sourceRef: null, asOf: null, value: 50 },
       },
+      enrichmentLocks: null,
     };
     expect(computeFacilityDiff(record, facility)).toHaveLength(0);
   });
@@ -233,11 +236,32 @@ describe("computeFacilityDiff — no-fabrication + idempotency", () => {
       enrichmentSources: {
         status: { provider: "Generic", sourceRef: null, asOf: null, value: "Proposed" },
       },
+      enrichmentLocks: null,
     };
     const statusDiffs = computeFacilityDiff(record, facility).filter(
       (d) => d.field === "status",
     );
     expect(statusDiffs).toHaveLength(0);
+  });
+
+  it("never proposes a change to an analyst-LOCKED field", () => {
+    // The desk manually set status="Decommissioned" and locked it. Even though
+    // the source states a different, otherwise-importable value, the lock wins.
+    const facility: DiffableFacility = {
+      id: 1,
+      name: "Jakarta JK1",
+      status: "Decommissioned",
+      facilityType: "Unknown / not reported",
+      capacityMw: null,
+      itLoadMw: null,
+      enrichmentSources: null,
+      enrichmentLocks: { status: { lockedAt: "2026-02-01T00:00:00.000Z" } },
+    };
+    const diffs = computeFacilityDiff(record, facility);
+    const fields = diffs.map((d) => d.field).sort();
+    // status is locked -> skipped; the other stated fields still flow.
+    expect(fields).toEqual(["capacityMw", "facilityType"]);
+    expect(fields).not.toContain("status");
   });
 });
 

@@ -5,6 +5,8 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { DataCentreFacilityEnrichmentLocks } from './dataCentreFacilityEnrichmentLocks';
+import type { DataCentreFacilityEnrichmentSources } from './dataCentreFacilityEnrichmentSources';
 import type { DataCentrePlanningRisk } from './dataCentrePlanningRisk';
 import type { DataCentreStatus } from './dataCentreStatus';
 import type { DataCentreType } from './dataCentreType';
@@ -51,4 +53,14 @@ export interface DataCentreFacility {
   createdBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+     * Per-field import provenance (provider, sourceRef, asOf, value). Null/absent = no external field ever imported. Never set by analyst edits.
+     * @nullable
+     */
+  enrichmentSources?: DataCentreFacilityEnrichmentSources;
+  /**
+     * Per-field analyst lock. A locked field is never overwritten by an import. Set only by the PATCH route (analyst action).
+     * @nullable
+     */
+  enrichmentLocks?: DataCentreFacilityEnrichmentLocks;
 }

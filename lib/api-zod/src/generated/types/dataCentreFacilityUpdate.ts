@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { DataCentreFacilityUpdateEnrichmentLocks } from './dataCentreFacilityUpdateEnrichmentLocks';
 import type { DataCentrePlanningRisk } from './dataCentrePlanningRisk';
 import type { DataCentreStatus } from './dataCentreStatus';
 import type { DataCentreType } from './dataCentreType';
@@ -44,4 +45,9 @@ export interface DataCentreFacilityUpdate {
   /** @nullable */
   linkedIncidentId?: number | null;
   createdBy?: string;
+  /**
+     * Full replacement of the per-field analyst lock map. Send to lock or unlock a field explicitly (omit a field to unlock it; null clears all). Manual edits of enrichable fields also auto-lock server-side.
+     * @nullable
+     */
+  enrichmentLocks?: DataCentreFacilityUpdateEnrichmentLocks;
 }

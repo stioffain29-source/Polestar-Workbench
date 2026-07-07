@@ -1,0 +1,69 @@
+Build the enrichment workbench UI first, then extend the existing data-centre country risk framework.
+
+Do not build a separate standalone country-risk tool. Extend the one already sitting under Data Centres.
+
+For data-centre enrichment, make the existing CLI work usable from the workbench:
+
+1. Add a downloadable CSV template.
+2. Add owner-only CSV upload.
+3. Add dry-run preview in the UI before anything is written.
+4. Show proposed changes by field.
+5. Add a separate Commit button.
+6. Show enrichment source and as-of date on the facility record.
+7. Add per-field analyst lock so manually corrected values are not overwritten by later imports.
+8. Keep no-fabrication rules.
+
+For the country-risk tool, Replit should do the heavy lifting.
+
+Do not make me manually fill 16 dimensions country by country.
+
+Extend the existing framework and wire best-choice public sources directly. Do not keep coming back for source-by-source sign-off. Build a source registry so sources can be swapped later if needed.
+
+Use the Polestar rating scale:
+
+Insignificant
+Low
+Moderate
+High
+Extreme
+
+Each risk dimension must show:
+
+Auto-seeded rating
+Source
+Source date
+Short rationale
+Confidence / coverage note
+Analyst override
+Analyst note
+Per-field analyst lock
+Last reviewed date
+
+Use these source mappings as the starting point:
+
+Corruption — Transparency International CPI
+Transparency — Transparency International CPI plus World Bank WGI Voice and Accountability where useful
+Regulatory environment — World Bank WGI Regulatory Quality and Rule of Law
+Planning and permitting risk — World Bank WGI Regulatory Quality plus analyst review note where no direct permitting data exists
+Political stability — World Bank WGI Political Stability
+Grid and power stability — World Bank Enterprise Surveys power outage indicators where available
+Utility and water supply — World Bank / WRI Aqueduct where available
+Water stress — WRI Aqueduct
+Subsea cable and connectivity resilience — ITU connectivity indicators as the public baseline, with manual analyst note for subsea-specific gaps
+Data localisation and data protection laws — UNCTAD Global Cyberlaw Tracker / DLA Piper Data Protection Laws of the World as source inputs
+Land and real estate constraints — public source where available, otherwise not reported
+Environmental and climate exposure — ND-GAIN / INFORM where available
+Natural hazard exposure — INFORM Risk Index
+Security and civil unrest risk — ACLED or existing Workbench incident data where available, otherwise analyst review
+Labour and skills availability — World Bank / ILO public indicators where available
+Tax, incentives and investment environment — public investment/tax source where available, otherwise not reported
+
+Rules:
+
+Do not fabricate ratings.
+Do not write a rating where the source is weak or missing.
+Where a source does not exist, mark the dimension as not reported.
+Every auto-rating must carry its source and rationale.
+Manual analyst override must always be possible.
+Analyst-locked fields must not be overwritten by future imports.
+The system should generate the first draft automatically, and the analyst should only review, correct or fill gaps.

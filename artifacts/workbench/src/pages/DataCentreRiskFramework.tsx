@@ -17,6 +17,7 @@ import { CountryRiskStrip } from "../components/CountryRiskStrip";
 import {
   DATA_CENTRE_RISK_DIMENSIONS,
   RISK_RATINGS,
+  RISK_CONFIDENCE,
   type DataCentreRiskDimensionKey,
 } from "../lib/dataCentreRisk";
 
@@ -37,6 +38,10 @@ type DimForm = {
   provisional: boolean;
   overridden: boolean;
   seededFrom: string | null;
+  sourceDate: string; // "" = not reported
+  confidence: string; // "" = not reported
+  lastReviewed: string | null;
+  locked: boolean;
 };
 
 const EMPTY_DIM: DimForm = {
@@ -47,6 +52,10 @@ const EMPTY_DIM: DimForm = {
   provisional: false,
   overridden: false,
   seededFrom: null,
+  sourceDate: "",
+  confidence: "",
+  lastReviewed: null,
+  locked: false,
 };
 
 type FormState = {
@@ -83,6 +92,10 @@ function riskToForm(r: DataCentreCountryRisk): FormState {
       provisional: Boolean(d.provisional),
       overridden: Boolean(d.overridden),
       seededFrom: d.seededFrom ?? null,
+      sourceDate: d.sourceDate ?? "",
+      confidence: d.confidence ?? "",
+      lastReviewed: d.lastReviewed ?? null,
+      locked: Boolean(d.locked),
     };
   }
   return {
@@ -117,6 +130,16 @@ function formToInput(f: FormState): DataCentreCountryRiskInput {
       provisional: false,
       overridden: d.overridden,
       seededFrom: d.seededFrom ?? null,
+      // Provenance metadata round-trips so a full-object save never erases a
+      // seed's sourceDate/confidence/lock. `sourceDate` keeps the source's
+      // as-of date (never overwritten with "now"); `lastReviewed` is stamped
+      // NOW because this save IS the analyst review.
+      sourceDate: d.sourceDate.trim() || null,
+      confidence: d.confidence
+        ? (d.confidence as DataCentreRiskDimension["confidence"])
+        : null,
+      lastReviewed: new Date().toISOString(),
+      locked: d.locked,
     };
   }
   const overallNote = f.overallNote.trim();
@@ -319,11 +342,18 @@ export default function DataCentreRiskFramework() {
                 <div key={key} className="border border-border rounded-sm p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="text-sm font-medium text-foreground">{label}</div>
-                    {showProvisional && (
-                      <span className="text-[10px] uppercase tracking-widest text-[#B26B00] bg-[#B26B00]/10 border border-[#B26B00]/30 rounded-sm px-1.5 py-0.5">
-                        Provisional — pending review
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {d.locked && (
+                        <span className="text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/30 rounded-sm px-1.5 py-0.5">
+                          Locked
+                        </span>
+                      )}
+                      {showProvisional && (
+                        <span className="text-[10px] uppercase tracking-widest text-[#B26B00] bg-[#B26B00]/10 border border-[#B26B00]/30 rounded-sm px-1.5 py-0.5">
+                          Provisional — pending review
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                     <label className="block">
@@ -381,10 +411,53 @@ export default function DataCentreRiskFramework() {
                       />
                     </label>
                   </div>
-                  {d.seededFrom && (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-2">
+                    <label className="block">
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-1">
+                        Source Date
+                      </div>
+                      <input
+                        className={inputCls}
+                        placeholder="e.g. 2024 or 2024-03"
+                        value={d.sourceDate}
+                        onChange={(e) => setDim(key, { sourceDate: e.target.value })}
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-1">
+                        Confidence
+                      </div>
+                      <select
+                        className={inputCls}
+                        value={d.confidence}
+                        onChange={(e) => setDim(key, { confidence: e.target.value })}
+                      >
+                        <option value="">— Not reported</option>
+                        {RISK_CONFIDENCE.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2 md:col-span-2 md:mt-5">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-accent"
+                        checked={d.locked}
+                        onChange={(e) => setDim(key, { locked: e.target.checked })}
+                      />
+                      <span className="text-xs font-sans text-foreground">
+                        Lock — never overwrite this dimension on auto-seed
+                      </span>
+                    </label>
+                  </div>
+                  {(d.seededFrom || d.lastReviewed) && (
                     <div className="mt-1.5 text-[10px] text-muted-foreground font-sans">
-                      Seeded from {d.seededFrom}
-                      {d.overridden ? " · analyst override" : ""}
+                      {d.seededFrom ? `Seeded from ${d.seededFrom}` : ""}
+                      {d.seededFrom && d.overridden ? " · analyst override" : ""}
+                      {d.seededFrom && d.lastReviewed ? " · " : ""}
+                      {d.lastReviewed
+                        ? `Reviewed ${new Date(d.lastReviewed).toLocaleDateString("en-GB")}`
+                        : ""}
                     </div>
                   )}
                 </div>

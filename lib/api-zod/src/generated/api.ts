@@ -2629,7 +2629,16 @@ export const ListDataCentreFacilitiesResponseItem = zod.object({
   "statusChangedAt": zod.coerce.date().nullish(),
   "createdBy": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "enrichmentSources": zod.record(zod.string(), zod.object({
+  "provider": zod.string(),
+  "sourceRef": zod.string().nullable(),
+  "asOf": zod.string().nullable(),
+  "value": zod.union([zod.string(),zod.number()])
+})).nullish().describe('Per-field import provenance (provider, sourceRef, asOf, value). Null\/absent = no external field ever imported. Never set by analyst edits.'),
+  "enrichmentLocks": zod.record(zod.string(), zod.object({
+  "lockedAt": zod.coerce.date()
+})).nullish().describe('Per-field analyst lock. A locked field is never overwritten by an import. Set only by the PATCH route (analyst action).')
 })
 export const ListDataCentreFacilitiesResponse = zod.array(ListDataCentreFacilitiesResponseItem)
 
@@ -2690,7 +2699,16 @@ export const GetDataCentreFacilityResponse = zod.object({
   "statusChangedAt": zod.coerce.date().nullish(),
   "createdBy": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "enrichmentSources": zod.record(zod.string(), zod.object({
+  "provider": zod.string(),
+  "sourceRef": zod.string().nullable(),
+  "asOf": zod.string().nullable(),
+  "value": zod.union([zod.string(),zod.number()])
+})).nullish().describe('Per-field import provenance (provider, sourceRef, asOf, value). Null\/absent = no external field ever imported. Never set by analyst edits.'),
+  "enrichmentLocks": zod.record(zod.string(), zod.object({
+  "lockedAt": zod.coerce.date()
+})).nullish().describe('Per-field analyst lock. A locked field is never overwritten by an import. Set only by the PATCH route (analyst action).')
 })
 
 
@@ -2721,7 +2739,10 @@ export const UpdateDataCentreFacilityBody = zod.object({
   "notes": zod.string().nullish(),
   "sourceUrl": zod.string().nullish(),
   "linkedIncidentId": zod.number().nullish(),
-  "createdBy": zod.string().optional()
+  "createdBy": zod.string().optional(),
+  "enrichmentLocks": zod.record(zod.string(), zod.object({
+  "lockedAt": zod.coerce.date()
+})).nullish().describe('Full replacement of the per-field analyst lock map. Send to lock or unlock a field explicitly (omit a field to unlock it; null clears all). Manual edits of enrichable fields also auto-lock server-side.')
 })
 
 export const UpdateDataCentreFacilityResponse = zod.object({
@@ -2749,13 +2770,131 @@ export const UpdateDataCentreFacilityResponse = zod.object({
   "statusChangedAt": zod.coerce.date().nullish(),
   "createdBy": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "enrichmentSources": zod.record(zod.string(), zod.object({
+  "provider": zod.string(),
+  "sourceRef": zod.string().nullable(),
+  "asOf": zod.string().nullable(),
+  "value": zod.union([zod.string(),zod.number()])
+})).nullish().describe('Per-field import provenance (provider, sourceRef, asOf, value). Null\/absent = no external field ever imported. Never set by analyst edits.'),
+  "enrichmentLocks": zod.record(zod.string(), zod.object({
+  "lockedAt": zod.coerce.date()
+})).nullish().describe('Per-field analyst lock. A locked field is never overwritten by an import. Set only by the PATCH route (analyst action).')
 })
 
 
 export const DeleteDataCentreFacilityParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
+export const ListDataCentreEnrichmentProvidersResponseItem = zod.object({
+  "token": zod.string(),
+  "name": zod.string(),
+  "format": zod.enum(['csv', 'json']),
+  "columns": zod.array(zod.string())
+})
+export const ListDataCentreEnrichmentProvidersResponse = zod.array(ListDataCentreEnrichmentProvidersResponseItem)
+
+
+
+
+
+
+
+export const PreviewDataCentreEnrichmentBody = zod.object({
+  "provider": zod.string().min(1),
+  "fileContent": zod.string().min(1),
+  "countries": zod.array(zod.string().min(1)).optional()
+})
+
+export const PreviewDataCentreEnrichmentResponse = zod.object({
+  "provider": zod.string(),
+  "commit": zod.boolean(),
+  "totalRecords": zod.number(),
+  "matched": zod.number(),
+  "unmatched": zod.number(),
+  "ambiguous": zod.number(),
+  "duplicateMatches": zod.number(),
+  "coverage": zod.array(zod.object({
+  "field": zod.string(),
+  "present": zod.number(),
+  "unmappable": zod.number(),
+  "total": zod.number(),
+  "pct": zod.number()
+})),
+  "diffs": zod.array(zod.object({
+  "facilityId": zod.number(),
+  "facilityName": zod.string(),
+  "field": zod.string(),
+  "current": zod.union([zod.string(),zod.number()]).nullable(),
+  "proposed": zod.union([zod.string(),zod.number()]),
+  "sourceRef": zod.string().nullable()
+})),
+  "unmatchedRecords": zod.array(zod.object({
+  "name": zod.string(),
+  "country": zod.string().nullable(),
+  "city": zod.string().nullable()
+})),
+  "ambiguousRecords": zod.array(zod.object({
+  "name": zod.string(),
+  "country": zod.string().nullable(),
+  "candidateIds": zod.array(zod.number())
+})),
+  "updatedRows": zod.number(),
+  "fieldWrites": zod.number(),
+  "logLines": zod.array(zod.string())
+}).describe('Result of one enrichment pass. On preview (commit=false) updatedRows and fieldWrites are 0. On commit they report the writes APPLIED to the live DB (re-planned under the same lock, so the returned diffs may differ from a prior preview if the data moved).')
+
+
+
+
+
+
+
+export const CommitDataCentreEnrichmentBody = zod.object({
+  "provider": zod.string().min(1),
+  "fileContent": zod.string().min(1),
+  "countries": zod.array(zod.string().min(1)).optional()
+})
+
+export const CommitDataCentreEnrichmentResponse = zod.object({
+  "provider": zod.string(),
+  "commit": zod.boolean(),
+  "totalRecords": zod.number(),
+  "matched": zod.number(),
+  "unmatched": zod.number(),
+  "ambiguous": zod.number(),
+  "duplicateMatches": zod.number(),
+  "coverage": zod.array(zod.object({
+  "field": zod.string(),
+  "present": zod.number(),
+  "unmappable": zod.number(),
+  "total": zod.number(),
+  "pct": zod.number()
+})),
+  "diffs": zod.array(zod.object({
+  "facilityId": zod.number(),
+  "facilityName": zod.string(),
+  "field": zod.string(),
+  "current": zod.union([zod.string(),zod.number()]).nullable(),
+  "proposed": zod.union([zod.string(),zod.number()]),
+  "sourceRef": zod.string().nullable()
+})),
+  "unmatchedRecords": zod.array(zod.object({
+  "name": zod.string(),
+  "country": zod.string().nullable(),
+  "city": zod.string().nullable()
+})),
+  "ambiguousRecords": zod.array(zod.object({
+  "name": zod.string(),
+  "country": zod.string().nullable(),
+  "candidateIds": zod.array(zod.number())
+})),
+  "updatedRows": zod.number(),
+  "fieldWrites": zod.number(),
+  "logLines": zod.array(zod.string())
+}).describe('Result of one enrichment pass. On preview (commit=false) updatedRows and fieldWrites are 0. On commit they report the writes APPLIED to the live DB (re-planned under the same lock, so the returned diffs may differ from a prior preview if the data moved).')
 
 
 export const ListDataCentreCountryRiskQueryParams = zod.object({
@@ -2773,8 +2912,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "planningPermitting": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2782,8 +2925,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "corruption": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2791,8 +2938,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "transparency": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2800,8 +2951,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "politicalStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2809,8 +2964,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "gridPowerStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2818,8 +2977,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "utilityWaterSupply": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2827,8 +2990,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "waterStress": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2836,8 +3003,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "subseaConnectivity": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2845,8 +3016,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "dataLocalisation": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2854,8 +3029,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "landRealEstate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2863,8 +3042,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "environmentalClimate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2872,8 +3055,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "naturalHazard": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2881,8 +3068,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "securityCivilUnrest": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2890,8 +3081,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "labourSkills": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2899,8 +3094,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "taxIncentives": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2908,8 +3107,12 @@ export const ListDataCentreCountryRiskResponseItem = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.')
 }).describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
   "overallNote": zod.string().nullish(),
   "createdBy": zod.string().nullish(),
@@ -2932,8 +3135,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "planningPermitting": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2941,8 +3148,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "corruption": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2950,8 +3161,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "transparency": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2959,8 +3174,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "politicalStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2968,8 +3187,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "gridPowerStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2977,8 +3200,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "utilityWaterSupply": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2986,8 +3213,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "waterStress": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -2995,8 +3226,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "subseaConnectivity": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3004,8 +3239,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "dataLocalisation": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3013,8 +3252,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "landRealEstate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3022,8 +3265,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "environmentalClimate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3031,8 +3278,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "naturalHazard": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3040,8 +3291,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "securityCivilUnrest": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3049,8 +3304,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "labourSkills": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3058,8 +3317,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "taxIncentives": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3067,8 +3330,12 @@ export const CreateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.')
 }).optional().describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
   "overallNote": zod.string().optional(),
   "createdBy": zod.string().optional()
@@ -3090,8 +3357,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "planningPermitting": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3099,8 +3370,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "corruption": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3108,8 +3383,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "transparency": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3117,8 +3396,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "politicalStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3126,8 +3409,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "gridPowerStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3135,8 +3422,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "utilityWaterSupply": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3144,8 +3435,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "waterStress": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3153,8 +3448,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "subseaConnectivity": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3162,8 +3461,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "dataLocalisation": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3171,8 +3474,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "landRealEstate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3180,8 +3487,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "environmentalClimate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3189,8 +3500,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "naturalHazard": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3198,8 +3513,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "securityCivilUnrest": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3207,8 +3526,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "labourSkills": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3216,8 +3539,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "taxIncentives": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3225,8 +3552,12 @@ export const GetDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.')
 }).describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
   "overallNote": zod.string().nullish(),
   "createdBy": zod.string().nullish(),
@@ -3252,8 +3583,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "planningPermitting": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3261,8 +3596,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "corruption": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3270,8 +3609,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "transparency": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3279,8 +3622,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "politicalStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3288,8 +3635,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "gridPowerStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3297,8 +3648,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "utilityWaterSupply": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3306,8 +3661,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "waterStress": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3315,8 +3674,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "subseaConnectivity": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3324,8 +3687,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "dataLocalisation": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3333,8 +3700,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "landRealEstate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3342,8 +3713,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "environmentalClimate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3351,8 +3726,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "naturalHazard": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3360,8 +3739,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "securityCivilUnrest": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3369,8 +3752,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "labourSkills": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3378,8 +3765,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "taxIncentives": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3387,8 +3778,12 @@ export const UpdateDataCentreCountryRiskBody = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.')
 }).optional().describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
   "overallNote": zod.string().nullish(),
   "createdBy": zod.string().optional()
@@ -3405,8 +3800,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "planningPermitting": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3414,8 +3813,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "corruption": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3423,8 +3826,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "transparency": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3432,8 +3839,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "politicalStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3441,8 +3852,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "gridPowerStability": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3450,8 +3865,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "utilityWaterSupply": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3459,8 +3878,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "waterStress": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3468,8 +3891,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "subseaConnectivity": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3477,8 +3904,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "dataLocalisation": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3486,8 +3917,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "landRealEstate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3495,8 +3930,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "environmentalClimate": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3504,8 +3943,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "naturalHazard": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3513,8 +3956,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "securityCivilUnrest": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3522,8 +3969,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "labourSkills": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3531,8 +3982,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.'),
   "taxIncentives": zod.object({
   "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
   "rationale": zod.string(),
@@ -3540,8 +3995,12 @@ export const UpdateDataCentreCountryRiskResponse = zod.object({
   "analystNote": zod.string(),
   "provisional": zod.boolean(),
   "overridden": zod.boolean(),
-  "seededFrom": zod.string().nullable()
-}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+  "seededFrom": zod.string().nullable(),
+  "sourceDate": zod.string().nullish(),
+  "confidence": zod.union([zod.enum(['Low', 'Medium', 'High']).describe('Evidence confidence \/ coverage for a dimension\'s assessment (distinct from the risk tier). Absence reads \"not reported\".'),zod.null()]).optional(),
+  "lastReviewed": zod.string().nullish(),
+  "locked": zod.boolean().optional()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.')
 }).describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
   "overallNote": zod.string().nullish(),
   "createdBy": zod.string().nullish(),

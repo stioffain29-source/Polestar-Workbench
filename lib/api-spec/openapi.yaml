@@ -1141,6 +1141,51 @@ paths:
         "204":
           description: Deleted
 
+  /data-centre-enrichment/providers:
+    get:
+      operationId: listDataCentreEnrichmentProviders
+      tags: [dataCentreFacilities]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EnrichmentProvider" }
+
+  /data-centre-enrichment/preview:
+    post:
+      operationId: previewDataCentreEnrichment
+      tags: [dataCentreFacilities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnrichmentPreviewInput" }
+      responses:
+        "200":
+          description: Dry-run enrichment plan (no writes).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnrichmentSummary" }
+
+  /data-centre-enrichment/commit:
+    post:
+      operationId: commitDataCentreEnrichment
+      tags: [dataCentreFacilities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnrichmentPreviewInput" }
+      responses:
+        "200":
+          description: Applied enrichment summary (writes committed).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnrichmentSummary" }
+
   /data-centre-country-risk:
     get:
       operationId: listDataCentreCountryRisk
@@ -2677,6 +2722,19 @@ components:
         createdBy: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        enrichmentSources:
+          description: >-
+            Per-field import provenance (provider, sourceRef, asOf, value).
+            Null/absent = no external field ever imported. Never set by analyst
+            edits.
+          type: ["object", "null"]
+          additionalProperties: { $ref: "#/components/schemas/EnrichmentFieldSource" }
+        enrichmentLocks:
+          description: >-
+            Per-field analyst lock. A locked field is never overwritten by an
+            import. Set only by the PATCH route (analyst action).
+          type: ["object", "null"]
+          additionalProperties: { $ref: "#/components/schemas/EnrichmentLock" }
 
     DataCentreFacilityInput:
       type: object
@@ -2724,6 +2782,136 @@ components:
         sourceUrl: { type: ["string", "null"] }
         linkedIncidentId: { type: ["integer", "null"] }
         createdBy: { type: string }
+        enrichmentLocks:
+          description: >-
+            Full replacement of the per-field analyst lock map. Send to lock or
+            unlock a field explicitly (omit a field to unlock it; null clears
+            all). Manual edits of enrichable fields also auto-lock server-side.
+          type: ["object", "null"]
+          additionalProperties: { $ref: "#/components/schemas/EnrichmentLock" }
+
+    EnrichmentFieldSource:
+      type: object
+      required: [provider, sourceRef, asOf, value]
+      properties:
+        provider: { type: string }
+        sourceRef: { type: ["string", "null"] }
+        asOf: { type: ["string", "null"] }
+        value: { type: ["string", "number"] }
+
+    EnrichmentLock:
+      type: object
+      required: [lockedAt]
+      properties:
+        lockedAt: { type: string, format: date-time }
+
+    EnrichmentProvider:
+      type: object
+      required: [token, name, format, columns]
+      properties:
+        token: { type: string }
+        name: { type: string }
+        format: { type: string, enum: [csv, json] }
+        columns:
+          type: array
+          items: { type: string }
+
+    EnrichmentPreviewInput:
+      type: object
+      required: [provider, fileContent]
+      properties:
+        provider: { type: string, minLength: 1 }
+        fileContent: { type: string, minLength: 1 }
+        countries:
+          type: array
+          items: { type: string, minLength: 1 }
+
+    EnrichmentFieldDiff:
+      type: object
+      required: [facilityId, facilityName, field, current, proposed, sourceRef]
+      properties:
+        facilityId: { type: integer }
+        facilityName: { type: string }
+        field: { type: string }
+        current: { type: ["string", "number", "null"] }
+        proposed: { type: ["string", "number"] }
+        sourceRef: { type: ["string", "null"] }
+
+    EnrichmentFieldCoverage:
+      type: object
+      required: [field, present, unmappable, total, pct]
+      properties:
+        field: { type: string }
+        present: { type: integer }
+        unmappable: { type: integer }
+        total: { type: integer }
+        pct: { type: number }
+
+    EnrichmentUnmatchedRecord:
+      type: object
+      required: [name, country, city]
+      properties:
+        name: { type: string }
+        country: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+
+    EnrichmentAmbiguousRecord:
+      type: object
+      required: [name, country, candidateIds]
+      properties:
+        name: { type: string }
+        country: { type: ["string", "null"] }
+        candidateIds:
+          type: array
+          items: { type: integer }
+
+    EnrichmentSummary:
+      type: object
+      description: >-
+        Result of one enrichment pass. On preview (commit=false) updatedRows and
+        fieldWrites are 0. On commit they report the writes APPLIED to the live
+        DB (re-planned under the same lock, so the returned diffs may differ from
+        a prior preview if the data moved).
+      required:
+        - provider
+        - commit
+        - totalRecords
+        - matched
+        - unmatched
+        - ambiguous
+        - duplicateMatches
+        - coverage
+        - diffs
+        - unmatchedRecords
+        - ambiguousRecords
+        - updatedRows
+        - fieldWrites
+        - logLines
+      properties:
+        provider: { type: string }
+        commit: { type: boolean }
+        totalRecords: { type: integer }
+        matched: { type: integer }
+        unmatched: { type: integer }
+        ambiguous: { type: integer }
+        duplicateMatches: { type: integer }
+        coverage:
+          type: array
+          items: { $ref: "#/components/schemas/EnrichmentFieldCoverage" }
+        diffs:
+          type: array
+          items: { $ref: "#/components/schemas/EnrichmentFieldDiff" }
+        unmatchedRecords:
+          type: array
+          items: { $ref: "#/components/schemas/EnrichmentUnmatchedRecord" }
+        ambiguousRecords:
+          type: array
+          items: { $ref: "#/components/schemas/EnrichmentAmbiguousRecord" }
+        updatedRows: { type: integer }
+        fieldWrites: { type: integer }
+        logLines:
+          type: array
+          items: { type: string }
 
     DataCentreRiskRating:
       type: string
@@ -2735,13 +2923,26 @@ components:
         - High
         - Extreme
 
+    DataCentreRiskConfidence:
+      type: string
+      description: >-
+        Evidence confidence / coverage for a dimension's assessment (distinct
+        from the risk tier). Absence reads "not reported".
+      enum:
+        - Low
+        - Medium
+        - High
+
     DataCentreRiskDimension:
       type: object
       description: >-
         One risk dimension's assessment. `rating` null = "not reported" (never
         invented). `provisional` marks an unreviewed auto-seeded rating; it is
         cleared once the analyst saves. `source` cites the basis and `seededFrom`
-        records auto-seed provenance (e.g. "TI CPI 2024").
+        records auto-seed provenance (e.g. "TI CPI 2024"). `sourceDate`,
+        `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance
+        metadata; historical rows that predate them simply omit them. A `locked`
+        dimension is never overwritten by an auto-seed.
       required:
         - rating
         - rationale
@@ -2761,6 +2962,13 @@ components:
         provisional: { type: boolean }
         overridden: { type: boolean }
         seededFrom: { type: ["string", "null"] }
+        sourceDate: { type: ["string", "null"] }
+        confidence:
+          anyOf:
+            - $ref: "#/components/schemas/DataCentreRiskConfidence"
+            - type: "null"
+        lastReviewed: { type: ["string", "null"] }
+        locked: { type: boolean }
 
     DataCentreCountryRiskDimensions:
       type: object

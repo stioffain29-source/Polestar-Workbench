@@ -33,6 +33,14 @@ export const DATA_CENTRE_RISK_RATINGS = [
 ] as const;
 export type DataCentreRiskRating = (typeof DATA_CENTRE_RISK_RATINGS)[number];
 
+// Confidence / coverage of a dimension's evidence. `null` (or absent) reads
+// "not reported". Distinct from the risk tier: it describes how well-sourced the
+// assessment is, not how bad the risk is. A weak/partial-coverage index seed is
+// stamped "Low" so the reader knows to treat the tier cautiously.
+export const DATA_CENTRE_RISK_CONFIDENCE = ["Low", "Medium", "High"] as const;
+export type DataCentreRiskConfidence =
+  (typeof DATA_CENTRE_RISK_CONFIDENCE)[number];
+
 // The 16 FIXED risk dimensions. `key` is the stable jsonb property (never
 // change once shipped); `label` is the display string. Any new dimension is a
 // code change in lockstep with the OpenAPI `DataCentreCountryRisk.dimensions`
@@ -76,6 +84,16 @@ export type DataCentreRiskDimensionValue = {
   provisional: boolean;
   overridden: boolean;
   seededFrom: string | null;
+  // Discrete per-dimension provenance metadata. ALL OPTIONAL so historical
+  // jsonb rows (written before these fields existed) parse unchanged — no DDL.
+  // `sourceDate`: the "as of" date of the cited index/source (ISO date or year).
+  // `confidence`: evidence confidence / coverage (see DATA_CENTRE_RISK_CONFIDENCE).
+  // `lastReviewed`: ISO timestamp the analyst last reviewed/saved this dimension.
+  // `locked`: analyst lock — a locked dimension is NEVER overwritten by a seed.
+  sourceDate?: string | null;
+  confidence?: DataCentreRiskConfidence | null;
+  lastReviewed?: string | null;
+  locked?: boolean;
 };
 
 // The dimensions object. A missing key reads "not reported"; the editor always

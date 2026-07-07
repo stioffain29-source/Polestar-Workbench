@@ -19,6 +19,16 @@ import type {
   DataCentreRiskRating,
 } from "@workspace/db/schema";
 
+import {
+  buildSeededDimension as buildSeededDimensionGeneric,
+  isSeedable,
+  splitCsvLine,
+} from "./riskSeed.js";
+
+// Re-export so existing importers (and the pinned band-map test) keep resolving
+// `splitCsvLine` from here; the single implementation now lives in riskSeed.
+export { splitCsvLine };
+
 // Bump this (and add a v2 band function) if the score→tier thresholds ever
 // change, so an old provisional seed is distinguishable from a new one.
 export const CPI_BAND_MAP_VERSION = 1;
@@ -52,75 +62,32 @@ export function buildSeededDimension(
   score: number,
   year: number,
 ): DataCentreRiskDimensionValue {
-  const rating = cpiScoreToRating(score);
-  return {
-    rating,
+  return buildSeededDimensionGeneric({
+    rating: cpiScoreToRating(score),
     rationale: `Provisional — seeded from TI CPI ${year} score ${score} via band mapping v${CPI_BAND_MAP_VERSION}; pending analyst review`,
     source: `Transparency International Corruption Perceptions Index ${year}`,
-    analystNote: "",
-    provisional: true,
-    overridden: false,
     seededFrom: `TI CPI ${year}`,
-  };
+    sourceDate: String(year),
+    confidence: "High",
+  });
 }
 
 /**
  * May this dimension be (re)seeded from CPI? NEVER overwrite analyst work:
- *  - an overridden dimension is off-limits;
+ *  - a locked or overridden dimension is off-limits;
  *  - a prior CPI provisional seed may be refreshed to a newer year;
  *  - an untouched/empty dimension may be seeded;
  *  - any dimension carrying non-seed analyst content is left alone.
+ * Delegates to the shared `isSeedable`, keyed on the "TI CPI" seed prefix.
  */
 export function isCpiSeedable(
   existing: DataCentreRiskDimensionValue | undefined,
 ): boolean {
-  if (!existing) return true;
-  if (existing.overridden) return false;
-  const isPriorCpiSeed =
-    existing.provisional && (existing.seededFrom ?? "").startsWith("TI CPI");
-  if (isPriorCpiSeed) return true;
-  const hasContent =
-    !!existing.rating ||
-    existing.rationale.trim() !== "" ||
-    existing.source.trim() !== "" ||
-    existing.analystNote.trim() !== "";
-  return !hasContent;
+  return isSeedable(existing, "TI CPI");
 }
 
 export type CpiRow = { country: string; score: number };
 export type ParsedCpi = { year: number | null; rows: CpiRow[] };
-
-// Split one CSV line honouring double-quoted fields (CPI country names such as
-// "Korea, North" and "Congo, Dem. Rep." embed commas).
-export function splitCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          cur += '"';
-          i += 1;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        cur += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ",") {
-      out.push(cur);
-      cur = "";
-    } else {
-      cur += ch;
-    }
-  }
-  out.push(cur);
-  return out.map((c) => c.trim());
-}
 
 /**
  * Parse a local CPI CSV into rows. The header must carry a country column

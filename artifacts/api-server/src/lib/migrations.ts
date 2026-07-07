@@ -543,6 +543,17 @@ export async function runDataMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS enrichment_sources jsonb
     `);
 
+    // Additive: per-field analyst LOCK (see EnrichmentLocks). Nullable jsonb
+    // keyed by enrichable field name -> { lockedAt }. Set ONLY by the owner-
+    // gated PATCH route when an analyst manually corrects a field, so a later
+    // enrichment import can never overwrite the correction (the engine's differ
+    // skips locked fields). No backfill — pre-existing rows correctly start
+    // NULL (nothing locked). Idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      ALTER TABLE data_centre_facilities
+      ADD COLUMN IF NOT EXISTS enrichment_locks jsonb
+    `);
+
     // Schema: per-country DATA-CENTRE RISK FRAMEWORK — one row per country with a
     // 16-dimension analyst-maintained assessment (jsonb `dimensions`). Ratings
     // may be auto-seeded from cited public indices then analyst-overridden; a

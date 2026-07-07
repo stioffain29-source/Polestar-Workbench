@@ -41,6 +41,36 @@ CPI CSV. INVERTED band map v1 (higher CPI = cleaner = lower risk):
   future threshold change be told apart from an old seed; bump it + the unit
   test if thresholds move.
 
+## Generalised offline seed registry (WGI/ND-GAIN/INFORM/Aqueduct/…)
+CPI seeding is now ONE case of a swappable registry: `scripts/src/lib/
+riskSeed.ts` (generic `ratingFromBands`/`isSeedable`/`buildSeededDimension`/
+`buildNoteDimension`/`parseIndexCsv`/`parseNotesCsv`), `scripts/src/lib/
+riskSourceRegistry.ts` (one entry per source → dimension(s) + a versioned band
+map, `kind:"rating"` or note-only `kind:"note"`), driven by one generic CLI
+`scripts/src/import-risk-seed.ts` (`--source=<id> --file= --year= [--commit]`).
+Adding a source = ONE registry entry; the CLI never changes.
+- `isSeedable` now ALSO refuses a `locked` dim (per-field lock) and
+  refuses a provisional seed from a DIFFERENT source prefix (cross-source
+  overwrite guard). Dimension value gained `sourceDate` / `confidence`
+  (Low|Medium|High — "Medium" NOT "Moderate", to avoid colliding with the risk
+  tier) / `lastReviewed` / `locked`.
+- **WGI column trap (no-fabrication):** WGI exports carry BOTH an "Estimate"
+  (−2.5..+2.5) and a "Percentile Rank" (0–100) column. The estimate is in-range
+  for a 0–100 band table but OPPOSITE meaning → silent mis-band. Value-header
+  regexes are deliberately narrowed to the specific domain token (WGI
+  `/percentile/i` only, INFORM `/hazard|exposure/`|`/conflict/`, etc.) — never a
+  generic `/index|score|value|percent/` catch-all that could grab a neighbouring
+  composite column.
+- Seeds are BUILT (and thus band-validated) during the PLAN pass, so a dry-run
+  surfaces an out-of-range value before any write; `--commit` runs in ONE
+  transaction so a mid-run failure rolls back (no partial seed).
+- Band maps pinned by `__tests__/scripts/riskSeedBandMaps.test.ts`; bump the
+  per-source `bandMapVersion` + the test if thresholds move.
+- Best-effort dataset auto-download was deliberately SKIPPED: raw govt bulk files
+  are wide/multi-sheet and several hosts 406/403 our egress IP; hand-reshaping =
+  fabrication risk. The registry expects an analyst to drop a clean offline CSV;
+  until then the dimension stays "not reported".
+
 ## Brand ramp
 `RISK_RATING_COLOR` mirrors `SPOT_SEV_COLOR`: petrol `#1B6B7A`=Insignificant
 ONLY, subdued red `#A33232`=Extreme ONLY (Low/Moderate/High = #6FB872 / #E67E22

@@ -48,6 +48,9 @@ import type {
   EditCountryProseInput,
   EditReportIncidentSummariesInput,
   EditReportProseInput,
+  EnrichmentPreviewInput,
+  EnrichmentProvider,
+  EnrichmentSummary,
   ErrorEnvelope,
   GdeltStructuredItem,
   GenerateCountryProseInput,
@@ -4072,6 +4075,207 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteDataCentreFacilityMutationOptions(options));
+    }
+
+export const getListDataCentreEnrichmentProvidersUrl = () => {
+
+
+
+
+  return `/api/data-centre-enrichment/providers`
+}
+
+export const listDataCentreEnrichmentProviders = async ( options?: RequestInit): Promise<EnrichmentProvider[]> => {
+
+  return customFetch<EnrichmentProvider[]>(getListDataCentreEnrichmentProvidersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDataCentreEnrichmentProvidersQueryKey = () => {
+    return [
+    `/api/data-centre-enrichment/providers`
+    ] as const;
+    }
+
+
+export const getListDataCentreEnrichmentProvidersQueryOptions = <TData = Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDataCentreEnrichmentProvidersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>> = ({ signal }) => listDataCentreEnrichmentProviders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDataCentreEnrichmentProvidersQueryResult = NonNullable<Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>>
+export type ListDataCentreEnrichmentProvidersQueryError = ErrorType<unknown>
+
+
+
+export function useListDataCentreEnrichmentProviders<TData = Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDataCentreEnrichmentProviders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDataCentreEnrichmentProvidersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewDataCentreEnrichmentUrl = () => {
+
+
+
+
+  return `/api/data-centre-enrichment/preview`
+}
+
+export const previewDataCentreEnrichment = async (enrichmentPreviewInput: EnrichmentPreviewInput, options?: RequestInit): Promise<EnrichmentSummary> => {
+
+  return customFetch<EnrichmentSummary>(getPreviewDataCentreEnrichmentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      enrichmentPreviewInput,)
+  }
+);}
+
+
+
+
+export const getPreviewDataCentreEnrichmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewDataCentreEnrichment>>, TError,{data: BodyType<EnrichmentPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewDataCentreEnrichment>>, TError,{data: BodyType<EnrichmentPreviewInput>}, TContext> => {
+
+const mutationKey = ['previewDataCentreEnrichment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewDataCentreEnrichment>>, {data: BodyType<EnrichmentPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewDataCentreEnrichment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewDataCentreEnrichmentMutationResult = NonNullable<Awaited<ReturnType<typeof previewDataCentreEnrichment>>>
+    export type PreviewDataCentreEnrichmentMutationBody = BodyType<EnrichmentPreviewInput>
+    export type PreviewDataCentreEnrichmentMutationError = ErrorType<unknown>
+
+    export const usePreviewDataCentreEnrichment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewDataCentreEnrichment>>, TError,{data: BodyType<EnrichmentPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewDataCentreEnrichment>>,
+        TError,
+        {data: BodyType<EnrichmentPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewDataCentreEnrichmentMutationOptions(options));
+    }
+
+export const getCommitDataCentreEnrichmentUrl = () => {
+
+
+
+
+  return `/api/data-centre-enrichment/commit`
+}
+
+export const commitDataCentreEnrichment = async (enrichmentPreviewInput: EnrichmentPreviewInput, options?: RequestInit): Promise<EnrichmentSummary> => {
+
+  return customFetch<EnrichmentSummary>(getCommitDataCentreEnrichmentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      enrichmentPreviewInput,)
+  }
+);}
+
+
+
+
+export const getCommitDataCentreEnrichmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitDataCentreEnrichment>>, TError,{data: BodyType<EnrichmentPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof commitDataCentreEnrichment>>, TError,{data: BodyType<EnrichmentPreviewInput>}, TContext> => {
+
+const mutationKey = ['commitDataCentreEnrichment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commitDataCentreEnrichment>>, {data: BodyType<EnrichmentPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  commitDataCentreEnrichment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommitDataCentreEnrichmentMutationResult = NonNullable<Awaited<ReturnType<typeof commitDataCentreEnrichment>>>
+    export type CommitDataCentreEnrichmentMutationBody = BodyType<EnrichmentPreviewInput>
+    export type CommitDataCentreEnrichmentMutationError = ErrorType<unknown>
+
+    export const useCommitDataCentreEnrichment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitDataCentreEnrichment>>, TError,{data: BodyType<EnrichmentPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof commitDataCentreEnrichment>>,
+        TError,
+        {data: BodyType<EnrichmentPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getCommitDataCentreEnrichmentMutationOptions(options));
     }
 
 export const getListDataCentreCountryRiskUrl = (params?: ListDataCentreCountryRiskParams,) => {

@@ -96,6 +96,29 @@ export interface EnrichmentFieldSource {
 }
 export type EnrichmentSources = Record<string, EnrichmentFieldSource>;
 
+// The four operational fields the supervised enrichment run may WRITE — and that
+// an analyst may therefore LOCK. Mirrors ENRICHABLE_FIELDS in the enrichment
+// engine; it is duplicated here (rather than imported) to avoid a dependency
+// cycle, since `lib/ingest` imports `lib/db`, not the other way round.
+export const ENRICHABLE_FACILITY_FIELDS = [
+  "status",
+  "facilityType",
+  "capacityMw",
+  "itLoadMw",
+] as const;
+export type EnrichableFacilityField =
+  (typeof ENRICHABLE_FACILITY_FIELDS)[number];
+
+// Per-field ANALYST LOCK. When an analyst manually corrects one of the four
+// enrichable fields, the owner-gated PATCH route stamps that field here so a
+// later enrichment import can NEVER overwrite the corrected value (the engine's
+// differ skips any locked field). Set ONLY by the PATCH route (an analyst
+// action) — the enrichment engine never writes locks. The analyst can clear a
+// lock (unlock toggle) to let future imports flow into that field again.
+export type EnrichmentLocks = Partial<
+  Record<EnrichableFacilityField, { lockedAt: string }>
+>;
+
 export const dataCentreFacilitiesTable = pgTable(
   "data_centre_facilities",
   {
@@ -154,6 +177,11 @@ export const dataCentreFacilitiesTable = pgTable(
     // set when a supervised enrichment run writes an operational field from an
     // external source. Never touched by manual analyst edits.
     enrichmentSources: jsonb("enrichment_sources").$type<EnrichmentSources>(),
+
+    // Per-field analyst LOCK (see EnrichmentLocks). Nullable — set by the PATCH
+    // route when an analyst manually corrects an enrichable field so no later
+    // import overwrites it. The enrichment engine never writes this column.
+    enrichmentLocks: jsonb("enrichment_locks").$type<EnrichmentLocks>(),
 
     // Analyst-entered authorship (NOT authenticated identity).
     createdBy: text("created_by"),

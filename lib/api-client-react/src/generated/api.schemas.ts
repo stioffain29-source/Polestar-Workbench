@@ -905,6 +905,31 @@ export const DataCentreType = {
   'Unknown_/_not_reported': 'Unknown / not reported',
 } as const;
 
+export interface EnrichmentFieldSource {
+  provider: string;
+  /** @nullable */
+  sourceRef: string | null;
+  /** @nullable */
+  asOf: string | null;
+  value: string | number;
+}
+
+/**
+ * Per-field import provenance (provider, sourceRef, asOf, value). Null/absent = no external field ever imported. Never set by analyst edits.
+ * @nullable
+ */
+export type DataCentreFacilityEnrichmentSources = {[key: string]: EnrichmentFieldSource} | null;
+
+export interface EnrichmentLock {
+  lockedAt: string;
+}
+
+/**
+ * Per-field analyst lock. A locked field is never overwritten by an import. Set only by the PATCH route (analyst action).
+ * @nullable
+ */
+export type DataCentreFacilityEnrichmentLocks = {[key: string]: EnrichmentLock} | null;
+
 export interface DataCentreFacility {
   id: number;
   name: string;
@@ -947,6 +972,16 @@ export interface DataCentreFacility {
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+     * Per-field import provenance (provider, sourceRef, asOf, value). Null/absent = no external field ever imported. Never set by analyst edits.
+     * @nullable
+     */
+  enrichmentSources?: DataCentreFacilityEnrichmentSources;
+  /**
+     * Per-field analyst lock. A locked field is never overwritten by an import. Set only by the PATCH route (analyst action).
+     * @nullable
+     */
+  enrichmentLocks?: DataCentreFacilityEnrichmentLocks;
 }
 
 export interface DataCentreFacilityInput {
@@ -972,6 +1007,12 @@ export interface DataCentreFacilityInput {
   linkedIncidentId?: number;
   createdBy?: string;
 }
+
+/**
+ * Full replacement of the per-field analyst lock map. Send to lock or unlock a field explicitly (omit a field to unlock it; null clears all). Manual edits of enrichable fields also auto-lock server-side.
+ * @nullable
+ */
+export type DataCentreFacilityUpdateEnrichmentLocks = {[key: string]: EnrichmentLock} | null;
 
 export interface DataCentreFacilityUpdate {
   /** @minLength 1 */
@@ -1008,6 +1049,88 @@ export interface DataCentreFacilityUpdate {
   /** @nullable */
   linkedIncidentId?: number | null;
   createdBy?: string;
+  /**
+     * Full replacement of the per-field analyst lock map. Send to lock or unlock a field explicitly (omit a field to unlock it; null clears all). Manual edits of enrichable fields also auto-lock server-side.
+     * @nullable
+     */
+  enrichmentLocks?: DataCentreFacilityUpdateEnrichmentLocks;
+}
+
+export type EnrichmentProviderFormat = typeof EnrichmentProviderFormat[keyof typeof EnrichmentProviderFormat];
+
+
+export const EnrichmentProviderFormat = {
+  csv: 'csv',
+  json: 'json',
+} as const;
+
+export interface EnrichmentProvider {
+  token: string;
+  name: string;
+  format: EnrichmentProviderFormat;
+  columns: string[];
+}
+
+export interface EnrichmentPreviewInput {
+  /** @minLength 1 */
+  provider: string;
+  /** @minLength 1 */
+  fileContent: string;
+  countries?: string[];
+}
+
+export interface EnrichmentFieldDiff {
+  facilityId: number;
+  facilityName: string;
+  field: string;
+  /** @nullable */
+  current: string | number | null;
+  proposed: string | number;
+  /** @nullable */
+  sourceRef: string | null;
+}
+
+export interface EnrichmentFieldCoverage {
+  field: string;
+  present: number;
+  unmappable: number;
+  total: number;
+  pct: number;
+}
+
+export interface EnrichmentUnmatchedRecord {
+  name: string;
+  /** @nullable */
+  country: string | null;
+  /** @nullable */
+  city: string | null;
+}
+
+export interface EnrichmentAmbiguousRecord {
+  name: string;
+  /** @nullable */
+  country: string | null;
+  candidateIds: number[];
+}
+
+/**
+ * Result of one enrichment pass. On preview (commit=false) updatedRows and fieldWrites are 0. On commit they report the writes APPLIED to the live DB (re-planned under the same lock, so the returned diffs may differ from a prior preview if the data moved).
+ */
+export interface EnrichmentSummary {
+  provider: string;
+  commit: boolean;
+  totalRecords: number;
+  matched: number;
+  unmatched: number;
+  ambiguous: number;
+  duplicateMatches: number;
+  coverage: EnrichmentFieldCoverage[];
+  diffs: EnrichmentFieldDiff[];
+  unmatchedRecords: EnrichmentUnmatchedRecord[];
+  ambiguousRecords: EnrichmentAmbiguousRecord[];
+  updatedRows: number;
+  fieldWrites: number;
+  logLines: string[];
 }
 
 /**
@@ -1025,7 +1148,19 @@ export const DataCentreRiskRating = {
 } as const;
 
 /**
- * One risk dimension's assessment. `rating` null = "not reported" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. "TI CPI 2024").
+ * Evidence confidence / coverage for a dimension's assessment (distinct from the risk tier). Absence reads "not reported".
+ */
+export type DataCentreRiskConfidence = typeof DataCentreRiskConfidence[keyof typeof DataCentreRiskConfidence];
+
+
+export const DataCentreRiskConfidence = {
+  Low: 'Low',
+  Medium: 'Medium',
+  High: 'High',
+} as const;
+
+/**
+ * One risk dimension's assessment. `rating` null = "not reported" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. "TI CPI 2024"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.
  */
 export interface DataCentreRiskDimension {
   rating: DataCentreRiskRating | null;
@@ -1036,6 +1171,12 @@ export interface DataCentreRiskDimension {
   overridden: boolean;
   /** @nullable */
   seededFrom: string | null;
+  /** @nullable */
+  sourceDate?: string | null;
+  confidence?: DataCentreRiskConfidence | null;
+  /** @nullable */
+  lastReviewed?: string | null;
+  locked?: boolean;
 }
 
 /**

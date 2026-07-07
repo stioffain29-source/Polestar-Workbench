@@ -5,10 +5,11 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { DataCentreRiskConfidence } from './dataCentreRiskConfidence';
 import type { DataCentreRiskRating } from './dataCentreRiskRating';
 
 /**
- * One risk dimension's assessment. `rating` null = "not reported" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. "TI CPI 2024").
+ * One risk dimension's assessment. `rating` null = "not reported" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. "TI CPI 2024"). `sourceDate`, `confidence`, `lastReviewed` and `locked` are OPTIONAL provenance metadata; historical rows that predate them simply omit them. A `locked` dimension is never overwritten by an auto-seed.
  */
 export interface DataCentreRiskDimension {
   rating: DataCentreRiskRating | null;
@@ -19,4 +20,10 @@ export interface DataCentreRiskDimension {
   overridden: boolean;
   /** @nullable */
   seededFrom: string | null;
+  /** @nullable */
+  sourceDate?: string | null;
+  confidence?: DataCentreRiskConfidence | null;
+  /** @nullable */
+  lastReviewed?: string | null;
+  locked?: boolean;
 }

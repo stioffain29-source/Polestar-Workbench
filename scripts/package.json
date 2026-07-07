@@ -13,6 +13,7 @@
     "import:peeringdb-data-centres": "tsx ./src/import-peeringdb-data-centres.ts",
     "enrich:data-centres": "tsx ./src/enrich-data-centres.ts",
     "import:cpi": "tsx ./src/import-cpi.ts",
+    "import:risk-seed": "tsx ./src/import-risk-seed.ts",
     "promote:social": "tsx ./src/promote-social.ts",
     "scrape:cargo-watch": "tsx ./src/scrape-cargo-watch.ts",
     "scrape:flashpoint": "tsx ./src/scrape-flashpoint.ts",

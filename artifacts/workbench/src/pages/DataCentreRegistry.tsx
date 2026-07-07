@@ -14,7 +14,21 @@ import {
   type DataCentreFacilityInput,
 } from "@workspace/api-client-react";
 import { format, parseISO } from "date-fns";
-import { Plus, Pencil, Trash2, X, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ExternalLink, Lock, Unlock } from "lucide-react";
+import DataCentreEnrichmentPanel from "../components/DataCentreEnrichmentPanel";
+
+// The four fields a bulk enrichment import may touch. Kept in sync with the
+// server's ENRICHABLE_FACILITY_FIELDS (in @workspace/db) — duplicated locally
+// because importing the db schema into the browser pulls in pg/drizzle. Each
+// carries an analyst LOCK toggle + enrichment provenance in the edit form.
+const ENRICHABLE_FIELDS = ["status", "facilityType", "capacityMw", "itLoadMw"] as const;
+type EnrichableField = (typeof ENRICHABLE_FIELDS)[number];
+const ENRICHABLE_LABELS: Record<EnrichableField, string> = {
+  status: "Status",
+  facilityType: "Type",
+  capacityMw: "Capacity (MW)",
+  itLoadMw: "IT Load (MW)",
+};
 
 // Owner-gated admin UI for the analyst-maintained Data Centre facility REGISTRY.
 //
@@ -170,10 +184,25 @@ export default function DataCentreRegistry() {
   const search = useSearch();
 
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingFacility, setEditingFacility] = useState<DataCentreFacility | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [locks, setLocks] = useState<Record<EnrichableField, boolean>>({
+    status: false,
+    facilityType: false,
+    capacityMw: false,
+    itLoadMw: false,
+  });
   const [error, setError] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
+
+  // Derive lock toggle state from a facility's persisted enrichmentLocks map.
+  const locksFromFacility = (f: DataCentreFacility): Record<EnrichableField, boolean> => ({
+    status: f.enrichmentLocks?.status != null,
+    facilityType: f.enrichmentLocks?.facilityType != null,
+    capacityMw: f.enrichmentLocks?.capacityMw != null,
+    itLoadMw: f.enrichmentLocks?.itLoadMw != null,
+  });
 
   // Deep link from the facility overlay map: `?facility=<id>` opens that
   // facility's full record. Guarded so it only fires once the target row is
@@ -189,7 +218,9 @@ export default function DataCentreRegistry() {
     if (!target) return;
     deepLinkHandledRef.current = requested;
     setEditingId(target.id);
+    setEditingFacility(target);
     setForm(facilityToForm(target));
+    setLocks(locksFromFacility(target));
     setError(null);
     setShowForm(true);
     // Scroll the matching row into view and briefly highlight it so the
@@ -238,19 +269,24 @@ export default function DataCentreRegistry() {
 
   function openCreate() {
     setEditingId(null);
+    setEditingFacility(null);
     setForm(EMPTY_FORM);
+    setLocks({ status: false, facilityType: false, capacityMw: false, itLoadMw: false });
     setError(null);
     setShowForm(true);
   }
   function openEdit(f: DataCentreFacility) {
     setEditingId(f.id);
+    setEditingFacility(f);
     setForm(facilityToForm(f));
+    setLocks(locksFromFacility(f));
     setError(null);
     setShowForm(true);
   }
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
+    setEditingFacility(null);
     setForm(EMPTY_FORM);
     setError(null);
   }
@@ -267,7 +303,19 @@ export default function DataCentreRegistry() {
     }
     const payload = formToInput(form);
     if (editingId != null) {
-      updateMut.mutate({ id: editingId, data: payload });
+      // Build the full analyst-lock map from the toggles. Reuse the existing
+      // lockedAt timestamp where a lock is preserved so the "since" date is
+      // stable; stamp now for a newly-set lock. The route also auto-locks any
+      // field whose value the analyst just changed, so a manual correction is
+      // protected even if its toggle was left off.
+      const enrichmentLocks: Record<string, { lockedAt: string }> = {};
+      for (const field of ENRICHABLE_FIELDS) {
+        if (locks[field]) {
+          const existing = editingFacility?.enrichmentLocks?.[field]?.lockedAt;
+          enrichmentLocks[field] = { lockedAt: existing ?? new Date().toISOString() };
+        }
+      }
+      updateMut.mutate({ id: editingId, data: { ...payload, enrichmentLocks } });
     } else {
       createMut.mutate({ data: payload });
     }
@@ -326,6 +374,9 @@ export default function DataCentreRegistry() {
         <SummaryTile label="Operational" value={summary.operational} accent="#1B6B7A" />
         <SummaryTile label="Recent Status Movers" value={summary.movers} accent="#A33232" />
       </div>
+
+      {/* Bulk enrichment — upload provider export, preview, then commit */}
+      <DataCentreEnrichmentPanel />
 
       {/* Form */}
       {showForm && (
@@ -426,6 +477,64 @@ export default function DataCentreRegistry() {
               />
             </Labelled>
           </div>
+
+          {/* Enrichable fields — analyst lock + enrichment provenance.
+              A locked field is never overwritten by a bulk enrichment import;
+              provenance shows where the current value came from. Shown only when
+              editing an existing facility. */}
+          {editingId != null && (
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-1">
+                Enrichment control
+              </h3>
+              <p className="text-xs text-muted-foreground font-sans mb-3">
+                Lock a field to protect an analyst correction — bulk imports skip
+                locked fields. Editing a field's value here locks it automatically.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {ENRICHABLE_FIELDS.map((field) => {
+                  const src = editingFacility?.enrichmentSources?.[field] ?? null;
+                  const locked = locks[field];
+                  return (
+                    <div
+                      key={field}
+                      className="flex items-start justify-between gap-3 border border-border rounded-sm px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground font-sans">
+                          {ENRICHABLE_LABELS[field]}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-sans mt-0.5">
+                          {src ? (
+                            <>
+                              Source: {src.provider}
+                              {src.sourceRef ? ` · ${src.sourceRef}` : ""}
+                              {src.asOf ? ` · as of ${src.asOf}` : ""}
+                            </>
+                          ) : (
+                            "No enrichment source — analyst-entered or not reported."
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLocks((s) => ({ ...s, [field]: !s[field] }))}
+                        className={`flex items-center gap-1.5 h-8 px-2.5 rounded-sm text-xs font-medium font-sans border shrink-0 ${
+                          locked
+                            ? "border-accent text-accent bg-accent/10"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                        aria-pressed={locked}
+                      >
+                        {locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                        {locked ? "Locked" : "Unlocked"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-3 mt-5">
             <button
               type="button"

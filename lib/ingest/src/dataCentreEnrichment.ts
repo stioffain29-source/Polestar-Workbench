@@ -36,6 +36,7 @@ import {
   type DataCentreFacility,
   type EnrichmentSources,
   type EnrichmentFieldSource,
+  type EnrichmentLocks,
 } from "@workspace/db";
 
 // ---------------------------------------------------------------------------
@@ -457,6 +458,8 @@ export interface DiffableFacility {
   capacityMw: number | null;
   itLoadMw: number | null;
   enrichmentSources: EnrichmentSources | null;
+  /** Per-field analyst lock. A locked field is never proposed for change. */
+  enrichmentLocks: EnrichmentLocks | null;
 }
 
 function currentValue(
@@ -494,9 +497,11 @@ function proposedValue(
 /**
  * Per-field diff for a matched facility. A field is proposed ONLY when:
  *   (a) the record carries a usable (mapped/parsed) value,
- *   (b) it differs from the current column value, AND
+ *   (b) it differs from the current column value,
  *   (c) `enrichment_sources` does NOT already record that EXACT value (so a
- *       value imported once is never re-imposed over a later analyst edit).
+ *       value imported once is never re-imposed over a later analyst edit), AND
+ *   (d) the field is NOT analyst-LOCKED (a manual correction the desk pinned so
+ *       no import can overwrite it).
  */
 export function computeFacilityDiff(
   record: EnrichmentRecord,
@@ -504,6 +509,7 @@ export function computeFacilityDiff(
 ): FieldDiff[] {
   const diffs: FieldDiff[] = [];
   for (const field of ENRICHABLE_FIELDS) {
+    if (facility.enrichmentLocks?.[field]) continue; // (d) analyst-locked
     const proposed = proposedValue(record, field);
     if (proposed == null) continue; // (a) nothing usable from the source
     const current = currentValue(facility, field);
@@ -640,6 +646,7 @@ function toDiffable(f: DataCentreFacility): DiffableFacility {
     capacityMw: f.capacityMw,
     itLoadMw: f.itLoadMw,
     enrichmentSources: f.enrichmentSources ?? null,
+    enrichmentLocks: f.enrichmentLocks ?? null,
   };
 }
 
