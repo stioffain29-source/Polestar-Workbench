@@ -38,23 +38,37 @@ Two things must BOTH hold or a headline ships untranslated:
    **How to apply:** if titles still aren't translating after markers are right,
    check the integration is provisioned — the failure is silent by design.
 
-## Sibling: KAMMI social-watch caption translation
+## Sibling: KAMMI social-watch caption translation (UNGATED — translate-all)
 
-`social_watch_items.caption` (Bahasa KAMMI post captions) gets the SAME treatment
-in `lib/ingest/src/captionTranslate.ts` → nullable `caption_en` column; the
-Protests `SocialWatchGroup` panel prefers `caption_en` and falls back to
-`caption`. It REUSES the exported `NON_LATIN_CLASS` + `INDONESIAN_MARKER_WORDS`
-constants and `needsTitleTranslation` predicate verbatim, so caption detection and
-title detection can never diverge — add a new marker word once and BOTH layers
-pick it up.
-**Why:** owner "I can't read bahasa" on the KAMMI panel; captions are a second
-free-text surface with the exact same ASCII-Bahasa detection problem as titles.
-**How to apply:** both prerequisites above apply identically (marker gate + OpenAI
-provisioned). Runs (commit) inside `runIngestOnce` and `runTitleTranslationOnce`,
-each in its own try so an LLM failure can't abort ingest. Idempotent: candidate
-SQL is `caption_en IS NULL` + non-English predicate, UPDATE re-guards
-`AND caption_en IS NULL`; the edit route sets `caption_en=null` so an edited
-caption re-translates. CLI: `translate-social-captions` (dry-run default; the
-dry-run still SPENDS LLM tokens, so don't run it alongside the server pass). The
-separate OSINT `social_raw` panel is a DIFFERENT surface and is intentionally NOT
-translated.
+`social_watch_items.caption` (Bahasa KAMMI post captions) is translated in
+`lib/ingest/src/captionTranslate.ts` → nullable `caption_en` column; the Protests
+`SocialWatchGroup` panel prefers `caption_en` and falls back to `caption`.
+**CRITICAL DIVERGENCE from the title path:** the caption pass DELIBERATELY DROPPED
+the marker-word / non-Latin gate. Its candidate query is now just
+`caption_en IS NULL AND caption IS NOT NULL` — every not-yet-processed caption is
+sent to the model, which returns already-English captions unchanged so they leave
+the candidate set. Do NOT re-add `INDONESIAN_MARKER_WORDS`/`NON_LATIN_CLASS` here.
+**Why:** the marker gate is structurally leaky (rule 1 above) — genuinely-Bahasa
+captions that happened to contain no listed function word shipped RAW, which is
+exactly the recurring "still shows bahasa in prod" complaint. The KAMMI panel is
+tiny + single-source, so translating everything costs little and closes the leak
+for good; the high-volume title path keeps its gate to avoid spending on English.
+**Long-caption timeout:** captions run 1,000+ chars (multi-paragraph event
+posts), so the caption path uses a 60s request timeout, NOT the title path's
+20s. A reasoning model aborts the longest captions at 20s on every attempt and
+they ship raw — the last few stubborn rows are always the longest. If new raw
+captions appear, suspect the timeout before the gate.
+**Frontend "Translated from Bahasa" marker:** compares a lowercase letters+digits
+SKELETON (strip emoji, punctuation and whitespace; keep only letters+digits) of
+`caption` vs `caption_en`, NOT raw strings — the model tidies whitespace AND drops
+decorative emoji even from English round-trips, so a raw compare falsely flags
+English rows as translated.
+**Prod self-heal:** prod DB is a read-only replica; only the deployment runtime
+writes `caption_en`. Fixes reach prod only after a REPUBLISH — the boot
+`runTitleTranslationOnce` pass (and `runIngestOnce`) then drains it. Runs (commit)
+inside both, each in its own try so an LLM failure can't abort ingest. Idempotent:
+UPDATE re-guards `AND caption_en IS NULL`; the edit route sets `caption_en=null`
+so an edited caption re-translates. CLI: `translate-social-captions` (dry-run
+default; dry-run still SPENDS tokens, so don't run it alongside the server pass).
+Needs OpenAI provisioned (`AI_INTEGRATIONS_OPENAI_*`) or it no-ops. The separate
+OSINT `social_raw` panel is a DIFFERENT surface and is intentionally NOT translated.

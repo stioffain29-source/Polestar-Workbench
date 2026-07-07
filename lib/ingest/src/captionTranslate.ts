@@ -7,14 +7,18 @@
 // original `caption` untouched. The UI prefers `caption_en` and falls back to
 // `caption`, so English rows and not-yet-processed rows are unaffected.
 //
-// Mirrors titleTranslate.ts exactly: SAME LLM client (Replit OpenAI integration
-// via openaiConfig), SAME bounded-concurrency + retry/backoff + abort-timeout
-// harness, and the SAME non-English detection predicate (shared NON_LATIN_CLASS
-// + INDONESIAN_MARKER_WORDS constants) so a caption is only ever sent to the
-// model when it is genuinely non-English. It is idempotent and converges: the
-// candidate query selects only rows whose caption_en is still NULL, so each
-// committed row leaves the set and the per-run limit is never spent scanning
-// already-translated or permanently-English rows.
+// Mirrors titleTranslate.ts's LLM harness (SAME Replit OpenAI client via
+// openaiConfig, SAME bounded-concurrency + retry/backoff + abort-timeout), but
+// DELIBERATELY drops its marker-word language gate. The incident-title path is
+// high-volume and mostly English, so it must gate to avoid spending the model on
+// English rows; the KAMMI panel is small and single-source Indonesian, and that
+// same gate was too leaky here — genuinely-Bahasa captions that happened not to
+// contain a listed function word shipped raw, which is exactly what the analyst
+// reported. So every not-yet-processed caption is translated; the prompt returns
+// already-English captions unchanged, so they round-trip and leave the candidate
+// set. It is idempotent and converges: the candidate query selects only rows
+// whose caption_en is still NULL, so each committed row leaves the set and
+// English rows are never re-scanned.
 //
 // STRICT no-fabrication: this step only re-expresses the existing caption in
 // English. It never adds facts, and it decides no scope, status, severity,
@@ -23,10 +27,14 @@
 import { sql } from "drizzle-orm";
 import { db, socialWatchItemsTable } from "@workspace/db";
 import { isLlmAvailable, openAiFastModel, readOpenAiConfig } from "./openaiConfig";
-import { INDONESIAN_MARKER_WORDS, NON_LATIN_CLASS, needsTitleTranslation } from "./titleTranslate";
 
 const MODEL = openAiFastModel();
-const REQUEST_TIMEOUT_MS = 20000;
+// Captions are long-form (multi-paragraph event announcements run 1,000+ chars),
+// unlike the short incident titles the sibling title path handles. A reasoning
+// model needs real wall-clock time to translate that much text, so a tight
+// timeout aborts the longest captions on every attempt and they ship raw. Give
+// the caption path generous headroom (the title path keeps its own tighter cap).
+const REQUEST_TIMEOUT_MS = 60000;
 // gpt-5-mini is a REASONING model: max_completion_tokens covers reasoning tokens
 // FIRST, then the visible answer. A small cap is spent entirely on reasoning, so
 // the model returns finish_reason="length" with EMPTY content and every
@@ -34,11 +42,6 @@ const REQUEST_TIMEOUT_MS = 20000;
 // this to 8192 and never lower — a caption emits only a few hundred answer
 // tokens, so the extra budget is reasoning headroom, not extra output cost.
 const MAX_COMPLETION_TOKENS = 8192;
-
-/** True when a caption is non-English and should get an English translation. */
-export function needsCaptionTranslation(caption?: string | null): boolean {
-  return needsTitleTranslation(caption);
-}
 
 type TranslateOutcome =
   | { ok: true; captionEn: string }
@@ -135,12 +138,11 @@ export interface CaptionTranslationSummary {
 }
 
 /**
- * Backfill / refresh `caption_en` for social-watch items whose original caption
- * is non-English. The SQL query selects ONLY non-English rows that still have a
- * NULL caption_en (the predicate matches needsCaptionTranslation), so the
- * per-run `limit` is spent exclusively on genuine candidates and the work
- * converges across runs: each translated row leaves the candidate set. English
- * rows never match and so are never re-scanned. Safe to run repeatedly.
+ * Backfill / refresh `caption_en` for social-watch items. Selects every row
+ * whose caption_en is still NULL and translates it; already-English captions are
+ * returned unchanged by the model and then leave the candidate set, so the work
+ * converges across runs and English rows are not re-scanned. Safe to run
+ * repeatedly.
  *
  * Does NOT close the shared DB pool — the long-lived server keeps it open; CLI
  * wrappers call pool.end() themselves.
@@ -160,14 +162,12 @@ export async function runSocialCaptionTranslation(
     return { candidates: 0, translated: 0, failed: 0, skipped: true, logLines };
   }
 
-  // Detection lives in the WHERE so only real candidates are returned. Patterns
-  // are passed as bound parameters (not interpolated into SQL text). `~` is
-  // case-sensitive (script ranges); `~*` is case-insensitive (Indonesian
-  // markers); `\y` is the Postgres word boundary. Same source of truth as
-  // titleTranslate so the JS predicate and the SQL query can never diverge.
-  const scriptPattern = `[${NON_LATIN_CLASS}]`;
-  const markerPattern = `\\y(${INDONESIAN_MARKER_WORDS.join("|")})\\y`;
-
+  // Translate EVERY not-yet-processed caption (caption_en still NULL). No
+  // language gate: see the file header — the marker-word gate used for the
+  // high-volume title path was too leaky for this small single-source panel and
+  // let genuinely-Bahasa captions ship raw. Already-English captions round-trip
+  // unchanged and then leave the candidate set, so this stays idempotent and
+  // converges without perpetually re-scanning English rows.
   const candidates = await db
     .select({
       id: socialWatchItemsTable.id,
@@ -175,7 +175,7 @@ export async function runSocialCaptionTranslation(
     })
     .from(socialWatchItemsTable)
     .where(
-      sql`${socialWatchItemsTable.captionEn} IS NULL AND ${socialWatchItemsTable.caption} IS NOT NULL AND (${socialWatchItemsTable.caption} ~ ${scriptPattern} OR ${socialWatchItemsTable.caption} ~* ${markerPattern})`,
+      sql`${socialWatchItemsTable.captionEn} IS NULL AND ${socialWatchItemsTable.caption} IS NOT NULL`,
     )
     .orderBy(sql`${socialWatchItemsTable.createdAt} DESC`)
     .limit(limit);

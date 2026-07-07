@@ -1277,6 +1277,19 @@ function SocialWatchGroup({
                   "—";
                 const where = it.location || it.city || "—";
                 const promoted = it.promotedIncidentId != null;
+                // Only flag a translation when caption_en meaningfully differs
+                // from the original. Already-English captions round-trip through
+                // the model, which lightly tidies whitespace AND drops decorative
+                // emoji, so a naive string compare would falsely flag them. Reduce
+                // both to a lowercase letters+digits skeleton (no emoji, punctuation
+                // or spacing) before comparing: genuine Bahasa→English rewrites still
+                // differ, English round-trips match.
+                const captionSkeleton = (s: string) =>
+                  s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+                const captionTranslated =
+                  !!it.captionEn &&
+                  !!it.caption &&
+                  captionSkeleton(it.captionEn) !== captionSkeleton(it.caption);
                 return (
                   <Fragment key={it.id}>
                   <tr className="hover:bg-muted/30 align-top">
@@ -1292,10 +1305,10 @@ function SocialWatchGroup({
                     <td className="p-2 text-xs whitespace-nowrap">{when}</td>
                     <td className="p-2 text-xs">{where}</td>
                     <td className="p-2 text-xs text-foreground/80">
-                      <span className="line-clamp-2" title={it.captionEn && it.caption ? it.caption : undefined}>
+                      <span className="line-clamp-2" title={captionTranslated ? it.caption ?? undefined : undefined}>
                         {it.captionEn || it.caption || <span className="text-muted-foreground">—</span>}
                       </span>
-                      {it.captionEn && it.caption && it.captionEn !== it.caption && (
+                      {captionTranslated && (
                         <span className="block text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">
                           Translated from Bahasa
                         </span>
