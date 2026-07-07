@@ -258,7 +258,13 @@ function isCourtOnly(r: FlashpointReportIncident): boolean {
 // independently.
 const SOCIAL_SOURCE_RE = /\b(twitter|x\.com|t\.co|instagram|tiktok|facebook|threads|youtube|reddit|telegram|t\.me|mastodon|truth\s*social|weibo|social\s*media)\b/i;
 const HANDLE_TITLE_RE = /^\s*[@#]/;
-const HUMAN_INTEREST_RE = /(\bobituary|\bfuneral|\bmemorial|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\bpodcast\b|\blistsicle\b|\bexplainer\b)/i;
+// The last alternatives cover soft literary human-interest FEATURES that carry
+// the protest vocabulary in the summary (so the relevance gate keeps them) but
+// read as a livelihood / community colour piece, not an operational incident —
+// e.g. "They sang on Kathmandu's streets to survive. The city silenced the
+// music" (a municipal busker crackdown feature). Bound to distinctive feature
+// idioms so a live "police silenced the protest" report is untouched.
+const HUMAN_INTEREST_RE = /(\bobituary|\bfuneral|\bmemorial|\btribute to\b|\binterview with\b|\bopinion piece\b|\bop[- ]ed\b|\bpodcast\b|\blistsicle\b|\bexplainer\b|\bsilenced the music\b|\bcrocodile tears\b)/i;
 const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ballegedly|\breportedly|\brumou?red|\bpurportedly)\b/i;
 
 function isLowCredibility(r: FlashpointReportIncident): boolean {

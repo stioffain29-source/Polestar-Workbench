@@ -363,7 +363,74 @@ const FIXTURES: Fixture[] = [
   {
     title: "What's next for Nepal after deadly protests force PM out?",
     verdict: "DROP",
-    reason: "editorial format",
+    reason: "flashpoint homonym in headline",
+  },
+
+  // ---- Explainer / question-framed backgrounder (Task #324): DROP ------
+  {
+    title: "What's behind Bangladesh's protest against PM Sheikh Hasina? - Reuters",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  {
+    title: "Why are young people protesting in Thailand? - Global Voices",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  {
+    title: "Why is Nepal's 'Gen Z' protesting? - Reuters",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  // An event report that merely CONTAINS "why"/"how" mid-sentence must survive.
+  {
+    title: "Police explain why they fired tear gas as protesters stormed parliament",
+    verdict: "KEEP",
+  },
+
+  // ---- Retrospective / commemoration narrative (Task #324): DROP -------
+  {
+    title: "How NAIDOC grew from a one-day protest to a week-long celebration",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+
+  // ---- Op-ed idiom (Task #324): DROP ----------------------------------
+  {
+    title:
+      "ACT party leader David Seymour's \u201ccrocodile tears\u201d for hypothetical children at protest in Wellington toy shop",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+
+  // ---- Regulatory / corporate RAIDS homonym (Task #324): DROP ---------
+  {
+    title: "Taiwan raids Super Micro in widening China chip smuggling probe",
+    summary:
+      "The raids mark an expansion of Taiwan's first public crackdown on artificial intelligence chip diversion.",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+  // A military raid on a protest camp is GENUINE unrest and must survive.
+  {
+    title: "Military raids Sri Lanka protest camps, leaders arrested - Al Jazeera",
+    verdict: "KEEP",
+  },
+
+  // ---- Minor workplace-allowance grievance (Task #324): DROP ----------
+  {
+    title: "Press Council Nepal Staff Protest Unpaid Dearness Allowance - Ratopati",
+    verdict: "DROP",
+    reason: "flashpoint homonym in headline",
+  },
+
+  // ---- Administrative / safety crackdown homonym (Task #324): DROP ----
+  {
+    title: "'Have to get me off at gunpoint': The fight for people's right to live on boats",
+    summary:
+      "Many are being removed from these dilapidated vessels amid a safety crackdown.",
+    verdict: "DROP",
+    reason: "non-civil-unrest sense",
   },
 
   // ---- Protest aftermath / clean-up (non-event): DROP ------------------

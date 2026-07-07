@@ -459,6 +459,34 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // demonstration. Runs before the title-rescue so the bare word "protest"
   // cannot rescue it.
   /\bprotest vote(?:s|r|rs)?\b/,
+  // Explainer / question-framed analysis piece — "What's behind Bangladesh's
+  // protest against PM Sheikh Hasina?", "Why are farmers protesting?". A
+  // leading interrogative marks a backgrounder/analysis, not a report of a
+  // live event. Bound to the leading interrogative openers only, so an event
+  // headline that merely contains "why"/"how" mid-sentence is untouched.
+  /^\s*(?:what'?s|what\s+is|what\s+are)\s+(?:behind|driving|fuel(?:l)?ing|next\s+for)\b/i,
+  /^\s*(?:why|how)\s+(?:is|are|did|do|does|has|have|the)\b[^.!?]{0,80}\?/i,
+  // Retrospective evolution / commemoration narrative — "How NAIDOC grew from
+  // a one-day protest to a week-long celebration". A "grew/turned/evolved from
+  // a protest to a celebration/festival/tradition" arc is a heritage
+  // retrospective, not a live demonstration. Bound to the from→to transition
+  // into a celebratory NOUN, so a live "protest turns violent/deadly" is safe.
+  /\b(?:grew|grow|turned|evolved|transformed|went|blossomed)\b[^.!?]{0,20}\bfrom\b[^.!?]{0,40}\bprotest\b[^.!?]{0,30}\bto\b[^.!?]{0,40}\b(?:celebration|festival|holiday|tradition|commemoration|carnival|week[- ]long)\b/i,
+  // Op-ed idiom — a scare-quoted "crocodile tears" headline is opinion
+  // commentary, not an event report, yet the bare word "protest" elsewhere in
+  // the title would otherwise title-rescue it.
+  /\bcrocodile tears\b/i,
+  // Regulatory / corporate enforcement RAIDS homonym — "Taiwan raids Super
+  // Micro in widening China chip smuggling probe", "Police anti-graft raids".
+  // A law-enforcement / regulatory raid tied to a smuggling / corruption /
+  // fraud / tax / trafficking / gambling / chip-diversion probe is not civil
+  // unrest. Bound to the enforcement-context noun so "military raids protest
+  // camps" (genuine unrest) is untouched.
+  /\braids?\b[^.!?]{0,60}\b(?:smuggl\w*|traffick\w*|corrupt\w*|graft|tax\b|fraud|money laundering|counterfeit|contraband|gambling|betting|chip\b|chips\b|semiconductor|export control|probe|scam)\b/i,
+  // Minor workplace-allowance grievance — "Press Council Nepal Staff Protest
+  // Over Dearness Allowance". A dearness-allowance / arrears staff pay claim is
+  // a routine administrative grievance, not security-relevant civil unrest.
+  /\bdearness allowance\b/i,
 ];
 
 // Editorial suppression — specific genuine-protest headlines an operator has
@@ -1270,7 +1298,7 @@ const FP_NEG_INTERSTATE = new RegExp(
   "i",
 );
 const FP_NEG_CRACKDOWN =
-  /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+) crackdown\b|\btiananmen\b/i;
+  /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft|safety|eviction|evict|demolition|encroach\w*|squatter|unauthori[sz]ed|vendor|hawker|busker|street performer|sidewalk|noise|helmet|jaywalk|chip|semiconductor|export control)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+|safety|eviction|demolition|encroachment|vendor|hawker|chip|semiconductor) crackdown\b|\btiananmen\b/i;
 // Financial / markets / regulatory context. A "crackdown" or "clampdown" set in
 // this vocabulary (banks, insurers, investment, capital flows, money flows,
 // securities, the bourse) is a MARKETS story, not civil unrest — "Beijing's
