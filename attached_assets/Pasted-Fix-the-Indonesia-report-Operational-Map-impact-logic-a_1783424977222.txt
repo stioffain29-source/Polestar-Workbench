@@ -1,0 +1,45 @@
+Fix the Indonesia report Operational Map impact logic and wording.
+
+Problem:
+The map cards are currently over-classifying incidents as Direct impact and using inflated language such as "evacuate" where the correct meaning is simply "moved", "removed", "escorted", "relocated", or "cleared".
+
+Impact logic must be tightened:
+
+Direct impact:
+Use only when the reporting shows a current or confirmed effect on client operations, movement, access, site security, utilities, production, logistics, workforce safety, or business continuity.
+
+Indirect impact:
+Use when the incident is relevant to the operating environment but does not directly affect a client site, route, workforce, movement, production, access, utilities, or logistics.
+
+Monitor only:
+Use for background incidents, preparedness meetings, isolated local crime, political/legal developments, corruption investigations, or general policing activity unless there is a clear operational effect.
+
+Specific rule:
+Do not mark an incident Direct impact merely because it happened in a region where clients may operate. There must be a stated operational consequence.
+
+Language correction:
+- Do not use "evacuated" unless people were formally evacuated from danger.
+- For police/security movement of a suspect or crowd control, use:
+  "moved"
+  "escorted"
+  "removed from the area"
+  "cleared from the scene"
+- Avoid alarmist language.
+
+Examples from current Indonesia map:
+- Cilegon city government flood preparedness meeting = Monitor only or Indirect, not Direct.
+- Semarang warehouse fire = Indirect unless it is a client warehouse or causes route/access/logistics disruption.
+- Sumatra power corruption / outage reporting = Indirect unless a current outage is confirmed affecting operations.
+- Kalimantan coal corruption / power outage reporting = Indirect unless a current operational outage is confirmed.
+- Kendari market fire = Indirect unless client site, route, staff, or logistics affected.
+- Mataram donation box theft suspect moved by police = Monitor only. Wording must not say evacuated.
+
+Required changes:
+1. Find where Operational Map impact_level is assigned.
+2. Tighten the direct/indirect/monitor rules as above.
+3. Fix the card copy generation so it uses plain, accurate operational language.
+4. Make the Map Read text match the revised logic.
+5. Apply this in builder, preview, and PDF if separate paths exist.
+6. Add or update tests so these examples do not classify as Direct impact without explicit operational effect.
+7. Before coding, list the files you will change.
+8. After coding, show a before/after sample of the Indonesia map cards.

@@ -10,9 +10,9 @@
 // drift. It is pure/deterministic (no React, no Leaflet) and unit-tested.
 // ---------------------------------------------------------------------------
 
-export type ImpactLevel = "Direct impact" | "Possible impact" | "Monitor only";
+export type ImpactLevel = "Direct impact" | "Indirect impact" | "Monitor only";
 
-export const IMPACT_ORDER: ImpactLevel[] = ["Direct impact", "Possible impact", "Monitor only"];
+export const IMPACT_ORDER: ImpactLevel[] = ["Direct impact", "Indirect impact", "Monitor only"];
 
 // Brand-safe impact-level palette. Midnight Blue and Electric Blue are the two
 // brand accents; "Monitor only" uses a neutral mid-grey. The reserved tiers
@@ -20,7 +20,7 @@ export const IMPACT_ORDER: ImpactLevel[] = ["Direct impact", "Possible impact", 
 // reused here, so an impact level can never be confused with a severity chip.
 export const IMPACT_COLOR: Record<ImpactLevel, string> = {
   "Direct impact": "#0B0B3D",
-  "Possible impact": "#4655FF",
+  "Indirect impact": "#4655FF",
   "Monitor only": "#6B7280",
 };
 
@@ -55,7 +55,7 @@ export function worstSeverityKey(incidents: Array<{ severity?: string }>): strin
 // same event.
 export const IMPACT_RANK: Record<ImpactLevel, number> = {
   "Direct impact": 3,
-  "Possible impact": 2,
+  "Indirect impact": 2,
   "Monitor only": 1,
 };
 
@@ -63,27 +63,27 @@ export const IMPACT_RANK: Record<ImpactLevel, number> = {
 // CONTENT-DRIVEN impact classification (the owner's rule).
 //
 // Impact level is read from the reporting's OWN WORDS — the actual operational
-// or commercial effect described — NOT from record count or severity. A murder,
-// arrest, drug raid, shooting or isolated crime is NEVER "Direct impact" unless
-// the reporting states a concrete operational effect on business activity.
+// or commercial effect described — NOT from record count or severity, and NEVER
+// merely because an event happened in a region where clients may operate. There
+// must be a STATED operational consequence to reach Direct.
 //
-//  - DIRECT IMPACT  : reporting shows a current operational effect — road/access
-//                     closure, protest blocking access, port/airport/warehouse/
-//                     factory/site disruption, utility outage, fire/explosion at
-//                     a commercial/industrial/logistics site, labour action
-//                     halting production/transport, regulatory enforcement
-//                     hitting operations, or a security incident directly hitting
-//                     a business site, staff, delivery route or transport
-//                     corridor. Confirmed disruption to logistics/production/
-//                     warehousing/delivery/staff movement.
-//  - POSSIBLE IMPACT: relevant but INDIRECT — protest/unrest/clash/security
-//                     activity near an operating area with no confirmed
-//                     disruption, or a hazard that could affect a site if
-//                     operating nearby. Crime or security activity with no
-//                     business interruption reported.
-//  - MONITOR ONLY   : isolated crime, policing or political activity with no
-//                     clear business consequence and no confirmed movement,
-//                     access, site, logistics, utility or continuity impact.
+//  - DIRECT IMPACT   : reporting shows a current or confirmed effect on client
+//                      operations, movement, access, site security, utilities,
+//                      production, logistics, workforce safety or business
+//                      continuity — a closed road/access, halted transport or
+//                      production, a site shut/attacked/evacuated, an outage
+//                      confirmed to hit operations, labour action stopping a
+//                      site, or a protest/blockade physically closing a route.
+//  - INDIRECT IMPACT : relevant to the operating environment but with NO
+//                      confirmed effect on a client site, route, workforce,
+//                      movement, production, access, utilities or logistics — a
+//                      site fire or utility outage reported on its own,
+//                      protest/unrest/security activity with no confirmed
+//                      disruption, or a natural hazard.
+//  - MONITOR ONLY    : background incidents, preparedness meetings, isolated
+//                      local crime, political/legal developments, corruption
+//                      investigations or general policing — unless a clear
+//                      operational effect is reported.
 // ---------------------------------------------------------------------------
 interface RelevanceInput {
   topic?: string;
@@ -95,23 +95,19 @@ function normText(i: RelevanceInput): string {
   return `${(i.displayTitle ?? "").trim()} ${i.title ?? ""}`.toLowerCase().replace(/\s+/g, " ");
 }
 
-// Confirmed operational effect — the ONLY route to "Direct impact". Each pattern
-// binds a disruption verb to a route, site, utility or transport noun so a bare
-// crime headline can never reach Direct.
-const DIRECT_SIGNALS: RegExp[] = [
+// A STATED current operational consequence — the ONLY route to "Direct impact".
+// Each pattern binds a disruption verb to a route, site, utility or transport
+// noun so a bare crime, a bare site fire or a bare outage can never reach Direct.
+const HARD_DISRUPTION: RegExp[] = [
   // Road / route / access closed, blocked, sealed, gridlocked.
   /\b(road|roads|highway|highways|toll|expressway|street|streets|bridge|route|lane|junction|access|border crossing|checkpoint)\b[^.]{0,45}\b(clos|block|shut|seal|barricad|cordon|cut off|gridlock|standstill|paralys)/,
   /\b(clos|block|shut|seal|barricad|cordon|occupy|occupied)\w*\b[^.]{0,20}\b(road|roads|highway|toll|street|bridge|route|access|gate|entrance|port|airport|terminal|railway|border)\b/,
   // Transport / operations halted, suspended, cancelled, grounded, delayed.
   /\b(halt|suspend|cancel|ground|disrupt|paralys|cripple|stopp|stall|delay)\w*\b[^.]{0,30}\b(flight|flights|train|trains|rail|railway|operation|operations|production|output|shipping|service|services|transport|port|ports|ferry|logistic|traffic|export|import)/,
   /\b(flight|flights|train|trains|rail|railway|operation|operations|production|output|shipping|service|services|transport|port|ports|ferry|logistic|traffic)\b[^.]{0,30}\b(halt|suspend|cancel|ground|disrupt|paralys|cripple|stopp|standstill|gridlock|stall|shut|grind)/,
-  // Named site disrupted / shut / attacked / evacuated / on fire.
-  /\b(port|ports|airport|terminal|warehouse|factory|factories|refiner|plant|smelter|mine|mines|depot|pipeline|dock|facility|facilities|complex|estate|mill)\w*\b[^.]{0,45}\b(clos|shut|halt|suspend|disrupt|evacuat|damag|attack|paralys|offline|stoppage|blockad|seiz|blaze|fire|explos|blast|razed|gutted|stormed)/,
-  // Utility outage affecting operations.
-  /\b(power\s*(cut|outage|failure|blackout)|blackout|electricity\s*(cut|outage|down)|grid\s*(fail|down|collaps)|water\s*(supply\s*)?(cut|disrupt|shortage|crisis)|fuel\s*shortage)\w*/,
-  // Fire / explosion at a commercial, industrial or logistics site.
-  /\b(fire|blaze|wildfire|explos|blast|detonat)\w*\b[^.]{0,45}\b(factory|factories|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)/,
-  /\b(factory|factories|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)\b[^.]{0,25}\b(fire|blaze|caught fire|on fire|explos|blast|razed|gutted|burn)/,
+  // Named site shut / halted / disrupted / attacked / evacuated / seized. A bare
+  // fire/explosion at the site is NOT here — that is SITE_HAZARD_SIGNALS (Indirect).
+  /\b(port|ports|airport|terminal|warehouse|factory|factories|refiner|plant|smelter|mine|mines|depot|pipeline|dock|facility|facilities|complex|estate|mill)\w*\b[^.]{0,45}\b(clos|shut|halt|suspend|disrupt|evacuat|attack|paralys|offline|stoppage|blockad|seiz|stormed)/,
   // Labour action disrupting production / transport / a site.
   /\b(strike|strikes|striking|walkout|walk-?out|work stoppage|industrial action|mogok|downed tools)\b[^.]{0,45}\b(halt|disrupt|paralys|cripple|shut|stopp|suspend|hit|ground|stall|output|production|port|transport|factory|operation)/,
   // Protest / blockade explicitly blocking a road, port, access or traffic.
@@ -122,12 +118,43 @@ const DIRECT_SIGNALS: RegExp[] = [
   /\b(disrupt|paralys|cripple|stoppage|standstill|shut down|shutdown)\w*\b[^.]{0,30}\b(operation|business|logistic|suppl|transport|movement|traffic|production|commerce|trade|deliver|distribution|econom)/,
 ];
 
-// Unrest / collective action — relevant to movement and access → Possible.
+// Utility outage STATED to hit operations → Direct. A bare outage (no stated
+// operational effect) is only Indirect (SITE_HAZARD_SIGNALS below).
+const DIRECT_UTILITY_EFFECT: RegExp[] = [
+  /\b(power\s*(cut|outage|failure|blackout)|blackout|electricity\s*(cut|outage|down|failure)|grid\s*(fail|down|collaps)|water\s*(supply\s*)?(cut|disrupt|shortage|crisis)|fuel\s*shortage)\w*\b[^.]{0,60}\b(crippl|paralys|halt|hit|forc|disrupt|shut|stopp|ground|operation|operations|production|output|factor|factories|plant|plants|industr|business|manufactur|port|ports|airport|refiner|hospital|logistic|mine|smelter)/,
+  /\b(operation|operations|production|output|factor|factories|plant|plants|industr|business|manufactur|port|ports|airport|refiner|hospital|logistic|mine|smelter)\w*\b[^.]{0,40}\b(power\s*(cut|outage|failure|blackout)|blackout|grid\s*(fail|down|collaps)|electricity\s*(cut|outage|down))/,
+];
+
+// Site fire/explosion or utility outage reported as a bare event, with NO stated
+// operational consequence → Indirect. It could affect operations if it is a
+// client site or hits a route, but the reporting confirms no such effect.
+const SITE_HAZARD_SIGNALS: RegExp[] = [
+  /\b(fire|blaze|wildfire|explos|blast|detonat)\w*\b[^.]{0,45}\b(factory|factories|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)\b/,
+  /\b(factory|factories|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)\b[^.]{0,25}\b(fire|blaze|caught fire|on fire|explos|blast|razed|gutted|burn)/,
+  /\b(power\s*(cut|outage|failure|blackout)|blackout|electricity\s*(cut|outage|down|failure)|grid\s*(fail|down|collaps)|water\s*(supply\s*)?(cut|disrupt|shortage|crisis)|fuel\s*shortage)\w*/,
+];
+
+// Background / administrative activity: preparedness meetings, drills, planning
+// coordination, workshops and briefings. A MEETING about floods is not a flood,
+// so these read Monitor only unless the SAME report states a current hard
+// disruption. Deliberately excludes "planned/planning" so a planned protest is
+// still read as unrest (Indirect), not demoted to background.
+const BACKGROUND_CONTEXT =
+  /\b(meeting|meetings|coordinat\w*|preparedness|readiness|contingency|drill|drills|simulation|rehearsal|workshop|seminar|forum|dialogue|deliberat\w*|socialis\w*|socializ\w*|briefing|rapat|sosialisasi|simulasi|kesiapsiagaan)\b/;
+
+// Investigation / legal framing: corruption, graft, bribery, probes, audits and
+// court process. A PROBE into power graft is not an outage, so this blocks the
+// utility/effect route to Direct (a pure corruption item still falls to Monitor
+// via the crime path). Does not, by itself, demote genuine unrest/security.
+const INVESTIGATION_CONTEXT =
+  /\b(corrupt\w*|graft|bribe\w*|embezzl\w*|kickback|probe|probes|investigat\w*|alleg\w*|audit|inquiry|inquiries|indict\w*|prosecut\w*|lawsuit|verdict|on trial|court\s+(hear|rul)|korupsi|suap|dugaan)\b/;
+
+// Unrest / collective action — relevant to movement and access → Indirect.
 const UNREST_SIGNALS =
   /\b(protest|demonstrat|rally|rallies|riot|unrest|clash|blockad|barricad|mob|brawl|melee|communal|sectarian|walkout|strike|mogok|picket|uprising|turmoil|standoff|stand-?off|occupation|occupy)\b/;
 
 // Broader security activity (armed groups, militancy, military/security forces,
-// bombs) — relevant to staff safety/movement → Possible. Deliberately excludes
+// bombs) — relevant to staff safety/movement → Indirect. Deliberately excludes
 // bare "shoot/shooting" so an "arrested shooting suspect" reads as isolated crime.
 const SECURITY_SIGNALS =
   /\b(militant|insurgent|separatist|rebel|terrorist|terrorism|extremis|guerrilla|armed group|armed men|gunmen|gunman|ambush|militia|jihad|bomb|bombing|ied|grenade|explos|blast|firefight|shoot-?out|gun\s?battle|opened fire|troops|soldier|military operation|security operation|security forces|armed forces|counter-?terror|air\s?strike|airstrike|air raid|drone strike|missile|kkb|opm|tpnpb)\b/;
@@ -136,19 +163,35 @@ const SECURITY_SIGNALS =
 const CRIME_SIGNALS =
   /\b(murder|homicide|manslaughter|slain|slay|stab|slash|body found|found dead|corpse|dismember|beheaded|shoot|shot|gunned|gunfire|firing|drug|narcotic|meth|cannabis|marijuana|cocaine|heroin|ganja|sabu|smuggl|traffick|robber|robbed|theft|thief|thieves|steal|stole|stolen|burglar|looting|pickpocket|fraud|scam|embezzl|corrupt|bribe|graft|launder|rape|rapist|molest|assault|kidnap|abduct|extort|ransom|arrest|detain|nab|apprehend|suspect|manhunt|fugitive|raid|bust|seiz|gambl|poach|domestic violence|human traffick|paedophile|pedophile)\b/;
 
-// Natural hazards — real but indirect operational relevance → Possible.
+// Natural hazards — real but indirect operational relevance → Indirect.
 const HAZARD_SIGNALS =
   /\b(flood|banjir|earthquake|quake|gempa|tremor|tsunami|storm|typhoon|cyclone|hurricane|landslide|longsor|volcan|erupt|lahar|drought|wildfire|bushfire|heat\s?wave|disaster|bencana|haze)\b/;
 
 // Classify ONE reported event's impact level from its own words.
 export function impactForIncident(i: RelevanceInput): ImpactLevel {
   const text = normText(i);
-  if (DIRECT_SIGNALS.some((re) => re.test(text))) return "Direct impact";
+  const hard = HARD_DISRUPTION.some((re) => re.test(text));
+
+  // Pure background administrative activity (a meeting / drill / plan) with no
+  // current hard disruption → Monitor only, even if it names a hazard or utility.
+  if (!hard && BACKGROUND_CONTEXT.test(text)) return "Monitor only";
+
+  // Confirmed current operational effect → Direct impact.
+  if (hard) return "Direct impact";
+  // Utility outage stated to hit operations → Direct — UNLESS it is only an
+  // investigation/allegation about power (a probe is not a live outage).
+  if (!INVESTIGATION_CONTEXT.test(text) && DIRECT_UTILITY_EFFECT.some((re) => re.test(text)))
+    return "Direct impact";
+
+  // Bare site fire/explosion or bare utility outage (incl. power named only in a
+  // corruption probe) → Indirect: relevant environment, no confirmed client effect.
+  if (SITE_HAZARD_SIGNALS.some((re) => re.test(text))) return "Indirect impact";
+
   const unrestOrSecurity = UNREST_SIGNALS.test(text) || SECURITY_SIGNALS.test(text);
   // Isolated crime/policing with no unrest or security dimension → Monitor only.
   if (!unrestOrSecurity && CRIME_SIGNALS.test(text)) return "Monitor only";
-  if (unrestOrSecurity) return "Possible impact";
-  if (HAZARD_SIGNALS.test(text)) return "Possible impact";
+  if (unrestOrSecurity) return "Indirect impact";
+  if (HAZARD_SIGNALS.test(text)) return "Indirect impact";
   // Relevant but neither disruptive, unrest/security, crime nor hazard:
   // conservative default — never inflate into a business impact.
   return "Monitor only";
@@ -167,8 +210,9 @@ export function impactLevelForSet(incidents: RelevanceInput[]): ImpactLevel {
 }
 
 // Practical, non-inflated "business relevance" wording that MATCHES the reported
-// event and its classified impact. It never labels a crime a business impact and
-// never asserts regulatory/compliance exposure unless the effect is regulatory.
+// event and its classified impact. It never labels a crime a business impact,
+// never asserts regulatory/compliance exposure unless the effect is regulatory,
+// and never uses alarmist language (e.g. "evacuated") the reporting does not.
 const REL_UTILITY = /\b(power|blackout|electricity|grid|water supply|outage|fuel shortage)\b/;
 const REL_SITE_FIRE =
   /\b(fire|blaze|explos|blast|detonat)\w*\b[^.]{0,45}\b(factory|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)|\b(factory|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)\b[^.]{0,25}\b(fire|blaze|explos|blast|burn|razed|gutted)/;
@@ -191,10 +235,12 @@ export function businessRelevance(i: RelevanceInput, impact: ImpactLevel): strin
     if (REL_MOVEMENT.test(text)) return "Confirmed movement and access disruption";
     return "Confirmed operational disruption";
   }
-  if (impact === "Possible impact") {
+  if (impact === "Indirect impact") {
     if (REL_PROTEST.test(text)) return "Possible movement disruption near protest area";
     if (UNREST_SIGNALS.test(text) || SECURITY_SIGNALS.test(text))
       return "Possible staff movement concern if operating nearby";
+    if (REL_SITE_FIRE.test(text)) return "Possible site or asset disruption if operating nearby";
+    if (REL_UTILITY.test(text)) return "Possible utility disruption if operating nearby";
     if (HAZARD_SIGNALS.test(text)) return "Possible site or utility disruption if operating nearby";
     return "Monitor for escalation or repeat activity";
   }
@@ -204,12 +250,13 @@ export function businessRelevance(i: RelevanceInput, impact: ImpactLevel): strin
   return "No reported commercial impact";
 }
 
-// Fixed map wording (owner brief, verbatim). Any "risk map" language is
-// replaced by these across every country report.
+// Fixed map wording (owner brief). Any "risk map" language is replaced by these
+// across every country report.
 export const OPERATIONAL_MAP_HEADING = "Operational Map";
 export const OPERATIONAL_MAP_SUBTITLE = "Reported operational issues this period";
 export const OPERATIONAL_MAP_READ =
   "This map shows reported operationally relevant issues for the current reporting period. " +
   "Not every security or crime incident creates commercial impact. " +
-  "Direct impact is used only where reporting indicates a current effect on movement, access, sites, logistics, utilities, production or business continuity. " +
-  "Isolated crime and policing incidents are normally Monitor only unless they affect operations directly.";
+  "Direct impact is used only where reporting shows a current or confirmed effect on operations, movement, access, site security, utilities, production, logistics, workforce safety or business continuity. " +
+  "Indirect impact marks issues relevant to the operating environment with no confirmed effect on a client site, route, workforce, movement, production, access, utilities or logistics. " +
+  "Background incidents, preparedness meetings, isolated crime, political or legal developments, corruption investigations and general policing are Monitor only unless a clear operational effect is reported.";
