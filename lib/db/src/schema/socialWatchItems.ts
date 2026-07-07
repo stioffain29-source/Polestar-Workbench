@@ -51,6 +51,10 @@ export const socialWatchItemsTable = pgTable(
     eventTimeText: text("event_time_text"),
     // Sanitised caption / post text (phone numbers etc. stripped before store).
     caption: text("caption"),
+    // Faithful English translation of a non-English (Bahasa) caption, filled by
+    // the caption-translate pass. NULL until translated; the UI prefers this and
+    // falls back to `caption`, so English + not-yet-processed rows are unaffected.
+    captionEn: text("caption_en"),
     // Public image URL(s) attached to the post.
     imageUrls: jsonb("image_urls").$type<string[]>().notNull().default([]),
     // Free-text location / venue, e.g. "Gedung DPR/MPR RI".

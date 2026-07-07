@@ -38,6 +38,7 @@ const LIST_COLUMNS = {
   eventDate: socialWatchItemsTable.eventDate,
   eventTimeText: socialWatchItemsTable.eventTimeText,
   caption: socialWatchItemsTable.caption,
+  captionEn: socialWatchItemsTable.captionEn,
   imageUrls: socialWatchItemsTable.imageUrls,
   location: socialWatchItemsTable.location,
   city: socialWatchItemsTable.city,
@@ -269,6 +270,9 @@ router.patch("/social-watch/:id", requireAdminToken, async (req, res): Promise<v
         eventDate: derived.eventDate,
         eventTimeText: derived.eventTimeText,
         caption: derived.caption,
+        // The caption was re-derived from the edit — drop any stale translation
+        // so the caption-translate pass re-translates the new text.
+        captionEn: null,
         imageUrls: derived.imageUrls,
         location: derived.loc.location,
         city: derived.loc.city,

@@ -88,6 +88,8 @@ export { runStrikesBackfill } from "./backfillStrikes";
 export type { StrikesBackfillSummary } from "./backfillStrikes";
 export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
+export { runSocialCaptionTranslation, needsCaptionTranslation } from "./captionTranslate";
+export type { CaptionTranslationSummary } from "./captionTranslate";
 export {
   isLlmAvailable,
   readOpenAiConfig,

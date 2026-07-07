@@ -37,3 +37,24 @@ Two things must BOTH hold or a headline ships untranslated:
    Uses `gpt-4o-mini`, bounded per run, bills to Replit credits.
    **How to apply:** if titles still aren't translating after markers are right,
    check the integration is provisioned — the failure is silent by design.
+
+## Sibling: KAMMI social-watch caption translation
+
+`social_watch_items.caption` (Bahasa KAMMI post captions) gets the SAME treatment
+in `lib/ingest/src/captionTranslate.ts` → nullable `caption_en` column; the
+Protests `SocialWatchGroup` panel prefers `caption_en` and falls back to
+`caption`. It REUSES the exported `NON_LATIN_CLASS` + `INDONESIAN_MARKER_WORDS`
+constants and `needsTitleTranslation` predicate verbatim, so caption detection and
+title detection can never diverge — add a new marker word once and BOTH layers
+pick it up.
+**Why:** owner "I can't read bahasa" on the KAMMI panel; captions are a second
+free-text surface with the exact same ASCII-Bahasa detection problem as titles.
+**How to apply:** both prerequisites above apply identically (marker gate + OpenAI
+provisioned). Runs (commit) inside `runIngestOnce` and `runTitleTranslationOnce`,
+each in its own try so an LLM failure can't abort ingest. Idempotent: candidate
+SQL is `caption_en IS NULL` + non-English predicate, UPDATE re-guards
+`AND caption_en IS NULL`; the edit route sets `caption_en=null` so an edited
+caption re-translates. CLI: `translate-social-captions` (dry-run default; the
+dry-run still SPENDS LLM tokens, so don't run it alongside the server pass). The
+separate OSINT `social_raw` panel is a DIFFERENT surface and is intentionally NOT
+translated.

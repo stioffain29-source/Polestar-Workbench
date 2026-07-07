@@ -3919,6 +3919,11 @@ components:
         eventDate: { type: ["string", "null"], format: date-time }
         eventTimeText: { type: ["string", "null"] }
         caption: { type: ["string", "null"] }
+        captionEn:
+          type: ["string", "null"]
+          description: >-
+            Faithful English translation of a non-English (Bahasa) caption. NULL
+            until translated; clients prefer this and fall back to caption.
         imageUrls:
           type: array
           items: { type: string }

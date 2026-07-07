@@ -53,7 +53,7 @@ const NON_LATIN_RANGES: ReadonlyArray<readonly [string, string]> = [
 // Character-class body, e.g. "\u0400-\u04FF\u0600-\u06FF…" using the ACTUAL
 // boundary characters (not literal "\u" escapes), valid in both JS and Postgres
 // regex character classes.
-const NON_LATIN_CLASS = NON_LATIN_RANGES.map(([a, b]) => `${a}-${b}`).join("");
+export const NON_LATIN_CLASS = NON_LATIN_RANGES.map(([a, b]) => `${a}-${b}`).join("");
 
 // Bahasa Indonesia / Malay is Latin-script and ASCII, so script detection alone
 // misses it (see MEMORY: "translate by SCRIPT + Indonesian markers, NOT
@@ -61,7 +61,7 @@ const NON_LATIN_CLASS = NON_LATIN_RANGES.map(([a, b]) => `${a}-${b}`).join("");
 // rare-to-absent in English headlines; the ambiguous short ones (para, dari,
 // massa, saat, soal …) are deliberately excluded so genuine English titles are
 // not needlessly rewritten.
-const INDONESIAN_MARKER_WORDS: readonly string[] = [
+export const INDONESIAN_MARKER_WORDS: readonly string[] = [
   "yang", "dengan", "untuk", "tidak", "telah", "sudah", "adalah", "menjadi",
   "terhadap", "kepada", "diduga", "ditangkap", "tewas", "korban", "warga",
   "polisi", "aparat", "aksi", "wilayah", "kabupaten", "provinsi", "kembali",

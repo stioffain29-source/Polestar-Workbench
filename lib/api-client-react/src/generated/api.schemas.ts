@@ -2082,6 +2082,11 @@ export interface SocialWatchItem {
   eventTimeText?: string | null;
   /** @nullable */
   caption?: string | null;
+  /**
+     * Faithful English translation of a non-English (Bahasa) caption. NULL until translated; clients prefer this and fall back to caption.
+     * @nullable
+     */
+  captionEn?: string | null;
   imageUrls?: string[];
   /** @nullable */
   location?: string | null;

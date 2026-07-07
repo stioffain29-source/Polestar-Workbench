@@ -250,6 +250,14 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS risk_rating text`,
     );
 
+    // Schema: English translation of a non-English KAMMI social-watch caption.
+    // Filled by the caption-translate pass; NULL until translated (UI falls back
+    // to the original caption). drizzle push only reaches dev, so the writable
+    // prod primary gains the column here on boot. Idempotent — IF NOT EXISTS.
+    await db.execute(
+      sql`ALTER TABLE social_watch_items ADD COLUMN IF NOT EXISTS caption_en text`,
+    );
+
     // Schema: persisted executive summary on topic reports. Previously
     // browser-local only (localStorage); analysts lost summaries across
     // browsers/sessions. Idempotent — IF NOT EXISTS.

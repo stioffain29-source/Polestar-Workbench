@@ -16,6 +16,7 @@ import {
   resolveAisKey,
   runStrikesIngest,
   runTitleTranslation,
+  runSocialCaptionTranslation,
   runResolveGoogleNewsUrls,
   runReliefWebCorroboration,
   runReliefWebReportsIngest,
@@ -585,6 +586,25 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       );
     } catch (err) {
       logger.error({ err }, "title translation pass failed");
+    }
+    // Translate non-English KAMMI social-watch captions into English (own table,
+    // own caption_en column; never touches incidents). Same idempotent/converging
+    // semantics as the title pass; isolated so an LLM/network failure can never
+    // fail the incident ingest — it just leaves caption_en null and the UI falls
+    // back to the original caption.
+    try {
+      const captions = await runSocialCaptionTranslation({ commit: true });
+      logger.info(
+        {
+          translated: captions.translated,
+          candidates: captions.candidates,
+          failed: captions.failed,
+          skipped: captions.skipped,
+        },
+        "social caption translation pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "social caption translation pass failed");
     }
     // Sequential: these share the same DB pool and dedupe against the incidents
     // table; running them one after another mirrors scrape:prod. Each is isolated
@@ -1249,6 +1269,24 @@ export async function runTitleTranslationOnce(): Promise<TitleTranslationRunResu
           `title-translate failed: ${err instanceof Error ? err.message : String(err)}`,
         ],
       };
+    }
+    // Piggyback the KAMMI social-watch caption translation on the same early boot
+    // run (own table/column; never incidents). Isolated so a failure here can
+    // never abort the title pass or the lock — the UI just falls back to the raw
+    // caption. Logged only; not part of the returned summary.
+    try {
+      const captions = await runSocialCaptionTranslation({ commit: true });
+      logger.info(
+        {
+          translated: captions.translated,
+          candidates: captions.candidates,
+          failed: captions.failed,
+          skipped: captions.skipped,
+        },
+        "boot translate: social caption translation run finished",
+      );
+    } catch (err) {
+      logger.error({ err }, "social caption translation failed");
     }
     const finishedAt = new Date();
     return {

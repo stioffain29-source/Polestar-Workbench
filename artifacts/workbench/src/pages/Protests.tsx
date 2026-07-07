@@ -29,7 +29,7 @@ import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRa
 import {
   classifyProtestCategory, detectOperationalImpacts,
   PROTEST_CATEGORIES, CATEGORY_COLOR, CATEGORY_CARD_LABEL,
-  OPERATIONAL_IMPACTS, type ProtestCategory,
+  OPERATIONAL_IMPACTS, groupByMonth, type ProtestCategory,
 } from "@/lib/protestsAnalysis";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
@@ -80,6 +80,10 @@ export default function Protests() {
   // full record set; the analyst can narrow the whole dashboard from the header.
   const [range, setRange] = useState<RangeKey>("2y");
   const windowDays = RANGE_DAYS[range];
+
+  // Which archived month (yyyy-MM key) is currently expanded in the incident
+  // archive below the main table, if any.
+  const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
 
   // Reconcile to the same scoped, noise-filtered set the dashboard card and the
   // reports use, so every surface tallies.
@@ -283,6 +287,71 @@ export default function Protests() {
   const sortedForTable = useMemo(
     () => [...inWindow].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
     [inWindow],
+  );
+
+  // Chunk the (date-sorted, in-window) table by calendar month so the main
+  // table stays short: the most recent month renders in full, every earlier
+  // month collapses into an expandable archive box below.
+  const monthGroups = useMemo(() => groupByMonth(sortedForTable), [sortedForTable]);
+  const currentMonth = monthGroups[0] ?? null;
+  const archiveMonths = monthGroups.slice(1);
+  const expandedMonthGroup =
+    archiveMonths.find((g) => g.key === expandedMonth) ?? null;
+
+  // Shared renderer for the incident table so the current month and every
+  // expanded archive month stay byte-identical.
+  const renderIncidentTable = (rows: typeof sortedForTable) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr>
+            <th className="text-left p-2 font-sans font-medium w-[120px]">Date</th>
+            <th className="text-left p-2 font-sans font-medium w-[140px]">Type</th>
+            <th className="text-left p-2 font-sans font-medium w-[130px]">Country</th>
+            <th className="text-left p-2 font-sans font-medium">Headline</th>
+            <th className="text-left p-2 font-sans font-medium w-[180px]">Sector / Impact</th>
+            <th className="text-left p-2 font-sans font-medium w-[100px]">Severity</th>
+            <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((i) => (
+            <tr key={i.id} className="hover:bg-muted/30 align-top">
+              <td className="p-2 font-mono text-xs whitespace-nowrap">
+                {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
+              </td>
+              <td className="p-2">
+                <span
+                  className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
+                  style={{ backgroundColor: CATEGORY_COLOR[i.category] }}
+                >
+                  {i.category}
+                </span>
+              </td>
+              <td className="p-2 text-xs">{i.country ?? "—"}</td>
+              <td className="p-2 font-medium">{i.title}</td>
+              <td className="p-2 text-xs text-foreground/80">
+                {i.impacts.length > 0 ? i.impacts[0] : <span className="text-muted-foreground">—</span>}
+              </td>
+              <td className="p-2">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
+                  {SEVERITY_LABELS[i.severity] ?? i.severity}
+                </span>
+              </td>
+              <td className="p-2">
+                {incidentSourceUrl(i) ? (
+                  <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground text-xs">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 
   return (
@@ -548,66 +617,59 @@ export default function Protests() {
         <div className="bg-white border border-border rounded-sm">
           {isLoading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
-          ) : !sortedForTable.length ? (
+          ) : !currentMonth ? (
             <div className="p-8 text-center text-sm text-muted-foreground">No incidents recorded for this topic.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <tr>
-                    <th className="text-left p-2 font-sans font-medium w-[120px]">Date</th>
-                    <th className="text-left p-2 font-sans font-medium w-[140px]">Type</th>
-                    <th className="text-left p-2 font-sans font-medium w-[130px]">Country</th>
-                    <th className="text-left p-2 font-sans font-medium">Headline</th>
-                    <th className="text-left p-2 font-sans font-medium w-[180px]">Sector / Impact</th>
-                    <th className="text-left p-2 font-sans font-medium w-[100px]">Severity</th>
-                    <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {sortedForTable.map((i) => (
-                    <tr key={i.id} className="hover:bg-muted/30 align-top">
-                      <td className="p-2 font-mono text-xs whitespace-nowrap">
-                        {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
-                      </td>
-                      <td className="p-2">
-                        <span
-                          className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
-                          style={{ backgroundColor: CATEGORY_COLOR[i.category] }}
-                        >
-                          {i.category}
-                        </span>
-                      </td>
-                      <td className="p-2 text-xs">{i.country ?? "—"}</td>
-                      <td className="p-2 font-medium">{i.title}</td>
-                      <td className="p-2 text-xs text-foreground/80">
-                        {i.impacts.length > 0 ? i.impacts[0] : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="p-2">
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
-                          {SEVERITY_LABELS[i.severity] ?? i.severity}
-                        </span>
-                      </td>
-                      <td className="p-2">
-                        {incidentSourceUrl(i) ? (
-                          <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="flex items-baseline justify-between px-3 pt-2.5 pb-1.5 border-b border-border">
+                <span className="text-xs font-sans font-medium uppercase tracking-wider text-muted-foreground">{currentMonth.label}</span>
+                <span className="text-[11px] text-muted-foreground">{currentMonth.rows.length} incident{currentMonth.rows.length === 1 ? "" : "s"}</span>
+              </div>
+              {renderIncidentTable(currentMonth.rows)}
+            </>
           )}
         </div>
         <p className="text-[11px] text-muted-foreground italic mt-2">
-          Highest severity on file: {highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}. Type is keyword-classified from the headline and summary; where uncertain, records default to Protest.
+          Showing the most recent month only; earlier incidents are archived by month below. Highest severity on file: {highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}. Type is keyword-classified from the headline and summary; where uncertain, records default to Protest.
         </p>
       </Section>
+
+      {/* 7b. Incident archive — earlier months collapsed into expandable boxes */}
+      {archiveMonths.length > 0 && (
+        <Section title="Incident Archive">
+          <p className="text-xs text-muted-foreground font-sans mb-3">
+            Earlier incidents grouped by month. Select a month to expand its records.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {archiveMonths.map((mth) => {
+              const active = expandedMonth === mth.key;
+              return (
+                <button
+                  key={mth.key}
+                  type="button"
+                  onClick={() => setExpandedMonth(active ? null : mth.key)}
+                  aria-expanded={active}
+                  className={`text-left border rounded-sm p-3 transition-colors ${active ? "border-accent bg-accent/5" : "border-border bg-white hover:bg-muted/30"}`}
+                >
+                  <div className="text-sm font-sans font-medium text-primary">{mth.label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {mth.rows.length} incident{mth.rows.length === 1 ? "" : "s"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {expandedMonthGroup && (
+            <div className="bg-white border border-border rounded-sm mt-4">
+              <div className="flex items-baseline justify-between px-3 pt-2.5 pb-1.5 border-b border-border">
+                <span className="text-xs font-sans font-medium uppercase tracking-wider text-muted-foreground">{expandedMonthGroup.label}</span>
+                <span className="text-[11px] text-muted-foreground">{expandedMonthGroup.rows.length} incident{expandedMonthGroup.rows.length === 1 ? "" : "s"}</span>
+              </div>
+              {renderIncidentTable(expandedMonthGroup.rows)}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* KAMMI / Indonesia Social Watch — additive context, never incidents */}
       <Section title="KAMMI / Indonesia Social Watch">
@@ -1230,7 +1292,14 @@ function SocialWatchGroup({
                     <td className="p-2 text-xs whitespace-nowrap">{when}</td>
                     <td className="p-2 text-xs">{where}</td>
                     <td className="p-2 text-xs text-foreground/80">
-                      <span className="line-clamp-2">{it.caption || <span className="text-muted-foreground">—</span>}</span>
+                      <span className="line-clamp-2" title={it.captionEn && it.caption ? it.caption : undefined}>
+                        {it.captionEn || it.caption || <span className="text-muted-foreground">—</span>}
+                      </span>
+                      {it.captionEn && it.caption && it.captionEn !== it.caption && (
+                        <span className="block text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                          Translated from Bahasa
+                        </span>
+                      )}
                       {it.issue && <span className="block text-[10px] text-muted-foreground mt-0.5">Issue: {it.issue}</span>}
                     </td>
                     <td className="p-2">

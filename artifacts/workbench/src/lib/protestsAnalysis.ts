@@ -10,6 +10,8 @@
 // "Other" bucket — when nothing matches we default to Protest, the broadest of
 // the four. Keep these pure and side-effect free so they stay easy to test.
 
+import { format } from "date-fns";
+
 export const PROTEST_CATEGORIES = [
   "Activism",
   "Protest",
@@ -123,4 +125,45 @@ export const OPERATIONAL_IMPACTS: OperationalImpactRule[] = [
 export function detectOperationalImpacts(i: ProtestTextLike): string[] {
   const t = text(i);
   return OPERATIONAL_IMPACTS.filter((r) => r.re.test(t)).map((r) => r.label);
+}
+
+// ---------------------------------------------------------------------------
+// Monthly archive grouping
+// ---------------------------------------------------------------------------
+// The incident table on the monitor grows unbounded as history accumulates, so
+// it is chunked by calendar month: the most recent month renders in full while
+// every earlier month collapses into an archive box the analyst can expand.
+
+export interface MonthGroup<T> {
+  /** Sort/identity key, e.g. "2026-07". */
+  key: string;
+  /** Human label, e.g. "July 2026". */
+  label: string;
+  rows: T[];
+}
+
+/**
+ * Group already-date-sorted records into calendar-month buckets, newest month
+ * first. Records must carry a valid `occurredDate`; callers filter out unpar- 
+ * seable dates upstream (the monitor's in-window set already does). Preserves
+ * the incoming order of rows within each month.
+ */
+export function groupByMonth<T extends { occurredDate: Date }>(
+  rows: T[],
+): MonthGroup<T>[] {
+  const buckets = new Map<string, T[]>();
+  for (const r of rows) {
+    if (Number.isNaN(r.occurredDate.getTime())) continue;
+    const key = format(r.occurredDate, "yyyy-MM");
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(r);
+    else buckets.set(key, [r]);
+  }
+  return Array.from(buckets.entries())
+    .map(([key, groupRows]) => ({
+      key,
+      label: format(groupRows[0].occurredDate, "MMMM yyyy"),
+      rows: groupRows,
+    }))
+    .sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
 }
