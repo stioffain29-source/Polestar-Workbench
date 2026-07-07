@@ -6,9 +6,21 @@ description: CLI-only OpenStreetMap → data_centre_facilities importer; Overpas
 # OSM data-centre registry importer
 
 A repeatable CLI (`import:osm-data-centres`) that self-populates the Data Centre
-facility registry from OpenStreetMap across 11 Asian countries. Engine
-`runOsmFacilityRegistryImport` in `lib/ingest/src/osmDataCentres.ts`; thin CLI in
+facility registry from OpenStreetMap. Scope = `OSM_DC_COUNTRIES` (11 Asian
+countries + Australia + New Zealand — extend by adding `{country, iso}`; nothing
+else pins the list). Engine `runOsmFacilityRegistryImport` in
+`lib/ingest/src/osmDataCentres.ts`; thin CLI in
 `scripts/src/import-osm-data-centres.ts`.
+
+## Capacity / IT-load / facility-type are ALWAYS "not reported" (source gap)
+
+OSM carries a name, coords, and sometimes `operator` — it does NOT carry MW
+capacity, IT load, or data-centre TYPE (colo/hyperscale/edge). So every OSM-
+imported row has `capacity_mw`/`it_load_mw` NULL and `facility_type`
+"Unknown / not reported". This is the no-fabrication policy, NOT a bug — do NOT
+derive a "type" from the OSM tag variant (telecom/man_made/building) or guess
+capacity. Populating these needs a DIFFERENT authoritative source (paid DC
+registry) or manual analyst entry via the facility CRUD UI.
 
 ## Non-obvious constraints (why it is built this way)
 

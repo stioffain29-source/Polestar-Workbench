@@ -91,6 +91,8 @@ export const OSM_DC_COUNTRIES: ReadonlyArray<{ country: string; iso: string }> =
     { country: "Japan", iso: "JP" },
     { country: "South Korea", iso: "KR" },
     { country: "India", iso: "IN" },
+    { country: "Australia", iso: "AU" },
+    { country: "New Zealand", iso: "NZ" },
   ];
 
 export type NormalisedFacility = {
