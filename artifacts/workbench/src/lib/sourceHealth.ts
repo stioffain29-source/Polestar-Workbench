@@ -138,23 +138,44 @@ export function isSourceScrapeStale(
 }
 
 // True when an actively-collecting feed is scraping but hasn't retained an
-// in-scope item within the relevance window. A NULL last-relevant timestamp is
-// treated as "telemetry not yet recorded" (unknown), NOT a fabricated zero, so a
-// feed is only flagged once we have a real stale timestamp to point at.
+// in-scope item within the relevance window.
+//
+// Two cases both count as a coverage gap worth an operator's attention:
+//  1. It DID once retain an in-scope item, but the last one is older than the
+//     relevance window (a feed that has gone quiet).
+//  2. It has NEVER retained an in-scope item (lastRelevantItemAt is NULL) yet it
+//     has been in the catalogue (createdAt) longer than the relevance window —
+//     i.e. it fetches successfully but has silently yielded nothing in-scope for
+//     the whole window. This is the "repaired feed reads green but is empty"
+//     masking pattern: a zero-item fetch is not an error, so without this the
+//     feed sits permanently "operational".
+//
+// A NULL last-relevant timestamp on a feed too young to judge (createdAt missing
+// or inside the window) is still treated as "telemetry not yet recorded"
+// (unknown), NOT a fabricated zero — a brand-new feed is given the window to
+// prove itself before being flagged.
 export function isSourceNoRelevantItem(
   s: {
     status: string;
     lastSuccessAt?: string | Date | null;
     lastFailureAt?: string | Date | null;
     lastRelevantItemAt?: string | Date | null;
+    createdAt?: string | Date | null;
   },
   now: Date = new Date(),
 ): boolean {
   if (!isActivelyCollecting(s)) return false;
-  if (!s.lastRelevantItemAt) return false;
+  if (s.lastRelevantItemAt) {
+    return (
+      now.getTime() - new Date(s.lastRelevantItemAt).getTime() >
+      NO_RELEVANT_ITEM_DAYS * DAY_MS
+    );
+  }
+  // Never retained anything. Only a gap once the feed has had the full window to
+  // yield an in-scope item; before that its NULL telemetry is genuinely unknown.
+  if (!s.createdAt) return false;
   return (
-    now.getTime() - new Date(s.lastRelevantItemAt).getTime() >
-    NO_RELEVANT_ITEM_DAYS * DAY_MS
+    now.getTime() - new Date(s.createdAt).getTime() > NO_RELEVANT_ITEM_DAYS * DAY_MS
   );
 }
 

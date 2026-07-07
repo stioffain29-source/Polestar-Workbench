@@ -106,7 +106,11 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   // development database, so prod produced empty PNG/Papua reports until
   // seeded here.
   { name: "ABC News Australia",      url: "https://www.abc.net.au/news/feed/45910/rss.xml",                                 sourceType: "rss",  reliability: 4, notes: "Owner: ANZ desk. National broadcaster — protest, industrial action and policing across capitals." },
-  { name: "Benar News",              url: "https://www.benarnews.org/english/rss",                                         sourceType: "rss",  reliability: 4, notes: "Owner: Asia desk. SE Asia regional desk — Philippines, Indonesia, Bangladesh. Direct RSS (the old rss2.xml path 404s)." },
+  // Benar News RETIRED (Task: empty-feed masking): its direct RSS and every
+  // Google-News site-scope query return zero items from our egress IP — it
+  // fetched "successfully" but never yielded an in-scope APAC unrest item, so it
+  // read permanently green. Removed from the seed and deleted below. Its SE Asia
+  // coverage is already carried by the per-country civil-unrest aggregators.
   { name: "Jubi.id (West Papua)",    url: "https://jubi.id/feed/",                                                          sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Jayapura / Indonesian Papua — community protest and security operations. Manual translation review required." },
   // Suara Papua — Indonesian-language West Papua outlet (direct WordPress feed,
   // like Jubi). Strong on highland security operations, displacement and
@@ -129,7 +133,12 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   // small so Google News honours the recency filter). These broaden PNG source
   // coverage beyond Post-Courier; the classify PNG gate still scopes relevance.
   { name: "The National (PNG)",      url: "https://news.google.com/rss/search?q=site:thenational.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. The National — PNG's largest-circulation daily (Port Moresby). Collected via Google-News site-scope (direct feed 403s our egress IP). Security/crime/operational cues, last 14 days." },
-  { name: "Loop PNG",                url: "https://news.google.com/rss/search?q=site:looppng.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. Loop PNG — high-volume PNG news portal. Collected via Google-News site-scope (no reachable direct feed). Security/crime/operational cues, last 14 days." },
+  // Loop PNG RETIRED (Task: empty-feed masking): no reachable direct feed AND
+  // its site-scope query (site:looppng.com and every domain variant) returns
+  // zero items — it fetched fine but never yielded an in-scope item, so it read
+  // permanently green. Removed from the seed and deleted below. PNG crime/
+  // security coverage is carried by The National, Post-Courier, NBC and the
+  // Port-Moresby/NCD aggregators.
   { name: "EMTV (PNG)",              url: "https://news.google.com/rss/search?q=site:emtv.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. EMTV — national broadcaster (Port Moresby). Collected via Google-News site-scope (direct feed redirects/blocks our egress IP). Security/crime/operational cues, last 14 days." },
   { name: "PNG Haus Bung",          url: "https://news.google.com/rss/search?q=site:pnghausbung.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. PNG Haus Bung — popular PNG news blog (tabloid register; corroborate before use). Collected via Google-News site-scope. Security/crime cues, last 14 days." },
   { name: "One PNG",                url: "https://news.google.com/rss/search?q=site:onepng.com+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. One PNG — community news aggregator. Collected via Google-News site-scope. Security/crime cues, last 14 days." },
@@ -137,10 +146,10 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   // direct feed (nbc.com.pg) blocks our egress IP, so collected via Google-News
   // site-scope like the other mastheads. Broadens NCD crime/security coverage.
   { name: "NBC PNG",                url: "https://news.google.com/rss/search?q=site:nbc.com.pg+(police+OR+raid+OR+robbery+OR+killed+OR+crime+OR+violence+OR+protest+OR+arrest+OR+court+OR+security+OR+airport+OR+road)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 3, notes: "Owner: Pacific desk. NBC PNG — National Broadcasting Corporation (state broadcaster, Port Moresby). Collected via Google-News site-scope (direct feed blocks our egress IP). Security/crime/operational cues, last 14 days." },
-  // TVWAN News (Digicel) — no standalone news site; its digital output is
-  // carried by Loop PNG (already collected above). Name-anchored Google-News
-  // query so TVWAN-branded reporting still surfaces when syndicated elsewhere.
-  { name: "TVWAN News",             url: "https://news.google.com/rss/search?q=%22TVWAN%22+(%22Papua+New+Guinea%22+OR+PNG+OR+%22Port+Moresby%22)+(police+OR+robbery+OR+crime+OR+killed+OR+arrest+OR+violence)+when:14d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 2, notes: "Owner: Pacific desk. TVWAN News (Digicel broadcaster) — no standalone news website; digital output carried by Loop PNG (separate feed). Name-anchored query for TVWAN-branded reporting. Last 14 days." },
+  // TVWAN News RETIRED (Task: empty-feed masking): Digicel broadcaster with no
+  // standalone news site; its name-anchored query returns only sports/telecom
+  // noise and zero in-scope security items, so it read permanently green.
+  // Removed from the seed and deleted below.
   // Port Moresby / National Capital District crime FALLBACK. The country-wide
   // crime feed above under-captures NCD because most Port Moresby crime stories
   // name a suburb, not the city/country. This feed anchors on POM + the major
@@ -2830,6 +2839,42 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (retireErr) {
       logger.error({ err: retireErr }, "Flashpoint dead-outlet retirement failed");
+    }
+
+    // 6c) Retire three flashpoint outlets that FETCH successfully but return zero
+    //     items — Benar News (direct RSS + every Google-News site-scope query
+    //     yields nothing from our egress IP), Loop PNG (no reachable feed, empty
+    //     site-scope) and TVWAN News (no standalone site; name-anchored query is
+    //     sports/telecom noise, no in-scope security items). A zero-item fetch is
+    //     not an error, so each read permanently "operational" (green) — the same
+    //     masking pattern the hard-failure telemetry fixed, but for empty feeds.
+    //     None can be repaired to a URL that yields in-scope items, and their
+    //     coverage is already carried by other seeded feeds, so they are removed
+    //     from the seed array above and deleted here. Marker-gated so a source
+    //     legitimately re-added later with the same name is never re-deleted.
+    try {
+      const emptyMarkerKey = "retired_empty_flashpoint_outlets_v1";
+      const existingEmptyMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${emptyMarkerKey}
+      `);
+      if ((existingEmptyMarker.rowCount ?? 0) === 0) {
+        const RETIRED_EMPTY_FLASHPOINT_SOURCES = ["Benar News", "Loop PNG", "TVWAN News"];
+        const res = await db
+          .delete(sourcesTable)
+          .where(
+            sql`${sourcesTable.topic} = 'flashpoint' AND ${inArray(sourcesTable.name, RETIRED_EMPTY_FLASHPOINT_SOURCES)}`,
+          );
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${emptyMarkerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: emptyMarkerKey },
+          "Retired empty flashpoint outlets (fetch OK but zero in-scope items, unrepairable)",
+        );
+      }
+    } catch (retireEmptyErr) {
+      logger.error({ err: retireEmptyErr }, "Flashpoint empty-outlet retirement failed");
     }
 
     // 7) One-time removal of dead placeholder (never-monitored) source rows.

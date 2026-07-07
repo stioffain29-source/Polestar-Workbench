@@ -285,13 +285,46 @@ describe("no-relevant-item derivation (collecting but nothing in-scope retained)
     ).toBe(false);
   });
 
-  it("treats a NULL last-relevant timestamp as unknown, not a fabricated gap", () => {
+  it("treats a NULL last-relevant timestamp with no createdAt as unknown, not a fabricated gap", () => {
     expect(
       isSourceNoRelevantItem(
         { status: "operational", lastSuccessAt: recentSuccess, lastRelevantItemAt: null },
         now,
       ),
     ).toBe(false);
+  });
+
+  it("does not flag a young feed that has never retained an item (given the window to prove itself)", () => {
+    const youngCreatedAt = "2026-06-18T12:00:00Z"; // 6 days ago, inside the window
+    expect(
+      isSourceNoRelevantItem(
+        {
+          status: "operational",
+          lastSuccessAt: recentSuccess,
+          lastRelevantItemAt: null,
+          createdAt: youngCreatedAt,
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("flags a long-catalogued feed that fetches fine but has NEVER retained an in-scope item", () => {
+    // The masking pattern: a zero-item fetch is not an error, so the feed reads
+    // green forever. Once it has been collecting past the window with nothing
+    // in-scope, surface it as a coverage gap.
+    const oldCreatedAt = "2026-04-01T12:00:00Z"; // ~84 days ago
+    expect(
+      isSourceNoRelevantItem(
+        {
+          status: "operational",
+          lastSuccessAt: recentSuccess,
+          lastRelevantItemAt: null,
+          createdAt: oldCreatedAt,
+        },
+        now,
+      ),
+    ).toBe(true);
   });
 
   it("never flags a feed that has never collected", () => {
