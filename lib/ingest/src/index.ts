@@ -7,8 +7,32 @@ export { runShippingIngest } from "./shipping";
 export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runDataCentresIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG, COUNTRY_ALIASES, GLOBAL_EXTRA_ALIASES, GLOBAL_TOPIC_ALIASES } from "./topicConfigs";
 export { classifyNewsConfidence } from "./newsConfidence";
 export type { Confidence } from "./newsConfidence";
-export { runNewsTopicIngest, classifyNewsItem } from "./newsTopic";
+export { runNewsTopicIngest, classifyNewsItem, detectCountry } from "./newsTopic";
 export type { NewsTopicConfig, TopicFeed, CountryAlias, Classified } from "./newsTopic";
+export {
+  runXSearchIngest,
+  emptyXSearchSummary,
+  decideXIncident,
+  routeTopic,
+  matchesDataCentre,
+  fetchRecentSearch,
+  readXConfig,
+  isXConfigured,
+  xDedupeKey,
+  xMarker,
+  markerPostId,
+  X_SEARCH_QUERIES,
+  X_MARKER_PREFIX,
+} from "./xSearch";
+export type {
+  XSearchSummary,
+  XSearchOptions,
+  XConfig,
+  XQuery,
+  XRoute,
+  XDecision,
+  NormalisedTweet,
+} from "./xSearch";
 export { runMarketPricesIngest } from "./marketPrices";
 export type { MarketPriceSummary } from "./marketPrices";
 export { runMarketSnapshotIngest } from "./marketSnapshot";
