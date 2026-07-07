@@ -106,7 +106,7 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   // development database, so prod produced empty PNG/Papua reports until
   // seeded here.
   { name: "ABC News Australia",      url: "https://www.abc.net.au/news/feed/45910/rss.xml",                                 sourceType: "rss",  reliability: 4, notes: "Owner: ANZ desk. National broadcaster — protest, industrial action and policing across capitals." },
-  { name: "Benar News",              url: "https://www.benarnews.org/english/rss2.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: Asia desk. SE Asia regional desk — Philippines, Indonesia, Bangladesh." },
+  { name: "Benar News",              url: "https://www.benarnews.org/english/rss",                                         sourceType: "rss",  reliability: 4, notes: "Owner: Asia desk. SE Asia regional desk — Philippines, Indonesia, Bangladesh. Direct RSS (the old rss2.xml path 404s)." },
   { name: "Jubi.id (West Papua)",    url: "https://jubi.id/feed/",                                                          sourceType: "rss",  reliability: 3, notes: "Owner: Pacific desk. Jayapura / Indonesian Papua — community protest and security operations. Manual translation review required." },
   // Suara Papua — Indonesian-language West Papua outlet (direct WordPress feed,
   // like Jubi). Strong on highland security operations, displacement and
@@ -157,31 +157,29 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "RPNGC (PNG Police, confirmation)", url: "https://news.google.com/rss/search?q=(%22Royal+Papua+New+Guinea+Constabulary%22+OR+RPNGC+OR+%22Police+Commissioner%22+OR+%22Acting+Commissioner%22)+(Papua+OR+PNG+OR+Moresby+OR+Lae+OR+Hagen)+when:21d&hl=en-PG&gl=PG&ceid=PG:en", sourceType: "rss", reliability: 4, notes: "Owner: Pacific desk. Royal PNG Constabulary official statements — CONFIRMATION-ONLY (corroborates masthead incidents; not a sole discovery basis). Sparse cadence, last 21 days." },
   { name: "RNZ Pacific",             url: "https://www.rnz.co.nz/rss/pacific.xml",                                          sourceType: "rss",  reliability: 4, notes: "Owner: Pacific desk. Regional coverage for PNG, Solomons, Fiji and Indonesian Papua." },
   // Direct publisher RSS — regional national dailies and broadcasters.
-  { name: "Daily Mirror Sri Lanka",  url: "http://www.dailymirror.lk/RSS_Feeds/news",                                       sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Sri Lanka — Colombo national daily." },
-  { name: "Nepal Republica",         url: "https://myrepublica.nagariknetwork.com/feed/",                                   sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Secondary Nepal national — corroborates Kathmandu Post." },
-  { name: "New Age Bangladesh",      url: "https://www.newagebd.net/rss.xml",                                               sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Bangladesh — labour and student coverage." },
-  { name: "Sunday Times Sri Lanka",  url: "https://www.sundaytimes.lk/feed",                                                sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Sri Lanka — Colombo weekly, political coverage." },
+  { name: "Daily Mirror Sri Lanka",  url: "https://news.google.com/rss/search?q=site:dailymirror.lk+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-LK&gl=LK&ceid=LK:en", sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Sri Lanka — Colombo national daily. Google-News site-scope: the direct RSS serves HTML to our egress IP. Last 14 days." },
+  { name: "Nepal Republica",         url: "https://news.google.com/rss/search?q=site:myrepublica.nagariknetwork.com+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-NP&gl=NP&ceid=NP:en", sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Secondary Nepal national — corroborates Kathmandu Post. Google-News site-scope: the direct feed 404s. Last 14 days." },
+  { name: "New Age Bangladesh",      url: "https://news.google.com/rss/search?q=site:newagebd.net+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-BD&gl=BD&ceid=BD:en", sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Bangladesh — labour and student coverage. Google-News site-scope: the direct feed 403s (Cloudflare) our egress IP. Last 14 days." },
+  { name: "Sunday Times Sri Lanka",  url: "https://news.google.com/rss/search?q=site:sundaytimes.lk+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-LK&gl=LK&ceid=LK:en", sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Sri Lanka — Colombo weekly, political coverage. Google-News site-scope: the direct feed 404s. Last 14 days." },
   { name: "The Kathmandu Post",      url: "https://kathmandupost.com/rss",                                                  sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Kathmandu — political mobilisation, student unions, transport strikes." },
   { name: "Philippine Daily Inquirer", url: "https://www.inquirer.net/fullfeed",                                            sourceType: "rss",  reliability: 4, notes: "Owner: PH desk. National daily — city-disruption and protest calendaring across Metro Manila." },
   { name: "Rappler",                 url: "https://www.rappler.com/feed/",                                                  sourceType: "rss",  reliability: 4, notes: "Owner: PH desk. Manila protest activity, union calls, student mobilisation." },
-  { name: "Prachatai English",       url: "https://prachatai.com/english/rss.xml",                                          sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Thailand — civic-space, student mobilisation." },
-  { name: "Tempo English",           url: "https://en.tempo.co/rss",                                                        sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — investigative weekly, civic-space coverage." },
-  { name: "The Jakarta Post",        url: "https://www.thejakartapost.com/feed",                                            sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — Jakarta-Java national daily." },
-  { name: "Kyodo News (English)",    url: "https://english.kyodonews.net/rss/news.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. Tokyo wire — labour disputes, civic protest and policing." },
-  { name: "NHK World Japan",         url: "https://www3.nhk.or.jp/nhkworld/en/news/feeds/",                                 sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. Japan — national broadcaster English wire." },
+  { name: "Tempo English",           url: "https://rss.tempo.co/en",                                                        sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — investigative weekly, civic-space coverage. Direct RSS (the old en.tempo.co/rss path 404s)." },
+  { name: "The Jakarta Post",        url: "https://news.google.com/rss/search?q=site:thejakartapost.com+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-ID&gl=ID&ceid=ID:en", sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — Jakarta-Java national daily. Google-News site-scope: the direct feed 404s. Last 14 days." },
+  { name: "Kyodo News (English)",    url: "https://news.google.com/rss/search?q=site:english.kyodonews.net+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. Tokyo wire — labour disputes, civic protest and policing. Google-News site-scope: the direct feed 404s. Last 14 days." },
+  { name: "NHK World Japan",         url: "https://news.google.com/rss/search?q=site:www3.nhk.or.jp/nhkworld+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-JP&gl=JP&ceid=JP:en", sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. Japan — national broadcaster English wire. Google-News site-scope: the direct feed path 404s. Last 14 days." },
   { name: "The Japan Times",         url: "https://www.japantimes.co.jp/feed/",                                             sourceType: "rss",  reliability: 4, notes: "Owner: JP desk. National daily — Tokyo and Osaka mobilisation, union action." },
   // Thematic / cross-regional desks (civic-space, labour, education) and
   // wires. Several are non-RSS catalogue entries that fail to parse from the
   // container — retained so Source Health mirrors the verified development
   // catalogue and coverage warnings count the full source set.
-  { name: "AFP Asia-Pacific",        url: "https://www.afp.com/en/news-hub",                                                sourceType: "news", reliability: 5, notes: "Owner: Asia desk. Secondary wire — corroborates Reuters and adds French-language coverage." },
-  { name: "Reuters Asia Pacific Wire", url: "https://www.reuters.com/world/asia-pacific/",                                  sourceType: "news", reliability: 5, notes: "Owner: Asia desk. Primary wire for breaking protest, strike and security-force activity." },
-  { name: "CIVICUS Monitor",         url: "https://monitor.civicus.org/api/",                                               sourceType: "api",  reliability: 5, notes: "Owner: Civic-space desk. Live tracker of assembly bans, detentions, internet shutdowns." },
-  { name: "Human Rights Watch Asia", url: "https://www.hrw.org/asia",                                                       sourceType: "rss",  reliability: 4, notes: "Owner: Civic-space desk. Crackdown reporting, mass arrests, security-force conduct." },
-  { name: "ITUC Global Rights Index", url: "https://www.ituc-csi.org/spip.php?page=backend",                                sourceType: "rss",  reliability: 4, notes: "Owner: Labour desk. International Trade Union Confederation — strike calls and labour-rights restrictions." },
-  { name: "IndustriALL Global Union", url: "https://www.industriall-union.org/rss.xml",                                     sourceType: "rss",  reliability: 4, notes: "Owner: Labour desk. Sectoral union action (manufacturing, mining, energy)." },
-  { name: "Education International APAC", url: "https://www.ei-ie.org/en/region/asia-pacific",                               sourceType: "rss",  reliability: 3, notes: "Owner: Education desk. Teacher and faculty mobilisation across APAC." },
-  { name: "University World News Asia", url: "https://www.universityworldnews.com/region.php?region=Asia&format=rss",       sourceType: "rss",  reliability: 3, notes: "Owner: Education desk. Campus protests, student union activity, faculty walkouts." },
+  { name: "AFP Asia-Pacific",        url: "https://news.google.com/rss/search?q=site:afp.com+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 5, notes: "Owner: Asia desk. Secondary wire — corroborates Reuters. Google-News site-scope: the afp.com hub is not an RSS feed. Last 14 days." },
+  { name: "Reuters Asia Pacific Wire", url: "https://news.google.com/rss/search?q=site:reuters.com/world/asia-pacific+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 5, notes: "Owner: Asia desk. Primary wire for breaking protest, strike and security-force activity. Google-News site-scope: reuters.com 401s our egress IP. Last 14 days." },
+  { name: "Human Rights Watch Asia", url: "https://news.google.com/rss/search?q=site:hrw.org+Asia+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+crackdown)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 4, notes: "Owner: Civic-space desk. Crackdown reporting, mass arrests, security-force conduct. Google-News site-scope: the /asia page is not an RSS feed. Last 14 days." },
+  { name: "ITUC Global Rights Index", url: "https://news.google.com/rss/search?q=site:ituc-csi.org+(strike+OR+union+OR+%22labour+rights%22+OR+walkout+OR+protest+OR+workers)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 4, notes: "Owner: Labour desk. International Trade Union Confederation — strike calls and labour-rights restrictions. Google-News site-scope: the direct feed 403s (Cloudflare) our egress IP. Last 14 days." },
+  { name: "IndustriALL Global Union", url: "https://news.google.com/rss/search?q=site:industriall-union.org+(strike+OR+union+OR+%22labour+rights%22+OR+walkout+OR+protest+OR+workers)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 4, notes: "Owner: Labour desk. Sectoral union action (manufacturing, mining, energy). Google-News site-scope: the direct rss.xml now serves HTML. Last 14 days." },
+  { name: "Education International APAC", url: "https://news.google.com/rss/search?q=site:ei-ie.org+(teacher+OR+strike+OR+protest+OR+union+OR+walkout)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 3, notes: "Owner: Education desk. Teacher and faculty mobilisation across APAC. Google-News site-scope: the /region page is not an RSS feed. Last 14 days." },
+  { name: "University World News Asia", url: "https://news.google.com/rss/search?q=site:universityworldnews.com+(student+OR+campus+OR+protest+OR+faculty+OR+strike+OR+walkout)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss",  reliability: 3, notes: "Owner: Education desk. Campus protests, student union activity, faculty walkouts. Google-News site-scope: the region.php RSS 404s. Last 14 days." },
 ];
 
 // Self-heal seed URLs on every startup. The seed loop below only inserts
@@ -2792,6 +2790,46 @@ export async function runDataMigrations(): Promise<void> {
       await repairFlashpointSeedUrls();
     } catch (srcErr) {
       logger.error({ err: srcErr }, "Flashpoint regional source seed failed");
+    }
+
+    // 6b) Retire two genuinely-defunct flashpoint outlets. Prachatai's English
+    //     section is dead (only the Thai feed still serves, which the
+    //     English-only flashpoint classifier cannot read; Thailand unrest is
+    //     already covered by the Thailand civil-unrest aggregator + Khaosod) and
+    //     the CIVICUS Monitor api endpoint is dormant and not indexed by Google
+    //     News, so neither can be repaired to a live feed. Removed from the seed
+    //     array above and deleted here so no permanently-green dead row remains.
+    //     Marker-gated: a source legitimately re-added later with the same name
+    //     is never re-deleted.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "retired_dead_flashpoint_outlets_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const RETIRED_FLASHPOINT_SOURCES = ["Prachatai English", "CIVICUS Monitor"];
+        const res = await db
+          .delete(sourcesTable)
+          .where(
+            sql`${sourcesTable.topic} = 'flashpoint' AND ${inArray(sourcesTable.name, RETIRED_FLASHPOINT_SOURCES)}`,
+          );
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "Retired dead flashpoint outlets (English section / api endpoint defunct, unrepairable)",
+        );
+      }
+    } catch (retireErr) {
+      logger.error({ err: retireErr }, "Flashpoint dead-outlet retirement failed");
     }
 
     // 7) One-time removal of dead placeholder (never-monitored) source rows.

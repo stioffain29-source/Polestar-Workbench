@@ -6,6 +6,7 @@ import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { fetchFeed } from "./feedFetch";
+import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 import { extractPngItem, derivePngProvince, derivePngIncidentDate } from "./pngExtract";
 import { extractWestPapuaItem, deriveWestPapuaIncidentDate } from "./westPapuaExtract";
 import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
@@ -709,25 +710,41 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
         });
         perFeed[s.name].accepted++;
       }
-      if (commit) {
-        await db
-          .update(sourcesTable)
-          .set({ lastSuccessAt: new Date(), errorMessage: null })
-          .where(eq(sourcesTable.id, s.id));
-      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       perFeed[s.name].error = msg;
-      if (commit) {
-        await db
-          .update(sourcesTable)
-          .set({ lastFailureAt: new Date(), errorMessage: msg.slice(0, 500) })
-          .where(eq(sourcesTable.id, s.id));
-      }
     }
   };
   for (let i = 0; i < fetchable.length; i += CONCURRENCY) {
     await Promise.allSettled(fetchable.slice(i, i + CONCURRENCY).map(processFeed));
+  }
+
+  // Record REAL per-feed health through the shared helper (identical path to
+  // every other topic): a failed fetch increments consecutive_failures and
+  // escalates to "failing" at the shared threshold; a successful fetch resets
+  // to "operational" and clears the error. Commit-gated — health is only
+  // written on a committing run. Keyed on (name, topic) so it upserts the
+  // catalogued flashpoint rows in place. NOTE: only telemetry fields are
+  // written — reliability/notes are deliberately omitted so the migration
+  // seed remains the canonical owner of curated per-source metadata and is
+  // never flattened by an ingest run.
+  if (commit) {
+    await recordSourceHealth(
+      "flashpoint",
+      fetchable.map((s) => {
+        const stat = perFeed[s.name];
+        return {
+          name: s.name,
+          url: s.url!,
+          ok: !stat?.error,
+          error: stat?.error ?? null,
+          collected: stat?.found,
+          retained: stat?.accepted,
+          rejected: stat?.rejected,
+          failureReason: categorizeFeedFailure(stat?.error),
+        };
+      }),
+    );
   }
 
   // In-batch dedupe (key + URL).
