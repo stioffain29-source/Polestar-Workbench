@@ -407,6 +407,7 @@ function FacilityInfo({
         {f.city ? `${f.city}, ` : ""}
         {f.country}
       </div>
+      <div>Type: {f.facilityType}</div>
       <div>Status: {f.status}</div>
       {f.statusChanged && (
         <div style={{ fontWeight: 700, color: "#4655FF" }}>

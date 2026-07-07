@@ -495,6 +495,7 @@ export async function runDataMigrations(): Promise<void> {
         longitude double precision,
         status text NOT NULL DEFAULT 'Unknown',
         planning_risk text NOT NULL DEFAULT 'Unknown',
+        facility_type text NOT NULL DEFAULT 'Unknown / not reported',
         capacity_mw double precision,
         it_load_mw double precision,
         announced_date timestamptz,
@@ -522,6 +523,39 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS data_centre_facilities_linked_incident_idx
         ON data_centre_facilities (linked_incident_id)
+    `);
+    // Additive: constrained facility type (see DATA_CENTRE_TYPES). Existing prod
+    // rows (where the CREATE TABLE IF NOT EXISTS above no-ops) gain it here.
+    // NOT NULL DEFAULT backfills every pre-existing row to "Unknown / not
+    // reported" — never inferred. Idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      ALTER TABLE data_centre_facilities
+      ADD COLUMN IF NOT EXISTS facility_type text NOT NULL DEFAULT 'Unknown / not reported'
+    `);
+
+    // Schema: per-country DATA-CENTRE RISK FRAMEWORK — one row per country with a
+    // 16-dimension analyst-maintained assessment (jsonb `dimensions`). Ratings
+    // may be auto-seeded from cited public indices then analyst-overridden; a
+    // missing dimension reads "not reported" (never invented). Isolated context:
+    // never touches incidents. Fixed vocabularies (ratings, dimension keys) live
+    // in the Drizzle schema, so vocab changes are code, not migrations. drizzle
+    // push only reaches dev, so the prod primary gains the table here on boot.
+    // Country uniqueness is case-insensitive via the lower(country) unique index.
+    // All idempotent (IF NOT EXISTS).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS data_centre_country_risk (
+        id serial PRIMARY KEY,
+        country text NOT NULL,
+        dimensions jsonb NOT NULL DEFAULT '{}'::jsonb,
+        overall_note text,
+        created_by text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS data_centre_country_risk_country_lower_idx
+        ON data_centre_country_risk (lower(country))
     `);
 
     // Schema: per-vessel AIS sighting state, kept ACROSS sample windows so a

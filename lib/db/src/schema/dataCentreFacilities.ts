@@ -61,6 +61,19 @@ export const DATA_CENTRE_PLANNING_RISKS = [
 ] as const;
 export type DataCentrePlanningRisk = (typeof DATA_CENTRE_PLANNING_RISKS)[number];
 
+// Facility type — fixed vocabulary. NEVER inferred from geography or operator;
+// defaults to "Unknown / not reported" unless a source clearly states the type.
+export const DATA_CENTRE_TYPES = [
+  "Hyperscale",
+  "Colocation",
+  "Enterprise",
+  "Edge",
+  "Cloud region",
+  "Carrier hotel",
+  "Unknown / not reported",
+] as const;
+export type DataCentreType = (typeof DATA_CENTRE_TYPES)[number];
+
 export const dataCentreFacilitiesTable = pgTable(
   "data_centre_facilities",
   {
@@ -83,6 +96,12 @@ export const dataCentreFacilitiesTable = pgTable(
     status: text("status").notNull().default("Unknown"),
     // Constrained planning / build-out risk (see DATA_CENTRE_PLANNING_RISKS).
     planningRisk: text("planning_risk").notNull().default("Unknown"),
+
+    // Constrained facility type (see DATA_CENTRE_TYPES). Defaults to
+    // "Unknown / not reported"; never inferred from geography or operator.
+    facilityType: text("facility_type")
+      .notNull()
+      .default("Unknown / not reported"),
 
     // Capacity figures (megawatts). Nullable — read "not reported" when blank.
     capacityMw: doublePrecision("capacity_mw"),

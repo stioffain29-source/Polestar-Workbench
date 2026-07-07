@@ -9,6 +9,7 @@ import {
   getListDataCentreFacilitiesQueryKey,
   DataCentreStatus,
   DataCentrePlanningRisk,
+  DataCentreType,
   type DataCentreFacility,
   type DataCentreFacilityInput,
 } from "@workspace/api-client-react";
@@ -27,6 +28,7 @@ import { Plus, Pencil, Trash2, X, ExternalLink } from "lucide-react";
 
 const STATUSES = Object.values(DataCentreStatus);
 const PLANNING_RISKS = Object.values(DataCentrePlanningRisk);
+const TYPES = Object.values(DataCentreType);
 
 type FormState = {
   name: string;
@@ -38,6 +40,7 @@ type FormState = {
   longitude: string;
   status: string;
   planningRisk: string;
+  facilityType: string;
   capacityMw: string;
   itLoadMw: string;
   announcedDate: string;
@@ -59,6 +62,7 @@ const EMPTY_FORM: FormState = {
   longitude: "",
   status: "Unknown",
   planningRisk: "Unknown",
+  facilityType: "Unknown / not reported",
   capacityMw: "",
   itLoadMw: "",
   announcedDate: "",
@@ -89,6 +93,7 @@ function facilityToForm(f: DataCentreFacility): FormState {
     longitude: f.longitude != null ? String(f.longitude) : "",
     status: f.status ?? "Unknown",
     planningRisk: f.planningRisk ?? "Unknown",
+    facilityType: f.facilityType ?? "Unknown / not reported",
     capacityMw: f.capacityMw != null ? String(f.capacityMw) : "",
     itLoadMw: f.itLoadMw != null ? String(f.itLoadMw) : "",
     announcedDate: ymd(f.announcedDate),
@@ -131,6 +136,7 @@ function formToInput(f: FormState): DataCentreFacilityInput {
     longitude: num(f.longitude),
     status: f.status as DataCentreFacilityInput["status"],
     planningRisk: f.planningRisk as DataCentreFacilityInput["planningRisk"],
+    facilityType: f.facilityType as DataCentreFacilityInput["facilityType"],
     capacityMw: num(f.capacityMw),
     itLoadMw: num(f.itLoadMw),
     announcedDate: iso(f.announcedDate),
@@ -372,6 +378,13 @@ export default function DataCentreRegistry() {
                 ))}
               </select>
             </Labelled>
+            <Labelled label="Type">
+              <select className={selectCls} value={form.facilityType} onChange={(e) => set("facilityType", e.target.value)}>
+                {TYPES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </Labelled>
             <Labelled label="Latitude">
               <input className={inputCls} value={form.latitude} onChange={(e) => set("latitude", e.target.value)} inputMode="decimal" />
             </Labelled>
@@ -455,6 +468,7 @@ export default function DataCentreRegistry() {
                   <th className="px-4 py-2 font-medium">Country</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Planning Risk</th>
+                  <th className="px-4 py-2 font-medium">Type</th>
                   <th className="px-4 py-2 font-medium">Capacity</th>
                   <th className="px-4 py-2 font-medium">Linked</th>
                   <th className="px-4 py-2 font-medium text-right">Actions</th>
@@ -489,6 +503,7 @@ export default function DataCentreRegistry() {
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-foreground">{f.planningRisk}</td>
+                    <td className="px-4 py-2.5 text-foreground">{f.facilityType}</td>
                     <td className="px-4 py-2.5 text-foreground">
                       {f.capacityMw != null ? `${f.capacityMw} MW` : "—"}
                     </td>

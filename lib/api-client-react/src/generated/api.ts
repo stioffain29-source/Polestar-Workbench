@@ -39,6 +39,9 @@ import type {
   CountryReportUpdate,
   CreateSocialWatchItemRequest,
   DashboardOverview,
+  DataCentreCountryRisk,
+  DataCentreCountryRiskInput,
+  DataCentreCountryRiskUpdate,
   DataCentreFacility,
   DataCentreFacilityInput,
   DataCentreFacilityUpdate,
@@ -59,6 +62,7 @@ import type {
   IncidentInput,
   IncidentUpdate,
   IntegrationStatusResponse,
+  ListDataCentreCountryRiskParams,
   ListDataCentreFacilitiesParams,
   ListGdeltStructuredItemsParams,
   ListIncidentsParams,
@@ -4068,6 +4072,350 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteDataCentreFacilityMutationOptions(options));
+    }
+
+export const getListDataCentreCountryRiskUrl = (params?: ListDataCentreCountryRiskParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/data-centre-country-risk?${stringifiedParams}` : `/api/data-centre-country-risk`
+}
+
+export const listDataCentreCountryRisk = async (params?: ListDataCentreCountryRiskParams, options?: RequestInit): Promise<DataCentreCountryRisk[]> => {
+
+  return customFetch<DataCentreCountryRisk[]>(getListDataCentreCountryRiskUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDataCentreCountryRiskQueryKey = (params?: ListDataCentreCountryRiskParams,) => {
+    return [
+    `/api/data-centre-country-risk`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDataCentreCountryRiskQueryOptions = <TData = Awaited<ReturnType<typeof listDataCentreCountryRisk>>, TError = ErrorType<unknown>>(params?: ListDataCentreCountryRiskParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDataCentreCountryRisk>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDataCentreCountryRiskQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDataCentreCountryRisk>>> = ({ signal }) => listDataCentreCountryRisk(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDataCentreCountryRisk>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDataCentreCountryRiskQueryResult = NonNullable<Awaited<ReturnType<typeof listDataCentreCountryRisk>>>
+export type ListDataCentreCountryRiskQueryError = ErrorType<unknown>
+
+
+
+export function useListDataCentreCountryRisk<TData = Awaited<ReturnType<typeof listDataCentreCountryRisk>>, TError = ErrorType<unknown>>(
+ params?: ListDataCentreCountryRiskParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDataCentreCountryRisk>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDataCentreCountryRiskQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDataCentreCountryRiskUrl = () => {
+
+
+
+
+  return `/api/data-centre-country-risk`
+}
+
+export const createDataCentreCountryRisk = async (dataCentreCountryRiskInput: DataCentreCountryRiskInput, options?: RequestInit): Promise<DataCentreCountryRisk> => {
+
+  return customFetch<DataCentreCountryRisk>(getCreateDataCentreCountryRiskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dataCentreCountryRiskInput,)
+  }
+);}
+
+
+
+
+export const getCreateDataCentreCountryRiskMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDataCentreCountryRisk>>, TError,{data: BodyType<DataCentreCountryRiskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDataCentreCountryRisk>>, TError,{data: BodyType<DataCentreCountryRiskInput>}, TContext> => {
+
+const mutationKey = ['createDataCentreCountryRisk'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDataCentreCountryRisk>>, {data: BodyType<DataCentreCountryRiskInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDataCentreCountryRisk(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDataCentreCountryRiskMutationResult = NonNullable<Awaited<ReturnType<typeof createDataCentreCountryRisk>>>
+    export type CreateDataCentreCountryRiskMutationBody = BodyType<DataCentreCountryRiskInput>
+    export type CreateDataCentreCountryRiskMutationError = ErrorType<unknown>
+
+    export const useCreateDataCentreCountryRisk = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDataCentreCountryRisk>>, TError,{data: BodyType<DataCentreCountryRiskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDataCentreCountryRisk>>,
+        TError,
+        {data: BodyType<DataCentreCountryRiskInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDataCentreCountryRiskMutationOptions(options));
+    }
+
+export const getGetDataCentreCountryRiskUrl = (id: number,) => {
+
+
+
+
+  return `/api/data-centre-country-risk/${id}`
+}
+
+export const getDataCentreCountryRisk = async (id: number, options?: RequestInit): Promise<DataCentreCountryRisk> => {
+
+  return customFetch<DataCentreCountryRisk>(getGetDataCentreCountryRiskUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDataCentreCountryRiskQueryKey = (id: number,) => {
+    return [
+    `/api/data-centre-country-risk/${id}`
+    ] as const;
+    }
+
+
+export const getGetDataCentreCountryRiskQueryOptions = <TData = Awaited<ReturnType<typeof getDataCentreCountryRisk>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDataCentreCountryRisk>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDataCentreCountryRiskQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDataCentreCountryRisk>>> = ({ signal }) => getDataCentreCountryRisk(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDataCentreCountryRisk>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDataCentreCountryRiskQueryResult = NonNullable<Awaited<ReturnType<typeof getDataCentreCountryRisk>>>
+export type GetDataCentreCountryRiskQueryError = ErrorType<unknown>
+
+
+
+export function useGetDataCentreCountryRisk<TData = Awaited<ReturnType<typeof getDataCentreCountryRisk>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDataCentreCountryRisk>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDataCentreCountryRiskQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateDataCentreCountryRiskUrl = (id: number,) => {
+
+
+
+
+  return `/api/data-centre-country-risk/${id}`
+}
+
+export const updateDataCentreCountryRisk = async (id: number,
+    dataCentreCountryRiskUpdate: DataCentreCountryRiskUpdate, options?: RequestInit): Promise<DataCentreCountryRisk> => {
+
+  return customFetch<DataCentreCountryRisk>(getUpdateDataCentreCountryRiskUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dataCentreCountryRiskUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateDataCentreCountryRiskMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDataCentreCountryRisk>>, TError,{id: number;data: BodyType<DataCentreCountryRiskUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDataCentreCountryRisk>>, TError,{id: number;data: BodyType<DataCentreCountryRiskUpdate>}, TContext> => {
+
+const mutationKey = ['updateDataCentreCountryRisk'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDataCentreCountryRisk>>, {id: number;data: BodyType<DataCentreCountryRiskUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDataCentreCountryRisk(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDataCentreCountryRiskMutationResult = NonNullable<Awaited<ReturnType<typeof updateDataCentreCountryRisk>>>
+    export type UpdateDataCentreCountryRiskMutationBody = BodyType<DataCentreCountryRiskUpdate>
+    export type UpdateDataCentreCountryRiskMutationError = ErrorType<unknown>
+
+    export const useUpdateDataCentreCountryRisk = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDataCentreCountryRisk>>, TError,{id: number;data: BodyType<DataCentreCountryRiskUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDataCentreCountryRisk>>,
+        TError,
+        {id: number;data: BodyType<DataCentreCountryRiskUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateDataCentreCountryRiskMutationOptions(options));
+    }
+
+export const getDeleteDataCentreCountryRiskUrl = (id: number,) => {
+
+
+
+
+  return `/api/data-centre-country-risk/${id}`
+}
+
+export const deleteDataCentreCountryRisk = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteDataCentreCountryRiskUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDataCentreCountryRiskMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDataCentreCountryRisk>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDataCentreCountryRisk>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteDataCentreCountryRisk'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDataCentreCountryRisk>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDataCentreCountryRisk(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDataCentreCountryRiskMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDataCentreCountryRisk>>>
+
+    export type DeleteDataCentreCountryRiskMutationError = ErrorType<unknown>
+
+    export const useDeleteDataCentreCountryRisk = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDataCentreCountryRisk>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDataCentreCountryRisk>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDataCentreCountryRiskMutationOptions(options));
     }
 
 export const getListCardDraftsUrl = () => {

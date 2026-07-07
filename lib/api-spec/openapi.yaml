@@ -1141,6 +1141,83 @@ paths:
         "204":
           description: Deleted
 
+  /data-centre-country-risk:
+    get:
+      operationId: listDataCentreCountryRisk
+      tags: [dataCentreCountryRisk]
+      parameters:
+        - name: country
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DataCentreCountryRisk" }
+    post:
+      operationId: createDataCentreCountryRisk
+      tags: [dataCentreCountryRisk]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataCentreCountryRiskInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCentreCountryRisk" }
+
+  /data-centre-country-risk/{id}:
+    get:
+      operationId: getDataCentreCountryRisk
+      tags: [dataCentreCountryRisk]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCentreCountryRisk" }
+    patch:
+      operationId: updateDataCentreCountryRisk
+      tags: [dataCentreCountryRisk]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataCentreCountryRiskUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataCentreCountryRisk" }
+    delete:
+      operationId: deleteDataCentreCountryRisk
+      tags: [dataCentreCountryRisk]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
   /card-drafts:
     get:
       operationId: listCardDrafts
@@ -2551,6 +2628,17 @@ components:
         - Moratorium
         - Unknown
 
+    DataCentreType:
+      type: string
+      enum:
+        - Hyperscale
+        - Colocation
+        - Enterprise
+        - Edge
+        - Cloud region
+        - Carrier hotel
+        - Unknown / not reported
+
     DataCentreFacility:
       type: object
       required:
@@ -2559,6 +2647,7 @@ components:
         - country
         - status
         - planningRisk
+        - facilityType
         - statusChanged
         - createdAt
         - updatedAt
@@ -2573,6 +2662,7 @@ components:
         longitude: { type: ["number", "null"] }
         status: { $ref: "#/components/schemas/DataCentreStatus" }
         planningRisk: { $ref: "#/components/schemas/DataCentrePlanningRisk" }
+        facilityType: { $ref: "#/components/schemas/DataCentreType" }
         capacityMw: { type: ["number", "null"] }
         itLoadMw: { type: ["number", "null"] }
         announcedDate: { type: ["string", "null"], format: date-time }
@@ -2601,6 +2691,7 @@ components:
         longitude: { type: number }
         status: { $ref: "#/components/schemas/DataCentreStatus" }
         planningRisk: { $ref: "#/components/schemas/DataCentrePlanningRisk" }
+        facilityType: { $ref: "#/components/schemas/DataCentreType" }
         capacityMw: { type: number }
         itLoadMw: { type: number }
         announcedDate: { type: string, format: date-time }
@@ -2623,6 +2714,7 @@ components:
         longitude: { type: ["number", "null"] }
         status: { $ref: "#/components/schemas/DataCentreStatus" }
         planningRisk: { $ref: "#/components/schemas/DataCentrePlanningRisk" }
+        facilityType: { $ref: "#/components/schemas/DataCentreType" }
         capacityMw: { type: ["number", "null"] }
         itLoadMw: { type: ["number", "null"] }
         announcedDate: { type: ["string", "null"], format: date-time }
@@ -2631,6 +2723,103 @@ components:
         notes: { type: ["string", "null"] }
         sourceUrl: { type: ["string", "null"] }
         linkedIncidentId: { type: ["integer", "null"] }
+        createdBy: { type: string }
+
+    DataCentreRiskRating:
+      type: string
+      description: Polestar five-tier risk scale. Absence of a rating reads "not reported".
+      enum:
+        - Insignificant
+        - Low
+        - Moderate
+        - High
+        - Extreme
+
+    DataCentreRiskDimension:
+      type: object
+      description: >-
+        One risk dimension's assessment. `rating` null = "not reported" (never
+        invented). `provisional` marks an unreviewed auto-seeded rating; it is
+        cleared once the analyst saves. `source` cites the basis and `seededFrom`
+        records auto-seed provenance (e.g. "TI CPI 2024").
+      required:
+        - rating
+        - rationale
+        - source
+        - analystNote
+        - provisional
+        - overridden
+        - seededFrom
+      properties:
+        rating:
+          anyOf:
+            - $ref: "#/components/schemas/DataCentreRiskRating"
+            - type: "null"
+        rationale: { type: string }
+        source: { type: string }
+        analystNote: { type: string }
+        provisional: { type: boolean }
+        overridden: { type: boolean }
+        seededFrom: { type: ["string", "null"] }
+
+    DataCentreCountryRiskDimensions:
+      type: object
+      description: >-
+        Fixed 16-dimension assessment map. A missing key reads "not reported";
+        the editor renders all sixteen regardless.
+      properties:
+        regulatoryEnvironment: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        planningPermitting: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        corruption: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        transparency: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        politicalStability: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        gridPowerStability: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        utilityWaterSupply: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        waterStress: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        subseaConnectivity: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        dataLocalisation: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        landRealEstate: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        environmentalClimate: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        naturalHazard: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        securityCivilUnrest: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        labourSkills: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+        taxIncentives: { $ref: "#/components/schemas/DataCentreRiskDimension" }
+
+    DataCentreCountryRisk:
+      type: object
+      required:
+        - id
+        - country
+        - dimensions
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: integer }
+        country: { type: string }
+        dimensions: { $ref: "#/components/schemas/DataCentreCountryRiskDimensions" }
+        overallNote: { type: ["string", "null"] }
+        createdBy: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    DataCentreCountryRiskInput:
+      type: object
+      required: [country]
+      properties:
+        country: { type: string, minLength: 1 }
+        dimensions: { $ref: "#/components/schemas/DataCentreCountryRiskDimensions" }
+        overallNote: { type: string }
+        createdBy: { type: string }
+
+    DataCentreCountryRiskUpdate:
+      type: object
+      description: >-
+        Full-object replace. When `dimensions` is supplied it replaces the whole
+        assessment map (no per-key merge).
+      properties:
+        country: { type: string, minLength: 1 }
+        dimensions: { $ref: "#/components/schemas/DataCentreCountryRiskDimensions" }
+        overallNote: { type: ["string", "null"] }
         createdBy: { type: string }
 
     CardTemplateKey:

@@ -7,6 +7,7 @@
  */
 import type { DataCentrePlanningRisk } from './dataCentrePlanningRisk';
 import type { DataCentreStatus } from './dataCentreStatus';
+import type { DataCentreType } from './dataCentreType';
 
 export interface DataCentreFacilityInput {
   /** @minLength 1 */
@@ -20,6 +21,7 @@ export interface DataCentreFacilityInput {
   longitude?: number;
   status?: DataCentreStatus;
   planningRisk?: DataCentrePlanningRisk;
+  facilityType?: DataCentreType;
   capacityMw?: number;
   itLoadMw?: number;
   announcedDate?: Date;

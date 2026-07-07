@@ -10,6 +10,7 @@
     "import:apify-instagram": "tsx ./src/import-apify-instagram.ts",
     "import:tapa-explorer": "tsx ./src/import-tapa-explorer.ts",
     "import:osm-data-centres": "tsx ./src/import-osm-data-centres.ts",
+    "import:cpi": "tsx ./src/import-cpi.ts",
     "promote:social": "tsx ./src/promote-social.ts",
     "scrape:cargo-watch": "tsx ./src/scrape-cargo-watch.ts",
     "scrape:flashpoint": "tsx ./src/scrape-flashpoint.ts",

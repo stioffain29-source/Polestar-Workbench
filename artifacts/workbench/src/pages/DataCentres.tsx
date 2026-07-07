@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import {
   useListIncidents,
   useListDataCentreFacilities,
+  useListDataCentreCountryRisk,
 } from "@workspace/api-client-react";
 import { format, differenceInDays, parseISO } from "date-fns";
 import {
@@ -18,6 +19,7 @@ import { CountryChoroplethMap, buildCountryIntensity } from "@/components/Countr
 import { DataCentreFacilityMap, statusColor } from "@/components/DataCentreFacilityMap";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
+import { CountryRiskStrip } from "@/components/CountryRiskStrip";
 import { ExternalLink, Server } from "lucide-react";
 
 const FILL_OPACITY = 0.78;
@@ -46,6 +48,7 @@ function cleanCountry(c?: string | null): string | null {
 export default function DataCentres() {
   const { data: rawIncidents = [], isLoading } = useListIncidents({ topic: "data_centres" });
   const { data: facilities = [], isLoading: facLoading } = useListDataCentreFacilities();
+  const { data: countryRisks = [] } = useListDataCentreCountryRisk();
 
   const [range, setRange] = useState<RangeKey>("2y");
   const windowDays = RANGE_DAYS[range];
@@ -251,7 +254,30 @@ export default function DataCentres() {
         </div>
       </Section>
 
-      {/* 3. Operational map — interactive facility map (incident layer toggles
+      {/* 3. Per-country risk framework — read-only analyst assessment strip.
+          Managed on the Data Centre Country Risk page; a dimension with no
+          rating reads "not reported" and never appears here. */}
+      <Section title="Country Risk Framework">
+        {countryRisks.length === 0 ? (
+          <div className="text-sm text-muted-foreground font-sans italic">
+            No country risk assessments on file.{" "}
+            <Link href="/registry/data-centre-risk" className="text-accent hover:underline not-italic">
+              Add one
+            </Link>
+            .
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {countryRisks.map((r) => (
+              <div key={r.id} className="bg-white border border-border rounded-sm p-3">
+                <CountryRiskStrip risk={r} showCountry />
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* 4. Operational map — interactive facility map (incident layer toggles
           separately) leads, incident-density choropleth follows. */}
       <Section title="Operational Map">
         <div className="grid grid-cols-1 gap-4">

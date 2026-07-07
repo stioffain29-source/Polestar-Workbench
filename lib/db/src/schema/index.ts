@@ -7,6 +7,7 @@ export * from "./sources";
 export * from "./reports";
 export * from "./spotReports";
 export * from "./dataCentreFacilities";
+export * from "./dataCentreCountryRisk";
 export * from "./countryReports";
 export * from "./countryReportProse";
 export * from "./reportIncidentSummaries";

@@ -892,6 +892,19 @@ export const DataCentrePlanningRisk = {
   Unknown: 'Unknown',
 } as const;
 
+export type DataCentreType = typeof DataCentreType[keyof typeof DataCentreType];
+
+
+export const DataCentreType = {
+  Hyperscale: 'Hyperscale',
+  Colocation: 'Colocation',
+  Enterprise: 'Enterprise',
+  Edge: 'Edge',
+  Cloud_region: 'Cloud region',
+  Carrier_hotel: 'Carrier hotel',
+  'Unknown_/_not_reported': 'Unknown / not reported',
+} as const;
+
 export interface DataCentreFacility {
   id: number;
   name: string;
@@ -908,6 +921,7 @@ export interface DataCentreFacility {
   longitude?: number | null;
   status: DataCentreStatus;
   planningRisk: DataCentrePlanningRisk;
+  facilityType: DataCentreType;
   /** @nullable */
   capacityMw?: number | null;
   /** @nullable */
@@ -947,6 +961,7 @@ export interface DataCentreFacilityInput {
   longitude?: number;
   status?: DataCentreStatus;
   planningRisk?: DataCentrePlanningRisk;
+  facilityType?: DataCentreType;
   capacityMw?: number;
   itLoadMw?: number;
   announcedDate?: string;
@@ -975,6 +990,7 @@ export interface DataCentreFacilityUpdate {
   longitude?: number | null;
   status?: DataCentreStatus;
   planningRisk?: DataCentrePlanningRisk;
+  facilityType?: DataCentreType;
   /** @nullable */
   capacityMw?: number | null;
   /** @nullable */
@@ -991,6 +1007,88 @@ export interface DataCentreFacilityUpdate {
   sourceUrl?: string | null;
   /** @nullable */
   linkedIncidentId?: number | null;
+  createdBy?: string;
+}
+
+/**
+ * Polestar five-tier risk scale. Absence of a rating reads "not reported".
+ */
+export type DataCentreRiskRating = typeof DataCentreRiskRating[keyof typeof DataCentreRiskRating];
+
+
+export const DataCentreRiskRating = {
+  Insignificant: 'Insignificant',
+  Low: 'Low',
+  Moderate: 'Moderate',
+  High: 'High',
+  Extreme: 'Extreme',
+} as const;
+
+/**
+ * One risk dimension's assessment. `rating` null = "not reported" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. "TI CPI 2024").
+ */
+export interface DataCentreRiskDimension {
+  rating: DataCentreRiskRating | null;
+  rationale: string;
+  source: string;
+  analystNote: string;
+  provisional: boolean;
+  overridden: boolean;
+  /** @nullable */
+  seededFrom: string | null;
+}
+
+/**
+ * Fixed 16-dimension assessment map. A missing key reads "not reported"; the editor renders all sixteen regardless.
+ */
+export interface DataCentreCountryRiskDimensions {
+  regulatoryEnvironment?: DataCentreRiskDimension;
+  planningPermitting?: DataCentreRiskDimension;
+  corruption?: DataCentreRiskDimension;
+  transparency?: DataCentreRiskDimension;
+  politicalStability?: DataCentreRiskDimension;
+  gridPowerStability?: DataCentreRiskDimension;
+  utilityWaterSupply?: DataCentreRiskDimension;
+  waterStress?: DataCentreRiskDimension;
+  subseaConnectivity?: DataCentreRiskDimension;
+  dataLocalisation?: DataCentreRiskDimension;
+  landRealEstate?: DataCentreRiskDimension;
+  environmentalClimate?: DataCentreRiskDimension;
+  naturalHazard?: DataCentreRiskDimension;
+  securityCivilUnrest?: DataCentreRiskDimension;
+  labourSkills?: DataCentreRiskDimension;
+  taxIncentives?: DataCentreRiskDimension;
+}
+
+export interface DataCentreCountryRisk {
+  id: number;
+  country: string;
+  dimensions: DataCentreCountryRiskDimensions;
+  /** @nullable */
+  overallNote?: string | null;
+  /** @nullable */
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DataCentreCountryRiskInput {
+  /** @minLength 1 */
+  country: string;
+  dimensions?: DataCentreCountryRiskDimensions;
+  overallNote?: string;
+  createdBy?: string;
+}
+
+/**
+ * Full-object replace. When `dimensions` is supplied it replaces the whole assessment map (no per-key merge).
+ */
+export interface DataCentreCountryRiskUpdate {
+  /** @minLength 1 */
+  country?: string;
+  dimensions?: DataCentreCountryRiskDimensions;
+  /** @nullable */
+  overallNote?: string | null;
   createdBy?: string;
 }
 
@@ -2445,6 +2543,10 @@ status?: SpotReportStatus;
 export type ListDataCentreFacilitiesParams = {
 country?: string;
 status?: DataCentreStatus;
+};
+
+export type ListDataCentreCountryRiskParams = {
+country?: string;
 };
 
 export type BeginBrowserLoginParams = {

@@ -2615,6 +2615,7 @@ export const ListDataCentreFacilitiesResponseItem = zod.object({
   "longitude": zod.number().nullish(),
   "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']),
   "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']),
+  "facilityType": zod.enum(['Hyperscale', 'Colocation', 'Enterprise', 'Edge', 'Cloud region', 'Carrier hotel', 'Unknown / not reported']),
   "capacityMw": zod.number().nullish(),
   "itLoadMw": zod.number().nullish(),
   "announcedDate": zod.coerce.date().nullish(),
@@ -2647,6 +2648,7 @@ export const CreateDataCentreFacilityBody = zod.object({
   "longitude": zod.number().optional(),
   "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']).optional(),
   "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']).optional(),
+  "facilityType": zod.enum(['Hyperscale', 'Colocation', 'Enterprise', 'Edge', 'Cloud region', 'Carrier hotel', 'Unknown / not reported']).optional(),
   "capacityMw": zod.number().optional(),
   "itLoadMw": zod.number().optional(),
   "announcedDate": zod.coerce.date().optional(),
@@ -2674,6 +2676,7 @@ export const GetDataCentreFacilityResponse = zod.object({
   "longitude": zod.number().nullish(),
   "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']),
   "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']),
+  "facilityType": zod.enum(['Hyperscale', 'Colocation', 'Enterprise', 'Edge', 'Cloud region', 'Carrier hotel', 'Unknown / not reported']),
   "capacityMw": zod.number().nullish(),
   "itLoadMw": zod.number().nullish(),
   "announcedDate": zod.coerce.date().nullish(),
@@ -2709,6 +2712,7 @@ export const UpdateDataCentreFacilityBody = zod.object({
   "longitude": zod.number().nullish(),
   "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']).optional(),
   "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']).optional(),
+  "facilityType": zod.enum(['Hyperscale', 'Colocation', 'Enterprise', 'Edge', 'Cloud region', 'Carrier hotel', 'Unknown / not reported']).optional(),
   "capacityMw": zod.number().nullish(),
   "itLoadMw": zod.number().nullish(),
   "announcedDate": zod.coerce.date().nullish(),
@@ -2731,6 +2735,7 @@ export const UpdateDataCentreFacilityResponse = zod.object({
   "longitude": zod.number().nullish(),
   "status": zod.enum(['Operational', 'Under construction', 'Approved', 'Proposed', 'Planning submitted', 'Planning refused', 'Delayed', 'Suspended', 'Cancelled', 'Unknown']),
   "planningRisk": zod.enum(['No known issue', 'Planning pending', 'Environmental review', 'Water constraint', 'Power constraint', 'Community opposition', 'Legal challenge', 'Political scrutiny', 'Permit refused', 'Moratorium', 'Unknown']),
+  "facilityType": zod.enum(['Hyperscale', 'Colocation', 'Enterprise', 'Edge', 'Cloud region', 'Carrier hotel', 'Unknown / not reported']),
   "capacityMw": zod.number().nullish(),
   "itLoadMw": zod.number().nullish(),
   "announcedDate": zod.coerce.date().nullish(),
@@ -2749,6 +2754,803 @@ export const UpdateDataCentreFacilityResponse = zod.object({
 
 
 export const DeleteDataCentreFacilityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const ListDataCentreCountryRiskQueryParams = zod.object({
+  "country": zod.coerce.string().optional()
+})
+
+export const ListDataCentreCountryRiskResponseItem = zod.object({
+  "id": zod.number(),
+  "country": zod.string(),
+  "dimensions": zod.object({
+  "regulatoryEnvironment": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "planningPermitting": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "corruption": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "transparency": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "politicalStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "gridPowerStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "utilityWaterSupply": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "waterStress": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "subseaConnectivity": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "dataLocalisation": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "landRealEstate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "environmentalClimate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "naturalHazard": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "securityCivilUnrest": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "labourSkills": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "taxIncentives": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+}).describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
+  "overallNote": zod.string().nullish(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListDataCentreCountryRiskResponse = zod.array(ListDataCentreCountryRiskResponseItem)
+
+
+
+
+
+export const CreateDataCentreCountryRiskBody = zod.object({
+  "country": zod.string().min(1),
+  "dimensions": zod.object({
+  "regulatoryEnvironment": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "planningPermitting": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "corruption": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "transparency": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "politicalStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "gridPowerStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "utilityWaterSupply": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "waterStress": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "subseaConnectivity": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "dataLocalisation": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "landRealEstate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "environmentalClimate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "naturalHazard": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "securityCivilUnrest": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "labourSkills": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "taxIncentives": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+}).optional().describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
+  "overallNote": zod.string().optional(),
+  "createdBy": zod.string().optional()
+})
+
+
+export const GetDataCentreCountryRiskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDataCentreCountryRiskResponse = zod.object({
+  "id": zod.number(),
+  "country": zod.string(),
+  "dimensions": zod.object({
+  "regulatoryEnvironment": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "planningPermitting": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "corruption": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "transparency": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "politicalStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "gridPowerStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "utilityWaterSupply": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "waterStress": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "subseaConnectivity": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "dataLocalisation": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "landRealEstate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "environmentalClimate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "naturalHazard": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "securityCivilUnrest": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "labourSkills": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "taxIncentives": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+}).describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
+  "overallNote": zod.string().nullish(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const UpdateDataCentreCountryRiskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateDataCentreCountryRiskBody = zod.object({
+  "country": zod.string().min(1).optional(),
+  "dimensions": zod.object({
+  "regulatoryEnvironment": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "planningPermitting": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "corruption": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "transparency": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "politicalStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "gridPowerStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "utilityWaterSupply": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "waterStress": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "subseaConnectivity": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "dataLocalisation": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "landRealEstate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "environmentalClimate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "naturalHazard": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "securityCivilUnrest": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "labourSkills": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "taxIncentives": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+}).optional().describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
+  "overallNote": zod.string().nullish(),
+  "createdBy": zod.string().optional()
+}).describe('Full-object replace. When `dimensions` is supplied it replaces the whole assessment map (no per-key merge).')
+
+export const UpdateDataCentreCountryRiskResponse = zod.object({
+  "id": zod.number(),
+  "country": zod.string(),
+  "dimensions": zod.object({
+  "regulatoryEnvironment": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "planningPermitting": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "corruption": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "transparency": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "politicalStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "gridPowerStability": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "utilityWaterSupply": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "waterStress": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "subseaConnectivity": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "dataLocalisation": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "landRealEstate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "environmentalClimate": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "naturalHazard": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "securityCivilUnrest": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "labourSkills": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").'),
+  "taxIncentives": zod.object({
+  "rating": zod.union([zod.enum(['Insignificant', 'Low', 'Moderate', 'High', 'Extreme']).describe('Polestar five-tier risk scale. Absence of a rating reads \"not reported\".'),zod.null()]),
+  "rationale": zod.string(),
+  "source": zod.string(),
+  "analystNote": zod.string(),
+  "provisional": zod.boolean(),
+  "overridden": zod.boolean(),
+  "seededFrom": zod.string().nullable()
+}).optional().describe('One risk dimension\'s assessment. `rating` null = \"not reported\" (never invented). `provisional` marks an unreviewed auto-seeded rating; it is cleared once the analyst saves. `source` cites the basis and `seededFrom` records auto-seed provenance (e.g. \"TI CPI 2024\").')
+}).describe('Fixed 16-dimension assessment map. A missing key reads \"not reported\"; the editor renders all sixteen regardless.'),
+  "overallNote": zod.string().nullish(),
+  "createdBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const DeleteDataCentreCountryRiskParams = zod.object({
   "id": zod.coerce.number()
 })
 

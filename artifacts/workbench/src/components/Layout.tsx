@@ -69,6 +69,7 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Report Builder", href: "/reports", icon: FileText },
         { label: "Spot Reports", href: "/spot-reports", icon: Siren },
         { label: "Data Centre Registry", href: "/registry/data-centres", icon: Server },
+        { label: "Data Centre Country Risk", href: "/registry/data-centre-risk", icon: Server },
       ]
     },
     {

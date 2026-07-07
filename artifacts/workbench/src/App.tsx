@@ -17,6 +17,7 @@ import CargoWatch from "./pages/CargoWatch";
 import Shipping from "./pages/Shipping";
 import DataCentres from "./pages/DataCentres";
 import DataCentreRegistry from "./pages/DataCentreRegistry";
+import DataCentreRiskFramework from "./pages/DataCentreRiskFramework";
 import Strikes from "./pages/Strikes";
 import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
@@ -203,6 +204,7 @@ function Router() {
         <Route path="/topics/conflict" component={Conflict} />
         <Route path="/topics/data-centres" component={DataCentres} />
         <Route path="/registry/data-centres" component={DataCentreRegistry} />
+        <Route path="/registry/data-centre-risk" component={DataCentreRiskFramework} />
         <Route path="/topics/:topic" component={Topic} />
         <Route path="/strikes/backfill" component={StrikesBackfill} />
         <Route path="/strikes/:theatre" component={Strikes} />
