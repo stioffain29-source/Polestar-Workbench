@@ -6,6 +6,7 @@ import {
   xMarker,
   markerPostId,
   X_MARKER_PREFIX,
+  X_SEARCH_QUERIES,
   type NormalisedTweet,
 } from "@workspace/ingest";
 import { RELEVANCE_RULE_VERSION } from "@workspace/relevance";
@@ -250,4 +251,98 @@ describe("fuzzy key + url dedupe (dedupe dims 2 & 3)", () => {
       xDedupeKey("Rally", new Date("2026-07-07T09:00:00.000Z"), "Indonesia", "flashpoint"),
     );
   });
+});
+
+// ---------------------------------------------------------------------------
+// Query intent vs routing behaviour.
+//
+// Each X_SEARCH_QUERIES entry carries a `label` naming the tier it INTENDS to
+// surface, but the FINAL topic always comes from content routing (routeTopic).
+// If a query's keywords drift so representative matching posts stop reaching
+// the intended tier, the label silently becomes misleading and the run report
+// loses meaning. These tests tie query INTENT to routing BEHAVIOUR:
+//   1. every query has a representative-post fixture (coverage),
+//   2. each fixture genuinely MATCHES its query (contains a term from every
+//      keyword group — so a fixture can't drift away from the query wording),
+//   3. each fixture ROUTES to the query's declared label (so a keyword drift
+//      that no longer plausibly reaches the intended tier is flagged).
+
+/** Pull the searchable terms out of one X query group, dropping operators. */
+function splitQueryTerms(group: string): string[] {
+  const terms: string[] = [];
+  const re = /"([^"]+)"|([A-Za-z][A-Za-z]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(group)) !== null) {
+    const t = (m[1] ?? m[2]).trim().toLowerCase();
+    if (t === "or" || t === "lang" || t === "en" || t === "is" || t === "retweet") continue;
+    terms.push(t);
+  }
+  return terms;
+}
+
+/**
+ * Split an X query into keyword GROUPS. A matching post must contain at least
+ * one term from EACH group (Twitter ANDs the groups, ORs within them). Operators
+ * (lang:en, -is:retweet) are stripped first.
+ */
+function parseQueryGroups(q: string): string[][] {
+  const noOps = q.replace(/lang:\S+/g, " ").replace(/-?is:\S+/g, " ");
+  const grouped = noOps.match(/\(([^)]*)\)/g);
+  const groups = grouped && grouped.length > 0 ? grouped : [noOps];
+  return groups.map(splitQueryTerms).filter((g) => g.length > 0);
+}
+
+// One representative, realistic post per query label. Each is written to MATCH
+// its query (a term from every group) AND to read like a genuine post an
+// analyst would want in the tier. Keyword-only jumbles are deliberately NOT
+// used: the relevance engine (the router) needs natural phrasing, so a jumble
+// under-represents what the query actually surfaces.
+const QUERY_FIXTURES: Record<string, string> = {
+  conflict:
+    "Insurgent militants ambush an army patrol in a firefight and clash in Mindanao, Philippines.",
+  flashpoint:
+    "Protesters hold a rally and riot amid unrest and a general strike in Jakarta, Indonesia.",
+  shipping:
+    "A tanker was seized in the Singapore Strait near Indonesia after an attack blocked the port.",
+  cargo_watch:
+    "A cargo theft and truck hijack hit a warehouse robbery in Jakarta, Indonesia.",
+};
+
+describe("X_SEARCH_QUERIES intent vs routing", () => {
+  it("every query has a representative-post fixture", () => {
+    for (const query of X_SEARCH_QUERIES) {
+      expect(Object.keys(QUERY_FIXTURES)).toContain(query.label);
+    }
+  });
+
+  it.each(X_SEARCH_QUERIES)(
+    "$label fixture matches the query and routes to $label",
+    (query) => {
+      const fixture = QUERY_FIXTURES[query.label];
+      expect(fixture).toBeTruthy();
+      const hay = fixture.toLowerCase();
+
+      // (2) The fixture must genuinely satisfy the query: at least one term from
+      // every keyword group appears in the post. This keeps the fixture tethered
+      // to the query wording — change the keywords and this fails until the
+      // fixture is updated, forcing the routing re-check below.
+      const groups = parseQueryGroups(query.q);
+      expect(groups.length).toBeGreaterThan(0);
+      for (const group of groups) {
+        const matched = group.some((term) => hay.includes(term));
+        expect(matched).toBe(true);
+      }
+
+      // (3) The representative post must actually reach the query's declared
+      // tier. If a keyword drift makes it route elsewhere (or nowhere), the
+      // label is misleading and this flags it.
+      const route = routeTopic({
+        title: fixture,
+        summary: fixture,
+        source: "X",
+        sourceUrl: "https://x.com/i/status/1",
+      });
+      expect(route).toEqual({ kind: "topic", topic: query.label });
+    },
+  );
 });
