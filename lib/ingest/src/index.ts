@@ -380,7 +380,7 @@ export {
   deriveWestPapuaIncidentDate,
 } from "./westPapuaExtract";
 export type { WestPapuaCategory, WestPapuaExtraction } from "./westPapuaExtract";
-export { deriveLocality } from "./structuredExtract";
+export { deriveLocality, detectStaleEventDate } from "./structuredExtract";
 export type { IncidentCategory } from "./structuredExtract";
 export type { NewsCountryBackfillSummary } from "./backfillNewsCountry";
 export { geocode } from "./geocode";

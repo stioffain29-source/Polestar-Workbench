@@ -384,3 +384,51 @@ export function deriveIncidentDate(text: string, pubDate: Date): Date | null {
   // Earliest distinct earlier date wins (the event, not a later follow-up ref).
   return new Date(Math.min(...candidates));
 }
+
+/**
+ * Detect a re-syndicated STALE event: an explicit, fully-qualified calendar date
+ * (day + month + explicit 4-digit year) literally present in the article
+ * text/title that is substantially OLDER than the feed's reported/publish date.
+ * Returns the oldest such stale date, or null when none is found.
+ *
+ * Strict no-fabrication: acts ONLY on an explicit day-month-YEAR date literally
+ * present in the text. A bare year, a month-only reference, or any date without
+ * an explicit year is ignored — so a recent item that merely mentions a past
+ * year in passing is never flagged. The default threshold (180 days) is
+ * deliberately large so genuine recent follow-ups are unaffected; the whole
+ * point is to catch old mass-casualty news re-published with a fresh feed date
+ * (a ~2.5-year gap), not to second-guess ordinary recency.
+ */
+export function detectStaleEventDate(
+  text: string,
+  reportedDate: Date,
+  thresholdDays = 180,
+): Date | null {
+  const reportedMs = reportedDate.getTime();
+  const staleBeforeMs = reportedMs - thresholdDays * 24 * 60 * 60 * 1000;
+  const candidates: number[] = [];
+
+  const collect = (day: number, month: number | undefined, yearStr: string | undefined) => {
+    // Require an EXPLICIT 4-digit year — never infer one. This is what keeps
+    // the guard from acting on a guessed date.
+    if (month === undefined || !yearStr) return;
+    if (!day || day < 1 || day > 31) return;
+    const year = Number(yearStr);
+    if (year < 1990 || year > 2100) return;
+    const d = Date.UTC(year, month, day);
+    if (d < staleBeforeMs) candidates.push(d);
+  };
+
+  let m: RegExpExecArray | null;
+  DMY_RE.lastIndex = 0;
+  while ((m = DMY_RE.exec(text)) !== null) {
+    collect(Number(m[1]), monthIndex(m[2]), m[3]);
+  }
+  MDY_RE.lastIndex = 0;
+  while ((m = MDY_RE.exec(text)) !== null) {
+    collect(Number(m[2]), monthIndex(m[1]), m[3]);
+  }
+
+  if (candidates.length === 0) return null;
+  return new Date(Math.min(...candidates));
+}

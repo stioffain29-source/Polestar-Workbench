@@ -3,6 +3,7 @@ import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
+import { detectStaleEventDate } from "./structuredExtract";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
@@ -359,6 +360,17 @@ export async function runNewsTopicIngest(
         const c = classify(cleanTitle, summary, feed, cfg, sourceName, host);
         if (!c.kept || !c.country) {
           rejected.push({ title, reason: c.reason, feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+
+        // Stale-syndication guard: if the item's own text/headline carries an
+        // explicit calendar date far older than the feed's reported date, it is
+        // re-syndicated old news re-published with a fresh feed date — skip it
+        // rather than stamp it as a current incident. Strict no-fabrication:
+        // acts only on an explicit in-text day-month-year.
+        if (detectStaleEventDate(`${cleanTitle} ${summary}`, when)) {
+          rejected.push({ title, reason: "stale-syndication", feedLabel: feed.label });
           perFeed[feed.label].rejected++;
           continue;
         }

@@ -7,6 +7,7 @@ import { geocode } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { fetchFeed } from "./feedFetch";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
+import { detectStaleEventDate } from "./structuredExtract";
 import { extractPngItem, derivePngProvince, derivePngIncidentDate } from "./pngExtract";
 import { extractWestPapuaItem, deriveWestPapuaIncidentDate } from "./westPapuaExtract";
 import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
@@ -690,6 +691,16 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
         if (!c.kept || !c.country) {
           if (itemIsPng && c.reason === "no-flashpoint-cue") pngRejectedNonSecurity++;
           rejected.push({ title, reason: c.reason, feedLabel: s.name });
+          perFeed[s.name].rejected++;
+          continue;
+        }
+        // Stale-syndication guard: if the item's own text/headline carries an
+        // explicit calendar date far older than the feed's reported date, it is
+        // re-syndicated old news (e.g. a 2024 massacre re-published with a fresh
+        // 2026 feed date) — skip it rather than stamp it as a current incident.
+        // Strict no-fabrication: acts only on an explicit in-text day-month-year.
+        if (detectStaleEventDate(`${title} ${summary}`, when)) {
+          rejected.push({ title, reason: "stale-syndication", feedLabel: s.name });
           perFeed[s.name].rejected++;
           continue;
         }

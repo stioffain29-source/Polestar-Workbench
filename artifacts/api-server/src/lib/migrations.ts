@@ -23,6 +23,7 @@ import {
   severityFromFatalities,
   maxSeverity,
   SEVERITY_RANK,
+  detectStaleEventDate,
   isReliefWebConfigured,
   isGdeltConfigured,
   PROMOTE_MARKER_PREFIX,
@@ -1910,6 +1911,103 @@ export async function runDataMigrations(): Promise<void> {
             marker: markerKey,
           },
           "One-time re-attribution of Unknown flashpoint rows (expanded demonym gazetteer)",
+        );
+      }
+    }
+
+    // 3d-6) ONE-TIME targeted removal of a specific misdated PNG massacre row.
+    //        A genuine Feb-2024 "64 killed in Papua New Guinea tribal violence"
+    //        (Enga/Wapenamanda massacre) resurfaced as a CURRENT Extreme incident
+    //        because Google News re-syndicated the old article with a fresh 2026
+    //        publish date and ingest copied that date verbatim into occurred_at.
+    //        The stored row's summary merely repeats the title with NO explicit
+    //        in-text date, so the general stale-syndication guard/backfill below
+    //        cannot catch it — it needs a targeted deletion keyed on its exact
+    //        signature (title + source + the false 2026-07-06 reported date).
+    //        Scoped to auto-scraped rows only, so an analyst-edited row is never
+    //        removed. Marker-gated → runs once (idempotently in prod on boot).
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "delete_misdated_png_massacre_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM incidents
+          WHERE title = '64 killed in Papua New Guinea tribal violence - The Eastleigh Voice'
+            AND source = 'Google News — Papua New Guinea (Crime & Security)'
+            AND occurred_at::date = DATE '2026-07-06'
+            AND analyst_notes LIKE 'auto-scraped:%'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { deleted: res.rowCount ?? 0, marker: markerKey },
+          "One-time removal of misdated re-syndicated PNG massacre incident",
+        );
+      }
+    }
+
+    // 3d-7) ONE-TIME stale-syndication backfill over stored auto-scraped rows.
+    //        Applies the SAME guard the ingest now enforces (detectStaleEventDate)
+    //        to already-stored incidents: a row whose own text/headline carries an
+    //        explicit day-month-YEAR date substantially older than its reported
+    //        occurred_at is re-syndicated old news re-published with a fresh feed
+    //        date, so it is removed (mirrors the ingest skip). Strict
+    //        no-fabrication: acts ONLY on an explicit in-text date, and ONLY on
+    //        auto-scraped rows (analyst_notes LIKE 'auto-scraped:%'), so
+    //        analyst-edited rows are never touched. Marker-gated → runs once. Bump
+    //        the key if the guard logic changes and stored rows should be re-swept.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "stale_syndication_backfill_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const rows = await db.execute(sql`
+          SELECT id, title, summary, occurred_at
+          FROM incidents
+          WHERE analyst_notes LIKE 'auto-scraped:%'
+        `);
+        const staleIds: number[] = [];
+        for (const r of rows.rows as Array<{
+          id: number;
+          title: string | null;
+          summary: string | null;
+          occurred_at: Date | string;
+        }>) {
+          const reported = new Date(r.occurred_at);
+          const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+          if (detectStaleEventDate(text, reported)) staleIds.push(r.id);
+        }
+        if (staleIds.length > 0) {
+          await db.execute(sql`
+            DELETE FROM incidents
+            WHERE id = ANY(${staleIds})
+              AND analyst_notes LIKE 'auto-scraped:%'
+          `);
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: rows.rows.length, deleted: staleIds.length, marker: markerKey },
+          "One-time stale-syndication backfill over stored auto-scraped incidents",
         );
       }
     }
