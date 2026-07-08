@@ -62,6 +62,22 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\bviewport-wrapper\b/,
 ];
 
+// A scraped Google-News SECTION / topic-page heading that leaked in as though
+// it were an article: "Papua New Guinea Massacre News", "<Place> Crime News",
+// "Breaking News", etc. The WHOLE (raw) title is "<optional place words>
+// <category> news" — an aggregator feed LABEL, never a dated incident (no event
+// verb, number, colon or clause follows "news"). Tested against the raw title
+// alone and anchored end-to-end, so a genuine headline that merely contains
+// "news" mid-sentence ("Papua New Guinea massacre: news of 26 dead emerges") is
+// never caught, and a real "…massacre: 26 killed" headline is untouched.
+const GENERIC_SECTION_TITLE_RE =
+  /^(?:[a-z][a-z .'&-]*\s)?(massacre|crime|violence|unrest|conflict|security|breaking|latest|daily|weekly|world|top|trending|headlines?)\s+news$/i;
+
+export function isGenericSectionTitle(title: string | null | undefined): boolean {
+  const t = (title ?? "").trim();
+  return t.length > 0 && GENERIC_SECTION_TITLE_RE.test(t);
+}
+
 // Cargo-specific exclusions. Cargo Watch covers operational cargo and
 // logistics-node crime: hijack, truck/container theft, warehouse and
 // depot pilferage, broken seals and logistics-crime stories. Pure

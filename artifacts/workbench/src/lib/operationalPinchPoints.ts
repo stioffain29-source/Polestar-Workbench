@@ -112,8 +112,13 @@ const HARD_DISRUPTION: RegExp[] = [
   /\b(strike|strikes|striking|walkout|walk-?out|work stoppage|industrial action|mogok|downed tools)\b[^.]{0,45}\b(halt|disrupt|paralys|cripple|shut|stopp|suspend|hit|ground|stall|output|production|port|transport|factory|operation)/,
   // Protest / blockade explicitly blocking a road, port, access or traffic.
   /\b(protest|demonstrat|rally|blockad|barricad|picket|occup|sit-?in)\w*\b[^.]{0,45}\b(block|clos|shut|barricad|seal|paralys|gridlock|halt|occup|storm)\w*\b[^.]{0,20}\b(road|roads|highway|toll|street|port|airport|access|gate|entrance|traffic|route|railway|office|building)/,
-  // Evacuation, curfew, lockdown, emergency restricting movement/operations.
-  /\b(evacuat|curfew|lockdown|state of emergency)\w*/,
+  // Curfew, lockdown, emergency restricting movement/operations. A BARE
+  // "evacuat" is deliberately NOT here: a named-site or route evacuation is
+  // already caught by the site/route/transport patterns above (L106/L110/L114),
+  // so a mass civilian evacuation carrying no site or route noun correctly
+  // falls to Indirect under the stated-consequence rule and must not force
+  // Direct on its own (it was over-escalating crime/meeting/medical rows).
+  /\b(curfew|lockdown|state of emergency)\w*/,
   // Explicit disruption to business, logistics, movement, supply or trade.
   /\b(disrupt|paralys|cripple|stoppage|standstill|shut down|shutdown)\w*\b[^.]{0,30}\b(operation|business|logistic|suppl|transport|movement|traffic|production|commerce|trade|deliver|distribution|econom)/,
 ];
