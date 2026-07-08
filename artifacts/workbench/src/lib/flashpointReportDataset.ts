@@ -630,27 +630,177 @@ function topicSignature(title: string, date: Date): string {
   return `${bucket}|${top.join(" ")}`;
 }
 
-export function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
-  const better = (a: T, b: T) => {
-    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
-    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
-    if (sa !== sb) return sa > sb;
-    return a.date.getTime() >= b.date.getTime();
+// Shared "which of two syndicated copies survives" rule: higher severity
+// first, then the more recent record. Used by every dedupe pass so the
+// surviving row is consistent across title / signature / same-event collapse.
+function sevDateBetter<T extends { date: Date; severity: string }>(a: T, b: T): boolean {
+  const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+  const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+  if (sa !== sb) return sa > sb;
+  return a.date.getTime() >= b.date.getTime();
+}
+
+// Tokens that must NOT anchor a same-event match. Generic mobilisation words
+// are topic-wide (they say nothing about WHICH event), and casualty /
+// reporting words vary outlet-to-outlet for the SAME event ("kills 19" vs
+// "kills 26" vs "death toll rises to 25"). Excluding both stops a shared
+// "protest"+actor from merging two DIFFERENT cities, while a shared place +
+// concrete event noun (e.g. "negombo"+"prison"+"riot") still collapses
+// syndicated copies of one event.
+const SAME_EVENT_NON_ANCHOR = new Set([
+  // generic mobilisation / topic-wide
+  "protest", "protester", "protesters", "protests", "rally", "rallies",
+  "march", "marches", "marching", "demonstration", "demonstrations",
+  "demonstrator", "demonstrators", "strike", "strikes", "walkout", "walkouts",
+  "picket", "boycott", "unrest", "movement", "activism", "activist",
+  "activists", "gathering", "sit", "sitin", "clash", "clashe", "clashes",
+  // casualty / reporting words (vary per outlet for one event)
+  "kill", "kills", "killed", "killing", "dead", "death", "deaths", "die",
+  "dies", "died", "toll", "wound", "wounds", "wounded", "injure", "injured",
+  "injures", "injury", "injuries", "hurt", "casualty", "casualties",
+  "fatality", "fatalities", "victim", "victims", "rise", "rises", "rose",
+  "rising", "increase", "increases", "increased", "climb", "climbs",
+  "following", "amid", "deadly", "least", "many", "several", "dozens",
+  "hundreds", "thousands", "people", "person", "persons",
+  // reporting cruft
+  "says", "say", "said", "warn", "warns", "warned", "report", "reports",
+  "reported", "update", "updates", "updated", "latest", "breaking", "live",
+  "video", "watch", "news", "day", "days", "week", "weeks",
+]);
+
+function singulariseToken(t: string): string {
+  if (t.length > 4 && t.endsWith("s") && !t.endsWith("ss")) return t.slice(0, -1);
+  return t;
+}
+
+// Distinctive place / concrete-event tokens that identify WHICH event a
+// headline is about. Numbers and the non-anchor vocabulary above are dropped.
+function anchorTokens(title: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of normaliseTitle(title).split(" ")) {
+    if (!raw || raw.length < 3) continue;
+    if (/^\d+$/.test(raw)) continue;
+    if (TITLE_STOP.has(raw) || SAME_EVENT_NON_ANCHOR.has(raw)) continue;
+    const w = singulariseToken(raw);
+    if (w.length < 3 || SAME_EVENT_NON_ANCHOR.has(w)) continue;
+    out.add(w);
+  }
+  return out;
+}
+
+// Concrete physical-incident nouns. They confirm a shared event TYPE (so they
+// count toward the anchor-overlap threshold) but they recur across unrelated
+// places, so they are NOT treated as the "subject" that says WHICH event it is
+// — otherwise two different-city prison riots would look like one story.
+const SAME_EVENT_TYPE_NOUN = new Set([
+  "riot", "prison", "jail", "fire", "blaze", "blast", "explosion", "bomb",
+  "bombing", "stampede", "siege", "arson", "shooting", "gunfight", "gunfire",
+  "hostage", "crash", "derailment", "collapse", "flood", "quake", "earthquake",
+  "cyclone", "typhoon", "landslide", "curfew", "lockdown", "blockade",
+  "roadblock", "crackdown", "standoff", "violence", "attack", "raid", "unrest",
+]);
+
+// Subject tokens = the place / actor / org names that identify WHICH event a
+// headline is about (anchors minus the recurring event-type nouns).
+function subjectTokens(anchors: Set<string>): Set<string> {
+  const out = new Set<string>();
+  for (const t of anchors) if (!SAME_EVENT_TYPE_NOUN.has(t)) out.add(t);
+  return out;
+}
+
+// True when each side names at least one subject the other never mentions —
+// i.e. they are about DIFFERENT specific subjects (different city / actor) and
+// must not be merged. A subset/superset pairing (one headline simply adds
+// detail, e.g. "Sri Lanka prison riot" vs "Negombo ... Sri Lanka") is NOT
+// distinct and is allowed to link.
+function distinctSubjects(a: Set<string>, b: Set<string>): boolean {
+  if (a.size === 0 || b.size === 0) return false;
+  let aExtra = false;
+  let bExtra = false;
+  for (const t of a) if (!b.has(t)) { aExtra = true; break; }
+  for (const t of b) if (!a.has(t)) { bExtra = true; break; }
+  return aExtra && bExtra;
+}
+
+const SAME_EVENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+
+function sameCountryOrUnknown(a: string, b: string): boolean {
+  const na = (a ?? "").trim().toLowerCase();
+  const nb = (b ?? "").trim().toLowerCase();
+  if (!na || !nb || na === "unknown" || nb === "unknown" || na === "—" || nb === "—") {
+    return true;
+  }
+  return na === nb;
+}
+
+// Same-event single-linkage collapse. Catches syndicated copies of ONE event
+// whose headlines differ too much for the exact title / topic-signature passes
+// — e.g. "26 killed in Sri Lanka prison riot", "Sri Lanka prison riot kills
+// 23, wounds more than 100", "Death toll in Negombo prisons riot increase to
+// 25", "Inmates to be transferred following deadly Negombo Prison riot". Two
+// rows link when, in the same country and within a short window, they share
+// >= 2 anchor tokens AND do not name mutually-exclusive subjects (so different
+// cities / actors stay apart). Transitivity via a bridging headline that names
+// both framings ("Negombo ... Sri Lanka Clash") closes the cluster; the best
+// row survives.
+function clusterSameEvent<
+  T extends { title: string; date: Date; severity: string; country?: string },
+>(rows: T[]): T[] {
+  const n = rows.length;
+  if (n < 2) return rows;
+  const anchors = rows.map((r) => anchorTokens(r.title));
+  const subjects = anchors.map((a) => subjectTokens(a));
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
   };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (Math.abs(rows[i].date.getTime() - rows[j].date.getTime()) > SAME_EVENT_WINDOW_MS) continue;
+      if (!sameCountryOrUnknown(rows[i].country ?? "", rows[j].country ?? "")) continue;
+      if (distinctSubjects(subjects[i], subjects[j])) continue;
+      const [small, big] = anchors[i].size <= anchors[j].size
+        ? [anchors[i], anchors[j]] : [anchors[j], anchors[i]];
+      let shared = 0;
+      for (const t of small) if (big.has(t)) shared++;
+      if (shared >= 2) parent[find(i)] = find(j);
+    }
+  }
+  const best = new Map<number, T>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    const prev = best.get(root);
+    if (!prev || sevDateBetter(rows[i], prev)) best.set(root, rows[i]);
+  }
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (seen.has(root)) continue;
+    seen.add(root);
+    out.push(best.get(root)!);
+  }
+  return out;
+}
+
+export function dedupeByTitle<T extends { title: string; date: Date; severity: string; country?: string }>(rows: T[]): T[] {
   const byTitle = new Map<string, T>();
   for (const r of rows) {
     const k = titleKey(r.title);
     if (!k) { byTitle.set(`__${Math.random()}`, r); continue; }
     const prev = byTitle.get(k);
-    if (!prev || better(r, prev)) byTitle.set(k, r);
+    if (!prev || sevDateBetter(r, prev)) byTitle.set(k, r);
   }
   const bySig = new Map<string, T>();
   for (const r of byTitle.values()) {
     const k = topicSignature(r.title, r.date);
     const prev = bySig.get(k);
-    if (!prev || better(r, prev)) bySig.set(k, r);
+    if (!prev || sevDateBetter(r, prev)) bySig.set(k, r);
   }
-  return Array.from(bySig.values());
+  // Third pass: fuzzy same-event collapse for syndicated rewrites the exact
+  // passes above cannot bridge (varying casualty counts / place-name framing).
+  return clusterSameEvent(Array.from(bySig.values()));
 }
 
 // --- Bucketing -------------------------------------------------------------
