@@ -722,13 +722,13 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
 // hope/joy" community items, "tidbits" round-ups). Substring match; the strict
 // severity + security gating below is the real safety net.
 const DEVELOPMENT_WIRE_RE =
-  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade)/i;
+  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade|groundbreaking|ceremony|renovat|classroom|farewell|new era|inflation|bursar|\b5g\b|designer|new collection|enduring relationship|strengthen(s|ing)? (its |the )?(relationship|partnership|ties|bond))/i;
 // A security / risk / hazard term anywhere in the text VETOES the drop, even
 // when the promotional lexicon also matches, so a genuine low-severity crime,
 // court, unrest or natural-hazard item is never removed. A veto only ever KEEPS
 // an item, so this list can be liberal without risking data loss.
 const SECURITY_TERM_RE =
-  /(robber|murder|homicide|killed|killing| kill |manslaughter|attack|assault|shoot|shot|gunman|gunmen| gun |firearm|weapon|knife|stab|violence|riot|unrest|protest|clash|tribal|sorcery|gender-based|abuse|smuggl|theft|stolen|steal|robbed|raid|kidnap|hostage|hijack|carjack|extort| gang|militant|insurg|separatist|rape|arson|bomb|explos|terror|convict|arrest|manhunt|fugitive|casualt|fatal|injur|wound| dead|death|police|earthquake|volcano|eruption|flood|landslide|outage)/i;
+  /(robber|murder|homicide|killed|killing| kill |manslaughter|attack|assault|shoot|shot|gunman|gunmen| gun |firearm|weapon|knife|stab|violence|riot|unrest|protest|clash|tribal|sorcery|gender-based|abuse|smuggl|theft|stolen|steal|robbed|raid|kidnap|hostage|hijack|carjack|extort| gang|militant|insurg|separatist|rape|arson|bomb|explos|terror|convict|arrest|manhunt|fugitive|casualt|fatal|injur|wound| dead|death|police|earthquake|volcano|eruption|flood|landslide|outage|fire|blaze|crash|kebakaran|penembakan|pembunuhan|perampokan|narkoba|penyelundupan|kekerasan|penyerangan|penculikan|polisi)/i;
 
 // STRUCTURAL non-incident titles: recurring newspaper round-up / column names
 // that are categorically never a single security event (e.g. Post-Courier PNG's

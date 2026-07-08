@@ -43,10 +43,65 @@ describe("isDevelopmentWireItem — guardrails (strict under-filter bias)", () =
       "PNG Aviation Network to benefit from new Niusky investments",
       "PMIA Domestic Terminal expansion project moves forward with contract signing",
       "Gereka road upgrade links communities",
+      "US, Papua New Guinea leaders during Tamiok Strike 26 groundbreaking ceremony",
+      "Peace ceremony for late Abraham Polly",
+      "U.S., Papua New Guinea engineers prepare Igam Barracks classrooms for renovation",
+      "PNG Air bids farewell to its DASH 8 fleet and embraces a new era of aviation",
+      "PNG inflation remains uneven",
+      "K92 Mining awards 100 community bursaries to host community students",
+      "Digicel di PNG siap kembangkan jaringan 5G",
+      "PNG designer Linda Philau Pius returns to Brisbane runway with new collection",
+      "US and PNG celebrate enduring relationship during Tamiok Strike",
+      "PNG Health Access strengthened through Australia aviation partnership",
     ];
     for (const title of drops) {
       expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(true);
     }
+  });
+
+  it("still keeps a low-severity crime item even when it carries a newly-added PR word (veto)", () => {
+    const keeps = [
+      "Gunmen ambush convoy near airport runway",
+      "Arsonist torches classroom in Goroka school attack",
+      "Robbers raid store during groundbreaking ceremony",
+    ];
+    for (const title of keeps) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(false);
+    }
+  });
+
+  it("keeps low-severity fire / crash hazard items (fire|blaze|crash veto)", () => {
+    const keeps = [
+      "Fire destroys classroom block in Goroka",
+      "Plane skids off runway at Nadzab airport", // 'runway' no longer a wire token
+      "Truck crash on Highlands Highway kills two",
+      "Blaze guts Lae market overnight",
+    ];
+    for (const title of keeps) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(false);
+    }
+  });
+
+  it("keeps low-severity Bahasa crime rows that reach the PNG window (Bahasa veto)", () => {
+    const keeps = [
+      "Polisi bongkar jaringan narkoba di Jayapura", // jaringan is no longer a wire token
+      "Penembakan warga di perbatasan Papua Nugini",
+      "Perampokan bersenjata di Port Moresby",
+    ];
+    for (const title of keeps) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(false);
+    }
+  });
+
+  it("still drops the fashion-runway and 5G rollout PR (via designer/new collection and \\b5g\\b)", () => {
+    expect(
+      isDevelopmentWireItem(
+        pi({ title: "PNG designer returns to Brisbane runway with new collection", severityRank: 2 }),
+      ),
+    ).toBe(true);
+    expect(
+      isDevelopmentWireItem(pi({ title: "Digicel di PNG siap kembangkan jaringan 5G", severityRank: 2 })),
+    ).toBe(true);
   });
 
   it("NEVER drops a Moderate+ item, even with promotional wording", () => {
