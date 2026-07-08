@@ -63,6 +63,12 @@ SKELETON (strip emoji, punctuation and whitespace; keep only letters+digits) of
 `caption` vs `caption_en`, NOT raw strings — the model tidies whitespace AND drops
 decorative emoji even from English round-trips, so a raw compare falsely flags
 English rows as translated.
+**TWO renderers, both must prefer `captionEn`:** the KAMMI caption is displayed in
+Protests.tsx (SocialWatchGroup monitor) AND in CountrySocialWatchContext.tsx (the
+"KAMMI protest monitoring context" panel inside the Indonesia / Jakarta / West Papua
+COUNTRY reports). Both must render `it.captionEn || it.caption`. The country-report
+panel was missed once and shipped raw Bahasa in prod even though `caption_en` was
+100% populated — the DB is not the place to look when only one surface reads raw.
 **Prod self-heal:** prod DB is a read-only replica; only the deployment runtime
 writes `caption_en`. Fixes reach prod only after a REPUBLISH — the boot
 `runTitleTranslationOnce` pass (and `runIngestOnce`) then drains it. Runs (commit)

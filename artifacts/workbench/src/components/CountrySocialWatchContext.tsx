@@ -114,6 +114,9 @@ export default function CountrySocialWatchContext({
           const when = whenLabel(it);
           const where = whereLabel(it);
           const promoted = it.promotedIncidentId !== null;
+          // Prefer the English translation; fall back to the original caption
+          // when it is untranslated (English rows, or prod not yet backfilled).
+          const caption = it.captionEn || it.caption;
           return (
             <li
               key={it.id}
@@ -145,9 +148,9 @@ export default function CountrySocialWatchContext({
                   </span>
                 )}
               </div>
-              {it.caption && (
+              {caption && (
                 <div style={{ marginTop: 3, lineHeight: 1.4 }}>
-                  {it.caption.length > 240 ? `${it.caption.slice(0, 240)}…` : it.caption}
+                  {caption.length > 240 ? `${caption.slice(0, 240)}…` : caption}
                 </div>
               )}
               <div style={{ marginTop: 3, fontSize: 11, color: "#6b6b6b" }}>
