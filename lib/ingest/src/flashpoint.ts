@@ -4,7 +4,7 @@ import { sql, eq, or, gte, isNotNull } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
-import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { evaluateIncidentRelevance, isGenericSectionTitle } from "@workspace/relevance";
 import { fetchFeed } from "./feedFetch";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 import { detectStaleEventDate } from "./structuredExtract";
@@ -431,6 +431,12 @@ function classify(title: string, summary: string, feedCountry?: string | null): 
 
   for (const re of FLASHPOINT_DENY) {
     if (re.test(hay)) return { kept: false, reason: `deny:${re.source.slice(0, 30)}`, country: null };
+  }
+
+  // Scraped Google-News SECTION / topic-page heading ("<Place> Massacre News")
+  // — an aggregator feed LABEL, never a dated incident. Tests the RAW title.
+  if (isGenericSectionTitle(title)) {
+    return { kept: false, reason: "deny:generic-section-title", country: null };
   }
 
   // Reject UK / Ireland-located events that a feed mis-stamped onto an APAC

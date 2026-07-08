@@ -1560,6 +1560,52 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-1a-i1b) ONE-TIME purge of scraped Google-News SECTION / topic-page
+    //     headings that leaked in as incidents — an aggregator feed LABEL, not
+    //     a dated event ("Papua New Guinea Massacre News", "<Place> Crime
+    //     News"). Feed queries containing a category word (e.g. the PNG
+    //     conflict feed's "massacre") make Google return the section label as
+    //     an item; it kept re-ingesting with a fresh date, evading the
+    //     stale-syndication guard. The ingest classifiers + relevance gates now
+    //     reject it (isGenericSectionTitle), but that only stops NEW inserts and
+    //     the RELEVANCE_RULE_VERSION backfill only DEMOTES to irrelevant — this
+    //     removes the rows already in the table. DELETE (not demote): these are
+    //     junk labels, never real incidents. The SQL regex MIRRORS the JS
+    //     GENERIC_SECTION_TITLE_RE (anchored end-to-end, optional place prefix,
+    //     a category word, then "news"), passed as a BOUND parameter so the
+    //     apostrophe in the char class needs no escaping and no backslashes are
+    //     required (POSIX [[:space:]] instead of \s). Marker-gated so it runs
+    //     once; bump the suffix if the section-title rule widens later.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const SECTION_TITLE_RE =
+        "^([a-z][a-z .'&-]*[[:space:]])?(massacre|crime|violence|unrest|conflict|security|breaking|latest|daily|weekly|world|top|trending|headlines?)[[:space:]]+news$";
+      const markerKey = "generic_section_title_purge_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM incidents
+          WHERE COALESCE(title, '') ~* ${SECTION_TITLE_RE}
+            AND COALESCE(title, '') NOT LIKE '% - %'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time purge of scraped Google-News section-title labels mis-ingested as incidents",
+        );
+      }
+    }
+
     // 3d-1a-i2) ONE-TIME re-clean of GDELT-promoted incidents against the new
     //     Option-A slop gate. The RELEVANCE_RULE_VERSION backfill deliberately
     //     SKIPS gdelt_cloud:/tapa_offline: rows (the lane/marker already vouched

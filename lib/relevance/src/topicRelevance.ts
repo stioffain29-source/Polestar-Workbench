@@ -75,7 +75,15 @@ const GENERIC_SECTION_TITLE_RE =
 
 export function isGenericSectionTitle(title: string | null | undefined): boolean {
   const t = (title ?? "").trim();
-  return t.length > 0 && GENERIC_SECTION_TITLE_RE.test(t);
+  if (t.length === 0) return false;
+  // A real Google-News article carries a " - Source Masthead" tail; many
+  // outlets are literally named "<X> Daily News" / "<X> World News", so a
+  // genuine headline like "…near Qatar - Gulf Daily News" ends in a category
+  // word + "news" and would otherwise be mis-flagged. A bare aggregator
+  // SECTION label ("Papua New Guinea Massacre News") never carries that
+  // separator, so the presence of " - " means it is a real article — keep it.
+  if (t.includes(" - ")) return false;
+  return GENERIC_SECTION_TITLE_RE.test(t);
 }
 
 // Cargo-specific exclusions. Cargo Watch covers operational cargo and
@@ -1582,6 +1590,15 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   const general = firstMatch(text, EXCLUDE_PHRASES);
   if (general) return { relevant: false, reason: `excluded: general-news noise (/${general.source}/)` };
 
+  // Scraped Google-News SECTION / topic-page heading ("Papua New Guinea
+  // Massacre News", "<Place> Crime News") that leaked in as though it were an
+  // article — an aggregator feed LABEL, never a dated incident. Applies to
+  // EVERY topic; tested against the RAW title (the guard is anchored
+  // end-to-end so a genuine headline containing "news" mid-sentence is safe).
+  if (isGenericSectionTitle(i.title)) {
+    return { relevant: false, reason: "excluded: generic aggregator section title" };
+  }
+
   if (topic === "shipping") {
     // Off-theatre geography gate: drop European / Black-Baltic / UK-Channel
     // maritime stories that have nothing to do with the tracked Gulf + Asia
@@ -2002,6 +2019,16 @@ const COUNTRY_SECURITY_SIGNAL_RE =
 const COUNTRY_ECONOMIC_NOISE_RE =
   /\b(subsid(y|ies|ise|ize)|levy|levies|excise|tariff|price (freeze|cap|control|shock)|industry dialogue|share price|stock price|equity|earnings|dividend|buyback|quarterly (result|results|report)|annual report|market cap|applauds?|lauds?|praises?|hails?|welcomes?|commends?|congratulates?|completes? (the )?migration|migrat(ion|es|ed|ing) (of|to) (its )?[a-z]+ (system|platform)|system (migration|upgrade)|prepaid metering|go[- ]live|new (it|billing|payment|digital) platform|boost|grants?|funding|funded|donations?|donat(?:es|ed)|sponsor(?:s|ed|ship)?)\b/i;
 
+// Consumer-commerce demand / sales stories — an artisan or trader seeing a
+// seasonal SURGE OF ORDERS ("shoe makers flooded with orders ahead of the new
+// school year") is a business/economy item, never a security incident, yet it
+// slips past COUNTRY_ECONOMIC_NOISE_RE (no subsidy/market word). Matches the
+// raw Bahasa title (banjir pesanan = flooded with orders; pesanan melonjak =
+// orders surge) AND the English display so it drops on either haystack. Gated
+// by !COUNTRY_SECURITY_SIGNAL_RE below, so "trader arrested" still stays.
+const COUNTRY_COMMERCE_DEMAND_RE =
+  /\b(banjir pesanan|pesanan (membludak|melonjak|meningkat|naik)|kebanjiran pesanan|omzet (melonjak|meningkat|naik)|laris manis|surge (of|in) orders|flood(?:ed)? (?:of|with) orders|orders? (?:surge[ds]?|soar(?:ed|s)?|spike[ds]?|boom(?:ed|ing)?))\b/i;
+
 // Sports / match coverage. A country security report never leads on a fixture,
 // a match preview or a tactical write-up. Extended beyond the bare sport nouns
 // to the match-report IDIOMS that leak in without one ("tactical analysis Japan
@@ -2211,9 +2238,18 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // Test the RAW title — the lower→UPPER case transition is the signature
   // and `haystack` has already lower-cased everything.
   if (YOUTUBE_VIDEO_ID_RE.test(i.title ?? "")) return false;
+  // Scraped Google-News SECTION / topic-page heading ("Papua New Guinea
+  // Massacre News", "<Place> Crime News") — an aggregator feed LABEL, never a
+  // dated incident. Country reports treat isCountryRelevant as the SOLE
+  // authority (they ignore the stored relevance_status), so the guard must be
+  // here too, not only in explainRelevance. Tests the RAW title.
+  if (isGenericSectionTitle(i.title)) return false;
   // Drop non-security economic / market / PR noise UNLESS the record carries
   // any (soft-inclusive) security signal — a fuel-subsidy protest/march stays.
   if (COUNTRY_ECONOMIC_NOISE_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
+    return false;
+  }
+  if (COUNTRY_COMMERCE_DEMAND_RE.test(text) && !COUNTRY_SECURITY_SIGNAL_RE.test(text)) {
     return false;
   }
   // Drop explainer / op-ed / "what you need to know" editorial UNLESS the

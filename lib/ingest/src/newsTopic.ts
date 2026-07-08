@@ -6,7 +6,7 @@ import { cleanText, hasWord, parseDate } from "./text";
 import { detectStaleEventDate } from "./structuredExtract";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
-import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { evaluateIncidentRelevance, isGenericSectionTitle } from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
 
@@ -194,6 +194,15 @@ function classify(
 
   const denyHit = cfg.deny.find((d) => hay.includes(d));
   if (denyHit) return { kept: false, reason: `deny:${denyHit}`, country: null };
+
+  // Scraped Google-News SECTION / topic-page heading ("Papua New Guinea
+  // Massacre News") — an aggregator feed LABEL, never a dated incident. Feed
+  // queries that contain a category word (e.g. the PNG conflict feed's
+  // "massacre") make Google return this section label as an item; reject it
+  // before allow so it is never inserted. Tests the RAW title (anchored).
+  if (isGenericSectionTitle(title)) {
+    return { kept: false, reason: "deny:generic-section-title", country: null };
+  }
 
   const allowHit = cfg.allow.find((a) => hay.includes(a));
   if (!allowHit) return { kept: false, reason: "no-allowlist-match", country: null };
