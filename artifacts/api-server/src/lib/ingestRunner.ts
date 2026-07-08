@@ -16,13 +16,12 @@ import {
   resolveAisKey,
   runStrikesIngest,
   runTitleTranslation,
-  runSocialCaptionTranslation,
   runResolveGoogleNewsUrls,
   runReliefWebCorroboration,
   runReliefWebReportsIngest,
   runIccPiracyIngest,
-  runSocialWatchIngest,
-  emptySocialWatchSummary,
+  runKammiSourceIngest,
+  emptyKammiSourceSummary,
   runFacebookOsintIngest,
   emptyFacebookOsintSummary,
   runGdeltEnrich,
@@ -44,7 +43,7 @@ import {
   type ReliefWebCorroborationSummary,
   type ReliefWebReportsSummary,
   type IccPiracySummary,
-  type SocialWatchSummary,
+  type KammiSourceSummary,
   type FacebookOsintSummary,
   type GdeltEnrichSummary,
   type GdeltStructuredSummary,
@@ -94,7 +93,7 @@ export type IngestRunResult =
       corroboration: ReliefWebCorroborationSummary;
       reliefwebReports: ReliefWebReportsSummary;
       iccPiracy: IccPiracySummary;
-      socialWatch: SocialWatchSummary;
+      kammiSource: KammiSourceSummary;
       facebookOsint: FacebookOsintSummary;
       gdeltEnrich: GdeltEnrichSummary;
       gdeltStructured: GdeltStructuredSummary;
@@ -393,14 +392,15 @@ function emptyGdeltStructured(err: unknown): GdeltStructuredSummary {
   };
 }
 
-function emptySocialWatch(err: unknown): SocialWatchSummary {
-  const base = emptySocialWatchSummary();
+function emptyKammiSource(err: unknown): KammiSourceSummary {
+  const base = emptyKammiSourceSummary();
   const msg = err instanceof Error ? err.message : String(err);
   return {
     ...base,
     mode: "commit",
+    fetchOk: false,
     errors: [msg],
-    logLines: [`social-watch ingest failed: ${msg}`],
+    logLines: [`KAMMI source ingest failed: ${msg}`],
   };
 }
 
@@ -586,25 +586,6 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       );
     } catch (err) {
       logger.error({ err }, "title translation pass failed");
-    }
-    // Translate non-English KAMMI social-watch captions into English (own table,
-    // own caption_en column; never touches incidents). Same idempotent/converging
-    // semantics as the title pass; isolated so an LLM/network failure can never
-    // fail the incident ingest — it just leaves caption_en null and the UI falls
-    // back to the original caption.
-    try {
-      const captions = await runSocialCaptionTranslation({ commit: true });
-      logger.info(
-        {
-          translated: captions.translated,
-          candidates: captions.candidates,
-          failed: captions.failed,
-          skipped: captions.skipped,
-        },
-        "social caption translation pass complete",
-      );
-    } catch (err) {
-      logger.error({ err }, "social caption translation pass failed");
     }
     // Sequential: these share the same DB pool and dedupe against the incidents
     // table; running them one after another mirrors scrape:prod. Each is isolated
@@ -815,29 +796,29 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ReliefWeb situational reports pass failed");
       reliefwebReports = emptyReliefWebReports(err);
     }
-    // KAMMI Pusat public social-media protest watch (Instagram).
-    // Writes ONLY the isolated social_watch_items store — CONTEXT ONLY, these
-    // rows are NEVER incidents and can never inflate any incident count (the
-    // only path into incidents is the explicit, gated promote action). No-ops
-    // cleanly when Instagram is not configured/enabled. Isolated in its own try
-    // so a scraper/network failure can never fail the wider ingest.
-    let socialWatch: SocialWatchSummary;
+    // KAMMI Pusat source provider (Instagram). Translates public posts to
+    // English, content-routes them into EXISTING incident topics (Flashpoint /
+    // Protests & Civil Unrest), relevance-gates, dedupes and inserts the new
+    // ones — KAMMI is "just another news source", so slop is discarded at the
+    // router and a genuine protest lands in the relevant feed. No-ops cleanly
+    // when Instagram is not configured/enabled. Isolated in its own try so a
+    // scraper/network failure can never fail the wider ingest.
+    let kammiSource: KammiSourceSummary;
     try {
-      socialWatch = await runSocialWatchIngest({ commit: true });
+      kammiSource = await runKammiSourceIngest({ commit: true });
       logger.info(
         {
-          active: socialWatch.active,
-          fetched: socialWatch.fetched,
-          relevant: socialWatch.relevant,
-          inserted: socialWatch.inserted,
-          alertsRaised: socialWatch.alertsRaised,
-          totalAfter: socialWatch.totalAfter,
+          active: kammiSource.active,
+          fetched: kammiSource.fetched,
+          routable: kammiSource.routable,
+          inserted: kammiSource.inserted,
+          byTopic: kammiSource.byTopic,
         },
-        "KAMMI social-watch pass complete",
+        "KAMMI source pass complete",
       );
     } catch (err) {
-      logger.error({ err }, "KAMMI social-watch pass failed");
-      socialWatch = emptySocialWatch(err);
+      logger.error({ err }, "KAMMI source pass failed");
+      kammiSource = emptyKammiSource(err);
     }
     // Facebook OSINT (Papua/PNG). Writes ONLY the isolated social_raw store —
     // CONTEXT ONLY, these rows are NEVER incidents and can never inflate any
@@ -960,7 +941,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       corroboration,
       reliefwebReports,
       iccPiracy,
-      socialWatch,
+      kammiSource,
       facebookOsint,
       gdeltEnrich,
       gdeltStructured,
@@ -1269,24 +1250,6 @@ export async function runTitleTranslationOnce(): Promise<TitleTranslationRunResu
           `title-translate failed: ${err instanceof Error ? err.message : String(err)}`,
         ],
       };
-    }
-    // Piggyback the KAMMI social-watch caption translation on the same early boot
-    // run (own table/column; never incidents). Isolated so a failure here can
-    // never abort the title pass or the lock — the UI just falls back to the raw
-    // caption. Logged only; not part of the returned summary.
-    try {
-      const captions = await runSocialCaptionTranslation({ commit: true });
-      logger.info(
-        {
-          translated: captions.translated,
-          candidates: captions.candidates,
-          failed: captions.failed,
-          skipped: captions.skipped,
-        },
-        "boot translate: social caption translation run finished",
-      );
-    } catch (err) {
-      logger.error({ err }, "social caption translation failed");
     }
     const finishedAt = new Date();
     return {

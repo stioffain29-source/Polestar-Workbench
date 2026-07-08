@@ -19,15 +19,14 @@ import {
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
   REGISTRY_HEALTH_TOPIC,
   REGISTRY_HEALTH_NAME,
-  readSocialWatchConfig,
-  SOCIAL_WATCH_IG_HEALTH_NAME,
+  readKammiSourceConfig,
+  KAMMI_IG_HEALTH_NAME,
   isGdeltStructuredConfigured,
   isGdeltStructuredEnabled,
   GDELT_STRUCTURED_HEALTH_NAME,
   GDELT_STRUCTURED_HEALTH_TOPIC,
   GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE,
 } from "@workspace/ingest";
-import { socialWatchItemsTable } from "@workspace/db";
 import type {
   IntegrationStatusItem,
   IntegrationStatusMetric,
@@ -61,11 +60,11 @@ import { logger } from "./logger";
 //                    freshness window (e.g. a channel that stopped posting)
 // ===========================================================================
 
-// Freshness window for the KAMMI social-watch feed, mirroring the AIS movement
-// FRESH_DAYS gate. A feed whose newest post is older than this is reported as
-// "dormant" rather than green "working", so a years-stale account never reads
-// as a live feed.
-const SOCIAL_WATCH_FRESH_DAYS = 30;
+// Freshness window for the KAMMI Instagram source, mirroring the AIS movement
+// FRESH_DAYS gate. A feed whose newest routed post is older than this is
+// reported as "dormant" rather than green "working", so a years-stale account
+// never reads as a live feed.
+const KAMMI_FRESH_DAYS = 30;
 
 function ageInDays(date: Date | null): number | null {
   if (!date) return null;
@@ -621,25 +620,28 @@ async function vesselRegistryStatus(): Promise<IntegrationStatusItem> {
   };
 }
 
-const SOCIAL_WATCH_IG_DETAIL =
-  "Monitors KAMMI Pusat public Instagram + Telegram posts for planned/active protest mobilisation as ADDITIVE context. When no paid Instagram scraper credential is set, the source runs in analyst MANUAL-ENTRY mode: operators paste Instagram/Telegram posts by hand (no scraping, no API keys). Posts are stored in their own table — never as incidents, so they never inflate any count. Confirmed-active items can be promoted to a flashpoint incident by an operator.";
+const KAMMI_IG_DETAIL =
+  "KAMMI Pusat's public Instagram feed is treated as JUST ANOTHER NEWS SOURCE. Public posts are fetched via the paid Apify Instagram scraper, PII-scrubbed, translated to English, then content-routed and relevance-gated by the SAME engine as every scraper — a genuine protest lands in the relevant incident feed (Flashpoint / Protests & Civil Unrest) and slop is discarded at the router. There is no separate review queue or context table. No-ops cleanly when INSTAGRAM_API_KEY / APIFY_TOKEN is unset or KAMMI_ENABLED=false.";
 
-async function socialWatchPlatformCounts(
-  platform: "instagram" | "telegram" | "all",
-): Promise<{ total: number; latest: Date | null }> {
-  const [row] = await db
-    .select({
-      n: sql<number>`count(*)::int`,
-      latest: sql<Date | string | null>`max(${socialWatchItemsTable.postedAt})`,
-    })
-    .from(socialWatchItemsTable)
-    .where(
-      platform === "all"
-        ? undefined
-        : eq(socialWatchItemsTable.platform, platform),
-    );
+// Count of KAMMI-sourced incidents (marker analyst_notes LIKE '%@kammi.pusat%')
+// and the newest post timestamp. KAMMI is a source provider: its posts land in
+// the shared `incidents` table via the relevance router, so its telemetry is the
+// count of rows it has routed — never a separate context table.
+async function kammiIncidentCounts(): Promise<{
+  total: number;
+  latest: Date | null;
+}> {
+  const res = await db.execute(
+    sql`SELECT count(*)::int AS n, max(occurred_at) AS latest FROM incidents WHERE analyst_notes LIKE '%@kammi.pusat%'`,
+  );
+  const row = res.rows[0] as
+    | { n: number | string | null; latest: Date | string | null }
+    | undefined;
   const latest = row?.latest ?? null;
-  return { total: row?.n ?? 0, latest: latest ? new Date(latest) : null };
+  return {
+    total: Number(row?.n ?? 0),
+    latest: latest ? new Date(latest) : null,
+  };
 }
 
 async function socialFeedStatus(name: string): Promise<string | null> {
@@ -659,9 +661,10 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
     "INSTAGRAM_API_BASE",
     "INSTAGRAM_ACTOR",
     "KAMMI_INSTAGRAM_HANDLE",
-    "SOCIAL_WATCH_ENABLED",
+    "KAMMI_ENABLED",
+    "KAMMI_MAX_ITEMS",
   ];
-  const cfg = readSocialWatchConfig();
+  const cfg = readKammiSourceConfig();
   const ig = cfg.instagram;
   const configured = ig.configured;
   const docsUrl = "https://apify.com";
@@ -670,21 +673,21 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
   let latest: Date | null = null;
   let feedStatus: string | null = null;
   try {
-    // The panel now represents the whole social-watch source (scraped Instagram
-    // AND manually-pasted Instagram/Telegram), so count across all platforms.
-    const counts = await socialWatchPlatformCounts("all");
+    // KAMMI is a source provider: its telemetry is the count of incidents it has
+    // routed into the shared table (marker analyst_notes LIKE '%@kammi.pusat%').
+    const counts = await kammiIncidentCounts();
     total = counts.total;
     latest = counts.latest;
-    feedStatus = await socialFeedStatus(SOCIAL_WATCH_IG_HEALTH_NAME);
+    feedStatus = await socialFeedStatus(KAMMI_IG_HEALTH_NAME);
   } catch (err) {
-    logger.warn({ err: msg(err) }, "social watch instagram status query failed");
+    logger.warn({ err: msg(err) }, "KAMMI instagram status query failed");
     return unknownItem({
       key: "social_watch_instagram",
-      label: "KAMMI Instagram (Social Watch)",
+      label: "KAMMI Instagram",
       configured,
       envVars,
       summary: "Status query failed.",
-      detail: SOCIAL_WATCH_IG_DETAIL,
+      detail: KAMMI_IG_DETAIL,
       docsUrl,
     });
   }
@@ -694,60 +697,47 @@ async function socialInstagramStatus(): Promise<IntegrationStatusItem> {
   if (!cfg.enabled) {
     status = "disabled";
     summary =
-      "Switched off (SOCIAL_WATCH_ENABLED=false) — social-media protest monitoring is disabled. Incident feeds are unaffected.";
+      "Switched off (KAMMI_ENABLED=false) — the KAMMI Instagram source is disabled. Other incident feeds are unaffected.";
   } else if (!ig.enabled) {
     status = "disabled";
     summary =
-      "Switched off (INSTAGRAM_ENABLED=false) — the Instagram social-watch source is disabled.";
+      "Switched off (INSTAGRAM_ENABLED=false) — the KAMMI Instagram source is disabled.";
   } else if (!configured) {
-    // No paid Instagram scraper credential — the source runs in analyst
-    // MANUAL-ENTRY mode: operators paste KAMMI Instagram/Telegram posts by hand
-    // (no scraping, no API keys). This is a fully functional mode, so it is
-    // reported as working rather than not_configured.
-    status = "working";
-    const age = ageInDays(latest);
-    const holding =
-      total > 0
-        ? age !== null
-          ? ` Holding ${total} manually-added post(s); newest is ${age} day(s) old.`
-          : ` Holding ${total} manually-added post(s).`
-        : " No posts added yet.";
+    status = "not_configured";
     summary =
-      `Analyst manual-entry mode — no paid Instagram scraper credential, so operators add KAMMI Instagram/Telegram posts by hand (no scraping, no API keys). Stored as protest-monitoring context only, never counted as incidents.` +
-      holding;
+      "No Apify Instagram credential (INSTAGRAM_API_KEY or APIFY_TOKEN) set — KAMMI Instagram posts are not being fetched. Other incident feeds are unaffected.";
   } else if (feedStatus === "failing") {
     status = "failing_upstream";
     summary =
-      "Configured, but the Instagram scraper upstream is returning errors on consecutive runs — no posts are being collected.";
+      "Configured, but the Apify Instagram scraper upstream is returning errors on consecutive runs — no KAMMI posts are being collected.";
   } else if (total > 0) {
     const age = ageInDays(latest);
-    if (age !== null && age > SOCIAL_WATCH_FRESH_DAYS) {
+    if (age !== null && age > KAMMI_FRESH_DAYS) {
       status = "dormant";
-      summary = `Feed appears dormant — newest of ${total} stored KAMMI Instagram post(s) is ${age} day(s) old (past the ${SOCIAL_WATCH_FRESH_DAYS}-day freshness window). Stored as protest-monitoring context only, never counted as incidents.`;
+      summary = `Feed appears dormant — newest of ${total} KAMMI-routed incident(s) is ${age} day(s) old (past the ${KAMMI_FRESH_DAYS}-day freshness window).`;
     } else {
       status = "working";
-      summary = `Holding ${total} KAMMI Instagram post(s) as protest-monitoring context — never counted as incidents.`;
+      summary = `Routed ${total} KAMMI Instagram post(s) into the relevant incident feed; slop is discarded at the router.`;
     }
   } else {
     status = "no_data";
     summary =
-      "Configured, but no Instagram posts collected yet — awaiting the next scrape or a protest-relevant post.";
+      "Configured, but no KAMMI Instagram post has passed the relevance router into an incident feed yet — awaiting the next scrape or a protest-relevant post.";
   }
 
   return {
     key: "social_watch_instagram",
-    label: "KAMMI Instagram (Social Watch)",
+    label: "KAMMI Instagram",
     status,
     summary,
-    detail: SOCIAL_WATCH_IG_DETAIL,
+    detail: KAMMI_IG_DETAIL,
     configured,
     optional: true,
     envVars,
     metrics: [
-      metric("Mode", configured ? "Scraper + manual" : "Manual entry"),
       metric("Account", `@${ig.handle}`),
-      metric("Provider", configured ? ig.provider : "analyst paste"),
-      metric("Posts stored", total),
+      metric("Provider", ig.provider),
+      metric("Incidents routed", total),
       metric("Latest post", fmtDate(latest)),
     ],
     docsUrl,

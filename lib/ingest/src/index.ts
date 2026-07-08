@@ -37,6 +37,7 @@ export {
   runInstagramSourceIngest,
   emptyInstagramSourceSummary,
   decideInstagramIncident,
+  dedupeAndInsertIgIncidents,
   readInstagramSourceConfig,
   isInstagramSourceConfigured,
   instagramMarker,
@@ -49,7 +50,23 @@ export type {
   InstagramSourceConfig,
   NormalisedIgPost,
   IgDecision,
+  IgDedupeInsertResult,
 } from "./instagramSource";
+export {
+  runKammiSourceIngest,
+  emptyKammiSourceSummary,
+  readKammiSourceConfig,
+  isKammiSourceActive,
+  fetchInstagramPosts,
+  isApifyAuthError,
+  ApifyStartAuthError,
+  KAMMI_IG_HEALTH_NAME,
+} from "./kammiSource";
+export type {
+  KammiSourceSummary,
+  KammiSourceOptions,
+  KammiSourceConfig,
+} from "./kammiSource";
 export { runMarketPricesIngest } from "./marketPrices";
 export type { MarketPriceSummary } from "./marketPrices";
 export { runMarketSnapshotIngest } from "./marketSnapshot";
@@ -88,8 +105,7 @@ export { runStrikesBackfill } from "./backfillStrikes";
 export type { StrikesBackfillSummary } from "./backfillStrikes";
 export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
-export { runSocialCaptionTranslation } from "./captionTranslate";
-export type { CaptionTranslationSummary } from "./captionTranslate";
+export { translateCaptionToEnglish } from "./captionTranslate";
 export {
   isLlmAvailable,
   readOpenAiConfig,
@@ -177,30 +193,7 @@ export {
 export type { ReliefWebReportsSummary } from "./reliefwebReports";
 export { runIccPiracyIngest, emptyIccPiracySummary } from "./iccPiracy";
 export type { IccPiracySummary } from "./iccPiracy";
-export {
-  runSocialWatchIngest,
-  emptySocialWatchSummary,
-  readSocialWatchConfig,
-  isSocialWatchActive,
-  sanitiseCaption,
-  classifyStatus,
-  isProtestRelevant,
-  isPromotable,
-  extractLocation,
-  extractIssue,
-  extractEventDateTime,
-  detectAlertReasons,
-  makeDedupKey,
-  SOCIAL_WATCH_STATUSES,
-  SOCIAL_WATCH_IG_HEALTH_NAME,
-} from "./socialWatch";
-export type {
-  SocialWatchSummary,
-  SocialWatchConfig,
-  SocialWatchStatus,
-  PlatformResult as SocialWatchPlatformResult,
-  RawSocialPost,
-} from "./socialWatch";
+export { sanitiseCaption } from "./text";
 export {
   runFacebookOsintIngest,
   persistFacebookPosts,
@@ -255,14 +248,9 @@ export type {
 } from "./facebookOsintEligibility";
 export {
   normaliseInstagramPost,
-  persistInstagramKammiPosts,
   resolveApifyTaskOrActorLatestDataset,
 } from "./instagramKammi";
-export type {
-  RawInstagramPost,
-  PersistInstagramKammiOptions,
-  PersistInstagramKammiResult,
-} from "./instagramKammi";
+export type { RawInstagramPost } from "./instagramKammi";
 export {
   runGdeltEnrich,
   isGdeltConfigured,

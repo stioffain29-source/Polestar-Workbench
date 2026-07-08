@@ -6,7 +6,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { recordSourceHealth } from "./sourceHealth";
-import { sanitiseCaption } from "./socialWatch";
+import { sanitiseCaption } from "./text";
 import {
   extractPngItem,
   derivePngProvince,

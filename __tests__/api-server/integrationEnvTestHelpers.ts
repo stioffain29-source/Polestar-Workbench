@@ -51,6 +51,8 @@ export const INTEGRATION_ENV_VARS: readonly string[] = [
   "INSTAGRAM_API_BASE",
   "INSTAGRAM_ACTOR",
   "KAMMI_INSTAGRAM_HANDLE",
+  "KAMMI_ENABLED",
+  "KAMMI_MAX_ITEMS",
   "SOCIAL_WATCH_ENABLED",
   // Operational admin controls
   "INGEST_ADMIN_TOKEN",

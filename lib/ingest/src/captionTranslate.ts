@@ -1,31 +1,24 @@
-// Clean English translations for non-English KAMMI social-watch captions.
+// Clean English translations for non-English social-media captions.
 //
-// The KAMMI Pusat protest-watch panel stores post captions verbatim (Bahasa
-// Indonesia, occasionally mixed English). Those read poorly for an English
-// analyst ("I can't read bahasa"). This stage produces a faithful English
-// caption and stores it on `social_watch_items.caption_en`, leaving the
-// original `caption` untouched. The UI prefers `caption_en` and falls back to
-// `caption`, so English rows and not-yet-processed rows are unaffected.
+// Social sources (KAMMI Instagram, and any future Bahasa-first feed) carry post
+// captions in Bahasa Indonesia (occasionally mixed English). The relevance
+// router and the incident title must be in English — an incident stored with a
+// Bahasa title would also fail to re-score on a RELEVANCE_RULE_VERSION bump — so
+// this stage produces a faithful English rendering of a caption before routing.
 //
 // Mirrors titleTranslate.ts's LLM harness (SAME Replit OpenAI client via
-// openaiConfig, SAME bounded-concurrency + retry/backoff + abort-timeout), but
-// DELIBERATELY drops its marker-word language gate. The incident-title path is
-// high-volume and mostly English, so it must gate to avoid spending the model on
-// English rows; the KAMMI panel is small and single-source Indonesian, and that
-// same gate was too leaky here — genuinely-Bahasa captions that happened not to
-// contain a listed function word shipped raw, which is exactly what the analyst
-// reported. So every not-yet-processed caption is translated; the prompt returns
-// already-English captions unchanged, so they round-trip and leave the candidate
-// set. It is idempotent and converges: the candidate query selects only rows
-// whose caption_en is still NULL, so each committed row leaves the set and
-// English rows are never re-scanned.
+// openaiConfig, SAME retry/backoff + abort-timeout). It DELIBERATELY drops the
+// title path's marker-word language gate: that gate exists to avoid spending the
+// model on the high-volume, mostly-English incident-title stream, but the social
+// caption stream is small and single-source Bahasa, and the same gate was too
+// leaky here — genuinely-Bahasa captions that happened not to contain a listed
+// function word shipped raw. So every caption is translated; the prompt returns
+// already-English captions unchanged.
 //
 // STRICT no-fabrication: this step only re-expresses the existing caption in
 // English. It never adds facts, and it decides no scope, status, severity,
 // country or promotion — those authorities run elsewhere and are unchanged.
 
-import { sql } from "drizzle-orm";
-import { db, socialWatchItemsTable } from "@workspace/db";
 import { isLlmAvailable, openAiFastModel, readOpenAiConfig } from "./openaiConfig";
 
 const MODEL = openAiFastModel();
@@ -129,85 +122,17 @@ async function translateWithRetry(caption: string, retries = 3): Promise<Transla
   return last;
 }
 
-export interface CaptionTranslationSummary {
-  candidates: number;
-  translated: number;
-  failed: number;
-  skipped: boolean;
-  logLines: string[];
-}
-
 /**
- * Backfill / refresh `caption_en` for social-watch items. Selects every row
- * whose caption_en is still NULL and translates it; already-English captions are
- * returned unchanged by the model and then leave the candidate set, so the work
- * converges across runs and English rows are not re-scanned. Safe to run
- * repeatedly.
- *
- * Does NOT close the shared DB pool — the long-lived server keeps it open; CLI
- * wrappers call pool.end() themselves.
+ * Translate one caption to clean English. Pure and side-effect free (no DB): the
+ * one translate authority every social source calls before routing. Returns the
+ * English rendering, or `null` when the LLM is unavailable/unset, the caption is
+ * empty, or translation fails after retries — the caller then falls back to the
+ * raw caption (which mostly drops at the relevance gate), never fabricating.
  */
-export async function runSocialCaptionTranslation(
-  opts: { commit?: boolean; limit?: number; concurrency?: number } = {},
-): Promise<CaptionTranslationSummary> {
-  const commit = opts.commit ?? false;
-  const limit = Math.max(1, opts.limit ?? 150);
-  const concurrency = Math.max(1, opts.concurrency ?? 4);
-  const logLines: string[] = [];
-
-  if (!isLlmAvailable()) {
-    logLines.push(
-      "caption-translate: LLM unavailable (set AI_INTEGRATIONS_OPENAI_* or OPENAI_API_KEY) — skipped",
-    );
-    return { candidates: 0, translated: 0, failed: 0, skipped: true, logLines };
-  }
-
-  // Translate EVERY not-yet-processed caption (caption_en still NULL). No
-  // language gate: see the file header — the marker-word gate used for the
-  // high-volume title path was too leaky for this small single-source panel and
-  // let genuinely-Bahasa captions ship raw. Already-English captions round-trip
-  // unchanged and then leave the candidate set, so this stays idempotent and
-  // converges without perpetually re-scanning English rows.
-  const candidates = await db
-    .select({
-      id: socialWatchItemsTable.id,
-      caption: socialWatchItemsTable.caption,
-    })
-    .from(socialWatchItemsTable)
-    .where(
-      sql`${socialWatchItemsTable.captionEn} IS NULL AND ${socialWatchItemsTable.caption} IS NOT NULL`,
-    )
-    .orderBy(sql`${socialWatchItemsTable.createdAt} DESC`)
-    .limit(limit);
-
-  logLines.push(`caption-translate: ${candidates.length} non-English candidate(s)`);
-
-  let translated = 0;
-  let failed = 0;
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < candidates.length) {
-      const r = candidates[next++];
-      const caption = r.caption ?? "";
-      const outcome = await translateWithRetry(caption);
-      if (!outcome.ok) {
-        failed++;
-        logLines.push(`  id=${r.id} FAILED (${outcome.error})`);
-        continue;
-      }
-      translated++;
-      if (commit) {
-        await db
-          .update(socialWatchItemsTable)
-          .set({ captionEn: outcome.captionEn })
-          .where(sql`${socialWatchItemsTable.id} = ${r.id} AND ${socialWatchItemsTable.captionEn} IS NULL`);
-      }
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, candidates.length) }, worker));
-
-  logLines.push(
-    `caption-translate: ${commit ? "committed" : "dry-run"} — translated ${translated}, failed ${failed}`,
-  );
-  return { candidates: candidates.length, translated, failed, skipped: false, logLines };
+export async function translateCaptionToEnglish(caption: string): Promise<string | null> {
+  if (!isLlmAvailable()) return null;
+  const trimmed = caption.trim();
+  if (!trimmed) return null;
+  const outcome = await translateWithRetry(trimmed);
+  return outcome.ok ? outcome.captionEn : null;
 }

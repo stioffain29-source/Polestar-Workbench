@@ -3,6 +3,8 @@ import {
   resolveAisKey,
   isGdeltStructuredConfigured,
   isGdeltStructuredEnabled,
+  readKammiSourceConfig,
+  isKammiSourceActive,
 } from "@workspace/ingest";
 import { sql } from "drizzle-orm";
 import {
@@ -294,36 +296,29 @@ async function hoursSinceNewestMaritimeSecurity(): Promise<number | null> {
 }
 
 /**
- * True when the KAMMI social-watch ingest is active — i.e. the Instagram feed is
- * both configured (key present) and not switched off. Mirrors
- * isSocialWatchActive() in lib/ingest/src/socialWatch.ts so the scheduler gates
- * on the SAME condition the collector uses: when it is inactive the
- * social_watch_items table is empty by design, so gating on its freshness would
- * force a needless scrape on every cold start.
+ * True when the KAMMI source provider is active — i.e. the Instagram/Apify feed
+ * is both configured (key present) and not switched off. Delegates to the
+ * collector's own isKammiSourceActive(readKammiSourceConfig()) so the scheduler
+ * gates on the EXACT condition the collector uses (no re-derived env drift):
+ * when it is inactive no KAMMI incidents are written, so gating on their
+ * freshness would force a needless scrape on every cold start.
  */
-function socialWatchActive(): boolean {
-  if (process.env["SOCIAL_WATCH_ENABLED"]?.trim().toLowerCase() === "false")
-    return false;
-  const off = (v: string | undefined): boolean => {
-    const s = v?.trim().toLowerCase();
-    return s === "false" || s === "0" || s === "off" || s === "no";
-  };
-  const igKeyed = (process.env["INSTAGRAM_API_KEY"]?.trim().length ?? 0) > 0;
-  const igActive = igKeyed && !off(process.env["INSTAGRAM_ENABLED"]);
-  return igActive;
+function kammiSourceActive(): boolean {
+  return isKammiSourceActive(readKammiSourceConfig());
 }
 
 /**
- * Hours since the newest stored KAMMI social-watch item (or null when the table
- * is empty). Social-watch items refresh ONLY inside a full ingest (runIngestOnce
- * → runSocialWatchIngest), so — like strikes, the land topics and AIS movement —
- * a stale-but-populated table should force a boot catch-up. Uses created_at
- * (insertion heartbeat) so a quiet protest week does not look stale. Only
- * considered when socialWatchActive(); an empty table is otherwise not a trigger.
+ * Hours since the newest KAMMI-sourced incident (or null when none exist). KAMMI
+ * incidents are written ONLY inside a full ingest (runIngestOnce →
+ * runKammiSourceIngest), so — like strikes, the land topics and AIS movement — a
+ * stale-but-populated feed should force a boot catch-up. Uses created_at
+ * (insertion heartbeat) so a quiet protest week does not look stale. Keyed on
+ * the KAMMI marker (analyst_notes LIKE '%@kammi.pusat%'). Only considered when
+ * kammiSourceActive(); no rows is otherwise not a trigger.
  */
-async function hoursSinceNewestSocialWatch(): Promise<number | null> {
+async function hoursSinceNewestKammiIncident(): Promise<number | null> {
   const res = await db.execute(
-    sql`SELECT MAX(created_at) AS last FROM social_watch_items`,
+    sql`SELECT MAX(created_at) AS last FROM incidents WHERE analyst_notes LIKE '%@kammi.pusat%'`,
   );
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
@@ -797,17 +792,17 @@ export function startIngestScheduler(): void {
           const maritimeSecurityAge = await hoursSinceNewestMaritimeSecurity();
           const maritimeSecurityStale =
             maritimeSecurityAge !== null && maritimeSecurityAge >= hours;
-          // KAMMI social-watch context also refreshes ONLY inside a full ingest.
-          // Treat a stale table as a reason to run, but ONLY when the Instagram
-          // feed is active — otherwise the table is empty by design and gating
-          // on it would force a needless scrape on every cold start. An empty
-          // table while active IS a trigger (initial population).
-          const socialActive = socialWatchActive();
-          const socialWatchAge = socialActive
-            ? await hoursSinceNewestSocialWatch()
+          // KAMMI-sourced incidents also refresh ONLY inside a full ingest.
+          // Treat a stale feed as a reason to run, but ONLY when the Instagram
+          // feed is active — otherwise no KAMMI incidents exist by design and
+          // gating on them would force a needless scrape on every cold start. No
+          // KAMMI rows while active IS a trigger (initial population).
+          const kammiActive = kammiSourceActive();
+          const kammiAge = kammiActive
+            ? await hoursSinceNewestKammiIncident()
             : null;
-          const socialWatchStale =
-            socialActive && (socialWatchAge === null || socialWatchAge >= hours);
+          const kammiStale =
+            kammiActive && (kammiAge === null || kammiAge >= hours);
           // Facebook OSINT (social_raw) also refreshes ONLY inside a full
           // ingest. Same shape as KAMMI social-watch: a stale table is a reason
           // to run, but ONLY when the source is active — otherwise the table is
@@ -859,7 +854,7 @@ export function startIngestScheduler(): void {
             strikesStale ||
             movementStale ||
             maritimeSecurityStale ||
-            socialWatchStale ||
+            kammiStale ||
             socialRawStale ||
             gdeltStructuredStale
           ) {
@@ -885,9 +880,8 @@ export function startIngestScheduler(): void {
                     ? null
                     : Math.round(maritimeSecurityAge),
                 maritimeSecurityStale,
-                socialWatchAgeHours:
-                  socialWatchAge === null ? null : Math.round(socialWatchAge),
-                socialWatchStale,
+                kammiAgeHours: kammiAge === null ? null : Math.round(kammiAge),
+                kammiStale,
                 socialRawAgeHours:
                   socialRawAge === null ? null : Math.round(socialRawAge),
                 socialRawStale,

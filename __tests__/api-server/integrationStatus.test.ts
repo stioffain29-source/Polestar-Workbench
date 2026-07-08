@@ -6,7 +6,6 @@ import {
   countryReportProseTable,
   incidentCorroborationsTable,
   reliefwebReportsTable,
-  socialWatchItemsTable,
 } from "@workspace/db";
 
 // The integration-status probes derive a public STATE + EVIDENCE for each
@@ -350,98 +349,99 @@ describe("admin_controls status", () => {
   });
 });
 
-describe("social-watch instagram integration status (freshness honesty)", () => {
+describe("KAMMI Instagram source-provider integration status (freshness honesty)", () => {
+  // KAMMI is now a SOURCE PROVIDER, not a manual board: its telemetry is the
+  // count of incidents it has ROUTED into the shared feed (marker
+  // analyst_notes LIKE '%@kammi.pusat%'), read via db.execute() — NOT the
+  // deprecated social_watch_items table. There is no "manual-entry mode": a
+  // post either routes into an incident or is discarded as slop at the router.
   function configureIg(): void {
     delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.KAMMI_ENABLED;
     delete process.env.INSTAGRAM_ENABLED;
     process.env.INSTAGRAM_API_KEY = "apify-key";
   }
   const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+  // Route kammiIncidentCounts()'s raw SQL (db.execute) to a canned count/latest.
+  function stubKammiCount(n: number, latest: Date | null): void {
+    jest.spyOn(db, "execute").mockResolvedValue({ rows: [{ n, latest }] } as never);
+  }
 
-  it("reports working when the newest post is inside the freshness window", async () => {
+  it("reports working when the newest routed incident is inside the freshness window", async () => {
     configureIg();
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 4, latest: daysAgo(3) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_instagram");
+    stubKammiCount(4, daysAgo(3));
+    const item = find(await statuses(), "social_watch_instagram");
     expect(item.status).toBe("working");
     expect(item.configured).toBe(true);
-    expect(item.summary).toContain("4 KAMMI Instagram post");
+    expect(item.summary).toContain("Routed 4 KAMMI Instagram post");
+    expect(item.summary).toContain("slop is discarded at the router");
   });
 
-  it("reports dormant with an N-day-old summary when the newest post is past the window", async () => {
+  it("reports dormant with an N-day-old summary when the newest routed incident is past the window", async () => {
     configureIg();
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 2, latest: daysAgo(120) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_instagram");
+    stubKammiCount(2, daysAgo(120));
+    const item = find(await statuses(), "social_watch_instagram");
     expect(item.status).toBe("dormant");
     expect(item.summary).toContain("dormant");
     expect(item.summary).toMatch(/\d+ day\(s\) old/);
-    expect(item.summary).toContain("30-day freshness window");
+    expect(item.summary).toContain("freshness window");
   });
 
-  it("reports no_data when configured but the table is empty", async () => {
+  it("reports no_data when configured but nothing has routed into an incident yet", async () => {
     configureIg();
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 0, latest: null }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_instagram");
+    stubKammiCount(0, null);
+    const item = find(await statuses(), "social_watch_instagram");
     expect(item.status).toBe("no_data");
   });
 
-  it("reports working manual-entry mode when no scraper credential is set", async () => {
+  it("reports not_configured when no Apify credential (INSTAGRAM_API_KEY / APIFY_TOKEN) is set", async () => {
     delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.KAMMI_ENABLED;
     delete process.env.INSTAGRAM_ENABLED;
     delete process.env.INSTAGRAM_API_KEY;
     delete process.env.APIFY_TOKEN;
-    // No scraper credential → analyst manual-entry mode (a fully functional
-    // mode, reported as working, NOT not_configured). Manually-added rows,
-    // even months old, are legitimate context.
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_instagram");
-    expect(item.status).toBe("working");
+    stubKammiCount(0, null);
+    const item = find(await statuses(), "social_watch_instagram");
+    expect(item.status).toBe("not_configured");
     expect(item.configured).toBe(false);
-    expect(item.summary).toContain("manual-entry mode");
-    expect(item.summary).toContain("5 manually-added post");
-  });
-
-  it("reports working manual-entry mode with no rows yet", async () => {
-    delete process.env.SOCIAL_WATCH_ENABLED;
-    delete process.env.INSTAGRAM_ENABLED;
-    delete process.env.INSTAGRAM_API_KEY;
-    delete process.env.APIFY_TOKEN;
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 0, latest: null }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_instagram");
-    expect(item.status).toBe("working");
-    expect(item.configured).toBe(false);
-    expect(item.summary).toContain("No posts added yet");
   });
 
   it("reports configured when only APIFY_TOKEN is set (fallback credential)", async () => {
     delete process.env.SOCIAL_WATCH_ENABLED;
+    delete process.env.KAMMI_ENABLED;
     delete process.env.INSTAGRAM_ENABLED;
     delete process.env.INSTAGRAM_API_KEY;
     process.env.APIFY_TOKEN = "apify_api_fallback";
-    const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 3, latest: daysAgo(2) }]],
-    ]);
-    const item = find(await statuses(byTable), "social_watch_instagram");
+    stubKammiCount(3, daysAgo(2));
+    const item = find(await statuses(), "social_watch_instagram");
     expect(item.configured).toBe(true);
     expect(item.status).toBe("working");
   });
 
-  it("keeps disabled when switched off, even with a stale row present", async () => {
-    process.env.SOCIAL_WATCH_ENABLED = "false";
-    process.env.INSTAGRAM_API_KEY = "apify-key";
+  it("reports failing_upstream when the recorded feed health row is 'failing'", async () => {
+    configureIg();
+    stubKammiCount(5, daysAgo(1));
     const byTable = new Map<unknown, Rows>([
-      [socialWatchItemsTable, [{ n: 5, latest: daysAgo(200) }]],
+      [sourcesTable, [{ status: "failing" }]],
     ]);
     const item = find(await statuses(byTable), "social_watch_instagram");
+    expect(item.status).toBe("failing_upstream");
+  });
+
+  it("keeps disabled when switched off via KAMMI_ENABLED, even with routed incidents present", async () => {
+    process.env.KAMMI_ENABLED = "false";
+    process.env.INSTAGRAM_API_KEY = "apify-key";
+    stubKammiCount(5, daysAgo(1));
+    const item = find(await statuses(), "social_watch_instagram");
+    expect(item.status).toBe("disabled");
+  });
+
+  it("keeps disabled when the legacy SOCIAL_WATCH_ENABLED alias is false", async () => {
+    delete process.env.KAMMI_ENABLED;
+    process.env.SOCIAL_WATCH_ENABLED = "false";
+    process.env.INSTAGRAM_API_KEY = "apify-key";
+    stubKammiCount(5, daysAgo(1));
+    const item = find(await statuses(), "social_watch_instagram");
     expect(item.status).toBe("disabled");
   });
 });

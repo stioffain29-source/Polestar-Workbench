@@ -19,8 +19,6 @@
  *   - /reports     : delete a report, asserting the card disappears.
  *   - /strikes/backfill: create a strike, asserting the "Recently Added" list
  *                    shows it without a reload.
- *   - /protests    : promote a Social Watch post, asserting the row flips from
- *                    the "Promote" button to its "Incident #N" back-link.
  *
  * CHECKLIST for any NEW same-screen mutation button: wire the mutation's
  * `onSuccess` to `queryClient.invalidateQueries({ queryKey: get<Thing>QueryKey() })`
@@ -80,7 +78,6 @@ import Incidents from "@/pages/Incidents";
 import SpotReports from "@/pages/SpotReports";
 import Reports from "@/pages/Reports";
 import StrikesBackfill from "@/pages/StrikesBackfill";
-import Protests from "@/pages/Protests";
 import CountryReport from "@/pages/CountryReport";
 
 // ---------------------------------------------------------------------------
@@ -92,7 +89,6 @@ let incidents: Row[] = [];
 let spotReports: Row[] = [];
 let reports: Row[] = [];
 let strikes: Row[] = [];
-let socialWatch: Row[] = [];
 let socialRaw: Row[] = [];
 let nextId = 1;
 // CountryReport baseline-retire flow: the curated baseline (null once retired)
@@ -197,22 +193,9 @@ function installFetch() {
         return jsonResponse(row, 201);
       }
 
-      // Social Watch + Facebook OSINT boards (Protests page) + the Promote
-      // action that mints a back-linked incident.
-      if (path === "/api/social-watch" && method === "GET") {
-        return jsonResponse(socialWatch);
-      }
+      // Facebook OSINT board (Protests page) raw-post feed.
       if (path === "/api/social-raw" && method === "GET") {
         return jsonResponse(socialRaw);
-      }
-      const swPromote = path.match(/^\/api\/social-watch\/(\d+)\/promote$/);
-      if (swPromote && method === "POST") {
-        const id = Number(swPromote[1]);
-        const incidentId = nextId++;
-        socialWatch = socialWatch.map((it) =>
-          it.id === id ? { ...it, promotable: false, promotedIncidentId: incidentId } : it,
-        );
-        return jsonResponse({ incidentId });
       }
 
       // CountryReport page: report + baseline + supporting reads, and the
@@ -333,7 +316,6 @@ beforeEach(() => {
   spotReports = [];
   reports = [];
   strikes = [];
-  socialWatch = [];
   socialRaw = [];
   countryBaseline = null;
   baselineGetCount = 0;
@@ -463,37 +445,6 @@ describe("same-screen mutation buttons refresh the visible list", () => {
     // i.e. the create handler invalidated the list query and it refetched.
     expect(await screen.findByText(new RegExp(country))).toBeTruthy();
     expect(strikes).toHaveLength(1);
-  });
-
-  it("/protests — promoting a Social Watch post flips the row without a reload", async () => {
-    socialWatch = [
-      {
-        id: 1,
-        platform: "instagram",
-        status: "active",
-        caption: "Test mobilisation caption",
-        url: null,
-        promotable: true,
-        promotedIncidentId: null,
-        alertReasons: [],
-        city: "Jakarta",
-        location: "Jakarta",
-      },
-    ];
-
-    renderWithClient(<Protests />);
-
-    // The promotable row loads and shows a live "Promote" button.
-    const promoteBtn = await screen.findByRole("button", { name: /^promote$/i });
-    fireEvent.click(promoteBtn);
-
-    // After a successful promote the board must refetch (invalidate) so the row
-    // flips to its back-linked "Incident #N" state WITHOUT a manual reload.
-    expect(await screen.findByText(/Incident #\d+/)).toBeTruthy();
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /^promote$/i })).toBeNull(),
-    );
-    expect(socialWatch[0].promotedIncidentId).not.toBeNull();
   });
 
   it("/countries/:slug — retiring a curated baseline refetches the baseline so the report falls back to live data without a reload", async () => {

@@ -1,13 +1,12 @@
 import { db, incidentsTable } from "@workspace/db";
 import type { InsertIncident } from "@workspace/db";
-import { cleanText } from "./text";
+import { cleanText, sanitiseCaption } from "./text";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
 import { detectCountry } from "./newsTopic";
 import { COUNTRY_ALIASES } from "./topicConfigs";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
-import { sanitiseCaption } from "./socialWatch";
 import { routeTopic, xDedupeKey } from "./xSearch";
 import { fetchApifyDatasetItems } from "./facebookOsint";
 import {
@@ -220,6 +219,115 @@ export function emptyInstagramSourceSummary(): InstagramSourceSummary {
   };
 }
 
+export interface IgDedupeInsertResult {
+  duplicateMarker: number;
+  duplicateKey: number;
+  duplicateUrl: number;
+  newToInsert: number;
+  inserted: number;
+  byTopic: Array<[string, number]>;
+  errors: string[];
+}
+
+/**
+ * The ONE dedupe + insert authority shared by every Instagram-shaped social
+ * source (Papua/separatist OSINT and KAMMI). Dedupes the decided rows against
+ * existing incidents by idempotency marker (re-runs), the fuzzy same-day key (a
+ * scraped/other-source row for the same event) and URL, then inserts the new
+ * ones (commit only). Grows the guard sets in-run so two posts describing the
+ * same event cannot both insert. Never closes the shared DB pool.
+ */
+export async function dedupeAndInsertIgIncidents(
+  decided: Array<{ topic: SeverityTopic; row: InsertIncident; id: string }>,
+  opts: { commit: boolean; log: (s: string) => void },
+): Promise<IgDedupeInsertResult> {
+  const { commit, log } = opts;
+  const result: IgDedupeInsertResult = {
+    duplicateMarker: 0,
+    duplicateKey: 0,
+    duplicateUrl: 0,
+    newToInsert: 0,
+    inserted: 0,
+    byTopic: [],
+    errors: [],
+  };
+
+  const existing = await db
+    .select({
+      title: incidentsTable.title,
+      occurredAt: incidentsTable.occurredAt,
+      country: incidentsTable.country,
+      topic: incidentsTable.topic,
+      sourceUrl: incidentsTable.sourceUrl,
+      resolvedUrl: incidentsTable.resolvedUrl,
+      analystNotes: incidentsTable.analystNotes,
+    })
+    .from(incidentsTable);
+
+  const seenMarkers = new Set<string>();
+  const existingKeys = new Set<string>();
+  const existingUrls = new Set<string>();
+  for (const row of existing) {
+    const pid = instagramMarkerPostId(row.analystNotes);
+    if (pid) seenMarkers.add(pid);
+    existingKeys.add(xDedupeKey(row.title, row.occurredAt, row.country, row.topic));
+    if (row.sourceUrl) existingUrls.add(normaliseUrl(row.sourceUrl));
+    if (row.resolvedUrl) existingUrls.add(normaliseUrl(row.resolvedUrl));
+  }
+
+  const toInsert: InsertIncident[] = [];
+  const byTopic = new Map<string, number>();
+  for (const d of decided) {
+    if (seenMarkers.has(d.id)) {
+      result.duplicateMarker++;
+      continue;
+    }
+    const key = xDedupeKey(
+      d.row.title,
+      d.row.occurredAt as Date,
+      d.row.country,
+      d.row.topic,
+    );
+    if (existingKeys.has(key)) {
+      result.duplicateKey++;
+      continue;
+    }
+    const url = d.row.sourceUrl ? normaliseUrl(d.row.sourceUrl) : null;
+    if (url && existingUrls.has(url)) {
+      result.duplicateUrl++;
+      continue;
+    }
+    toInsert.push(d.row);
+    seenMarkers.add(d.id);
+    existingKeys.add(key);
+    if (url) existingUrls.add(url);
+    byTopic.set(d.topic, (byTopic.get(d.topic) ?? 0) + 1);
+  }
+  result.newToInsert = toInsert.length;
+  result.byTopic = [...byTopic.entries()].sort((a, b) => b[1] - a[1]);
+
+  log(`  already ingested   : ${result.duplicateMarker}`);
+  log(`  dupe (key)         : ${result.duplicateKey}`);
+  log(`  dupe (url)         : ${result.duplicateUrl}`);
+  log(`  new to insert      : ${result.newToInsert}`);
+
+  if (commit && toInsert.length > 0) {
+    try {
+      await db.insert(incidentsTable).values(toInsert);
+      result.inserted = toInsert.length;
+      log(`  inserted           : ${result.inserted}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(msg);
+      log(`  INSERT FAILED      : ${msg}`);
+    }
+  } else if (!commit) {
+    log("  DRY-RUN — no rows written. Re-run with --commit to insert.");
+  }
+
+  return result;
+}
+
 export type InstagramSourceOptions = {
   commit?: boolean;
   /** Import a specific Apify dataset directly. */
@@ -352,87 +460,20 @@ export async function runInstagramSourceIngest(
   }
   summary.routable = decided.length;
 
-  // Dedupe against existing incidents: idempotency marker (re-runs), fuzzy key (a
-  // scraped/other-source row for the same event) and URL.
-  const existing = await db
-    .select({
-      title: incidentsTable.title,
-      occurredAt: incidentsTable.occurredAt,
-      country: incidentsTable.country,
-      topic: incidentsTable.topic,
-      sourceUrl: incidentsTable.sourceUrl,
-      resolvedUrl: incidentsTable.resolvedUrl,
-      analystNotes: incidentsTable.analystNotes,
-    })
-    .from(incidentsTable);
-
-  const seenMarkers = new Set<string>();
-  const existingKeys = new Set<string>();
-  const existingUrls = new Set<string>();
-  for (const row of existing) {
-    const pid = instagramMarkerPostId(row.analystNotes);
-    if (pid) seenMarkers.add(pid);
-    existingKeys.add(xDedupeKey(row.title, row.occurredAt, row.country, row.topic));
-    if (row.sourceUrl) existingUrls.add(normaliseUrl(row.sourceUrl));
-    if (row.resolvedUrl) existingUrls.add(normaliseUrl(row.resolvedUrl));
-  }
-
-  const toInsert: InsertIncident[] = [];
-  const byTopic = new Map<string, number>();
-  for (const d of decided) {
-    if (seenMarkers.has(d.id)) {
-      summary.duplicateMarker++;
-      continue;
-    }
-    const key = xDedupeKey(
-      d.row.title,
-      d.row.occurredAt as Date,
-      d.row.country,
-      d.row.topic,
-    );
-    if (existingKeys.has(key)) {
-      summary.duplicateKey++;
-      continue;
-    }
-    const url = d.row.sourceUrl ? normaliseUrl(d.row.sourceUrl) : null;
-    if (url && existingUrls.has(url)) {
-      summary.duplicateUrl++;
-      continue;
-    }
-    toInsert.push(d.row);
-    // Grow the guard sets so two posts describing the same event in one run
-    // cannot both insert.
-    seenMarkers.add(d.id);
-    existingKeys.add(key);
-    if (url) existingUrls.add(url);
-    byTopic.set(d.topic, (byTopic.get(d.topic) ?? 0) + 1);
-  }
-  summary.newToInsert = toInsert.length;
-  summary.byTopic = [...byTopic.entries()].sort((a, b) => b[1] - a[1]);
-
   log(`  fetched            : ${summary.fetched}`);
   log(`  data-centre held   : ${summary.dataCentreHeld}`);
   log(`  no country         : ${summary.skippedNoCountry}`);
   log(`  unroutable         : ${summary.skippedUnroutable}`);
   log(`  routable           : ${summary.routable}`);
-  log(`  already ingested   : ${summary.duplicateMarker}`);
-  log(`  dupe (key)         : ${summary.duplicateKey}`);
-  log(`  dupe (url)         : ${summary.duplicateUrl}`);
-  log(`  new to insert      : ${summary.newToInsert}`);
 
-  if (commit && toInsert.length > 0) {
-    try {
-      await db.insert(incidentsTable).values(toInsert);
-      summary.inserted = toInsert.length;
-      log(`  inserted           : ${summary.inserted}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      summary.errors.push(msg);
-      log(`  INSERT FAILED      : ${msg}`);
-    }
-  } else if (!commit) {
-    log("  DRY-RUN — no rows written. Re-run with --commit to insert.");
-  }
+  const res = await dedupeAndInsertIgIncidents(decided, { commit, log });
+  summary.duplicateMarker = res.duplicateMarker;
+  summary.duplicateKey = res.duplicateKey;
+  summary.duplicateUrl = res.duplicateUrl;
+  summary.newToInsert = res.newToInsert;
+  summary.inserted = res.inserted;
+  summary.byTopic = res.byTopic;
+  for (const e of res.errors) summary.errors.push(e);
 
   if (commit && summary.errors.length === 0) {
     await recordSourceHealth(

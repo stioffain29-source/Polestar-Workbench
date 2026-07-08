@@ -26,3 +26,28 @@ export function cleanText(s: string | undefined | null): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/**
+ * Strip private/personal data from a social-media caption before it is stored or
+ * sent to any model: phone numbers (Indonesian +62 / 08… and generic
+ * international forms), WhatsApp links/numbers, and email addresses. Public
+ * hashtags and @org mentions are preserved. This is a hard guardrail — member-
+ * level / personal data must never be persisted. Shared by every social source
+ * (Instagram, Facebook OSINT, KAMMI).
+ */
+export function sanitiseCaption(raw: string): string {
+  let t = raw;
+  // wa.me / api.whatsapp.com links with numbers.
+  t = t.replace(/https?:\/\/(?:wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com)\/\S+/gi, "[removed]");
+  t = t.replace(/\bwhats?app\b\s*[:#]?\s*\+?\d[\d\s().-]{6,}\d/gi, "[removed]");
+  // Email addresses.
+  t = t.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[removed]");
+  // Indonesian + generic phone numbers (+62…, 08…, or 9+ digit runs).
+  t = t.replace(/\+62[\d\s().-]{7,}\d/g, "[removed]");
+  t = t.replace(/\b08\d[\d\s().-]{6,}\d/g, "[removed]");
+  t = t.replace(/\+?\d[\d\s().-]{9,}\d/g, (m) => {
+    const digits = m.replace(/\D/g, "");
+    return digits.length >= 10 ? "[removed]" : m;
+  });
+  return t.replace(/[ \t]{2,}/g, " ").trim();
+}
