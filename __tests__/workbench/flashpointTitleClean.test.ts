@@ -91,3 +91,115 @@ describe("dedupeByTitle — video/watch syndication", () => {
     expect(dedupeByTitle(rows)).toHaveLength(2);
   });
 });
+
+describe("dedupeByTitle — same-event syndication collapse", () => {
+  it("collapses varying casualty-count / place-framing copies of one prison riot into a single row", () => {
+    const rows = [
+      {
+        title: "19 killed in Sri Lanka prison riot",
+        date: new Date("2026-07-06T02:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Sri Lanka prison riot kills 23, wounds more than 100",
+        date: new Date("2026-07-06T09:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Death toll in Negombo prison riot rises to 25",
+        date: new Date("2026-07-06T18:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "26 dead after deadly Negombo prison riot in Sri Lanka",
+        date: new Date("2026-07-07T01:00:00Z"),
+        severity: "extreme",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Clash at Negombo prison leaves scores dead across Sri Lanka jails",
+        date: new Date("2026-07-07T05:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Inmates to be transferred following Negombo prison riot",
+        date: new Date("2026-07-07T08:00:00Z"),
+        severity: "moderate",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Sri Lanka prison riot: death toll climbs as violence spreads",
+        date: new Date("2026-07-07T12:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Negombo prison riot: 25 killed, hundreds wounded",
+        date: new Date("2026-07-07T20:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+    ];
+    const out = dedupeByTitle(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0].severity).toBe("extreme");
+  });
+
+  it("keeps two same-type events in different cities apart (exclusive subjects)", () => {
+    const rows = [
+      {
+        title: "Prison riot erupts in Manila amid overcrowding",
+        date: new Date("2026-07-06T02:00:00Z"),
+        severity: "high",
+        country: "Philippines",
+      },
+      {
+        title: "Prison riot erupts in Cebu amid overcrowding",
+        date: new Date("2026-07-06T03:00:00Z"),
+        severity: "high",
+        country: "Philippines",
+      },
+    ];
+    expect(dedupeByTitle(rows)).toHaveLength(2);
+  });
+
+  it("keeps two different same-country events apart when only the country name is shared", () => {
+    const rows = [
+      {
+        title: "Sri Lanka prison riot kills 23",
+        date: new Date("2026-07-06T02:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Riots erupt in Sri Lanka over fuel shortages",
+        date: new Date("2026-07-06T05:00:00Z"),
+        severity: "moderate",
+        country: "Sri Lanka",
+      },
+    ];
+    expect(dedupeByTitle(rows)).toHaveLength(2);
+  });
+
+  it("does not merge across different countries even when wording matches", () => {
+    const rows = [
+      {
+        title: "PTI supporters clash with police in Lahore rally",
+        date: new Date("2026-07-06T02:00:00Z"),
+        severity: "moderate",
+        country: "Pakistan",
+      },
+      {
+        title: "Opposition supporters clash with police in Dhaka rally",
+        date: new Date("2026-07-06T03:00:00Z"),
+        severity: "moderate",
+        country: "Bangladesh",
+      },
+    ];
+    expect(dedupeByTitle(rows)).toHaveLength(2);
+  });
+});

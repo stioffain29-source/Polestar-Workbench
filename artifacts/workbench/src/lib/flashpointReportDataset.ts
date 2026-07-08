@@ -724,6 +724,20 @@ function distinctSubjects(a: Set<string>, b: Set<string>): boolean {
 
 const SAME_EVENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
+// Tokens of the country NAME (e.g. "Sri Lanka" -> {sri, lanka}). A multi-word
+// country name alone would otherwise satisfy the >= 2 shared-anchor threshold,
+// letting two DIFFERENT same-country events merge on their shared nationality.
+// These are excluded from the shared-anchor count so a link needs >= 2 real
+// place / event anchors BEYOND the country name.
+function countryNameTokens(country: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of normaliseTitle(country).split(" ")) {
+    if (!raw || raw.length < 3) continue;
+    out.add(singulariseToken(raw));
+  }
+  return out;
+}
+
 function sameCountryOrUnknown(a: string, b: string): boolean {
   const na = (a ?? "").trim().toLowerCase();
   const nb = (b ?? "").trim().toLowerCase();
@@ -744,12 +758,13 @@ function sameCountryOrUnknown(a: string, b: string): boolean {
 // both framings ("Negombo ... Sri Lanka Clash") closes the cluster; the best
 // row survives.
 function clusterSameEvent<
-  T extends { title: string; date: Date; severity: string; country?: string },
+  T extends { title: string; date: Date; severity: string; country?: string | null },
 >(rows: T[]): T[] {
   const n = rows.length;
   if (n < 2) return rows;
   const anchors = rows.map((r) => anchorTokens(r.title));
   const subjects = anchors.map((a) => subjectTokens(a));
+  const countryToks = rows.map((r) => countryNameTokens(r.country ?? ""));
   const parent = Array.from({ length: n }, (_, i) => i);
   const find = (i: number): number => {
     while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
@@ -763,7 +778,11 @@ function clusterSameEvent<
       const [small, big] = anchors[i].size <= anchors[j].size
         ? [anchors[i], anchors[j]] : [anchors[j], anchors[i]];
       let shared = 0;
-      for (const t of small) if (big.has(t)) shared++;
+      for (const t of small) {
+        if (!big.has(t)) continue;
+        if (countryToks[i].has(t) || countryToks[j].has(t)) continue;
+        shared++;
+      }
       if (shared >= 2) parent[find(i)] = find(j);
     }
   }
@@ -784,7 +803,7 @@ function clusterSameEvent<
   return out;
 }
 
-export function dedupeByTitle<T extends { title: string; date: Date; severity: string; country?: string }>(rows: T[]): T[] {
+export function dedupeByTitle<T extends { title: string; date: Date; severity: string; country?: string | null }>(rows: T[]): T[] {
   const byTitle = new Map<string, T>();
   for (const r of rows) {
     const k = titleKey(r.title);

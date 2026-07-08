@@ -105,10 +105,11 @@ function resolveShippingTrue<T extends TrueIncidentLike>(incidents: T[]): T[] {
 }
 
 // Flashpoint/protests: relevance gate THEN collapse syndicated rewrites of the
-// same event using the report builder's exact two-pass title+signature dedup,
-// so the monitor and the dashboard card both count DISTINCT events, not the
-// number of outlets that re-ran the same wire. The dedup keeps the best row
-// (highest severity, then newest), mirroring the Shipping list-level transform.
+// same event using the report builder's three-pass dedup (exact title, topic
+// signature, then fuzzy same-event clustering), so the monitor and the
+// dashboard card both count DISTINCT events, not the number of outlets that
+// re-ran the same wire. The dedup keeps the best row (highest severity, then
+// newest), mirroring the Shipping list-level transform.
 function resolveFlashpointTrue<T extends TrueIncidentLike>(incidents: T[]): T[] {
   const relevant = incidents.filter((i) => isTrueIncident("flashpoint", i));
   const enriched = relevant.map((i) => {
