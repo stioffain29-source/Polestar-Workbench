@@ -219,6 +219,25 @@ export interface UpcomingSignalSource extends UpcomingSignalInput {
   sourceUrl?: string | null;
 }
 
+// Announcement-date formatter shared by every surface so the date reads
+// identically (UTC, avoiding the timezone day-roll bug) as "DD Mon YYYY".
+const SIGNAL_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+export function formatAnnouncedDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${SIGNAL_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// ONE bullet-line formatter for the Indonesia brief (screen + PDF), so the
+// preview and the PDF can never disagree. Reads "<signal>: <meaning> (reported
+// <date>)." — the date is the ANNOUNCEMENT date, never a fabricated event date.
+export function upcomingSignalLine(r: UpcomingSignalRow): string {
+  return `${r.signal}: ${r.meaning} (reported ${formatAnnouncedDate(r.announcedAt)}).`;
+}
+
 // Build the deduped, capped forewarning rows shared by the live monitor and the
 // Indonesia brief. Scans only a recent announcement window (default 14 days) so
 // a wide date range cannot resurrect long-stale "upcoming" items. Rows are

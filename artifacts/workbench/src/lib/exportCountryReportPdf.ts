@@ -33,6 +33,7 @@ import {
   type KpiCardData,
 } from "./pdfChrome";
 import { COUNTRY_COVER_URLS } from "./coverImages";
+import { upcomingSignalLine } from "./upcomingSignals";
 import { relatedIncidentsLimit } from "./reportWindow";
 import { reportKindLabel } from "./reportKind";
 import { classifyIncidentType } from "./incidentClassifier";
@@ -1326,6 +1327,17 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
   if (escalationIndicators.length > 0) {
     drawJakartaStrandLabel(ctx, "Escalation Indicators");
     drawJakartaBulletList(ctx, escalationIndicators);
+  }
+  // Reported upcoming activity (advance warning) — mirrors the screen preview
+  // order (escalation indicators, then upcoming activity). Empty for every
+  // theatre except Indonesia, so byte-identical elsewhere.
+  if ((d.upcomingSignals ?? []).length > 0) {
+    drawJakartaStrandLabel(ctx, "Reported Upcoming Activity");
+    drawJakartaBulletList(ctx, (d.upcomingSignals ?? []).map(upcomingSignalLine));
+    renderProse(
+      ctx,
+      "Forward-looking signals drawn from reporting that announces scheduled or planned activity. Dates shown are announcement dates, not confirmed event dates.",
+    );
   }
 
   // 8. Polestar View — closes the written brief.

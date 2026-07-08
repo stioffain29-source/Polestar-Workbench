@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { format } from "date-fns";
+import { upcomingSignalLine } from "../lib/upcomingSignals";
 import type {
   PngReportDataset,
   PngReportItem,
@@ -400,6 +401,25 @@ export default function PngCountryReportBody({
           <div style={{ marginTop: 10 }}>
             <StrandLabel>Escalation Indicators</StrandLabel>
             <BulletList items={escalationIndicators} />
+          </div>
+        ) : null}
+        {(d.upcomingSignals ?? []).length > 0 ? (
+          <div style={{ marginTop: 10 }}>
+            <StrandLabel>Reported Upcoming Activity</StrandLabel>
+            <BulletList items={(d.upcomingSignals ?? []).map(upcomingSignalLine)} />
+            <p
+              style={{
+                fontFamily: ROBOTO,
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: DUSK,
+                margin: "4px 0 0 0",
+              }}
+            >
+              Forward-looking signals drawn from reporting that announces
+              scheduled or planned activity. Dates shown are announcement dates,
+              not confirmed event dates.
+            </p>
           </div>
         ) : null}
       </Section>

@@ -26,6 +26,7 @@ import {
 } from "@/lib/protestsAnalysis";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { buildUpcomingSignalRows, formatAnnouncedDate } from "@/lib/upcomingSignals";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -274,6 +275,27 @@ export default function Protests() {
   const sortedForTable = useMemo(
     () => [...inWindow].sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime()),
     [inWindow],
+  );
+
+  // --- Reported upcoming activity (advance warning) -----------------------
+  // Forward-looking signals extracted from reporting that ANNOUNCES a
+  // scheduled / planned protest. Built from the full resolved set (NOT the
+  // RangeToggle window) on a FIXED 14-day announcement lookback via the shared
+  // upcomingSignals authority, so it never drifts from the report/brief. Empty
+  // is normal (STRICT no-fabrication: an unreported march is not surfaced).
+  const upcomingSignals = useMemo(
+    () =>
+      buildUpcomingSignalRows(
+        enriched.map((i) => ({
+          title: i.title,
+          summary: i.summary ?? null,
+          country: i.country ?? null,
+          occurredAt: i.occurredAt,
+          sourceUrl: incidentSourceUrl(i),
+        })),
+        { windowDays: 14 },
+      ),
+    [enriched],
   );
 
   // Chunk the (date-sorted, in-window) table by calendar month so the main
@@ -597,6 +619,57 @@ export default function Protests() {
             );
           })}
         </div>
+      </Section>
+
+      {/* 6b. Reported upcoming activity — advance warning of scheduled/announced protests */}
+      <Section title="Reported Upcoming Activity">
+        <div className="bg-white border border-border rounded-sm">
+          {isLoading ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+          ) : upcomingSignals.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              No scheduled or announced upcoming activity has been reported.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="text-left p-2 font-sans font-medium w-[130px]">Country</th>
+                    <th className="text-left p-2 font-sans font-medium">Reported Signal</th>
+                    <th className="text-left p-2 font-sans font-medium">Operational Meaning</th>
+                    <th className="text-left p-2 font-sans font-medium w-[120px]">Announced</th>
+                    <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {upcomingSignals.map((r, idx) => (
+                    <tr key={`${r.country}-${idx}`} className="hover:bg-muted/30 align-top">
+                      <td className="p-2 text-xs">{r.country}</td>
+                      <td className="p-2 font-medium">{r.signal}</td>
+                      <td className="p-2 text-xs text-foreground/80">{r.meaning}</td>
+                      <td className="p-2 font-mono text-xs whitespace-nowrap">
+                        {formatAnnouncedDate(r.announcedAt)}
+                      </td>
+                      <td className="p-2">
+                        {r.sourceUrl ? (
+                          <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground italic mt-2">
+          Forward-looking signals drawn from reporting that announces scheduled or planned protest activity over the next 14 days. The date shown is the announcement date, not a confirmed event date. An empty panel means no upcoming activity has been reported — not that none will occur.
+        </p>
       </Section>
 
       {/* 7. Incident table */}

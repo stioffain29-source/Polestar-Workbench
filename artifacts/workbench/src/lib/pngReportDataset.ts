@@ -35,6 +35,7 @@ import {
   type StorySimInput,
 } from "./countrySameStory";
 import { stripWireCruft } from "./incidentTitle";
+import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSignals";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
@@ -246,6 +247,15 @@ export interface StructuredTheatreConfig {
   // isNonKineticAssistanceItem). Set ONLY on PNG_REPORT_CONFIG; every other
   // theatre is byte-identical because the correction is inert when unset.
   demoteNonKineticWire?: boolean;
+  // Indonesia-only. When true, the Outlook section additionally renders a
+  // "Reported Upcoming Activity" table of forward-looking protest signals
+  // extracted from the period's reporting (shared upcomingSignals authority,
+  // same rows the live Protests monitor shows). STRICT no-fabrication: the
+  // table shows the ANNOUNCEMENT date + source, never a guessed event date, and
+  // is empty when nothing is reported. Set ONLY on INDONESIA_REPORT_CONFIG;
+  // every other theatre leaves `upcomingSignals` empty so their render is
+  // byte-identical.
+  showUpcomingSignals?: boolean;
 }
 
 export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -402,6 +412,7 @@ export const INDONESIA_REPORT_CONFIG: StructuredTheatreConfig = {
   extractItem: extractIndonesiaItem,
   proseVariant: "operating-risk",
   topIncidentsHeading: "Priority Incidents This Week",
+  showUpcomingSignals: true,
 };
 
 export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
@@ -576,6 +587,10 @@ export interface PngReportDataset {
   // reporting, backstopped by the curated baseline watchlist.
   locationWatchlist: LocationWatchlistEntry[];
   outlook: string;
+  // Forward-looking "Reported Upcoming Activity" rows shown inside the Outlook
+  // section. Populated ONLY for theatres with config.showUpcomingSignals
+  // (Indonesia); empty [] everywhere else so their render is byte-identical.
+  upcomingSignals: UpcomingSignalRow[];
   // Optional heading override for the priority-incidents section (operating-risk
   // theatres set "Priority Incidents This Week"; unset → renderer default).
   topIncidentsHeading?: string;
@@ -1373,6 +1388,25 @@ export function buildStructuredReportDataset(
     outlook = `${mostLikely} ${locLine}\n\n${escLine}\n\n${deEscalation} ${worseImpact}`;
   }
 
+  // --- Reported upcoming activity (advance warning) --------------------------
+  // Forward-looking protest signals extracted via the shared upcomingSignals
+  // authority — the SAME rows the live Protests monitor surfaces. Fed from the
+  // 30-day source set so the authority's own 14-day announcement window applies
+  // (never a fabricated event date). Gated to Indonesia; every other theatre
+  // gets [] so its render is byte-identical. Detection reads the translated
+  // displayTitle when present so English keyword cues fire on Bahasa headlines.
+  const upcomingSignals: UpcomingSignalRow[] = config.showUpcomingSignals
+    ? buildUpcomingSignalRows(
+        (args.thirtyDay ?? []).map((i) => ({
+          title: i.displayTitle ?? i.title,
+          summary: i.summary ?? null,
+          country: config.countryName,
+          occurredAt: i.occurredAt,
+          sourceUrl: (i.resolvedUrl ?? i.sourceUrl ?? null) || null,
+        })),
+      )
+    : [];
+
   // --- Trajectory (shared by BLUF + Polestar View) ---------------------------
   // Without a previous window there is no honest basis for a trend, so fall back
   // to "stable" (reads as "holds to the standing pattern") rather than inferring
@@ -1876,6 +1910,7 @@ export function buildStructuredReportDataset(
     businessImpact,
     locationWatchlist,
     outlook,
+    upcomingSignals,
     topIncidentsHeading: config.topIncidentsHeading,
     proseVariant: config.proseVariant,
     polestarView,
