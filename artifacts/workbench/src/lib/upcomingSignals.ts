@@ -29,8 +29,13 @@ export interface UpcomingSignalInput {
 // Self-sufficient future cues: the cue itself names a protest / political-legal
 // object, so it qualifies on its own (e.g. "planned strike", "call for a
 // rally", "scheduled hearing").
+// NOTE: bare "strike on|rally on|march on" alternatives were deliberately
+// REMOVED — they false-positive on kinetic strikes ("drone strike on convoy")
+// and market moves ("shares rally on rate-cut hopes"). Genuinely scheduled
+// marches/rallies ("farmers to march on parliament on Friday") still qualify
+// via the temporal+object path, keeping detection precision-first.
 const FUTURE_STRONG_RE =
-  /\b(planned (protest|strike|rally|march|blockade|mobilisation|mobilization|walkout|shutdown)|announced (protest|strike|rally|march|mobilisation|mobilization)|to (protest|march|rally)|(to|will) (stage|hold|launch|begin|commence|call)(?: (?:a|an|the))? (protest|sit[- ]in|march|rally|strike|walkout|demonstration|blockade|shutdown|boycott|mobilisation|mobilization)|will (protest|march|rally|strike|walkout|demonstrate)|call(ed|s)? for (a )?(protest|strike|rally|march|sit[- ]in|shutdown|boycott|walkout)|strike on |rally on |march on |union calls|students? to (protest|march|rally)|scheduled (hearing|sitting|vote|session)|court date|anniversary (of|protest|march|rally)|upcoming (protest|strike|rally|march|hearing|vote))\b/i;
+  /\b(planned (protest|strike|rally|march|blockade|mobilisation|mobilization|walkout|shutdown)|announced (protest|strike|rally|march|mobilisation|mobilization)|to (protest|march|rally)|(to|will) (stage|hold|launch|begin|commence|call)(?: (?:a|an|the))? (protest|sit[- ]in|march|rally|strike|walkout|demonstration|blockade|shutdown|boycott|mobilisation|mobilization)|will (protest|march|rally|strike|walkout|demonstrate)|call(ed|s)? for (a )?(protest|strike|rally|march|sit[- ]in|shutdown|boycott|walkout)|union calls|students? to (protest|march|rally)|scheduled (hearing|sitting|vote|session)|court date|anniversary (of|protest|march|rally)|upcoming (protest|strike|rally|march|hearing|vote))\b/i;
 
 // Bare temporal / open-ended cues that carry NO protest object of their own.
 // They only qualify when a protest object co-occurs elsewhere in the text, so

@@ -287,7 +287,9 @@ export default function Protests() {
     () =>
       buildUpcomingSignalRows(
         enriched.map((i) => ({
-          title: i.title,
+          // Translated title first so English cues fire on Bahasa headlines —
+          // parity with the Indonesia brief, which also feeds displayTitle.
+          title: i.displayTitle ?? i.title,
           summary: i.summary ?? null,
           country: i.country ?? null,
           occurredAt: i.occurredAt,

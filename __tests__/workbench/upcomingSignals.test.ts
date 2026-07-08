@@ -46,6 +46,19 @@ describe("upcomingSignals — advance-warning detection authority", () => {
     expect(hasUpcomingSignal({ title: "Champions set for the final on Sunday" })).toBe(false);
   });
 
+  it("rejects kinetic-strike and market-rally homonyms ('X on ' false positives)", () => {
+    // Kinetic military strike, not a labour strike notice.
+    expect(hasUpcomingSignal({ title: "Drone strike on convoy kills three" })).toBe(false);
+    // Financial-markets rally, not a protest rally.
+    expect(hasUpcomingSignal({ title: "Shares rally on rate-cut hopes" })).toBe(false);
+  });
+
+  it("still detects a genuinely scheduled march via the temporal+object path", () => {
+    expect(
+      hasUpcomingSignal({ title: "Farmers to march on parliament on Friday" }),
+    ).toBe(true);
+  });
+
   it("rejects already-completed protest reporting (past, not forewarning)", () => {
     expect(
       hasUpcomingSignal({ title: "Thousands joined a rally yesterday that has ended" }),
