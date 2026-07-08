@@ -3,6 +3,12 @@ import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import { classifyIncidentType } from "./incidentClassifier";
 import { stripWireCruft } from "./incidentTitle";
+import {
+  extractFutureSignals,
+  shortSignalLabel,
+  forecastMeaningFor,
+  operationalMeaningFor,
+} from "./upcomingSignals";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any
@@ -532,17 +538,8 @@ function primaryCountry(raw: string | null | undefined): string {
 // --- Future-protest extractor ----------------------------------------------
 // Pulls forward-looking signals out of the file: dated protest calls,
 // announced strikes, scheduled court hearings, named mobilisation dates.
-// Used to populate Forecast: Next 7-14 Days and Watch Next so those
-// sections quote actual upcoming activity rather than generic advice.
-const FUTURE_LANG_RE = /\b(next week|next month|tomorrow|tonight|this (weekend|friday|saturday|sunday|monday|tuesday|wednesday|thursday)|on (monday|tuesday|wednesday|thursday|friday|saturday|sunday)|planned (protest|strike|rally|march|blockade|mobilisation|mobilization|walkout|shutdown)|announced (protest|strike|rally|march|mobilisation|mobilization)|to (protest|march|rally|stage|hold|begin|launch|stage a (protest|sit[- ]in|march|rally))|will (protest|march|rally|stage|hold|begin|launch|strike)|call(ed|s)? for (a )?(protest|strike|rally|march|sit[- ]in|shutdown|boycott|walkout)|strike on |rally on |march on |union calls|students? to (protest|march|rally)|scheduled (hearing|sitting|vote|session)|court date|anniversary (of|protest|march|rally)|set for |upcoming (protest|strike|rally|march|hearing|vote)|to commence|to begin)\b/i;
 const COVERAGE_COUNTRIES = ["Australia", "Papua New Guinea", "Indonesia", "Philippines", "Japan", "Nepal"] as const;
 const COVERAGE_CITY_RE = /\b(sydney|melbourne|canberra|brisbane|port moresby|jayapura|manila|quezon city|tokyo|osaka|kathmandu|pokhara)\b/i;
-function extractFutureSignals(rows: EnrichedIncident[]): EnrichedIncident[] {
-  return rows.filter((r) => {
-    const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-    return FUTURE_LANG_RE.test(text);
-  });
-}
 
 // --- Dedupe helpers --------------------------------------------------------
 // Google-News / wire titles append the publisher after a final ASCII " - " and
@@ -1558,134 +1555,6 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   return out.map((b) => `- ${b}`).join("\n");
 }
 
-// Detect a city / location cue in the text so forecast labels can
-// carry "Country (City)" rather than country alone. Restricted to the
-// recurring APAC capitals and major commercial cities the brief
-// actually covers.
-const CITY_LOOKUP: Array<[RegExp, string]> = [
-  [/\bislamabad\b/i, "Islamabad"],
-  [/\brawalpindi\b/i, "Rawalpindi"],
-  [/\blahore\b/i, "Lahore"],
-  [/\bkarachi\b/i, "Karachi"],
-  [/\bpeshawar\b/i, "Peshawar"],
-  [/\bquetta\b/i, "Quetta"],
-  [/\badiala\b/i, "Rawalpindi"],
-  [/\bdhaka\b/i, "Dhaka"],
-  [/\bchittagong\b/i, "Chittagong"],
-  [/\bnew delhi\b|\bdelhi\b/i, "Delhi"],
-  [/\bmumbai\b/i, "Mumbai"],
-  [/\bkolkata\b/i, "Kolkata"],
-  [/\bchennai\b/i, "Chennai"],
-  [/\bbengaluru\b|\bbangalore\b/i, "Bengaluru"],
-  [/\bmanila\b|\bquezon city\b/i, "Manila"],
-  [/\bcebu\b/i, "Cebu"],
-  [/\bseoul\b/i, "Seoul"],
-  [/\bbusan\b/i, "Busan"],
-  [/\btokyo\b/i, "Tokyo"],
-  [/\bosaka\b/i, "Osaka"],
-  [/\bjakarta\b/i, "Jakarta"],
-  [/\bbangkok\b/i, "Bangkok"],
-  [/\bkuala lumpur\b/i, "Kuala Lumpur"],
-  [/\bhanoi\b/i, "Hanoi"],
-  [/\bho chi minh\b/i, "Ho Chi Minh City"],
-  [/\bkathmandu\b/i, "Kathmandu"],
-  [/\bcolombo\b/i, "Colombo"],
-  [/\bport moresby\b/i, "Port Moresby"],
-  [/\bsydney\b/i, "Sydney"],
-  [/\bmelbourne\b/i, "Melbourne"],
-  [/\bcanberra\b/i, "Canberra"],
-  [/\btaipei\b/i, "Taipei"],
-];
-function detectCity(r: EnrichedIncident): string | null {
-  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  for (const [rx, name] of CITY_LOOKUP) {
-    if (rx.test(text)) return name;
-  }
-  return null;
-}
-
-// Clean, content-based signal labels for Watch Next and the Forecast
-// table. Labels must read as actor + trigger + form — never bare
-// "Protest mobilisation". Adds city in parens when detectable so the
-// reader sees country + city + actor + expected effect across the
-// row (effect column comes from forecastMeaningFor).
-function shortSignalLabel(r: EnrichedIncident): string {
-  const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  const city = detectCity(r);
-  const withCity = (label: string): string => (city ? `${label} (${city})` : label);
-  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) {
-    if (/\bsection\s*144\b|\bdefy/.test(text)) return withCity("PTI protest defying Section 144");
-    if (/release|imprisonment|bail|adiala/.test(text)) return withCity("PTI mobilisation for Imran's release");
-    if (/case|court|cjp|hearing|trial/.test(text)) return withCity("PTI court-hearing pressure");
-    if (/countrywide|nationwide|across.*cities/.test(text)) return "PTI countrywide protest call";
-    return withCity("PTI street mobilisation");
-  }
-  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return withCity("Section 144 / curfew order");
-  if (/\b(chemist|pharmacist)s?\b/.test(text)) return withCity("Chemists' strike notice over e-pharmacy rules");
-  if (/(union|labour|labor).*(injunct|strike|walkout)|injunct.*(union|strike|labour|labor)/.test(text)) return withCity("Union injunction ruling — sectoral strike risk");
-  if (/\b(metro bus|salaries|salary|pay|wages?|unpaid)\b/.test(text)) return withCity("Sectoral pay protest by transport / public-sector staff");
-  if (/\b(student union|student body|students?)\b.{0,40}\b(protest|march|rally|walkout|strike)\b/.test(text)) return withCity("Student-body mobilisation");
-  if (/\b(teacher|faculty|vc|university|campus)\b/.test(text)) return withCity("Faculty / campus protest");
-  if (/\b(dowry|kin|family|relatives).*(protest|sit|demand)|protest.*(family|kin)/.test(text)) return withCity("Family-led sit-in at official premises");
-  if (/\b(petroleum|fuel|levy|tariff|tax|price)\b/.test(text)) return withCity("Fuel / levy political challenge");
-  if (/\bblockade|roadblock|highway|motorway|sit[- ]?in\b/.test(text)) return withCity("Road blockade / sit-in");
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return withCity("Sectoral strike notice");
-  if (/\brally|march|protest|demonstration\b/.test(text)) {
-    // Pull the trigger keyword instead of a bare "Protest mobilisation".
-    const trig =
-      /\b(rape|murder|killing|femicide|gender violence|gbv)\b/i.test(text) ? "gender-violence protest"
-      : /\bpalestin|gaza|israel|sumud\b/i.test(text) ? "Palestine solidarity protest"
-      : /\banti[- ]?india\b/i.test(text) ? "anti-India protest"
-      : /\bdefence spending|parliament|budget|funds\b/i.test(text) ? "policy / budget protest"
-      : /\b(election|vote|electoral|poll)\b/i.test(text) ? "electoral protest"
-      : /\b(opposition|movement)\b/i.test(text) ? "opposition street action"
-      : /\b(union|labour|labor|workers?)\b/i.test(text) ? "labour-led protest march"
-      : "civic protest march";
-    return withCity(trig.charAt(0).toUpperCase() + trig.slice(1));
-  }
-  // Last-resort: clean clip on a word boundary, no ellipsis. Final
-  // guard: never return a bare "Protest mobilisation" — fall back to
-  // a generic but trigger-aware label instead.
-  const t = (r.title ?? "").trim();
-  const candidate = t.length <= 48
-    ? t
-    : (() => {
-        const slice = t.slice(0, 48);
-        const cut = slice.lastIndexOf(" ");
-        return cut > 20 ? slice.slice(0, cut).trim() : slice.trim();
-      })();
-  if (/^\s*protest mobilisation\s*$/i.test(candidate)) {
-    return withCity("Civic protest march");
-  }
-  return candidate;
-}
-
-// Forecast-table operational meaning — short, decision-grade phrase
-// keyed off content. Kept distinct from the Watch Next bullet line.
-function forecastMeaningFor(r: EnrichedIncident): string {
-  const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Road closures and venue-access friction around party HQs, court complexes and city centres.";
-  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Trigger WFH and close public-facing sites in the affected area.";
-  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Pharmacy supply disruption 24-72h ahead; brief procurement and customer-care.";
-  if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Sectoral disruption pending court ruling; pre-position contingency supply.";
-  if (/\b(metro bus|salaries|salary|wages|pay)\b/.test(text)) return "Sectoral walkout risk; brief logistics and field operations on local delays.";
-  if (/\b(teacher|faculty|campus|university|student)\b/.test(text)) return "Campus action seeds city-centre protests within a week; expect adjoining-road disruption.";
-  if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security and visitor management.";
-  if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "Adverse ruling converts into same-day rallies near the court complex.";
-  if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Validate against logistics corridor; pre-position alternative routings.";
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Supply-chain friction and sectoral closures 24-72h ahead.";
-  return "Treat as leading indicator; confirm operating impact inside 24-48h.";
-}
-
-function operationalMeaningFor(r: EnrichedIncident): string {
-  const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "supply-chain friction and sectoral closures 24-72h ahead.";
-  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "road closures and venue-access friction; brief drivers in advance.";
-  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "adverse ruling triggers same-day rallies near the court complex.";
-  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate against logistics corridor; pre-position alternative routings.";
-  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger WFH and close public-facing sites in the affected area.";
-  return "treat as leading indicator; confirm inside 24-48h.";
-}
 
 function buildWatchNext(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
