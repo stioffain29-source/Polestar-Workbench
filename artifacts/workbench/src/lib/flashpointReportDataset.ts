@@ -148,6 +148,14 @@ const SEV_RANK: Record<string, number> = {
 const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme",
 };
+// Brand five-tier severity ramp — mirrors SEV_COLOR in pdfChrome.ts. Kept
+// local so this dataset stays free of the jsPDF/@assets import chain that
+// pdfChrome pulls in (which would break the jest/tsx callers of this file).
+// If a tier colour changes there, change it here in lockstep.
+// A33232 = Extreme only, 1B6B7A = Insignificant only.
+const SEV_HEX: Record<string, string> = {
+  insignificant: "#1B6B7A", low: "#6FB872", moderate: "#E67E22", high: "#C0392B", extreme: "#A33232",
+};
 
 function sevKey(s: string | null | undefined): string {
   return (s ?? "").toLowerCase();
@@ -881,7 +889,7 @@ export function buildFlashpointReportDataset(
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
     {
-      label: "Records In Window",
+      label: "Incidents In Window",
       value: String(enriched.length),
     },
     {
@@ -893,19 +901,34 @@ export function buildFlashpointReportDataset(
     {
       label: "Top Issue Type",
       value: topIssue,
-      note: topIssueN > 0 ? `${topIssueN} record${topIssueN === 1 ? "" : "s"}` : undefined,
+      note: topIssueN > 0 ? `${topIssueN} incident${topIssueN === 1 ? "" : "s"}` : undefined,
     },
     {
       label: "Most Affected Country",
       value: topCountry,
-      note: topCountryN > 0 ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}` : undefined,
+      note: topCountryN > 0 ? `${topCountryN} incident${topCountryN === 1 ? "" : "s"}` : undefined,
     },
     { label: "Latest Incident", value: latest },
   ];
 
-  // Country bar rows (top 12 only, identified countries)
+  // Country bar rows (top 12 only, identified countries). Bar LENGTH is the
+  // distinct-incident count; bar COLOUR is that country's highest severity
+  // tier this window — so a low-volume but severe theatre reads as serious
+  // rather than being buried beneath high-volume, low-severity activity.
+  const countryTopSev = new Map<string, string>();
+  for (const r of enriched) {
+    const c = (r.country ?? "").trim();
+    if (!c) continue;
+    const k = sevKey(r.severity);
+    if ((SEV_RANK[k] ?? 0) > (SEV_RANK[countryTopSev.get(c) ?? ""] ?? 0)) {
+      countryTopSev.set(c, k);
+    }
+  }
   const countryRows: BarRow[] = Array.from(countryCount.entries())
-    .map(([label, value]) => ({ label, value, color: "#465bff" }))
+    .map(([label, value]) => {
+      const sk = countryTopSev.get(label);
+      return { label, value, color: (sk && SEV_HEX[sk]) || "#465bff" };
+    })
     .sort((a, b) => b.value - a.value)
     .slice(0, 12);
 

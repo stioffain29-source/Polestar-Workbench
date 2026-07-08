@@ -69,7 +69,7 @@ const report = {
 };
 
 // ---------------------------------------------------------------------------
-// FlashpointReportPreview — "Records by Country" HorizontalBarChart (labelW
+// FlashpointReportPreview — "Incidents by Country" HorizontalBarChart (labelW
 // 180) plus the activism / civil-unrest IncidentTables and the Related
 // Incidents table. Same incident set as the tiles sibling test so the rows
 // survive selectFlashpointUsable.
@@ -119,7 +119,7 @@ describe("FlashpointReportPreview charts & tables", () => {
     />,
   );
 
-  it("renders the Records by Country bar chart with real country labels", () => {
+  it("renders the Incidents by Country bar chart with real country labels", () => {
     const labels = barLabels(html, 180);
     expect(labels).toContain("Indonesia");
     expect(labels).toContain("Philippines");

@@ -510,8 +510,16 @@ export default function FlashpointReportPreview({
               className="uppercase mb-2"
               style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
             >
-              {ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country"}
+              {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
             </div>
+            {ds.countryRows.length > 0 && (
+            <div
+              className="mb-2"
+              style={{ fontFamily: "Roboto, sans-serif", fontSize: 10, fontStyle: "italic", color: DUSK, opacity: 0.8 }}
+            >
+              Bar length shows incident count; colour shows the highest severity reported in each country.
+            </div>
+            )}
             <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No countries with reported activity this week." />
           </div>
         </Section>

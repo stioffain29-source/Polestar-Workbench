@@ -240,7 +240,7 @@ function drawHorizontalBarChart(
   ctx: Ctx,
   heading: string,
   rows: BarRow[],
-  opts: { labelW?: number; barColor?: string; emptyMessage?: string } = {},
+  opts: { labelW?: number; barColor?: string; emptyMessage?: string; caption?: string } = {},
 ) {
   const labelW = opts.labelW ?? 160;
   const valueW = 34;
@@ -248,11 +248,12 @@ function drawHorizontalBarChart(
   const gap = 5;
   const axisH = 14;
   const headingH = 22;
+  const captionH = opts.caption && rows.length > 0 ? 14 : 0;
   const projectedH =
     rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
-  // Reserve room for heading + chart body together so the heading
-  // cannot strand at the bottom of a page above an orphaned chart.
-  ensureSpace(ctx, headingH + projectedH);
+  // Reserve room for heading + caption + chart body together so the
+  // heading cannot strand at the bottom of a page above an orphaned chart.
+  ensureSpace(ctx, headingH + captionH + projectedH);
   drawSubtitle(ctx, heading);
   const { pdf, MX, CW } = ctx;
   if (rows.length === 0) {
@@ -267,6 +268,14 @@ function drawHorizontalBarChart(
     setRoboto(pdf, "regular");
     ctx.y += 22;
     return;
+  }
+  if (opts.caption) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(8);
+    pdf.text(sanitize(opts.caption), MX, ctx.y + 6);
+    setRoboto(pdf, "regular");
+    ctx.y += captionH;
   }
   const trackX = MX + labelW + 6;
   const trackW = CW - labelW - 6 - valueW - 6;
@@ -622,12 +631,14 @@ export async function exportFlashpointReportPdf(
   drawHorizontalBarChart(
     ctx,
     ds.countryRows.length >= 12
-      ? "Records by Country (Top 12)"
-      : "Records by Country",
+      ? "Incidents by Country (Top 12)"
+      : "Incidents by Country",
     ds.countryRows,
     {
       labelW: 160,
       emptyMessage: "No identified incident countries reported this week.",
+      caption:
+        "Bar length shows incident count; colour shows the highest severity reported in each country.",
     },
   );
 
