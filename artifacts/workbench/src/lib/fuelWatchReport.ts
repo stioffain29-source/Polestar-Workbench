@@ -27,10 +27,12 @@ import {
   buildFuelRegionalHighlights,
   buildFuelProducerBuyerActions,
   buildFuelOperationalRead,
+  buildFuelGulfChokepointWatch,
   topUpFuelBullets,
   FUEL_DEFAULT_WATCH_NEXT,
   FUEL_DEFAULT_IMPLICATIONS,
   type ProducerBuyerActionRow,
+  type FuelGulfChokepointWatch,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
 import { format, parseISO } from "date-fns";
@@ -125,6 +127,10 @@ export interface FuelIncidentData {
    *  Never repeats the Related Incidents table. Null when the window
    *  carries no usable fuel-relevant records. */
   operationalRead: string | null;
+  /** Standing Gulf/Hormuz chokepoint view (wider lookback than the 7-day
+   *  market window). Null when no chokepoint reporting falls in the lookback,
+   *  so the section is omitted rather than padded. */
+  gulfChokepointWatch: FuelGulfChokepointWatch | null;
 }
 
 export interface FuelNarrativeData {
@@ -301,6 +307,14 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     incidents,
   });
+  // Gulf/Hormuz chokepoint watch anchors on the MARKET period end (not the
+  // stored draft date) and looks back ~60 days, so a Gulf escalation that fell
+  // just outside the 7-day report window is still surfaced. fuelMarketLatestDate
+  // is the report's true market close; fall back to the issue date if absent.
+  const gulfChokepointWatch = buildFuelGulfChokepointWatch({
+    periodEnd: fuelMarketLatestDate(report.hardNumbers) ?? report.issueDate,
+    incidents,
+  });
 
   // Validation. The fail-closed export gate is keyed on market data
   // only: Brent, WTI and jet fuel are the required indicators. Other
@@ -403,6 +417,7 @@ export function buildFuelWatchReportData(
       regionalHighlights,
       producerBuyerActions,
       operationalRead,
+      gulfChokepointWatch,
     },
     narrativeData: {
       executiveSummary: report.executiveSummary,

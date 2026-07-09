@@ -1079,6 +1079,16 @@ export async function exportTopicReportPdf(
         fuelData.incidentData.regionalHighlights,
       ),
     );
+    // Gulf and Hormuz Chokepoint Watch — heading + prose (atomic) then the
+    // dated anchor lines as bullets. Mirrors the on-screen preview exactly, so
+    // screen == in-app PDF.
+    if (fuelData.incidentData.gulfChokepointWatch) {
+      const gulf = fuelData.incidentData.gulfChokepointWatch;
+      drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.read);
+      if (gulf.itemLines.length > 0) {
+        renderProse(ctx, gulf.itemLines.map((l) => `\u2022  ${l}`).join("\n"));
+      }
+    }
     if (fuelData.incidentData.producerBuyerActions.length > 0) {
       // Guard against an orphaned section heading: if there isn't room
       // for the heading + table header + a couple of rows, push the

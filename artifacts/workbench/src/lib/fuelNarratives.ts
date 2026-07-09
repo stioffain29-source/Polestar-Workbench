@@ -7,6 +7,7 @@
 // instead of padding it.
 
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
+import { stripWireCruft } from "./incidentTitle";
 
 function titleCase(s: string): string {
   return s
@@ -206,6 +207,236 @@ export function buildFuelRegionalHighlights(opts: {
     paragraphs.push(`${opener} ${recordsClause} ${phrase}. ${why} ${watch}`);
   }
   return paragraphs.join("\n\n");
+}
+
+// ---------------------------------------------------------------------------
+// Gulf & Hormuz Chokepoint Watch
+//
+// A standing chokepoint view that looks back further than the 7-day market
+// window (default 60 days) so a Gulf/Hormuz escalation that fell just outside
+// the reporting week is still surfaced. The selector is DELIBERATELY NARROW:
+// bare OPEC / Saudi / Israel market chatter is excluded because it floods the
+// window with generic oil-market noise; only genuine Strait-of-Hormuz /
+// Persian-Gulf / Arabian-Gulf / Red-Sea / Bab-el-Mandeb chokepoint vocabulary
+// qualifies. STRICT no-fabrication: prose is theme-detected from the matched
+// records ONLY, cites real dated anchor events, carries no numeric counts, and
+// never asserts a "currently rising" trend the data does not support — an
+// escalation that has since gone quiet is reported as easing, not as live.
+// ---------------------------------------------------------------------------
+
+const GULF_CHOKEPOINT_RE =
+  /\b(strait of hormuz|hormuz|persian gulf|arabian gulf|bab[- ]?el[- ]?mandeb|red sea)\b/i;
+
+// Reopen / resumed-transit vocabulary. Shared so the theme blob and the
+// per-record temporal test below agree on what counts as a "reopening".
+const GULF_REOPEN_RE =
+  /\b(reopen|re-open|clears|cleared|exit|exits|transit|resume|resumed|passage|sail)/i;
+
+const GULF_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+function gulfDayKey(iso: string | null | undefined): string | null {
+  const m = (iso ?? "").match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : null;
+}
+// Format a bare yyyy-mm-dd key as "9 May 2026" WITHOUT going through Date, so
+// a date-only key can never shift a day under the server's timezone.
+function gulfFmtDay(key: string): string {
+  const m = key.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return key;
+  return `${parseInt(m[3], 10)} ${GULF_MONTHS[parseInt(m[2], 10) - 1]} ${m[1]}`;
+}
+
+const GULF_SEV_RANK: Record<string, number> = {
+  insignificant: 1,
+  low: 2,
+  moderate: 3,
+  high: 4,
+  extreme: 5,
+};
+
+export interface FuelGulfWatchItem {
+  title: string;
+  /** yyyy-mm-dd */
+  date: string;
+  severity: string;
+  country: string | null;
+}
+
+export interface FuelGulfChokepointWatch {
+  /** 1-2 deterministic paragraphs of analyst prose. */
+  read: string;
+  /** Deduped anchor incidents, most-severe-then-newest, capped. */
+  items: FuelGulfWatchItem[];
+  /** Pre-formatted "9 May 2026 — <title> — High" lines for the bullet list. */
+  itemLines: string[];
+  /** Date span of surfaced activity, e.g. "9 May – 17 Jun 2026". */
+  rangeLabel: string;
+}
+
+/**
+ * Build the Gulf & Hormuz Chokepoint Watch section from the fuel incident
+ * set. Returns null when no genuine chokepoint reporting falls in the
+ * lookback window, so the caller omits the section entirely (no placeholder).
+ * Both the on-screen preview and the PDF receive the identical raw incident
+ * array and this function is fully deterministic, so screen == PDF.
+ */
+export function buildFuelGulfChokepointWatch(opts: {
+  /** The reporting-period end (market close), NOT the stored draft date. */
+  periodEnd: string;
+  incidents: TopicFastFactsIncident[];
+  lookbackDays?: number;
+  maxItems?: number;
+}): FuelGulfChokepointWatch | null {
+  const lookbackDays = opts.lookbackDays ?? 60;
+  const maxItems = opts.maxItems ?? 6;
+  const endKey = gulfDayKey(opts.periodEnd);
+  if (!endKey) return null;
+  const endDate = new Date(`${endKey}T00:00:00Z`);
+  const startKey = new Date(endDate.getTime() - lookbackDays * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  // 1. Select fuel chokepoint records within the lookback window. Match on the
+  //    TITLE ONLY (not the summary): a genuine Gulf/Hormuz chokepoint story
+  //    names the chokepoint in its headline, whereas a domestic pump-price cut,
+  //    an SPR-withdrawal note or a fuel-levy debate merely MENTIONS Hormuz as
+  //    background market colour in its body. Title-matching keeps the section
+  //    precision-first so those passing mentions never masquerade as chokepoint
+  //    anchors.
+  const matched = opts.incidents
+    .filter((i) => i.topic === "fuel")
+    .map((i) => ({ i, key: gulfDayKey(i.occurredAt) }))
+    .filter(
+      (x): x is { i: TopicFastFactsIncident; key: string } =>
+        x.key !== null && x.key >= startKey && x.key <= endKey,
+    )
+    .filter(({ i }) => GULF_CHOKEPOINT_RE.test(i.title ?? ""));
+  if (matched.length === 0) return null;
+
+  // 2. Rank most-severe-then-newest, then dedupe syndication so one event
+  //    with many rewrites collapses to a single representative row.
+  const ranked = matched.slice().sort((a, b) => {
+    const sa = GULF_SEV_RANK[(a.i.severity ?? "").toLowerCase()] ?? 0;
+    const sb = GULF_SEV_RANK[(b.i.severity ?? "").toLowerCase()] ?? 0;
+    if (sb !== sa) return sb - sa;
+    return b.key.localeCompare(a.key);
+  });
+  const kept: { i: TopicFastFactsIncident; key: string; title: string }[] = [];
+  const keptTokens: Set<string>[] = [];
+  for (const { i, key } of ranked) {
+    const title = stripWireCruft(i.title ?? "").trim();
+    if (!title) continue;
+    const tok = sigTokens(title);
+    if (keptTokens.some((k) => nearDuplicate(tok, k))) continue;
+    kept.push({ i, key, title });
+    keptTokens.push(tok);
+  }
+  if (kept.length === 0) return null;
+
+  // 3. Theme detection over the FULL matched set (not just the capped list),
+  //    so the prose reflects everything that happened, not only the anchors.
+  //    Titles only, matching the precision-first selection above.
+  const blob = matched
+    .map(({ i }) => i.title ?? "")
+    .join(" ")
+    .toLowerCase();
+  const hasClosure =
+    /\b(closure|closed|shut|blockad|disrupt|cut supply|crisis|choke)/.test(blob);
+  const hasKinetic =
+    /\b(refinery attack|attack|struck|missile|drone|explosion|blast|oil spill|sabotage)\b/.test(
+      blob,
+    );
+  const hasBypass =
+    /\b(bypass|pipeline|alternative route|skirt|reroute|diversion)\b/.test(blob);
+
+  // Breadth of coverage — used to decide whether the opener may call this the
+  // "dominant" risk. A window with only a stray headline or two must NOT claim
+  // a "marked concentration" (that would fabricate intensity the data lacks);
+  // it falls back to a neutral opener. "Broad" = several distinct deduped
+  // events spread across several calendar days.
+  const distinctDays = new Set(matched.map((x) => x.key)).size;
+  const broadCoverage = kept.length >= 4 && distinctDays >= 3;
+
+  // Date span of surfaced activity.
+  const keys = matched.map((x) => x.key).sort();
+  const firstKey = keys[0];
+  const lastKey = keys[keys.length - 1];
+  const rangeLabel =
+    firstKey === lastKey
+      ? gulfFmtDay(firstKey)
+      : `${gulfFmtDay(firstKey)} \u2013 ${gulfFmtDay(lastKey)}`;
+
+  // Anchor = the top-ranked (most severe, then newest) kept record.
+  const anchor = kept[0];
+  const anchorSevRank = GULF_SEV_RANK[(anchor.i.severity ?? "").toLowerCase()] ?? 0;
+
+  // A reopening may only be asserted when a reopen-vocabulary record actually
+  // POST-DATES the peak anchor — otherwise "subsequently reopened" would
+  // misstate the sequence (most transit headlines in a closure spell predate
+  // the peak). No qualifying record → the clause is simply omitted.
+  const reopenAfterAnchor = matched.some(
+    ({ i, key }) => key > anchor.key && GULF_REOPEN_RE.test(i.title ?? ""),
+  );
+
+  // 4. Compose deterministic, no-fabrication prose.
+  const p1: string[] = [];
+  p1.push(
+    broadCoverage
+      ? "The Strait of Hormuz and wider Gulf were the period's dominant fuel-route risk, with a marked concentration of chokepoint reporting."
+      : "The Strait of Hormuz and wider Gulf featured in the period's fuel-route reporting.",
+  );
+  if (hasClosure) {
+    p1.push(
+      "Coverage centred on Hormuz closure and shipping disruption, forcing dependent crude and product flows onto longer, costlier routes and lifting the war-risk premium.",
+    );
+  }
+  if (hasKinetic && anchorSevRank >= 4) {
+    p1.push(
+      `Pressure peaked on ${gulfFmtDay(anchor.key)} with the window's most serious chokepoint incident: ${anchor.title}.`,
+    );
+  }
+
+  const p2: string[] = [];
+  if (reopenAfterAnchor) {
+    p2.push(
+      "The strait subsequently reopened in phases, with tanker transits resuming later in the window.",
+    );
+  }
+  if (hasBypass) {
+    p2.push("Bypass pipelines and alternative routing featured as the main mitigation.");
+  }
+  // Recency clause — honest about current status; never claims a rise the data
+  // does not show. If the freshest chokepoint record predates the period end by
+  // more than a fortnight, the escalation has eased even though it stays a watch.
+  const gapDays = Math.round(
+    (endDate.getTime() - new Date(`${lastKey}T00:00:00Z`).getTime()) / 86_400_000,
+  );
+  if (gapDays > 14) {
+    p2.push(
+      `No fresh Gulf chokepoint reporting has surfaced in the market period since ${gulfFmtDay(lastKey)}, so the chokepoint reads as easing — but it stays a standing watch given the fragility of the route.`,
+    );
+  } else {
+    p2.push(
+      "The chokepoint remains a live, standing watch given the fragility of the route.",
+    );
+  }
+
+  const read = [p1.join(" "), p2.join(" ")].filter((s) => s.trim()).join("\n\n");
+
+  const capped = kept.slice(0, maxItems);
+  const items: FuelGulfWatchItem[] = capped.map(({ i, key, title }) => ({
+    title,
+    date: key,
+    severity: (i.severity ?? "").toLowerCase(),
+    country: normaliseCountry(i.country),
+  }));
+  const itemLines = capped.map(
+    ({ i, key, title }) => `${gulfFmtDay(key)} \u2014 ${title} \u2014 ${titleCase(i.severity ?? "")}`,
+  );
+
+  return { read, items, itemLines, rangeLabel };
 }
 
 // Producer/buyer/government/infrastructure/market classification rules.

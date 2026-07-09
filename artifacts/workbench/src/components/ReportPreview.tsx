@@ -965,6 +965,23 @@ export default function ReportPreview({
             <NarrativeSection title="What Happened" text={resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)} />
             <NarrativeSection title="Operational Read" text={pickRead(report.fuelOperationalRead, fuelData.incidentData.operationalRead)} />
             <NarrativeSection title="Regional Highlights" text={pickRead(report.fuelRegionalHighlights, fuelData.incidentData.regionalHighlights)} />
+            {fuelData.incidentData.gulfChokepointWatch && (
+              <Section title="Gulf and Hormuz Chokepoint Watch">
+                <Paragraphs text={fuelData.incidentData.gulfChokepointWatch.read} />
+                {fuelData.incidentData.gulfChokepointWatch.itemLines.length > 0 && (
+                  <ul
+                    className="list-disc pl-5 space-y-1.5"
+                    style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+                  >
+                    {fuelData.incidentData.gulfChokepointWatch.itemLines.map((line, i) => (
+                      <li key={i} className="text-[14px] leading-[1.6] font-light">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            )}
             {fuelData.incidentData.producerBuyerActions.length > 0 && (
               <Section title="Producer and Buyer Actions">
                 <ProducerActionsTable rows={fuelData.incidentData.producerBuyerActions} />
