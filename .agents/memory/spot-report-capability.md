@@ -155,3 +155,38 @@ it's in the API contract; the drift test must stay green.
   (a one-incident report ran to 4 pages). The cap keeps aspect ratio, centres the
   image, and makes the border hug it. Same single-page-fit lever family as the
   220px locator map.
+
+## Local-draft autosave / recovery (never lose an unsaved draft)
+
+The editor form lives only in React state until Save POSTs; a draft the user
+typed but never successfully saved used to vanish on navigation. A localStorage
+autosave + recovery safety net now backs it (`DRAFT_PREFIX` keyed slots). Three
+non-obvious traps, each a real bug the architect caught — do not regress them:
+
+- **Autosave must be gated by a `ready` STATE, never a ref set in the same
+  commit.** The restore effect does `setForm(draft)` + `setReady(true)` together;
+  React batches them, so the autosave effect (deps include `ready`) first sees
+  `ready=false`, bails, and only re-runs once the restored form is committed. A
+  `readyRef.current=true` set synchronously does NOT work: the autosave effect in
+  that same commit still reads the stale empty `form` and its synchronous
+  empty-clear branch DELETES the draft you just tried to recover.
+- **A `baselineRef` (serialised clean form) gates SAVES, or the notice cries
+  wolf forever.** After loading a report, the form is non-empty, so autosave
+  would write a byte-identical draft, and every reopen would then "recover" it.
+  Autosave saves only when `JSON(form) !== baselineRef.current`. Reset the
+  baseline on load, on Discard, on update-success, AND in create-success BEFORE
+  `setLocation` (the `/new` and `/:id` editor share one wouter Route, so create
+  does NOT unmount — a stale `/new` baseline otherwise writes a phantom draft
+  under the new id and re-triggers recovery). The empty-clear branch is
+  deliberately NOT baseline-gated so emptying a form drops its draft at once.
+- **Namespace from-incident new-drafts (`new:<ids>`) separately from the manual
+  `new` slot**, and have the new-restore effect set `prefilled.current=true` when
+  it recovers, so the incident prefill can't overwrite recovered edits. Otherwise
+  opening a from-incident link clobbers an in-progress manual draft.
+
+`loadDraft` merges over `emptyForm()` and coerces the array fields, so a draft
+written by an older schema can't crash `isFormEmpty`/render. `saveDraft` retries
+without photos on a quota error (typed prose survives even if attachments don't)
+and never throws into render. Diagnosis note: a "lost" report is almost always a
+draft that never POSTed (check deployment logs for a POST/PATCH + the row count),
+not deleted data — spot reports have no server-side autosave.

@@ -242,6 +242,99 @@ function emptyForm(): FormState {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Local draft autosave. A spot report lives only in React state until the Save
+// button POSTs it; navigating away from an unsaved /new draft (or an edited
+// existing report) used to lose everything with no trace. We now mirror the
+// live form into localStorage on every change and recover it on load, so a
+// draft survives a navigation, a crash, a closed tab, or a failed save. The
+// copy is cleared the moment a real server save succeeds.
+// ---------------------------------------------------------------------------
+const DRAFT_PREFIX = "polestar:spot-report-draft:";
+
+function draftKey(idOrNew: number | string): string {
+  return `${DRAFT_PREFIX}${idOrNew}`;
+}
+
+function loadDraft(key: string): FormState | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { form?: Partial<FormState> } | null;
+    if (!parsed?.form || typeof parsed.form !== "object") return null;
+    // Merge over a fresh default so a draft written by an older schema (missing
+    // fields) can never crash isFormEmpty/setForm; coerce the collections that
+    // the render path indexes into.
+    const merged: FormState = { ...emptyForm(), ...parsed.form };
+    merged.linkedIncidentIds = Array.isArray(merged.linkedIncidentIds)
+      ? merged.linkedIncidentIds
+      : [];
+    merged.mapPoints = Array.isArray(merged.mapPoints) ? merged.mapPoints : [];
+    merged.photos = Array.isArray(merged.photos) ? merged.photos : [];
+    return merged;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(key: string, form: FormState): void {
+  const write = (f: FormState) =>
+    localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), form: f }));
+  try {
+    write(form);
+  } catch {
+    // localStorage quota (photo data URLs are large) — retry without photos so
+    // the analyst's typed prose still survives even if attachments can't.
+    try {
+      write({ ...form, photos: [] });
+    } catch {
+      // Best-effort only; never let autosave throw into the render path.
+    }
+  }
+}
+
+function clearDraft(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/** True when the analyst has typed nothing worth preserving (ignores the
+ * auto-stamped report date and the default status / empty collections). */
+function isFormEmpty(f: FormState): boolean {
+  const text = [
+    f.title,
+    f.incidentDate,
+    f.country,
+    f.province,
+    f.city,
+    f.latitude,
+    f.longitude,
+    f.category,
+    f.severity,
+    f.bluf,
+    f.incidentDetails,
+    f.currentSituation,
+    f.operationalImpact,
+    f.assessment,
+    f.outlook,
+    f.recommendedActions,
+    f.analystNotes,
+    f.confidenceLevel,
+    f.internalSourceNotes,
+    f.affectedRadiusKm,
+    f.createdBy,
+  ].some((v) => v.trim() !== "");
+  return (
+    !text &&
+    f.linkedIncidentIds.length === 0 &&
+    f.mapPoints.length === 0 &&
+    f.photos.length === 0
+  );
+}
+
 function formFromReport(r: SpotReport): FormState {
   return {
     title: r.title ?? "",
@@ -315,14 +408,94 @@ export default function SpotReportEditor() {
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const initId = useRef<number | null>(null);
   const prefilled = useRef(false);
+  const restoredNew = useRef(false);
+  // Serialised snapshot of the "clean" form (the server copy, a recovered
+  // draft, or empty). Autosave persists only when the live form DIFFERS from
+  // this, so an untouched report never writes a self-perpetuating draft.
+  const baselineRef = useRef<string>("");
+  // `ready` flips true only AFTER the restore decision has been committed, so
+  // the initial (still-empty) render can neither clear nor overwrite a draft.
+  const [ready, setReady] = useState(false);
+  const [recovered, setRecovered] = useState(false);
 
-  // Load saved report into the form once (re-runs if the id changes).
+  // NEW reports opened from an incident get their own draft slot keyed by the
+  // incident ids, so opening a from-incident link can never clobber a manual
+  // "new" draft (or vice versa).
+  const newDraftKey = useMemo(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const idsParam = sp.get("incidentIds") || sp.get("incidentId");
+    return draftKey(idsParam ? `new:${idsParam}` : "new");
+  }, []);
+
+  const currentDraftKey = isNew ? newDraftKey : id != null ? draftKey(id) : null;
+
+  // Load saved report into the form once (re-runs if the id changes). If an
+  // unsaved LOCAL draft that DIFFERS from the server copy exists, recover it in
+  // preference so edits made before a lost save are not silently discarded.
   useEffect(() => {
     if (report && initId.current !== report.id) {
-      setForm(formFromReport(report));
+      const serverForm = formFromReport(report);
+      const draft = loadDraft(draftKey(report.id));
+      if (
+        draft &&
+        !isFormEmpty(draft) &&
+        JSON.stringify(draft) !== JSON.stringify(serverForm)
+      ) {
+        setForm(draft);
+        baselineRef.current = JSON.stringify(draft);
+        setRecovered(true);
+        toast({
+          title: "Recovered unsaved changes",
+          description: "Showing edits that were never saved. Press Save to keep them.",
+        });
+      } else {
+        // No draft, or a stale byte-identical one — use the server copy and
+        // drop any leftover identical draft.
+        if (draft) clearDraft(draftKey(report.id));
+        setForm(serverForm);
+        baselineRef.current = JSON.stringify(serverForm);
+      }
       initId.current = report.id;
+      setReady(true);
     }
-  }, [report]);
+  }, [report, toast]);
+
+  // Recover a NEW (unsaved) draft on mount. If one exists we restore it and
+  // suppress the incident pre-fill so it cannot overwrite recovered edits.
+  useEffect(() => {
+    if (!isNew || restoredNew.current) return;
+    const draft = loadDraft(newDraftKey);
+    if (draft && !isFormEmpty(draft)) {
+      setForm(draft);
+      baselineRef.current = JSON.stringify(draft);
+      setRecovered(true);
+      prefilled.current = true;
+      toast({
+        title: "Recovered your unsaved draft",
+        description: "Press Save to store it permanently.",
+      });
+    } else {
+      baselineRef.current = JSON.stringify(emptyForm());
+    }
+    restoredNew.current = true;
+    setReady(true);
+  }, [isNew, newDraftKey, toast]);
+
+  // Mirror the live form into localStorage once the restore decision is
+  // committed. This is the safety net: a draft survives navigation, a crash, or
+  // a failed save. Clearing on empty is synchronous (so an emptied form drops
+  // its draft immediately); saving is debounced and skipped when the form still
+  // matches the clean baseline.
+  useEffect(() => {
+    if (!ready || !currentDraftKey) return;
+    if (isFormEmpty(form)) {
+      clearDraft(currentDraftKey);
+      return;
+    }
+    if (JSON.stringify(form) === baselineRef.current) return;
+    const t = setTimeout(() => saveDraft(currentDraftKey, form), 400);
+    return () => clearTimeout(t);
+  }, [form, currentDraftKey, ready]);
 
   // Pre-fill a NEW report from incident(s) passed via query string.
   useEffect(() => {
@@ -651,6 +824,12 @@ export default function SpotReportEditor() {
         { data: buildData(true) as never },
         {
           onSuccess: (created) => {
+            clearDraft(newDraftKey);
+            // Adopt the just-saved content as the clean baseline BEFORE we
+            // navigate to the new id (same wouter Route, no unmount), so
+            // autosave can't write a phantom draft that re-triggers recovery.
+            baselineRef.current = JSON.stringify(form);
+            setRecovered(false);
             qc.invalidateQueries({ queryKey: getListSpotReportsQueryKey() });
             toast({ title: "Spot report created" });
             setLocation(`/spot-reports/${(created as SpotReport).id}`);
@@ -665,6 +844,9 @@ export default function SpotReportEditor() {
         { id, data: buildData(false) as never },
         {
           onSuccess: () => {
+            clearDraft(draftKey(id));
+            baselineRef.current = JSON.stringify(form);
+            setRecovered(false);
             qc.invalidateQueries({ queryKey: getGetSpotReportQueryKey(id) });
             qc.invalidateQueries({ queryKey: getListSpotReportsQueryKey() });
             toast({ title: "Saved" });
@@ -827,6 +1009,7 @@ export default function SpotReportEditor() {
                     { id },
                     {
                       onSuccess: () => {
+                        clearDraft(draftKey(id));
                         qc.invalidateQueries({ queryKey: getListSpotReportsQueryKey() });
                         setLocation("/spot-reports");
                       },
@@ -844,6 +1027,30 @@ export default function SpotReportEditor() {
             >
               <Trash2 className="w-4 h-4" />
             </Button>
+          )}
+          {recovered && (
+            <div className="flex items-center gap-2 text-xs font-sans text-muted-foreground">
+              <span className="uppercase tracking-wider">Unsaved draft recovered</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    !confirm(
+                      "Discard the recovered local draft? Unsaved changes will be lost.",
+                    )
+                  )
+                    return;
+                  if (currentDraftKey) clearDraft(currentDraftKey);
+                  const clean = report ? formFromReport(report) : emptyForm();
+                  baselineRef.current = JSON.stringify(clean);
+                  setForm(clean);
+                  setRecovered(false);
+                }}
+                className="underline hover:text-foreground"
+              >
+                Discard
+              </button>
+            </div>
           )}
           <Button
             onClick={handleSave}
