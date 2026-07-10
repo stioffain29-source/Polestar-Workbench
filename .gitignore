@@ -48,6 +48,14 @@ Thumbs.db
 .cache/
 .local/
 
+# pnpm workspace — npm/yarn lockfiles must never be committed; a stray
+# package-lock.json makes the deploy install step run `npm install` (instead of
+# pnpm), which can 404 on the package firewall. pnpm-lock.yaml is the only lockfile.
+package-lock.json
+**/package-lock.json
+yarn.lock
+**/yarn.lock
+
 # Local dev secrets (see .env.local.example)
 .env.local
 
