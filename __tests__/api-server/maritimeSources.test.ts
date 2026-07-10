@@ -1,4 +1,4 @@
-import { db, maritimeMovementTable, sourcesTable } from "@workspace/db";
+import { db, maritimeMovementTable, sourcesTable, officialMilitaryMaritimeSourcesTable, maritimeSecurityEventsTable } from "@workspace/db";
 import { getMaritimeSourceHealth } from "../../artifacts/api-server/src/lib/maritimeSources";
 import type { MaritimeSourceHealthItem } from "@workspace/api-zod";
 import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
@@ -292,5 +292,52 @@ describe("maritime manual-upload source health", () => {
     const item = find(await getMaritimeSourceHealth(), "manual_upload");
     expect(item.status).toBe("stale");
     expect(item.asOf).not.toBeNull();
+  });
+});
+
+describe("M1.5 official military & maritime source health", () => {
+  it("exposes CENTCOM and UKMTO slots in the Primary Military group", async () => {
+    delete process.env.CENTCOM_INGEST_ENABLED;
+    delete process.env.UKMTO_INGEST_ENABLED;
+    const byTable = new Map<unknown, Rows>([
+      [officialMilitaryMaritimeSourcesTable, [{ count: 0, latest: null }]],
+      [maritimeSecurityEventsTable, [{ count: 0, latest: null }]],
+      [sourcesTable, []],
+      [maritimeMovementTable, []],
+    ]);
+    stubDb(byTable);
+    const items = await getMaritimeSourceHealth();
+    const centcom = find(items, "centcom");
+    const ukmto = find(items, "ukmto");
+    expect(centcom.group).toBe("Primary Military and Maritime Sources");
+    expect(ukmto.group).toBe("Primary Military and Maritime Sources");
+    expect(centcom.status).toBe("stale");
+    expect(ukmto.status).toBe("stale");
+  });
+
+  it("reports live when fresh official rows exist", async () => {
+    const byTable = new Map<unknown, Rows>([
+      [officialMilitaryMaritimeSourcesTable, [{ count: 2, latest: daysAgo(1) }]],
+      [maritimeSecurityEventsTable, [{ count: 0, latest: null }]],
+      [sourcesTable, [{ status: "pending", lastSuccessAt: daysAgo(1) }]],
+      [maritimeMovementTable, []],
+    ]);
+    stubDb(byTable);
+    const centcom = find(await getMaritimeSourceHealth(), "centcom");
+    expect(centcom.status).toBe("live");
+    expect(centcom.asOf).not.toBeNull();
+  });
+
+  it("reports disabled when CENTCOM_INGEST_ENABLED=false", async () => {
+    process.env.CENTCOM_INGEST_ENABLED = "false";
+    const byTable = new Map<unknown, Rows>([
+      [officialMilitaryMaritimeSourcesTable, [{ count: 0, latest: null }]],
+      [maritimeSecurityEventsTable, [{ count: 0, latest: null }]],
+      [sourcesTable, []],
+      [maritimeMovementTable, []],
+    ]);
+    stubDb(byTable);
+    const centcom = find(await getMaritimeSourceHealth(), "centcom");
+    expect(centcom.status).toBe("disabled");
   });
 });

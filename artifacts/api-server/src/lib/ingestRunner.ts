@@ -20,6 +20,11 @@ import {
   runReliefWebCorroboration,
   runReliefWebReportsIngest,
   runIccPiracyIngest,
+  emptyIccPiracySummary,
+  runUkmtoIngest,
+  emptyUkmtoIngestSummary,
+  runCentcomIngest,
+  emptyCentcomIngestSummary,
   runKammiSourceIngest,
   emptyKammiSourceSummary,
   runFacebookOsintIngest,
@@ -43,6 +48,8 @@ import {
   type ReliefWebCorroborationSummary,
   type ReliefWebReportsSummary,
   type IccPiracySummary,
+  type UkmtoIngestSummary,
+  type CentcomIngestSummary,
   type KammiSourceSummary,
   type FacebookOsintSummary,
   type GdeltEnrichSummary,
@@ -93,6 +100,8 @@ export type IngestRunResult =
       corroboration: ReliefWebCorroborationSummary;
       reliefwebReports: ReliefWebReportsSummary;
       iccPiracy: IccPiracySummary;
+      ukmtoOfficial: UkmtoIngestSummary;
+      centcomOfficial: CentcomIngestSummary;
       kammiSource: KammiSourceSummary;
       facebookOsint: FacebookOsintSummary;
       gdeltEnrich: GdeltEnrichSummary;
@@ -560,6 +569,32 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "ICC piracy ingest failed");
       iccPiracy = emptyIccPiracy(err);
     }
+    // M1.5 official UKMTO + CENTCOM scaffolds — write ONLY to
+    // official_military_maritime_sources (Phase 2 parser) and Source Health.
+    // NEVER spot_reports. Isolated try/catch so scaffold failures cannot abort
+    // the wider ingest chain.
+    let ukmtoOfficial: UkmtoIngestSummary;
+    try {
+      ukmtoOfficial = await runUkmtoIngest({ commit: true });
+      logger.info(
+        { ran: ukmtoOfficial.ran, disabled: ukmtoOfficial.disabled },
+        "UKMTO official ingest scaffold complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "UKMTO official ingest scaffold failed");
+      ukmtoOfficial = emptyUkmtoIngestSummary(err);
+    }
+    let centcomOfficial: CentcomIngestSummary;
+    try {
+      centcomOfficial = await runCentcomIngest({ commit: true });
+      logger.info(
+        { ran: centcomOfficial.ran, disabled: centcomOfficial.disabled },
+        "CENTCOM official ingest scaffold complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "CENTCOM official ingest scaffold failed");
+      centcomOfficial = emptyCentcomIngestSummary(err);
+    }
     // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
     // West Papua feeds) into clean English advisory titles. Runs EARLY — next to
     // strikes and ICC piracy, BEFORE the multi-minute scraper chain — for the
@@ -941,6 +976,8 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       corroboration,
       reliefwebReports,
       iccPiracy,
+      ukmtoOfficial,
+      centcomOfficial,
       kammiSource,
       facebookOsint,
       gdeltEnrich,

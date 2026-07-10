@@ -14,4 +14,6 @@ export interface MaritimeSourceHealthItem {
   detail: string;
   /** @nullable */
   asOf?: string | null;
+  /** @nullable */
+  group?: string | null;
 }

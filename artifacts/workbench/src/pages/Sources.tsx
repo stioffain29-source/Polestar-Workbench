@@ -195,6 +195,11 @@ function MaritimeSourceRow({ item }: { item: MaritimeSourceHealthItem }) {
     <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-[1.2fr_1.8fr_0.8fr] gap-3 text-sm">
       <div>
         <div className="font-serif font-bold text-primary">{item.label}</div>
+        {item.group ? (
+          <div className="mt-0.5 text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+            {item.group}
+          </div>
+        ) : null}
         <div className="mt-1">
           <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", MARITIME_BADGE[item.status])}>
             {MARITIME_LABEL[item.status]}

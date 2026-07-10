@@ -22,6 +22,7 @@ import reliefwebReportsRouter from "./reliefwebReports";
 import gdeltStructuredRouter from "./gdeltStructured";
 import socialRawRouter from "./socialRaw";
 import maritimeSecurityEventsRouter from "./maritimeSecurityEvents";
+import officialMilitaryMaritimeSourcesRouter from "./officialMilitaryMaritimeSources";
 import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
@@ -65,6 +66,7 @@ router.use(reliefwebReportsRouter);
 router.use(gdeltStructuredRouter);
 router.use(socialRawRouter);
 router.use(maritimeSecurityEventsRouter);
+router.use(officialMilitaryMaritimeSourcesRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
 

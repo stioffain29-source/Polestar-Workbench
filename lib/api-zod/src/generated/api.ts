@@ -719,6 +719,65 @@ export const ListMaritimeSecurityEventsResponseItem = zod.object({
 export const ListMaritimeSecurityEventsResponse = zod.array(ListMaritimeSecurityEventsResponseItem)
 
 
+/**
+ * @summary M1.5 primary military & maritime official sources (CENTCOM, UKMTO, partners) stored as STANDALONE official items with analyst flags and watch routing — never as incidents.
+ */
+export const listOfficialMilitaryMaritimeSourcesQueryLimitMax = 200;
+
+export const ListOfficialMilitaryMaritimeSourcesQueryParams = zod.object({
+  source: zod
+    .enum(["centcom", "ukmto", "partner", "jmic", "cmf"])
+    .optional()
+    .describe("Limit to one adapter source key (centcom | ukmto | jmic | cmf | …)"),
+  watch: zod
+    .enum(["conflict", "shipping"])
+    .optional()
+    .describe("Limit to items routed to a watch (primary or watch_tags)"),
+  flag: zod
+    .enum([
+      "significant_incident",
+      "escalation_indicator",
+      "maritime_disruption",
+      "evidence_available",
+      "possible_spot_report",
+    ])
+    .optional()
+    .describe("Limit to items with a specific analyst flag set"),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listOfficialMilitaryMaritimeSourcesQueryLimitMax)
+    .optional()
+    .describe("Max number of most-recent items to return (1-200)"),
+});
+
+export const ListOfficialMilitaryMaritimeSourcesResponseItem = zod.object({
+  id: zod.number(),
+  sourceName: zod.string(),
+  externalId: zod.string(),
+  title: zod.string(),
+  publishedAt: zod.coerce.date().nullish(),
+  sourceUrl: zod.string(),
+  bodyText: zod.string().nullish(),
+  classification: zod.string(),
+  flagSignificantIncident: zod.boolean(),
+  flagEscalationIndicator: zod.boolean(),
+  flagMaritimeDisruption: zod.boolean(),
+  flagEvidenceAvailable: zod.boolean(),
+  flagPossibleSpotReport: zod.boolean(),
+  primaryWatch: zod.enum(["conflict", "shipping"]).nullish(),
+  watchTags: zod.array(zod.enum(["conflict", "shipping"])),
+  ingestedAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+}).describe(
+  "An M1.5 official military or maritime source item (CENTCOM, UKMTO, partner product). NOT an incident — stored in its own table with analyst flags and dual-watch routing; never inflates any incident count.",
+);
+export const ListOfficialMilitaryMaritimeSourcesResponse = zod.array(
+  ListOfficialMilitaryMaritimeSourcesResponseItem,
+);
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 

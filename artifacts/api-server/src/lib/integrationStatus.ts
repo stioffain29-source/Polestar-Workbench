@@ -4,6 +4,7 @@ import {
   incidentCorroborationsTable,
   countryReportProseTable,
   reliefwebReportsTable,
+  officialMilitaryMaritimeSourcesTable,
   maritimeMovementTable,
   sourcesTable,
   gdeltStructuredItemsTable,
@@ -121,6 +122,8 @@ const RELIEFWEB_REPORTS_DETAIL =
   "Pulls UN OCHA ReliefWeb situational/humanitarian reports for the monitored APAC countries as supporting CONTEXT under Conflict Watch and country reports. Stored in their own table — never as incidents, so they never inflate any count.";
 const RELIEFWEB_REPORTS_NOT_CONFIGURED_MESSAGE =
   "RELIEFWEB_APPNAME not set to an approved value — situational context disabled. ReliefWeb's v2 API returns 403 without a pre-approved appname (request one at https://apidoc.reliefweb.int/parameters#appname).";
+const OFFICIAL_M15_DETAIL =
+  "M1.5 primary military & maritime official sources (CENTCOM press releases, UKMTO warnings/advisories, partner products). Stored in their own table with analyst flags and dual-watch routing — never as incidents, so they never inflate any count. Phase 1 registers connector slots and Source Health; live parsers land in Phase 2.";
 const LIVEUAMAP_DETAIL =
   "Server-side proxy for the PAID Liveuamap live-map overlay (the key never reaches the browser; upstream calls are TTL-cached). The incident map works fully without it. If keyed but upstream fails, Liveuamap may be blocking this server's egress IP — ask Liveuamap support to allowlist the deployment's public IP for server-to-server API access.";
 const OPENAI_DETAIL =
@@ -314,6 +317,69 @@ async function reliefwebReportsStatus(): Promise<IntegrationStatusItem> {
       metric("Countries covered", countries),
     ],
     docsUrl: "https://apidoc.reliefweb.int/parameters#appname",
+  };
+}
+
+async function officialMilitaryMaritimeStatus(): Promise<IntegrationStatusItem> {
+  const envVars = ["CENTCOM_INGEST_ENABLED", "UKMTO_INGEST_ENABLED"];
+  let centcom = 0;
+  let ukmto = 0;
+  let partners = 0;
+  let latest: Date | null = null;
+  try {
+    const [row] = await db
+      .select({
+        centcom: sql<number>`count(*) filter (where ${officialMilitaryMaritimeSourcesTable.sourceName} = 'centcom')::int`,
+        ukmto: sql<number>`count(*) filter (where ${officialMilitaryMaritimeSourcesTable.sourceName} = 'ukmto')::int`,
+        partners: sql<number>`count(*) filter (where ${officialMilitaryMaritimeSourcesTable.sourceName} not in ('centcom', 'ukmto'))::int`,
+        latest: sql<Date | null>`max(${officialMilitaryMaritimeSourcesTable.ingestedAt})`,
+      })
+      .from(officialMilitaryMaritimeSourcesTable);
+    centcom = row?.centcom ?? 0;
+    ukmto = row?.ukmto ?? 0;
+    partners = row?.partners ?? 0;
+    latest = row?.latest ?? null;
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "official military maritime integration status query failed");
+    return unknownItem({
+      key: "official_military_maritime",
+      label: "Primary Military and Maritime Sources",
+      configured: true,
+      envVars,
+      summary: "Status query failed.",
+      detail: OFFICIAL_M15_DETAIL,
+      docsUrl: null,
+    });
+  }
+
+  const total = centcom + ukmto + partners;
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (total > 0) {
+    status = "working";
+    summary = `Holding ${total} official CENTCOM/UKMTO/partner item(s) as standalone sources — never counted as incidents.`;
+  } else {
+    status = "no_data";
+    summary =
+      "Built and merged; CENTCOM + UKMTO connector scaffolds registered — awaiting Phase 2 parsers and the first successful ingest.";
+  }
+
+  return {
+    key: "official_military_maritime",
+    label: "Primary Military and Maritime Sources",
+    status,
+    summary,
+    detail: OFFICIAL_M15_DETAIL,
+    configured: true,
+    optional: true,
+    envVars,
+    metrics: [
+      metric("CENTCOM items", centcom),
+      metric("UKMTO items", ukmto),
+      metric("Partner items", partners),
+      metric("Latest ingest", fmtDate(latest)),
+    ],
+    docsUrl: null,
   };
 }
 
@@ -918,6 +984,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       gdeltStatus(),
       reliefwebStatus(),
       reliefwebReportsStatus(),
+      officialMilitaryMaritimeStatus(),
       liveuamapStatus(),
       aisMovementStatus(),
       vesselRegistryStatus(),

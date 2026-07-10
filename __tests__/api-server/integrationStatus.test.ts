@@ -6,6 +6,7 @@ import {
   countryReportProseTable,
   incidentCorroborationsTable,
   reliefwebReportsTable,
+  officialMilitaryMaritimeSourcesTable,
 } from "@workspace/db";
 
 // The integration-status probes derive a public STATE + EVIDENCE for each
@@ -332,6 +333,30 @@ describe("reliefweb_reports integration status (situational context)", () => {
   });
 });
 
+describe("official_military_maritime integration status (M1.5)", () => {
+  it("reports no_data when the official table is empty", async () => {
+    const byTable = new Map<unknown, Rows>([
+      [officialMilitaryMaritimeSourcesTable, [{ centcom: 0, ukmto: 0, partners: 0, latest: null }]],
+    ]);
+    const item = find(await statuses(byTable), "official_military_maritime");
+    expect(item.label).toBe("Primary Military and Maritime Sources");
+    expect(item.status).toBe("no_data");
+    expect(item.configured).toBe(true);
+  });
+
+  it("reports working when official rows are stored", async () => {
+    const byTable = new Map<unknown, Rows>([
+      [
+        officialMilitaryMaritimeSourcesTable,
+        [{ centcom: 1, ukmto: 2, partners: 0, latest: new Date("2026-07-01T00:00:00Z") }],
+      ],
+    ]);
+    const item = find(await statuses(byTable), "official_military_maritime");
+    expect(item.status).toBe("working");
+    expect(item.summary).toContain("3");
+  });
+});
+
 describe("admin_controls status", () => {
   it("is not_configured when INGEST_ADMIN_TOKEN is unset", async () => {
     delete process.env.INGEST_ADMIN_TOKEN;
@@ -461,6 +486,7 @@ describe("getIntegrationStatuses envelope", () => {
         "liveuamap",
         "openai",
         "reliefweb",
+        "official_military_maritime",
         "reliefweb_reports",
         "social_watch_instagram",
         "tapa_iis",

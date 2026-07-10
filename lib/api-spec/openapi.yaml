@@ -394,6 +394,51 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/MaritimeSecurityEvent" }
 
+  /official-military-maritime-sources:
+    get:
+      operationId: listOfficialMilitaryMaritimeSources
+      tags: [official-military-maritime-sources]
+      summary: >-
+        M1.5 primary military & maritime official sources (CENTCOM, UKMTO,
+        partners) stored as STANDALONE official items with analyst flags and
+        watch routing — never as incidents.
+      parameters:
+        - name: source
+          in: query
+          description: Limit to one adapter source key (centcom | ukmto | jmic | cmf | …)
+          schema:
+            type: string
+            enum: [centcom, ukmto, partner, jmic, cmf]
+        - name: watch
+          in: query
+          description: Limit to items routed to a watch (primary or watch_tags)
+          schema:
+            type: string
+            enum: [conflict, shipping]
+        - name: flag
+          in: query
+          description: Limit to items with a specific analyst flag set
+          schema:
+            type: string
+            enum:
+              - significant_incident
+              - escalation_indicator
+              - maritime_disruption
+              - evidence_available
+              - possible_spot_report
+        - name: limit
+          in: query
+          description: Max number of most-recent items to return (1-200)
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OfficialMilitaryMaritimeSource" }
+
   /incidents:
     get:
       operationId: listIncidents
@@ -3731,6 +3776,49 @@ components:
         sourceUrl: { type: ["string", "null"] }
         classification: { type: string }
 
+    OfficialMilitaryMaritimeSource:
+      type: object
+      description: >-
+        An M1.5 official military or maritime source item (CENTCOM, UKMTO,
+        partner product). NOT an incident — stored in its own table with analyst
+        flags and dual-watch routing; never inflates any incident count.
+      required:
+        - id
+        - sourceName
+        - externalId
+        - title
+        - sourceUrl
+        - classification
+        - flagSignificantIncident
+        - flagEscalationIndicator
+        - flagMaritimeDisruption
+        - flagEvidenceAvailable
+        - flagPossibleSpotReport
+        - watchTags
+      properties:
+        id: { type: integer }
+        sourceName: { type: string }
+        externalId: { type: string }
+        title: { type: string }
+        publishedAt: { type: ["string", "null"], format: date-time }
+        sourceUrl: { type: string }
+        bodyText: { type: ["string", "null"] }
+        classification: { type: string }
+        flagSignificantIncident: { type: boolean }
+        flagEscalationIndicator: { type: boolean }
+        flagMaritimeDisruption: { type: boolean }
+        flagEvidenceAvailable: { type: boolean }
+        flagPossibleSpotReport: { type: boolean }
+        primaryWatch:
+          type: ["string", "null"]
+          enum: [conflict, shipping]
+        watchTags:
+          type: array
+          items: { type: string, enum: [conflict, shipping] }
+        ingestedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     LiveuamapRegion:
       type: string
       enum:
@@ -3842,6 +3930,7 @@ components:
         status: { $ref: "#/components/schemas/MaritimeSourceState" }
         detail: { type: string }
         asOf: { type: ["string", "null"] }
+        group: { type: ["string", "null"] }
 
     ApacLocalFeedHealth:
       type: object

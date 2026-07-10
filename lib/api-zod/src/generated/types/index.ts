@@ -128,6 +128,7 @@ export * from './maritimeMovementInput';
 export * from './maritimeMovementInputConfidence';
 export * from './maritimeSecurityEvent';
 export * from './maritimeSourceHealthItem';
+export * from './officialMilitaryMaritimeSource';
 export * from './maritimeSourceState';
 export * from './maritimeVessel';
 export * from './maritimeVesselVesselClass';

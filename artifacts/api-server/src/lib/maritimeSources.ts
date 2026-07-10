@@ -1,6 +1,18 @@
-import { db, maritimeMovementTable, sourcesTable } from "@workspace/db";
-import { resolveAisKey } from "@workspace/ingest";
-import { eq, ilike, sql } from "drizzle-orm";
+import {
+  db,
+  maritimeMovementTable,
+  maritimeSecurityEventsTable,
+  officialMilitaryMaritimeSourcesTable,
+  sourcesTable,
+} from "@workspace/db";
+import {
+  CENTCOM_HEALTH_NAME,
+  CENTCOM_HEALTH_TOPIC,
+  UKMTO_HEALTH_NAME,
+  UKMTO_HEALTH_TOPIC,
+} from "../../../../lib/ingest/src/m15/health";
+import { resolveAisKey } from "../../../../lib/ingest/src/maritimeMovement";
+import { and, eq, ilike, sql } from "drizzle-orm";
 import type {
   MaritimeSourceHealthItem,
   MaritimeSourceState,
@@ -10,29 +22,45 @@ import { logger } from "./logger";
 // ===========================================================================
 // Maritime Source Health.
 //
-// A focused, maritime-specific health board for the six maritime sources the
-// Shipping Watch product cares about: UKMTO, the IMB Piracy Reporting Centre,
-// the Reuters / news-verification feed, an optional AIS provider, optional
-// Windward, and manual movement-context upload.
+// Shipping Watch maritime sources plus M1.5 official military & maritime
+// sources (CENTCOM, UKMTO). Uses its OWN four-state vocabulary:
+//   live / stale / disabled / unavailable
 //
-// It uses its OWN four-state vocabulary (distinct from the general integration
-// status states) per the product spec:
-//   live         producing fresh data within the freshness window
-//   stale        configured/seen before, but the newest data is old
-//   disabled     explicitly switched off via an env flag
-//   unavailable  not configured / no connector / never produced data
-//
-// Statuses are driven by REAL signals only — the per-feed `sources` telemetry,
-// the freshness of the isolated maritime_movement (context) store, and the
-// presence of the optional AIS / Windward env scaffolding. An unconfigured AIS
-// provider reads "unavailable", NOT "failing": absence is not an outage.
-//
-// The AIS / Windward env vars (AIS_PROVIDER, AIS_API_KEY, AIS_ENABLED,
-// WINDWARD_ENABLED, WINDWARD_API_KEY) are read SERVER-SIDE only; their values
-// are never returned — only the derived state and a non-secret detail string.
+// Official-source rows probe the isolated `official_military_maritime_sources`
+// table AND the per-feed `sources` telemetry written by the ingest scaffolds.
 // ===========================================================================
 
+export const OFFICIAL_M15_GROUP = "Primary Military and Maritime Sources";
+
 const FRESH_DAYS = 14;
+
+interface OfficialSourceDef {
+  key: string;
+  label: string;
+  sourceName: string;
+  healthName: string;
+  healthTopic: string;
+  envVar: string;
+}
+
+const OFFICIAL_SOURCES: OfficialSourceDef[] = [
+  {
+    key: "centcom",
+    label: "CENTCOM (official releases)",
+    sourceName: "centcom",
+    healthName: CENTCOM_HEALTH_NAME,
+    healthTopic: CENTCOM_HEALTH_TOPIC,
+    envVar: "CENTCOM_INGEST_ENABLED",
+  },
+  {
+    key: "ukmto",
+    label: "UKMTO (official advisories)",
+    sourceName: "ukmto",
+    healthName: UKMTO_HEALTH_NAME,
+    healthTopic: UKMTO_HEALTH_TOPIC,
+    envVar: "UKMTO_INGEST_ENABLED",
+  },
+];
 
 function freshnessOf(asOf: Date | null): "live" | "stale" | null {
   if (!asOf) return null;
@@ -47,9 +75,7 @@ function isFalsey(raw: string | undefined): boolean {
 }
 
 interface ProviderEnv {
-  /** A credential is present (the integration COULD run). */
   configured: boolean;
-  /** Explicitly switched off via its enable flag. */
   disabled: boolean;
 }
 
@@ -69,46 +95,6 @@ function fmt(d: Date | null): string | null {
   return Number.isNaN(ms) ? null : d.toISOString().slice(0, 10);
 }
 
-/** Newest maritime_movement `data_as_of` whose source_name matches a pattern (or any row). */
-async function latestMovement(pattern?: string): Promise<Date | null> {
-  try {
-    const [row] = await db
-      .select({ latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})` })
-      .from(maritimeMovementTable)
-      .where(pattern ? ilike(maritimeMovementTable.sourceName, pattern) : undefined);
-    return toDate(row?.latest);
-  } catch (err) {
-    logger.warn({ err: msg(err) }, "maritime movement freshness query failed");
-    return null;
-  }
-}
-
-/**
- * Newest GENUINELY-MANUAL movement upload — excludes provider-fed rows (AIS /
- * Windward) so the "Manual context upload" row reflects only operator uploads,
- * not the live AIS feed (whose source_name contains "ais").
- */
-async function latestManualMovement(): Promise<Date | null> {
-  try {
-    const [row] = await db
-      .select({ latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})` })
-      .from(maritimeMovementTable)
-      .where(
-        sql`${maritimeMovementTable.sourceName} NOT ILIKE '%ais%' AND ${maritimeMovementTable.sourceName} NOT ILIKE '%windward%'`,
-      );
-    return toDate(row?.latest);
-  } catch (err) {
-    logger.warn({ err: msg(err) }, "manual maritime movement freshness query failed");
-    return null;
-  }
-}
-
-/**
- * Coerce a raw `max(timestamp)` result to a real Date. A raw `sql` aggregate
- * bypasses Drizzle's column type parser, so the pg driver hands back the
- * timestamp as a STRING; without this, freshnessOf/fmt would call .getTime()
- * on a string and throw once any movement row exists.
- */
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
   const d = value instanceof Date ? value : new Date(value);
@@ -125,15 +111,195 @@ function item(
   status: MaritimeSourceState,
   detail: string,
   asOf: string | null,
+  group?: string,
 ): MaritimeSourceHealthItem {
-  return { key, label, status, detail, asOf };
+  return { key, label, status, detail, asOf, group: group ?? null };
 }
 
-/**
- * Status for the news-derived shipping feed (the current confirmed-incident
- * source until the dedicated UKMTO/IMB connector lands). Driven by the live
- * per-feed `sources` telemetry for topic='shipping'.
- */
+async function latestMovement(pattern?: string): Promise<Date | null> {
+  try {
+    const [row] = await db
+      .select({ latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})` })
+      .from(maritimeMovementTable)
+      .where(pattern ? ilike(maritimeMovementTable.sourceName, pattern) : undefined);
+    return toDate(row?.latest);
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "maritime movement freshness query failed");
+    return null;
+  }
+}
+
+async function latestManualMovement(): Promise<Date | null> {
+  try {
+    const [row] = await db
+      .select({ latest: sql<Date | null>`max(${maritimeMovementTable.dataAsOf})` })
+      .from(maritimeMovementTable)
+      .where(
+        sql`${maritimeMovementTable.sourceName} NOT ILIKE '%ais%' AND ${maritimeMovementTable.sourceName} NOT ILIKE '%windward%'`,
+      );
+    return toDate(row?.latest);
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "manual maritime movement freshness query failed");
+    return null;
+  }
+}
+
+async function latestOfficialSource(
+  sourceName: string,
+): Promise<{ count: number; latest: Date | null }> {
+  try {
+    const [row] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${officialMilitaryMaritimeSourcesTable.ingestedAt})`,
+      })
+      .from(officialMilitaryMaritimeSourcesTable)
+      .where(eq(officialMilitaryMaritimeSourcesTable.sourceName, sourceName));
+    return { count: row?.count ?? 0, latest: toDate(row?.latest) };
+  } catch (err) {
+    logger.warn({ err: msg(err), sourceName }, "official source freshness query failed");
+    return { count: 0, latest: null };
+  }
+}
+
+async function officialFeedStatus(
+  healthName: string,
+  healthTopic: string,
+): Promise<{ status: string | null; lastSuccessAt: Date | null }> {
+  try {
+    const [row] = await db
+      .select({
+        status: sourcesTable.status,
+        lastSuccessAt: sourcesTable.lastSuccessAt,
+      })
+      .from(sourcesTable)
+      .where(
+        and(eq(sourcesTable.name, healthName), eq(sourcesTable.topic, healthTopic)),
+      );
+    return {
+      status: row?.status ?? null,
+      lastSuccessAt: row?.lastSuccessAt ?? null,
+    };
+  } catch (err) {
+    logger.warn({ err: msg(err), healthName }, "official source feed telemetry query failed");
+    return { status: null, lastSuccessAt: null };
+  }
+}
+
+async function officialSourceStatus(def: OfficialSourceDef): Promise<MaritimeSourceHealthItem> {
+  if (isFalsey(process.env[def.envVar])) {
+    return item(
+      def.key,
+      def.label,
+      "disabled",
+      `Switched off (${def.envVar}=false).`,
+      null,
+      OFFICIAL_M15_GROUP,
+    );
+  }
+
+  const [{ count, latest }, feed] = await Promise.all([
+    latestOfficialSource(def.sourceName),
+    officialFeedStatus(def.healthName, def.healthTopic),
+  ]);
+
+  const dataFresh = freshnessOf(latest);
+  const pollFresh = freshnessOf(feed.lastSuccessAt);
+
+  if (count > 0 && dataFresh === "live") {
+    return item(
+      def.key,
+      def.label,
+      "live",
+      `${count} official item(s) on file; connector registered.`,
+      fmt(latest),
+      OFFICIAL_M15_GROUP,
+    );
+  }
+  if (count > 0 && dataFresh === "stale") {
+    return item(
+      def.key,
+      def.label,
+      "stale",
+      `${count} official item(s) on file, but the newest is older than the freshness window.`,
+      fmt(latest),
+      OFFICIAL_M15_GROUP,
+    );
+  }
+  if (feed.status === "failing") {
+    return item(
+      def.key,
+      def.label,
+      "stale",
+      "Connector registered but the upstream fetch is failing — awaiting a successful run.",
+      fmt(feed.lastSuccessAt),
+      OFFICIAL_M15_GROUP,
+    );
+  }
+  if (feed.status === "pending" || feed.status === "operational" || pollFresh) {
+    return item(
+      def.key,
+      def.label,
+      "stale",
+      "Connector registered (Phase 1 scaffold) — awaiting first official items from the Phase 2 parser.",
+      fmt(feed.lastSuccessAt),
+      OFFICIAL_M15_GROUP,
+    );
+  }
+  return item(
+    def.key,
+    def.label,
+    "stale",
+    "Connector slot registered — awaiting the first ingest run.",
+    null,
+    OFFICIAL_M15_GROUP,
+  );
+}
+
+async function imbPiracyStatus(): Promise<MaritimeSourceHealthItem> {
+  const label = "IMB Piracy Reporting Centre";
+  try {
+    const [row] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${maritimeSecurityEventsTable.fetchedAt})`,
+      })
+      .from(maritimeSecurityEventsTable)
+      .where(eq(maritimeSecurityEventsTable.sourceName, "icc_imb"));
+    const latest = toDate(row?.latest);
+    const fresh = freshnessOf(latest);
+    const count = row?.count ?? 0;
+    if (count > 0 && fresh === "live") {
+      return item(
+        "imb",
+        label,
+        "live",
+        `${count} current-year IMB event(s) mirrored in the standalone maritime-security table.`,
+        fmt(latest),
+      );
+    }
+    if (count > 0 && fresh === "stale") {
+      return item(
+        "imb",
+        label,
+        "stale",
+        "IMB data exists but is older than the freshness window.",
+        fmt(latest),
+      );
+    }
+    return item(
+      "imb",
+      label,
+      "stale",
+      "ICC/IMB connector registered — awaiting a successful map fetch.",
+      fmt(latest),
+    );
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "IMB maritime source health query failed");
+    return item("imb", label, "unavailable", "Status query failed.", null);
+  }
+}
+
 async function newsFeedStatus(): Promise<MaritimeSourceHealthItem> {
   const label = "Reuters / news-verification feed";
   try {
@@ -213,12 +379,10 @@ async function manualUploadStatus(): Promise<MaritimeSourceHealthItem> {
   return item("manual_upload", label, "unavailable", "No manual movement-context upload yet.", null);
 }
 
-/**
- * Assemble the six-source maritime health snapshot. Each probe is independent
- * and degrades to a non-alarming state; the whole thing never throws.
- */
 export async function getMaritimeSourceHealth(): Promise<MaritimeSourceHealthItem[]> {
-  const [news, ais, windward, manual] = await Promise.all([
+  const [official, imb, news, ais, windward, manual] = await Promise.all([
+    Promise.all(OFFICIAL_SOURCES.map((def) => officialSourceStatus(def))),
+    imbPiracyStatus(),
     newsFeedStatus(),
     providerStatus({
       key: "ais",
@@ -237,36 +401,13 @@ export async function getMaritimeSourceHealth(): Promise<MaritimeSourceHealthIte
     manualUploadStatus(),
   ]);
 
-  // UKMTO and the IMB Piracy Reporting Centre have no live connector yet — that
-  // is a separately-tracked ingest source. They read "unavailable" (slots in
-  // when that connector lands) rather than "failing": nothing is broken.
-  const ukmto = item(
-    "ukmto",
-    "UKMTO",
-    "unavailable",
-    "No live UKMTO connector yet — confirmed events arrive via the news feed until the dedicated maritime source lands.",
-    null,
-  );
-  const imb = item(
-    "imb",
-    "IMB Piracy Reporting Centre",
-    "unavailable",
-    "No live IMB connector yet — slots into the confirmed-incidents table when the dedicated piracy source lands.",
-    null,
-  );
-  // ReCAAP ISC is the authoritative regional body for piracy / armed robbery
-  // against ships in Asia (and the cargo-theft-at-sea events Cargo Watch tracks).
-  // We have no direct connector to its incident database — those events reach us
-  // only as news echoes via the shipping / cargo feeds — so it reads
-  // "unavailable" (slots in when the dedicated authority source lands), never
-  // "failing": nothing is broken.
   const recaap = item(
     "recaap",
     "ReCAAP ISC",
     "unavailable",
-    "No direct ReCAAP ISC connector yet — Asia piracy / armed-robbery and cargo-theft-at-sea events arrive only as news echoes via the shipping and cargo feeds until the dedicated authority source lands.",
+    "No direct ReCAAP ISC connector yet — Asia piracy events arrive only as news echoes via the shipping and cargo feeds.",
     null,
   );
 
-  return [ukmto, imb, recaap, news, ais, windward, manual];
+  return [...official, imb, recaap, news, ais, windward, manual];
 }
