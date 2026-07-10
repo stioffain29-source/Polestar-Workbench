@@ -379,3 +379,27 @@ export type {
   IngestSummary,
   FeedStat,
 } from "./types";
+export {
+  loadTriggerTerms,
+  TRIGGER_TERMS,
+  termToPattern,
+  matchesTerms,
+  matchRegionTags,
+  routeOfficialSource,
+  isPartnerEscalationAdvisory,
+  isPartnerThreatLevelUpdate,
+  assignAnalystFlags,
+  simulateOfficialSourceIngest,
+} from "./m15";
+export type {
+  M15TriggerTerms,
+  M15CentcomTerms,
+  M15UkmtoTerms,
+  M15PartnerTerms,
+  M15Watch,
+  M15SourceKind,
+  RouteOfficialSourceInput,
+  RouteOfficialSourceResult,
+  AssignAnalystFlagsInput,
+  AnalystFlags,
+} from "./m15";
