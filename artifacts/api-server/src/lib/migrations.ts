@@ -990,6 +990,55 @@ export async function runDataMigrations(): Promise<void> {
         ON maritime_security_events (year)
     `);
 
+    // Schema: M1.5 primary military & maritime official sources (CENTCOM, UKMTO,
+    // JMIC, CMF, …). A STANDALONE official-source table — NEVER incidents — so
+    // it can NEVER inflate any incident count. Carries P1-D2 analyst flags and
+    // P1-D3 watch-routing columns. drizzle push only reaches dev, so the prod
+    // primary gains the table here on boot. All idempotent (IF NOT EXISTS).
+    // Mirrors lib/db/src/schema/officialMilitaryMaritimeSources.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS official_military_maritime_sources (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL,
+        external_id text NOT NULL,
+        title text NOT NULL,
+        published_at timestamptz,
+        source_url text NOT NULL,
+        body_text text,
+        classification text NOT NULL DEFAULT 'official_military_maritime',
+        flag_significant_incident boolean NOT NULL DEFAULT false,
+        flag_escalation_indicator boolean NOT NULL DEFAULT false,
+        flag_maritime_disruption boolean NOT NULL DEFAULT false,
+        flag_evidence_available boolean NOT NULL DEFAULT false,
+        flag_possible_spot_report boolean NOT NULL DEFAULT false,
+        primary_watch text,
+        watch_tags jsonb NOT NULL DEFAULT '[]'::jsonb,
+        ingested_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS official_military_maritime_sources_source_external_unique
+        ON official_military_maritime_sources (source_name, external_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS official_military_maritime_sources_url_idx
+        ON official_military_maritime_sources (source_name, source_url)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS official_military_maritime_sources_published_idx
+        ON official_military_maritime_sources (published_at)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS official_military_maritime_sources_primary_watch_idx
+        ON official_military_maritime_sources (primary_watch)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS official_military_maritime_sources_possible_spot_report_idx
+        ON official_military_maritime_sources (flag_possible_spot_report)
+    `);
+
     // Schema: AI-generated country-report narratives + sibling tables that the
     // country/PNG report builder relies on. These were previously created only by
     // the dev-only drizzle `push`, so a fresh production database never had them.

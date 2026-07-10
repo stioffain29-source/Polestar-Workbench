@@ -19,6 +19,7 @@ export * from "./cards";
 export * from "./maritimeMovement";
 export * from "./maritimeVesselSightings";
 export * from "./maritimeSecurityEvents";
+export * from "./officialMilitaryMaritimeSources";
 export * from "./socialWatchItems";
 export * from "./socialRaw";
 export * from "./auth";
