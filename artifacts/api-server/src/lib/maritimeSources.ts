@@ -7,9 +7,8 @@ import {
 } from "@workspace/db";
 import {
   CENTCOM_HEALTH_NAME,
-  CENTCOM_HEALTH_TOPIC,
+  OFFICIAL_M15_HEALTH_TOPIC,
   UKMTO_HEALTH_NAME,
-  UKMTO_HEALTH_TOPIC,
 } from "../../../../lib/ingest/src/m15/health";
 import { resolveAisKey } from "../../../../lib/ingest/src/maritimeMovement";
 import { and, eq, ilike, sql } from "drizzle-orm";
@@ -49,7 +48,7 @@ const OFFICIAL_SOURCES: OfficialSourceDef[] = [
     label: "CENTCOM (official releases)",
     sourceName: "centcom",
     healthName: CENTCOM_HEALTH_NAME,
-    healthTopic: CENTCOM_HEALTH_TOPIC,
+    healthTopic: OFFICIAL_M15_HEALTH_TOPIC,
     envVar: "CENTCOM_INGEST_ENABLED",
   },
   {
@@ -57,7 +56,7 @@ const OFFICIAL_SOURCES: OfficialSourceDef[] = [
     label: "UKMTO (official advisories)",
     sourceName: "ukmto",
     healthName: UKMTO_HEALTH_NAME,
-    healthTopic: UKMTO_HEALTH_TOPIC,
+    healthTopic: OFFICIAL_M15_HEALTH_TOPIC,
     envVar: "UKMTO_INGEST_ENABLED",
   },
 ];

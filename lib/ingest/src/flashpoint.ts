@@ -7,7 +7,7 @@ import { geocode } from "./geocode";
 import { evaluateIncidentRelevance, isGenericSectionTitle } from "@workspace/relevance";
 import { fetchFeed } from "./feedFetch";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
-import { detectStaleEventDate } from "./structuredExtract";
+import { detectStaleEventDate, isKnownStaleSyndication } from "./structuredExtract";
 import { extractPngItem, derivePngProvince, derivePngIncidentDate } from "./pngExtract";
 import { extractWestPapuaItem, deriveWestPapuaIncidentDate } from "./westPapuaExtract";
 import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
@@ -706,6 +706,13 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
         // 2026 feed date) — skip it rather than stamp it as a current incident.
         // Strict no-fabrication: acts only on an explicit in-text day-month-year.
         if (detectStaleEventDate(`${title} ${summary}`, when)) {
+          rejected.push({ title, reason: "stale-syndication", feedLabel: s.name });
+          perFeed[s.name].rejected++;
+          continue;
+        }
+        // Known stale re-syndications with no explicit in-text date (e.g. the
+        // Feb-2024 PNG highlands massacre re-posted under a fresh feed date).
+        if (isKnownStaleSyndication(`${title} ${summary}`)) {
           rejected.push({ title, reason: "stale-syndication", feedLabel: s.name });
           perFeed[s.name].rejected++;
           continue;

@@ -30,6 +30,18 @@ Two things must BOTH hold or a headline ships untranslated:
    omitted — the West Papua culture headline was still caught by the unambiguous
    "pergeseran" / "adat" / "budaya". Prefer several distinct words over one
    ambiguous one.
+   **Recurring: West Papua CONFLICT headlines slip the gate.** Bahasa conflict
+   ACTION verbs (tembak/menembak/penembak "shoot", tangkap/menangkap
+   "arrest/capture", plus prajurit "soldier", satgas "task force", jenazah
+   "corpse", evakuasi "evacuate", sindikat "syndicate", desak "urge", asing
+   "foreign", terbang/penerbangan "flight", langgar "violate", larangan "ban",
+   ketinggian "altitude") were added after rows like "Satgas Cartenz Tangkap …
+   Sindikat", "Akui tembak pilot asing … langgar larangan terbang" shipped raw.
+   All verified no English spelling collision. This is now the THIRD marker-batch
+   addition — the word list is inherently whack-a-mole.
+   **NOTE on prefixed compounds:** "Pascapenembakan" does NOT hit the
+   "penembakan" `\y` boundary (leading prefix), but such rows in practice carry
+   another listed marker, so they still translate.
 
 2. **The OpenAI integration must be provisioned.** The pass is a no-op (caught,
    logged, falls back to raw) unless `AI_INTEGRATIONS_OPENAI_*` env vars are set
@@ -37,6 +49,17 @@ Two things must BOTH hold or a headline ships untranslated:
    Uses `gpt-4o-mini`, bounded per run, bills to Replit credits.
    **How to apply:** if titles still aren't translating after markers are right,
    check the integration is provisioned — the failure is silent by design.
+
+## Durable alternative to the growing word list: gate by SOURCE
+
+The robust fix (architect-recommended, not yet built) is to make Bahasa-first
+outlets (Jubi.id, Cenderawasih Pos, Suara Papua, the `indonesia_local` feeds)
+ALWAYS translation candidates regardless of title vocabulary — same pattern the
+KAMMI caption path already uses (translate-all). Translation only rewords, never
+invents (STRICT no-fabrication safe), and a model round-trip returns already-
+English titles unchanged, so a false candidate just costs one LLM call. This
+retires the per-region word-list growth. **How to apply:** when tempted to add a
+4th marker batch, prefer adding the source domain to a candidate-by-source list.
 
 ## Sibling: KAMMI social-watch caption translation (UNGATED — translate-all)
 

@@ -123,6 +123,21 @@ export const INDONESIAN_MARKER_WORDS: readonly string[] = [
   "sidang", "penjara", "vonis", "terdakwa", "kasus", "dugaan", "suap",
   "perkara", "penahanan", "geledah", "hakim", "kejaksaan", "penyidik",
   "saksi", "tahun", "miliar", "rupiah",
+  // West Papua conflict ACTION vocabulary. Several live Papua-desk headlines
+  // ("Satgas Cartenz Tangkap … Sindikat …", "TNI Akan Tambah Prajurit …
+  // Pascapenembakan Pilot", "Jenazah Pilot AMA … Dievakuasi …", "Akui tembak
+  // pilot asing … langgar larangan terbang", "KNPB desak … dialog …") carried
+  // NONE of the words above, so the candidate query never selected them and raw
+  // Bahasa shipped to readers. Each word below is distinctly Indonesian (no
+  // English spelling collision), so adding them cannot snag a genuine English
+  // headline.
+  "tembak", "menembak", "penembak", "tertembak",
+  "tangkap", "menangkap", "penangkapan", "tertangkap",
+  "prajurit", "satgas", "jenazah",
+  "evakuasi", "dievakuasi", "mengevakuasi",
+  "sindikat", "desak", "mendesak", "asing",
+  "sakiti", "menyakiti", "terbang", "penerbangan",
+  "langgar", "larangan", "berhasil", "ketinggian",
 ];
 
 const NON_LATIN_RE = new RegExp(`[${NON_LATIN_CLASS}]`);

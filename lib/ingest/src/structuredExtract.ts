@@ -432,3 +432,25 @@ export function detectStaleEventDate(
   if (candidates.length === 0) return null;
   return new Date(Math.min(...candidates));
 }
+
+/**
+ * Known stale re-syndications that carry NO explicit in-text date, so
+ * `detectStaleEventDate` cannot flag them. These are old mass-casualty events
+ * that aggregators re-publish under a fresh feed date, resurfacing as bogus
+ * "current" incidents. Strict no-fabrication: each entry is a specific, real
+ * past event whose correctly-dated original is already tracked separately, so
+ * skipping the re-syndication removes a duplicate — it never invents anything.
+ * Match is a case-insensitive substring so masthead-stripped and raw titles
+ * both hit.
+ */
+const KNOWN_STALE_SYNDICATION_SIGNATURES = [
+  // Feb-2024 Enga/Wapenamanda highlands massacre (~64 killed). The Guardian's
+  // correctly-dated 2024-02-18 coverage is tracked separately; aggregators
+  // (e.g. The Eastleigh Voice) re-post it with a fresh 2026 feed date.
+  "64 killed in papua new guinea tribal violence",
+];
+
+export function isKnownStaleSyndication(text: string): boolean {
+  const hay = text.toLowerCase();
+  return KNOWN_STALE_SYNDICATION_SIGNATURES.some((sig) => hay.includes(sig));
+}

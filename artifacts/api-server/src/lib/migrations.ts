@@ -2017,10 +2017,14 @@ export async function runDataMigrations(): Promise<void> {
     //        publish date and ingest copied that date verbatim into occurred_at.
     //        The stored row's summary merely repeats the title with NO explicit
     //        in-text date, so the general stale-syndication guard/backfill below
-    //        cannot catch it — it needs a targeted deletion keyed on its exact
-    //        signature (title + source + the false 2026-07-06 reported date).
+    //        cannot catch it. The DURABLE fix is the ingest-layer
+    //        `isKnownStaleSyndication` skip (structuredExtract) that stops the
+    //        scraper re-storing it; a one-time delete alone lost against
+    //        re-ingestion, which is why the row kept reappearing. This delete now
+    //        only clears any copy already stored, keyed on title + source.
     //        Scoped to auto-scraped rows only, so an analyst-edited row is never
-    //        removed. Marker-gated → runs once (idempotently in prod on boot).
+    //        removed. Marker bumped to v2 (date clause dropped) to clear the
+    //        re-ingested copy.
     {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS app_migration_markers (
@@ -2028,7 +2032,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "delete_misdated_png_massacre_v1";
+      const markerKey = "delete_misdated_png_massacre_v2";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);
@@ -2037,7 +2041,6 @@ export async function runDataMigrations(): Promise<void> {
           DELETE FROM incidents
           WHERE title = '64 killed in Papua New Guinea tribal violence - The Eastleigh Voice'
             AND source = 'Google News — Papua New Guinea (Crime & Security)'
-            AND occurred_at::date = DATE '2026-07-06'
             AND analyst_notes LIKE 'auto-scraped:%'
         `);
         await db.execute(sql`
@@ -2092,7 +2095,7 @@ export async function runDataMigrations(): Promise<void> {
         if (staleIds.length > 0) {
           await db.execute(sql`
             DELETE FROM incidents
-            WHERE id = ANY(${staleIds})
+            WHERE ${inArray(incidentsTable.id, staleIds)}
               AND analyst_notes LIKE 'auto-scraped:%'
           `);
         }

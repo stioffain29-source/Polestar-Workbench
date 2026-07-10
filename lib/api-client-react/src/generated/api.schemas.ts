@@ -2064,6 +2064,52 @@ export interface MaritimeSecurityEvent {
   classification: string;
 }
 
+/**
+ * @nullable
+ */
+export type OfficialMilitaryMaritimeSourcePrimaryWatch = typeof OfficialMilitaryMaritimeSourcePrimaryWatch[keyof typeof OfficialMilitaryMaritimeSourcePrimaryWatch] | null;
+
+
+export const OfficialMilitaryMaritimeSourcePrimaryWatch = {
+  conflict: 'conflict',
+  shipping: 'shipping',
+} as const;
+
+export type OfficialMilitaryMaritimeSourceWatchTagsItem = typeof OfficialMilitaryMaritimeSourceWatchTagsItem[keyof typeof OfficialMilitaryMaritimeSourceWatchTagsItem];
+
+
+export const OfficialMilitaryMaritimeSourceWatchTagsItem = {
+  conflict: 'conflict',
+  shipping: 'shipping',
+} as const;
+
+/**
+ * An M1.5 official military or maritime source item (CENTCOM, UKMTO, partner product). NOT an incident — stored in its own table with analyst flags and dual-watch routing; never inflates any incident count.
+ */
+export interface OfficialMilitaryMaritimeSource {
+  id: number;
+  sourceName: string;
+  externalId: string;
+  title: string;
+  /** @nullable */
+  publishedAt?: string | null;
+  sourceUrl: string;
+  /** @nullable */
+  bodyText?: string | null;
+  classification: string;
+  flagSignificantIncident: boolean;
+  flagEscalationIndicator: boolean;
+  flagMaritimeDisruption: boolean;
+  flagEvidenceAvailable: boolean;
+  flagPossibleSpotReport: boolean;
+  /** @nullable */
+  primaryWatch?: OfficialMilitaryMaritimeSourcePrimaryWatch;
+  watchTags: OfficialMilitaryMaritimeSourceWatchTagsItem[];
+  ingestedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type LiveuamapRegion = typeof LiveuamapRegion[keyof typeof LiveuamapRegion];
 
 
@@ -2173,6 +2219,8 @@ export interface MaritimeSourceHealthItem {
   detail: string;
   /** @nullable */
   asOf?: string | null;
+  /** @nullable */
+  group?: string | null;
 }
 
 export interface ApacLocalFeedHealth {
@@ -2415,6 +2463,57 @@ country?: string;
  */
 limit?: number;
 };
+
+export type ListOfficialMilitaryMaritimeSourcesParams = {
+/**
+ * Limit to one adapter source key (centcom | ukmto | jmic | cmf | …)
+ */
+source?: ListOfficialMilitaryMaritimeSourcesSource;
+/**
+ * Limit to items routed to a watch (primary or watch_tags)
+ */
+watch?: ListOfficialMilitaryMaritimeSourcesWatch;
+/**
+ * Limit to items with a specific analyst flag set
+ */
+flag?: ListOfficialMilitaryMaritimeSourcesFlag;
+/**
+ * Max number of most-recent items to return (1-200)
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+};
+
+export type ListOfficialMilitaryMaritimeSourcesSource = typeof ListOfficialMilitaryMaritimeSourcesSource[keyof typeof ListOfficialMilitaryMaritimeSourcesSource];
+
+
+export const ListOfficialMilitaryMaritimeSourcesSource = {
+  centcom: 'centcom',
+  ukmto: 'ukmto',
+  partner: 'partner',
+  jmic: 'jmic',
+  cmf: 'cmf',
+} as const;
+
+export type ListOfficialMilitaryMaritimeSourcesWatch = typeof ListOfficialMilitaryMaritimeSourcesWatch[keyof typeof ListOfficialMilitaryMaritimeSourcesWatch];
+
+
+export const ListOfficialMilitaryMaritimeSourcesWatch = {
+  conflict: 'conflict',
+  shipping: 'shipping',
+} as const;
+
+export type ListOfficialMilitaryMaritimeSourcesFlag = typeof ListOfficialMilitaryMaritimeSourcesFlag[keyof typeof ListOfficialMilitaryMaritimeSourcesFlag];
+
+
+export const ListOfficialMilitaryMaritimeSourcesFlag = {
+  significant_incident: 'significant_incident',
+  escalation_indicator: 'escalation_indicator',
+  maritime_disruption: 'maritime_disruption',
+  evidence_available: 'evidence_available',
+  possible_spot_report: 'possible_spot_report',
+} as const;
 
 export type ListIncidentsParams = {
 topic?: Topic;

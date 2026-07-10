@@ -73,6 +73,7 @@ import type {
   ListMaritimeSecurityEventsParams,
   ListMaritimeVesselsParams,
   ListMarketPricesParams,
+  ListOfficialMilitaryMaritimeSourcesParams,
   ListReliefWebReportsParams,
   ListReportsParams,
   ListSocialRawItemsParams,
@@ -88,6 +89,7 @@ import type {
   MarketPrice,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
+  OfficialMilitaryMaritimeSource,
   ReliefWebReport,
   Report,
   ReportIncidentSummariesResult,
@@ -1227,6 +1229,90 @@ export function useListMaritimeSecurityEvents<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMaritimeSecurityEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListOfficialMilitaryMaritimeSourcesUrl = (params?: ListOfficialMilitaryMaritimeSourcesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/official-military-maritime-sources?${stringifiedParams}` : `/api/official-military-maritime-sources`
+}
+
+/**
+ * @summary M1.5 primary military & maritime official sources (CENTCOM, UKMTO, partners) stored as STANDALONE official items with analyst flags and watch routing — never as incidents.
+ */
+export const listOfficialMilitaryMaritimeSources = async (params?: ListOfficialMilitaryMaritimeSourcesParams, options?: RequestInit): Promise<OfficialMilitaryMaritimeSource[]> => {
+
+  return customFetch<OfficialMilitaryMaritimeSource[]>(getListOfficialMilitaryMaritimeSourcesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOfficialMilitaryMaritimeSourcesQueryKey = (params?: ListOfficialMilitaryMaritimeSourcesParams,) => {
+    return [
+    `/api/official-military-maritime-sources`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOfficialMilitaryMaritimeSourcesQueryOptions = <TData = Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>, TError = ErrorType<unknown>>(params?: ListOfficialMilitaryMaritimeSourcesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOfficialMilitaryMaritimeSourcesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>> = ({ signal }) => listOfficialMilitaryMaritimeSources(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOfficialMilitaryMaritimeSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>>
+export type ListOfficialMilitaryMaritimeSourcesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary M1.5 primary military & maritime official sources (CENTCOM, UKMTO, partners) stored as STANDALONE official items with analyst flags and watch routing — never as incidents.
+ */
+
+export function useListOfficialMilitaryMaritimeSources<TData = Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>, TError = ErrorType<unknown>>(
+ params?: ListOfficialMilitaryMaritimeSourcesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOfficialMilitaryMaritimeSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOfficialMilitaryMaritimeSourcesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

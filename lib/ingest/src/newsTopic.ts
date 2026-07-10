@@ -3,7 +3,7 @@ import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
-import { detectStaleEventDate } from "./structuredExtract";
+import { detectStaleEventDate, isKnownStaleSyndication } from "./structuredExtract";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance, isGenericSectionTitle } from "@workspace/relevance";
@@ -379,6 +379,13 @@ export async function runNewsTopicIngest(
         // rather than stamp it as a current incident. Strict no-fabrication:
         // acts only on an explicit in-text day-month-year.
         if (detectStaleEventDate(`${cleanTitle} ${summary}`, when)) {
+          rejected.push({ title, reason: "stale-syndication", feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
+        // Known stale re-syndications with no explicit in-text date (e.g. the
+        // Feb-2024 PNG highlands massacre re-posted under a fresh feed date).
+        if (isKnownStaleSyndication(`${cleanTitle} ${summary}`)) {
           rejected.push({ title, reason: "stale-syndication", feedLabel: feed.label });
           perFeed[feed.label].rejected++;
           continue;
