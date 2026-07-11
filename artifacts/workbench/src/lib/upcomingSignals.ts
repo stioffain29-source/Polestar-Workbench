@@ -58,9 +58,28 @@ const PAST_EVENT_RE =
 const SPORTS_HOMONYM_RE =
   /\b(match|matches|champ|champions?|championship|vs\.?|versus|team[- ]?mates?|cup|league|semi[- ]?finals?|quarter[- ]?finals?|semis|fixtures?|kick[- ]?off|goals?|scorers?|strikers?|coach|tournament|medal|olympics?|world cup|test series|innings|wicket)\b/i;
 
+// Natural-hazard bulletins (volcano seismicity, earthquakes, typhoons, floods)
+// are covered by the apac_local hazard layer but are NOT civil-unrest
+// forewarning. They leak into this detector two ways: "volcanic UNREST" matches
+// the PROTEST_OBJECT_RE `unrest` token, and "typhoon WILL STRIKE" matches the
+// FUTURE_STRONG_RE `will strike` alternative. Both then combine with an
+// announcement day-of-week ("on Monday") to read as an upcoming protest.
+const NATURAL_HAZARD_RE =
+  /\b(volcan(o|oes|ic)|seismic|eruptions?|erupt(s|ed|ing)?|phreatic|phivolcs|magma|lava|ashfall|earthquakes?|quakes?|tremors?|aftershocks?|magnitude[- ]?\d|richter|tsunami|typhoons?|cyclones?|hurricanes?|storm surge|landslides?|mudslides?|floodwaters?|flooding)\b/i;
+
+// Unambiguous civil-unrest ACTIONS. Deliberately EXCLUDES the bare word
+// "unrest" (also geological "volcanic unrest") and bare "strike" (collides with
+// kinetic / hazard "will strike"), so it can gate the hazard veto without
+// dropping a genuine hazard-triggered protest ("march over flood relief").
+const PROTEST_ACTION_RE =
+  /\b(protest(s|ers?|ing)?|rally|rallies|march(es|ing)?|demonstrat(e|es|ion|ions|ors?)|walk[- ]?outs?|sit[- ]?in|picket|vigil|boycott|blockade|roadblock|hartal|bandh|dharna|gherao|agitation|strikers?|workers? strike|labou?r strike|general strike)\b/i;
+
 // Does this incident announce upcoming protest activity worth warning on?
 export function hasUpcomingSignal(input: UpcomingSignalInput): boolean {
   const text = `${input.title ?? ""} ${input.summary ?? ""}`;
+  // Reject natural-hazard bulletins unless a genuine protest ACTION co-occurs
+  // (which keeps hazard-triggered protests while dropping pure geology/weather).
+  if (NATURAL_HAZARD_RE.test(text) && !PROTEST_ACTION_RE.test(text)) return false;
   const object = PROTEST_OBJECT_RE.test(text);
   const strong = FUTURE_STRONG_RE.test(text);
   const temporal = FUTURE_TEMPORAL_RE.test(text);

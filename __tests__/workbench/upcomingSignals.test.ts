@@ -65,6 +65,35 @@ describe("upcomingSignals — advance-warning detection authority", () => {
     ).toBe(false);
     expect(hasUpcomingSignal({ title: "Protest march took place over the weekend" })).toBe(false);
   });
+
+  it("rejects natural-hazard bulletins ('volcanic unrest' / 'will strike' are not protests)", () => {
+    // Real prod leak: "volcanic unrest" hits the protest-object token and the
+    // announcement day-of-week ("on Monday") supplies the temporal cue.
+    expect(
+      hasUpcomingSignal({
+        title: "Taal Volcano logs 61 quakes, 60 tremors in 24 hours",
+        summary:
+          "Phivolcs reported on Monday an increase in seismic activity, indicating low-level volcanic unrest; steam-driven phreatic eruptions may occur.",
+      }),
+    ).toBe(false);
+    // Second leak vector: hazard "will strike" matches FUTURE_STRONG_RE.
+    expect(
+      hasUpcomingSignal({ title: "Typhoon will strike the coast this weekend" }),
+    ).toBe(false);
+    expect(
+      hasUpcomingSignal({ title: "Magnitude 6.1 earthquake to strike offshore, agency warns" }),
+    ).toBe(false);
+  });
+
+  it("still keeps a genuine hazard-triggered protest (hazard + real protest action)", () => {
+    // Fixture genuinely fires BOTH regexes: "flooding" (hazard) + "march"
+    // (protest action), so the co-occurrence keep-path is actually exercised.
+    expect(
+      hasUpcomingSignal({
+        title: "Residents to march over flooding response failures next week",
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("buildUpcomingSignalRows — windowing, dedup, formatting", () => {

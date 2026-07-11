@@ -27,6 +27,19 @@ rally on rate-cut hopes"); genuinely scheduled marches still pass via temporal+o
 Past-event and sports/diplomacy-homonym vetoes drop completed events and "team-mates
 rally".
 
+**Natural-hazard veto (first check in `hasUpcomingSignal`).** Geological/meteorological
+bulletins leak in two ways: "volcanic UNREST" hits `PROTEST_OBJECT_RE`'s `unrest` token,
+and "typhoon WILL STRIKE" hits `FUTURE_STRONG_RE`'s `will strike`; an announcement
+day-of-week ("on Monday") then supplies the temporal cue. `NATURAL_HAZARD_RE`
+(volcano/seismic/eruption/quake/tremor/typhoon/cyclone/flooding/etc.) vetoes such text
+UNLESS `PROTEST_ACTION_RE` also fires. **Why:** a Taal Volcano seismic bulletin appeared
+in the monitor's Reported Upcoming Activity list. **How to apply:** `PROTEST_ACTION_RE`
+deliberately EXCLUDES the bare words `unrest` and `strike` (the exact homonyms), so a real
+hazard-triggered protest ("march over flooding response failures") is kept while pure
+geology/weather is dropped. `magnitude` is scoped to `magnitude[- ]?\d` so figurative
+"magnitude" doesn't false-veto. This is a frontend display detector — recomputes at
+render, NO `RELEVANCE_RULE_VERSION` bump.
+
 **Parity plumbing.** The Indonesia brief field `upcomingSignals` is gated on
 `StructuredTheatreConfig.showUpcomingSignals` (true only on `INDONESIA_REPORT_CONFIG`) —
 every other structured theatre stays byte-identical (`[]`). Screen (`PngCountryReportBody`)
