@@ -7,8 +7,11 @@ import {
   storySimilarity,
   clusterSameStoryRows,
   consolidateCountryStories,
+  readableRepresentativeIndex,
   type SameStoryRow,
 } from "@/lib/countrySameStory";
+import { isLikelyNonEnglish } from "@/lib/incidentTitle";
+import { buildWestPapuaReportDataset } from "@/lib/pngReportDataset";
 
 const DAY = 86_400_000;
 const base = Date.parse("2026-06-20T08:00:00.000Z");
@@ -359,5 +362,138 @@ describe("token helpers", () => {
   it("tokenJaccard is 1 for identical sets and 0 for disjoint", () => {
     expect(tokenJaccard(new Set(["a", "b"]), new Set(["a", "b"]))).toBe(1);
     expect(tokenJaccard(new Set(["a"]), new Set(["b"]))).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Readable (English) representative selection — the Bahasa-leads-Top-3 fix.
+// ---------------------------------------------------------------------------
+describe("readableRepresentativeIndex", () => {
+  // idx: 0 foreign/high, 1 english/high, 2 english/moderate, 3 foreign/high
+  const foreign = [true, false, false, true];
+  const rank = [4, 4, 3, 4];
+  const date = [300, 200, 500, 400];
+  const rf = (i: number) => foreign[i];
+  const sr = (i: number) => rank[i];
+  const dm = (i: number) => date[i];
+
+  it("keeps cluster[0] unchanged when it already renders in English", () => {
+    expect(readableRepresentativeIndex([1, 0, 2], rf, sr, dm)).toBe(1);
+  });
+
+  it("re-selects the English member in the same top severity tier when cluster[0] is foreign", () => {
+    expect(readableRepresentativeIndex([0, 3, 1], rf, sr, dm)).toBe(1);
+  });
+
+  it("never downgrades severity: ignores a lower-tier English member", () => {
+    // cluster [0 foreign/high, 2 english/moderate] — no high-tier English → keep 0
+    expect(readableRepresentativeIndex([0, 2], rf, sr, dm)).toBe(0);
+  });
+
+  it("falls back to cluster[0] when no English sibling exists (honest gap)", () => {
+    expect(readableRepresentativeIndex([0, 3], rf, sr, dm)).toBe(0);
+  });
+
+  it("prefers the NEWEST English member when several share the top tier", () => {
+    const fgn = [true, false, false];
+    const rnk = [4, 4, 4];
+    const dts = [900, 100, 800];
+    expect(
+      readableRepresentativeIndex([0, 1, 2], (i) => fgn[i], (i) => rnk[i], (i) => dts[i]),
+    ).toBe(2);
+  });
+});
+
+describe("consolidateCountryStories — leads with the English version of a bilingual story", () => {
+  // Identical raw titles guarantee the two rows cluster; they differ only in
+  // whether an English display_title has landed yet.
+  const bahasa = "Penembakan pilot di Yahukimo Papua menewaskan warga sipil";
+
+  it("returns the translated member, dropping the newest untranslated Bahasa duplicate", () => {
+    const out = consolidateCountryStories([
+      {
+        id: "new-bahasa",
+        title: bahasa,
+        displayTitle: null,
+        severity: "high",
+        occurredAt: "2026-07-10T08:00:00.000Z",
+        category: "Armed conflict",
+      },
+      {
+        id: "old-english",
+        title: bahasa,
+        displayTitle: "Pilot shooting in Yahukimo, Papua kills a civilian",
+        severity: "high",
+        occurredAt: "2026-07-09T08:00:00.000Z",
+        category: "Armed conflict",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe("old-english");
+    expect(isLikelyNonEnglish(out[0].displayTitle ?? out[0].title)).toBe(false);
+  });
+
+  it("leaves an already-English newest representative untouched (no flip)", () => {
+    const english = "Pilot shot dead in Yahukimo, Papua";
+    const out = consolidateCountryStories([
+      {
+        id: "new-english",
+        title: english,
+        displayTitle: null,
+        severity: "high",
+        occurredAt: "2026-07-10T08:00:00.000Z",
+        category: "Armed conflict",
+      },
+      {
+        id: "old-english",
+        title: english,
+        displayTitle: null,
+        severity: "high",
+        occurredAt: "2026-07-09T08:00:00.000Z",
+        category: "Armed conflict",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe("new-english");
+  });
+});
+
+describe("buildWestPapuaReportDataset — Top 3 never leads with untranslated Bahasa", () => {
+  const bahasa = "Penembakan pilot di Yahukimo Papua menewaskan warga sipil";
+  const mk = (over: Record<string, unknown>) => ({
+    country: "Indonesia",
+    location: "Yahukimo, Papua Pegunungan",
+    source: "Test Wire",
+    ...over,
+  });
+  const windowIncidents = [
+    mk({
+      id: 31229,
+      title: bahasa,
+      displayTitle: null,
+      severity: "high",
+      occurredAt: "2026-07-10T08:00:00.000Z",
+    }),
+    mk({
+      id: 30641,
+      title: bahasa,
+      displayTitle: "Pilot shooting in Yahukimo, Papua kills a civilian",
+      severity: "high",
+      occurredAt: "2026-07-09T08:00:00.000Z",
+    }),
+  ];
+
+  it("surfaces the translated English headline in the Top 3, not the newest Bahasa one", () => {
+    const ds = buildWestPapuaReportDataset({
+      windowIncidents,
+      previousWindowIncidents: [],
+      thirtyDay: windowIncidents,
+      ninetyDay: windowIncidents,
+      baselineWatchlist: [],
+      periodLabel: "7\u201310 July 2026",
+    });
+    const yahu = ds.topThree.find((i) => /yahukimo/i.test(i.title));
+    expect(yahu).toBeDefined();
+    expect(isLikelyNonEnglish(yahu!.title)).toBe(false);
   });
 });

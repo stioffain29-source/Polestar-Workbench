@@ -30,11 +30,12 @@ import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakarta
 import {
   clusterSameStoryRows,
   incidentTypeKey,
+  readableRepresentativeIndex,
   storySimilarity,
   type SameStoryRow,
   type StorySimInput,
 } from "./countrySameStory";
-import { stripWireCruft } from "./incidentTitle";
+import { isLikelyNonEnglish, stripWireCruft } from "./incidentTitle";
 import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSignals";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
@@ -454,6 +455,12 @@ export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
 export interface PngReportItem {
   id: string;
   title: string;
+  // Original-language (pre-translation) headline, masthead/wire-cruft stripped
+  // but NOT substituted by display_title. `title` above resolves to the English
+  // display_title when one exists, so bilingual copies of one story diverge on
+  // `title`; clusterSameStory feeds this raw title to the additive cross-language
+  // merge paths so those copies still cluster (and lead with the English member).
+  rawTitle?: string;
   // Jakarta-only: an analyst-rewritten Top-3 development title (theme + area
   // lead) that replaces the raw headline on the card. Set behind
   // config.jakartaProse; unset for every other theatre, so ItemCard falls back
@@ -695,9 +702,14 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
   const title = stripWireCruft(
     i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source),
   );
+  // Original-language headline: same cleaning as `title` but WITHOUT the
+  // display_title substitution, so cross-language duplicates of one story share
+  // it (see PngReportItem.rawTitle / clusterSameStory).
+  const rawTitle = stripWireCruft(cleanTitle(i.title, i.source));
   return {
     id: String(i.id ?? `${i.title}-${i.occurredAt}`),
     title,
+    rawTitle,
     summary: (i.summary ?? "").trim(),
     province,
     location: (i.location ?? "").trim() || null,
@@ -977,10 +989,35 @@ function clusterSameStory(
     severityRank: it.severityRank,
     category: it.category,
     displayCategory: it.displayCategory,
+    // Original-language headline. `title` above is already resolved to the
+    // English display_title, so a translated copy and its still-untranslated
+    // sibling of the SAME story diverge and never match on `title`. The raw
+    // title lets clusterSameStoryRows' additive cross-language paths merge them
+    // (then readableRepresentativeIndex below leads with the English member).
+    rawTitle: it.rawTitle ?? null,
   }));
-  return clusterSameStoryRows(rows, { crossProvince }).map((cluster) =>
-    cluster.map((i) => items[i]),
-  );
+  return clusterSameStoryRows(rows, { crossProvince }).map((cluster) => {
+    // The cluster seed order makes cluster[0] the "highest severity, then
+    // newest" member — but the newest row of a still-unfolding foreign-language
+    // story is the one whose English display_title has not landed yet. Put the
+    // newest ENGLISH-rendering member of the same top severity tier first so the
+    // Top-3 headline never reads in Bahasa while an English version of the SAME
+    // story exists; every other member is kept so syndicated re-runs stay
+    // excluded from the lower sections. items[i].title already prefers the
+    // English display_title (see toItem), so a still-foreign title means no
+    // translation exists for that member.
+    const repIdx = readableRepresentativeIndex(
+      cluster,
+      (i) => isLikelyNonEnglish(items[i].title),
+      (i) => rows[i].severityRank,
+      (i) => rows[i].dateMs,
+    );
+    const ordered =
+      repIdx === cluster[0]
+        ? cluster
+        : [repIdx, ...cluster.filter((i) => i !== repIdx)];
+    return ordered.map((i) => items[i]);
+  });
 }
 
 function capitaliseFirst(s: string): string {

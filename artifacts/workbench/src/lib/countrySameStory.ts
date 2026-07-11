@@ -46,6 +46,7 @@
 // (Jakarta / Indonesia) keep the gate so distinct cities are never merged.
 
 import { canonicalTitleKey } from "./monitorDedupe";
+import { isUntranslatedTitle } from "./incidentTitle";
 
 const SEV_RANK: Record<string, number> = {
   insignificant: 1,
@@ -315,6 +316,14 @@ export interface SameStoryRow {
   // Optional secondary compatibility signals (report-builder parity).
   category?: string | null;
   displayCategory?: string | null;
+  // Optional ORIGINAL-LANGUAGE (pre-translation) headline. When a caller can
+  // supply it (the structured report builder, whose `title` is already resolved
+  // to the English display_title so bilingual copies of one story diverge and no
+  // longer match on `title`), an ADDITIVE cross-language merge path lets a
+  // translated copy and its still-untranslated sibling cluster on their shared
+  // original headline. Absent (e.g. the page-level consolidator, whose `title`
+  // is already the raw title) → the extra path is inert and nothing changes.
+  rawTitle?: string | null;
 }
 
 const DAY = 86_400_000;
@@ -342,6 +351,7 @@ export function clusterSameStoryRows(
   });
   const feats = rows.map((r) => {
     const toks = storyTokens(r.title);
+    const raw = r.rawTitle && r.rawTitle.trim() ? r.rawTitle : null;
     return {
       toks,
       prem: namedPremises(r.title),
@@ -354,6 +364,10 @@ export function clusterSameStoryRows(
       placeToks: new Set(
         [...toks].filter((t) => !CLASH_GENERIC_TOKENS.has(t)),
       ),
+      // Additive cross-language merge signals — computed ONLY when the caller
+      // supplies a raw pre-translation headline (see SameStoryRow.rawTitle).
+      rawCanon: raw ? canonicalTitleKey(raw) : "",
+      rawToks: raw ? storyTokens(raw) : null,
     };
   });
   interface Cluster {
@@ -371,6 +385,16 @@ export function clusterSameStoryRows(
       const ff = feats[j];
       // PATH 0: identical canonical title — same story regardless of date/place.
       if (f.canon && f.canon === ff.canon) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
+      // PATH 0-raw: identical canonical ORIGINAL-LANGUAGE title. Additive — lets a
+      // translated copy and its still-untranslated sibling of the SAME story merge
+      // even though their resolved (display) titles diverge by language. Inert
+      // unless BOTH rows carry a rawTitle, so nothing the resolved-title paths
+      // already merge is ever un-merged.
+      if (f.rawCanon && f.rawCanon === ff.rawCanon) {
         c.members.push(i);
         placed = true;
         break;
@@ -413,6 +437,23 @@ export function clusterSameStoryRows(
         placed = true;
         break;
       }
+      // PATH 1-raw: strong ORIGINAL-LANGUAGE title overlap, same/adjacent day.
+      // Additive companion to PATH 1 for bilingual duplicates whose resolved
+      // titles diverge by language but whose original headlines still overlap
+      // strongly. Gated identically (province + compatible type, already checked
+      // above) and inert unless both rows carry a rawTitle.
+      if (
+        f.rawToks &&
+        ff.rawToks &&
+        dd <= DAY &&
+        ff.rawToks.size >= 3 &&
+        f.rawToks.size >= 3 &&
+        tokenJaccard(ff.rawToks, f.rawToks) >= 0.5
+      ) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
       // PATH 2: shared named premises within a wider window (the sandal-factory
       // -fire case), gated by a modest overlap so a fluke shared modifier across
       // very different headlines cannot merge two distinct events.
@@ -442,14 +483,53 @@ export function clusterSameStoryRows(
   return clusters.map((c) => c.members);
 }
 
+// ---------------------------------------------------------------------------
+// Readable (English) representative selection
+// ---------------------------------------------------------------------------
+// Foreign-language incident headlines are translated into an English
+// `display_title` by a BOUNDED per-run ingest backfill, so the NEWEST rows of a
+// still-unfolding story lag untranslated for ~a day. Because a cluster's
+// representative is "highest severity, then NEWEST" (the clusterSameStoryRows
+// seed order), that newest row is the one LEAST likely to be translated yet — so
+// every country surface would systematically lead with raw Bahasa even though an
+// English version of the SAME story already exists lower in the cluster.
+//
+// Given one already-formed cluster (indices into the caller's rows, cluster[0] =
+// the natural representative), return the index of the representative to SHOW.
+// Normally cluster[0]; but when cluster[0] still renders in a foreign language,
+// re-select — WITHIN THE SAME top severity tier — the NEWEST member that renders
+// in English. Never downgrades severity; picks an intact real row (no fabricated
+// or mis-attributed text). Falls back to cluster[0] when no English sibling
+// exists in that tier (an honest coverage gap the UntranslatedBadge still flags).
+export function readableRepresentativeIndex(
+  cluster: number[],
+  rendersForeign: (idx: number) => boolean,
+  severityRank: (idx: number) => number,
+  dateMs: (idx: number) => number,
+): number {
+  const repIdx = cluster[0];
+  if (!rendersForeign(repIdx)) return repIdx;
+  const topRank = severityRank(repIdx);
+  let best: number | null = null;
+  for (const idx of cluster) {
+    if (severityRank(idx) !== topRank) continue; // never downgrade the severity tier
+    if (rendersForeign(idx)) continue; // must render in English
+    if (best === null || dateMs(idx) > dateMs(best)) best = idx;
+  }
+  return best ?? repIdx;
+}
+
 // Page-level convenience: collapse a window of raw incidents to one row per
 // consolidated story, keeping the representative (highest severity, then
-// newest). Province is intentionally left null for every row so the title /
-// premises evidence decides (the page cannot resolve config provinces, and the
-// set is already scoped to one country).
+// newest — but preferring a translated English version of the SAME story when
+// the natural representative is still untranslated; see
+// readableRepresentativeIndex). Province is intentionally left null for every
+// row so the title / premises evidence decides (the page cannot resolve config
+// provinces, and the set is already scoped to one country).
 export function consolidateCountryStories<
   T extends {
     title: string;
+    displayTitle?: string | null;
     severity?: string | null;
     occurredAt: string;
     category?: string | null;
@@ -464,7 +544,17 @@ export function consolidateCountryStories<
     severityRank: SEV_RANK[(r.severity ?? "").toLowerCase()] ?? 0,
     category: r.category ?? null,
   }));
-  return clusterSameStoryRows(sr).map((cluster) => rows[cluster[0]]);
+  return clusterSameStoryRows(sr).map(
+    (cluster) =>
+      rows[
+        readableRepresentativeIndex(
+          cluster,
+          (idx) => isUntranslatedTitle(rows[idx].title, rows[idx].displayTitle),
+          (idx) => sr[idx].severityRank,
+          (idx) => sr[idx].dateMs,
+        )
+      ],
+  );
 }
 
 // ---------------------------------------------------------------------------
