@@ -1078,7 +1078,7 @@ function buildOtherWatched(
     const f = focusOf(a);
     return f.hasFocus ? `${a.theatre} (${joinList(f.labels)})` : a.theatre;
   });
-  return `Lower-level activity also showed in ${joinList(parts)}. The record is thinner there this period, but any of them can climb the list quickly on a single clash or attack, so they stay on watch.`;
+  return `Lower-level activity also showed in ${joinList(parts)}. It was quieter there this period, but any of these could worsen quickly on a single clash or attack, so they stay on watch.`;
 }
 
 function buildWhatMatters(
@@ -1413,6 +1413,10 @@ const GENERIC_CONFLICT_PHRASES = [
   "background reporting into a live duty-of-care problem",
   "The practical response is clear",
   "keep people away from the worst-hit areas",
+  // Superseded auto Other Watched Theatres (pre plainer-voice rewrite). Saved
+  // reports carrying the "record is thinner" / "climb the list" analyst-speak
+  // reseed the cleaner reader-facing wording.
+  "The record is thinner there this period",
 ];
 
 export function isGenericConflictProse(text: string): boolean {
