@@ -488,6 +488,45 @@ async function tick(reason: string): Promise<boolean> {
 }
 
 /**
+ * Run ONE dedicated title-translation pass and log the outcome. Foreign
+ * (Bahasa / non-Latin) headlines get an English `display_title` here. The full
+ * incident chain's OWN translation step sits at the very end (after the strikes
+ * and ICC-piracy passes) and is routinely skipped when an autoscale instance is
+ * torn down mid-chain, so without a dedicated pass freshly-ingested foreign
+ * headlines ship untranslated and the 7-day country briefs render the raw
+ * original title. Runs on the SAME cadence as ingest (boot catch-up + recurring
+ * interval) so newly-inserted rows are translated promptly, not only at the next
+ * cold-start boot. Idempotent, commits per row, converges (each committed row
+ * leaves the candidate set), self-skips when no OpenAI key is configured, and
+ * shares the advisory lock so it never collides with a full run.
+ */
+async function translationTick(reason: string): Promise<void> {
+  try {
+    const result = await runTitleTranslationOnce();
+    if (!result.ran) {
+      logger.info(
+        { reason },
+        "translate pass skipped (full ingest already running)",
+      );
+      return;
+    }
+    logger.info(
+      {
+        reason,
+        candidates: result.titleTranslation.candidates,
+        translated: result.titleTranslation.translated,
+        failed: result.titleTranslation.failed,
+        skipped: result.titleTranslation.skipped,
+        durationMs: result.durationMs,
+      },
+      "translate pass finished",
+    );
+  } catch (err) {
+    logger.error({ err, reason }, "translate pass failed");
+  }
+}
+
+/**
  * Run ONLY the fuel-price ingest (no incident scrape). Used when incidents are
  * already fresh but a fuel report is missing prices, so a flaky FRED fetch gets
  * retried on the next cold start instead of being skipped forever.
@@ -681,30 +720,7 @@ export function startIngestScheduler(): void {
         // warm window. The pass is idempotent, commits per row and converges, so
         // a torn-down run still persists what it finished and the next boot
         // drains the rest; it self-skips when no OpenAI key is configured.
-        try {
-          const result = await runTitleTranslationOnce();
-          if (!result.ran) {
-            logger.info(
-              "boot translate: skipped (full ingest already running)",
-            );
-          } else {
-            logger.info(
-              {
-                candidates: result.titleTranslation.candidates,
-                translated: result.titleTranslation.translated,
-                failed: result.titleTranslation.failed,
-                skipped: result.titleTranslation.skipped,
-                durationMs: result.durationMs,
-              },
-              "boot translate: early title-translation run finished",
-            );
-          }
-        } catch (err) {
-          logger.error(
-            { err },
-            "boot translate: early title-translation run failed",
-          );
-        }
+        await translationTick("boot-early");
       })(),
     STRIKES_BOOT_DELAY_MS,
   );
@@ -894,6 +910,7 @@ export function startIngestScheduler(): void {
               "boot ingest: data stale, running catch-up",
             );
             await tick("boot");
+            await translationTick("boot-catchup");
             return;
           }
           // Incidents are fresh, so skip the expensive scrape. But the fuel-price
@@ -921,6 +938,7 @@ export function startIngestScheduler(): void {
     () =>
       void (async () => {
         await tick("interval");
+        await translationTick("interval");
         await monitorMovementFreshness("interval");
       })(),
     hours * MS_PER_HOUR,
