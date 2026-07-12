@@ -32,9 +32,10 @@ import {
 export const TAPA_SOURCE_LABEL = "TAPA EMEA (APAC)";
 
 // Idempotency marker prefix written to analyst_notes. The full marker is
-// `tapa_offline:<sha256(9 fields)>:<n>` where n is the occurrence index within
-// the group of rows byte-identical across all nine fields — so even genuine
-// duplicate rows get a stable, unique marker and a re-run never double-inserts.
+// `tapa_offline:<sha256(9 fields)>:0`. Rows byte-identical across all nine
+// fields are collapsed to a single incident (see markTapaRows), so the
+// occurrence index is always 0; a re-run reproduces the same marker and never
+// double-inserts.
 export const TAPA_PROMOTE_MARKER_PREFIX = "tapa_offline:";
 
 // Default EUR→USD rate, overridable via TAPA_EUR_USD_RATE. Kept configurable so
@@ -311,19 +312,27 @@ export function decideTapaPromotion(input: TapaPromoteInput): TapaPromoteDecisio
 }
 
 /**
- * Assign a stable idempotency marker to every parsed row. Rows byte-identical
- * across all nine fields share a hash; the occurrence index (0-based, in stable
- * parse order) disambiguates them so genuine duplicates each get a unique
- * marker and a re-run reproduces the exact same markers.
+ * Assign a stable idempotency marker to every UNIQUE parsed row. Rows that are
+ * byte-identical across all nine fields (the same theft appearing in more than
+ * one saved export because the analyst pulled overlapping date ranges) share a
+ * hash and are COLLAPSED to a single incident — only the first occurrence is
+ * kept, always at occurrence 0.
+ *
+ * The owner reversed the earlier "one distinct occurrence per byte-identical
+ * row" behaviour: a TAPA record identical in all nine fields (date included) is
+ * an overlapping-import artifact, not a genuine repeat event. A re-run
+ * reproduces the same occurrence-0 markers, so the pass stays idempotent.
  */
 export function markTapaRows(rows: string[][]): Array<{ record: TapaRecord; marker: string }> {
-  const counts = new Map<string, number>();
-  return rows.map((row) => {
+  const seen = new Set<string>();
+  const out: Array<{ record: TapaRecord; marker: string }> = [];
+  for (const row of rows) {
     const hash = tapaRowHash(row);
-    const n = counts.get(hash) ?? 0;
-    counts.set(hash, n + 1);
-    return { record: tapaRowToRecord(row), marker: tapaMarker(hash, n) };
-  });
+    if (seen.has(hash)) continue;
+    seen.add(hash);
+    out.push({ record: tapaRowToRecord(row), marker: tapaMarker(hash, 0) });
+  }
+  return out;
 }
 
 export interface TapaPromoteSummary {

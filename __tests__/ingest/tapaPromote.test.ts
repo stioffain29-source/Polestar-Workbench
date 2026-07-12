@@ -134,15 +134,15 @@ describe("tapa markers", () => {
     expect(tapaRowHash(row)).toBe(tapaRowHash([...row]));
     expect(tapaRowHash(row)).not.toBe(tapaRowHash(["z", ...row.slice(1)]));
   });
-  it("gives byte-identical rows distinct occurrence markers", () => {
+  it("collapses byte-identical rows to a single occurrence-0 marker", () => {
     const row = ["05.07.2026", "Robbery", "", "", "", "No", "N/A", "X", "Singapore"];
     const marked = markTapaRows([row, [...row], ["09.09.2026", ...row.slice(1)]]);
-    // first two share a hash but differ by occurrence index
-    expect(marked[0].marker).not.toBe(marked[1].marker);
+    // the two byte-identical rows collapse to one; the differing-date row stays
+    expect(marked).toHaveLength(2);
     expect(marked[0].marker.endsWith(":0")).toBe(true);
-    expect(marked[1].marker.endsWith(":1")).toBe(true);
-    // third row has a different hash → occurrence 0 again
-    expect(marked[2].marker.endsWith(":0")).toBe(true);
+    expect(marked[1].marker.endsWith(":0")).toBe(true);
+    // the two survivors carry different hashes
+    expect(marked[0].marker).not.toBe(marked[1].marker);
   });
 });
 

@@ -1458,6 +1458,44 @@ export async function runDataMigrations(): Promise<void> {
         );
       }
     }
+    // 3b-ii) ONE-TIME removal of byte-identical TAPA cargo-crime duplicates.
+    //
+    //     Overlapping-date TAPA exports promoted the same incident more than
+    //     once: every byte-identical copy (same nine fields, date included) was
+    //     stamped tapa_offline:<hash>:<n> with n>0. The owner confirmed these
+    //     are import artifacts, not genuine repeat events, so collapse each
+    //     hash group to its occurrence-0 row and delete the rest. markTapaRows
+    //     now emits only occurrence 0, so no new n>0 rows can be created; this
+    //     repairs rows promoted before that change. Marker-gated one-time (safe
+    //     no-op in prod if the admin promote route was never run there).
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "tapa_byte_identical_dedupe_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM incidents
+          WHERE topic = 'cargo_watch'
+            AND analyst_notes LIKE 'tapa_offline:%'
+            AND split_part(analyst_notes, ':', 3) <> '0'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time TAPA byte-identical duplicate cleanup (kept occurrence 0)",
+        );
+      }
+    }
     // 3c) ONE-TIME relocation of out-of-theatre strike rows.
     //
     //     Both Missile Strike Tracker theatres (maritime_hormuz, land_gcc) are

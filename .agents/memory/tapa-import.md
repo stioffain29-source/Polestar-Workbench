@@ -45,16 +45,19 @@ explicitly asking.
   the other silently drops from the monitor. NOTE: the cargo-slop gate
   (`.agents/memory/cargo-slop.md`) deliberately runs BEFORE this short-circuit,
   so `analystInScope` no longer beats EVERY gate — but TAPA's synthesised text
-  carries no slop framing, so no slop pattern can match it and the 489 TAPA rows
-  are not display-dropped.
+  carries no slop framing, so no slop pattern can match it and the TAPA rows are
+  not display-dropped.
 - **Country canon:** `normaliseTapaCountry` files Hong Kong → China (+geoHint),
   and canonicalises Viet Nam→Vietnam, Korea, Republic of→South Korea,
   Taiwan, Province of China→Taiwan — must match cargoAnalysis aliases.
-- **Idempotency:** marker `analyst_notes=tapa_offline:<sha256(9 fields)>:<occurrence>`.
+- **Idempotency:** marker `analyst_notes=tapa_offline:<sha256(9 fields)>:0`.
   Dedupe is marker-only (TAPA rows have no URL, so gdelt's fuzzy news/URL dedupe
-  does not apply). Byte-identical rows across pages promote as DISTINCT incidents
-  via the occurrence index — expected, so an analyst may see near-identical
-  Cargo Watch rows. Re-running the route inserts 0.
+  does not apply). Byte-identical rows across pages (same 9 fields incl. date)
+  are COLLAPSED to ONE incident by `markTapaRows` — the owner confirmed these are
+  overlapping-import artifacts, not genuine repeats, REVERSING the earlier
+  "distinct occurrence per copy" behaviour. Existing n>0 rows were removed by a
+  marker-gated boot cleanup (`tapa_byte_identical_dedupe_v1` in migrations.ts).
+  Re-running the route inserts 0.
 - **backfillRelevance (migrations.ts):** MUST keep excluding BOTH
   `'gdelt_cloud:%'` AND `'tapa_offline:%'` so a `RELEVANCE_RULE_VERSION` bump
   cannot re-score these structured rows by text.
@@ -72,9 +75,11 @@ explicitly asking.
 
 ## Verified facts (this dataset, 5 saved pages)
 
-- 489 rows total; parser stable at 489 after the CLI refactor.
-- Severity split low 226 / moderate 198 / high 65 — high=65 exactly equals the
-  source's "High Value = Yes" count (a good sanity check for the classifier).
+- 489 rows parsed from the 5 pages; `markTapaRows` now collapses 17
+  byte-identical (overlapping-date) copies → 472 unique incidents promoted.
+- Severity split (of the 489 parsed rows) low 226 / moderate 198 / high 65 —
+  high=65 exactly equals the source's "High Value = Yes" count (a good sanity
+  check for the classifier).
 - Country spread (post-normalisation): India 267, Philippines 61, Vietnam 45,
   China 29 (incl. 24 Hong Kong), Indonesia 20, Malaysia 16, Thailand 16,
   Pakistan 9, Australia 9, South Korea 6, Japan 4, Taiwan 3, Singapore 2,
