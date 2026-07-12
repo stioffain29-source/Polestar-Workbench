@@ -4,11 +4,13 @@ import {
   buildSocialIncidentSummary,
   socialPromoteMarker,
   markerSocialRawId,
+  runSocialPromote,
   SOCIAL_PROMOTE_MARKER_PREFIX,
   type SocialPromoteInput,
 } from "@workspace/ingest";
 import type { IncidentCandidate } from "@workspace/ingest";
 import { RELEVANCE_RULE_VERSION } from "@workspace/relevance";
+import { db } from "@workspace/db";
 
 // A minimal social_raw row fixture. Callers override the fields the test cares
 // about. Defaults to a promotable Facebook local-media row.
@@ -237,5 +239,122 @@ describe("decideSocialPromotion", () => {
       reason: "duplicate",
       duplicateOf: 900,
     });
+  });
+});
+
+// Exercises the COMMIT branch of runSocialPromote against a mocked `db`. This
+// path never ran for real until it threw on its first commit: the final count
+// query destructured `db.execute(...)` as an array, but `db.execute` returns
+// `{ rows }`, so it threw `TypeError: ... is not iterable` AFTER the incidents
+// were already inserted (data written, script exits with an error). These tests
+// guard the commit branch so a future refactor can't reintroduce that silent
+// mid-commit failure.
+describe("runSocialPromote (commit branch)", () => {
+  // Builds a mocked `db` where:
+  //  - the first `.select().from().where()` returns the unpromoted social_raw rows
+  //  - the second `.select({...}).from()` (awaited directly) returns candidate incidents
+  //  - `.transaction(cb)` runs the callback with a tx that inserts + claims a row
+  //  - `.execute(...)` returns the drizzle `{ rows }` shape
+  function setupCommitDb(opts: {
+    socialRows: SocialPromoteInput[];
+    incidents?: IncidentCandidate[];
+    executeResult?: unknown;
+    claimReturns?: Array<{ id: number }>;
+  }) {
+    const incidents = opts.incidents ?? [];
+    let selectCall = 0;
+
+    const selectSpy = jest.spyOn(db, "select").mockImplementation((() => {
+      const call = selectCall++;
+      // First select() (no projection) → social_raw rows via .from().where()
+      // Second select({...}) (with projection) → incidents via .from() (awaited)
+      if (call === 0) {
+        return {
+          from: () => ({
+            where: () => Promise.resolve(opts.socialRows),
+          }),
+        } as any;
+      }
+      const thenable: any = {
+        from: () => thenable,
+        then: (res: (v: unknown) => unknown) => res(incidents),
+      };
+      return thenable;
+    }) as any);
+
+    // `transaction` lives on the drizzle prototype, so it is not spy-able as an
+    // own property; assign a mock directly and restore it in afterEach.
+    const txSpy = jest.fn(async (cb: any) => {
+      const tx = {
+        insert: () => ({
+          values: () => ({
+            returning: () => Promise.resolve([{ id: 5000 }]),
+          }),
+        }),
+        update: () => ({
+          set: () => ({
+            where: () => ({
+              returning: () => Promise.resolve(opts.claimReturns ?? [{ id: 1 }]),
+            }),
+          }),
+        }),
+      };
+      return cb(tx);
+    });
+    (db as any).transaction = txSpy;
+
+    const executeSpy = jest
+      .spyOn(db, "execute")
+      .mockResolvedValue(
+        (opts.executeResult ?? { rows: [{ count: 7 }] }) as any,
+      );
+
+    return { selectSpy, txSpy, executeSpy };
+  }
+
+  const originalTransaction = db.transaction;
+  afterEach(() => {
+    jest.restoreAllMocks();
+    (db as any).transaction = originalTransaction;
+  });
+
+  it("completes without throwing and reports inserted / totalAfter", async () => {
+    setupCommitDb({ socialRows: [row()], executeResult: { rows: [{ count: 7 }] } });
+
+    const summary = await runSocialPromote({ commit: true });
+
+    expect(summary.mode).toBe("commit");
+    expect(summary.newToInsert).toBe(1);
+    expect(summary.inserted).toBe(1);
+    expect(summary.totalAfter).toBe(7);
+    expect(summary.errors).toEqual([]);
+  });
+
+  it("reads the count off `.rows` (drizzle db.execute shape), not an array", async () => {
+    const { executeSpy } = setupCommitDb({
+      socialRows: [row()],
+      executeResult: { rows: [{ count: 42 }] },
+    });
+
+    const summary = await runSocialPromote({ commit: true });
+
+    // The count query result must be treated as `{ rows: [...] }` — the exact
+    // shape whose array-destructuring regression this test defends against.
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    const result = await executeSpy.mock.results[0]!.value;
+    expect(Array.isArray(result)).toBe(false);
+    expect(result).toHaveProperty("rows");
+    expect(summary.totalAfter).toBe(42);
+  });
+
+  it("skips the count query entirely in dry-run mode", async () => {
+    const { executeSpy } = setupCommitDb({ socialRows: [row()] });
+
+    const summary = await runSocialPromote({ commit: false });
+
+    expect(summary.mode).toBe("dry-run");
+    expect(summary.newToInsert).toBe(1);
+    expect(summary.inserted).toBe(0);
+    expect(executeSpy).not.toHaveBeenCalled();
   });
 });
