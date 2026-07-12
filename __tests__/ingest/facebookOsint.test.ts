@@ -413,6 +413,38 @@ describe("pickCorroboration (soft, upgrades credibility)", () => {
     );
     expect(m).toBeNull();
   });
+
+  it("does NOT corroborate on incidental place/org overlap without a shared security-event term", () => {
+    // A PR / greeting post that shares only place / org / generic tokens with an
+    // unrelated same-day incident. Same country + same day previously cleared the
+    // 0.5 bar on date proximity alone; now it must not.
+    const m = pickCorroboration(
+      {
+        text: "Selamat Idul Fitri from the Enga highlands community forum seminar",
+        country: "Papua New Guinea",
+        province: null,
+        category: "Civil unrest / protest",
+        date: new Date("2026-06-20T06:00:00Z"),
+      },
+      [mk({})],
+    );
+    expect(m).toBeNull();
+  });
+
+  it("still corroborates when a real security-event word is shared", () => {
+    const m = pickCorroboration(
+      {
+        text: "Reports of a tribal clash near the Enga community forum",
+        country: "Papua New Guinea",
+        province: null,
+        category: "Tribal / communal violence",
+        date: new Date("2026-06-20T06:00:00Z"),
+      },
+      [mk({})],
+    );
+    expect(m).not.toBeNull();
+    expect(m!.incident.id).toBe(1);
+  });
 });
 
 describe("pickDuplicate (hard, blocks promotion)", () => {

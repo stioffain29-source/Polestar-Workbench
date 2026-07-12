@@ -199,6 +199,37 @@ describe("decideSocialPromotion", () => {
     expect(d.row.relevanceStatus).toBeDefined();
   });
 
+  it("does NOT promote a non-credible PR post that only shares incidental tokens with an unrelated incident", () => {
+    // A KAMMI-style greeting / seminar post carrying NO security-event vocab.
+    const prPost = row({
+      sourceTier: "osint",
+      detectedCredibleDomains: [],
+      corroborated: false,
+      country: "Indonesia",
+      province: "Jakarta",
+      location: "Jakarta",
+      category: "Civil unrest / protest",
+      caption:
+        "Selamat Idul Fitri from KAMMI. Join our national seminar forum in Jakarta this week.",
+      businessImpact: null,
+    });
+    // An unrelated same-day incident that shares only the place token "jakarta".
+    const unrelated = inc({
+      id: 950,
+      title: "Earthquake felt across greater Jakarta region",
+      summary: "A moderate earthquake shook parts of Jakarta on Monday.",
+      country: "Indonesia",
+      province: "Jakarta",
+      category: "Other security",
+      occurredAt: new Date("2026-07-01T00:00:00.000Z"),
+      incidentDate: new Date("2026-07-01T00:00:00.000Z"),
+    });
+    expect(decideSocialPromotion(prPost, [unrelated])).toEqual({
+      promote: false,
+      reason: "not-credible",
+    });
+  });
+
   it("blocks a duplicate of an already-tracked incident", () => {
     const d = decideSocialPromotion(row({ sourceTier: "official" }), [inc()]);
     expect(d).toEqual({

@@ -586,6 +586,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const CORROBORATION_WINDOW_DAYS = 10;
 export const CORROBORATION_THRESHOLD = 0.5;
 export const CORROBORATION_MIN_SHARED = 2;
+// The shared tokens must include at least this many security-EVENT terms. This
+// is the precision gate that stops a PR / greeting / announcement post from
+// "corroborating" an unrelated same-country incident on incidental place / org /
+// generic-word overlap alone: date proximity can no longer clear the bar by
+// itself — a real event/action word must appear in BOTH texts.
+export const CORROBORATION_MIN_SECURITY_SHARED = 1;
 
 // Duplicate-block: a hard match that blocks promotion. Stricter on every axis.
 export const DUPLICATE_WINDOW_DAYS = 4;
@@ -599,7 +605,17 @@ export const DUPLICATE_MIN_SHARED = 3;
 interface RawScore {
   score: number;
   shared: number;
+  /** How many of the SHARED tokens carry a security-EVENT meaning. */
+  securityShared: number;
   diffDays: number;
+}
+
+// A shared token is "security-meaningful" when it is itself a security-EVENT cue
+// (crime / violence / unrest / armed action / acute instability). Place names,
+// org names, generic 4+ char words, and bare years never qualify. Reuses the
+// same curated cue list the security-event guard uses, so the two gates agree.
+function isSecurityMeaningfulToken(token: string): boolean {
+  return hasSecurityEventSignal(token);
 }
 
 function scoreCandidate(
@@ -617,13 +633,18 @@ function scoreCandidate(
   if (postTokens.size === 0) return null;
   const incTokens = tokenize(`${inc.title} ${inc.summary ?? ""}`);
   let shared = 0;
-  for (const t of postTokens) if (incTokens.has(t)) shared++;
+  let securityShared = 0;
+  for (const t of postTokens) {
+    if (!incTokens.has(t)) continue;
+    shared++;
+    if (isSecurityMeaningfulToken(t)) securityShared++;
+  }
 
   const dateScore = 1 - diffDays / windowDays;
   // Overlap saturates at 3 shared tokens so a short caption can still match.
   const overlap = Math.min(1, shared / 3);
   const score = 0.5 * overlap + 0.5 * dateScore;
-  return { score, shared, diffDays };
+  return { score, shared, securityShared, diffDays };
 }
 
 export interface IncidentMatch {
@@ -654,6 +675,10 @@ export function pickCorroboration(
     const r = scoreCandidate(post, inc, CORROBORATION_WINDOW_DAYS);
     if (!r) continue;
     if (r.shared < CORROBORATION_MIN_SHARED) continue;
+    // Precision gate: the shared vocabulary must include a real security-EVENT
+    // term, not just incidental place / org / generic-word overlap. Without this
+    // a same-day PR post "corroborates" any unrelated same-country incident.
+    if (r.securityShared < CORROBORATION_MIN_SECURITY_SHARED) continue;
     if (r.score < CORROBORATION_THRESHOLD) continue;
     if (!best || r.score > best.score) {
       best = {

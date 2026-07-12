@@ -15,18 +15,27 @@ Indonesian words, "2026") auto-corroborate. Result: non-incident KAMMI PR posts
 promote as fake "Civil unrest / protest — Indonesia" flashpoint incidents,
 "corroborated" by unrelated earthquakes / wildfires / counter-terror seminars.
 
-**Owner DECISION (2026-07-12): shown this false-positive behaviour in full, the
-owner chose "commit anyway" and DECLINED tightening the gate.** The Facebook
-"Papua & PNG" Apify dataset was committed (`import:apify-facebook --commit`):
-90 new `social_raw` rows + 17 promoted incidents (8 KAMMI Instagram → flashpoint,
-9 Facebook → 6 conflict + 3 flashpoint), all marked `analyst_notes=social_raw:%`,
-`confidence=low`.
-**Why:** the owner wanted the real social data in the feeds now, false positives
-included. Do NOT purge these rows or "fix" the corroboration gate as unsolicited
-cleanup — it was a deliberate, informed choice; reverting would undo their call.
-**How to apply:** if a future task asks to cut false social-promoted incidents,
-the real repair is requiring SECURITY-MEANINGFUL token overlap (not any shared
-tokens) in `pickCorroboration` — confirm with the owner first.
+**RESOLVED (2026-07-12, superseding the earlier "commit anyway").** The gate was
+tightened: `pickCorroboration` now requires at least one SHARED security-EVENT
+token (`CORROBORATION_MIN_SECURITY_SHARED`, reusing `hasSecurityEventSignal` at
+token granularity), so date proximity + incidental place/org/generic-word overlap
+can no longer corroborate. `pickDuplicate` is UNCHANGED (looser duplicate-block is
+fine — it only prevents double-count). No `RELEVANCE_RULE_VERSION` bump (this is
+promote-gate logic, not the relevance engine).
+**Why:** every fake was a non-credible OSINT row promoted ONLY via loose
+corroboration to an unrelated same-country incident (earthquake/wildfire/seminar)
+that shared no event vocabulary. Requiring a shared event term keeps genuine
+security posts promotable while dropping PR/greeting/announcement noise.
+**Owner also chose (2026-07-12) to REMOVE the earlier false batch.** A one-off
+re-derivation under the new gate deleted 11 of the 16 promoted incidents
+(10 not-credible + 1 now-duplicate) and reset their `social_raw` back-links to
+context-only; the 5 declared-credible-source rows stayed. Candidate pool for the
+re-derivation EXCLUDED social-promoted incidents so a fake couldn't corroborate a
+fake. This was done on the DEV DB only — prod would need a boot migration if its
+own promoted rows must be purged.
+**How to apply:** the corroboration gate is now the durable fix; if new false
+social incidents ever appear, check `CORROBORATION_MIN_SECURITY_SHARED` and the
+`SECURITY_EVENT_CUES` coverage before loosening anything.
 
 **No native Instagram Apify dataset existed** in the account — only the
 Facebook-shaped "Papua & PNG" dataset + a pre-existing KAMMI Instagram backlog
