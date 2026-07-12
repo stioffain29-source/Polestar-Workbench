@@ -427,3 +427,41 @@ describe("classifyCategory — commodity taxonomy", () => {
     expect(classifyCategory({ title: "Unknown item reported missing" })).toBe("Other");
   });
 });
+
+describe("classifyScope — trade-press commentary / non-incident slop is excluded", () => {
+  const SLOP: string[] = [
+    "Cargo Theft Costs Trucking $18M Daily",
+    "Cargo Theft Up 17 Percent in 2025",
+    "SAFER Transport Act takes aim at cargo theft",
+    "Why cargo theft is exploding across the country",
+    "LPM Webinar now on-demand: cargo theft trends",
+    "AI Drives New Wave of Cargo Theft",
+    "LAPD recovers nearly $4 million in stolen freight",
+    "Cargo Theft in Latin America: A Persistent Threat",
+  ];
+  it.each(SLOP)("marks commentary as excluded_non_cargo: %s", (title) => {
+    expect(classifyScope({ title, country: null }, "Country not identified")).toBe(
+      "excluded_non_cargo",
+    );
+  });
+
+  it("does not let a US-token think-piece survive on an analyst override", () => {
+    // The slop check runs ahead of every rescue, so even an analyst-flagged row
+    // cannot promote a commentary piece into the lane.
+    expect(
+      classifyScope(
+        { title: "LAPD recovers $4 million in stolen freight", country: "USA", analystInScope: true },
+        "APAC",
+      ),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("still keeps a genuine in-region incident that quotes a loss figure", () => {
+    expect(
+      classifyScope(
+        { title: "Container truck robbery on Pemalang Ring Road, loss of Rp1.8 billion", country: "Indonesia" },
+        "APAC",
+      ),
+    ).toBe("in_scope");
+  });
+});

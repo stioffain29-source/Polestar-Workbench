@@ -3,7 +3,7 @@
 // resolver, and the Cargo Watch report all classify scope, category and
 // USD loss identically and can never drift.
 
-import { splitAttributedCountries } from "./topicRelevance";
+import { splitAttributedCountries, matchCargoSlop } from "./topicRelevance";
 
 export interface CargoIncidentLike {
   title: string;
@@ -443,6 +443,12 @@ export type Scope = "in_scope" | "out_of_scope_geo" | "excluded_non_cargo" | "co
 
 export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   const text = `${i.title} ${i.summary ?? ""}`;
+  // US/UK trade-press commentary, legislation, statistics, webinars and other
+  // non-incident "cargo theft" pieces are not Cargo Watch EVENTS. Drop them
+  // ahead of every rescue (port-security signal, analyst override) so a
+  // think-piece can never be promoted into the lane. Shared with the ingest
+  // relevance gate via @workspace/relevance so the surfaces cannot drift.
+  if (matchCargoSlop(text)) return "excluded_non_cargo";
   // A genuine PORT cargo-security event (stowaways, port/vessel robbery, a
   // container narcotics seizure, etc.) is squarely in the widened scope even
   // though it names no land freight noun. Compute it once and let it bypass the

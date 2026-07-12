@@ -10,6 +10,8 @@
 // record as off-topic regardless of keyword hits (live news blogs,
 // general death/travel stories, etc).
 
+import { CARGO_SLOP_EXCLUDE } from "./cargoSlop";
+
 export interface RelevanceInput {
   topic: string;
   title: string;
@@ -1621,6 +1623,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   if (topic === "cargo_watch") {
     const m = firstMatch(text, CARGO_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: cargo off-topic (/${m.source}/)` };
+    // Trade-press commentary, legislation, statistics, webinars, vendor-trend
+    // marketing and out-of-region items that merely say "cargo theft" are not
+    // Cargo Watch EVENTS. Shared detector with the frontend scope classifier.
+    const slop = firstMatch(text, CARGO_SLOP_EXCLUDE);
+    if (slop) return { relevant: false, reason: `excluded: cargo commentary/non-incident (/${slop.source}/)` };
   }
   if (topic === "energy") {
     const m = firstMatch(text, ENERGY_EXCLUDE);

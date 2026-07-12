@@ -41,8 +41,12 @@ explicitly asking.
 - **In-scope gate:** `TAPA_SCOPE_COUNTRIES` in tapaPromote MUST mirror
   `cargoAnalysis` APAC+Middle-East sets exactly (lib cannot import workbench, so
   it is duplicated). It sets `analystInScope`, which `classifyScope`
-  short-circuits to `in_scope` for APAC/ME BEFORE its noise gates. A country
-  added to one set but not the other silently drops from the monitor.
+  short-circuits to `in_scope` for APAC/ME. A country added to one set but not
+  the other silently drops from the monitor. NOTE: the cargo-slop gate
+  (`.agents/memory/cargo-slop.md`) deliberately runs BEFORE this short-circuit,
+  so `analystInScope` no longer beats EVERY gate — but TAPA's synthesised text
+  carries no slop framing, so no slop pattern can match it and the 489 TAPA rows
+  are not display-dropped.
 - **Country canon:** `normaliseTapaCountry` files Hong Kong → China (+geoHint),
   and canonicalises Viet Nam→Vietnam, Korea, Republic of→South Korea,
   Taiwan, Province of China→Taiwan — must match cargoAnalysis aliases.
