@@ -461,6 +461,8 @@ export async function runInstagramSourceIngest(
   summary.routable = decided.length;
 
   log(`  fetched            : ${summary.fetched}`);
+  log(`  no text            : ${summary.skippedNoText}`);
+  log(`  no date            : ${summary.skippedNoDate}`);
   log(`  data-centre held   : ${summary.dataCentreHeld}`);
   log(`  no country         : ${summary.skippedNoCountry}`);
   log(`  unroutable         : ${summary.skippedUnroutable}`);

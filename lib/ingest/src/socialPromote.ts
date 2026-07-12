@@ -451,12 +451,12 @@ export async function runSocialPromote(
       }
     }
 
-    const [{ count } = { count: 0 }] = (await db.execute(
+    const countRes = (await db.execute(
       sql`SELECT COUNT(*)::int AS count FROM incidents WHERE analyst_notes LIKE ${
         SOCIAL_PROMOTE_MARKER_PREFIX + "%"
       }`,
-    )) as unknown as Array<{ count: number }>;
-    summary.totalAfter = count ?? 0;
+    )) as unknown as { rows: Array<{ count: number }> };
+    summary.totalAfter = countRes.rows[0]?.count ?? 0;
     log(`  inserted=${summary.inserted} social-promoted-total=${summary.totalAfter}`);
   } else if (!commit) {
     log("  DRY-RUN — re-run with --commit to write.");
