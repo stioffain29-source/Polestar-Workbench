@@ -72,7 +72,7 @@ export const GLOBAL_EXTRA_ALIASES: CountryAlias[] = [
   { canonical: "Zambia", aliases: ["zambia", "zambian", "lusaka", "zesco"] },
   { canonical: "Spain", aliases: ["spain", "spanish", "madrid", "barcelona", "iberia", "iberian"] },
   { canonical: "Portugal", aliases: ["portugal", "portuguese", "lisbon"] },
-  { canonical: "Ukraine", aliases: ["ukraine", "ukrainian", "ukrainians", "kyiv", "kiev", "zaporizhzhia", "kharkiv", "odesa", "odessa"] },
+  { canonical: "Ukraine", aliases: ["ukraine", "ukrainian", "ukrainians", "kyiv", "kiev", "zaporizhzhia", "kharkiv", "odesa", "odessa", "crimea", "crimean", "sevastopol", "simferopol", "balaklava", "kerch"] },
   { canonical: "Russia", aliases: ["russia", "russian", "russians", "moscow", "rosseti"] },
   { canonical: "Germany", aliases: ["germany", "german", "germans", "berlin", "hamburg", "munich"] },
   { canonical: "Cuba", aliases: ["cuba", "cuban", "cubans", "havana"] },

@@ -37,4 +37,16 @@ describe("geocode", () => {
     expect(result?.location).toBe("Jayapura");
     expect(result?.latitude).toBe(-2.53);
   });
+
+  it("places a Crimea/Balaklava energy incident within Ukraine", () => {
+    const result = geocode(
+      "Ukraine",
+      "Massive blackout in Crimea after a likely strike on the Balaklava Thermal Power Plant",
+    );
+    expect(result).toEqual({
+      latitude: 44.5,
+      longitude: 33.6,
+      location: "Balaklava",
+    });
+  });
 });

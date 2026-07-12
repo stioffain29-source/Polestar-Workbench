@@ -1655,6 +1655,53 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-1) ONE-TIME relocation of Crimea energy incidents mis-stamped onto a
+    //     feed default country. Energy is a WORLD-scope monitor, so a Crimea
+    //     power-plant strike is a legitimate global-market incident — but
+    //     "Crimea"/"Balaklava" were absent from the gazetteer, so a Crimea story
+    //     cross-syndicated into a country-edition feed (e.g. the Pakistan energy
+    //     edition) had no country detected and was stamped with the feed default
+    //     (Pakistan) and dropped on that centroid. The gazetteer now resolves
+    //     these to Ukraine; this repairs rows already stored. RELOCATE (never
+    //     delete) — the incident is real and in-scope. Re-stamp country =
+    //     'Ukraine' and re-geocode to Balaklava/Crimea coordinates. Bound to a
+    //     Crimea/Balaklava/Sevastopol title/summary token AND country != Ukraine
+    //     so an already-correct row is untouched. Marker-gated so analyst edits
+    //     afterwards are never overwritten. NOTE: backslashes are DOUBLED (\\y)
+    //     because this is a JS template literal first.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "energy_crimea_to_ukraine_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          UPDATE incidents
+          SET country = 'Ukraine',
+              location = 'Balaklava',
+              latitude = 44.5,
+              longitude = 33.6
+          WHERE topic = 'energy'
+            AND country <> 'Ukraine'
+            AND (COALESCE(title,'') || ' ' || COALESCE(summary,'')) ~* '\\y(crimea|crimean|balaklava|sevastopol|simferopol|kerch)\\y'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time relocation of Crimea energy incidents mis-stamped onto a feed default country",
+        );
+      }
+    }
+
     // 3d-1a-i1b) ONE-TIME purge of scraped Google-News SECTION / topic-page
     //     headings that leaked in as incidents — an aggregator feed LABEL, not
     //     a dated event ("Papua New Guinea Massacre News", "<Place> Crime

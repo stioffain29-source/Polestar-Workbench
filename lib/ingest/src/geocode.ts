@@ -275,6 +275,13 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   tangerang: { lat: -6.18, lng: 106.63 },
   madiun: { lat: -7.63, lng: 111.52 },
   "soekarno-hatta": { lat: -6.13, lng: 106.66, name: "Soekarno-Hatta" },
+  // Ukraine — Crimea (world-scope energy). Balaklava first so a Balaklava
+  // thermal-power-plant strike resolves to the town, not the peninsula.
+  balaklava: { lat: 44.5, lng: 33.6, name: "Balaklava" },
+  sevastopol: { lat: 44.62, lng: 33.53, name: "Sevastopol" },
+  simferopol: { lat: 44.95, lng: 34.1, name: "Simferopol" },
+  kerch: { lat: 45.36, lng: 36.47, name: "Kerch" },
+  crimea: { lat: 45.3, lng: 34.4, name: "Crimea" },
 };
 
 function titleCase(s: string): string {
