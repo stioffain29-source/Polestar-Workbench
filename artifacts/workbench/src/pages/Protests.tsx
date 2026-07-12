@@ -280,9 +280,11 @@ export default function Protests() {
   // --- Reported upcoming activity (advance warning) -----------------------
   // Forward-looking signals extracted from reporting that ANNOUNCES a
   // scheduled / planned protest. Built from the full resolved set (NOT the
-  // RangeToggle window) on a FIXED 14-day announcement lookback via the shared
-  // upcomingSignals authority, so it never drifts from the report/brief. Empty
-  // is normal (STRICT no-fabrication: an unreported march is not surfaced).
+  // RangeToggle window) on a FIXED 7-day announcement lookback via the shared
+  // upcomingSignals authority, so it never drifts from the report/brief. A
+  // 7-day window keeps the panel to genuinely current signals — an older
+  // announcement describes an event that has almost certainly already passed.
+  // Empty is normal (STRICT no-fabrication: an unreported march is not surfaced).
   const upcomingSignals = useMemo(
     () =>
       buildUpcomingSignalRows(
@@ -295,7 +297,7 @@ export default function Protests() {
           occurredAt: i.occurredAt,
           sourceUrl: incidentSourceUrl(i),
         })),
-        { windowDays: 14 },
+        { windowDays: 7 },
       ),
     [enriched],
   );
@@ -670,7 +672,7 @@ export default function Protests() {
           )}
         </div>
         <p className="text-[11px] text-muted-foreground italic mt-2">
-          Forward-looking signals drawn from reporting that announces scheduled or planned protest activity over the next 14 days. The date shown is the announcement date, not a confirmed event date. An empty panel means no upcoming activity has been reported — not that none will occur.
+          Forward-looking signals drawn from reporting in the past week that announces scheduled or planned protest activity. The date shown is the announcement date, not a confirmed event date. An empty panel means no upcoming activity has been reported — not that none will occur.
         </p>
       </Section>
 

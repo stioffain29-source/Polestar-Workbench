@@ -1428,7 +1428,7 @@ export function buildStructuredReportDataset(
   // --- Reported upcoming activity (advance warning) --------------------------
   // Forward-looking protest signals extracted via the shared upcomingSignals
   // authority — the SAME rows the live Protests monitor surfaces. Fed from the
-  // 30-day source set so the authority's own 14-day announcement window applies
+  // 30-day source set so the authority's own 7-day announcement window applies
   // (never a fabricated event date). Gated to Indonesia; every other theatre
   // gets [] so its render is byte-identical. Detection reads the translated
   // displayTitle when present so English keyword cues fire on Bahasa headlines.

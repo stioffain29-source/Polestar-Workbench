@@ -263,15 +263,17 @@ export function upcomingSignalLine(r: UpcomingSignalRow): string {
 }
 
 // Build the deduped, capped forewarning rows shared by the live monitor and the
-// Indonesia brief. Scans only a recent announcement window (default 14 days) so
-// a wide date range cannot resurrect long-stale "upcoming" items. Rows are
+// Indonesia brief. Scans only a recent announcement window (default 7 days) so
+// a wide date range cannot resurrect long-stale "upcoming" items — an
+// announcement older than a week almost always describes an event that has
+// already passed, which is wrong under an "upcoming activity" heading. Rows are
 // collapsed on (country, signal) exactly as the flashpoint report does.
 export function buildUpcomingSignalRows(
   rows: UpcomingSignalSource[],
   opts: { now?: Date; windowDays?: number; cap?: number } = {},
 ): UpcomingSignalRow[] {
   const now = opts.now ?? new Date();
-  const windowDays = opts.windowDays ?? 14;
+  const windowDays = opts.windowDays ?? 7;
   const cap = opts.cap ?? 8;
   const nowMs = now.getTime();
   const cutoff = nowMs - windowDays * 86_400_000;

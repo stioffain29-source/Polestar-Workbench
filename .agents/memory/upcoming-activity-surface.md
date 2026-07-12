@@ -13,6 +13,13 @@ the weekly Flashpoint report (Forecast + Watch Next), and the Indonesia country 
 so every surface shows the ANNOUNCEMENT date only (`announcedAt` = report timestamp),
 never a guessed calendar date; captions say so explicitly.
 
+**7-day announcement window (was 14).** `buildUpcomingSignalRows` default is now 7 days;
+the monitor passes `windowDays: 7` and the Indonesia brief follows the default. **Why:** an
+announcement older than a week almost always describes an event that has already happened, so
+under an "Upcoming Activity" heading a 14-day window read as all-stale/passed dates. **How to
+apply:** keep it short; do NOT widen back to 14. The caption must NOT say "over the next 14
+days" (implies future events); it describes reporting "in the past week".
+
 **Bahasa parity rule.** Any surface feeding the authority must pass the TRANSLATED title
 first (`displayTitle ?? title`) — English detection cues never fire on raw Bahasa
 headlines. A surface that feeds raw `title` silently misses Indonesian announcements the
