@@ -370,6 +370,73 @@ describe("recordSourceHealth — scrape-health telemetry", () => {
   });
 });
 
+describe("recordSourceHealth — flashpoint sustained-outage escalation", () => {
+  // Regression guard for the original frozen-green defect: a flashpoint feed
+  // that fails on enough CONSECUTIVE ingest runs must escalate from
+  // "operational" to "failing", and a later success must reset it. This drives
+  // the real flashpoint call shape (ok derived from the per-feed error, the
+  // coarse failureReason via categorizeFeedFailure) across a sequence of runs,
+  // feeding each run's resulting counter back in as the next run's existing row.
+  const FEED = { name: "PNG flashpoint feed", url: "http://png.test/rss" };
+
+  async function runFailingRun(consecutiveFailures: number) {
+    const cap = setupDb({ existing: [{ id: 42, consecutiveFailures }] });
+    const error = "timed out after 20000ms";
+    await recordSourceHealth("flashpoint", [
+      {
+        name: FEED.name,
+        url: FEED.url,
+        ok: false,
+        error,
+        failureReason: categorizeFeedFailure(error),
+      },
+    ]);
+    expect(cap.updates).toHaveLength(1);
+    return cap.updates[0].set;
+  }
+
+  it("stays operational for the first two consecutive failures, then flips to failing on the third", async () => {
+    // Run 1: healthy row (streak 0) fails once -> transient, still operational.
+    const run1 = await runFailingRun(0);
+    expect(run1.status).toBe("operational");
+    expect(run1.consecutiveFailures).toBe(1);
+    expect(run1.failureReason).toBe("timeout");
+
+    // Run 2: streak 1 fails again -> still below threshold, still operational.
+    const run2 = await runFailingRun(run1.consecutiveFailures);
+    expect(run2.status).toBe("operational");
+    expect(run2.consecutiveFailures).toBe(2);
+
+    // Run 3: streak 2 fails a third time -> crosses the threshold -> failing.
+    const run3 = await runFailingRun(run2.consecutiveFailures);
+    expect(run3.consecutiveFailures).toBe(FAILURE_ESCALATION_THRESHOLD);
+    expect(run3.status).toBe("failing");
+    // Once escalated the raw error surfaces (no transient prefix) for operators.
+    expect(run3.errorMessage).toBe("timed out after 20000ms");
+    expect(run3.lastFailureAt).toBeInstanceOf(Date);
+  });
+
+  it("resets a failing flashpoint feed back to operational on the next successful run", async () => {
+    // A feed sitting at/above the threshold (currently "failing").
+    const cap = setupDb({
+      existing: [{ id: 42, consecutiveFailures: FAILURE_ESCALATION_THRESHOLD }],
+    });
+
+    await recordSourceHealth("flashpoint", [
+      { name: FEED.name, url: FEED.url, ok: true },
+    ]);
+
+    expect(cap.updates).toHaveLength(1);
+    const set = cap.updates[0].set;
+    expect(set.status).toBe("operational");
+    expect(set.consecutiveFailures).toBe(0);
+    expect(set.errorMessage).toBeNull();
+    expect(set.lastSuccessAt).toBeInstanceOf(Date);
+    // A success must not stamp a new failure timestamp (lets the UI see recovery).
+    expect(set.lastFailureAt).toBeUndefined();
+  });
+});
+
 describe("categorizeFeedFailure", () => {
   it("returns null for an absent error (nothing failed)", () => {
     expect(categorizeFeedFailure(null)).toBeNull();
