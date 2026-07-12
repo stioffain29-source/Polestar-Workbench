@@ -34,6 +34,8 @@ import {
   hasSecurityEventSignal,
   isLikelyEnglish,
   applySecurityEventGuard,
+  facebookOsintIntervalHours,
+  withinFacebookCadence,
   type RawFacebookPost,
   type IncidentCandidate,
 } from "@workspace/ingest";
@@ -964,5 +966,55 @@ describe("persistFacebookPosts collapses duplicates in-run (dry-run)", () => {
     expect(res.newToInsert).toBe(1);
     expect(res.inserted).toBe(0);
     expect(insertSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Daily cadence — the PAID Apify fetch self-throttles to one pull per interval.
+// The DB-touching runFacebookOsintIngest gate delegates its decision to these
+// two pure helpers, so they carry the coverage.
+// ---------------------------------------------------------------------------
+describe("facebookOsintIntervalHours", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it("defaults to 24h when unset", () => {
+    delete process.env.FACEBOOK_OSINT_INTERVAL_HOURS;
+    expect(facebookOsintIntervalHours()).toBe(24);
+  });
+
+  it("honours a positive override", () => {
+    process.env.FACEBOOK_OSINT_INTERVAL_HOURS = "72";
+    expect(facebookOsintIntervalHours()).toBe(72);
+  });
+
+  it("falls back to 24h for non-positive or non-numeric values", () => {
+    for (const bad of ["0", "-5", "abc", ""]) {
+      process.env.FACEBOOK_OSINT_INTERVAL_HOURS = bad;
+      expect(facebookOsintIntervalHours()).toBe(24);
+    }
+  });
+});
+
+describe("withinFacebookCadence", () => {
+  const now = Date.parse("2026-07-12T12:00:00Z");
+  const hoursAgo = (h: number) => new Date(now - h * 3_600_000);
+
+  it("skips (returns true) when the last run is inside the interval", () => {
+    expect(withinFacebookCadence(hoursAgo(5), 24, now)).toBe(true);
+  });
+
+  it("runs (returns false) when the last run is older than the interval", () => {
+    expect(withinFacebookCadence(hoursAgo(25), 24, now)).toBe(false);
+  });
+
+  it("runs (returns false) on a null heartbeat so initial population proceeds", () => {
+    expect(withinFacebookCadence(null, 24, now)).toBe(false);
+  });
+
+  it("treats the exact boundary as due (not within)", () => {
+    expect(withinFacebookCadence(hoursAgo(24), 24, now)).toBe(false);
   });
 });

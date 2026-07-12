@@ -65,6 +65,38 @@ dataset items use aliases the normaliser must keep: `permalink`/`url`→url,
 a live key; one persist seam guarantees a manual import can never behave
 differently (e.g. skip the isolation/dedup invariants) from the live feed.
 
+**Daily automation — the scheduled path BOTH collects AND promotes.**
+`runFacebookOsintIngest({commit:true})` runs inside `runIngestOnce`
+(ingestRunner.ts) and `runSocialPromote({commit:true})` runs RIGHT AFTER it in
+the same runner, so the daily scheduler is the unattended collect→promote path
+(`import:apify-facebook` / `promote:social` are the manual CLI equivalents).
+`runSocialPromote` is a FREE DB→DB pass (0 external calls, idempotent), so it
+runs on EVERY full ingest and is NOT gated on the FB cadence — it drains any
+eligible backlog (incl. manually-imported rows) each run; a quiet DB yields
+`new=0`. It lives in its OWN try in the runner so a promote failure can never
+fail the wider ingest.
+**Why:** promotion must be free and prompt (drain backlog every tick) while the
+paid collection must self-throttle — different clocks for different costs.
+
+**Cadence gate throttles the PAID Apify fetch (not the free promote).** When
+active + committing, `runFacebookOsintIngest` skips the fetch if the last
+SUCCESSFUL pull was within `FACEBOOK_OSINT_INTERVAL_HOURS` (default 24). The
+clock is the Source-Health HEARTBEAT (`MAX(sources.last_success_at)` for the FB
+row via `lastSuccessfulFacebookRunAt()`), NOT `social_raw`'s timestamps —
+`social_raw` uses `onConflictDoNothing`, so an all-duplicate 0-insert run leaves
+its timestamps unchanged and keying off them would re-spend the paid call every
+boot for a quiet page. `recordSourceHealth` stamps `last_success_at` ONLY on a
+successful fetch (`f.ok`), so a failed run leaves the heartbeat untouched and the
+next boot retries rather than waiting out the interval. A cadence skip sets
+`summary.reason="cadence"`, fills `totalAfter`/`latestPostedAt` from
+`tableStats()`, and returns WITHOUT `recordSourceHealth` (no heartbeat bump).
+`FacebookOsintSummary.reason` ∈ `disabled|no-api-key|cadence|ok`. The scheduler
+boot gate mirrors this: `socialRawStale` is active-only and keys off the SAME
+heartbeat + `facebookOsintIntervalHours()` (log field `facebookRunAgeHours`);
+never-run-while-active is a trigger. **Why:** the paid feed must self-throttle to
+~1×/day even though the enclosing ingest ticks every 12h; the free promote must
+not be throttled so it can drain backlog promptly.
+
 **Two classification SCOPES via the `mode` option (default "scoped").**
 "scoped" = `classifyPost` keeps ONLY in-theatre (PNG / Indonesian-Papua) posts —
 the live engine ALWAYS uses this. "broad" (`--broad`, importer only) =

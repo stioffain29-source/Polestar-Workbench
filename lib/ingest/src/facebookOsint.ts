@@ -2,6 +2,7 @@ import {
   db,
   socialRawTable,
   incidentsTable,
+  sourcesTable,
   type InsertSocialRawItem,
 } from "@workspace/db";
 import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
@@ -120,6 +121,35 @@ const FETCH_TIMEOUT_MS = 30000;
 const FETCH_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 2500;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Hours between live Facebook OSINT pulls (default daily). The collector
+ * self-throttles to this interval via the cadence gate in runFacebookOsintIngest
+ * so frequent autoscale cold starts cannot re-spend the PAID Apify call. Keyed
+ * off the Source Health heartbeat (sources.last_success_at), which advances on
+ * every successful run — including an all-duplicate 0-insert one — unlike
+ * social_raw's own timestamps, which do not advance under onConflictDoNothing.
+ */
+export function facebookOsintIntervalHours(): number {
+  const raw = process.env.FACEBOOK_OSINT_INTERVAL_HOURS;
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 24;
+}
+
+/**
+ * The pure cadence DECISION: true when a prior successful run exists AND it is
+ * more recent than the interval — i.e. the (PAID) fetch should be skipped. A
+ * null heartbeat (never run) returns false so an initial-population run always
+ * proceeds. `now` is injectable for tests.
+ */
+export function withinFacebookCadence(
+  lastRun: Date | null,
+  intervalHours: number,
+  now: number = Date.now(),
+): boolean {
+  if (!lastRun) return false;
+  return (now - lastRun.getTime()) / 3_600_000 < intervalHours;
+}
 
 export interface FacebookOsintConfig {
   enabled: boolean;
@@ -1079,6 +1109,13 @@ export interface FacebookOsintSummary {
   mode: "commit" | "dry-run";
   active: boolean;
   configured: boolean;
+  /**
+   * Why the pass ran (or did not). "cadence" = skipped because the last
+   * successful pull was within FACEBOOK_OSINT_INTERVAL_HOURS (no fetch, no PAID
+   * Apify call, no Source Health write). "disabled"/"no-api-key" mirror the
+   * inactive states; "ok" = the fetch ran.
+   */
+  reason: "disabled" | "no-api-key" | "cadence" | "ok";
   pageHandle: string;
   sourceTier: SourceTier;
   /** Monitored pages configured. */
@@ -1115,6 +1152,7 @@ export function emptyFacebookOsintSummary(): FacebookOsintSummary {
     mode: "dry-run",
     active: isFacebookOsintActive(cfg),
     configured: cfg.configured,
+    reason: "ok",
     pageHandle: cfg.pageHandle,
     sourceTier: cfg.sourceTier,
     pages: cfg.pages.length,
@@ -1485,11 +1523,44 @@ export async function runFacebookOsintIngest(
   summary.mode = commit ? "commit" : "dry-run";
   summary.active = isFacebookOsintActive(cfg);
   summary.configured = cfg.configured;
+  summary.reason = !cfg.enabled
+    ? "disabled"
+    : !cfg.configured
+      ? "no-api-key"
+      : "ok";
   summary.logLines = logLines;
   summary.errors = errors;
   log(
     `facebook-osint — mode=${commit ? "COMMIT" : "DRY-RUN"} active=${summary.active} pages=${cfg.pages.length} search=${cfg.searchEnabled ? cfg.searchTerms.length : 0}`,
   );
+
+  // --- Cadence gate: when active + committing, skip the (PAID) Apify fetch if
+  // the last SUCCESSFUL pull was within the interval. Keyed off the Source
+  // Health heartbeat (sources.last_success_at), which advances even on an
+  // all-duplicate 0-insert run — social_raw's own timestamps do NOT (they use
+  // onConflictDoNothing), so keying off them would re-spend the paid call every
+  // boot for a quiet page. A cadence skip writes NO Source Health (leaves the
+  // heartbeat untouched) and no-ops. A null heartbeat while active still runs
+  // (initial population). The gate applies ONLY to the committing scheduled
+  // path: a dry-run (commit=false) bypasses it and, when configured, still
+  // fetches (paid) — it just writes nothing.
+  if (commit && summary.active) {
+    const intervalHours = facebookOsintIntervalHours();
+    const lastRun = await lastSuccessfulFacebookRunAt();
+    if (withinFacebookCadence(lastRun, intervalHours)) {
+      const ageHours = (Date.now() - lastRun!.getTime()) / 3_600_000;
+      summary.reason = "cadence";
+      log(
+        `  cadence: last successful run ${ageHours.toFixed(1)}h ago < ${intervalHours}h interval — skipping (no fetch, no Apify spend).`,
+      );
+      const stats = await tableStats();
+      summary.totalAfter = stats.total;
+      summary.latestPostedAt = stats.latest
+        ? stats.latest.toISOString()
+        : null;
+      return summary;
+    }
+  }
 
   // --- Fetch (no-op when not configured). Multi-page + optional post-search;
   // partial-failure tolerant (one dead source never sinks the rest).
@@ -1555,6 +1626,24 @@ export async function runFacebookOsintIngest(
   summary.totalAfter = persisted.totalAfter;
   summary.latestPostedAt = persisted.latestPostedAt;
   return summary;
+}
+
+/**
+ * The timestamp of the last SUCCESSFUL Facebook OSINT pull, read from the
+ * Source Health heartbeat (sources.last_success_at for the FB row). Returns null
+ * when the source has never run successfully. Used by the cadence gate — the
+ * heartbeat only advances on a successful fetch, so a failed run leaves it
+ * untouched and the next boot retries rather than waiting out the interval.
+ */
+async function lastSuccessfulFacebookRunAt(): Promise<Date | null> {
+  const [row] = await db
+    .select({
+      last: sql<Date | string | null>`max(${sourcesTable.lastSuccessAt})`,
+    })
+    .from(sourcesTable)
+    .where(eq(sourcesTable.name, FACEBOOK_OSINT_HEALTH_NAME));
+  const last = row?.last ?? null;
+  return last ? new Date(last) : null;
 }
 
 async function recordSourceHealthForPage(

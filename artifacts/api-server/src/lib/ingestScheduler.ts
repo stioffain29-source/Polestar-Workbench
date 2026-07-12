@@ -5,6 +5,8 @@ import {
   isGdeltStructuredEnabled,
   readKammiSourceConfig,
   isKammiSourceActive,
+  facebookOsintIntervalHours,
+  FACEBOOK_OSINT_HEALTH_NAME,
 } from "@workspace/ingest";
 import { sql } from "drizzle-orm";
 import {
@@ -340,16 +342,20 @@ function facebookOsintActive(): boolean {
 }
 
 /**
- * Hours since the newest stored Facebook OSINT item (or null when the table is
- * empty). social_raw refreshes ONLY inside a full ingest (runIngestOnce →
- * runFacebookOsintIngest), so — like strikes, the land topics, AIS movement and
- * KAMMI social-watch — a stale-but-populated table should force a boot catch-up.
- * Uses created_at (insertion heartbeat) so a quiet posting week does not look
- * stale. Only considered when facebookOsintActive().
+ * Hours since the last SUCCESSFUL Facebook OSINT pull (or null when it has never
+ * run). Keyed off the Source Health heartbeat (sources.last_success_at for the
+ * FB row), NOT max(social_raw.created_at): the collector persists with
+ * onConflictDoNothing, so an all-duplicate run (common for a slow-posting page)
+ * does NOT advance the social_raw timestamps — keying off them would keep the
+ * table looking "stale" forever and re-fire the PAID Apify pull on every boot.
+ * The heartbeat advances on every successful run, including a 0-insert one, so
+ * it is the honest "last time we actually pulled" clock. The FB collector's own
+ * cadence gate uses the same heartbeat, so the two agree. Only considered when
+ * facebookOsintActive().
  */
-async function hoursSinceNewestSocialRaw(): Promise<number | null> {
+async function hoursSinceLastFacebookRun(): Promise<number | null> {
   const res = await db.execute(
-    sql`SELECT MAX(created_at) AS last FROM social_raw`,
+    sql`SELECT MAX(last_success_at) AS last FROM sources WHERE name = ${FACEBOOK_OSINT_HEALTH_NAME}`,
   );
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
@@ -820,17 +826,22 @@ export function startIngestScheduler(): void {
           const kammiStale =
             kammiActive && (kammiAge === null || kammiAge >= hours);
           // Facebook OSINT (social_raw) also refreshes ONLY inside a full
-          // ingest. Same shape as KAMMI social-watch: a stale table is a reason
+          // ingest. Same shape as KAMMI social-watch: a stale feed is a reason
           // to run, but ONLY when the source is active — otherwise the table is
           // empty by design and gating on it would force a needless scrape on
-          // every cold start. An empty table while active IS a trigger (initial
-          // population).
+          // every cold start. Keyed off the FB cadence (default 24h), NOT the
+          // generic interval, because the collector self-throttles to that
+          // interval via its own cadence gate and would no-op (spending no PAID
+          // Apify call) on a shorter trigger. Never-run while active IS a
+          // trigger (initial population).
           const fbOsintActive = facebookOsintActive();
-          const socialRawAge = fbOsintActive
-            ? await hoursSinceNewestSocialRaw()
+          const facebookRunAge = fbOsintActive
+            ? await hoursSinceLastFacebookRun()
             : null;
           const socialRawStale =
-            fbOsintActive && (socialRawAge === null || socialRawAge >= hours);
+            fbOsintActive &&
+            (facebookRunAge === null ||
+              facebookRunAge >= facebookOsintIntervalHours());
           // GDELT Cloud structured event layer also refreshes ONLY inside a full
           // ingest. Same shape as the social layers: a stale table is a reason to
           // run, but ONLY when configured+enabled — otherwise the table is empty
@@ -898,8 +909,8 @@ export function startIngestScheduler(): void {
                 maritimeSecurityStale,
                 kammiAgeHours: kammiAge === null ? null : Math.round(kammiAge),
                 kammiStale,
-                socialRawAgeHours:
-                  socialRawAge === null ? null : Math.round(socialRawAge),
+                facebookRunAgeHours:
+                  facebookRunAge === null ? null : Math.round(facebookRunAge),
                 socialRawStale,
                 gdeltStructuredAgeHours:
                   gdeltStructuredAge === null

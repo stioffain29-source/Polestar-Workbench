@@ -34,6 +34,8 @@ import {
   emptyGdeltStructuredSummary,
   runGdeltPromote,
   emptyGdeltPromoteSummary,
+  runSocialPromote,
+  emptySocialPromoteSummary,
   runTapaPromote,
   emptyTapaPromoteSummary,
   runFacebookOsintReclassify,
@@ -57,6 +59,7 @@ import {
   type GdeltEnrichSummary,
   type GdeltStructuredSummary,
   type GdeltPromoteSummary,
+  type SocialPromoteSummary,
   type TapaPromoteSummary,
   type FacebookOsintReclassifySummary,
   type XSearchSummary,
@@ -107,6 +110,7 @@ export type IngestRunResult =
       centcomOfficial: CentcomIngestSummary;
       kammiSource: KammiSourceSummary;
       facebookOsint: FacebookOsintSummary;
+      socialPromote: SocialPromoteSummary;
       gdeltEnrich: GdeltEnrichSummary;
       gdeltStructured: GdeltStructuredSummary;
       gdeltPromote: GdeltPromoteSummary;
@@ -377,6 +381,16 @@ function emptyGdeltPromote(err: unknown): GdeltPromoteSummary {
     mode: "commit",
     errors: [msg],
     logLines: [`GDELT promote pass failed: ${msg}`],
+  };
+}
+
+function emptySocialPromote(err: unknown): SocialPromoteSummary {
+  const base = emptySocialPromoteSummary("commit");
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ...base,
+    errors: [msg],
+    logLines: [`social promote pass failed: ${msg}`],
   };
 }
 
@@ -892,6 +906,32 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "Facebook OSINT (Papua/PNG) pass failed");
       facebookOsint = emptyFacebookOsint(err);
     }
+    // Social promote pass. Reads the LOCAL social_raw rows the Facebook OSINT
+    // pass above just refreshed (0 external calls) and promotes eligible,
+    // not-yet-promoted rows into real incidents — the DB→DB bridge from the
+    // isolated social CONTEXT table into the incident pipeline, mirroring the
+    // GDELT/TAPA promote passes. The runner re-derives eligibility server-side
+    // and rolls back on a claim race, so it can neither trust request input nor
+    // double-promote. Isolated in its own try so a failure here can never fail
+    // the wider ingest.
+    let socialPromote: SocialPromoteSummary;
+    try {
+      socialPromote = await runSocialPromote({ commit: true });
+      logger.info(
+        {
+          unpromotedConsidered: socialPromote.unpromotedConsidered,
+          newToInsert: socialPromote.newToInsert,
+          inserted: socialPromote.inserted,
+          totalAfter: socialPromote.totalAfter,
+          byTopic: socialPromote.byTopic,
+          bySource: socialPromote.bySource,
+        },
+        "Social promote pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "Social promote pass failed");
+      socialPromote = emptySocialPromote(err);
+    }
     // GDELT precision enrichment. ADDITIVE — attaches structured ACLED-style
     // fields (precise sub-national geo, fatality counts, named actors, event
     // coding, AI confidence) onto EXISTING flashpoint rows; never replaces the
@@ -993,6 +1033,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       centcomOfficial,
       kammiSource,
       facebookOsint,
+      socialPromote,
       gdeltEnrich,
       gdeltStructured,
       gdeltPromote,

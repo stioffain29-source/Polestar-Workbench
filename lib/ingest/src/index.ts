@@ -223,6 +223,8 @@ export {
   emptyFacebookOsintSummary,
   readFacebookOsintConfig,
   isFacebookOsintActive,
+  facebookOsintIntervalHours,
+  withinFacebookCadence,
   classifyPost,
   classifyPostBroad,
   resolveScope,
