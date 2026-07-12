@@ -95,7 +95,53 @@ const INGEST_LOCK_KEY = 0x506f6c65;
 // The same threshold also drives the Source Health "needs review" amber signal
 // (integrationStatus.socialPromoteStatus), so it is resolved from one shared
 // helper in @workspace/ingest to keep the log alarm and the panel in lockstep.
-const SOCIAL_PROMOTE_WARN_THRESHOLD = socialPromoteWarnThreshold();
+
+// Minimal logger shape the reporter needs — lets tests pass a stub.
+type PromoteAlarmLogger = {
+  info: (obj: unknown, msg: string) => void;
+  warn: (obj: unknown, msg: string) => void;
+};
+
+/**
+ * Log the social-promote result and raise the regression WARN when this run
+ * minted more than `SOCIAL_PROMOTE_WARN_THRESHOLD` incidents. Extracted from the
+ * runner so the threshold branch is unit-testable in isolation (it is otherwise
+ * buried inside the multi-minute `runIngestOnce` chain). Returns whether the
+ * alarm fired and the threshold used, for the test's benefit; the runner ignores
+ * the return value.
+ */
+export function reportSocialPromoteResult(
+  log: PromoteAlarmLogger,
+  summary: SocialPromoteSummary,
+): { warned: boolean; threshold: number } {
+  const promotePayload = {
+    unpromotedConsidered: summary.unpromotedConsidered,
+    newToInsert: summary.newToInsert,
+    inserted: summary.inserted,
+    totalAfter: summary.totalAfter,
+    byTopic: summary.byTopic,
+    bySource: summary.bySource,
+    // Name exactly which incidents this run minted (marker + ids) so a
+    // questionable auto-created incident is queryable straight from the logs,
+    // without a DB dump.
+    minted: summary.minted,
+  };
+  log.info(promotePayload, "Social promote pass complete");
+  // Regression alarm (mirrors the AIS-movement SLA monitor): under the
+  // tightened corroboration gate this pass should mint 0 (rarely 1) rows.
+  // Promoting more than the threshold on a single run is the early signal that
+  // the gate has regressed or a look-alike OSINT burst slipped through —
+  // surface it as a WARN so it is caught in prod logs.
+  const threshold = socialPromoteWarnThreshold();
+  if (summary.inserted > threshold) {
+    log.warn(
+      { ...promotePayload, threshold },
+      "Social promote pass minted an unexpectedly high number of incidents — possible regression",
+    );
+    return { warned: true, threshold };
+  }
+  return { warned: false, threshold };
+}
 
 export type IngestRunResult =
   | {
@@ -931,30 +977,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     let socialPromote: SocialPromoteSummary;
     try {
       socialPromote = await runSocialPromote({ commit: true });
-      const promotePayload = {
-        unpromotedConsidered: socialPromote.unpromotedConsidered,
-        newToInsert: socialPromote.newToInsert,
-        inserted: socialPromote.inserted,
-        totalAfter: socialPromote.totalAfter,
-        byTopic: socialPromote.byTopic,
-        bySource: socialPromote.bySource,
-        // Name exactly which incidents this run minted (marker + ids) so a
-        // questionable auto-created incident is queryable straight from the
-        // logs, without a DB dump.
-        minted: socialPromote.minted,
-      };
-      logger.info(promotePayload, "Social promote pass complete");
-      // Regression alarm (mirrors the AIS-movement SLA monitor): under the
-      // tightened corroboration gate this pass should mint 0 (rarely 1) rows.
-      // Promoting more than the threshold on a single run is the early signal
-      // that the gate has regressed or a look-alike OSINT burst slipped
-      // through — surface it as a WARN so it is caught in prod logs.
-      if (socialPromote.inserted > SOCIAL_PROMOTE_WARN_THRESHOLD) {
-        logger.warn(
-          { ...promotePayload, threshold: SOCIAL_PROMOTE_WARN_THRESHOLD },
-          "Social promote pass minted an unexpectedly high number of incidents — possible regression",
-        );
-      }
+      reportSocialPromoteResult(logger, socialPromote);
     } catch (err) {
       logger.error({ err }, "Social promote pass failed");
       socialPromote = emptySocialPromote(err);
