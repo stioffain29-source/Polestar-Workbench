@@ -1,4 +1,4 @@
-import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable } from "@workspace/db";
+import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
 import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
@@ -28,9 +28,13 @@ import {
   isGdeltConfigured,
   PROMOTE_MARKER_PREFIX,
   TAPA_PROMOTE_MARKER_PREFIX,
+  SOCIAL_PROMOTE_MARKER_PREFIX,
+  decideSocialPromotion,
+  markerSocialRawId,
   GDELT_NOT_CONFIGURED_MESSAGE,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
   type Severity,
+  type IncidentCandidate,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
@@ -3811,6 +3815,136 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (reErr) {
       logger.error({ err: reErr }, "Global country re-attribution failed");
+    }
+
+    // 3d-1z) ONE-TIME purge of falsely-promoted social OSINT incidents.
+    //   The social promote pass (runSocialPromote) runs inside the deployment
+    //   runtime against the writable PROD DB, so prod may hold falsely-promoted
+    //   `social_raw:%` incidents minted BEFORE the corroboration gate was
+    //   tightened (a same-day PR / greeting post "corroborated" an unrelated
+    //   earthquake / seminar on incidental token overlap). Prod is read-only
+    //   from the workspace, so it can only be cleaned inside the runtime. This
+    //   mirrors the one-off DEV cleanup: re-derive each already-promoted
+    //   `social_raw` row under the CURRENT gate (decideSocialPromotion) and, for
+    //   any row that no longer qualifies, DELETE the minted incident and reset
+    //   the source back-link to context-only. The candidate pool EXCLUDES
+    //   social-promoted incidents so a fake can never corroborate a fake.
+    //   Marker-gated + idempotent (re-running is a no-op once applied).
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "social_promote_false_incident_purge_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        // Every incident minted by the social promote pass (marker social_raw:<id>).
+        const promotedIncidents = await db
+          .select({
+            id: incidentsTable.id,
+            analystNotes: incidentsTable.analystNotes,
+          })
+          .from(incidentsTable)
+          .where(
+            like(incidentsTable.analystNotes, `${SOCIAL_PROMOTE_MARKER_PREFIX}%`),
+          );
+
+        // Candidate pool: every incident EXCEPT the social-promoted ones,
+        // grouped by country (the corroboration/duplicate scorers gate on
+        // same-country). Excluding social-promoted rows is the crux — it ensures
+        // a fake incident can never "corroborate" another fake during re-derive.
+        const candidateRows = await db
+          .select({
+            id: incidentsTable.id,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            country: incidentsTable.country,
+            province: incidentsTable.province,
+            category: incidentsTable.category,
+            occurredAt: incidentsTable.occurredAt,
+            incidentDate: incidentsTable.incidentDate,
+          })
+          .from(incidentsTable)
+          .where(
+            not(
+              like(incidentsTable.analystNotes, `${SOCIAL_PROMOTE_MARKER_PREFIX}%`),
+            ),
+          );
+
+        const byCountry = new Map<string, IncidentCandidate[]>();
+        for (const inc of candidateRows) {
+          const key = inc.country.trim().toLowerCase();
+          let bucket = byCountry.get(key);
+          if (!bucket) {
+            bucket = [];
+            byCountry.set(key, bucket);
+          }
+          bucket.push({
+            id: inc.id,
+            title: inc.title,
+            summary: inc.summary,
+            country: inc.country,
+            province: inc.province,
+            category: inc.category,
+            occurredAt: inc.occurredAt,
+            incidentDate: inc.incidentDate,
+          });
+        }
+
+        let scanned = 0;
+        let deleted = 0;
+        let missingSource = 0;
+        for (const inc of promotedIncidents) {
+          const sid = markerSocialRawId(inc.analystNotes);
+          if (sid === null) continue;
+          scanned++;
+          const [item] = await db
+            .select()
+            .from(socialRawTable)
+            .where(eq(socialRawTable.id, sid));
+          // Source row gone — leave the incident untouched rather than guess.
+          if (!item) {
+            missingSource++;
+            continue;
+          }
+          const key = item.country.trim().toLowerCase();
+          const candidates = byCountry.get(key) ?? [];
+          const decision = decideSocialPromotion(item, candidates);
+          if (decision.promote) continue;
+          // No longer qualifies under the tightened gate: delete the incident
+          // and reset the source row back to context-only, atomically.
+          await db.transaction(async (tx) => {
+            await tx
+              .delete(incidentsTable)
+              .where(eq(incidentsTable.id, inc.id));
+            await tx
+              .update(socialRawTable)
+              .set({
+                promotedIncidentId: null,
+                promotedAt: null,
+                reviewStatus: "pending_review",
+                updatedAt: new Date(),
+              })
+              .where(eq(socialRawTable.id, sid));
+          });
+          deleted++;
+        }
+
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned, deleted, missingSource, marker: markerKey },
+          "One-time purge of falsely-promoted social OSINT incidents",
+        );
+      }
+    } catch (spErr) {
+      logger.error({ err: spErr }, "Social false-incident purge failed");
     }
 
     try {
