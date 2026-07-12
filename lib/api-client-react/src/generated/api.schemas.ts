@@ -2182,6 +2182,7 @@ export const IntegrationStatusState = {
   unknown: 'unknown',
   pending: 'pending',
   dormant: 'dormant',
+  attention: 'attention',
 } as const;
 
 export interface IntegrationStatusMetric {

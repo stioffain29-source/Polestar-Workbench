@@ -54,12 +54,20 @@ type Rows = Record<string, unknown>[];
 function stubDb(byTable: Map<unknown, Rows>): void {
   jest.spyOn(db, "select").mockImplementation(() => {
     let tbl: unknown = null;
+    const rows = () => byTable.get(tbl) ?? [];
+    // The chain is a thenable so both `await ...where()` and the longer
+    // `await ...where().orderBy().limit()` form (used by socialPromoteStatus)
+    // resolve to the same per-table rows.
     const chain: Record<string, unknown> = {
       from: (t: unknown) => {
         tbl = t;
         return chain;
       },
-      where: () => Promise.resolve(byTable.get(tbl) ?? []),
+      where: () => chain,
+      orderBy: () => chain,
+      limit: () => Promise.resolve(rows()),
+      then: (onF: (v: Rows) => unknown, onR?: (e: unknown) => unknown) =>
+        Promise.resolve(rows()).then(onF, onR),
     };
     return chain as never;
   });
@@ -471,6 +479,59 @@ describe("KAMMI Instagram source-provider integration status (freshness honesty)
   });
 });
 
+describe("social OSINT auto-promotion status (analyst review surface)", () => {
+  // The count + newest-3 queries both read incidentsTable, so one combined row
+  // serves both; the last-run count + timestamp come from the sourcesTable
+  // health row (itemsRetained = the last promote run's inserted count).
+  const promotedRow = {
+    n: 3,
+    latest: new Date("2026-07-10T00:00:00Z"),
+    id: 88,
+    topic: "flashpoint",
+    notes: "social_raw:12 — promoted",
+    createdAt: new Date("2026-07-10T00:00:00Z"),
+  };
+
+  beforeEach(() => {
+    process.env.SOCIAL_PROMOTE_WARN_THRESHOLD = "2";
+  });
+
+  it("reports no_data when nothing has cleared the promote gate yet", async () => {
+    const byTable = new Map<unknown, Rows>([
+      [incidentsTable, []],
+      [sourcesTable, []],
+    ]);
+    const item = find(await statuses(byTable), "social_promote");
+    expect(item.status).toBe("no_data");
+    expect(item.configured).toBe(true);
+    expect(item.optional).toBe(true);
+  });
+
+  it("reports working when incidents were promoted and the last run stayed within the threshold", async () => {
+    const byTable = new Map<unknown, Rows>([
+      [incidentsTable, [promotedRow]],
+      [sourcesTable, [{ retained: 1, lastSuccessAt: new Date("2026-07-10T00:00:00Z") }]],
+    ]);
+    const item = find(await statuses(byTable), "social_promote");
+    expect(item.status).toBe("working");
+    expect(item.summary).toContain("3");
+    expect(item.metrics).toEqual(
+      expect.arrayContaining([{ label: "Auto-promoted incidents", value: "3" }]),
+    );
+  });
+
+  it("reports attention (amber) when the last run promoted more than the threshold", async () => {
+    const byTable = new Map<unknown, Rows>([
+      [incidentsTable, [promotedRow]],
+      [sourcesTable, [{ retained: 5, lastSuccessAt: new Date("2026-07-10T00:00:00Z") }]],
+    ]);
+    const item = find(await statuses(byTable), "social_promote");
+    expect(item.status).toBe("attention");
+    expect(item.summary).toContain("5");
+    expect(item.summary).toContain("2");
+  });
+});
+
 describe("getIntegrationStatuses envelope", () => {
   it("returns every integration plus a generation timestamp", async () => {
     (isLlmAvailable as jest.Mock).mockReturnValue(false);
@@ -488,6 +549,7 @@ describe("getIntegrationStatuses envelope", () => {
         "reliefweb",
         "official_military_maritime",
         "reliefweb_reports",
+        "social_promote",
         "social_watch_instagram",
         "tapa_iis",
         "vessel_registry",

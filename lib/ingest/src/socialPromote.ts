@@ -34,6 +34,7 @@ import {
   type SocialRawItem,
 } from "@workspace/db";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
+import { recordSourceHealth } from "./sourceHealth";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import type { IncidentCategory } from "./structuredExtract";
 import {
@@ -71,6 +72,31 @@ export function markerSocialRawId(
   if (!m) return null;
   const n = Number.parseInt(m[1]!, 10);
   return Number.isFinite(n) ? n : null;
+}
+
+// ---------------------------------------------------------------------------
+// Source Health telemetry (shared name + regression threshold)
+// ---------------------------------------------------------------------------
+// The commit pass records its LAST-RUN outcome into a `sources` row so an
+// analyst can review what the scheduler auto-created straight from Source Health
+// (no log dump). The row is a derived internal transform (no external fetch), so
+// it is recorded "operational" and never alarms the Action Required panel — the
+// amber "needs review" signal is derived separately on the Integrations panel by
+// comparing this row's last-run promoted count against the regression threshold.
+export const SOCIAL_PROMOTE_HEALTH_NAME = "Social OSINT — promoted incidents";
+export const SOCIAL_PROMOTE_HEALTH_TOPIC = "flashpoint";
+
+// The DB→DB social promote pass runs against the writable production DB on every
+// boot/timer; with the tightened corroboration gate it should mint 0
+// (occasionally 1) incident per run. A run that promotes more than this many
+// rows is treated as a possible regression. Override with
+// SOCIAL_PROMOTE_WARN_THRESHOLD; tune, don't disable.
+export function socialPromoteWarnThreshold(): number {
+  const raw = Number.parseInt(
+    process.env.SOCIAL_PROMOTE_WARN_THRESHOLD?.trim() ?? "",
+    10,
+  );
+  return Number.isFinite(raw) && raw > 0 ? raw : 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +494,16 @@ export async function runSocialPromote(
         log(`  ERROR promoting row #${item.id}: ${msg}`);
       }
     }
+  } else if (!commit) {
+    log("  DRY-RUN — re-run with --commit to write.");
+  }
 
+  // On EVERY commit run (including a clean 0-promote run) refresh the running
+  // total and stamp the last-run outcome into Source Health so an analyst can
+  // review what the scheduler auto-created without reading deployment logs. A
+  // 0-promote run overwrites a prior high count, so a transient regression
+  // clears itself on the next quiet run rather than sticking on the panel.
+  if (commit) {
     const countRes = (await db.execute(
       sql`SELECT COUNT(*)::int AS count FROM incidents WHERE analyst_notes LIKE ${
         SOCIAL_PROMOTE_MARKER_PREFIX + "%"
@@ -481,8 +516,37 @@ export async function runSocialPromote(
         `  minted incident #${m.incidentId} (topic=${m.topic}, social_raw=${m.socialRawId}) — ${m.marker}`,
       );
     }
-  } else if (!commit) {
-    log("  DRY-RUN — re-run with --commit to write.");
+
+    // Best-effort telemetry only (recordSourceHealth swallows its own DB
+    // errors). Recorded "operational" — the amber "needs review" signal is
+    // derived on the Integrations panel by comparing `retained` (this run's
+    // promoted count) against socialPromoteWarnThreshold(), so this row never
+    // alarms the Action Required panel.
+    if (summary.errors.length === 0) {
+      await recordSourceHealth(
+        SOCIAL_PROMOTE_HEALTH_TOPIC,
+        [
+          {
+            name: SOCIAL_PROMOTE_HEALTH_NAME,
+            url: "",
+            ok: true,
+            collected: summary.unpromotedConsidered,
+            retained: summary.inserted,
+            rejected:
+              summary.skippedNotSecurity +
+              summary.skippedNotCredible +
+              summary.skippedDuplicate,
+          },
+        ],
+        {
+          sourceType: "derived",
+          reliability: 3,
+          notes:
+            "Social OSINT (social_raw) rows auto-promoted into flashpoint/conflict incidents by the DB→DB promote pass. Read-only telemetry for analyst review.",
+          scrapeMethod: "Internal promote pass",
+        },
+      );
+    }
   }
 
   return summary;

@@ -319,6 +319,9 @@ export {
   socialPromoteMarker,
   markerSocialRawId,
   SOCIAL_PROMOTE_MARKER_PREFIX,
+  SOCIAL_PROMOTE_HEALTH_NAME,
+  SOCIAL_PROMOTE_HEALTH_TOPIC,
+  socialPromoteWarnThreshold,
 } from "./socialPromote";
 export type {
   SocialPromoteSummary,

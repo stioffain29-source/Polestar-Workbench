@@ -27,6 +27,11 @@ import {
   GDELT_STRUCTURED_HEALTH_NAME,
   GDELT_STRUCTURED_HEALTH_TOPIC,
   GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE,
+  SOCIAL_PROMOTE_MARKER_PREFIX,
+  SOCIAL_PROMOTE_HEALTH_NAME,
+  SOCIAL_PROMOTE_HEALTH_TOPIC,
+  markerSocialRawId,
+  socialPromoteWarnThreshold,
 } from "@workspace/ingest";
 import type {
   IntegrationStatusItem,
@@ -953,6 +958,127 @@ async function gdeltStructuredStatus(): Promise<IntegrationStatusItem> {
   };
 }
 
+const SOCIAL_PROMOTE_DETAIL =
+  "The social OSINT promote pass reads isolated social_raw context rows and auto-mints incidents from those that clear the server-side security + credibility gate (marker analyst_notes 'social_raw:<id>'). This panel surfaces what the scheduler auto-created so an analyst can review it here instead of in deployment logs. When the LAST run promoted more than the alarm threshold it flags 'needs review' (amber) — a possible gate regression or a burst of look-alike posts. Read-only: it never changes the promote gate.";
+
+// Read-only analyst review of what the social OSINT promote pass auto-created.
+// EVIDENCE: total promoted incidents, the newest few markers/dates, and the
+// last commit run's promoted count (from the promote pass's own Source Health
+// row). The panel turns amber ("attention") when that last-run count exceeded
+// socialPromoteWarnThreshold() — the SAME threshold the ingest runner alarms on
+// in the logs — so the two never disagree. This function only READS; it never
+// promotes or alters gate logic.
+async function socialPromoteStatus(): Promise<IntegrationStatusItem> {
+  const threshold = socialPromoteWarnThreshold();
+  const like = `${SOCIAL_PROMOTE_MARKER_PREFIX}%`;
+
+  let total = 0;
+  let latest: Date | null = null;
+  let recent: Array<{ id: number; topic: string; notes: string | null; createdAt: Date | null }> =
+    [];
+  let lastRunInserted: number | null = null;
+  let lastRunAt: Date | null = null;
+  try {
+    const [row] = await db
+      .select({
+        n: sql<number>`count(*)::int`,
+        latest: sql<Date | null>`max(${incidentsTable.createdAt})`,
+      })
+      .from(incidentsTable)
+      .where(sql`${incidentsTable.analystNotes} LIKE ${like}`);
+    total = row?.n ?? 0;
+    latest = row?.latest ?? null;
+
+    recent = await db
+      .select({
+        id: incidentsTable.id,
+        topic: incidentsTable.topic,
+        notes: incidentsTable.analystNotes,
+        createdAt: incidentsTable.createdAt,
+      })
+      .from(incidentsTable)
+      .where(sql`${incidentsTable.analystNotes} LIKE ${like}`)
+      .orderBy(sql`${incidentsTable.createdAt} desc`)
+      .limit(3);
+
+    // Last commit run's outcome, recorded by runSocialPromote into its own
+    // Source Health row (itemsRetained = that run's promoted count).
+    const [health] = await db
+      .select({
+        retained: sourcesTable.itemsRetained,
+        lastSuccessAt: sourcesTable.lastSuccessAt,
+      })
+      .from(sourcesTable)
+      .where(
+        and(
+          eq(sourcesTable.name, SOCIAL_PROMOTE_HEALTH_NAME),
+          eq(sourcesTable.topic, SOCIAL_PROMOTE_HEALTH_TOPIC),
+        ),
+      );
+    lastRunInserted = health?.retained ?? null;
+    lastRunAt = health?.lastSuccessAt ?? null;
+  } catch (err) {
+    logger.warn({ err: msg(err) }, "social promote integration status query failed");
+    return unknownItem({
+      key: "social_promote",
+      label: "Social OSINT auto-promotion",
+      configured: true,
+      envVars: ["SOCIAL_PROMOTE_WARN_THRESHOLD"],
+      summary: "Status query failed.",
+      detail: SOCIAL_PROMOTE_DETAIL,
+      docsUrl: null,
+    });
+  }
+
+  const overThreshold = lastRunInserted !== null && lastRunInserted > threshold;
+
+  let status: IntegrationStatusState;
+  let summary: string;
+  if (overThreshold) {
+    status = "attention";
+    summary = `Needs review — the last promote run auto-created ${lastRunInserted} incident(s), above the alarm threshold of ${threshold}. Check the newest social_raw incidents below for a possible gate regression or a burst of look-alike posts.`;
+  } else if (total > 0) {
+    status = "working";
+    summary = `Auto-promoted ${total} social OSINT incident(s) to date; the last run added ${
+      lastRunInserted ?? 0
+    }, within the alarm threshold of ${threshold}.`;
+  } else {
+    status = "no_data";
+    summary =
+      "No social OSINT context row has cleared the promote gate into an incident yet — nothing to review.";
+  }
+
+  const metrics: IntegrationStatusMetric[] = [
+    metric("Auto-promoted incidents", total),
+    metric("Last run promoted", lastRunInserted),
+    metric("Alarm threshold", threshold),
+    metric("Last run", fmtDate(lastRunAt)),
+    metric("Newest promoted", fmtDate(latest)),
+  ];
+  // The newest markers themselves, so an analyst can jump straight to the rows.
+  for (const r of recent) {
+    metrics.push(
+      metric(
+        `Incident #${r.id} (${r.topic})`,
+        `social_raw:${markerSocialRawId(r.notes) ?? "?"} · ${fmtDate(r.createdAt)}`,
+      ),
+    );
+  }
+
+  return {
+    key: "social_promote",
+    label: "Social OSINT auto-promotion",
+    status,
+    summary,
+    detail: SOCIAL_PROMOTE_DETAIL,
+    configured: true,
+    optional: true,
+    envVars: ["SOCIAL_PROMOTE_WARN_THRESHOLD"],
+    metrics,
+    docsUrl: null,
+  };
+}
+
 function adminControlsStatus(): IntegrationStatusItem {
   const configured = Boolean(process.env["INGEST_ADMIN_TOKEN"]?.trim());
   return {
@@ -990,6 +1116,7 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatusRespons
       vesselRegistryStatus(),
       openaiStatus(),
       socialInstagramStatus(),
+      socialPromoteStatus(),
       gdeltStructuredStatus(),
       Promise.resolve(tapaStatus()),
       Promise.resolve(xOsintStatus()),

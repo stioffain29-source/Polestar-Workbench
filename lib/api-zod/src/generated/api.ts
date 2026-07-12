@@ -1325,7 +1325,7 @@ export const GetIntegrationStatusResponse = zod.object({
   "integrations": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string(),
-  "status": zod.enum(['working', 'not_configured', 'failing_upstream', 'no_data', 'disabled', 'unknown', 'pending', 'dormant']),
+  "status": zod.enum(['working', 'not_configured', 'failing_upstream', 'no_data', 'disabled', 'unknown', 'pending', 'dormant', 'attention']),
   "summary": zod.string(),
   "detail": zod.string().nullish(),
   "configured": zod.boolean(),

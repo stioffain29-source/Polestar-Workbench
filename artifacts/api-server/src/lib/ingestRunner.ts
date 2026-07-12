@@ -42,6 +42,7 @@ import {
   emptyFacebookOsintReclassifySummary,
   runXSearchIngest,
   emptyXSearchSummary,
+  socialPromoteWarnThreshold,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   type IngestSummary,
@@ -91,13 +92,10 @@ const INGEST_LOCK_KEY = 0x506f6c65;
 // WARN — an operational alarm mirroring the AIS-movement SLA monitor — so it is
 // caught in the logs rather than only when someone spots a bad incident on the
 // live site. Override with SOCIAL_PROMOTE_WARN_THRESHOLD; tune, don't disable.
-const SOCIAL_PROMOTE_WARN_THRESHOLD = (() => {
-  const raw = Number.parseInt(
-    process.env.SOCIAL_PROMOTE_WARN_THRESHOLD?.trim() ?? "",
-    10,
-  );
-  return Number.isFinite(raw) && raw > 0 ? raw : 2;
-})();
+// The same threshold also drives the Source Health "needs review" amber signal
+// (integrationStatus.socialPromoteStatus), so it is resolved from one shared
+// helper in @workspace/ingest to keep the log alarm and the panel in lockstep.
+const SOCIAL_PROMOTE_WARN_THRESHOLD = socialPromoteWarnThreshold();
 
 export type IngestRunResult =
   | {
