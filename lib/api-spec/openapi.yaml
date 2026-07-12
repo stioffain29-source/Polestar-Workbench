@@ -3689,6 +3689,7 @@ components:
         postedAt: { type: ["string", "null"], format: date-time }
         incidentDate: { type: ["string", "null"], format: date-time }
         caption: { type: ["string", "null"] }
+        captionEn: { type: ["string", "null"] }
         imageUrls:
           type: array
           items: { type: string }

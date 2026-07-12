@@ -36,6 +36,8 @@ import {
   emptyGdeltPromoteSummary,
   runTapaPromote,
   emptyTapaPromoteSummary,
+  runFacebookOsintReclassify,
+  emptyFacebookOsintReclassifySummary,
   runXSearchIngest,
   emptyXSearchSummary,
   runPngExtractBackfill,
@@ -56,6 +58,7 @@ import {
   type GdeltStructuredSummary,
   type GdeltPromoteSummary,
   type TapaPromoteSummary,
+  type FacebookOsintReclassifySummary,
   type XSearchSummary,
   type TitleTranslationSummary,
 } from "@workspace/ingest";
@@ -138,6 +141,16 @@ export type TapaPromoteRunResult =
       finishedAt: Date;
       durationMs: number;
       tapaPromote: TapaPromoteSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type FacebookOsintReclassifyRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      reclassify: FacebookOsintReclassifySummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -1058,6 +1071,47 @@ export async function runTapaPromoteOnce(
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       tapaPromote,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the Facebook OSINT reclassify + translate pass once. A free, DB-only
+ * maintenance pass over the isolated `facebook_osint` context rows: it translates
+ * non-English captions into English (`caption_en`) and re-runs the security-event
+ * guard, demoting community-chatter rows mis-filed under a real security category
+ * (un-promoting any incident they had spawned). Deliberately NOT part of the
+ * recurring scheduler — an operator-triggered, reviewed maintenance path. Shares
+ * the same advisory lock so it can never collide with a full run. Dry-run unless
+ * commit=true.
+ */
+export async function runFacebookOsintReclassifyOnce(
+  opts: { commit?: boolean; maxTranslations?: number } = {},
+): Promise<FacebookOsintReclassifyRunResult> {
+  const commit = opts.commit ?? false;
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let reclassify: FacebookOsintReclassifySummary;
+    try {
+      reclassify = await runFacebookOsintReclassify({
+        commit,
+        maxTranslations: opts.maxTranslations,
+      });
+    } catch (err) {
+      logger.error({ err }, "Facebook OSINT reclassify pass failed");
+      reclassify = emptyFacebookOsintReclassifySummary(
+        commit ? "commit" : "dry-run",
+      );
+      reclassify.errors.push(err instanceof Error ? err.message : String(err));
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      reclassify,
     };
   });
   if (!res.ran) return res;

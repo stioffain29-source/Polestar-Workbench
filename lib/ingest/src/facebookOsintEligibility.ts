@@ -267,6 +267,257 @@ export function computeConfidence(input: ConfidenceInput): number {
 }
 
 // ---------------------------------------------------------------------------
+// Security-event signal guard (pure, multilingual)
+// ---------------------------------------------------------------------------
+// The theatre extractors classify a post into a security category from a broad
+// vocabulary, so community chatter (a lost-property notice, an eviction gripe, a
+// governance press release) sometimes lands in a real security category and can
+// even be auto-promoted. This guard is a stricter, precision-first second gate:
+// it asks whether the caption actually reports a SECURITY EVENT — a crime, act of
+// violence, unrest, armed action, or acute political instability — using an
+// explicit English + Bahasa Indonesia + Tok Pisin cue list matched against the
+// caption text ONLY. It NEVER fabricates: it can only DEMOTE a post the caller
+// judges unreadable-as-security, and it is applied solely to `facebook_osint`
+// OSINT context rows. Callers must only demote when the text is judgeable
+// ({@link isLikelyEnglish} or a translation is present) — a caption we cannot
+// confidently read is left untouched, never demoted on a guess.
+
+// NFKC folds unicode-styled letters (bold/italic "mathematical" alphabets,
+// small-caps, full-width) down to plain ASCII so a caption written in styled
+// glyphs — e.g. "𝗔𝗧𝗧𝗘𝗠𝗣𝗧𝗘𝗗 𝗛𝗢𝗟𝗗𝗨𝗣" — still matches the cue list.
+function normaliseForSignal(text: string): string {
+  return text.normalize("NFKC").toLowerCase();
+}
+
+// Curated security-EVENT cues. Each denotes a crime, act of violence, unrest,
+// armed action, or acute political instability. Deliberately EXCLUDES civil /
+// administrative grievance vocabulary (eviction, corruption, misuse,
+// investigation, appointment) — those are governance chatter, not a security
+// event, and are the noise this guard exists to drop.
+const SECURITY_EVENT_CUES: RegExp[] = [
+  // --- English: homicide / violence ---
+  /\bkill(?:ed|ing|ings|s)?\b/,
+  /\bmurder(?:ed|s)?\b/,
+  /\bhomicide\b/,
+  /\bshot dead\b/,
+  /\bfatal(?:ly|ity|ities)?\b/,
+  /\bstab(?:bed|bing|bings)?\b/,
+  /\bmachete\b/,
+  /\bbush ?knife\b/,
+  /\bbeheaded?\b/,
+  /\bassault(?:ed|s)?\b/,
+  /\battack(?:ed|s|ers|ing)?\b/,
+  /\bambush(?:ed|es|ing)?\b/,
+  /\braid(?:ed|s|ing)?\b/,
+  /\bexecut(?:e|ed|ion|ions)\b/,
+  // --- English: firearms / shooting ---
+  /\bshoot(?:ing|out|s)?\b/,
+  /\bgunfire\b/,
+  /\bgunmen\b/,
+  /\bgunman\b/,
+  /\bgunpoint\b/,
+  /\bopen(?:ed)? fire\b/,
+  /\bfirearms?\b/,
+  /\brifles?\b/,
+  /\bpistols?\b/,
+  /\bweapons?\b/,
+  // --- English: robbery / theft ---
+  /\brob(?:bed|bery|beries|bers)?\b/,
+  /\bhold[- ]?up\b/,
+  /\bheld up\b/,
+  /\btheft\b/,
+  /\bthief\b/,
+  /\bthieves\b/,
+  /\bstolen\b/,
+  /\bsteal(?:ing)?\b/,
+  /\bburglar\w*\b/,
+  /\bbreak[- ]?in\b/,
+  /\bloot(?:ing|ed|ers)?\b/,
+  /\bransack\w*\b/,
+  // --- English: unrest / clashes ---
+  /\briot(?:s|ing|ers)?\b/,
+  /\bunrest\b/,
+  /\bclash(?:es|ed|ing)?\b/,
+  /\btribal (?:fight|clash|war|conflict|violence)\w*\b/,
+  /\b(?:communal|ethnic) (?:violence|clash\w*|conflict)\b/,
+  /\bprotest(?:s|ers|ing)?\b/,
+  /\bdemonstrat(?:ion|ors|ing|e)\w*\b/,
+  /\brally\b/,
+  /\bblockade\b/,
+  /\broadblock\b/,
+  // --- English: arson / explosives ---
+  /\barson\b/,
+  /\bset (?:on )?fire\b/,
+  /\btorch(?:ed|ing)?\b/,
+  /\bbomb(?:ing|s|ed)?\b/,
+  /\bgrenade\b/,
+  /\bexplosion\b/,
+  /\bblast\b/,
+  // --- English: abduction ---
+  /\bkidnap(?:ping|ped|pers)?\b/,
+  /\babduct(?:ion|ed)?\b/,
+  /\bhostages?\b/,
+  // --- English: gangs / groups ---
+  /\bgang\b/,
+  /\braskol\w*\b/,
+  /\bseparatist\w*\b/,
+  /\bmilitants?\b/,
+  /\binsurgen\w*\b/,
+  // --- English: acute political instability ---
+  /\bcoup\b/,
+  /\bmutiny\b/,
+  /\bmartial law\b/,
+  /\bstate of emergency\b/,
+  /\bcurfew\b/,
+  /\bno[- ]confidence\b/,
+  /\bvote of no confidence\b/,
+  /\bimpeach\w*\b/,
+  // --- English: maritime security ---
+  /\bpiracy\b/,
+  /\bpirates?\b/,
+  /\bhijack\w*\b/,
+  /\bsea robbery\b/,
+  // --- English: sorcery-accusation violence (PNG) ---
+  /\bsorcery\w*\b/,
+  /\bsanguma\b/,
+  // --- Bahasa Indonesia ---
+  /\bcuranmor\b/, // curi ranmor — motor-vehicle theft
+  /\bpencuri(?:an)?\b/,
+  /\bmaling\b/,
+  /\bpembobolan\b/,
+  /\brampok\b/,
+  /\bperampokan\b/,
+  /\bbegal\b/,
+  /\bpembegalan\b/,
+  /\bpembunuhan\b/,
+  /\bdibunuh\b/,
+  /\bkorban tewas\b/,
+  /\bpenembakan\b/,
+  /\bbaku ?tembak\b/,
+  /\btertembak\b/,
+  /\bditembak\b/,
+  /\bpenikaman\b/,
+  /\bditikam\b/,
+  /\bpembacokan\b/,
+  /\bdibacok\b/,
+  /\bperang suku\b/,
+  /\bbentrok(?:an)?\b/,
+  /\bkerusuhan\b/,
+  /\bricuh\b/,
+  /\bpenganiayaan\b/,
+  /\bdianiaya\b/,
+  /\beksekusi\b/,
+  /\bpenculikan\b/,
+  /\bdisandera\b/,
+  /\bpenyanderaan\b/,
+  /\bpembakaran\b/,
+  /\bdibakar\b/,
+  /\bpenjarahan\b/,
+  /\bunjuk rasa\b/,
+  /\bdemonstrasi\b/,
+  /\baksi (?:demo|protes|massa)\b/,
+  /\bmogok\b/,
+  /\bseparatis\b/,
+  /\bpenyerangan\b/,
+  /\bserangan\b/,
+  /\bsenjata (?:api|tajam)\b/,
+  /\bbersenjata\b/,
+  // --- Tok Pisin (PNG) ---
+  /\bpait\b/, // fight
+  /\bkilim\b/, // kill / hit
+  /\bholdap\b/, // hold-up / robbery
+  /\bsutim\b/, // stab / shoot
+  /\bstil\b/, // steal
+];
+
+/**
+ * True when the caption text carries an explicit security-EVENT cue (crime,
+ * violence, unrest, armed action, or acute political instability) in English,
+ * Bahasa Indonesia, or Tok Pisin. Pure and no-fabrication: matched against the
+ * given text only, after NFKC-normalising styled unicode glyphs to ASCII.
+ */
+export function hasSecurityEventSignal(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const t = normaliseForSignal(text);
+  return SECURITY_EVENT_CUES.some((re) => re.test(t));
+}
+
+// A small, high-frequency English function-word set used only to decide whether
+// a caption is confidently READABLE as English — the precondition for the guard
+// being allowed to DEMOTE. It is NOT a language classifier; it deliberately errs
+// towards "not English" so a non-English caption is never demoted on a guess
+// (it is left untouched until a translation is available).
+const ENGLISH_FUNCTION_WORDS = new Set([
+  "the", "and", "of", "to", "in", "a", "is", "for", "on", "with", "at", "by",
+  "was", "were", "has", "have", "had", "that", "this", "from", "you", "your",
+  "should", "will", "are", "as", "an", "it", "they", "their", "after", "into",
+]);
+
+/**
+ * Rough heuristic: is this text confidently English? True when it contains at
+ * least three DISTINCT common English function words. Used only to gate the
+ * security-signal guard's demote decision — never to classify or route.
+ */
+export function isLikelyEnglish(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const words = text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z\s]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const hits = new Set<string>();
+  for (const w of words) {
+    if (ENGLISH_FUNCTION_WORDS.has(w)) hits.add(w);
+    if (hits.size >= 3) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Security-event guard applied to a classified category (pure)
+// ---------------------------------------------------------------------------
+
+export interface SecurityGuardInput {
+  /** The category the theatre classifier assigned. */
+  category: IncidentCategory;
+  /** The original (possibly non-English) caption. */
+  caption: string | null | undefined;
+  /** The English translation, when available (else null). */
+  captionEn: string | null | undefined;
+}
+
+export interface SecurityGuardResult {
+  /** The category after guarding — demoted to "Other security" when slop. */
+  category: IncidentCategory;
+  /** True when the guard changed a real category to "Other security". */
+  demoted: boolean;
+}
+
+/**
+ * Second-gate guard: when the classifier assigned a real security category but
+ * NEITHER the caption nor its translation carries a security-event cue, AND the
+ * text is confidently readable (English or translated), demote the category to
+ * "Other security". A non-security category is returned unchanged; an unreadable
+ * (untranslated, non-English) caption is left untouched — never demoted on a
+ * guess. Pure and deterministic so ingest and the reclassify route agree.
+ */
+export function applySecurityEventGuard(
+  input: SecurityGuardInput,
+): SecurityGuardResult {
+  if (input.category === "Other security") {
+    return { category: input.category, demoted: false };
+  }
+  const signal =
+    hasSecurityEventSignal(input.caption) ||
+    hasSecurityEventSignal(input.captionEn);
+  if (signal) return { category: input.category, demoted: false };
+  const judgeable = !!input.captionEn || isLikelyEnglish(input.caption);
+  if (!judgeable) return { category: input.category, demoted: false };
+  return { category: "Other security", demoted: true };
+}
+
+// ---------------------------------------------------------------------------
 // Incident matching (corroboration + duplicate-block)
 // ---------------------------------------------------------------------------
 // A compact token/date scorer mirroring the reliefweb corroboration approach:

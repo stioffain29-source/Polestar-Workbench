@@ -60,6 +60,7 @@ const LIST_COLUMNS = {
   postedAt: socialRawTable.postedAt,
   incidentDate: socialRawTable.incidentDate,
   caption: socialRawTable.caption,
+  captionEn: socialRawTable.captionEn,
   imageUrls: socialRawTable.imageUrls,
   links: socialRawTable.links,
   detectedCredibleDomains: socialRawTable.detectedCredibleDomains,

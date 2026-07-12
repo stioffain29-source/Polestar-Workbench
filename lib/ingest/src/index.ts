@@ -253,6 +253,9 @@ export {
   categoryToTopic,
   normaliseSourceTier,
   tokenize,
+  hasSecurityEventSignal,
+  isLikelyEnglish,
+  applySecurityEventGuard,
   CREDIBLE_DOMAINS,
 } from "./facebookOsintEligibility";
 export type {
@@ -266,6 +269,8 @@ export type {
   ReviewInput,
   Review,
   ConfidenceInput,
+  SecurityGuardInput,
+  SecurityGuardResult,
 } from "./facebookOsintEligibility";
 export {
   normaliseInstagramPost,
@@ -318,6 +323,11 @@ export type {
   SocialPromoteInput,
   SocialPromoteDecision,
 } from "./socialPromote";
+export {
+  runFacebookOsintReclassify,
+  emptyFacebookOsintReclassifySummary,
+} from "./facebookOsintReclassify";
+export type { FacebookOsintReclassifySummary } from "./facebookOsintReclassify";
 export {
   runTapaPromote,
   emptyTapaPromoteSummary,

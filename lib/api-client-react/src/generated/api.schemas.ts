@@ -1969,6 +1969,8 @@ export interface SocialRawItem {
   incidentDate?: string | null;
   /** @nullable */
   caption?: string | null;
+  /** @nullable */
+  captionEn?: string | null;
   imageUrls?: string[];
   links?: string[];
   detectedCredibleDomains?: string[];

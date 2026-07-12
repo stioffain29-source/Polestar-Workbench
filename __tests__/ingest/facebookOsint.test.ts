@@ -31,6 +31,9 @@ import {
   pickCorroboration,
   pickDuplicate,
   normaliseSourceTier,
+  hasSecurityEventSignal,
+  isLikelyEnglish,
+  applySecurityEventGuard,
   type RawFacebookPost,
   type IncidentCandidate,
 } from "@workspace/ingest";
@@ -652,6 +655,110 @@ describe("detectKeywords", () => {
   it("does not duplicate a cue that matches more than once", () => {
     const kws = detectKeywords("protest, protests and more protesters at the protest");
     expect(kws.filter((k) => k === "protest")).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security-event signal guard — the precision-first second gate that DEMOTES
+// community-chatter rows the theatre classifier mis-filed under a real security
+// category. No-fabrication: it can only downgrade, and only when the text is
+// confidently readable (English or translated). These cases mirror the live
+// rows the reclassify pass was written against.
+// ---------------------------------------------------------------------------
+describe("hasSecurityEventSignal (multilingual event cues)", () => {
+  it("fires on English homicide / robbery / unrest cues", () => {
+    expect(hasSecurityEventSignal("Man killed by poison in the village")).toBe(true);
+    expect(hasSecurityEventSignal("Attempted holdup at the trade store")).toBe(true);
+    expect(hasSecurityEventSignal("Riot police disperse the crowd")).toBe(true);
+  });
+
+  it("fires on Bahasa Indonesia event cues", () => {
+    expect(hasSecurityEventSignal("Pelaku curanmor ditangkap warga")).toBe(true);
+    expect(hasSecurityEventSignal("Perang suku kembali pecah di pegunungan")).toBe(true);
+    expect(hasSecurityEventSignal("Eksekusi tahanan memicu kecaman")).toBe(true);
+  });
+
+  it("fires on NFKC-styled unicode glyphs (bold small-caps)", () => {
+    expect(hasSecurityEventSignal("𝗔𝗧𝗧𝗘𝗠𝗣𝗧𝗘𝗗 𝗛𝗢𝗟𝗗𝗨𝗣 near the market")).toBe(true);
+  });
+
+  it("does NOT fire on community / governance chatter", () => {
+    expect(hasSecurityEventSignal("Ojek driver returns a lost bag to its owner")).toBe(false);
+    expect(hasSecurityEventSignal("SME funds disbursed to local traders this quarter")).toBe(false);
+    expect(hasSecurityEventSignal("Community fair held over the weekend")).toBe(false);
+    expect(hasSecurityEventSignal("")).toBe(false);
+    expect(hasSecurityEventSignal(null)).toBe(false);
+  });
+});
+
+describe("isLikelyEnglish gates the demote decision", () => {
+  it("is true only with three distinct common function words", () => {
+    expect(isLikelyEnglish("The families were evicted from the land")).toBe(true);
+    expect(isLikelyEnglish("Perang suku di pegunungan")).toBe(false);
+    expect(isLikelyEnglish("")).toBe(false);
+    expect(isLikelyEnglish(null)).toBe(false);
+  });
+});
+
+describe("applySecurityEventGuard demotes slop, keeps real events", () => {
+  it("keeps a real English security event untouched", () => {
+    const r = applySecurityEventGuard({
+      category: "Homicide / violent crime",
+      caption: "A man was killed by poison in the village",
+      captionEn: null,
+    });
+    expect(r.demoted).toBe(false);
+    expect(r.category).toBe("Homicide / violent crime");
+  });
+
+  it("keeps a real event carried only in the translation", () => {
+    const r = applySecurityEventGuard({
+      category: "Tribal / communal violence",
+      caption: "Perang suku kembali pecah",
+      captionEn: "Tribal war breaks out again in the highlands",
+    });
+    expect(r.demoted).toBe(false);
+    expect(r.category).toBe("Tribal / communal violence");
+  });
+
+  it("demotes an English community-chatter row mis-filed as security", () => {
+    const r = applySecurityEventGuard({
+      category: "Civil unrest / protest",
+      caption: "The families were evicted and should be helped #eviction #land",
+      captionEn: null,
+    });
+    expect(r.demoted).toBe(true);
+    expect(r.category).toBe("Other security");
+  });
+
+  it("demotes a translated Bahasa lost-property notice mis-filed as security", () => {
+    const r = applySecurityEventGuard({
+      category: "Theft / break-in",
+      caption: "Ojek online kembalikan tas penumpang yang tertinggal",
+      captionEn: "Ride-hailing driver returns a passenger's left-behind bag",
+    });
+    expect(r.demoted).toBe(true);
+    expect(r.category).toBe("Other security");
+  });
+
+  it("NEVER demotes an unreadable, untranslated non-English caption (no guessing)", () => {
+    const r = applySecurityEventGuard({
+      category: "Civil unrest / protest",
+      caption: "Kegiatan warga di kampung akhir pekan lalu",
+      captionEn: null,
+    });
+    expect(r.demoted).toBe(false);
+    expect(r.category).toBe("Civil unrest / protest");
+  });
+
+  it("leaves an already-'Other security' row unchanged", () => {
+    const r = applySecurityEventGuard({
+      category: "Other security",
+      caption: "Anything at all",
+      captionEn: null,
+    });
+    expect(r.demoted).toBe(false);
+    expect(r.category).toBe("Other security");
   });
 });
 

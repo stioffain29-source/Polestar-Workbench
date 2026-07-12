@@ -9,6 +9,7 @@ import {
   runMovementOnce,
   runGdeltStructuredOnce,
   runTapaPromoteOnce,
+  runFacebookOsintReclassifyOnce,
   runXSearchOnce,
 } from "../lib/ingestRunner";
 import { backfillRelevance, backfillSeverity } from "../lib/migrations";
@@ -503,6 +504,93 @@ router.post("/admin/tapa-promote", async (req: Request, res: Response) => {
     }
   }
 });
+
+// Facebook OSINT reclassify + translate maintenance pass. Free, DB-only: it
+// translates non-English `facebook_osint` captions into English (caption_en) and
+// re-runs the security-event guard, demoting community-chatter rows mis-filed
+// under a real security category and un-promoting any incident they had spawned.
+// Deliberately NOT part of the automatic scheduler — an operator-triggered,
+// reviewed maintenance path that mirrors /admin/tapa-promote. Append
+// ?mode=dry-run to preview counts without writing. Optional ?maxTranslations=<n>
+// bounds LLM fan-out per run (default 300; re-run to drain a larger backlog).
+router.post(
+  "/admin/social-reclassify",
+  async (req: Request, res: Response) => {
+    const expected = process.env["INGEST_ADMIN_TOKEN"];
+    if (!expected) {
+      req.log.warn(
+        "admin social-reclassify called but INGEST_ADMIN_TOKEN is not configured",
+      );
+      res.status(503).json({
+        error: "ingestion_disabled",
+        message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+      });
+      return;
+    }
+
+    const presented = presentedToken(req);
+    if (!presented || !safeEqual(presented, expected)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    try {
+      const dryRun = req.query["mode"] === "dry-run";
+      const rawMax = Number(req.query["maxTranslations"]);
+      const maxTranslations =
+        Number.isFinite(rawMax) && rawMax >= 0 ? Math.floor(rawMax) : undefined;
+      req.log.info({ dryRun, maxTranslations }, "admin social-reclassify started");
+      const result = await runFacebookOsintReclassifyOnce({
+        commit: !dryRun,
+        maxTranslations,
+      });
+      if (!result.ran) {
+        res.status(409).json({ error: "ingestion_in_progress" });
+        return;
+      }
+      const r = result.reclassify;
+      req.log.info(
+        {
+          mode: r.mode,
+          considered: r.considered,
+          translated: r.translated,
+          demoted: r.demoted,
+          unpromoted: r.unpromoted,
+          updated: r.updated,
+          durationMs: result.durationMs,
+        },
+        "admin social-reclassify finished",
+      );
+      res.json({
+        ok: true,
+        startedAt: result.startedAt.toISOString(),
+        finishedAt: result.finishedAt.toISOString(),
+        durationMs: result.durationMs,
+        reclassify: {
+          mode: r.mode,
+          considered: r.considered,
+          translated: r.translated,
+          translateSkippedNoLlm: r.translateSkippedNoLlm,
+          demoted: r.demoted,
+          unpromoted: r.unpromoted,
+          updated: r.updated,
+          unchanged: r.unchanged,
+          demotedIds: r.demotedIds,
+          unpromotedIncidentIds: r.unpromotedIncidentIds,
+          errors: r.errors,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, "admin social-reclassify failed");
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .json({ ok: false, error: "ingestion_failed", message });
+      }
+    }
+  },
+);
 
 // X (Twitter) recent-search source provider → reviewed incident promote.
 // Fetches recent posts, routes them into existing incident topics, relevance-

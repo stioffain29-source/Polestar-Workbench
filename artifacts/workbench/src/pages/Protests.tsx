@@ -1120,8 +1120,16 @@ function OsintTable({
                 </td>
                 <td className="p-2 text-xs text-foreground/80">
                   <span className="line-clamp-2">
-                    {it.caption || <span className="text-muted-foreground">—</span>}
+                    {it.captionEn ||
+                      it.caption || (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                   </span>
+                  {it.captionEn && it.caption && it.captionEn !== it.caption && (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      translated from original
+                    </span>
+                  )}
                   {keywords.length > 0 && (
                     <span className="flex flex-wrap gap-1 mt-1">
                       {keywords.slice(0, 6).map((k) => (

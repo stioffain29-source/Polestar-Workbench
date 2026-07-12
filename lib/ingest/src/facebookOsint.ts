@@ -28,6 +28,7 @@ import {
   pickCorroboration,
   categoryToTopic,
   normaliseSourceTier,
+  applySecurityEventGuard,
   type SourceTier,
   type CredibleDomainMatch,
   type IncidentCandidate,
@@ -997,7 +998,17 @@ function classifyInScope(
     : deriveWestPapuaIncidentDate(caption, pubDate);
 
   const credibleDomains = detectCredibleDomains(post.outboundLinks);
-  const category = extraction.category;
+  // Second-gate guard: a broad theatre vocabulary can file community chatter (a
+  // lost-property notice, an eviction gripe, a governance press release) under a
+  // real security category. Demote such a post to "Other security" when NEITHER
+  // the caption nor its translation carries a security-event cue. At ingest only
+  // the raw caption is available, so an English caption is judged now; a
+  // non-English one is left untouched until the reclassify pass translates it.
+  const category = applySecurityEventGuard({
+    category: extraction.category,
+    caption,
+    captionEn: null,
+  }).category;
   const location = isPng
     ? derivePngLocality(null, caption)
     : deriveWestPapuaLocality(null, caption);

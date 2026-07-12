@@ -25,6 +25,8 @@ export interface SocialRawItem {
   incidentDate?: Date | null;
   /** @nullable */
   caption?: string | null;
+  /** @nullable */
+  captionEn?: string | null;
   imageUrls?: string[];
   links?: string[];
   detectedCredibleDomains?: string[];

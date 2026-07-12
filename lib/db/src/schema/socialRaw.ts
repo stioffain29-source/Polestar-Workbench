@@ -72,6 +72,10 @@ export const socialRawTable = pgTable(
     incidentDate: timestamp("incident_date", { withTimezone: true }),
     // Sanitised, minimised post text (phone/email/private links stripped).
     caption: text("caption"),
+    // Clean English translation of a non-English caption (Bahasa / Tok Pisin).
+    // Filled by the reclassify pass; NULL until translated (UI falls back to the
+    // original `caption`). Never fabricates — a faithful re-expression only.
+    captionEn: text("caption_en"),
     // Public image URL(s) attached to the post.
     imageUrls: jsonb("image_urls").$type<string[]>().notNull().default([]),
     // Outbound links found in the post (token-bearing URLs redacted).
