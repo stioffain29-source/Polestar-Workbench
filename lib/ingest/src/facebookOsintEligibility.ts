@@ -334,10 +334,15 @@ const SECURITY_EVENT_CUES: RegExp[] = [
   /\bbreak[- ]?in\b/,
   /\bloot(?:ing|ed|ers)?\b/,
   /\bransack\w*\b/,
+  /\bmugg(?:ing|ed|ers?)\b/,
+  /\bsnatch(?:ed|ing)? (?:theft|robbery|bag|phone|purse)\b/,
+  /\bcarjack\w*\b/,
   // --- English: unrest / clashes ---
   /\briot(?:s|ing|ers)?\b/,
   /\bunrest\b/,
   /\bclash(?:es|ed|ing)?\b/,
+  /\bbrawl(?:s|ing|ed)?\b/,
+  /\bfirefight\b/,
   /\btribal (?:fight|clash|war|conflict|violence)\w*\b/,
   /\b(?:communal|ethnic) (?:violence|clash\w*|conflict)\b/,
   /\bprotest(?:s|ers|ing)?\b/,
@@ -389,6 +394,10 @@ const SECURITY_EVENT_CUES: RegExp[] = [
   /\bperampokan\b/,
   /\bbegal\b/,
   /\bpembegalan\b/,
+  /\bjambret\b/, // snatch theft
+  /\bpenjambretan\b/,
+  /\bdijambret\b/,
+  /\bmenjambret\b/,
   /\bpembunuhan\b/,
   /\bdibunuh\b/,
   /\bkorban tewas\b/,
@@ -403,11 +412,20 @@ const SECURITY_EVENT_CUES: RegExp[] = [
   /\bperang suku\b/,
   /\bbentrok(?:an)?\b/,
   /\bkerusuhan\b/,
+  /\brusuh\b/,
   /\bricuh\b/,
+  /\btawuran?\b/, // mass brawl between groups
+  /\bpengeroyokan\b/, // mob assault
+  /\bdikeroyok\b/,
+  /\bkeroyok(?:i|an)?\b/,
+  /\bamuk massa\b/, // mob rampage
+  /\bmengamuk\b/,
   /\bpenganiayaan\b/,
   /\bdianiaya\b/,
   /\beksekusi\b/,
   /\bpenculikan\b/,
+  /\bpenyekapan\b/, // unlawful confinement / captivity
+  /\bdisekap\b/,
   /\bdisandera\b/,
   /\bpenyanderaan\b/,
   /\bpembakaran\b/,

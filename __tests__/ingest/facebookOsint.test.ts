@@ -712,6 +712,24 @@ describe("hasSecurityEventSignal (multilingual event cues)", () => {
     expect(hasSecurityEventSignal("Eksekusi tahanan memicu kecaman")).toBe(true);
   });
 
+  it("fires on newly-added crime/violence vocabulary", () => {
+    // Bahasa: snatch theft, mass brawl, mob assault, rampage, captivity, riot.
+    expect(hasSecurityEventSignal("Pelajar diamankan setelah jambret perempuan")).toBe(true);
+    expect(hasSecurityEventSignal("Aksi penjambretan marak di jalan protokol")).toBe(true);
+    expect(hasSecurityEventSignal("Tawuran antar kampung pecah semalam")).toBe(true);
+    expect(hasSecurityEventSignal("Korban dikeroyok massa hingga terluka")).toBe(true);
+    expect(hasSecurityEventSignal("Pengeroyokan terjadi di depan pasar")).toBe(true);
+    expect(hasSecurityEventSignal("Amuk massa merusak kantor polisi")).toBe(true);
+    expect(hasSecurityEventSignal("Korban disekap selama tiga hari")).toBe(true);
+    expect(hasSecurityEventSignal("Situasi rusuh di depan gedung dewan")).toBe(true);
+    // English: mugging, brawl, carjacking, firefight, snatch theft.
+    expect(hasSecurityEventSignal("Tourist mugged near the market")).toBe(true);
+    expect(hasSecurityEventSignal("A brawl broke out between rival groups")).toBe(true);
+    expect(hasSecurityEventSignal("Carjacking reported on the highway")).toBe(true);
+    expect(hasSecurityEventSignal("Police in a firefight with the gunmen")).toBe(true);
+    expect(hasSecurityEventSignal("Victim of a snatch theft loses her phone")).toBe(true);
+  });
+
   it("fires on NFKC-styled unicode glyphs (bold small-caps)", () => {
     expect(hasSecurityEventSignal("𝗔𝗧𝗧𝗘𝗠𝗣𝗧𝗘𝗗 𝗛𝗢𝗟𝗗𝗨𝗣 near the market")).toBe(true);
   });
