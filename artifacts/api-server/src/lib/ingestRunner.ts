@@ -83,6 +83,22 @@ import { logger } from "./logger";
 // every instance so they contend on the same lock.
 const INGEST_LOCK_KEY = 0x506f6c65;
 
+// Social-promote regression alarm. The DB→DB social promote pass runs against
+// the writable production DB on every boot/timer; with the tightened
+// corroboration gate it should mint 0 (occasionally 1) incident per run. A run
+// that promotes more than this many rows is treated as a possible regression
+// (e.g. the gate weakened, or a burst of look-alike OSINT posts) and raises a
+// WARN — an operational alarm mirroring the AIS-movement SLA monitor — so it is
+// caught in the logs rather than only when someone spots a bad incident on the
+// live site. Override with SOCIAL_PROMOTE_WARN_THRESHOLD; tune, don't disable.
+const SOCIAL_PROMOTE_WARN_THRESHOLD = (() => {
+  const raw = Number.parseInt(
+    process.env.SOCIAL_PROMOTE_WARN_THRESHOLD?.trim() ?? "",
+    10,
+  );
+  return Number.isFinite(raw) && raw > 0 ? raw : 2;
+})();
+
 export type IngestRunResult =
   | {
       ran: true;
@@ -917,17 +933,30 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     let socialPromote: SocialPromoteSummary;
     try {
       socialPromote = await runSocialPromote({ commit: true });
-      logger.info(
-        {
-          unpromotedConsidered: socialPromote.unpromotedConsidered,
-          newToInsert: socialPromote.newToInsert,
-          inserted: socialPromote.inserted,
-          totalAfter: socialPromote.totalAfter,
-          byTopic: socialPromote.byTopic,
-          bySource: socialPromote.bySource,
-        },
-        "Social promote pass complete",
-      );
+      const promotePayload = {
+        unpromotedConsidered: socialPromote.unpromotedConsidered,
+        newToInsert: socialPromote.newToInsert,
+        inserted: socialPromote.inserted,
+        totalAfter: socialPromote.totalAfter,
+        byTopic: socialPromote.byTopic,
+        bySource: socialPromote.bySource,
+        // Name exactly which incidents this run minted (marker + ids) so a
+        // questionable auto-created incident is queryable straight from the
+        // logs, without a DB dump.
+        minted: socialPromote.minted,
+      };
+      logger.info(promotePayload, "Social promote pass complete");
+      // Regression alarm (mirrors the AIS-movement SLA monitor): under the
+      // tightened corroboration gate this pass should mint 0 (rarely 1) rows.
+      // Promoting more than the threshold on a single run is the early signal
+      // that the gate has regressed or a look-alike OSINT burst slipped
+      // through — surface it as a WARN so it is caught in prod logs.
+      if (socialPromote.inserted > SOCIAL_PROMOTE_WARN_THRESHOLD) {
+        logger.warn(
+          { ...promotePayload, threshold: SOCIAL_PROMOTE_WARN_THRESHOLD },
+          "Social promote pass minted an unexpectedly high number of incidents — possible regression",
+        );
+      }
     } catch (err) {
       logger.error({ err }, "Social promote pass failed");
       socialPromote = emptySocialPromote(err);

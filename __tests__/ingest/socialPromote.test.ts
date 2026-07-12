@@ -328,6 +328,11 @@ describe("runSocialPromote (commit branch)", () => {
     expect(summary.inserted).toBe(1);
     expect(summary.totalAfter).toBe(7);
     expect(summary.errors).toEqual([]);
+    // Each minted incident is captured for the log-based regression monitor:
+    // the new incident id, its source row, topic, and parseable marker.
+    expect(summary.minted).toHaveLength(1);
+    expect(summary.minted[0]!.incidentId).toBe(5000);
+    expect(summary.minted[0]!.marker).toMatch(/^social_raw:/);
   });
 
   it("reads the count off `.rows` (drizzle db.execute shape), not an array", async () => {

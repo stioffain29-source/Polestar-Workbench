@@ -271,6 +271,16 @@ export interface SocialPromoteSummary {
   byTopic: Array<[string, number]>;
   bySource: Array<[string, number]>;
   totalAfter: number | null;
+  // Audit trail of each incident this run actually minted (commit only): the
+  // new incident id, its source social_raw id, the routed topic, and the
+  // parseable analyst-notes marker. Lets a monitor name exactly what was
+  // created without a full DB dump. Empty on dry-run or when nothing promoted.
+  minted: Array<{
+    incidentId: number;
+    socialRawId: number;
+    topic: string;
+    marker: string;
+  }>;
   errors: string[];
   logLines: string[];
 }
@@ -290,6 +300,7 @@ export function emptySocialPromoteSummary(
     byTopic: [],
     bySource: [],
     totalAfter: null,
+    minted: [],
     errors: [],
     logLines: [],
   };
@@ -416,7 +427,7 @@ export async function runSocialPromote(
   if (commit && toInsert.length > 0) {
     for (const { item, decision } of toInsert) {
       try {
-        await db.transaction(async (tx) => {
+        const insertedId = await db.transaction(async (tx) => {
           const [row] = await tx
             .insert(incidentsTable)
             .values(decision.row)
@@ -437,8 +448,15 @@ export async function runSocialPromote(
             )
             .returning({ id: socialRawTable.id });
           if (claimed.length === 0) throw new AlreadyPromotedError();
+          return row!.id;
         });
         summary.inserted++;
+        summary.minted.push({
+          incidentId: insertedId,
+          socialRawId: decision.socialRawId,
+          topic: decision.topic,
+          marker: (decision.row.analystNotes as string | null) ?? "",
+        });
       } catch (err) {
         if (err instanceof AlreadyPromotedError) {
           summary.skippedAlreadyPromoted++;
@@ -458,6 +476,11 @@ export async function runSocialPromote(
     )) as unknown as { rows: Array<{ count: number }> };
     summary.totalAfter = countRes.rows[0]?.count ?? 0;
     log(`  inserted=${summary.inserted} social-promoted-total=${summary.totalAfter}`);
+    for (const m of summary.minted) {
+      log(
+        `  minted incident #${m.incidentId} (topic=${m.topic}, social_raw=${m.socialRawId}) — ${m.marker}`,
+      );
+    }
   } else if (!commit) {
     log("  DRY-RUN — re-run with --commit to write.");
   }

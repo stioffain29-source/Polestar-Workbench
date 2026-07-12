@@ -37,6 +37,15 @@ own promoted rows must be purged.
 social incidents ever appear, check `CORROBORATION_MIN_SECURITY_SHARED` and the
 `SECURITY_EVENT_CUES` coverage before loosening anything.
 
+**Regression alarm (2026-07-12).** `runSocialPromote`'s summary now carries a
+`minted[]` audit trail (incidentId/socialRawId/topic/marker per newly created
+incident), logged on every scheduler run. `runIngestOnce` raises a WARN
+("...unexpectedly high number of incidents — possible regression") when
+`inserted` exceeds `SOCIAL_PROMOTE_WARN_THRESHOLD` (env, default 2), mirroring
+the AIS-movement SLA WARN. Purpose: catch a gate regression / look-alike burst
+from prod logs instead of spotting a bad incident on the live site. Promote-gate
+logic itself is UNCHANGED.
+
 **No native Instagram Apify dataset existed** in the account — only the
 Facebook-shaped "Papua & PNG" dataset + a pre-existing KAMMI Instagram backlog
 in `social_raw`. So the `scrape:instagram` provider itself was never validated
