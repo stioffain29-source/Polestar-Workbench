@@ -77,6 +77,9 @@ export const GLOBAL_EXTRA_ALIASES: CountryAlias[] = [
   { canonical: "Germany", aliases: ["germany", "german", "germans", "berlin", "hamburg", "munich"] },
   { canonical: "Cuba", aliases: ["cuba", "cuban", "cubans", "havana"] },
   { canonical: "Mongolia", aliases: ["mongolia", "mongolian", "ulaanbaatar"] },
+  { canonical: "Turkey", aliases: ["turkey", "turkish", "turkiye", "istanbul", "ankara"] },
+  { canonical: "United Kingdom", aliases: ["united kingdom", "britain", "british", "england", "scotland", "london"] },
+  { canonical: "Venezuela", aliases: ["venezuela", "venezuelan", "caracas"] },
 ];
 
 // Region + global gazetteer for the three global-market topics. Region-first.

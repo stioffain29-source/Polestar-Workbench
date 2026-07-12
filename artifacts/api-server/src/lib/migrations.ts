@@ -1706,6 +1706,73 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-1a) ONE-TIME relocation of OTHER cross-syndicated foreign energy
+    //     stories mis-stamped onto a feed default country. Same defect as the
+    //     Crimea case (3d-1): Energy is a WORLD-scope monitor, but Turkey /
+    //     United Kingdom / Venezuela were absent from the gazetteer, so a story
+    //     naming ONLY one of them (e.g. "Power restored in Turkey after
+    //     blackout" carried in the Bangladesh energy edition, a Scotland power
+    //     tariff item in the Sri Lanka edition, a Venezuela outage from "Times
+    //     of Oman") had no country detected and was stamped with the feed
+    //     default and dropped on that centroid. The gazetteer now resolves these
+    //     three; this repairs rows already stored. RELOCATE (never delete) — the
+    //     incidents are real and in-scope. Each row is re-stamped to the named
+    //     country and re-geocoded to its centroid. Match the foreign token in the
+    //     TITLE only (the summary repeats the publisher masthead — "Times of
+    //     Oman" — so a summary match would false-negative via the region guard)
+    //     AND require that NO in-region country name appears in the title, so a
+    //     genuinely in-region story that merely mentions a foreign place (e.g.
+    //     "Iraq-Turkey Pipeline sabotage", stored Iraq) is never moved. Bound to
+    //     country <> the target so an already-correct row is untouched.
+    //     Marker-gated so analyst edits afterwards are never overwritten. NOTE:
+    //     backslashes are DOUBLED (\\y) because this is a JS template literal.
+    {
+      const markerKey = "energy_foreign_syndication_relocate_v2";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const regionGuard =
+          "\\y(pakistan|india|indian|bangladesh|sri lanka|ceylon|nepal|myanmar|burma|indonesia|philippine|thai|thailand|vietnam|malaysia|china|chinese|iran|iranian|iraq|iraqi|saudi|emirates|dubai|abu dhabi|qatar|kuwait|oman|omani|bahrain|yemen|israel|israeli|australia|australian|new zealand|japan|japanese|korea|korean|cambodia|laos|ukraine|russia|russian|germany|german|spain|spanish|iberia|portugal|cuba|mongolia|south africa|eskom|nigeria|kenya|ghana|zimbabwe|zambia|niger|united states|america|american|texas|california|canada|canadian)\\y";
+        const targets: { country: string; token: string; lat: number; lng: number }[] = [
+          { country: "Turkey", token: "\\y(turkey|turkish|turkiye|istanbul|ankara)\\y", lat: 38.96, lng: 35.24 },
+          { country: "United Kingdom", token: "\\y(united kingdom|britain|british|england|scotland|london)\\y", lat: 54.0, lng: -2.5 },
+          { country: "Venezuela", token: "\\y(venezuela|venezuelan|caracas)\\y", lat: 6.42, lng: -66.59 },
+        ];
+        let total = 0;
+        for (const t of targets) {
+          // Single-target attribution: a title that also names ANOTHER target
+          // country is ambiguous, so skip it (never guess which one to stamp).
+          const otherTokens = targets
+            .filter((o) => o.country !== t.country)
+            .map((o) => o.token.slice(2, -2)) // strip the shared \y…\y wrapper
+            .join("|");
+          const otherGuard = `\\y(${otherTokens})\\y`;
+          const res = await db.execute(sql`
+            UPDATE incidents
+            SET country = ${t.country},
+                location = NULL,
+                latitude = ${t.lat},
+                longitude = ${t.lng}
+            WHERE topic = 'energy'
+              AND country <> ${t.country}
+              AND COALESCE(title,'') ~* ${t.token}
+              AND COALESCE(title,'') !~* ${regionGuard}
+              AND COALESCE(title,'') !~* ${otherGuard}
+          `);
+          total += res.rowCount ?? 0;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: total, marker: markerKey },
+          "One-time relocation of cross-syndicated foreign (Turkey/UK/Venezuela) energy incidents mis-stamped onto a feed default country",
+        );
+      }
+    }
+
     // 3d-1a-i1b) ONE-TIME purge of scraped Google-News SECTION / topic-page
     //     headings that leaked in as incidents — an aggregator feed LABEL, not
     //     a dated event ("Papua New Guinea Massacre News", "<Place> Crime
