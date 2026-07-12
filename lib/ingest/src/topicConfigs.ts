@@ -193,7 +193,7 @@ const ENERGY_COUNTRIES = [
 
 const ENERGY_TERMS = `("power outage" OR "power cut" OR "blackout" OR "brownout" OR "rolling blackout" OR "load shedding" OR "load-shedding" OR "grid failure" OR "power grid" OR "electricity crisis" OR "power shortage" OR "electricity shortage" OR "power rationing" OR "electricity price" OR "electricity tariff" OR "power tariff" OR "energy crisis" OR "energy shortage" OR "gas shortage" OR "substation fire")`;
 
-const ENERGY_CONFIG: NewsTopicConfig = {
+export const ENERGY_CONFIG: NewsTopicConfig = {
   topic: "energy",
   feeds: [
     ...countryFeeds(ENERGY_COUNTRIES, ENERGY_TERMS),
