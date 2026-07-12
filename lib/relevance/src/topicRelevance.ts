@@ -2229,6 +2229,33 @@ const COUNTRY_ENTERTAINMENT_RE =
 const COUNTRY_MOURNING_ANNOUNCEMENT_RE =
   /\b(?:announce\w*|umumkan|mengumumkan|declare[ds]?|menyatakan)\b.{0,30}\b(?:mourning|duka(?: nasional)?|berkabung)\b|\b(?:national mourning|duka nasional|hari (?:berkabung|duka)|berkabung nasional|belasungkawa|obituary|memorial service)\b/i;
 
+// MILITARY EXERCISE / DRILL — a planned or reported joint/naval/air/live-fire
+// exercise, drill, war-game or manoeuvre is a scheduled training activity, not a
+// security INCIDENT, yet it carries the words "military" and "exercise" and so
+// slips past every other gate (the incident-based gate is exclusion-only). The
+// exercise nouns are bound to a MILITARY qualifier so the oil/fire/dental
+// "drill" homonyms and a bare "exercise" (e.g. "exercise caution") never match.
+// Dropped UNLESS a FRESH attack word is present, so a real ambush/raid that
+// happens DURING an exercise still passes (mirrors the mourning-drop gate).
+const COUNTRY_MILITARY_EXERCISE_RE =
+  /\b(?:military|joint|combined|bilateral|multinational|naval|air|maritime|live[- ]?fire|combat|army|navy|air[- ]?force) (?:exercises?|drills?|manoeuvres?|maneuvers?|war ?games?|training exercises?)\b|\bwar[- ]?games?\b|\b(?:latihan (?:militer|gabungan|tempur|bersama)|latihan perang)\b/i;
+
+// THEMATIC OP-ED / EXPLAINER / ESSAY — a labelled opinion/analysis/commentary/
+// explainer piece ("Opinion:", "Analysis:", "Explainer:") or a broad thematic
+// essay framing ("Beyond the ceasefire: …", "everyday insecurity in …", "the
+// politics of …", "making sense of …"). A country SECURITY aggregate lists
+// concrete dated EVENTS, not background think-pieces. Unlike
+// COUNTRY_EXPLAINER_NOISE_RE / COUNTRY_OPINION_DEBATE_RE these are dropped
+// OUTRIGHT — with NO security-word rescue — because a thematic essay routinely
+// NAMES militancy / attacks / a crackdown while reporting no fresh incident, and
+// the task requires dropping them EVEN when they carry security words. The
+// patterns are kept precise: labelled essay prefixes (with a trailing colon /
+// dash / pipe) and essay-title conventions a hard-news incident headline never
+// uses, so real dated incidents are unaffected. The label group and the Bahasa
+// forms (opini / tajuk / analisis) are matched against the RAW haystack too.
+const COUNTRY_THEMATIC_ESSAY_RE =
+  /^["'“”(]?\s*(?:opinion|op[-\s]?ed|analysis|analisis|commentary|column|editorial|editor'?s note|essay|explainer|explained|long read|perspective|viewpoint|opini|tajuk rencana|tajuk)\s*[:\-–—|]|^["'“”(]?\s*beyond\b[^:]{0,60}:|\beveryday (?:insecurity|violence|crime)\b|\b(?:the (?:roots|politics|shadow|legacy) of|making sense of|rethinking|reimagining|reflections? on)\b/i;
+
 /**
  * Country reports allow any operational SECURITY record that mentions the
  * country context. They strip the shared general-news exclusions above and,
@@ -2337,6 +2364,22 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // present. A mourning piece inherently names a death, so "killed / dead" must
   // NOT rescue it — only a reported fresh attack (the incident) keeps it.
   if (COUNTRY_MOURNING_ANNOUNCEMENT_RE.test(text) && !COUNTRY_FRESH_ATTACK_RE.test(text)) {
+    return false;
+  }
+  // Drop MILITARY EXERCISE / DRILL coverage (a planned or reported joint / naval
+  // / live-fire exercise or war-game) unless a FRESH attack word is present. A
+  // scheduled training activity is not an incident; a real ambush/raid DURING an
+  // exercise still passes (same gate as the mourning drop).
+  if (COUNTRY_MILITARY_EXERCISE_RE.test(text) && !COUNTRY_FRESH_ATTACK_RE.test(text)) {
+    return false;
+  }
+  // Drop THEMATIC op-ed / analysis / explainer / essay pieces OUTRIGHT — even
+  // when they carry security words. A labelled essay ("Opinion:", "Analysis:",
+  // "Explainer:") or a broad thematic framing ("Beyond …:", "everyday
+  // insecurity", "the politics of …") names militancy/attacks/crackdowns while
+  // reporting no fresh dated incident; the patterns are essay-title conventions a
+  // hard-news incident headline never uses, so there is no security rescue here.
+  if (COUNTRY_THEMATIC_ESSAY_RE.test(text)) {
     return false;
   }
   return true;

@@ -226,6 +226,12 @@ export interface StructuredTheatreConfig {
   // West Papua); the nationwide multi-region reports (Indonesia / Jakarta) leave
   // it unset so distinct cities are never merged.
   crossProvinceDedup?: boolean;
+  // PNG-only. When true, the "Incident Details" section lists each theme's
+  // incidents as compact per-item cards (own place + honest date) beneath the
+  // theme paragraph. Set ONLY on PNG_REPORT_CONFIG — West Papua, Indonesia and
+  // Jakarta stay paragraph-only (inert), so high-volume theatres never explode
+  // the brief into hundreds of pages.
+  perIncidentDetailCards?: boolean;
   // Optional Customer Relevance audience. Names who the brief is most relevant
   // to ("Most relevant to <audience>."); the period's main issues are derived
   // from the incident mix, not from this field. Unset → a generic audience.
@@ -280,6 +286,7 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
   filterDevelopmentWire: true,
   demoteNonKineticWire: true,
   crossProvinceDedup: true,
+  perIncidentDetailCards: true,
   deriveProvince: derivePngProvince,
   extractItem: extractPngItem,
   locationAugmentations: {
@@ -622,6 +629,11 @@ export interface PngReportDataset {
   // Incidents to analyse in "Incident Details" — every windowItem NOT promoted
   // into the Top 3 story clusters above.
   incidentDetailsItems: PngReportItem[];
+  // PNG-only (config.perIncidentDetailCards). When true, the renderer lists each
+  // theme's incidents as compact per-item cards beneath the theme paragraph.
+  // False for every other theatre, leaving their Incident Details paragraph-only
+  // rendering byte-identical.
+  showPerIncidentCards: boolean;
   // Grouped recommended actions (Movement security, Site security, …), built
   // from this period's incident mix and the location watchlist.
   recommendedActions: RecommendedActionGroup[];
@@ -629,7 +641,16 @@ export interface PngReportDataset {
   // renderer prefers these over the generic Incident-Details theme groups and
   // Operational-Impact bullets; unset for every other theatre, leaving their
   // rendering byte-identical.
-  incidentThemesOverride?: { key: string; heading: string; paragraph: string }[];
+  // `items` is always absent for the Jakarta paragraph-only override; it is
+  // declared optional only so the field is structurally compatible with the
+  // generic `CountryIncidentThemeGroup[]` (which carries per-incident `items`)
+  // at the `?? buildCountryIncidentThemes(...)` merge point in both consumers.
+  incidentThemesOverride?: {
+    key: string;
+    heading: string;
+    paragraph: string;
+    items?: PngReportItem[];
+  }[];
   operationalImpactOverride?: string[];
   // Jakarta-only layout hint: render the closing Polestar View keep-together so
   // the complete assessment paragraph never splits across a page boundary
@@ -1956,6 +1977,7 @@ export function buildStructuredReportDataset(
     reportingConfidence,
     windowItems,
     incidentDetailsItems,
+    showPerIncidentCards: config.perIncidentDetailCards ?? false,
     recommendedActions,
     incidentThemesOverride,
     operationalImpactOverride,

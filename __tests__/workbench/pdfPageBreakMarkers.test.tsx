@@ -121,6 +121,9 @@ function makePngDataset(): PngReportDataset {
     },
     windowItems: [topItem, ncdConfirmed, morobeItem],
     incidentDetailsItems: [ncdConfirmed, morobeItem],
+    // PNG is the ONLY theatre that renders compact per-item cards under each
+    // Incident Details theme; West Papua / Indonesia / Jakarta stay inert.
+    showPerIncidentCards: true,
     recommendedActions: [
       {
         key: "movement",
@@ -137,17 +140,32 @@ describe("PngCountryReportBody page-break markers", () => {
   );
 
   it("marks every atomic block with data-pdf-row", () => {
-    // The rebuilt renderer marks each Top 3 tile card, each PRESENT Incident
-    // Details theme group, and each grouped Recommended Actions block as atomic
-    // blocks the exporter must never split mid-cut. Present-only themes (no fixed
-    // six-theme scaffold), so derive the expected count from the same dataset.
+    // The rebuilt renderer marks each Top 3 tile card, each per-incident compact
+    // card inside a PRESENT Incident Details theme group (the theme wrapper is no
+    // longer atomic — each incident earns its own place + date card), and each
+    // grouped Recommended Actions block as atomic blocks the exporter must never
+    // split mid-cut. Present-only themes (no fixed six-theme scaffold), so derive
+    // the expected count from the same dataset.
     const ds = makePngDataset();
+    const themeItemRows = buildCountryIncidentThemes(ds.incidentDetailsItems).reduce(
+      (sum, g) => sum + g.items.length,
+      0,
+    );
     const expected =
-      ds.topThree.length +
-      buildCountryIncidentThemes(ds.incidentDetailsItems).length +
-      ds.recommendedActions.length;
+      ds.topThree.length + themeItemRows + ds.recommendedActions.length;
     expect(expected).toBeGreaterThan(0);
     expect(countMatches(html, /data-pdf-row="true"/g)).toBe(expected);
+  });
+
+  it("stays paragraph-only (no per-item cards) when showPerIncidentCards is off", () => {
+    // West Papua / Indonesia / Jakarta keep the Incident Details section
+    // paragraph-only (inert) so high-volume theatres never explode into hundreds
+    // of pages. With the flag off, the ONLY data-pdf-row blocks are the Top 3
+    // tiles and the grouped Recommended Actions — no per-incident theme cards.
+    const ds = { ...makePngDataset(), showPerIncidentCards: false };
+    const inertHtml = renderToStaticMarkup(<PngCountryReportBody dataset={ds} />);
+    const expected = ds.topThree.length + ds.recommendedActions.length;
+    expect(countMatches(inertHtml, /data-pdf-row="true"/g)).toBe(expected);
   });
 
   it("marks long prose blocks with data-pdf-flow for line-level breaks", () => {

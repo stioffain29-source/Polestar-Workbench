@@ -1155,6 +1155,10 @@ function drawStructuredItemCard(
   ctx: Ctx,
   item: PngReportItem,
   suppressEmptyLocation = false,
+  // Compact cards (beneath an Incident Details theme paragraph) omit the
+  // business-impact body — title, severity chip and meta line only — so the
+  // theme paragraph is not repeated per item. Mirrors ItemCard's `compact`.
+  compact = false,
 ) {
   const { pdf, MX, CW } = ctx;
   const sk = sevKey(item.severity);
@@ -1186,14 +1190,14 @@ function drawStructuredItemCard(
   );
 
   pdf.setFontSize(9);
-  const bodyLines: string[] = pdf.splitTextToSize(
-    sanitize(item.businessImpact),
-    innerW,
-  );
+  const bodyLines: string[] = compact
+    ? []
+    : pdf.splitTextToSize(sanitize(item.businessImpact), innerW);
 
   const titleBlockH = Math.max(titleLines.length * 14, 18);
-  const cardH =
-    padY + titleBlockH + 6 + metaLines.length * 11 + 6 + bodyLines.length * 12 + padY;
+  const cardH = compact
+    ? padY + titleBlockH + 6 + metaLines.length * 11 + padY
+    : padY + titleBlockH + 6 + metaLines.length * 11 + 6 + bodyLines.length * 12 + padY;
 
   if (ctx.y + cardH > ctx.H - ctx.BOTTOM) newPage(ctx);
   const top = ctx.y;
@@ -1232,11 +1236,13 @@ function drawStructuredItemCard(
   setText(pdf, DUSK);
   pdf.text(metaLines, MX + padX, yy + 8, { lineHeightFactor: 1.3 });
 
-  // Business-impact body.
-  yy += metaLines.length * 11 + 6;
-  pdf.setFontSize(9);
-  setText(pdf, DUSK);
-  pdf.text(bodyLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+  // Business-impact body (omitted on compact Incident Details cards).
+  if (!compact) {
+    yy += metaLines.length * 11 + 6;
+    pdf.setFontSize(9);
+    setText(pdf, DUSK);
+    pdf.text(bodyLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+  }
 
   ctx.y = top + cardH + 10;
 }
@@ -1281,6 +1287,12 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
     for (const g of incidentThemes) {
       drawJakartaStrandLabel(ctx, g.heading);
       renderProse(ctx, g.paragraph);
+      // Per-item cards are PNG-only (d.showPerIncidentCards), mirroring the
+      // on-screen body for screen==PDF parity. The PNG brief lists each theme
+      // incident's own place + honest date beneath the paragraph; West Papua,
+      // Indonesia and Jakarta stay paragraph-only (inert).
+      const themeItems = d.showPerIncidentCards ? (g.items ?? []) : [];
+      for (const it of themeItems) drawStructuredItemCard(ctx, it, false, true);
     }
   }
 

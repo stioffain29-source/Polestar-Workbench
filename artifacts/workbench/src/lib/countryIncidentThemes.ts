@@ -81,6 +81,10 @@ export interface CountryIncidentThemeGroup {
   heading: string;
   // One short count-free paragraph — what the renderer displays.
   paragraph: string;
+  // The real incidents that fell into this theme, ranked most-serious first
+  // (severityRank desc, then most-recently reported), so the renderer and the
+  // PDF can list each one's own place + date beneath the theme paragraph.
+  items: PngReportItem[];
   // What happened — the kind of activity reported, with the specific categories.
   whatHappened: string;
   // Where — the provinces/areas it concentrated in.
@@ -282,6 +286,16 @@ export function buildCountryIncidentThemes(
     return items.length >= 2 || worstSeverityIndex(items) >= 2;
   }).map((def) => {
     const items = byTheme.get(def.key)!;
+    // Rank items most-serious-first (severityRank desc, then most-recently
+    // reported) so the per-item cards lead with the same incident the
+    // paragraph's "most serious reported was …" lead names. Mirrors
+    // leadIncidentSentence's ordering exactly.
+    const rankedItems = [...items].sort((a, b) => {
+      if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
+      const ad = a.reportedDate instanceof Date ? a.reportedDate.getTime() : 0;
+      const bd = b.reportedDate instanceof Date ? b.reportedDate.getTime() : 0;
+      return bd - ad;
+    });
     const provs = topProvinces(items);
     const cats = topCategories(items).map(categoryNoun);
     const worst = worstSeverityIndex(items);
@@ -322,6 +336,7 @@ export function buildCountryIncidentThemes(
       key: def.key,
       heading: def.heading,
       paragraph,
+      items: rankedItems,
       whatHappened,
       where,
       whyItMatters,

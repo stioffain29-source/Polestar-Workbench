@@ -156,9 +156,16 @@ function dateLine(item: PngReportItem): string {
 function ItemCard({
   item,
   suppressEmptyLocation = false,
+  compact = false,
 }: {
   item: PngReportItem;
   suppressEmptyLocation?: boolean;
+  // Compact cards (used beneath an Incident Details theme paragraph) show only
+  // the title, severity chip and the meta line (category · place · date ·
+  // source) — no business-impact body — so the theme paragraph is not repeated
+  // per item. Honours "no slop": the item earns its own place + honest date
+  // without padding.
+  compact?: boolean;
 }) {
   const color = SEV_COLOR[item.severity] ?? ELECTRIC;
   const summaries = useContext(IncidentSummaryContext);
@@ -208,9 +215,11 @@ function ItemCard({
           .join("  ·  ")}
         {item.source ? `  ·  ${item.source}` : ""}
       </div>
-      <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 6, lineHeight: 1.5, textAlign: "left" }}>
-        {bodyText}
-      </div>
+      {compact ? null : (
+        <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 6, lineHeight: 1.5, textAlign: "left" }}>
+          {bodyText}
+        </div>
+      )}
     </div>
   );
 }
@@ -346,12 +355,23 @@ export default function PngCountryReportBody({
                 : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
           </EmptyNote>
         ) : (
-          incidentThemes.map((g) => (
-            <div key={g.key} data-pdf-row="true" style={{ marginBottom: 12 }}>
-              <StrandLabel>{g.heading}</StrandLabel>
-              <Prose text={g.paragraph} />
-            </div>
-          ))
+          incidentThemes.map((g) => {
+            // Per-item cards are PNG-only (d.showPerIncidentCards). The PNG brief
+            // lists each theme incident's own place + honest date beneath the
+            // theme paragraph via a compact ItemCard. West Papua, Indonesia and
+            // Jakarta stay paragraph-only (inert) — Jakarta's override carries no
+            // items anyway, and the high-volume theatres must never explode.
+            const themeItems = d.showPerIncidentCards ? (g.items ?? []) : [];
+            return (
+              <div key={g.key} style={{ marginBottom: 12 }}>
+                <StrandLabel>{g.heading}</StrandLabel>
+                <Prose text={g.paragraph} />
+                {themeItems.map((it) => (
+                  <ItemCard key={it.id} item={it} compact />
+                ))}
+              </div>
+            );
+          })
         )}
         {photoAt("inside-incident-details")}
       </Section>

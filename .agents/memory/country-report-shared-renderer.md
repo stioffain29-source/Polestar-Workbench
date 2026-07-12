@@ -40,6 +40,21 @@ leftover existed but failed the meaningfulness gate → "Remaining reporting …
 to isolated, lower-severity incidents that did not warrant separate detail." Never claim
 "no further reporting" when sub-threshold leftover items actually exist.
 
+## Per-theatre gating — additions to the shared renderer are DANGEROUS
+`PngCountryReportBody.tsx` + `exportCountryReportPdf.ts` render PNG, West Papua,
+Indonesia AND Jakarta from the same code. Any per-incident / expansive addition
+(e.g. the compact per-item "place + honest date" cards under each Incident
+Details theme) MUST be gated to a specific theatre, or high-volume theatres blow
+up. **Why:** rendering per-item cards unconditionally took Indonesia's weekly
+brief to ~361 pages (West Papua ~15) while PNG stayed ~6 — the font gate PASSED
+at 361 pages because it only checks fonts, not length. **How to apply:** the
+per-item cards are switched on by a config flag `perIncidentDetailCards` set ONLY
+on `PNG_REPORT_CONFIG`, surfaced on the dataset as `showPerIncidentCards`, and
+both consumers read `d.showPerIncidentCards ? (g.items ?? []) : []`. Keep West
+Papua / Indonesia / Jakarta paragraph-only (inert). `buildCountryIncidentThemes`
+still populates `items` for every theatre — the gate lives in the consumers, not
+the builder.
+
 ## Maritime Security REMOVED from country reports
 Country reports no longer render the ICC/IMB maritime-security block or its
 fetch. **Why:** scope decision for the country brief. TOPIC (shipping) reports
