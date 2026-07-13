@@ -23,7 +23,7 @@ import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "@/components/CargoPatternDashboard";
-import CargoIncidentTimeline from "@/components/CargoIncidentTimeline";
+import CargoActivityMatrix from "@/components/CargoActivityMatrix";
 import CargoPriorityMatrix from "@/components/CargoPriorityMatrix";
 import type { ReportPreviewData } from "@/components/ReportPreview";
 
@@ -519,9 +519,9 @@ export default function CargoReportPreview({
           </div>
         )}
 
-        {model.timeline.total > 0 && (
+        {model.activity.total > 0 && (
           <div className="mb-8" style={{ breakInside: "avoid" }}>
-            <CargoIncidentTimeline timeline={model.timeline} />
+            <CargoActivityMatrix activity={model.activity} />
           </div>
         )}
 

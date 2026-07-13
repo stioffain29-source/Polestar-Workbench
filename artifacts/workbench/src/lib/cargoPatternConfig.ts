@@ -164,47 +164,29 @@ export function stageForCategory(category: string): CargoStageKey {
   return CATEGORY_TO_STAGE[category] ?? "enforcement";
 }
 
-// --- Timeline lanes (spec PAGE 5) -----------------------------------------
+// --- Weekly activity matrix (spec PAGE 5) ---------------------------------
 //
-// Five category lanes. The staging-yard stage folds into inland transport on
-// the timeline (handover/staging is part of the inland leg), so every incident
-// still appears exactly once.
-
-export type CargoLaneKey =
-  | "warehouse_depot"
-  | "inland_transport"
-  | "port_terminal"
-  | "maritime"
-  | "enforcement";
-
-export const TIMELINE_LANE_ORDER: CargoLaneKey[] = [
-  "warehouse_depot",
-  "inland_transport",
-  "port_terminal",
-  "maritime",
-  "enforcement",
-];
-
-export const TIMELINE_LANE_LABEL: Record<CargoLaneKey, string> = {
+// The Weekly Activity by Pattern matrix uses the six supply-chain stages as its
+// rows. These row labels are held here (rather than reusing STAGE_META.label)
+// so the enforcement row reads as the shorter "Enforcement activity" the spec
+// asks for, without changing the supply-chain exposure card wording.
+export const WEEKLY_PATTERN_ROW_LABEL: Record<CargoStageKey, string> = {
   warehouse_depot: "Warehouse and depot",
   inland_transport: "Inland transport",
+  staging_yard: "Staging yard",
   port_terminal: "Port and terminal",
   maritime: "Maritime",
   enforcement: "Enforcement activity",
 };
 
-const STAGE_TO_LANE: Record<CargoStageKey, CargoLaneKey> = {
-  warehouse_depot: "warehouse_depot",
-  inland_transport: "inland_transport",
-  staging_yard: "inland_transport",
-  port_terminal: "port_terminal",
-  maritime: "maritime",
-  enforcement: "enforcement",
-};
+// Below this many unique incidents the frequency matrix is not meaningful; the
+// report lists the incidents individually in a compact box instead.
+export const ACTIVITY_MATRIX_MIN_INCIDENTS = 3;
 
-export function laneForStage(stage: CargoStageKey): CargoLaneKey {
-  return STAGE_TO_LANE[stage];
-}
+// Guard against a corrupt far-future date inflating the column count. The cargo
+// window is ~30 days, so a real period is ~5 weeks; the cap never bites in
+// practice but bounds the table width defensively.
+export const ACTIVITY_MATRIX_MAX_WEEKS = 26;
 
 // --- Operational-consequence scoring model (spec PAGE 6) ------------------
 //

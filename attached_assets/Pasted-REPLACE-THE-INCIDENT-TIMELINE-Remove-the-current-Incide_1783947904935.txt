@@ -1,0 +1,137 @@
+REPLACE THE INCIDENT TIMELINE
+
+Remove the current Incident Timeline completely.
+
+Do not attempt to refine it, enlarge the markers or add more labels. The format is difficult to interpret and is not suitable for the Cargo Watch report.
+
+Replace it with a simple section titled:
+
+WEEKLY ACTIVITY BY PATTERN
+
+PURPOSE
+
+Show when each cargo security pattern was reported during the reporting period without displaying individual incident markers or headlines.
+
+Use a matrix with:
+
+Rows:
+
+1. Warehouse and depot
+2. Inland transport
+3. Staging yard
+4. Port and terminal
+5. Maritime
+6. Enforcement activity
+
+Columns:
+
+One column for each reporting week.
+
+Example:
+
+PATTERN                  06 JUN   13 JUN   20 JUN   27 JUN   TOTAL
+
+Warehouse and depot         0        1        2        1        4
+Inland transport            1        0        1        3        5
+Staging yard                0        0        0        1        1
+Port and terminal           0        1        0        0        1
+Maritime                    0        0        2        0        2
+Enforcement activity        1        0        0        2        3
+
+The example values above are illustrative only. Use the actual deduplicated report data.
+
+DISPLAY REQUIREMENTS
+
+1. Show the incident count clearly inside every populated cell.
+
+2. Use blank cells or a light zero for weeks with no incidents.
+
+3. Use a slightly stronger background shade as the number of incidents increases.
+
+4. The number must remain visible. Do not rely on colour alone.
+
+5. Add a Total column on the right.
+
+6. Add a Weekly Total row at the bottom.
+
+7. Use short week labels such as:
+
+06 Jun
+13 Jun
+20 Jun
+27 Jun
+
+8. Generate week labels dynamically from the reporting period.
+
+9. Keep the layout clean and compact.
+
+10. Do not include individual incident titles.
+
+11. Do not use dots, bubbles, symbols or a separate legend.
+
+12. Do not use severity colours in this section. This graphic is showing frequency and timing, not risk severity.
+
+13. Use the existing Polestar blue palette with very light shading.
+
+14. Ensure the matrix remains readable in the exported PDF at normal page size.
+
+ANALYTICAL STATEMENT
+
+Add one short statement beneath the matrix.
+
+It must be generated from the data and explain the clearest change or concentration.
+
+Examples:
+
+“Warehouse and inland transport incidents were concentrated during the final two reporting weeks.”
+
+“Reporting remained dispersed, with no clear weekly concentration.”
+
+“Enforcement activity increased after the main cluster of reported cargo losses.”
+
+Do not hardcode these examples.
+
+DATA REQUIREMENTS
+
+The matrix must use the same deduplicated incident set as:
+
+1. Total Records
+2. Country map
+3. Weekly trend chart
+4. Supply chain exposure
+5. Pattern cards
+6. Priority Matrix
+7. Incident appendix
+
+The Weekly Total row must reconcile with the Total Records figure.
+
+Where an incident has no reliable event date, place it in a final column titled:
+
+DATE UNCONFIRMED
+
+Do not assign it to the publication date unless that is the only date available and the report clearly uses publication date as its standard.
+
+SPARSE DATA
+
+If there are fewer than three incidents, do not generate the full matrix.
+
+Instead show a simple compact box containing:
+
+Date
+Pattern
+Location
+Severity
+
+If there are no incidents, omit this section completely.
+
+FINAL CHECK
+
+Export the PDF and confirm:
+
+1. The matrix is understandable without explanation.
+2. All text and numbers are readable.
+3. Totals reconcile.
+4. The matrix does not split across pages.
+5. The analytical statement matches the displayed data.
+
+Do not change the Priority Matrix or any other report section as part of this task.

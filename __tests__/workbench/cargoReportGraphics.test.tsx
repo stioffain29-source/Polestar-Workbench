@@ -6,14 +6,14 @@ import {
 } from "../../artifacts/workbench/src/lib/cargoPatternModel";
 import CargoSupplyChainExposure from "../../artifacts/workbench/src/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "../../artifacts/workbench/src/components/CargoPatternDashboard";
-import CargoIncidentTimeline from "../../artifacts/workbench/src/components/CargoIncidentTimeline";
+import CargoActivityMatrix from "../../artifacts/workbench/src/components/CargoActivityMatrix";
 import CargoPriorityMatrix from "../../artifacts/workbench/src/components/CargoPriorityMatrix";
 import { SevChip } from "../../artifacts/workbench/src/components/CargoGraphicPrimitives";
 
 // Task: four SHARED graphic components (supply-chain exposure, pattern
-// dashboard, incident timeline, priority matrix) render the redesigned Cargo
-// Watch pattern report. The same components render on-screen and rasterise into
-// the PDF, so these renderToStaticMarkup checks prove they never render an
+// dashboard, weekly activity matrix, priority matrix) render the redesigned
+// Cargo Watch pattern report. The same components render on-screen and rasterise
+// into the PDF, so these renderToStaticMarkup checks prove they never render an
 // empty section, carry the brand palette (A33232 = Extreme only, 1B6B7A =
 // Insignificant only, Electric 4655FF), and degrade gracefully on sparse data.
 
@@ -48,14 +48,18 @@ function richModel() {
 }
 
 describe("cargo report graphics — supply-chain exposure", () => {
-  it("renders the six stages with counts and the brand fill colour", () => {
+  it("renders the five physical stages plus the enforcement box and the brand fill colour", () => {
     const m = richModel();
     const html = renderToStaticMarkup(
       <CargoSupplyChainExposure stages={m.stages} total={m.totalUnique} />,
     );
     expect(html).toContain("Supply-Chain Exposure");
-    // All six stages present in fixed order.
-    for (const s of m.stages) expect(html).toContain(s.label);
+    // The five physical movement stages present in fixed order.
+    const physical = m.stages.filter((s) => s.key !== "enforcement");
+    expect(physical).toHaveLength(5);
+    for (const s of physical) expect(html).toContain(s.label);
+    // Cross-cutting/enforcement lifted into its own full-width box beneath.
+    expect(html).toContain("Cross-Cutting and Enforcement Activity");
     // Electric-blue share-bar fill.
     expect(html).toContain("#4655FF");
   });
@@ -66,7 +70,7 @@ describe("cargo report graphics — supply-chain exposure", () => {
       <CargoSupplyChainExposure stages={m.stages} total={m.totalUnique} />,
     );
     expect(html).toContain("Supply-Chain Exposure");
-    expect(html).toContain("No incidents this period");
+    expect(html).toContain("No incidents identified this period.");
   });
 });
 
@@ -88,23 +92,45 @@ describe("cargo report graphics — pattern dashboard", () => {
   });
 });
 
-describe("cargo report graphics — incident timeline", () => {
-  it("plots category lanes for a populated period", () => {
+describe("cargo report graphics — weekly activity matrix", () => {
+  it("renders the frequency matrix for a sufficient period", () => {
     const m = richModel();
+    expect(m.activity.sufficient).toBe(true);
     const html = renderToStaticMarkup(
-      <CargoIncidentTimeline timeline={m.timeline} />,
+      <CargoActivityMatrix activity={m.activity} />,
     );
-    expect(html).toContain("Incident Timeline");
-    // At least one lane label rendered.
-    expect(html).toContain(m.timeline.lanes[0].label);
+    expect(html).toContain("Weekly Activity by Pattern");
+    // A pattern row label and a week column label are both present.
+    expect(html).toContain(m.activity.rows[0].label);
+    expect(html).toContain(m.activity.weeks[0].label);
+    // Reconciling "Weekly total" row is drawn.
+    expect(html).toContain("Weekly total");
+    // Frequency shading, not severity: the extreme/insignificant reserved hues
+    // never appear in the matrix.
+    expect(html).not.toContain("#A33232");
+    expect(html).not.toContain("#1B6B7A");
+  });
+
+  it("lists incidents in a compact box for a sparse period", () => {
+    const one = buildCargoPatternModel(
+      [inc({ id: 1, title: "Truck hijacking on the Karak highway in Malaysia", severity: "high" })],
+      { issueDate: ISSUE },
+    );
+    expect(one.activity.sufficient).toBe(false);
+    expect(one.activity.total).toBe(1);
+    const html = renderToStaticMarkup(
+      <CargoActivityMatrix activity={one.activity} />,
+    );
+    expect(html).toContain("Weekly Activity by Pattern");
+    expect(html).toContain("individual incidents are listed below");
   });
 
   it("shows a no-data note for an empty period", () => {
     const m = buildCargoPatternModel([], { issueDate: ISSUE });
     const html = renderToStaticMarkup(
-      <CargoIncidentTimeline timeline={m.timeline} />,
+      <CargoActivityMatrix activity={m.activity} />,
     );
-    expect(html).toContain("No incidents to plot this period");
+    expect(html).toContain("No cargo incidents were reported this period");
   });
 });
 

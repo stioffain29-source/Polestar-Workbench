@@ -36,8 +36,8 @@ const REPORT: ReportPreviewData = {
 
 // A multi-pattern week: two truck-hijacking rows, two warehouse-theft rows and a
 // port sea-robbery singleton across three countries, so every pattern surface
-// (map, trend, supply-chain exposure, pattern cards, timeline, priority matrix)
-// materialises and the appendix carries rows.
+// (map, trend, supply-chain exposure, pattern cards, weekly activity matrix,
+// priority matrix) materialises and the appendix carries rows.
 const RICH: TopicFastFactsIncident[] = [
   inc({ id: 1, title: "Truck hijacking on the Karak highway in Malaysia", severity: "high", occurredAt: "2026-06-24" }),
   inc({ id: 2, title: "Armed men hijack a cargo truck near Johor Bahru, Malaysia", severity: "moderate", occurredAt: "2026-06-22" }),
@@ -71,6 +71,15 @@ describe("CargoReportPreview — pattern-report parity", () => {
     );
     expect(html).not.toContain("Related Incidents");
     expect(html).not.toContain("Named Port");
+  });
+
+  it("replaces the Incident Timeline with the Weekly Activity by Pattern matrix", () => {
+    const html = renderToStaticMarkup(
+      <CargoReportPreview report={REPORT} incidents={RICH} />,
+    );
+    expect(html).not.toContain("Incident Timeline");
+    expect(html).toContain("Weekly Activity by Pattern");
+    expect(html).toContain("Weekly total");
   });
 
   it("degrades a sparse/empty period without throwing or fabricating rows", () => {

@@ -2,8 +2,9 @@
 //
 // ONE reconciliation source for the redesigned Cargo Watch report. Everything
 // the preview and the PDF render — Fast Facts, country map, weekly trend,
-// supply-chain exposure, pattern dashboard, timeline, priority matrix and the
-// condensed appendix — is derived HERE from a single deduplicated set of unique
+// supply-chain exposure, pattern dashboard, weekly activity matrix, priority
+// matrix and the condensed appendix — is derived HERE from a single
+// deduplicated set of unique
 // incidents (the cluster primaries). Because every surface counts the same
 // deduped set, the totals reconcile by construction (spec "DEDUPLICATION
 // REQUIREMENTS").
@@ -40,11 +41,10 @@ import {
   STAGE_ORDER,
   STAGE_META,
   stageForCategory,
-  laneForStage,
-  TIMELINE_LANE_ORDER,
-  TIMELINE_LANE_LABEL,
+  WEEKLY_PATTERN_ROW_LABEL,
+  ACTIVITY_MATRIX_MIN_INCIDENTS,
+  ACTIVITY_MATRIX_MAX_WEEKS,
   type CargoStageKey,
-  type CargoLaneKey,
   SEVERITY_WEIGHT,
   USD_HIGH_MIN,
   USD_MID_MIN,
@@ -67,6 +67,7 @@ import {
   PATTERN_SEVERITY_FLOOR,
   MAX_PATTERN_CARDS,
 } from "./cargoPatternConfig";
+import { parseISO, isValid, startOfWeek, addWeeks, format } from "date-fns";
 
 // --- Output shapes --------------------------------------------------------
 
@@ -98,26 +99,45 @@ export interface CargoPatternCard {
   significance: number; // total consequence weight, for ranking
 }
 
-export interface CargoTimelineMarker {
-  id: string;
-  laneKey: CargoLaneKey;
-  date: string; // ISO occurredAt
-  shortLocation: string; // "" when none
-  category: string;
-  severityKey: string;
+export interface CargoActivityWeek {
+  key: string; // Monday week-start, yyyy-MM-dd
+  label: string; // "06 Jun"
 }
 
-export interface CargoTimelineLane {
-  key: CargoLaneKey;
+export interface CargoActivityRow {
+  stageKey: CargoStageKey;
   label: string;
-  markers: CargoTimelineMarker[];
+  weekCounts: number[]; // aligned to CargoActivityMatrix.weeks
+  unconfirmed: number; // incidents in this row with no usable date
+  total: number; // weekCounts sum + unconfirmed
 }
 
-export interface CargoTimeline {
-  lanes: CargoTimelineLane[];
-  start: string | null;
-  end: string | null;
-  total: number;
+export interface CargoActivitySparseItem {
+  id: string;
+  date: string; // ISO occurredAt, "" when none
+  dateLabel: string; // "06 Jun" or "Date unconfirmed"
+  pattern: string; // stage row label
+  location: string; // "" when none
+  severityKey: string;
+  severityLabel: string;
+}
+
+// Weekly Activity by Pattern — a frequency matrix of unique incidents across
+// supply-chain stages (rows) and reporting weeks (columns). Every unique
+// incident lands in exactly one cell, so weeklyTotals + unconfirmedTotal
+// reconcile with `total` (== totalUnique) by construction. Cell shading is
+// FREQUENCY (scaled by maxCell), never severity.
+export interface CargoActivityMatrix {
+  sufficient: boolean; // total >= ACTIVITY_MATRIX_MIN_INCIDENTS
+  total: number; // == totalUnique
+  weeks: CargoActivityWeek[];
+  rows: CargoActivityRow[]; // one per stage, fixed STAGE_ORDER
+  weeklyTotals: number[]; // aligned to weeks
+  unconfirmedTotal: number;
+  hasUnconfirmed: boolean;
+  maxCell: number; // max body/unconfirmed cell, for the shade scale
+  statement: string; // data-derived; "" when total === 0
+  sparseItems: CargoActivitySparseItem[]; // populated when 0 < total < min
 }
 
 export type CargoQuadrant =
@@ -172,7 +192,7 @@ export interface CargoPatternModel {
   trendCaption: string;
   stages: CargoStageSummary[];
   patterns: CargoPatternCard[]; // <= MAX_PATTERN_CARDS dashboard cards
-  timeline: CargoTimeline;
+  activity: CargoActivityMatrix;
   matrix: CargoMatrix;
   appendix: CargoAppendixRow[];
   assessment: CargoAssessment;
@@ -370,7 +390,6 @@ export function buildCargoPatternModel(
     primary: CargoClusterInput;
     category: string;
     stage: CargoStageKey;
-    lane: CargoLaneKey;
     sevKey: string;
     sevRank: number;
     consequence: number; // normalised 0..1
@@ -384,7 +403,6 @@ export function buildCargoPatternModel(
       primary: p,
       category,
       stage,
-      lane: laneForStage(stage),
       sevKey: severityKeyOf(p),
       sevRank: severityRankOf(p),
       consequence: normalisedConsequence(p, repeatCountries),
@@ -465,31 +483,113 @@ export function buildCargoPatternModel(
     .sort((a, b) => b.significance - a.significance)
     .slice(0, MAX_PATTERN_CARDS);
 
-  // 7. Timeline — five category lanes, staging-yard folded into inland
-  //    transport. One marker per unique incident (reconciles with the total).
-  const timelineDates = primaries
-    .map((p) => p.occurredAt)
-    .filter((d): d is string => !!d)
-    .sort();
-  const lanes: CargoTimelineLane[] = TIMELINE_LANE_ORDER.map((key) => {
-    const markers = derived
-      .filter((d) => d.lane === key)
-      .map((d) => ({
-        id: String(d.primary.id ?? d.cluster.id),
-        laneKey: key,
-        date: d.primary.occurredAt,
-        shortLocation: shortLocation(d.primary),
-        category: d.category,
-        severityKey: d.sevKey,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return { key, label: TIMELINE_LANE_LABEL[key], markers };
+  // 7. Weekly activity matrix — rows are the six supply-chain stages, columns
+  //    are contiguous Monday-anchored reporting weeks (min..max), plus a TOTAL
+  //    and a "date unconfirmed" bucket. Each unique incident lands in exactly
+  //    one cell (its stage x its week, or the unconfirmed bucket when it has no
+  //    usable date), so weeklyTotals + unconfirmedTotal reconcile with
+  //    totalUnique. Shading is FREQUENCY (renderer scales by maxCell).
+  const datedDerived: { der: Derived; date: Date }[] = [];
+  const undatedByStage = new Map<CargoStageKey, number>();
+  for (const d of derived) {
+    const iso = d.primary.occurredAt ?? "";
+    const dt = iso ? parseISO(iso) : new Date(NaN);
+    if (iso && isValid(dt)) datedDerived.push({ der: d, date: dt });
+    else undatedByStage.set(d.stage, (undatedByStage.get(d.stage) ?? 0) + 1);
+  }
+
+  const weeks: CargoActivityWeek[] = [];
+  const weekPos = new Map<string, number>();
+  if (datedDerived.length > 0) {
+    const times = datedDerived.map((x) => x.date.getTime());
+    let cursor = startOfWeek(new Date(Math.min(...times)), { weekStartsOn: 1 });
+    const lastStart = startOfWeek(new Date(Math.max(...times)), {
+      weekStartsOn: 1,
+    });
+    while (
+      cursor.getTime() <= lastStart.getTime() &&
+      weeks.length < ACTIVITY_MATRIX_MAX_WEEKS
+    ) {
+      const key = format(cursor, "yyyy-MM-dd");
+      weekPos.set(key, weeks.length);
+      weeks.push({ key, label: format(cursor, "dd MMM") });
+      cursor = addWeeks(cursor, 1);
+    }
+  }
+
+  const activityRows: CargoActivityRow[] = STAGE_ORDER.map((key) => {
+    const weekCounts = new Array<number>(weeks.length).fill(0);
+    let unconfirmed = undatedByStage.get(key) ?? 0;
+    for (const { der, date } of datedDerived) {
+      if (der.stage !== key) continue;
+      const wkKey = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const pos = weekPos.get(wkKey);
+      if (pos != null) weekCounts[pos] += 1;
+      else unconfirmed += 1; // defensive: date beyond the capped range
+    }
+    const total = weekCounts.reduce((s, n) => s + n, 0) + unconfirmed;
+    return {
+      stageKey: key,
+      label: WEEKLY_PATTERN_ROW_LABEL[key],
+      weekCounts,
+      unconfirmed,
+      total,
+    };
   });
-  const timeline: CargoTimeline = {
-    lanes,
-    start: timelineDates[0] ?? null,
-    end: timelineDates[timelineDates.length - 1] ?? null,
+
+  const weeklyTotals = weeks.map((_, i) =>
+    activityRows.reduce((s, r) => s + r.weekCounts[i], 0),
+  );
+  const unconfirmedTotal = activityRows.reduce((s, r) => s + r.unconfirmed, 0);
+  const datedTotal = weeklyTotals.reduce((s, n) => s + n, 0);
+  const maxCell = activityRows.reduce(
+    (mx, r) => Math.max(mx, r.unconfirmed, ...r.weekCounts),
+    0,
+  );
+
+  const activitySufficient = totalUnique >= ACTIVITY_MATRIX_MIN_INCIDENTS;
+  const sparseItems: CargoActivitySparseItem[] =
+    totalUnique > 0 && !activitySufficient
+      ? derived
+          .slice()
+          .sort((a, b) =>
+            (b.primary.occurredAt ?? "").localeCompare(
+              a.primary.occurredAt ?? "",
+            ),
+          )
+          .map((d) => {
+            const iso = d.primary.occurredAt ?? "";
+            const dt = iso ? parseISO(iso) : new Date(NaN);
+            const hasDate = !!iso && isValid(dt);
+            return {
+              id: String(d.primary.id ?? d.cluster.id),
+              date: hasDate ? iso : "",
+              dateLabel: hasDate ? format(dt, "dd MMM") : "Date unconfirmed",
+              pattern: WEEKLY_PATTERN_ROW_LABEL[d.stage],
+              location: shortLocation(d.primary),
+              severityKey: d.sevKey,
+              severityLabel: SEV_LABEL[d.sevKey] ?? d.sevKey,
+            };
+          })
+      : [];
+
+  const activity: CargoActivityMatrix = {
+    sufficient: activitySufficient,
     total: totalUnique,
+    weeks,
+    rows: activityRows,
+    weeklyTotals,
+    unconfirmedTotal,
+    hasUnconfirmed: unconfirmedTotal > 0,
+    maxCell,
+    statement: buildActivityStatement(
+      weeks,
+      weeklyTotals,
+      activityRows,
+      datedTotal,
+      totalUnique,
+    ),
+    sparseItems,
   };
 
   // 8. Priority matrix — plot pattern GROUPS (not individual incidents). High
@@ -579,7 +679,7 @@ export function buildCargoPatternModel(
     trendCaption,
     stages,
     patterns,
-    timeline,
+    activity,
     matrix,
     appendix,
     assessment,
@@ -627,6 +727,56 @@ function buildTrendCaption(
     return `Activity eased during the final reporting week relative to the preceding week.`;
   }
   return `Activity held broadly steady across the closing weeks of the period.`;
+}
+
+// One data-derived sentence beneath the Weekly Activity by Pattern matrix. It
+// characterises the distribution the reader is looking at (timing and lead
+// pattern) without restating cell counts — no record-count annotations in
+// prose. Returns "" when there is nothing to describe.
+function buildActivityStatement(
+  weeks: CargoActivityWeek[],
+  weeklyTotals: number[],
+  rows: CargoActivityRow[],
+  datedTotal: number,
+  grandTotal: number,
+): string {
+  if (grandTotal === 0) return "";
+
+  const ranked = rows
+    .filter((r) => r.total > 0)
+    .slice()
+    .sort((a, b) => b.total - a.total);
+  const leadLabel = ranked[0] ? ranked[0].label.toLowerCase() : "cargo crime";
+
+  if (datedTotal === 0) {
+    return "Reported incidents this period carry no confirmed event date, so no weekly distribution can be shown.";
+  }
+
+  if (weeks.length === 1) {
+    return `Reported activity fell within a single reporting week (week of ${weeks[0].label}), led by ${leadLabel}.`;
+  }
+
+  let peakIdx = 0;
+  for (let i = 1; i < weeklyTotals.length; i++) {
+    if (weeklyTotals[i] > weeklyTotals[peakIdx]) peakIdx = i;
+  }
+  const peakShare = weeklyTotals[peakIdx] / datedTotal;
+  const lastTwo =
+    (weeklyTotals[weeklyTotals.length - 1] ?? 0) +
+    (weeklyTotals[weeklyTotals.length - 2] ?? 0);
+  const lastTwoShare = lastTwo / datedTotal;
+
+  if (peakShare >= 0.5) {
+    return `Reported activity concentrated in the week of ${weeks[peakIdx].label}, led by ${leadLabel}.`;
+  }
+  if (weeks.length >= 3 && lastTwoShare >= 0.6) {
+    return `Reported activity clustered in the final two reporting weeks, led by ${leadLabel}.`;
+  }
+  const leadShare = ranked[0] ? ranked[0].total / grandTotal : 0;
+  if (leadShare >= 0.5) {
+    return `Reporting spread across the period, with ${leadLabel} the most frequently reported pattern.`;
+  }
+  return "Reporting stayed dispersed across the period, with no single week or pattern dominating.";
 }
 
 // --- Assessment defaults --------------------------------------------------

@@ -25,7 +25,7 @@ export default function CargoPatternDashboard({
     return (
       <GraphicFrame
         title="Operational Patterns"
-        subtitle="Dominant cargo-crime patterns this period."
+        subtitle="Leading incident types within the broader supply chain exposure."
       >
         <div style={{ fontSize: 11, color: G.muted }}>
           No single category rose to a distinct operational pattern this period.
@@ -38,7 +38,7 @@ export default function CargoPatternDashboard({
   return (
     <GraphicFrame
       title="Operational Patterns"
-      subtitle="The dominant cargo-crime patterns this period, ranked by operational significance."
+      subtitle="Leading incident types within the broader supply chain exposure."
       footnote="Share is each pattern's percentage of the period's unique incidents."
     >
       <div

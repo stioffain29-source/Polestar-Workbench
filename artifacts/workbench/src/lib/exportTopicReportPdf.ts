@@ -7,7 +7,7 @@ import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "@/components/CargoPatternDashboard";
-import CargoIncidentTimeline from "@/components/CargoIncidentTimeline";
+import CargoActivityMatrix from "@/components/CargoActivityMatrix";
 import CargoPriorityMatrix from "@/components/CargoPriorityMatrix";
 import {
   buildCargoPatternModel,
@@ -902,8 +902,8 @@ export async function exportTopicReportPdf(
       }
 
       // Operational pattern graphics — supply-chain exposure, the pattern
-      // dashboard, the incident timeline, and the priority matrix. Each is the
-      // SAME React component the preview renders, rasterised here.
+      // dashboard, the weekly activity matrix, and the priority matrix. Each is
+      // the SAME React component the preview renders, rasterised here.
       if (cargoModel.totalUnique > 0) {
         drawSectionHeading(ctx, "Supply-Chain Exposure");
         ensureSpace(ctx, 300);
@@ -924,13 +924,13 @@ export async function exportTopicReportPdf(
           }),
         );
       }
-      if (cargoModel.timeline.total > 0) {
-        drawSectionHeading(ctx, "Incident Timeline");
-        ensureSpace(ctx, 260);
+      if (cargoModel.activity.total > 0) {
+        ensureSpace(ctx, 320);
+        drawSectionHeading(ctx, "Weekly Activity by Pattern");
         await embedReactChartInPdf(
           ctx,
-          createElement(CargoIncidentTimeline, {
-            timeline: cargoModel.timeline,
+          createElement(CargoActivityMatrix, {
+            activity: cargoModel.activity,
           }),
         );
       }

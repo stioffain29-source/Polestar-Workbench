@@ -61,16 +61,23 @@ describe("cargo pattern model — single-source reconciliation", () => {
     expect(m.stages.map((s) => s.key)).toEqual(STAGE_ORDER);
   });
 
-  it("timeline markers sum to the total unique count", () => {
+  it("activity matrix cells reconcile with the total unique count", () => {
     const rows = [
-      inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high" }),
-      inc({ id: 2, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate" }),
-      inc({ id: 3, title: "Robbers board ship at Singapore anchorage", severity: "low" }),
+      inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high", occurredAt: "2026-06-24" }),
+      inc({ id: 2, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate", occurredAt: "2026-06-17" }),
+      inc({ id: 3, title: "Robbers board ship at Singapore anchorage", severity: "low", occurredAt: "2026-06-10" }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
-    const markerCount = m.timeline.lanes.reduce((s, l) => s + l.markers.length, 0);
-    expect(markerCount).toBe(m.totalUnique);
-    expect(m.timeline.total).toBe(m.totalUnique);
+    // Every unique incident lands in exactly one cell: weekly totals plus the
+    // date-unconfirmed bucket reconcile with the deduped set.
+    const weekSum = m.activity.weeklyTotals.reduce((s, n) => s + n, 0);
+    expect(weekSum + m.activity.unconfirmedTotal).toBe(m.totalUnique);
+    // The per-row totals also reconcile with the deduped set.
+    const rowSum = m.activity.rows.reduce((s, r) => s + r.total, 0);
+    expect(rowSum).toBe(m.totalUnique);
+    expect(m.activity.total).toBe(m.totalUnique);
+    // Multi-week period spans at least two Monday-anchored columns.
+    expect(m.activity.weeks.length).toBeGreaterThanOrEqual(2);
   });
 
   it("appendix has exactly one row per unique incident", () => {
