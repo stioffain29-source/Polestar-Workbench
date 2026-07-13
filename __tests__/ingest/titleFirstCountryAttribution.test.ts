@@ -1,4 +1,9 @@
-import { classifyNewsItem, ENERGY_CONFIG } from "@workspace/ingest";
+import {
+  classifyNewsItem,
+  ENERGY_CONFIG,
+  FUEL_CONFIG,
+  FERTILISER_CONFIG,
+} from "@workspace/ingest";
 
 // Locks the WRITE-TIME fix for cross-syndicated foreign stories: when a story's
 // TITLE unambiguously names exactly one tracked country that differs from the
@@ -67,4 +72,123 @@ describe("title-first country attribution at ingest", () => {
     expect(c.kept).toBe(true);
     expect(c.country).toBe("Pakistan");
   });
+});
+
+// FUEL and FERTILISER share ENERGY's global gazetteer (GLOBAL_TOPIC_ALIASES) and
+// the same title-first `classify` logic, so the SAME mis-attribution defect can
+// re-appear if either config's allow list or the gazetteer drifts. These import
+// the REAL configs so a gazetteer/ordering change surfaces as a failing test.
+
+describe("FUEL title-first country attribution at ingest", () => {
+  it("stamps a single-country title over an in-region feed default", () => {
+    const c = classifyNewsItem(
+      FUEL_CONFIG,
+      "Fuel shortage hits French gas stations nationwide",
+      "",
+      { defaultCountry: "Vietnam" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("France");
+  });
+
+  it("lets the single-country title beat an incidental summary mention", () => {
+    const c = classifyNewsItem(
+      FUEL_CONFIG,
+      "Australia fuel crisis deepens as diesel shortage spreads",
+      "Compared to earlier Pakistan fuel queues",
+      { defaultCountry: "Pakistan" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Australia");
+  });
+
+  it("stays conservative for a multi-country title (region-first)", () => {
+    const c = classifyNewsItem(
+      FUEL_CONFIG,
+      "India and Bangladesh both hit by a severe fuel crisis",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("India");
+  });
+});
+
+describe("FERTILISER title-first country attribution at ingest", () => {
+  it("stamps a single-country title over an in-region feed default", () => {
+    const c = classifyNewsItem(
+      FERTILISER_CONFIG,
+      "Poland urea shortage forces farmers to cut planting",
+      "",
+      { defaultCountry: "India" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Poland");
+  });
+
+  it("lets the single-country title beat an incidental summary mention", () => {
+    const c = classifyNewsItem(
+      FERTILISER_CONFIG,
+      "France fertiliser price surge squeezes farmers",
+      "Growers recalled the earlier India fertiliser subsidy row",
+      { defaultCountry: "India" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("France");
+  });
+
+  it("stays conservative for a multi-country title (region-first)", () => {
+    const c = classifyNewsItem(
+      FERTILISER_CONFIG,
+      "Pakistan and India both face a deepening urea shortage",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("India");
+  });
+});
+
+// Regression lock for the one-time relocate migration
+// `fuel_fertiliser_foreign_syndication_relocate_v1` (migrations.ts): every
+// foreign story it had to retroactively re-stamp must now classify to the
+// correct country AT WRITE TIME, so no future relocate migration is needed for
+// new rows. Each case sets an in-region (wrong) feed default to prove the
+// title-named country overrides it. The migration is the source of truth for
+// the expected countries (France, Poland, Australia, UK, Ukraine, India).
+describe("relocate-migration examples now classify correctly at write time", () => {
+  const cases: {
+    country: string;
+    title: string;
+    wrongDefault: string;
+  }[] = [
+    // "Fuel shortage in French gas stations" was stored Vietnam.
+    { country: "France", title: "Fuel shortage in French gas stations", wrongDefault: "Vietnam" },
+    // "Scotland vulnerable after Grangemouth closure" was stored India.
+    {
+      country: "United Kingdom",
+      title: "Scotland fuel supply vulnerable after Grangemouth refinery shutdown",
+      wrongDefault: "India",
+    },
+    // "Australia fuel crisis" was stored Myanmar/Philippines.
+    { country: "Australia", title: "Australia fuel crisis worsens", wrongDefault: "Myanmar" },
+    // "Fuel shortage grows in Crimea" was stored Bangladesh/India.
+    { country: "Ukraine", title: "Fuel shortage grows in Crimea", wrongDefault: "Bangladesh" },
+    // "Kerala Assembly ... fuel crisis" was stored Philippines.
+    {
+      country: "India",
+      title: "Kerala Assembly grapples with a worsening fuel crisis",
+      wrongDefault: "Philippines",
+    },
+    // Poland is a relocate target in the same migration.
+    { country: "Poland", title: "Poland fuel shortage worsens as diesel rationing begins", wrongDefault: "Pakistan" },
+  ];
+
+  for (const { country, title, wrongDefault } of cases) {
+    it(`attributes "${title}" to ${country}`, () => {
+      const c = classifyNewsItem(FUEL_CONFIG, title, "", { defaultCountry: wrongDefault });
+      expect(c.kept).toBe(true);
+      expect(c.country).toBe(country);
+    });
+  }
 });
