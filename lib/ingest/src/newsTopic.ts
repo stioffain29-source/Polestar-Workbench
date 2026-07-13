@@ -96,6 +96,20 @@ export function detectCountry(hay: string, aliases: CountryAlias[]): string | nu
   return match ? match.canonical : null;
 }
 
+// All DISTINCT tracked countries named in a piece of text (canonical names, in
+// gazetteer order). Used to test whether a TITLE names exactly one tracked
+// country: when it does, that country is authoritative over the feed's default
+// and over any incidental country mention in the summary. When it names two or
+// more, attribution stays conservative (no guessing) — see `classify`.
+export function detectCountriesInText(hay: string, aliases: CountryAlias[]): string[] {
+  const found: string[] = [];
+  for (const c of aliases) {
+    if (found.includes(c.canonical)) continue;
+    if (c.aliases.some((a) => hasWord(hay, a))) found.push(c.canonical);
+  }
+  return found;
+}
+
 // Remove the publisher masthead from text before COUNTRY detection. Google News
 // repeats the source name into the RSS summary, so a cross-border story from
 // "The Times of India" about strikes "inside Pakistan" carries the token "india"
@@ -214,7 +228,24 @@ function classify(
   // cross-border event ("strikes ... inside Pakistan" must resolve to Pakistan,
   // not India).
   const geoHay = stripSourceMasthead(hay, sourceName);
-  const detected = detectCountry(geoHay, cfg.countryAliases);
+
+  // Title-first attribution. A country-edition feed cross-syndicates a story
+  // that names a DIFFERENT foreign country; the world-scope topics share
+  // energy's global gazetteer, so the old code blind-stamped it with the feed's
+  // defaultCountry (or let an incidental summary mention win) and the geocoder
+  // dropped it on the wrong centroid — an Australian story tagged Myanmar, a
+  // French one tagged Vietnam. When the TITLE (masthead-stripped) unambiguously
+  // names exactly ONE tracked country, that country is authoritative: it beats
+  // the feed default and any summary mention. Multi-country titles stay
+  // conservative — fall back to the region-first title+summary scan (no
+  // guessing). This fixes the mis-stamp at write time so no further one-time
+  // relocate migrations are needed for new rows.
+  const titleHay = stripSourceMasthead(title.toLowerCase(), sourceName);
+  const titleCountries = detectCountriesInText(titleHay, cfg.countryAliases);
+  const detected =
+    titleCountries.length === 1
+      ? titleCountries[0]
+      : detectCountry(geoHay, cfg.countryAliases);
 
   // No in-region country in the text means we are about to blind-trust the
   // feed's defaultCountry. Before doing so, reject obvious cross-syndicated
