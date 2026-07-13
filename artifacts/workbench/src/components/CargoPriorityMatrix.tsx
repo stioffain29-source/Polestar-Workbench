@@ -13,7 +13,10 @@ export interface CargoPriorityMatrixProps {
   matrix: CargoMatrix;
 }
 
-const PLOT_H = 300;
+const PLOT_H = 380;
+// Cap and centre the plot so a full-width column can't stretch the 2x2 matrix
+// into a wide, squashed rectangle; a near-square cell grid reads correctly.
+const PLOT_MAX_W = 480;
 
 // Quadrant cell rectangles as percentages of the plot (x from left, y from
 // top). x = frequency (right is higher), y = consequence (top is higher).
@@ -109,7 +112,7 @@ export default function CargoPriorityMatrix({
       subtitle="Each pattern placed by how often it recurs (horizontal) against its consequence (vertical)."
       footnote="Consequence blends severity, confirmed loss, violence and organisation signals. Position is indicative, not to scale."
     >
-      <div style={{ display: "flex" }}>
+      <div style={{ display: "flex", maxWidth: PLOT_MAX_W, margin: "0 auto" }}>
         {/* Y axis caption */}
         <div
           style={{

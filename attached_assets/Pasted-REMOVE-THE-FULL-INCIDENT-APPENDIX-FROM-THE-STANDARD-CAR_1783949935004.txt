@@ -1,0 +1,95 @@
+REMOVE THE FULL INCIDENT APPENDIX FROM THE STANDARD CARGO WATCH REPORT
+
+The current Incident Appendix is too long, visually dense and difficult to read. It adds report length without improving the client’s understanding of the main risks.
+
+Remove the full incident table from the standard Cargo Watch PDF.
+
+Replace it with a section titled:
+
+SELECTED INCIDENTS
+
+PURPOSE
+
+Show a small number of incidents that provide evidence for the main patterns identified in the report.
+
+DISPLAY
+
+Show no more than six incidents.
+
+Use one compact card or row per incident containing:
+
+1. Date
+2. Country or location
+3. Incident type
+4. One sentence summary
+5. Severity
+6. Confidence
+
+Do not include:
+
+1. Long news headlines
+2. Source counts
+3. Repeated “not reported” fields
+4. Full incident descriptions
+5. Every incident in the reporting period
+
+INCIDENT SELECTION
+
+Select incidents that best demonstrate:
+
+1. The most frequent operational pattern
+2. The highest consequence pattern
+3. The main affected geography
+4. A significant change from the previous period
+5. A credible insider or organised activity indicator
+6. A meaningful law enforcement disruption or recovery
+
+Do not simply select the six most recent incidents.
+
+Avoid selecting multiple reports of the same event.
+
+FULL INCIDENT REGISTER
+
+Keep the complete deduplicated incident register available within the Workbench.
+
+Add a separate export option:
+
+EXPORT INCIDENT REGISTER
+
+The export should provide the full underlying dataset as CSV or XLSX with:
+
+Date
+Country
+Location
+Category
+Incident summary
+Severity
+Confidence
+Status
+Cargo type
+Company or operator
+Source reference
+
+The full incident register must not be included automatically in the client PDF.
+
+OPTIONAL ANNEX
+
+Where needed, allow the report creator to select:
+
+INCLUDE FULL INCIDENT ANNEX
+
+This option must be off by default.
+
+When enabled, the annex should start on a new page and retain a readable font size. Do not shrink the table to force every record onto one page.
+
+STANDARD REPORT
+
+The standard Cargo Watch report should end with:
+
+1. Selected Incidents
+2. Polestar View
+3. Disclaimer
+
+Do not include the full incident database in the normal report.
+
+Do not change the Supply Chain Exposure or Operational Patterns sections.
