@@ -380,6 +380,17 @@ function classify(title: string, summary: string, feed: Feed): Classified {
   return { kept: true, reason: `allow:${allowHit}`, country };
 }
 
+// Test-only surface (mirrors cargoTestHooks). Wraps the internal country-aware
+// classify so unit tests can lock the REAL attribution path without a live
+// feed. `defaultCountry` stands in for the per-feed default (e.g. Hormuz →
+// Iran) so a failure to detect an in-text country surfaces as the wrong
+// (default) attribution rather than Unknown.
+export const shippingTestHooks = {
+  classify: (title: string, summary: string, defaultCountry = "Unknown"): Classified =>
+    classify(title, summary, { label: "test", url: "", group: "vessel", defaultCountry }),
+  detectCountry,
+};
+
 function dedupeKey(title: string, when: Date, country: string): string {
   return [
     title.trim().toLowerCase().slice(0, 200),

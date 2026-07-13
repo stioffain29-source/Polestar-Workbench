@@ -311,7 +311,7 @@ export const ENERGY_CONFIG: NewsTopicConfig = {
 // ------------------------------------------------------------ fertiliser ----
 const FERT_TERMS = `("fertiliser shortage" OR "fertilizer shortage" OR "fertiliser price" OR "fertilizer price" OR "urea shortage" OR "urea price" OR "fertiliser subsidy" OR "fertilizer subsidy" OR "potash" OR "DAP shortage" OR "farmers protest")`;
 
-const FERT_CONFIG: NewsTopicConfig = {
+export const FERTILISER_CONFIG: NewsTopicConfig = {
   topic: "fertiliser",
   feeds: [
     ...countryFeeds(SOUTH_APAC, FERT_TERMS),
@@ -356,7 +356,7 @@ const FERT_CONFIG: NewsTopicConfig = {
 // ------------------------------------------------------------------ fuel ----
 const FUEL_TERMS = `("fuel shortage" OR "fuel crisis" OR "fuel rationing" OR "fuel conservation" OR "diesel rationing" OR "diesel restriction" OR "petrol shortage" OR "diesel shortage" OR "fuel price hike" OR "refinery fire" OR "refinery outage" OR "fuel subsidy" OR "LPG shortage" OR "pump price" OR "aviation turbine fuel" OR "jet fuel shortage" OR "fuel pass" OR "fuel queue" OR "fuel protest" OR "aviation fuel" OR "fuel export")`;
 
-const FUEL_CONFIG: NewsTopicConfig = {
+export const FUEL_CONFIG: NewsTopicConfig = {
   topic: "fuel",
   feeds: [
     ...countryFeeds(SOUTH_APAC, FUEL_TERMS),
@@ -1005,7 +1005,7 @@ export function runConflictIngest(opts: IngestOptions = {}): Promise<IngestSumma
 }
 
 export function runFertiliserIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
-  return runNewsTopicIngest(FERT_CONFIG, opts);
+  return runNewsTopicIngest(FERTILISER_CONFIG, opts);
 }
 
 export function runFuelIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
