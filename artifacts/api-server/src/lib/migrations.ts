@@ -1894,6 +1894,117 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-1c) ONE-TIME relocation of cross-syndicated CONFLICT incidents mis-stamped
+    //     onto a feed default country — the SAME foreign-syndication defect audited
+    //     for energy (3d-1a) and fuel/fertiliser (3d-1b), now checked for the
+    //     region-locked topics that also carry cross-syndicated stories (shipping,
+    //     conflict, cargo_watch). Audit finding: cargo_watch had NO genuine
+    //     stored-country mis-stamps (its cross-country flags were masthead-only or a
+    //     foreign SUBJECT of an in-region event, e.g. a Thai robbery of a "Chinese
+    //     man"); shipping's cross-country flags were maritime-CHOKEPOINT context
+    //     (Suez/Hormuz/Bab el-Mandeb named but the incident is at the chokepoint, not
+    //     that littoral) or commerce port-congestion noise the relevance gate already
+    //     drops — neither is a feed-default mis-stamp, so relocating them would be
+    //     wrong. Conflict, however, had genuine in-region -> in-region mis-stamps: a
+    //     Thai school shooting stored India, Cebu City shootouts stored Pakistan (at
+    //     the Pakistan centroid), a Negros army clash stored India, a Baloch
+    //     insurgency piece stored Sri Lanka, a Myanmar politics story stored
+    //     Bangladesh. These are real, in-scope APAC incidents dropped on the WRONG
+    //     country centroid (map != table). RELOCATE (never delete) to the named
+    //     country + its centroid. Match a DISTINCTLY-national token in the TITLE only
+    //     and require NO OTHER tracked country token in the title, so a multi-country
+    //     story is never guessed. Pakistan is scoped to distinctly-Pakistani tokens
+    //     (baloch/balochistan) ONLY — the sensitive India<->Pakistan cross-border
+    //     attribution is owned by conflict_india_to_pakistan_relocate_v1 and must not
+    //     be re-opened here. No gazetteer/choropleth additions: every target is an
+    //     already-tracked in-region country with a centroid and a region polygon
+    //     (region-locked topics never surface out-of-region countries on the map).
+    //     Marker-gated so analyst edits are never overwritten. Backslashes are
+    //     DOUBLED (\\y) because this is a JS template literal.
+    {
+      const markerKey = "conflict_foreign_syndication_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        // Full tracked-country token map for the "others" guard (a title naming a
+        // second tracked country is ambiguous and left untouched).
+        const COUNTRY_TOKENS: Record<string, string> = {
+          India: "india|indian|delhi|mumbai|kolkata|chennai|bengaluru|uttar pradesh|maharashtra|tamil nadu|kerala|karnataka|telangana|gujarat|rajasthan|odisha|kochi|hyderabad|manipur|assam|kashmir|punjab",
+          Pakistan: "pakistan|pakistani|karachi|lahore|islamabad|sindh|balochistan|baloch|peshawar|quetta|multan|faisalabad|rawalpindi|waziristan|khyber",
+          Bangladesh: "bangladesh|bangladeshi|dhaka|chittagong|chattogram",
+          "Sri Lanka": "sri lanka|sri lankan|colombo|ceylon",
+          Nepal: "nepal|nepali|kathmandu",
+          Myanmar: "myanmar|burma|burmese|yangon|naypyidaw|mandalay|rakhine|rohingya",
+          Indonesia: "indonesia|indonesian|jakarta|java|sumatra|surabaya|sulawesi",
+          Philippines: "philippines|filipino|philippine|manila|luzon|mindanao|cebu|visayas|davao|negros|quezon|zamboanga",
+          Vietnam: "vietnam|vietnamese|hanoi|ho chi minh",
+          Thailand: "thailand|thai|bangkok|phuket|chiang mai|pattaya",
+          Malaysia: "malaysia|malaysian|kuala lumpur|sabah|sarawak",
+          China: "china|chinese|beijing|shanghai|guangdong",
+          Japan: "japan|japanese|tokyo|osaka",
+          "South Korea": "south korea|korean|seoul|busan",
+          Iran: "iran|iranian|tehran",
+          Iraq: "iraq|iraqi|baghdad|basra",
+          "Saudi Arabia": "saudi arabia|saudi|riyadh|jeddah|yanbu|dammam",
+          "United Arab Emirates": "united arab emirates|uae|dubai|abu dhabi|fujairah",
+          Qatar: "qatar|qatari|doha",
+          Kuwait: "kuwait|kuwaiti",
+          Oman: "oman|omani|muscat",
+          Bahrain: "bahrain|bahraini|manama",
+          Yemen: "yemen|yemeni|houthi|sanaa|hodeidah|aden",
+          Australia: "australia|australian|sydney|melbourne|brisbane|perth|adelaide|canberra|queensland",
+          "New Zealand": "new zealand|auckland|wellington|christchurch",
+          Cambodia: "cambodia|cambodian|phnom penh",
+          Laos: "laos|laotian|vientiane",
+          "Papua New Guinea": "papua new guinea|bougainville|port moresby",
+          "West Papua": "west papua",
+          Israel: "israel|israeli|tel aviv|gaza|jerusalem",
+          Lebanon: "lebanon|lebanese|beirut|hezbollah",
+          Syria: "syria|syrian|damascus|aleppo",
+          Ukraine: "ukraine|ukrainian|kyiv|kiev|crimea",
+          Russia: "russia|russian|moscow",
+          Nigeria: "nigeria|nigerian|lagos|abuja",
+        };
+        // Curated relocate targets: distinctly-national title tokens + centroid.
+        const targets: { country: string; token: string; lat: number; lng: number }[] = [
+          { country: "Thailand", token: "thailand|thai|bangkok|phuket|chiang mai|pattaya", lat: 15.87, lng: 100.99 },
+          { country: "Philippines", token: "philippines|filipino|philippine|manila|cebu|negros|luzon|mindanao|visayas|davao|zamboanga", lat: 12.88, lng: 121.77 },
+          { country: "Myanmar", token: "myanmar|burma|burmese|yangon|naypyidaw|mandalay|rakhine|rohingya", lat: 21.91, lng: 95.96 },
+          { country: "Pakistan", token: "balochistan|baloch", lat: 30.38, lng: 69.35 },
+        ];
+        let total = 0;
+        for (const t of targets) {
+          const others = Object.entries(COUNTRY_TOKENS)
+            .filter(([c]) => c !== t.country)
+            .map(([, tok]) => tok)
+            .join("|");
+          const targetGuard = `\\y(${t.token})\\y`;
+          const otherGuard = `\\y(${others})\\y`;
+          const res = await db.execute(sql`
+            UPDATE incidents
+            SET country = ${t.country},
+                location = NULL,
+                latitude = ${t.lat},
+                longitude = ${t.lng}
+            WHERE topic = 'conflict'
+              AND country <> ${t.country}
+              AND COALESCE(title,'') ~* ${targetGuard}
+              AND COALESCE(title,'') !~* ${otherGuard}
+          `);
+          total += res.rowCount ?? 0;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: total, marker: markerKey },
+          "One-time relocation of cross-syndicated conflict incidents mis-stamped onto a feed default country",
+        );
+      }
+    }
+
     // 3d-1a-i1b) ONE-TIME purge of scraped Google-News SECTION / topic-page
     //     headings that leaked in as incidents — an aggregator feed LABEL, not
     //     a dated event ("Papua New Guinea Massacre News", "<Place> Crime
