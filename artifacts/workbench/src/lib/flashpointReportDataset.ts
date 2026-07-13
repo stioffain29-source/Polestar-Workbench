@@ -809,8 +809,8 @@ function clusterSameEvent<
   const n = rows.length;
   if (n < 2) return rows;
   const anchors = rows.map((r) => anchorTokens(r.title));
-  const subjects = anchors.map((a) => subjectTokens(a));
   const countryToks = rows.map((r) => countryNameTokens(r.country ?? ""));
+  const subjects = anchors.map((a, i) => subjectTokens(a, countryToks[i]));
   const parent = Array.from({ length: n }, (_, i) => i);
   const find = (i: number): number => {
     while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }

@@ -149,6 +149,32 @@ describe("dedupeByTitle — same-event syndication collapse", () => {
     expect(out[0].severity).toBe("extreme");
   });
 
+  it("collapses editorial-angle copies of one riot that differ only in framing/procedural vocabulary", () => {
+    const rows = [
+      {
+        title: "Negombo prison riots: Lessons not learnt from Mahara jail violence",
+        date: new Date("2026-07-11T19:02:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Sri Lanka moves to address prison overcrowding after riot kills 28 - Reuters",
+        date: new Date("2026-07-10T00:00:00Z"),
+        severity: "extreme",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Anatomy of the Negombo prison riot: Government should fix the prison system without delay",
+        date: new Date("2026-07-09T00:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+    ];
+    const out = dedupeByTitle(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0].severity).toBe("extreme");
+  });
+
   it("keeps two same-type events in different cities apart (exclusive subjects)", () => {
     const rows = [
       {
