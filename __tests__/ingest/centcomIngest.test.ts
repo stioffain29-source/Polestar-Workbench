@@ -8,6 +8,7 @@ import {
   parseCentcomListing,
   resolveCentcomUrl,
   runCentcomIngest,
+  selectCentcomListingForFetch,
   CENTCOM_SOURCE,
 } from "../../lib/ingest/src/centcomIngest";
 import { routeOfficialSource } from "../../lib/ingest/src/m15";
@@ -84,6 +85,34 @@ describe("CENTCOM detail parser (Step 2)", () => {
   });
 });
 
+describe("CENTCOM live fetch selection (Step 4)", () => {
+  const listingHtml = readFixture("centcom-press-releases-listing.html");
+  const listing = parseCentcomListing(listingHtml);
+
+  it("selects newest items first and caps detail fetches", () => {
+    const selected = selectCentcomListingForFetch(listing, { maxItems: 2 });
+    expect(selected).toHaveLength(2);
+    expect(selected[0]?.externalId).toBe("4538814");
+    expect(selected[1]?.externalId).toBe("4538801");
+  });
+
+  it("skips items at or before sincePublishedAt", () => {
+    const selected = selectCentcomListingForFetch(listing, {
+      maxItems: 10,
+      sincePublishedAt: new Date("2026-07-01"),
+    });
+    expect(selected.map((i) => i.externalId)).toEqual(["4538814", "4538801"]);
+  });
+
+  it("skips external ids already stored", () => {
+    const selected = selectCentcomListingForFetch(listing, {
+      maxItems: 10,
+      existingExternalIds: new Set(["4538814", "4015365"]),
+    });
+    expect(selected.map((i) => i.externalId)).toEqual(["4538801"]);
+  });
+});
+
 describe("CENTCOM persist + routing (Step 3)", () => {
   const listingHtml = readFixture("centcom-press-releases-listing.html");
   const detail4015365 = readFixture("centcom-press-release-4015365.html");
@@ -101,21 +130,25 @@ describe("CENTCOM persist + routing (Step 3)", () => {
   const stored: StoredRow[] = [];
 
   function setupDbMock() {
-    jest.spyOn(db, "select").mockImplementation(
-      () =>
-        ({
-          from: () => ({
-            where: (predicate: unknown) => {
-              const rows = stored.map((r) => ({
+    jest.spyOn(db, "select").mockImplementation((fields?: unknown) => {
+      const shape = fields as Record<string, unknown> | undefined;
+      const isCount = shape != null && "n" in shape;
+      const isLatest = shape != null && "latest" in shape;
+      return {
+        from: () => ({
+          where: () => {
+            if (isCount) return Promise.resolve([{ n: stored.length }]);
+            if (isLatest) return Promise.resolve([{ latest: null }]);
+            return Promise.resolve(
+              stored.map((r) => ({
                 externalId: r.externalId,
                 sourceUrl: r.sourceUrl,
-              }));
-              void predicate;
-              return Promise.resolve(rows);
-            },
-          }),
-        }) as never,
-    );
+              })),
+            );
+          },
+        }),
+      } as never;
+    });
 
     jest.spyOn(db, "insert").mockImplementation(
       () =>
@@ -162,6 +195,7 @@ describe("CENTCOM persist + routing (Step 3)", () => {
       listingHtml,
       fetchDetailHtml: fetchDetail,
       externalIds: ["4015365"],
+      sincePublishedAt: null,
     });
 
     expect(first.inserted).toBe(1);
@@ -179,6 +213,7 @@ describe("CENTCOM persist + routing (Step 3)", () => {
       listingHtml,
       fetchDetailHtml: fetchDetail,
       externalIds: ["4015365"],
+      sincePublishedAt: null,
     });
 
     expect(second.inserted).toBe(0);
@@ -205,6 +240,7 @@ describe("CENTCOM persist + routing (Step 3)", () => {
       listingHtml,
       fetchDetailHtml: fetchDetail,
       externalIds: ["4015365"],
+      sincePublishedAt: null,
     });
     expect(stored[0]?.primaryWatch).toBe("conflict");
     expect(stored[0]?.watchTags).toEqual(["conflict", "shipping"]);
@@ -217,6 +253,7 @@ describe("CENTCOM persist + routing (Step 3)", () => {
       listingHtml,
       fetchDetailHtml: fetchDetail,
       externalIds: ["4015365"],
+      sincePublishedAt: null,
     });
     expect(summary.inserted).toBe(0);
     expect(stored).toHaveLength(0);

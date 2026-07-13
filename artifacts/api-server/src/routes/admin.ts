@@ -6,6 +6,7 @@ import {
   runIngestOnce,
   runReliefWebReportsOnce,
   runIccPiracyOnce,
+  runCentcomOfficialOnce,
   runMovementOnce,
   runGdeltStructuredOnce,
   runTapaPromoteOnce,
@@ -330,6 +331,78 @@ router.post("/admin/icc-piracy", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin icc-piracy failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Protected manual trigger for ONLY the CENTCOM official press-release ingest.
+//
+// Same token gate + advisory lock as /admin/icc-piracy. Pass ?commit=true to
+// write rows; default is dry-run (commit=false) for operator validation.
+router.post("/admin/centcom-official", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin centcom-official called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  const commit =
+    req.query.commit === "true" ||
+    req.query.commit === "1" ||
+    req.body?.commit === true;
+
+  try {
+    req.log.info({ commit }, "admin centcom-official started");
+    const result = await runCentcomOfficialOnce({ commit });
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const r = result.centcomOfficial;
+    req.log.info(
+      {
+        commit,
+        itemsFetched: r.itemsFetched,
+        inserted: r.inserted,
+        duplicateInDb: r.duplicateInDb,
+        durationMs: result.durationMs,
+      },
+      "admin centcom-official finished",
+    );
+    res.json({
+      ok: true,
+      commit,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      centcomOfficial: {
+        mode: r.mode,
+        disabled: r.disabled,
+        itemsFetched: r.itemsFetched,
+        inserted: r.inserted,
+        duplicateInDb: r.duplicateInDb,
+        totalAfter: r.totalAfter,
+        errors: r.errors,
+        logLines: r.logLines,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin centcom-official failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

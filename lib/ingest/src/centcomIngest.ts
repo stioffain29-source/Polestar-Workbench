@@ -6,7 +6,7 @@ import {
   type InsertOfficialMilitaryMaritimeSource,
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { fetchBody } from "./feedFetch";
+import { fetchBody, sleep } from "./feedFetch";
 import {
   parseCentcomDetail,
   parseCentcomListing,
@@ -40,6 +40,9 @@ export { CENTCOM_HEALTH_NAME, CENTCOM_SOURCE_URL } from "./m15/health";
 const CENTCOM_HEALTH_NOTES =
   "U.S. Central Command (CENTCOM) official press releases ingested as STANDALONE official sources (never as incidents).";
 const FETCH_TIMEOUT_MS = 30_000;
+const FETCH_ATTEMPTS = 3;
+const FETCH_BACKOFF_MS = 2500;
+const DEFAULT_MAX_DETAIL_FETCHES = 10;
 const DEFAULT_FIXTURE_NAME = "centcom-press-releases-listing.html";
 
 function isDisabled(): boolean {
@@ -55,6 +58,13 @@ function fixtureDirFromEnv(): string | null {
     return join(process.cwd(), "__tests__", "fixtures", "m15");
   }
   return null;
+}
+
+function maxDetailFetchesFromEnv(): number {
+  const raw = process.env.CENTCOM_INGEST_MAX_DETAIL?.trim();
+  if (!raw) return DEFAULT_MAX_DETAIL_FETCHES;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_DETAIL_FETCHES;
 }
 
 function detailFixturePath(fixtureDir: string, externalId: string): string {
@@ -81,11 +91,44 @@ export type CentcomIngestOptions = {
   listingHtml?: string;
   /** Override detail fetch — return null to skip an item. */
   fetchDetailHtml?: (item: CentcomListingItem) => Promise<string | null>;
-  /** Cap items processed (tests / dry runs). */
-  maxItems?: number;
+  /** Cap detail HTTP fetches (defaults to CENTCOM_INGEST_MAX_DETAIL or 10). */
+  maxDetailFetches?: number;
   /** Process only these listing external ids. */
   externalIds?: string[];
+  /** Skip items at or before this published_at (live incremental ingest). */
+  sincePublishedAt?: Date | null;
 };
+
+/** Select newest listing items for detail fetch, respecting since/max/existing. */
+export function selectCentcomListingForFetch(
+  listing: CentcomListingItem[],
+  opts: {
+    maxItems: number;
+    sincePublishedAt?: Date | null;
+    existingExternalIds?: ReadonlySet<string>;
+  },
+): CentcomListingItem[] {
+  let items = [...listing];
+  items.sort((a, b) => {
+    const at = a.publishedAt?.getTime() ?? 0;
+    const bt = b.publishedAt?.getTime() ?? 0;
+    return bt - at;
+  });
+
+  if (opts.sincePublishedAt) {
+    const sinceMs = opts.sincePublishedAt.getTime();
+    items = items.filter((item) => {
+      const t = item.publishedAt?.getTime();
+      return t == null || t > sinceMs;
+    });
+  }
+
+  if (opts.existingExternalIds?.size) {
+    items = items.filter((item) => !opts.existingExternalIds!.has(item.externalId));
+  }
+
+  return items.slice(0, Math.max(0, opts.maxItems));
+}
 
 export function emptyCentcomIngestSummary(
   err?: unknown,
@@ -113,13 +156,56 @@ type PreparedRelease = {
   bodyText: string;
 };
 
+async function fetchHtmlWithRetry(url: string): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
+    try {
+      return await fetchBody(url, FETCH_TIMEOUT_MS);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < FETCH_ATTEMPTS - 1) {
+        await sleep(FETCH_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
 async function loadListingHtml(opts: CentcomIngestOptions): Promise<string> {
   if (opts.listingHtml) return opts.listingHtml;
   const fixtureDir = fixtureDirFromEnv();
   if (fixtureDir) {
     return readFileSync(join(fixtureDir, DEFAULT_FIXTURE_NAME), "utf8");
   }
-  return fetchBody(CENTCOM_SOURCE_URL, FETCH_TIMEOUT_MS);
+  return fetchHtmlWithRetry(CENTCOM_SOURCE_URL);
+}
+
+async function latestCentcomPublishedAt(): Promise<Date | null> {
+  const [row] = await db
+    .select({
+      latest: sql<Date | null>`max(${officialMilitaryMaritimeSourcesTable.publishedAt})`,
+    })
+    .from(officialMilitaryMaritimeSourcesTable)
+    .where(eq(officialMilitaryMaritimeSourcesTable.sourceName, CENTCOM_SOURCE));
+  if (!row?.latest) return null;
+  const d = new Date(row.latest);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+async function existingCentcomExternalIds(ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({
+      externalId: officialMilitaryMaritimeSourcesTable.externalId,
+    })
+    .from(officialMilitaryMaritimeSourcesTable)
+    .where(
+      and(
+        eq(officialMilitaryMaritimeSourcesTable.sourceName, CENTCOM_SOURCE),
+        inArray(officialMilitaryMaritimeSourcesTable.externalId, ids),
+      ),
+    );
+  return new Set(rows.map((r) => r.externalId));
 }
 
 async function defaultFetchDetail(
@@ -134,7 +220,7 @@ async function defaultFetchDetail(
       return null;
     }
   }
-  return fetchBody(item.sourceUrl, FETCH_TIMEOUT_MS);
+  return fetchHtmlWithRetry(item.sourceUrl);
 }
 
 function buildInsertRow(release: PreparedRelease): InsertOfficialMilitaryMaritimeSource {
@@ -224,19 +310,43 @@ export async function runCentcomIngest(
   }
 
   try {
-    const listingHtml = await loadListingHtml(opts);
-    let listing = parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
+    const usingFixtures = !!opts.listingHtml || !!fixtureDirFromEnv();
+    if (!usingFixtures) {
+      log(`  live fetch — listing ${CENTCOM_SOURCE_URL}`);
+    }
 
+    const listingHtml = await loadListingHtml(opts);
+    const parsedListing = parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
+    log(`  parsed ${parsedListing.length} listing tile(s)`);
+
+    let listing = parsedListing;
     if (opts.externalIds?.length) {
       const allow = new Set(opts.externalIds);
       listing = listing.filter((item) => allow.has(item.externalId));
     }
-    if (opts.maxItems != null && opts.maxItems >= 0) {
-      listing = listing.slice(0, opts.maxItems);
+
+    const sincePublishedAt =
+      opts.sincePublishedAt !== undefined
+        ? opts.sincePublishedAt
+        : await latestCentcomPublishedAt();
+    const maxDetailFetches = opts.maxDetailFetches ?? maxDetailFetchesFromEnv();
+    const existingIds = await existingCentcomExternalIds(
+      listing.map((item) => item.externalId),
+    );
+    const beforeSelect = listing.length;
+    listing = selectCentcomListingForFetch(listing, {
+      maxItems: maxDetailFetches,
+      sincePublishedAt,
+      existingExternalIds: existingIds,
+    });
+    const prefetchDuplicates = beforeSelect - listing.length;
+
+    if (sincePublishedAt) {
+      log(`  incremental since ${sincePublishedAt.toISOString()}`);
     }
+    log(`  selected ${listing.length} release(s) for detail fetch (max ${maxDetailFetches})`);
 
     base.itemsFetched = listing.length;
-    log(`  parsed ${listing.length} listing item(s)`);
 
     const fetchDetail = opts.fetchDetailHtml ?? defaultFetchDetail;
     const prepared: PreparedRelease[] = [];
@@ -301,7 +411,7 @@ export async function runCentcomIngest(
       );
     }
 
-    base.duplicateInDb = prepared.length - toInsert.length;
+    base.duplicateInDb = prepared.length - toInsert.length + prefetchDuplicates;
     log(
       `  ${prepared.length} release(s); ${base.duplicateInDb} duplicate(s); ${toInsert.length} new`,
     );
@@ -325,22 +435,27 @@ export async function runCentcomIngest(
     }
 
     if (commit) {
+      const feedOk = errors.length === 0;
       await recordSourceHealth(
         CENTCOM_HEALTH_TOPIC,
         [
           {
             name: CENTCOM_HEALTH_NAME,
             url: CENTCOM_SOURCE_URL,
-            ok: true,
+            ok: feedOk,
             collected: prepared.length,
             retained: base.inserted,
             rejected: prepared.length - toInsert.length,
+            error: feedOk
+              ? null
+              : errors[0] ?? "CENTCOM ingest completed with errors",
           },
         ],
         {
           sourceType: "html",
           scrapeMethod: "HTML listing + detail",
           notes: CENTCOM_HEALTH_NOTES,
+          pending: !feedOk,
         },
       );
     }

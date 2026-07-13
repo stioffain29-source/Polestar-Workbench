@@ -5,15 +5,26 @@ import {
   UKMTO_SOURCE_URL,
 } from "./m15/health";
 
-// M1.5 — UKMTO official products ingest (Phase 2 parser). Phase 1 scaffold:
-// registers Source Health and returns an empty summary without fetching or
-// writing rows. NEVER touches spot_reports.
+export {
+  parseUkmtoListing,
+  parseUkmtoDetail,
+  resolveUkmtoUrl,
+  UKMTO_SITE_ORIGIN,
+} from "./ukmtoParse";
+export type {
+  UkmtoListingItem,
+  UkmtoDetail,
+  UkmtoProductType,
+} from "./ukmtoParse";
+
+// M1.5 — UKMTO official products ingest. Phase 2 parsers land here; persist
+// wiring follows in a later step. NEVER touches spot_reports.
 
 export const UKMTO_SOURCE = "ukmto" as const;
 export const UKMTO_HEALTH_TOPIC = OFFICIAL_M15_HEALTH_TOPIC;
 export { UKMTO_HEALTH_NAME, UKMTO_SOURCE_URL } from "./m15/health";
 const UKMTO_HEALTH_NOTES =
-  "UK Maritime Trade Operations (UKMTO) — official warnings, advisories and PDF products ingested as STANDALONE official sources (never as incidents). Phase 1 scaffold — parser lands in Phase 2.";
+  "UK Maritime Trade Operations (UKMTO) — official warnings, advisories and PDF products ingested as STANDALONE official sources (never as incidents).";
 
 function isDisabled(): boolean {
   const v = process.env.UKMTO_INGEST_ENABLED?.trim().toLowerCase();
@@ -97,7 +108,7 @@ export async function runUkmtoIngest(
     return base;
   }
 
-  log("  scaffold only — no live fetch or DB writes (Phase 2 parser)");
+  log("  parser only — persist lands in a later step");
   if (commit) {
     await recordSourceHealth(
       UKMTO_HEALTH_TOPIC,

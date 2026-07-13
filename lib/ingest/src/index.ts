@@ -196,16 +196,26 @@ export type { IccPiracySummary } from "./iccPiracy";
 export {
   runUkmtoIngest,
   emptyUkmtoIngestSummary,
+  parseUkmtoListing,
+  parseUkmtoDetail,
+  resolveUkmtoUrl,
   UKMTO_SOURCE,
   UKMTO_HEALTH_TOPIC,
+  UKMTO_SITE_ORIGIN,
 } from "./ukmtoIngest";
-export type { UkmtoIngestSummary } from "./ukmtoIngest";
+export type {
+  UkmtoIngestSummary,
+  UkmtoListingItem,
+  UkmtoDetail,
+  UkmtoProductType,
+} from "./ukmtoIngest";
 export {
   runCentcomIngest,
   emptyCentcomIngestSummary,
   parseCentcomListing,
   parseCentcomDetail,
   resolveCentcomUrl,
+  selectCentcomListingForFetch,
   CENTCOM_SOURCE,
   CENTCOM_HEALTH_TOPIC,
   CENTCOM_SITE_ORIGIN,

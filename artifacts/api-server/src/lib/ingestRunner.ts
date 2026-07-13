@@ -258,6 +258,16 @@ export type IccPiracyRunResult =
     }
   | { ran: false; reason: "locked" };
 
+export type CentcomOfficialRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      centcomOfficial: CentcomIngestSummary;
+    }
+  | { ran: false; reason: "locked" };
+
 export type MovementRunResult =
   | {
       ran: true;
@@ -675,8 +685,13 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     try {
       centcomOfficial = await runCentcomIngest({ commit: true });
       logger.info(
-        { ran: centcomOfficial.ran, disabled: centcomOfficial.disabled },
-        "CENTCOM official ingest scaffold complete",
+        {
+          ran: centcomOfficial.ran,
+          disabled: centcomOfficial.disabled,
+          inserted: centcomOfficial.inserted,
+          itemsFetched: centcomOfficial.itemsFetched,
+        },
+        "CENTCOM official ingest complete",
       );
     } catch (err) {
       logger.error({ err }, "CENTCOM official ingest scaffold failed");
@@ -1392,6 +1407,36 @@ export async function runMovementOnce(): Promise<MovementRunResult> {
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       maritimeMovement,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the CENTCOM official press-release ingest. Supports dry-run
+ * (commit=false) for operator validation before writing rows. Shares the same
+ * advisory lock so it can never collide with a full run.
+ */
+export async function runCentcomOfficialOnce(
+  opts: { commit?: boolean } = {},
+): Promise<CentcomOfficialRunResult> {
+  const commit = opts.commit ?? false;
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let centcomOfficial: CentcomIngestSummary;
+    try {
+      centcomOfficial = await runCentcomIngest({ commit });
+    } catch (err) {
+      logger.error({ err }, "CENTCOM official ingest failed");
+      centcomOfficial = emptyCentcomIngestSummary(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      centcomOfficial,
     };
   });
   if (!res.ran) return res;
