@@ -516,7 +516,7 @@ const CONFLICT_COUNTRIES = [...SOUTH_APAC, "Malaysia"];
 
 const CONFLICT_TERMS = `("armed clash" OR "gun battle" OR firefight OR shootout OR insurgent OR insurgency OR militant OR rebel OR separatist OR ambush OR "roadside bomb" OR "armed group" OR "armed attack" OR gunmen OR "armed robbery" OR kidnapping OR abduction OR "shot dead")`;
 
-const CONFLICT_CONFIG: NewsTopicConfig = {
+export const CONFLICT_CONFIG: NewsTopicConfig = {
   topic: "conflict",
   feeds: [
     ...countryFeeds(CONFLICT_COUNTRIES, CONFLICT_TERMS),

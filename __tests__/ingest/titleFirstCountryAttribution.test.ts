@@ -3,6 +3,9 @@ import {
   ENERGY_CONFIG,
   FUEL_CONFIG,
   FERTILISER_CONFIG,
+  CONFLICT_CONFIG,
+  INDONESIA_LOCAL_CONFIG,
+  APAC_LOCAL_CONFIG,
 } from "@workspace/ingest";
 
 // Locks the WRITE-TIME fix for cross-syndicated foreign stories: when a story's
@@ -191,4 +194,147 @@ describe("relocate-migration examples now classify correctly at write time", () 
       expect(c.country).toBe(country);
     });
   }
+});
+
+// The SAME shared `classify`/title-first logic also drives CONFLICT and the two
+// local topics, but each uses its OWN gazetteer (CONFLICT_ALIASES,
+// INDONESIA_LOCAL_ALIASES, APAC_LOCAL_ALIASES) — NOT the global one the energy/
+// fuel/fertiliser cases above exercise. A gazetteer reorder or alias drift on
+// these configs could silently mis-attribute a country with no failing test.
+// These import the REAL configs so that drift surfaces here.
+
+describe("CONFLICT title-first country attribution at ingest", () => {
+  it("stamps a single-country title over an in-region feed default", () => {
+    // A cross-syndicated Myanmar story arriving on the India insurgency feed
+    // must resolve to Myanmar, not the feed's India default.
+    const c = classifyNewsItem(
+      CONFLICT_CONFIG,
+      "Myanmar junta airstrike kills dozens in latest offensive",
+      "",
+      { defaultCountry: "India" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Myanmar");
+  });
+
+  it("lets the single-country title beat an incidental summary mention", () => {
+    // The summary names India (region-ordered before Philippines), but the
+    // TITLE clearly names only the Philippines, so the Philippines must win.
+    const c = classifyNewsItem(
+      CONFLICT_CONFIG,
+      "Philippines troops clash with Abu Sayyaf militants in Sulu",
+      "Compared with an earlier India insurgency operation",
+      { defaultCountry: "India" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Philippines");
+  });
+
+  it("stays conservative for a multi-country title (region-first)", () => {
+    // India is region-ordered before Myanmar in CONFLICT_ALIASES, so a
+    // two-country title falls back to the region-first scan and picks India.
+    const c = classifyNewsItem(
+      CONFLICT_CONFIG,
+      "India and Myanmar armies clash with insurgents along the border",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("India");
+  });
+
+  it("keeps the standing West Papua separation over an Indonesia default", () => {
+    // West Papua is the FIRST alias; a Papua insurgency story must never be
+    // mis-stamped Indonesia by the feed default.
+    const c = classifyNewsItem(
+      CONFLICT_CONFIG,
+      "TPNPB gunmen ambush security forces near Timika",
+      "",
+      { defaultCountry: "Indonesia" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("West Papua");
+  });
+});
+
+describe("INDONESIA_LOCAL title-first country attribution at ingest", () => {
+  it("stamps a single-country title over an in-region feed default", () => {
+    // A Malaysia story cross-syndicated onto the Indonesia default feed must
+    // resolve to Malaysia, not blind-stamp Indonesia.
+    const c = classifyNewsItem(
+      INDONESIA_LOCAL_CONFIG,
+      "Malaysia police break up protest in Kuala Lumpur",
+      "",
+      { defaultCountry: "Indonesia" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Malaysia");
+  });
+
+  it("diverts a Papua title to West Papua over the Indonesia default", () => {
+    // West Papua is listed FIRST so any Papua story is diverted to its own tag
+    // and NEVER mis-stamped Indonesia.
+    const c = classifyNewsItem(
+      INDONESIA_LOCAL_CONFIG,
+      "Penembakan di Timika, Papua tewaskan seorang warga",
+      "",
+      { defaultCountry: "Indonesia" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("West Papua");
+  });
+
+  it("stays conservative for a multi-country title (region-first)", () => {
+    // Malaysia is region-ordered before Indonesia, so a two-country title
+    // falls back to the region-first scan and picks Malaysia.
+    const c = classifyNewsItem(
+      INDONESIA_LOCAL_CONFIG,
+      "Malaysia and Indonesia both hit by flood as monsoon rains intensify",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Malaysia");
+  });
+});
+
+describe("APAC_LOCAL title-first country attribution at ingest", () => {
+  it("stamps a single-country title over a multi-country desk default", () => {
+    // The RNZ Pacific / BenarNews desks default to Unknown; a title naming only
+    // the Philippines must resolve to the Philippines.
+    const c = classifyNewsItem(
+      APAC_LOCAL_CONFIG,
+      "Philippines protest erupts in Manila over fuel prices",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Philippines");
+  });
+
+  it("lets the single-country title beat an incidental summary mention", () => {
+    // The summary names the Philippines (region-ordered before Thailand), but
+    // the TITLE names only Thailand, so Thailand must win.
+    const c = classifyNewsItem(
+      APAC_LOCAL_CONFIG,
+      "Thailand deep-south bombing wounds soldiers in Narathiwat",
+      "Compared to an earlier Philippines Mindanao clash",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Thailand");
+  });
+
+  it("stays conservative for a multi-country title (region-first)", () => {
+    // West Papua is the FIRST alias, so a Papua+Philippines title resolves to
+    // West Papua under the region-first scan.
+    const c = classifyNewsItem(
+      APAC_LOCAL_CONFIG,
+      "West Papua and Philippines both report deadly clash this week",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("West Papua");
+  });
 });
