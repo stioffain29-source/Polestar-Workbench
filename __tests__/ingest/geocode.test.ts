@@ -28,8 +28,16 @@ describe("geocode", () => {
     });
   });
 
+  it("falls back to the country centroid for a table country with no matching city", () => {
+    expect(geocode("Nigeria", "Incident in Lagos")).toEqual({
+      latitude: 9.08,
+      longitude: 8.68,
+      location: null,
+    });
+  });
+
   it("returns null for countries outside the lookup table", () => {
-    expect(geocode("Nigeria", "Incident in Lagos")).toBeNull();
+    expect(geocode("Brazil", "Incident in Sao Paulo")).toBeNull();
   });
 
   it("anchors combined Papua tags on the first semicolon component", () => {
