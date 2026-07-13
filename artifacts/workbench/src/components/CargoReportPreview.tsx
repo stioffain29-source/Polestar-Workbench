@@ -22,7 +22,6 @@ import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "@/components/CargoPatternDashboard";
 import CargoActivityMatrix from "@/components/CargoActivityMatrix";
-import CargoPriorityMatrix from "@/components/CargoPriorityMatrix";
 import type { ReportPreviewData } from "@/components/ReportPreview";
 
 // Cargo Watch pattern-report preview. Renders exactly the sections
@@ -657,7 +656,7 @@ export default function CargoReportPreview({
           </div>
         )}
 
-        {/* PAGES 4–6 — Pattern dashboard, timeline, priority matrix */}
+        {/* PAGES 4–5 — Pattern dashboard, weekly activity */}
         {model.totalUnique > 0 && (
           <div className="mb-8" style={{ breakInside: "avoid" }}>
             <CargoPatternDashboard patterns={model.patterns} />
@@ -670,13 +669,7 @@ export default function CargoReportPreview({
           </div>
         )}
 
-        {model.matrix.sufficient && (
-          <div className="mb-8" style={{ breakInside: "avoid" }}>
-            <CargoPriorityMatrix matrix={model.matrix} />
-          </div>
-        )}
-
-        {/* PAGE 7 — Operational assessment */}
+        {/* Operational assessment */}
         {situationText.trim() && (
           <Section title="Situation">
             <Paragraphs text={situationText} />

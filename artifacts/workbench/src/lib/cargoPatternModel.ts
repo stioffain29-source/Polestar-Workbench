@@ -2,9 +2,8 @@
 //
 // ONE reconciliation source for the redesigned Cargo Watch report. Everything
 // the preview and the PDF render — Fast Facts, country map, weekly trend,
-// supply-chain exposure, pattern dashboard, weekly activity matrix, priority
-// matrix and the condensed appendix — is derived HERE from a single
-// deduplicated set of unique
+// supply-chain exposure, pattern dashboard, weekly activity matrix and the
+// condensed appendix — is derived HERE from a single deduplicated set of unique
 // incidents (the cluster primaries). Because every surface counts the same
 // deduped set, the totals reconcile by construction (spec "DEDUPLICATION
 // REQUIREMENTS").

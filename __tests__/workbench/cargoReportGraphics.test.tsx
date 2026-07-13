@@ -7,15 +7,14 @@ import {
 import CargoSupplyChainExposure from "../../artifacts/workbench/src/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "../../artifacts/workbench/src/components/CargoPatternDashboard";
 import CargoActivityMatrix from "../../artifacts/workbench/src/components/CargoActivityMatrix";
-import CargoPriorityMatrix from "../../artifacts/workbench/src/components/CargoPriorityMatrix";
 import { SevChip } from "../../artifacts/workbench/src/components/CargoGraphicPrimitives";
 
-// Task: four SHARED graphic components (supply-chain exposure, pattern
-// dashboard, weekly activity matrix, priority matrix) render the redesigned
-// Cargo Watch pattern report. The same components render on-screen and rasterise
-// into the PDF, so these renderToStaticMarkup checks prove they never render an
-// empty section, carry the brand palette (A33232 = Extreme only, 1B6B7A =
-// Insignificant only, Electric 4655FF), and degrade gracefully on sparse data.
+// Task: three SHARED graphic components (supply-chain exposure, pattern
+// dashboard, weekly activity matrix) render the redesigned Cargo Watch pattern
+// report. The same components render on-screen and rasterise into the PDF, so
+// these renderToStaticMarkup checks prove they never render an empty section,
+// carry the brand palette (A33232 = Extreme only, 1B6B7A = Insignificant only,
+// Electric 4655FF), and degrade gracefully on sparse data.
 
 const ISSUE = "2026-06-28";
 
@@ -131,30 +130,6 @@ describe("cargo report graphics — weekly activity matrix", () => {
       <CargoActivityMatrix activity={m.activity} />,
     );
     expect(html).toContain("No cargo incidents were reported this period");
-  });
-});
-
-describe("cargo report graphics — priority matrix", () => {
-  it("renders the four quadrants and a numbered legend when sufficient", () => {
-    const m = richModel();
-    expect(m.matrix.sufficient).toBe(true);
-    const html = renderToStaticMarkup(<CargoPriorityMatrix matrix={m.matrix} />);
-    expect(html).toContain("Priority Action");
-    expect(html).toContain("Monitor");
-    expect(html).toContain("Emerging Concern");
-    expect(html).toContain("Persistent Exposure");
-    // Legend maps a point to its pattern name.
-    expect(html).toContain(m.matrix.points[0].name);
-  });
-
-  it("explains an insufficient period instead of an empty plot", () => {
-    const one = buildCargoPatternModel(
-      [inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high" })],
-      { issueDate: ISSUE },
-    );
-    expect(one.matrix.sufficient).toBe(false);
-    const html = renderToStaticMarkup(<CargoPriorityMatrix matrix={one.matrix} />);
-    expect(html).toContain("Insufficient distinct patterns");
   });
 });
 

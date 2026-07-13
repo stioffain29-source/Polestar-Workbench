@@ -8,7 +8,6 @@ import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "@/components/CargoPatternDashboard";
 import CargoActivityMatrix from "@/components/CargoActivityMatrix";
-import CargoPriorityMatrix from "@/components/CargoPriorityMatrix";
 import {
   buildCargoPatternModel,
   type CargoAppendixRow,
@@ -1083,8 +1082,8 @@ export async function exportTopicReportPdf(
       }
 
       // Operational pattern graphics — supply-chain exposure, the pattern
-      // dashboard, the weekly activity matrix, and the priority matrix. Each is
-      // the SAME React component the preview renders, rasterised here.
+      // dashboard, and the weekly activity matrix. Each is the SAME React
+      // component the preview renders, rasterised here.
       if (cargoModel.totalUnique > 0) {
         drawSectionHeading(ctx, "Supply-Chain Exposure");
         ensureSpace(ctx, 300);
@@ -1113,14 +1112,6 @@ export async function exportTopicReportPdf(
           createElement(CargoActivityMatrix, {
             activity: cargoModel.activity,
           }),
-        );
-      }
-      if (cargoModel.matrix.sufficient) {
-        drawSectionHeading(ctx, "Priority Matrix");
-        ensureSpace(ctx, 320);
-        await embedReactChartInPdf(
-          ctx,
-          createElement(CargoPriorityMatrix, { matrix: cargoModel.matrix }),
         );
       }
 
