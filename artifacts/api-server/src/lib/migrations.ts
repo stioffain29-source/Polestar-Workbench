@@ -1773,6 +1773,127 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3d-1b) ONE-TIME relocation of cross-syndicated foreign FUEL / FERTILISER
+    //     stories mis-stamped onto a feed default country — the SAME defect as
+    //     the energy case (3d-1a), now audited for the other two world-scope
+    //     commodity monitors. Fuel and fertiliser share energy's world gazetteer
+    //     (GLOBAL_TOPIC_ALIASES), so a story naming ONLY a foreign country was
+    //     stamped with the country-edition feed's defaultCountry and dropped on
+    //     that centroid (e.g. "Fuel shortage in French gas stations" stored
+    //     Vietnam; "Scotland vulnerable after Grangemouth closure" stored India;
+    //     "Australia fuel crisis" stored Myanmar/Philippines; "Fuel shortage
+    //     grows in Crimea" stored Bangladesh/India; "Kerala Assembly ... fuel
+    //     crisis" stored Philippines). The gazetteer now adds France + Poland;
+    //     the earlier reattribution pass could not fix these because it never
+    //     fires on an in-region -> in-region change (Australia/India mis-stamps)
+    //     and the marker-gated one-time run had already passed for later rows.
+    //     RELOCATE (never delete) — the incidents are real and in-scope. Each row
+    //     is re-stamped to the named country and re-geocoded to its centroid.
+    //     Match the target token in the TITLE only (the summary repeats the
+    //     publisher masthead, which the region guard would false-negative on) AND
+    //     require that NO OTHER tracked country name appears in the title, so a
+    //     multi-country story is never guessed at. Bound to country <> the target
+    //     so an already-correct row is untouched. Marker-gated so analyst edits
+    //     afterwards are never overwritten. NOTE: backslashes are DOUBLED (\\y)
+    //     because this is a JS template literal.
+    {
+      const markerKey = "fuel_fertiliser_foreign_syndication_relocate_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        // Full tracked-country token map (region + global gazetteer). The "others"
+        // guard for a given target is every OTHER country's tokens joined, so a
+        // title naming a second country is left untouched (ambiguous).
+        const COUNTRY_TOKENS: Record<string, string> = {
+          India: "india|indian|delhi|mumbai|kolkata|chennai|bengaluru|uttar pradesh|maharashtra|tamil nadu|kerala|karnataka|telangana|gujarat|rajasthan|odisha|kochi|hyderabad",
+          Pakistan: "pakistan|pakistani|karachi|lahore|islamabad|sindh|balochistan|k-electric|nepra|peshawar|quetta|multan|faisalabad|rawalpindi",
+          Bangladesh: "bangladesh|bangladeshi|dhaka|chittagong|chattogram|bpdb|desco|gazipur|sylhet|khulna",
+          "Sri Lanka": "sri lanka|sri lankan|colombo|ceylon|ceb",
+          Nepal: "nepal|nepali|kathmandu|nea",
+          Myanmar: "myanmar|burma|burmese|yangon|naypyidaw|mandalay",
+          Indonesia: "indonesia|indonesian|jakarta|java|sumatra|surabaya",
+          Philippines: "philippines|filipino|manila|luzon|mindanao|cebu|meralco|napocor|visayas|davao",
+          Vietnam: "vietnam|vietnamese|hanoi|ho chi minh",
+          Thailand: "thailand|thai|bangkok|phuket|chiang mai|pattaya",
+          Malaysia: "malaysia|malaysian|kuala lumpur",
+          China: "china|chinese|beijing|shanghai|guangdong",
+          Japan: "japan|japanese|tokyo|osaka|tepco|fukushima",
+          "South Korea": "south korea|korean|seoul|busan",
+          Iran: "iran|iranian|tehran",
+          Iraq: "iraq|iraqi|baghdad|basra",
+          "Saudi Arabia": "saudi arabia|saudi|riyadh|jeddah|yanbu|dammam|mecca|medina",
+          "United Arab Emirates": "united arab emirates|uae|dubai|abu dhabi|fujairah",
+          Qatar: "qatar|qatari|doha",
+          Kuwait: "kuwait|kuwaiti",
+          Oman: "oman|omani|muscat",
+          Bahrain: "bahrain|bahraini|manama",
+          Australia: "australia|australian|sydney|melbourne|brisbane|perth|adelaide|canberra|queensland",
+          "New Zealand": "new zealand|auckland|wellington|christchurch",
+          "United States": "united states|u\\.s\\.|u\\.s\\.a\\.|usa|america|american|texas|california|florida|ohio|new york|houston|dallas|chicago|ercot",
+          Canada: "canada|canadian|ontario|quebec|alberta|toronto|vancouver",
+          "South Africa": "south africa|south african|eskom|johannesburg|pretoria|cape town|durban",
+          Nigeria: "nigeria|nigerian|lagos|abuja|port harcourt",
+          Kenya: "kenya|kenyan|nairobi",
+          Ghana: "ghana|ghanaian|accra|dumsor",
+          Zimbabwe: "zimbabwe|zimbabwean|harare|zesa",
+          Zambia: "zambia|zambian|lusaka|zesco",
+          Spain: "spain|spanish|madrid|barcelona|iberia",
+          Portugal: "portugal|portuguese|lisbon",
+          Ukraine: "ukraine|ukrainian|kyiv|kiev|crimea|crimean|sevastopol|simferopol|balaklava|kerch|zaporizhzhia|kharkiv|odesa|odessa",
+          Russia: "russia|russian|moscow|rosseti",
+          Germany: "germany|german|berlin|hamburg|munich",
+          Cuba: "cuba|cuban|havana",
+          Mongolia: "mongolia|mongolian|ulaanbaatar",
+          Turkey: "turkey|turkish|turkiye|istanbul|ankara",
+          "United Kingdom": "united kingdom|britain|british|england|scotland|london|grangemouth",
+          Venezuela: "venezuela|venezuelan|caracas",
+          France: "france|french|paris",
+          Poland: "poland|polish|warsaw",
+        };
+        // Targets to relocate to. `token` matches the target in the title (curated
+        // to unambiguous identifiers — India uses distinctly-Indian states/cities,
+        // never the India/Pakistan-shared "punjab").
+        const targets: { country: string; token: string; lat: number; lng: number }[] = [
+          { country: "France", token: "france|french|paris", lat: 46.23, lng: 2.21 },
+          { country: "Poland", token: "poland|polish|warsaw", lat: 51.92, lng: 19.13 },
+          { country: "Australia", token: COUNTRY_TOKENS.Australia, lat: -25.27, lng: 133.78 },
+          { country: "United Kingdom", token: COUNTRY_TOKENS["United Kingdom"], lat: 54.0, lng: -2.5 },
+          { country: "Ukraine", token: COUNTRY_TOKENS.Ukraine, lat: 48.38, lng: 31.17 },
+          { country: "India", token: "kerala|karnataka|tamil nadu|mumbai|delhi|kolkata|chennai|bengaluru|maharashtra|uttar pradesh|gujarat|rajasthan|odisha|kochi|hyderabad", lat: 22.59, lng: 78.96 },
+        ];
+        let total = 0;
+        for (const t of targets) {
+          const others = Object.entries(COUNTRY_TOKENS)
+            .filter(([c]) => c !== t.country)
+            .map(([, tok]) => tok)
+            .join("|");
+          const targetGuard = `\\y(${t.token})\\y`;
+          const otherGuard = `\\y(${others})\\y`;
+          const res = await db.execute(sql`
+            UPDATE incidents
+            SET country = ${t.country},
+                location = NULL,
+                latitude = ${t.lat},
+                longitude = ${t.lng}
+            WHERE topic IN ('fuel', 'fertiliser')
+              AND country <> ${t.country}
+              AND COALESCE(title,'') ~* ${targetGuard}
+              AND COALESCE(title,'') !~* ${otherGuard}
+          `);
+          total += res.rowCount ?? 0;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: total, marker: markerKey },
+          "One-time relocation of cross-syndicated foreign fuel/fertiliser incidents mis-stamped onto a feed default country",
+        );
+      }
+    }
+
     // 3d-1a-i1b) ONE-TIME purge of scraped Google-News SECTION / topic-page
     //     headings that leaked in as incidents — an aggregator feed LABEL, not
     //     a dated event ("Papua New Guinea Massacre News", "<Place> Crime

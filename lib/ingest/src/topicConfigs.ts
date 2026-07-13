@@ -80,6 +80,8 @@ export const GLOBAL_EXTRA_ALIASES: CountryAlias[] = [
   { canonical: "Turkey", aliases: ["turkey", "turkish", "turkiye", "istanbul", "ankara"] },
   { canonical: "United Kingdom", aliases: ["united kingdom", "britain", "british", "england", "scotland", "london"] },
   { canonical: "Venezuela", aliases: ["venezuela", "venezuelan", "caracas"] },
+  { canonical: "France", aliases: ["france", "french", "paris"] },
+  { canonical: "Poland", aliases: ["poland", "polish", "warsaw"] },
 ];
 
 // Region + global gazetteer for the three global-market topics. Region-first.

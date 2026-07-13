@@ -88,6 +88,8 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
   Turkey: [38.96, 35.24],
   "United Kingdom": [54.0, -2.5],
   Venezuela: [6.42, -66.59],
+  France: [46.23, 2.21],
+  Poland: [51.92, 19.13],
 };
 
 // City name -> [lat, lng]. Keys are lowercase; matched word-bounded in text.
@@ -291,6 +293,9 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   london: { lat: 51.51, lng: -0.13, name: "London" },
   scotland: { lat: 56.49, lng: -4.2, name: "Scotland" },
   caracas: { lat: 10.49, lng: -66.88, name: "Caracas" },
+  // France / Poland (world-scope energy/fuel/fertiliser newsmakers).
+  paris: { lat: 48.86, lng: 2.35, name: "Paris" },
+  warsaw: { lat: 52.23, lng: 21.01, name: "Warsaw" },
 };
 
 function titleCase(s: string): string {

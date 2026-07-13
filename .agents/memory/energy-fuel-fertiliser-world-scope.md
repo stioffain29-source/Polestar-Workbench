@@ -43,6 +43,25 @@ dropping them. The fix is to widen attribution + map framing, not add sources.
   inline `{UAE}` alias mirroring `CHOROPLETH_COUNTRY_ALIASES`), and that
   worldExtras is exactly the out-of-region set with no dups/overlap.
 
+## Stored-row foreign-syndication mis-stamps (all three topics)
+
+The `runGlobalCountryReattribution` pass (marker `global_country_reattribution_v1`)
+only ever moves a row Unknown→anything or in-region→OUT-of-region; it deliberately
+NEVER fires on in-region→in-region. So an Australia/India story blind-stamped with
+another in-region feed default (e.g. an Australian fuel-crisis story tagged
+Myanmar, a Kerala petrol story tagged Philippines) is NOT repaired by it. Fix those
+with a marker-gated one-time relocate in `migrations.ts` that matches a target
+country token in the TITLE only and requires NO OTHER tracked country token in the
+title (title names exactly one country → relocate to it). Precedent markers:
+`energy_foreign_syndication_relocate_v2` (energy: Turkey/UK/Venezuela) and
+`fuel_fertiliser_foreign_syndication_relocate_v1` (fuel/fertiliser: France, Poland,
+Australia, UK, Ukraine/Crimea, India). The title-only + others-guard also cleans
+spurious multi-country co-tags (e.g. "India; Iran" on a pure Delhi petrol-price
+story → India) since `country <> target` is exact-string. Added France + Poland to
+`GLOBAL_EXTRA_ALIASES` + `COUNTRY_CENTROIDS` + city coords (paris/warsaw) + regen
+choropleth. Left Taiwan OUT despite Unknown Taiwan fuel rows: its only signal is the
+"Taipei Times"/"Focus Taiwan" masthead (masthead-pollution trap).
+
 ## How to apply / gotchas
 
 - Adding an out-of-region country needs BOTH a `GLOBAL_EXTRA_ALIASES` entry WITH
