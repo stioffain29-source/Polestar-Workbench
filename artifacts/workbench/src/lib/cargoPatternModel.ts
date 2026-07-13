@@ -170,6 +170,215 @@ export interface CargoAppendixRow {
   severityLabel: string;
   severityKey: string;
   confidence: string; // "" unless analytically relevant ("Unconfirmed")
+  // Register/curated-card fields. Blank ("") when the source is silent — never
+  // fabricated. `confidenceLabel` is the raw enrichment tier (High/Medium/Low)
+  // used on the Selected Incidents card and the exported register, distinct
+  // from the terser `confidence` column which only ever reads "Unconfirmed".
+  country: string;
+  confidenceLabel: string; // "High" | "Medium" | "Low" | ""
+  status: string; // enrichment lifecycle status, "" when unknown
+  cargoType: string; // "" when not reported
+  company: string; // company / operator, "" when not reported
+  source: string; // publisher name, "" when unknown
+  sourceUrl: string; // "" when unknown
+}
+
+// Input to the deterministic Selected Incidents chooser. One per unique
+// incident, carrying the compact row it would emit plus the signals the six
+// selection criteria read.
+export interface CargoSelectionCandidate {
+  id: string;
+  date: string; // ISO occurredAt
+  category: string;
+  stage: CargoStageKey;
+  consequence: number; // 0..1
+  country: string; // "" when unknown
+  signalText: string; // title + summary, for insider/enforcement matching
+  row: CargoAppendixRow;
+}
+
+export const MAX_SELECTED_INCIDENTS = 6;
+
+// Law-enforcement disruption / recovery cues (criterion f). Enforcement-stage
+// categories (arrests) plus seizure/recovery wording that lands in other stages
+// (e.g. a port narcotics seizure). Kept narrow so a plain theft never matches.
+const LAW_ENFORCEMENT_RE =
+  /\b(arrest\w*|seiz\w*|seized|recover\w*|recovered|interdict\w*|confiscat\w*|bust\w*|dismantl\w*|raid\w*|charged|convict\w*|sentenc\w*|detain\w*|apprehend\w*)\b/i;
+
+// Deterministic ordering: consequence desc -> date desc -> id asc. Used for both
+// per-criterion representative choice and the final display order, so preview,
+// PDF and tests can never disagree.
+function bySelectionRank(
+  a: CargoSelectionCandidate,
+  b: CargoSelectionCandidate,
+): number {
+  return (
+    b.consequence - a.consequence ||
+    b.date.localeCompare(a.date) ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+function bestOf(
+  candidates: CargoSelectionCandidate[],
+): CargoSelectionCandidate | null {
+  if (candidates.length === 0) return null;
+  return candidates.slice().sort(bySelectionRank)[0];
+}
+
+// Choose <= MAX_SELECTED_INCIDENTS incidents that demonstrate the period's
+// operational picture across six criteria, in order:
+//   (a) most-frequent operational pattern
+//   (b) highest-consequence pattern
+//   (c) main affected geography
+//   (d) largest positive within-window change (surge week), skipped if < 2 weeks
+//   (e) a credible insider / organised-crime indicator
+//   (f) a law-enforcement disruption / recovery
+// Picks are de-duplicated by id (an incident satisfying several criteria counts
+// once), then topped up by consequence so the section is never short when data
+// exists. Explicitly NOT the six most recent. No "vs previous period" claim is
+// ever emitted — criterion (d) only influences WHICH incident is shown.
+export function selectIncidents(
+  candidates: CargoSelectionCandidate[],
+  opts: { max?: number } = {},
+): CargoAppendixRow[] {
+  const max = opts.max ?? MAX_SELECTED_INCIDENTS;
+  if (candidates.length === 0) return [];
+  // Collapse any repeated incident id up front so the "one card per incident"
+  // invariant holds on every path (candidates are normally pre-deduped, but the
+  // guarantee must not depend on that).
+  const seen = new Set<string>();
+  const unique = candidates.filter((c) => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+  if (unique.length <= max) {
+    return unique.slice().sort(bySelectionRank).map((c) => c.row);
+  }
+  candidates = unique;
+
+  // Frequency + mean consequence per category (patterns).
+  const catCount = new Map<string, number>();
+  const catConsSum = new Map<string, number>();
+  const countryCount = new Map<string, number>();
+  for (const c of candidates) {
+    catCount.set(c.category, (catCount.get(c.category) ?? 0) + 1);
+    catConsSum.set(c.category, (catConsSum.get(c.category) ?? 0) + c.consequence);
+    if (c.country) {
+      countryCount.set(c.country, (countryCount.get(c.country) ?? 0) + 1);
+    }
+  }
+
+  // (a) most-frequent pattern: highest count, tie-break higher mean consequence,
+  //     then category name for stability.
+  let freqCat: string | null = null;
+  for (const [cat, count] of catCount) {
+    if (freqCat === null) {
+      freqCat = cat;
+      continue;
+    }
+    const bestCount = catCount.get(freqCat) ?? 0;
+    if (count > bestCount) freqCat = cat;
+    else if (count === bestCount) {
+      const meanA = (catConsSum.get(cat) ?? 0) / count;
+      const meanBest = (catConsSum.get(freqCat) ?? 0) / bestCount;
+      if (meanA > meanBest || (meanA === meanBest && cat < freqCat)) freqCat = cat;
+    }
+  }
+
+  // (b) highest-consequence pattern: highest mean, tie-break higher count.
+  let consCat: string | null = null;
+  for (const [cat, count] of catCount) {
+    const mean = (catConsSum.get(cat) ?? 0) / count;
+    if (consCat === null) {
+      consCat = cat;
+      continue;
+    }
+    const bestCount = catCount.get(consCat) ?? 0;
+    const bestMean = (catConsSum.get(consCat) ?? 0) / bestCount;
+    if (mean > bestMean) consCat = cat;
+    else if (mean === bestMean) {
+      if (count > bestCount || (count === bestCount && cat < consCat)) consCat = cat;
+    }
+  }
+
+  // (c) main geography: most-reported country.
+  let mainCountry: string | null = null;
+  for (const [country, count] of countryCount) {
+    if (mainCountry === null) {
+      mainCountry = country;
+      continue;
+    }
+    const bestCount = countryCount.get(mainCountry) ?? 0;
+    if (count > bestCount || (count === bestCount && country < mainCountry)) {
+      mainCountry = country;
+    }
+  }
+
+  // (d) largest positive within-window change. Bucket candidates into
+  //     Monday-anchored weeks and find the week whose count most exceeds the
+  //     preceding week's. Needs at least two distinct weeks; otherwise skipped.
+  const weekKey = (iso: string): string | null => {
+    const d = parseISO(iso);
+    if (!isValid(d)) return null;
+    return startOfWeek(d, { weekStartsOn: 1 }).toISOString().slice(0, 10);
+  };
+  const weekBuckets = new Map<string, CargoSelectionCandidate[]>();
+  for (const c of candidates) {
+    const wk = weekKey(c.date);
+    if (!wk) continue;
+    const arr = weekBuckets.get(wk);
+    if (arr) arr.push(c);
+    else weekBuckets.set(wk, [c]);
+  }
+  let surgeWeek: string | null = null;
+  const orderedWeeks = [...weekBuckets.keys()].sort();
+  if (orderedWeeks.length >= 2) {
+    let bestDelta = 0;
+    for (let i = 1; i < orderedWeeks.length; i++) {
+      const delta =
+        (weekBuckets.get(orderedWeeks[i])?.length ?? 0) -
+        (weekBuckets.get(orderedWeeks[i - 1])?.length ?? 0);
+      if (delta > bestDelta) {
+        bestDelta = delta;
+        surgeWeek = orderedWeeks[i];
+      }
+    }
+  }
+
+  // (e) insider / organised-crime indicator.
+  const orgInsider = candidates.filter(
+    (c) => ORG_CRIME_RE.test(c.signalText) || INSIDER_RE.test(c.signalText),
+  );
+  // (f) law-enforcement disruption / recovery.
+  const enforcement = candidates.filter(
+    (c) => c.stage === "enforcement" || LAW_ENFORCEMENT_RE.test(c.signalText),
+  );
+
+  const picks: CargoSelectionCandidate[] = [];
+  const pushUnique = (c: CargoSelectionCandidate | null) => {
+    if (c && !picks.some((p) => p.id === c.id)) picks.push(c);
+  };
+
+  pushUnique(freqCat ? bestOf(candidates.filter((c) => c.category === freqCat)) : null);
+  pushUnique(consCat ? bestOf(candidates.filter((c) => c.category === consCat)) : null);
+  pushUnique(
+    mainCountry ? bestOf(candidates.filter((c) => c.country === mainCountry)) : null,
+  );
+  pushUnique(surgeWeek ? bestOf(weekBuckets.get(surgeWeek) ?? []) : null);
+  pushUnique(bestOf(orgInsider));
+  pushUnique(bestOf(enforcement));
+
+  // Top up by consequence so a data-rich period always fills the section.
+  if (picks.length < max) {
+    for (const c of candidates.slice().sort(bySelectionRank)) {
+      if (picks.length >= max) break;
+      pushUnique(c);
+    }
+  }
+
+  return picks.slice(0, max).sort(bySelectionRank).map((c) => c.row);
 }
 
 export interface CargoAssessment {
@@ -194,7 +403,8 @@ export interface CargoPatternModel {
   patterns: CargoPatternCard[]; // <= MAX_PATTERN_CARDS dashboard cards
   activity: CargoActivityMatrix;
   matrix: CargoMatrix;
-  appendix: CargoAppendixRow[];
+  appendix: CargoAppendixRow[]; // FULL deduplicated register (Workbench only)
+  selected: CargoAppendixRow[]; // <= 6 curated Selected Incidents (client PDF)
   assessment: CargoAssessment;
 }
 
@@ -639,7 +849,7 @@ export function buildCargoPatternModel(
     .slice()
     .sort((a, b) => b.primary.occurredAt.localeCompare(a.primary.occurredAt))
     .map((d) => {
-      const conf = d.cluster.enrichment.confidence;
+      const e = d.cluster.enrichment;
       return {
         id: String(d.primary.id ?? d.cluster.id),
         date: d.primary.occurredAt,
@@ -650,9 +860,42 @@ export function buildCargoPatternModel(
         ),
         severityLabel: SEV_LABEL[d.sevKey] ?? d.sevKey,
         severityKey: d.sevKey,
-        confidence: conf === "Low" ? "Unconfirmed" : "",
+        confidence: e.confidence === "Low" ? "Unconfirmed" : "",
+        country: cargoCountry(toIncidentLike(d.primary)) ?? "",
+        confidenceLabel: e.confidence ?? "",
+        status: e.status ?? "",
+        cargoType: e.cargoType ?? "",
+        company: e.company ?? "",
+        source: (d.primary.source ?? "").trim(),
+        sourceUrl: (d.primary.sourceUrl ?? "").trim(),
       };
     });
+
+  // Curated Selected Incidents — a small, deterministic set (<= 6) chosen to
+  // demonstrate the period's operational picture (most-frequent pattern,
+  // highest-consequence pattern, main geography, the largest within-window
+  // change, a credible insider/organised indicator and a law-enforcement
+  // disruption/recovery). NOT the six most recent. Built from the same derived
+  // set as the full register, keyed by id so the two never disagree.
+  const rowById = new Map(appendix.map((r) => [r.id, r]));
+  const candidates: CargoSelectionCandidate[] = derived
+    .map((d) => {
+      const id = String(d.primary.id ?? d.cluster.id);
+      const row = rowById.get(id);
+      if (!row) return null;
+      return {
+        id,
+        date: d.primary.occurredAt,
+        category: d.category,
+        stage: d.stage,
+        consequence: d.consequence,
+        country: row.country,
+        signalText: primaryText(d.primary),
+        row,
+      } satisfies CargoSelectionCandidate;
+    })
+    .filter((c): c is CargoSelectionCandidate => c !== null);
+  const selected = selectIncidents(candidates);
 
   // 10. Data-derived captions (spec PAGE 2). No hardcoded names/dates.
   const mapCaption = buildMapCaption(intensity, totalUnique);
@@ -682,6 +925,7 @@ export function buildCargoPatternModel(
     activity,
     matrix,
     appendix,
+    selected,
     assessment,
   };
 }

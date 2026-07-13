@@ -1,6 +1,10 @@
 import {
   buildCargoPatternModel,
+  selectIncidents,
+  MAX_SELECTED_INCIDENTS,
   type CargoPatternModelInput,
+  type CargoSelectionCandidate,
+  type CargoAppendixRow,
 } from "../../artifacts/workbench/src/lib/cargoPatternModel";
 import {
   STAGE_ORDER,
@@ -158,5 +162,101 @@ describe("cargo pattern model — single-source reconciliation", () => {
       0,
     );
     expect(intensityTotal).toBeLessThanOrEqual(m.totalUnique);
+  });
+});
+
+function appendixRow(p: Partial<CargoAppendixRow>): CargoAppendixRow {
+  return {
+    id: "x",
+    date: "2026-06-24",
+    location: "",
+    category: "Theft",
+    summary: "Cargo stolen.",
+    severityLabel: "Moderate",
+    severityKey: "moderate",
+    confidence: "",
+    country: "Malaysia",
+    confidenceLabel: "",
+    status: "",
+    cargoType: "",
+    company: "",
+    source: "",
+    sourceUrl: "",
+    ...p,
+  };
+}
+
+function cand(p: Partial<CargoSelectionCandidate>): CargoSelectionCandidate {
+  const id = p.id ?? "1";
+  return {
+    id,
+    date: "2026-06-24",
+    category: "Theft",
+    stage: "in_transit",
+    consequence: 0.3,
+    country: "Malaysia",
+    signalText: "cargo stolen",
+    row: appendixRow({ id, ...(p.row ?? {}) }),
+    ...p,
+  };
+}
+
+describe("cargo Selected Incidents picker — selectIncidents", () => {
+  it("caps the selection at MAX_SELECTED_INCIDENTS (6)", () => {
+    const candidates = Array.from({ length: 12 }, (_, i) =>
+      cand({
+        id: String(i + 1),
+        category: `Category ${i}`,
+        consequence: (i % 5) / 10,
+        country: i % 2 === 0 ? "Malaysia" : "Indonesia",
+      }),
+    );
+    const picked = selectIncidents(candidates);
+    expect(picked.length).toBe(MAX_SELECTED_INCIDENTS);
+    expect(picked.length).toBeLessThanOrEqual(candidates.length);
+  });
+
+  it("never returns two cards for the same incident id", () => {
+    const candidates = [
+      cand({ id: "1", category: "Hijacking", consequence: 0.9 }),
+      cand({ id: "1", category: "Hijacking", consequence: 0.9 }),
+      cand({ id: "2", category: "Warehouse theft", consequence: 0.5 }),
+      cand({ id: "3", category: "Pilferage", consequence: 0.2 }),
+    ];
+    const picked = selectIncidents(candidates);
+    const ids = picked.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("is consequence/criteria-led, not recency-led (a recent trivial row is not guaranteed)", () => {
+    // One high-consequence older incident vs. five most-recent trivial ones of
+    // the SAME category/geography (so only the frequency slot could admit them).
+    const highOld = cand({
+      id: "hi",
+      category: "Armed hijacking",
+      consequence: 0.95,
+      date: "2026-06-10",
+      country: "Malaysia",
+      signalText: "armed gang hijack container truck",
+    });
+    const recentTrivial = Array.from({ length: 6 }, (_, i) =>
+      cand({
+        id: `r${i}`,
+        category: "Pilferage",
+        consequence: 0.05,
+        date: `2026-06-2${i + 1}`,
+        country: "Indonesia",
+        signalText: "minor pilferage reported",
+      }),
+    );
+    const picked = selectIncidents([highOld, ...recentTrivial]);
+    // The high-consequence older incident must be selected despite being oldest.
+    expect(picked.some((r) => r.id === "hi")).toBe(true);
+    // And the newest trivial row is NOT automatically the top card.
+    expect(picked[0]?.id).not.toBe("r5");
+  });
+
+  it("returns an empty array for no candidates (no fabrication)", () => {
+    expect(selectIncidents([])).toEqual([]);
   });
 });

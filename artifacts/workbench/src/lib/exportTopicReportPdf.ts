@@ -113,6 +113,10 @@ export interface ExportTopicReportPdfOptions {
    *  section. Fetched once by the caller from /api/market-prices?group=energy
    *  so preview and PDF read the identical dataset. */
   marketPrices?: MarketPrice[];
+  /** Cargo Watch only. When true, appends the full deduplicated incident
+   *  register as a readable annex on a fresh final page. Defaults to false —
+   *  the standard report carries only the curated Selected Incidents. */
+  includeFullAnnex?: boolean;
 }
 
 export interface TopicReportData {
@@ -428,44 +432,163 @@ function drawRelatedIncidents(
   void reportCadence(topic);
 }
 
-// Condensed incident appendix (cargo report only). One row per UNIQUE incident,
-// replacing the removed Related Incidents + Named Port Breakdown + Cargo
-// Incident Clusters sections. Paginates like drawRelatedIncidents so a heavy
-// period still runs to the two-page cap without orphaning rows across a break.
-function drawCargoAppendix(ctx: Ctx, rows: CargoAppendixRow[]) {
+// Compose the "Country — location" line for a curated card / annex row. Blank
+// segments are dropped (no fabricated "not reported"); when both are absent the
+// caller decides what to show.
+function cargoPlaceLine(row: CargoAppendixRow): string {
+  const country = sanitize(row.country);
+  const loc = sanitize(row.location);
+  if (country && loc && loc.toLowerCase() !== country.toLowerCase()) {
+    return `${country} — ${loc}`;
+  }
+  return country || loc;
+}
+
+function cargoDateStr(iso: string): string {
+  if (!iso) return "";
+  try {
+    return format(parseISO(iso), "dd MMM yyyy");
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+// Curated "Selected Incidents" — up to six compact cards demonstrating the
+// period's operational picture. Each card carries Date, Country/location,
+// Incident type, a one-sentence summary, a Severity chip and Confidence. Blank
+// fields are simply omitted (no fabricated placeholders). Variable height: the
+// summary wraps, everything else is single-line.
+function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
   const { pdf, MX, CW } = ctx;
+  drawSectionHeading(ctx, "Selected Incidents");
   if (rows.length === 0) {
-    drawSectionHeading(ctx, "Incident Appendix");
     renderProse(ctx, "No cargo-crime incidents were recorded this period.");
     return;
   }
-  // Start the condensed reference list on a fresh page so its compact rows pack
-  // full pages and the whole appendix stays within ~2 pages.
-  if (ctx.y > ctx.TOP + 4) newPage(ctx);
-  drawSectionHeading(ctx, "Incident Appendix");
 
-  const colDateW = 62;
-  const colLocW = 92;
-  const colCatW = 92;
-  const colSevW = 56;
-  const colConfW = 52;
+  const PAD = 8;
+  const innerW = CW - 2 * PAD;
+  const SUM_FONT = 8.5;
+  const META_FONT = 8;
+  const lineH = 11;
+  const gap = 8;
+
+  for (const r of rows) {
+    // Pre-measure the card so it never splits across a page break.
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(SUM_FONT);
+    const summaryLines: string[] = pdf.splitTextToSize(
+      sanitize(r.summary),
+      innerW,
+    );
+    const place = cargoPlaceLine(r);
+    const typeLine = sanitize(r.category);
+    const hasMeta = !!(place || typeLine);
+    const cardH =
+      PAD + // top pad
+      lineH + // date + chip row
+      (hasMeta ? lineH : 0) + // place · category
+      summaryLines.length * lineH + // summary
+      PAD; // bottom pad
+
+    ensureSpace(ctx, cardH + gap);
+    const top = ctx.y;
+
+    // Card border.
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.7);
+    pdf.rect(MX, top, CW, cardH);
+
+    // Row 1: date (left) and severity chip + confidence (right).
+    let cursorY = top + PAD + 8;
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(META_FONT);
+    setText(pdf, NAVY);
+    pdf.text(cargoDateStr(r.date), MX + PAD, cursorY);
+
+    // Severity chip on the right; confidence text sits to its left.
+    const sk = sevKey(r.severityKey);
+    const sevText = sanitize((r.severityLabel || "").toUpperCase());
+    let chipLeft = MX + CW - PAD;
+    if (sevText) {
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(6.5);
+      const chipTextW = pdf.getTextWidth(sevText);
+      const chipW = chipTextW + 12;
+      const chipH = 11;
+      chipLeft = MX + CW - PAD - chipW;
+      setFill(pdf, SEV_COLOR[sk] ?? "#999999");
+      pdf.rect(chipLeft, top + PAD + 1, chipW, chipH, "F");
+      setText(pdf, WHITE);
+      pdf.text(sevText, chipLeft + chipW / 2, top + PAD + 8.5, {
+        align: "center",
+      });
+    }
+    if (r.confidenceLabel) {
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(META_FONT);
+      setText(pdf, DUSK);
+      const conf = `Confidence: ${sanitize(r.confidenceLabel)}`;
+      const confW = pdf.getTextWidth(conf);
+      pdf.text(conf, chipLeft - 8 - confW, cursorY);
+    }
+
+    // Row 2: place · category.
+    if (hasMeta) {
+      cursorY += lineH;
+      setRoboto(pdf, "medium");
+      pdf.setFontSize(META_FONT);
+      setText(pdf, DUSK);
+      const meta = [place, typeLine].filter(Boolean).join("  ·  ");
+      pdf.text(sanitize(meta), MX + PAD, cursorY);
+    }
+
+    // Summary (wrapped).
+    cursorY += lineH;
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(SUM_FONT);
+    setText(pdf, NAVY);
+    for (const line of summaryLines) {
+      pdf.text(line, MX + PAD, cursorY);
+      cursorY += lineH;
+    }
+
+    ctx.y = top + cardH + gap;
+  }
+  ctx.y += 2;
+}
+
+// Optional full incident annex — the complete deduplicated register in a
+// readable, wrapped table. Off by default; when the author opts in it starts on
+// a fresh final page. Unlike the retired 6.5pt appendix it uses an 8pt face and
+// wraps the summary to variable-height rows so nothing is truncated.
+function drawFullAnnex(ctx: Ctx, rows: CargoAppendixRow[]) {
+  const { pdf, MX, CW } = ctx;
+  if (rows.length === 0) return;
+  newPage(ctx);
+  drawSectionHeading(ctx, "Incident Annex");
+  renderProse(
+    ctx,
+    "Complete deduplicated incident register for the period. Fields are left blank where the source did not report them.",
+  );
+
+  const colDateW = 60;
+  const colLocW = 96;
+  const colCatW = 84;
+  const colSevW = 58;
+  const colConfW = 48;
   const colSumW = CW - colDateW - colLocW - colCatW - colSevW - colConfW;
-  // Condensed reference list: one compact SINGLE-LINE row per unique incident so
-  // the full deduplicated set stays within ~2 pages (long cells are truncated
-  // with an ellipsis rather than wrapped). Small type + a fixed row height are
-  // what keep the appendix short; nothing is dropped.
-  const FONT = 6.5;
-  const headerH = 14;
-  const rowH = 14;
-  const xDate = MX + 6;
-  const xLoc = MX + colDateW + 6;
-  const xCat = MX + colDateW + colLocW + 6;
-  const xSum = MX + colDateW + colLocW + colCatW + 6;
+  const FONT = 8;
+  const lineH = 10;
+  const vPad = 5;
+  const headerH = 15;
+  const xDate = MX + 5;
+  const xLoc = MX + colDateW + 5;
+  const xCat = MX + colDateW + colLocW + 5;
+  const xSum = MX + colDateW + colLocW + colCatW + 5;
   const sevColX = MX + colDateW + colLocW + colCatW + colSumW;
-  const xConf = sevColX + colSevW + 6;
+  const xConf = sevColX + colSevW + 5;
 
-  // Truncate a value to a single line within `w`, appending an ellipsis when it
-  // overflows. Assumes the caller has already selected the regular face at FONT.
   const oneLine = (value: string, w: number): string => {
     const clean = sanitize(value);
     if (!clean) return "";
@@ -489,21 +612,29 @@ function drawCargoAppendix(ctx: Ctx, rows: CargoAppendixRow[]) {
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(FONT);
-    pdf.text("DATE", xDate, ctx.y + 9);
-    pdf.text("LOCATION", xLoc, ctx.y + 9);
-    pdf.text("CATEGORY", xCat, ctx.y + 9);
-    pdf.text("INCIDENT SUMMARY", xSum, ctx.y + 9);
-    pdf.text("SEVERITY", sevColX + 6, ctx.y + 9);
-    pdf.text("CONF.", xConf, ctx.y + 9);
+    pdf.text("DATE", xDate, ctx.y + 10);
+    pdf.text("LOCATION", xLoc, ctx.y + 10);
+    pdf.text("CATEGORY", xCat, ctx.y + 10);
+    pdf.text("INCIDENT SUMMARY", xSum, ctx.y + 10);
+    pdf.text("SEVERITY", sevColX + 5, ctx.y + 10);
+    pdf.text("CONF.", xConf, ctx.y + 10);
     ctx.y += headerH;
     setRoboto(pdf, "regular");
     pdf.setFontSize(FONT);
   };
 
-  ensureSpace(ctx, headerH + rowH);
+  ensureSpace(ctx, headerH + 24);
   drawHeader();
 
   for (const r of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(FONT);
+    const summaryLines: string[] = pdf.splitTextToSize(
+      sanitize(r.summary),
+      colSumW - 8,
+    );
+    const rowH = Math.max(16, summaryLines.length * lineH + vPad * 2);
+
     if (ctx.y + rowH > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
@@ -514,38 +645,32 @@ function drawCargoAppendix(ctx: Ctx, rows: CargoAppendixRow[]) {
     pdf.line(MX, ctx.y, MX, ctx.y + rowH);
     pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
 
-    const baseY = ctx.y + 9;
+    const baseY = ctx.y + vPad + 7;
     setText(pdf, DUSK);
-    let dateStr = "";
-    if (r.date) {
-      try {
-        dateStr = format(parseISO(r.date), "dd MMM yyyy");
-      } catch {
-        dateStr = r.date.slice(0, 10);
-      }
-    }
-    pdf.text(dateStr, xDate, baseY);
-    pdf.text(oneLine(r.location, colLocW - 8), xLoc, baseY);
+    pdf.text(cargoDateStr(r.date), xDate, baseY);
+    pdf.text(oneLine(cargoPlaceLine(r), colLocW - 8), xLoc, baseY);
     pdf.text(oneLine(r.category, colCatW - 8), xCat, baseY);
     setText(pdf, NAVY);
-    pdf.text(oneLine(r.summary, colSumW - 8), xSum, baseY);
+    let sumY = baseY;
+    for (const line of summaryLines) {
+      pdf.text(line, xSum, sumY);
+      sumY += lineH;
+    }
     setText(pdf, DUSK);
-    if (r.confidence) {
-      pdf.text(oneLine(r.confidence, colConfW - 8), xConf, baseY);
+    if (r.confidenceLabel) {
+      pdf.text(oneLine(r.confidenceLabel, colConfW - 8), xConf, baseY);
     }
 
-    // Severity chip, keyed off the model's severity key so the colour ramp
-    // matches every other surface (A33232 Extreme, 1B6B7A Insignificant).
     const sk = sevKey(r.severityKey);
     const sevText = sanitize((r.severityLabel || "").toUpperCase());
     if (sevText) {
       setFill(pdf, SEV_COLOR[sk] ?? "#999999");
       const chipW = colSevW - 8;
-      pdf.rect(sevColX + 4, ctx.y + 2.5, chipW, 9, "F");
+      pdf.rect(sevColX + 4, ctx.y + vPad, chipW, 11, "F");
       setText(pdf, WHITE);
       setRoboto(pdf, "bold");
-      pdf.setFontSize(5);
-      pdf.text(sevText, sevColX + 4 + chipW / 2, ctx.y + 8.5, {
+      pdf.setFontSize(6);
+      pdf.text(sevText, sevColX + 4 + chipW / 2, ctx.y + vPad + 7.5, {
         align: "center",
       });
       setRoboto(pdf, "regular");
@@ -955,14 +1080,21 @@ export async function exportTopicReportPdf(
       if (bp.trim()) drawBulletSection(ctx, "Business Priorities", bp, 5);
       const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
       if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 6);
+
+      // Curated Selected Incidents — up to six cards demonstrating the period's
+      // operational picture (NOT the six most recent). The full deduplicated
+      // register lives in the Workbench and the CSV export; it only appears in
+      // the PDF when the author opts into the annex below.
+      drawSelectedIncidents(ctx, cargoModel.selected);
+
       const pv = pickRead(data.polestarView, a.polestarView);
       if (pv.trim()) drawSectionWithProse(ctx, "Polestar View", pv);
 
-      // Condensed incident appendix — one row per unique incident, replacing
-      // the removed Related Incidents + Named Port Breakdown + Cargo Incident
-      // Clusters sections. Drawn with jsPDF primitives (not rasterised) so it
-      // paginates within the two-page cap.
-      drawCargoAppendix(ctx, cargoModel.appendix);
+      // Optional full incident annex — off by default. When enabled it is the
+      // last thing before the disclaimer, on its own fresh page.
+      if (options.includeFullAnnex) {
+        drawFullAnnex(ctx, cargoModel.appendix);
+      }
     } else {
       const proseSections: [string, string][] = [
         [

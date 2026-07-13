@@ -38,7 +38,12 @@ import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import ConflictReportPreview from "@/components/ConflictReportPreview";
 import CargoReportPreview from "@/components/CargoReportPreview";
-import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
+import {
+  buildCargoPatternModel,
+  type CargoPatternModelInput,
+} from "@/lib/cargoPatternModel";
+import { downloadCargoRegisterCsv } from "@/lib/cargoRegisterExport";
+import { ArrowLeft, Download, FileSpreadsheet, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
@@ -317,7 +322,36 @@ export default function ReportEditor() {
   const [allowMissingExport, setAllowMissingExport] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
+  // Cargo Watch: opt-in to appending the full incident register as a PDF annex.
+  // Off by default — the standard cargo report ends at Selected Incidents →
+  // Polestar View → Disclaimer; the full register lives in the Workbench + CSV.
+  const [includeFullAnnex, setIncludeFullAnnex] = useState(false);
+
   const incidentsForExport = incidents ?? [];
+
+  // Full deduplicated cargo register (the Workbench-only companion to the PDF's
+  // curated Selected Incidents), exported to CSV on demand. Built from the SAME
+  // model as the preview/PDF so the register matches the report.
+  const cargoRegisterRows = useMemo(() => {
+    if (form.topic !== "cargo_watch") return [];
+    return buildCargoPatternModel(
+      incidentsForExport.map(
+        (i): CargoPatternModelInput => ({
+          id: i.id,
+          topic: i.topic,
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          sourceUrl: i.sourceUrl ?? null,
+          location: i.location ?? null,
+          country: i.country ?? null,
+          severity: i.severity ?? null,
+          occurredAt: i.occurredAt,
+        }),
+      ),
+      { issueDate: form.issueDate ?? new Date().toISOString().slice(0, 10) },
+    ).appendix;
+  }, [form.topic, form.issueDate, incidentsForExport]);
 
   // Per-incident AI summaries for the Related Incidents table of TOPIC,
   // CONFLICT and SHIPPING reports (flashpoint/protests/fuel carry no such
@@ -714,6 +748,7 @@ export default function ReportEditor() {
             incidentSummaries: effectiveSummaries,
             aiProse: aiProseSections,
             marketPrices: energyMarketPrices,
+            includeFullAnnex,
           },
         );
       }
@@ -1306,7 +1341,34 @@ export default function ReportEditor() {
             {form.title || "Untitled report"}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {form.topic === "cargo_watch" && (
+            <>
+              <label className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-muted-foreground cursor-pointer select-none mr-1">
+                <input
+                  type="checkbox"
+                  checked={includeFullAnnex}
+                  onChange={(e) => setIncludeFullAnnex(e.target.checked)}
+                  className="accent-accent"
+                />
+                Include full annex
+              </label>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  downloadCargoRegisterCsv(
+                    cargoRegisterRows,
+                    `${slugifyForFilename(form.title || "cargo-watch")}-incident-register.csv`,
+                  )
+                }
+                disabled={cargoRegisterRows.length === 0}
+                className="rounded-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export Incident Register
+              </Button>
+            </>
+          )}
           <Button
             variant="outline"
             onClick={() => {
@@ -2263,6 +2325,7 @@ export default function ReportEditor() {
               incidents={incidentsForExport}
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
+              includeFullAnnex={includeFullAnnex}
             />
           ) : (
             <ReportPreview

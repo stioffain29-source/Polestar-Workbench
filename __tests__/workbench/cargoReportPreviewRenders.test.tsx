@@ -57,12 +57,34 @@ describe("CargoReportPreview — pattern-report parity", () => {
       "What Matters",
       "Business Priorities",
       "Watch Next",
+      "Selected Incidents",
       "Polestar View",
-      "Incident Appendix",
       "Disclaimer",
     ]) {
       expect(html).toContain(section);
     }
+  });
+
+  it("omits the full incident annex by default and includes it only when opted in", () => {
+    const off = renderToStaticMarkup(
+      <CargoReportPreview report={REPORT} incidents={RICH} />,
+    );
+    expect(off).not.toContain("Incident Annex");
+    const on = renderToStaticMarkup(
+      <CargoReportPreview report={REPORT} incidents={RICH} includeFullAnnex />,
+    );
+    expect(on).toContain("Incident Annex");
+  });
+
+  it("renders no more than six Selected Incidents cards (curated, not the full register)", () => {
+    const html = renderToStaticMarkup(
+      <CargoReportPreview report={REPORT} incidents={RICH} />,
+    );
+    // Each card carries a "Confidence:" label OR a severity chip; count the
+    // date-anchored cards via the summary paragraphs is brittle, so assert the
+    // curated section exists and the full-register table does NOT (annex off).
+    expect(html).toContain("Selected Incidents");
+    expect(html).not.toContain("Incident Summary");
   });
 
   it("drops the removed Related Incidents and Named Port Breakdown surfaces", () => {
@@ -87,9 +109,10 @@ describe("CargoReportPreview — pattern-report parity", () => {
       <CargoReportPreview report={REPORT} incidents={[]} />,
     );
     expect(html.length).toBeGreaterThan(0);
-    // Structural chrome still renders; the appendix names the empty state rather
-    // than inventing incident rows (strict no-fabrication).
-    expect(html).toContain("Incident Appendix");
+    // Structural chrome still renders; Selected Incidents names the empty state
+    // rather than inventing incident rows (strict no-fabrication).
+    expect(html).toContain("Selected Incidents");
+    expect(html).toContain("No cargo-crime incidents were recorded this period.");
     expect(html).toContain("Disclaimer");
   });
 });

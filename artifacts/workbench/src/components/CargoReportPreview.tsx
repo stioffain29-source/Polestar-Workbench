@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { format, parseISO } from "date-fns";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { resolveReportWindow } from "@/lib/reportWindow";
@@ -208,7 +209,134 @@ function GraphicCaption({ text }: { text: string }) {
   );
 }
 
-function AppendixTable({ rows }: { rows: CargoAppendixRow[] }) {
+// Date rendered as "dd MMM yyyy" to match the PDF's cargoDateStr exactly
+// (preview == PDF parity). Blank/invalid dates degrade to the ISO date slice.
+function cargoDateStr(iso: string): string {
+  if (!iso) return "";
+  try {
+    return format(parseISO(iso), "dd MMM yyyy");
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+// "Country — location" line for a card / annex row. Blank segments dropped; no
+// fabricated placeholder text (mirrors the PDF's cargoPlaceLine).
+function placeLine(r: CargoAppendixRow): string {
+  const c = (r.country || "").trim();
+  const l = (r.location || "").trim();
+  if (c && l && l.toLowerCase() !== c.toLowerCase()) return `${c} — ${l}`;
+  return c || l;
+}
+
+// Curated "Selected Incidents" — up to six compact cards demonstrating the
+// period's operational picture (NOT the six most recent). Mirrors the PDF's
+// drawSelectedIncidents section, same order.
+function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, margin: 0 }}>
+        No cargo-crime incidents were recorded this period.
+      </p>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {rows.map((r) => {
+        const chip = sevChipColors(r.severityKey);
+        const meta = [placeLine(r), r.category].filter(Boolean).join("  ·  ");
+        return (
+          <div
+            key={r.id}
+            style={{
+              border: `1px solid ${POLAR}`,
+              padding: "10px 12px",
+              breakInside: "avoid",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  color: NAVY,
+                }}
+              >
+                {cargoDateStr(r.date)}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {r.confidenceLabel && (
+                  <span
+                    style={{
+                      fontFamily: "Roboto, sans-serif",
+                      fontSize: 10.5,
+                      color: DUSK,
+                    }}
+                  >
+                    Confidence: {r.confidenceLabel}
+                  </span>
+                )}
+                <span
+                  style={{
+                    display: "inline-block",
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 9,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    color: chip.fg,
+                    background: chip.bg,
+                    borderRadius: 3,
+                    padding: "2px 6px",
+                    lineHeight: 1,
+                  }}
+                >
+                  {r.severityLabel}
+                </span>
+              </div>
+            </div>
+            {meta && (
+              <div
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontWeight: 500,
+                  fontSize: 11,
+                  color: DUSK,
+                  marginTop: 4,
+                }}
+              >
+                {meta}
+              </div>
+            )}
+            <p
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontSize: 11.5,
+                lineHeight: 1.45,
+                color: NAVY,
+                margin: "4px 0 0",
+              }}
+            >
+              {r.summary}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Full deduplicated incident register — the optional annex, rendered only when
+// the author opts in. Same readable table as the PDF's drawFullAnnex.
+function FullAnnexTable({ rows }: { rows: CargoAppendixRow[] }) {
   if (rows.length === 0) {
     return (
       <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, margin: 0 }}>
@@ -262,8 +390,8 @@ function AppendixTable({ rows }: { rows: CargoAppendixRow[] }) {
           const chip = sevChipColors(r.severityKey);
           return (
             <tr key={r.id} style={{ breakInside: "avoid" }}>
-              <td style={td}>{r.date ? r.date.slice(0, 10) : ""}</td>
-              <td style={td}>{r.location}</td>
+              <td style={td}>{cargoDateStr(r.date)}</td>
+              <td style={td}>{placeLine(r)}</td>
               <td style={td}>{r.category}</td>
               <td style={td}>{r.summary}</td>
               <td style={td}>
@@ -285,7 +413,7 @@ function AppendixTable({ rows }: { rows: CargoAppendixRow[] }) {
                   {r.severityLabel}
                 </span>
               </td>
-              <td style={td}>{r.confidence}</td>
+              <td style={td}>{r.confidenceLabel}</td>
             </tr>
           );
         })}
@@ -298,11 +426,15 @@ export default function CargoReportPreview({
   report,
   incidents = [],
   aiProse,
+  includeFullAnnex = false,
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
   incidentSummaries?: Record<string, string>;
   aiProse?: TopicAiProse | null;
+  /** Mirror of the PDF option: when true, append the full incident register as
+   *  an annex after Polestar View. Off by default. */
+  includeFullAnnex?: boolean;
 }) {
   const topic = report.topic ?? "cargo_watch";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -552,16 +684,24 @@ export default function CargoReportPreview({
             <Bullets text={watchNextText} max={6} />
           </Section>
         )}
+        {/* Curated Selected Incidents — up to six cards, before Polestar View.
+            The full register lives in the Workbench + CSV, not here. */}
+        <Section title="Selected Incidents">
+          <SelectedIncidents rows={model.selected} />
+        </Section>
+
         {polestarViewText.trim() && (
           <Section title="Polestar View">
             <Paragraphs text={polestarViewText} />
           </Section>
         )}
 
-        {/* FINAL — Condensed incident appendix (replaces Related Incidents) */}
-        <Section title="Incident Appendix">
-          <AppendixTable rows={model.appendix} />
-        </Section>
+        {/* Optional full incident annex — off by default, after Polestar View. */}
+        {includeFullAnnex && (
+          <Section title="Incident Annex">
+            <FullAnnexTable rows={model.appendix} />
+          </Section>
+        )}
 
         <Section title="Disclaimer">
           <p
