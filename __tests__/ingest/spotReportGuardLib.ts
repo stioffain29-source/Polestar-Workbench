@@ -55,6 +55,7 @@ function collectTsFiles(path: string): string[] {
   if (st.isFile()) return path.endsWith(".ts") ? [path] : [];
   const out: string[] = [];
   for (const entry of readdirSync(path)) {
+    if (entry === "node_modules") continue;
     out.push(...collectTsFiles(join(path, entry)));
   }
   return out;

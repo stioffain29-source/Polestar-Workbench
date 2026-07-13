@@ -16,6 +16,7 @@ module.exports = {
     // Shared non-test helpers live next to the suites that import them; the
     // broad `testMatch` glob would otherwise run them as (empty) suites.
     "/__tests__/.*TestHelpers\\.ts$",
+    "/__tests__/ingest/spotReportGuardLib\\.ts$",
   ],
   collectCoverage: process.env.CI === "true",
   coverageDirectory: "coverage",

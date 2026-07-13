@@ -203,10 +203,19 @@ export type { UkmtoIngestSummary } from "./ukmtoIngest";
 export {
   runCentcomIngest,
   emptyCentcomIngestSummary,
+  parseCentcomListing,
+  parseCentcomDetail,
+  resolveCentcomUrl,
   CENTCOM_SOURCE,
   CENTCOM_HEALTH_TOPIC,
+  CENTCOM_SITE_ORIGIN,
 } from "./centcomIngest";
-export type { CentcomIngestSummary } from "./centcomIngest";
+export type {
+  CentcomIngestSummary,
+  CentcomIngestOptions,
+  CentcomListingItem,
+  CentcomDetail,
+} from "./centcomIngest";
 export {
   UKMTO_HEALTH_NAME,
   UKMTO_SOURCE_URL,

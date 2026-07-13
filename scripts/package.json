@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "m15:phase0-check": "tsx ./src/m15-phase0-check.ts",
     "import:legacy": "tsx ./src/import-legacy.ts",
     "import:apify-facebook": "tsx ./src/import-apify-facebook.ts",
     "scrape:kammi": "tsx ./src/scrape-kammi.ts",
