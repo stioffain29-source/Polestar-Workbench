@@ -86,6 +86,62 @@ describe("CountryReportMap render (producer/consumer drift guard)", () => {
   });
 });
 
+// Papua New Guinea is a dot-mode country. The Operational Map plots a marker
+// only where a row resolved to a real sub-national place (location is a
+// non-empty string); a centroid-fallback row (location null) is counted but
+// NOT plotted. This is the fix for the map "staying on the same spot each
+// week": every centroid-fallback row used to stack invisibly on the one
+// national point.
+const pngPlacedIncident: CountryFastFactsIncident = {
+  id: "png1",
+  topic: "flashpoint",
+  title: "Tribal clash erupts in Wabag, Enga Province",
+  severity: "high",
+  occurredAt: "2026-06-14T00:00:00.000Z",
+  country: "Papua New Guinea",
+  location: "Wabag",
+  latitude: -5.49,
+  longitude: 143.71,
+};
+
+const pngCentroidIncident: CountryFastFactsIncident = {
+  id: "png2",
+  topic: "flashpoint",
+  title: "Countrywide unrest reported",
+  severity: "high",
+  occurredAt: "2026-06-14T00:00:00.000Z",
+  country: "Papua New Guinea",
+  location: null,
+  latitude: -6.31,
+  longitude: 143.96,
+};
+
+describe("CountryReportMap dot-mode plottability (location-presence gate)", () => {
+  it("plots a PNG row that resolved to a named town", () => {
+    const html = renderToStaticMarkup(
+      <CountryReportMap
+        incidents={[pngPlacedIncident]}
+        countryName="Papua New Guinea"
+      />,
+    );
+    // A plotted row produces a dot card carrying the impact/relevance strings.
+    expect(html).toContain("Impact level:");
+  });
+
+  it("does NOT plot a PNG centroid-fallback row and reports it unplotted", () => {
+    const html = renderToStaticMarkup(
+      <CountryReportMap
+        incidents={[pngCentroidIncident]}
+        countryName="Papua New Guinea"
+      />,
+    );
+    expect(html).not.toContain("Impact level:");
+    expect(html).toContain(
+      "No reported operational issue names a mappable place this period",
+    );
+  });
+});
+
 describe("operationalPinchPoints API shape (fails if exports are renamed)", () => {
   it("classifies a confirmed disruption as Direct impact", () => {
     expect(impactForIncident(dotIncident)).toBe("Direct impact");

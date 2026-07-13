@@ -241,7 +241,6 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   enga: { lat: -5.49, lng: 143.58, name: "Enga" },
   wabag: { lat: -5.49, lng: 143.71, name: "Wabag" },
   hela: { lat: -5.95, lng: 142.9, name: "Hela" },
-  tari: { lat: -5.85, lng: 142.95, name: "Tari" },
   "southern highlands": { lat: -6.15, lng: 143.66, name: "Southern Highlands" },
   mendi: { lat: -6.15, lng: 143.66, name: "Mendi" },
   "western highlands": { lat: -5.86, lng: 144.23, name: "Western Highlands" },
@@ -271,7 +270,7 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   daru: { lat: -9.08, lng: 143.21, name: "Daru" },
   popondetta: { lat: -8.77, lng: 148.24, name: "Popondetta" },
   kokoda: { lat: -8.88, lng: 147.74, name: "Kokoda" },
-  buka: { lat: -5.42, lng: 154.67, name: "Buka" },
+  bougainville: { lat: -6.4, lng: 155.38, name: "Bougainville" },
   // Middle East (Cargo Watch)
   dubai: { lat: 25.2, lng: 55.27 },
   "abu dhabi": { lat: 24.45, lng: 54.38 },
