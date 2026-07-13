@@ -118,6 +118,25 @@ export const STAGE_META: Record<CargoStageKey, CargoStageMeta> = {
   },
 };
 
+// Deterministic, per-STAGE operational-relevance line for the curated "Key
+// Incidents" cards. Explains why an event at this point in the supply chain
+// matters operationally — generic to the stage, never a fabricated per-incident
+// detail. Kept beside STAGE_META so the two stay in step.
+export const OPERATIONAL_RELEVANCE_BY_STAGE: Record<CargoStageKey, string> = {
+  warehouse_depot:
+    "Highlights static-site exposure at storage and distribution facilities, where access control and after-hours security carry the load.",
+  inland_transport:
+    "Points to exposure during road movement on predictable corridors, where route planning and in-transit tracking are the main defences.",
+  staging_yard:
+    "Underlines custody and seal-integrity risk at handover points between carriers.",
+  port_terminal:
+    "Reflects cargo-custody and access-control exposure inside the terminal environment.",
+  maritime:
+    "Shows vessel and anchorage exposure to boarding and theft on the water.",
+  enforcement:
+    "Indicates law-enforcement activity against cargo crime, with a bearing on recovery and repeat-offending.",
+};
+
 // Maps every classifier taxonomy label (see CARGO_CATEGORIES in cargoAnalysis)
 // onto a single supply-chain stage. The floor label routes to the
 // cross-cutting/enforcement stage so it never inflates a specific stage, and

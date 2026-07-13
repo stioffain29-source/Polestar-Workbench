@@ -57,7 +57,7 @@ describe("CargoReportPreview — pattern-report parity", () => {
       "What Matters",
       "Business Priorities",
       "Watch Next",
-      "Selected Incidents",
+      "Key Incidents",
       "Polestar View",
       "Disclaimer",
     ]) {
@@ -76,15 +76,17 @@ describe("CargoReportPreview — pattern-report parity", () => {
     expect(on).toContain("Incident Annex");
   });
 
-  it("renders no more than six Selected Incidents cards (curated, not the full register)", () => {
+  it("renders no more than four curated Key Incidents cards (not the full register)", () => {
     const html = renderToStaticMarkup(
       <CargoReportPreview report={REPORT} incidents={RICH} />,
     );
-    // Each card carries a "Confidence:" label OR a severity chip; count the
-    // date-anchored cards via the summary paragraphs is brittle, so assert the
-    // curated section exists and the full-register table does NOT (annex off).
-    expect(html).toContain("Selected Incidents");
+    // Cards carry a "SEVERITY:" chip (Confidence was removed from the card);
+    // counting date-anchored cards via the summary paragraphs is brittle, so
+    // assert the curated section exists and the full-register table does NOT
+    // (annex off), and that Confidence no longer appears on the cards.
+    expect(html).toContain("Key Incidents");
     expect(html).not.toContain("Incident Summary");
+    expect(html).not.toContain("Confidence:");
   });
 
   it("drops the removed Related Incidents and Named Port Breakdown surfaces", () => {
@@ -109,9 +111,9 @@ describe("CargoReportPreview — pattern-report parity", () => {
       <CargoReportPreview report={REPORT} incidents={[]} />,
     );
     expect(html.length).toBeGreaterThan(0);
-    // Structural chrome still renders; Selected Incidents names the empty state
+    // Structural chrome still renders; Key Incidents names the empty state
     // rather than inventing incident rows (strict no-fabrication).
-    expect(html).toContain("Selected Incidents");
+    expect(html).toContain("Key Incidents");
     expect(html).toContain("No cargo-crime incidents were recorded this period.");
     expect(html).toContain("Disclaimer");
   });

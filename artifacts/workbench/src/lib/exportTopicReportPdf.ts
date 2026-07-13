@@ -453,14 +453,16 @@ function cargoDateStr(iso: string): string {
   }
 }
 
-// Curated "Selected Incidents" — up to six compact cards demonstrating the
-// period's operational picture. Each card carries Date, Country/location,
-// Incident type, a one-sentence summary, a Severity chip and Confidence. Blank
-// fields are simply omitted (no fabricated placeholders). Variable height: the
-// summary wraps, everything else is single-line.
+// Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS compact cards that best
+// illustrate the period's main operational patterns (NOT the most recent). Each
+// card carries Date + a Severity chip, Location · Incident type, a one-sentence
+// summary, an Operational relevance line and (only where the source carries an
+// explicit signal) a resolved Status. Confidence is deliberately omitted from
+// the cards — it stays in the register and CSV. Blank fields are omitted (no
+// fabricated placeholders). Mirrors CargoReportPreview's SelectedIncidents.
 function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
   const { pdf, MX, CW } = ctx;
-  drawSectionHeading(ctx, "Selected Incidents");
+  drawSectionHeading(ctx, "Key Incidents");
   if (rows.length === 0) {
     renderProse(ctx, "No cargo-crime incidents were recorded this period.");
     return;
@@ -470,8 +472,24 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
   const innerW = CW - 2 * PAD;
   const SUM_FONT = 8.5;
   const META_FONT = 8;
+  const REL_FONT = 8;
   const lineH = 11;
   const gap = 8;
+
+  // Section subtitle (italic), mirroring the on-screen preview.
+  setRoboto(pdf, "italic");
+  pdf.setFontSize(META_FONT);
+  setText(pdf, DUSK);
+  const subLines: string[] = pdf.splitTextToSize(
+    "Incidents that best illustrate the main operational patterns identified during the reporting period.",
+    CW,
+  );
+  ensureSpace(ctx, subLines.length * lineH + 4);
+  for (const line of subLines) {
+    ctx.y += lineH;
+    pdf.text(line, MX, ctx.y);
+  }
+  ctx.y += 6;
 
   for (const r of rows) {
     // Pre-measure the card so it never splits across a page break.
@@ -484,11 +502,25 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
     const place = cargoPlaceLine(r);
     const typeLine = sanitize(r.category);
     const hasMeta = !!(place || typeLine);
+
+    // Operational relevance + resolved status (only where present).
+    pdf.setFontSize(REL_FONT);
+    const relText = sanitize(r.operationalRelevance || "");
+    const relLines: string[] = relText
+      ? pdf.splitTextToSize(`Operational relevance: ${relText}`, innerW)
+      : [];
+    const statusText = sanitize(r.clientStatus || "");
+    const statusLines: string[] = statusText
+      ? pdf.splitTextToSize(`Status: ${statusText}`, innerW)
+      : [];
+
     const cardH =
       PAD + // top pad
       lineH + // date + chip row
       (hasMeta ? lineH : 0) + // place · category
       summaryLines.length * lineH + // summary
+      relLines.length * lineH + // operational relevance
+      statusLines.length * lineH + // resolved status
       PAD; // bottom pad
 
     ensureSpace(ctx, cardH + gap);
@@ -499,38 +531,30 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
     pdf.setLineWidth(0.7);
     pdf.rect(MX, top, CW, cardH);
 
-    // Row 1: date (left) and severity chip + confidence (right).
+    // Row 1: date (left) and severity chip (right). Confidence is intentionally
+    // not drawn here — it lives in the register and CSV, not the card.
     let cursorY = top + PAD + 8;
     setRoboto(pdf, "bold");
     pdf.setFontSize(META_FONT);
     setText(pdf, NAVY);
     pdf.text(cargoDateStr(r.date), MX + PAD, cursorY);
 
-    // Severity chip on the right; confidence text sits to its left.
     const sk = sevKey(r.severityKey);
-    const sevText = sanitize((r.severityLabel || "").toUpperCase());
-    let chipLeft = MX + CW - PAD;
-    if (sevText) {
+    const label = (r.severityLabel || "").trim();
+    if (label) {
+      const sevText = sanitize(`SEVERITY: ${label.toUpperCase()}`);
       setRoboto(pdf, "bold");
       pdf.setFontSize(6.5);
       const chipTextW = pdf.getTextWidth(sevText);
       const chipW = chipTextW + 12;
       const chipH = 11;
-      chipLeft = MX + CW - PAD - chipW;
+      const chipLeft = MX + CW - PAD - chipW;
       setFill(pdf, SEV_COLOR[sk] ?? "#999999");
       pdf.rect(chipLeft, top + PAD + 1, chipW, chipH, "F");
       setText(pdf, WHITE);
       pdf.text(sevText, chipLeft + chipW / 2, top + PAD + 8.5, {
         align: "center",
       });
-    }
-    if (r.confidenceLabel) {
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(META_FONT);
-      setText(pdf, DUSK);
-      const conf = `Confidence: ${sanitize(r.confidenceLabel)}`;
-      const confW = pdf.getTextWidth(conf);
-      pdf.text(conf, chipLeft - 8 - confW, cursorY);
     }
 
     // Row 2: place · category.
@@ -551,6 +575,28 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
     for (const line of summaryLines) {
       pdf.text(line, MX + PAD, cursorY);
       cursorY += lineH;
+    }
+
+    // Operational relevance (wrapped).
+    if (relLines.length) {
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(REL_FONT);
+      setText(pdf, DUSK);
+      for (const line of relLines) {
+        pdf.text(line, MX + PAD, cursorY);
+        cursorY += lineH;
+      }
+    }
+
+    // Resolved status (wrapped).
+    if (statusLines.length) {
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(REL_FONT);
+      setText(pdf, DUSK);
+      for (const line of statusLines) {
+        pdf.text(line, MX + PAD, cursorY);
+        cursorY += lineH;
+      }
     }
 
     ctx.y = top + cardH + gap;
@@ -753,11 +799,47 @@ export async function exportTopicReportPdf(
     ),
   });
 
-  const execText = resolveSimpleProse(
-    data.executiveSummary,
-    aiProse?.executiveSummary,
-    proseDraft.executiveSummary,
-  );
+  const isCargo = data.topic === "cargo_watch";
+  // Cargo Watch is a pattern report: one shared model drives Fast Facts, the
+  // four operational graphics, the deterministic assessment prose, the
+  // executive summary and the curated Key Incidents — built ONCE, above the
+  // Executive Summary, from the SAME windowed set the on-screen preview uses so
+  // screen == PDF. Hoisted here so the Executive Summary can read it.
+  const cargoModel = isCargo
+    ? buildCargoPatternModel(
+        filterTopicReportIncidents(incidents, data.topic, data.issueDate).map(
+          (i) => ({
+            id: i.id,
+            topic: i.topic,
+            title: i.title,
+            summary: i.summary ?? null,
+            source: i.source ?? null,
+            sourceUrl: i.sourceUrl ?? null,
+            location: i.location ?? null,
+            country: i.country ?? null,
+            severity: i.severity ?? null,
+            occurredAt: i.occurredAt,
+          }),
+        ),
+        {
+          issueDate: data.issueDate,
+          topicLabel: topicLabels[data.topic] ?? data.topic,
+        },
+      )
+    : null;
+
+  // Executive Summary. For Cargo Watch it is the deterministic, analytical
+  // paragraph from the model (spec TASK A) — an owner override wins, the AI
+  // layer is deliberately NOT consulted so the strict format rules always hold.
+  // Every other topic keeps the AI narrative + template fallback stack.
+  const execText =
+    isCargo && cargoModel
+      ? resolveSimpleProse(data.executiveSummary, null, cargoModel.executiveSummary)
+      : resolveSimpleProse(
+          data.executiveSummary,
+          aiProse?.executiveSummary,
+          proseDraft.executiveSummary,
+        );
   if (execText.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, execText);
@@ -947,34 +1029,8 @@ export async function exportTopicReportPdf(
       ),
     );
   } else {
-    const isCargo = data.topic === "cargo_watch";
-    // Cargo Watch is a pattern report: one shared model drives Fast Facts, the
-    // four operational graphics, the deterministic assessment prose, and the
-    // condensed appendix — built ONCE from the SAME windowed set the on-screen
-    // preview uses so screen == PDF.
-    const cargoModel = isCargo
-      ? buildCargoPatternModel(
-          filterTopicReportIncidents(incidents, data.topic, data.issueDate).map(
-            (i) => ({
-              id: i.id,
-              topic: i.topic,
-              title: i.title,
-              summary: i.summary ?? null,
-              source: i.source ?? null,
-              sourceUrl: i.sourceUrl ?? null,
-              location: i.location ?? null,
-              country: i.country ?? null,
-              severity: i.severity ?? null,
-              occurredAt: i.occurredAt,
-            }),
-          ),
-          {
-            issueDate: data.issueDate,
-            topicLabel: topicLabels[data.topic] ?? data.topic,
-          },
-        )
-      : null;
-
+    // isCargo + cargoModel are hoisted above the Executive Summary so it can
+    // read the model's deterministic executive summary.
     drawSectionHeading(ctx, "Fast Facts");
     drawFastFactsKpiCards(
       ctx,
@@ -1081,10 +1137,10 @@ export async function exportTopicReportPdf(
       const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
       if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 6);
 
-      // Curated Selected Incidents — up to six cards demonstrating the period's
-      // operational picture (NOT the six most recent). The full deduplicated
-      // register lives in the Workbench and the CSV export; it only appears in
-      // the PDF when the author opts into the annex below.
+      // Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS cards that best
+      // illustrate the period's operational patterns (NOT the most recent). The
+      // full deduplicated register lives in the Workbench and the CSV export; it
+      // only appears in the PDF when the author opts into the annex below.
       drawSelectedIncidents(ctx, cargoModel.selected);
 
       const pv = pickRead(data.polestarView, a.polestarView);

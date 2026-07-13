@@ -293,6 +293,33 @@ export function hasPortCargoSecurity(text: string): boolean {
   return PORT_CARGO_SECURITY_RE.test(text);
 }
 
+// Personal, non-commercial robbery cues — a private traveller's phone, wallet or
+// cash; a passenger vehicle; household property. On their own these describe
+// street/highway crime, not a cargo movement.
+const PERSONAL_ROBBERY_RE =
+  /\b(passengers?|commuters?|pedestrians?|motorists?|motorcyclists?|private (?:car|vehicle|traveller|traveler)|mobile phone|smartphone|handset|wallet|handbag|purse|personal (?:cash|belongings|effects|phone|mobile|items)|household (?:goods|items|property|belongings))\b/i;
+
+// Stricter, DISPLAY-ONLY cargo-relatedness predicate for the curated "Key
+// Incidents" cards. Confirms the event genuinely involves a commercial cargo
+// movement or logistics operation, and drops ordinary personal robberies that
+// carry no commercial-cargo signal. Purely additive — it never touches Fast
+// Facts, Supply-Chain Exposure or Operational Patterns, which read the full set.
+export function isCargoRelatedIncident(text: string): boolean {
+  const t = text || "";
+  const commercial = hasCargoVocab(t) || hasPortCargoSecurity(t);
+  if (!commercial) return false;
+  // A clearly personal robbery with no explicit load/port context is excluded
+  // even if a stray cargo noun appears in passing.
+  if (
+    PERSONAL_ROBBERY_RE.test(t) &&
+    !hasPortCargoSecurity(t) &&
+    !CARGO_LOAD_CONTEXT_RE.test(t)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 // Commercial-shipping / port-OPERATIONS noise explicitly ruled OUT of Cargo
 // Watch: berth / anchorage congestion and waiting, port throughput / expansion /
 // development / automation / capacity, dwell time, demurrage, freight / box /

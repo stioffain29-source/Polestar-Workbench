@@ -8,12 +8,9 @@ import { topicCoverUrl } from "@/lib/coverImages";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import {
   resolveSimpleProse,
-  stableDraftTopicReportProse,
-  toDraftableIncidents,
   type TopicAiProse,
 } from "@/lib/topicProseResolution";
 import type { TopicFastFactsIncident, TopicFastFactCard } from "@/lib/topicFastFacts";
-import { filterTopicReportIncidents } from "@/lib/topicFastFacts";
 import {
   buildCargoPatternModel,
   type CargoPatternModelInput,
@@ -229,9 +226,12 @@ function placeLine(r: CargoAppendixRow): string {
   return c || l;
 }
 
-// Curated "Selected Incidents" — up to six compact cards demonstrating the
-// period's operational picture (NOT the six most recent). Mirrors the PDF's
-// drawSelectedIncidents section, same order.
+// Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS compact cards that best
+// illustrate the period's main operational patterns (NOT the most recent).
+// Mirrors the PDF's drawSelectedIncidents section, same order and fields: date +
+// severity, location · type, summary, operational relevance and (only where the
+// source carries an explicit signal) a resolved status. Confidence is
+// deliberately omitted from the cards — it stays in the register and CSV.
 function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
   if (rows.length === 0) {
     return (
@@ -242,6 +242,19 @@ function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <p
+        style={{
+          fontFamily: "Roboto, sans-serif",
+          fontSize: 11.5,
+          fontStyle: "italic",
+          lineHeight: 1.5,
+          color: DUSK,
+          margin: "0 0 2px",
+        }}
+      >
+        Incidents that best illustrate the main operational patterns identified
+        during the reporting period.
+      </p>
       {rows.map((r) => {
         const chip = sevChipColors(r.severityKey);
         const meta = [placeLine(r), r.category].filter(Boolean).join("  ·  ");
@@ -272,36 +285,23 @@ function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
               >
                 {cargoDateStr(r.date)}
               </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {r.confidenceLabel && (
-                  <span
-                    style={{
-                      fontFamily: "Roboto, sans-serif",
-                      fontSize: 10.5,
-                      color: DUSK,
-                    }}
-                  >
-                    Confidence: {r.confidenceLabel}
-                  </span>
-                )}
-                <span
-                  style={{
-                    display: "inline-block",
-                    fontFamily: "Roboto, sans-serif",
-                    fontWeight: 700,
-                    fontSize: 9,
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                    color: chip.fg,
-                    background: chip.bg,
-                    borderRadius: 3,
-                    padding: "2px 6px",
-                    lineHeight: 1,
-                  }}
-                >
-                  {r.severityLabel}
-                </span>
-              </div>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "Roboto, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 9,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  color: chip.fg,
+                  background: chip.bg,
+                  borderRadius: 3,
+                  padding: "2px 6px",
+                  lineHeight: 1,
+                }}
+              >
+                SEVERITY: {r.severityLabel}
+              </span>
             </div>
             {meta && (
               <div
@@ -327,6 +327,33 @@ function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
             >
               {r.summary}
             </p>
+            {r.operationalRelevance && (
+              <p
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontSize: 11,
+                  lineHeight: 1.45,
+                  color: DUSK,
+                  margin: "4px 0 0",
+                }}
+              >
+                <span style={{ fontWeight: 700 }}>Operational relevance:</span>{" "}
+                {r.operationalRelevance}
+              </p>
+            )}
+            {r.clientStatus && (
+              <p
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontSize: 11,
+                  lineHeight: 1.45,
+                  color: DUSK,
+                  margin: "2px 0 0",
+                }}
+              >
+                <span style={{ fontWeight: 700 }}>Status:</span> {r.clientStatus}
+              </p>
+            )}
           </div>
         );
       })}
@@ -464,30 +491,16 @@ export default function CargoReportPreview({
     [incidents, issueDate],
   );
 
-  // Executive Summary keeps the AI narrative layer (with a deterministic
-  // template fallback) so it can explain exposure, geography, the period's key
-  // change and reporting confidence. The five assessment sections below are
-  // deterministic from the model and editable via pickRead.
-  const proseDraft = useMemo(
-    () =>
-      stableDraftTopicReportProse({
-        topic,
-        issueDate,
-        // Build the fallback draft from the SAME windowed + cargo-scoped set the
-        // PDF uses (exportTopicReportPdf) so the Executive Summary fallback never
-        // disagrees between the preview and the export.
-        incidents: toDraftableIncidents(
-          topic && issueDate
-            ? filterTopicReportIncidents(incidents, topic, issueDate)
-            : incidents,
-        ),
-      }),
-    [topic, issueDate, incidents],
-  );
+  // Executive Summary is a deterministic, analytical paragraph built from the
+  // cargo model (spec TASK A): dominant supply-chain stage, leading patterns,
+  // principal geography, overall severity and the main operational implication.
+  // An owner override wins; the AI narrative layer is deliberately NOT consulted
+  // here so the summary always honours the strict format rules (word count,
+  // banned phrases). The assessment sections below stay editable via pickRead.
   const execText = resolveSimpleProse(
     report.executiveSummary,
-    aiProse?.executiveSummary,
-    proseDraft.executiveSummary,
+    null,
+    model.executiveSummary,
   );
 
   const a = model.assessment;
@@ -684,9 +697,9 @@ export default function CargoReportPreview({
             <Bullets text={watchNextText} max={6} />
           </Section>
         )}
-        {/* Curated Selected Incidents — up to six cards, before Polestar View.
-            The full register lives in the Workbench + CSV, not here. */}
-        <Section title="Selected Incidents">
+        {/* Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS cards, before
+            Polestar View. The full register lives in the Workbench + CSV. */}
+        <Section title="Key Incidents">
           <SelectedIncidents rows={model.selected} />
         </Section>
 

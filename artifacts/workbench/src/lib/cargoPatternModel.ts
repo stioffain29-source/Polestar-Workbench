@@ -16,6 +16,7 @@ import {
   classifyCargoCategory,
   parseUsdLoss,
   cargoCountry,
+  isCargoRelatedIncident,
   type CargoIncidentLike,
 } from "./cargoAnalysis";
 import {
@@ -40,6 +41,7 @@ import { stripWireCruft } from "./incidentTitle";
 import {
   STAGE_ORDER,
   STAGE_META,
+  OPERATIONAL_RELEVANCE_BY_STAGE,
   stageForCategory,
   WEEKLY_PATTERN_ROW_LABEL,
   ACTIVITY_MATRIX_MIN_INCIDENTS,
@@ -181,6 +183,13 @@ export interface CargoAppendixRow {
   company: string; // company / operator, "" when not reported
   source: string; // publisher name, "" when unknown
   sourceUrl: string; // "" when unknown
+  // Curated "Key Incidents" card fields. `operationalRelevance` is a
+  // deterministic, per-stage line explaining why the event matters
+  // operationally; `clientStatus` is a resolved outcome (Suspects arrested,
+  // Cargo recovered, Under investigation, Unconfirmed, Ongoing) surfaced ONLY
+  // where the source text carries an explicit signal — "" otherwise.
+  operationalRelevance: string;
+  clientStatus: string;
 }
 
 // Input to the deterministic Selected Incidents chooser. One per unique
@@ -197,7 +206,31 @@ export interface CargoSelectionCandidate {
   row: CargoAppendixRow;
 }
 
-export const MAX_SELECTED_INCIDENTS = 6;
+export const MAX_SELECTED_INCIDENTS = 4;
+
+// Resolve a client-facing STATUS for a "Key Incidents" card from the source
+// text ALONE — surfaced only where an explicit signal exists, "" otherwise (no
+// default "Ongoing", which would be fabrication). Precedence runs strongest
+// outcome first: an arrest, then a recovery, then an active investigation, then
+// a stated ongoing situation, and finally an unconfirmed/speculative framing.
+function deriveClientStatus(signalText: string): string {
+  const t = signalText || "";
+  if (/\b(arrest\w*|detain\w*|apprehend\w*|charged|convict\w*|sentenc\w*)\b/i.test(t))
+    return "Suspects arrested";
+  if (/\b(recover\w*|recovered|seiz\w*|seized|confiscat\w*|returned)\b/i.test(t))
+    return "Cargo recovered";
+  if (/\b(investigat\w*|probe|inquiry|manhunt|hunt for|search for|searching for)\b/i.test(t))
+    return "Under investigation";
+  if (/\b(ongoing|continu\w*|still at large|remain\w* at large|yet to be caught)\b/i.test(t))
+    return "Ongoing";
+  if (
+    /\b(alleged\w*|unconfirmed|reportedly|suspected|claim\w*|purported\w*|no confirmation)\b/i.test(
+      t,
+    )
+  )
+    return "Unconfirmed";
+  return "";
+}
 
 // Law-enforcement disruption / recovery cues (criterion f). Enforcement-stage
 // categories (arrests) plus seizure/recovery wording that lands in other stages
@@ -226,18 +259,79 @@ function bestOf(
   return candidates.slice().sort(bySelectionRank)[0];
 }
 
-// Choose <= MAX_SELECTED_INCIDENTS incidents that demonstrate the period's
-// operational picture across six criteria, in order:
-//   (a) most-frequent operational pattern
-//   (b) highest-consequence pattern
-//   (c) main affected geography
-//   (d) largest positive within-window change (surge week), skipped if < 2 weeks
-//   (e) a credible insider / organised-crime indicator
-//   (f) a law-enforcement disruption / recovery
-// Picks are de-duplicated by id (an incident satisfying several criteria counts
-// once), then topped up by consequence so the section is never short when data
-// exists. Explicitly NOT the six most recent. No "vs previous period" claim is
-// ever emitted — criterion (d) only influences WHICH incident is shown.
+function normLocKey(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function summaryTokens(s: string): Set<string> {
+  return new Set(
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2),
+  );
+}
+
+function tokenOverlapRatio(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  let shared = 0;
+  for (const w of small) if (large.has(w)) shared++;
+  return shared / small.size;
+}
+
+// Collapse near-duplicate EVENTS among selection candidates so two syndicated
+// copies of one incident can never occupy two "Key Incidents" cards. Two
+// candidates merge when they share the same day, a normalised location AND the
+// same category, and their cleaned summaries overlap by >= 60% of the shorter
+// token set. The higher-ranked candidate (bySelectionRank) is kept. Display-only
+// — it never touches the full register, Fast Facts or the pattern counts.
+function dedupeCandidateEvents(
+  candidates: CargoSelectionCandidate[],
+): CargoSelectionCandidate[] {
+  const ranked = candidates.slice().sort(bySelectionRank);
+  const kept: CargoSelectionCandidate[] = [];
+  const keptMeta: {
+    day: string;
+    loc: string;
+    category: string;
+    toks: Set<string>;
+  }[] = [];
+  for (const c of ranked) {
+    const day = (c.date || "").slice(0, 10);
+    const loc = normLocKey(c.row.location);
+    const toks = summaryTokens(c.row.summary);
+    const dup = keptMeta.some(
+      (m) =>
+        m.day === day &&
+        m.loc === loc &&
+        m.category === c.category &&
+        tokenOverlapRatio(m.toks, toks) >= 0.6,
+    );
+    if (dup) continue;
+    kept.push(c);
+    keptMeta.push({ day, loc, category: c.category, toks });
+  }
+  return kept;
+}
+
+// Choose <= MAX_SELECTED_INCIDENTS incidents that best illustrate the period's
+// main operational patterns, across four archetypes, in order:
+//   (a) most-frequent operational pattern (the dominant threat)
+//   (b) highest-consequence pattern (the most operationally significant event)
+//   (c) an event that broadens the picture — a different affected geography OR
+//       supply-chain stage from those already picked
+//   (f) a law-enforcement disruption / recovery outcome, where present
+// Picks are de-duplicated by id (an incident satisfying several archetypes
+// counts once), then topped up so the section fills when data exists — preferring
+// a fresh country+category combination before a second card from an
+// already-represented combination. Explicitly NOT the most recent, and NO
+// "vs previous period" / surge claim is ever emitted.
 export function selectIncidents(
   candidates: CargoSelectionCandidate[],
   opts: { max?: number } = {},
@@ -261,13 +355,9 @@ export function selectIncidents(
   // Frequency + mean consequence per category (patterns).
   const catCount = new Map<string, number>();
   const catConsSum = new Map<string, number>();
-  const countryCount = new Map<string, number>();
   for (const c of candidates) {
     catCount.set(c.category, (catCount.get(c.category) ?? 0) + 1);
     catConsSum.set(c.category, (catConsSum.get(c.category) ?? 0) + c.consequence);
-    if (c.country) {
-      countryCount.set(c.country, (countryCount.get(c.country) ?? 0) + 1);
-    }
   }
 
   // (a) most-frequent pattern: highest count, tie-break higher mean consequence,
@@ -303,54 +393,6 @@ export function selectIncidents(
     }
   }
 
-  // (c) main geography: most-reported country.
-  let mainCountry: string | null = null;
-  for (const [country, count] of countryCount) {
-    if (mainCountry === null) {
-      mainCountry = country;
-      continue;
-    }
-    const bestCount = countryCount.get(mainCountry) ?? 0;
-    if (count > bestCount || (count === bestCount && country < mainCountry)) {
-      mainCountry = country;
-    }
-  }
-
-  // (d) largest positive within-window change. Bucket candidates into
-  //     Monday-anchored weeks and find the week whose count most exceeds the
-  //     preceding week's. Needs at least two distinct weeks; otherwise skipped.
-  const weekKey = (iso: string): string | null => {
-    const d = parseISO(iso);
-    if (!isValid(d)) return null;
-    return startOfWeek(d, { weekStartsOn: 1 }).toISOString().slice(0, 10);
-  };
-  const weekBuckets = new Map<string, CargoSelectionCandidate[]>();
-  for (const c of candidates) {
-    const wk = weekKey(c.date);
-    if (!wk) continue;
-    const arr = weekBuckets.get(wk);
-    if (arr) arr.push(c);
-    else weekBuckets.set(wk, [c]);
-  }
-  let surgeWeek: string | null = null;
-  const orderedWeeks = [...weekBuckets.keys()].sort();
-  if (orderedWeeks.length >= 2) {
-    let bestDelta = 0;
-    for (let i = 1; i < orderedWeeks.length; i++) {
-      const delta =
-        (weekBuckets.get(orderedWeeks[i])?.length ?? 0) -
-        (weekBuckets.get(orderedWeeks[i - 1])?.length ?? 0);
-      if (delta > bestDelta) {
-        bestDelta = delta;
-        surgeWeek = orderedWeeks[i];
-      }
-    }
-  }
-
-  // (e) insider / organised-crime indicator.
-  const orgInsider = candidates.filter(
-    (c) => ORG_CRIME_RE.test(c.signalText) || INSIDER_RE.test(c.signalText),
-  );
   // (f) law-enforcement disruption / recovery.
   const enforcement = candidates.filter(
     (c) => c.stage === "enforcement" || LAW_ENFORCEMENT_RE.test(c.signalText),
@@ -361,17 +403,36 @@ export function selectIncidents(
     if (c && !picks.some((p) => p.id === c.id)) picks.push(c);
   };
 
+  // (a) the dominant pattern and (b) the most operationally significant event.
   pushUnique(freqCat ? bestOf(candidates.filter((c) => c.category === freqCat)) : null);
   pushUnique(consCat ? bestOf(candidates.filter((c) => c.category === consCat)) : null);
-  pushUnique(
-    mainCountry ? bestOf(candidates.filter((c) => c.country === mainCountry)) : null,
-  );
-  pushUnique(surgeWeek ? bestOf(weekBuckets.get(surgeWeek) ?? []) : null);
-  pushUnique(bestOf(orgInsider));
-  pushUnique(bestOf(enforcement));
 
-  // Top up by consequence so a data-rich period always fills the section.
+  // (c) broaden the picture: the strongest event whose affected geography or
+  //     supply-chain stage is not already represented among the picks.
+  const diverse = candidates.filter((c) => {
+    if (picks.some((p) => p.id === c.id)) return false;
+    const newCountry = !!c.country && !picks.some((p) => p.country === c.country);
+    const newStage = !picks.some((p) => p.stage === c.stage);
+    return newCountry || newStage;
+  });
+  pushUnique(bestOf(diverse));
+
+  // (f) a law-enforcement disruption or recovery outcome, where present.
+  pushUnique(bestOf(enforcement.filter((c) => !picks.some((p) => p.id === c.id))));
+
+  // Top up so a data-rich period always fills the section, but prefer an event
+  // that adds a fresh country+category combination before allowing a second
+  // card from an already-represented combination (a genuine cluster).
   if (picks.length < max) {
+    const combo = (c: CargoSelectionCandidate) => `${c.country}|${c.category}`;
+    const takenCombos = new Set(picks.map(combo));
+    for (const c of candidates.slice().sort(bySelectionRank)) {
+      if (picks.length >= max) break;
+      if (picks.some((p) => p.id === c.id)) continue;
+      if (takenCombos.has(combo(c))) continue;
+      pushUnique(c);
+      takenCombos.add(combo(c));
+    }
     for (const c of candidates.slice().sort(bySelectionRank)) {
       if (picks.length >= max) break;
       pushUnique(c);
@@ -404,7 +465,8 @@ export interface CargoPatternModel {
   activity: CargoActivityMatrix;
   matrix: CargoMatrix;
   appendix: CargoAppendixRow[]; // FULL deduplicated register (Workbench only)
-  selected: CargoAppendixRow[]; // <= 6 curated Selected Incidents (client PDF)
+  selected: CargoAppendixRow[]; // <= MAX_SELECTED_INCIDENTS curated Key Incidents
+  executiveSummary: string; // one analytical paragraph (spec TASK A)
   assessment: CargoAssessment;
 }
 
@@ -868,15 +930,19 @@ export function buildCargoPatternModel(
         company: e.company ?? "",
         source: (d.primary.source ?? "").trim(),
         sourceUrl: (d.primary.sourceUrl ?? "").trim(),
+        operationalRelevance: OPERATIONAL_RELEVANCE_BY_STAGE[d.stage] ?? "",
+        clientStatus: deriveClientStatus(primaryText(d.primary)),
       };
     });
 
-  // Curated Selected Incidents — a small, deterministic set (<= 6) chosen to
-  // demonstrate the period's operational picture (most-frequent pattern,
-  // highest-consequence pattern, main geography, the largest within-window
-  // change, a credible insider/organised indicator and a law-enforcement
-  // disruption/recovery). NOT the six most recent. Built from the same derived
-  // set as the full register, keyed by id so the two never disagree.
+  // Curated "Key Incidents" — a small, deterministic set (<= MAX_SELECTED_INCIDENTS)
+  // that best illustrates the period's main operational patterns (dominant
+  // pattern, highest-consequence event, a broadening geography/stage and a
+  // law-enforcement outcome). NOT the most recent. Built from the same derived
+  // set as the full register, keyed by id so the two never disagree. A stricter
+  // cargo-relatedness gate (drops ordinary personal robberies) and an event
+  // de-duplication pass apply to the CARDS ONLY — the full register keeps every
+  // unique row.
   const rowById = new Map(appendix.map((r) => [r.id, r]));
   const candidates: CargoSelectionCandidate[] = derived
     .map((d) => {
@@ -894,8 +960,9 @@ export function buildCargoPatternModel(
         row,
       } satisfies CargoSelectionCandidate;
     })
-    .filter((c): c is CargoSelectionCandidate => c !== null);
-  const selected = selectIncidents(candidates);
+    .filter((c): c is CargoSelectionCandidate => c !== null)
+    .filter((c) => isCargoRelatedIncident(c.signalText));
+  const selected = selectIncidents(dedupeCandidateEvents(candidates));
 
   // 10. Data-derived captions (spec PAGE 2). No hardcoded names/dates.
   const mapCaption = buildMapCaption(intensity, totalUnique);
@@ -910,7 +977,7 @@ export function buildCargoPatternModel(
     totalUnique,
   );
 
-  return {
+  const model: CargoPatternModel = {
     totalUnique,
     isEmpty,
     clusters,
@@ -926,8 +993,11 @@ export function buildCargoPatternModel(
     matrix,
     appendix,
     selected,
+    executiveSummary: "",
     assessment,
   };
+  model.executiveSummary = buildCargoExecutiveSummary(model);
+  return model;
 }
 
 // --- Data-derived captions ------------------------------------------------
@@ -1021,6 +1091,103 @@ function buildActivityStatement(
     return `Reporting spread across the period, with ${leadLabel} the most frequently reported pattern.`;
   }
   return "Reporting stayed dispersed across the period, with no single week or pattern dominating.";
+}
+
+// --- Executive summary (spec TASK A) --------------------------------------
+
+// STRICT rising check for the weekly totals: only true when the last three
+// reporting weeks are monotonically non-decreasing AND the final week exceeds
+// the first of the three. Anything shorter, flat or choppy is NOT "rising", so
+// the summary never claims a trend the data does not support.
+export function isWeeklyRising(weeklyTotals: number[]): boolean {
+  const t = weeklyTotals.slice(-3);
+  if (t.length < 3) return false;
+  return t[2] > t[0] && t[2] >= t[1] && t[1] >= t[0];
+}
+
+// Build the single-paragraph analytical executive summary. Deterministic and
+// data-derived: names the dominant supply-chain stage, the leading one or two
+// patterns, the principal geography (not every country), law-enforcement only
+// where material, the overall severity and the main operational implication. No
+// record counts, no numerals, none of the banned crutch phrases; "rising" and
+// organised-crime framing appear only when the data supports them. Appends the
+// exact indicative-reporting note only when reporting is thin (< 5 unique).
+export function buildCargoExecutiveSummary(model: CargoPatternModel): string {
+  if (model.totalUnique === 0) {
+    return "No qualifying cargo-security incidents were identified during the reporting period. Reporting remains indicative rather than comprehensive.";
+  }
+
+  const leadStage = model.stages
+    .slice()
+    .sort((a, b) => b.count - a.count)
+    .filter((s) => s.count > 0)[0];
+  const stagePhrase = leadStage
+    ? `${leadStage.label.toLowerCase()} activity`
+    : "activity spread across the supply chain";
+
+  const leadPatterns = model.patterns.slice(0, 2).map((p) => p.name.toLowerCase());
+  let patternClause: string;
+  if (leadPatterns.length >= 2) {
+    patternClause = `, with ${leadPatterns[0]} and ${leadPatterns[1]} the clearest drivers of exposure`;
+  } else if (leadPatterns.length === 1) {
+    patternClause = `, with ${leadPatterns[0]} the clearest driver of exposure`;
+  } else {
+    patternClause = "";
+  }
+  const risingClause = isWeeklyRising(model.activity.weeklyTotals)
+    ? ", and reported activity rose towards the end of the period"
+    : "";
+  const s1 = `Cargo-security reporting this period centred on ${stagePhrase}${patternClause}${risingClause}.`;
+
+  const enforcementStage = model.stages.find(
+    (s) => s.key === "enforcement" && s.count > 0,
+  );
+  const enforcementMaterial = !!enforcementStage && enforcementStage.sharePct >= 20;
+  const enforcementClause = enforcementMaterial
+    ? ", with law-enforcement activity a visible feature"
+    : "";
+  const geo = topCountry(model.primaries);
+  const s2 = geo
+    ? `Reporting was most concentrated in ${geo}${enforcementClause}, although this may partly reflect stronger local media coverage there.`
+    : `Reporting was geographically dispersed, with no single country dominating${enforcementClause}.`;
+
+  const sevCount = new Map<string, number>();
+  for (const r of model.appendix) {
+    const k = r.severityKey || sevKey(r.severityLabel);
+    sevCount.set(k, (sevCount.get(k) ?? 0) + 1);
+  }
+  let modalKey = "moderate";
+  let modalN = -1;
+  let highestKey = "insignificant";
+  for (const [k, n] of sevCount) {
+    if (n > modalN || (n === modalN && (SEV_RANK[k] ?? 0) > (SEV_RANK[modalKey] ?? 0))) {
+      modalN = n;
+      modalKey = k;
+    }
+    if ((SEV_RANK[k] ?? 0) > (SEV_RANK[highestKey] ?? 0)) highestKey = k;
+  }
+  const modalLabel = (SEV_LABEL[modalKey] ?? modalKey).toLowerCase();
+  const s3 =
+    (SEV_RANK[highestKey] ?? 0) > (SEV_RANK[modalKey] ?? 0)
+      ? `Overall severity was predominantly ${modalLabel}, with a minority of events reaching ${(SEV_LABEL[highestKey] ?? highestKey).toLowerCase()} severity.`
+      : `Overall severity was predominantly ${modalLabel}, with no higher-tier events recorded.`;
+
+  const concern = leadStage
+    ? leadStage.primaryConcern.toLowerCase()
+    : "cargo-in-transit protection";
+  const controls = model.patterns[0]?.controlAffected.slice(0, 2) ?? [];
+  const controlClause =
+    controls.length >= 2
+      ? `, with ${controls[0].toLowerCase()} and ${controls[1].toLowerCase()} the controls most in need of reinforcement across the region`
+      : controls.length === 1
+        ? `, with ${controls[0].toLowerCase()} the control most in need of reinforcement across the region`
+        : " across the region";
+  const s4 = `This keeps ${concern} the main operational priority${controlClause}.`;
+
+  const thinNote =
+    model.totalUnique < 5 ? " Reporting remains indicative rather than comprehensive." : "";
+
+  return `${s1} ${s2} ${s3} ${s4}${thinNote}`;
 }
 
 // --- Assessment defaults --------------------------------------------------

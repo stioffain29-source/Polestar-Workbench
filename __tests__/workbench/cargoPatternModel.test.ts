@@ -1,5 +1,7 @@
 import {
   buildCargoPatternModel,
+  buildCargoExecutiveSummary,
+  isWeeklyRising,
   selectIncidents,
   MAX_SELECTED_INCIDENTS,
   type CargoPatternModelInput,
@@ -258,5 +260,94 @@ describe("cargo Selected Incidents picker — selectIncidents", () => {
 
   it("returns an empty array for no candidates (no fabrication)", () => {
     expect(selectIncidents([])).toEqual([]);
+  });
+});
+
+describe("cargo executive summary — buildCargoExecutiveSummary (spec TASK A)", () => {
+  // Six banned crutch phrases the spec forbids in the summary prose.
+  const BANNED = [
+    "Cargo loss this month was shaped by",
+    "The most serious reached",
+    "There is little to go on",
+    "Most consistent reporting",
+    "Alongside",
+    "Treat this as a rough guide",
+  ];
+
+  // A comfortably-populated period: eight clearly distinct in-scope cargo events
+  // (different country/day/source) so the deduped, scope-passing set lands well
+  // above the five-incident indicative-note threshold.
+  const RICH: CargoPatternModelInput[] = [
+    inc({ id: 1, title: "Armed robbers hijack a container truck on a highway in Malaysia", severity: "high", occurredAt: "2026-06-24", source: "A", sourceUrl: "https://x/1", country: "Malaysia" }),
+    inc({ id: 2, title: "Thieves raid a bonded warehouse in Jakarta, Indonesia", severity: "moderate", occurredAt: "2026-06-23", source: "B", sourceUrl: "https://x/2", country: "Indonesia" }),
+    inc({ id: 3, title: "Cargo truck looted after an ambush on a trunk road in Thailand", severity: "high", occurredAt: "2026-06-22", source: "C", sourceUrl: "https://x/3", country: "Thailand" }),
+    inc({ id: 4, title: "Freight consignment stolen from a logistics depot in the Philippines", severity: "moderate", occurredAt: "2026-06-21", source: "D", sourceUrl: "https://x/4", country: "Philippines" }),
+    inc({ id: 5, title: "Container cargo theft reported at a port yard in Vietnam", severity: "low", occurredAt: "2026-06-20", source: "E", sourceUrl: "https://x/5", country: "Vietnam" }),
+    inc({ id: 6, title: "Goods-in-transit robbery on a highway in India", severity: "moderate", occurredAt: "2026-06-19", source: "F", sourceUrl: "https://x/6", country: "India" }),
+    inc({ id: 7, title: "Warehouse break-in and cargo theft in Bangladesh", severity: "low", occurredAt: "2026-06-18", source: "G", sourceUrl: "https://x/7", country: "Bangladesh" }),
+    inc({ id: 8, title: "Truck hijacking with cargo stolen near Karachi, Pakistan", severity: "high", occurredAt: "2026-06-17", source: "H", sourceUrl: "https://x/8", country: "Pakistan" }),
+  ];
+
+  // A thin period: two events, below the five-incident threshold.
+  const SPARSE: CargoPatternModelInput[] = [
+    inc({ id: 1, title: "Thieves raid a bonded warehouse in Jakarta, Indonesia", severity: "moderate", occurredAt: "2026-06-24", source: "A", sourceUrl: "https://y/1", country: "Indonesia" }),
+    inc({ id: 2, title: "Armed robbers hijack a container truck on a highway in Malaysia", severity: "high", occurredAt: "2026-06-23", source: "B", sourceUrl: "https://y/2", country: "Malaysia" }),
+  ];
+
+  it("produces a single analytical paragraph with no numerals or record counts", () => {
+    const m = buildCargoPatternModel(RICH, { issueDate: ISSUE });
+    expect(m.totalUnique).toBeGreaterThanOrEqual(5);
+    const s = m.executiveSummary;
+    // One paragraph: no line breaks, ends on a full stop.
+    expect(s).not.toContain("\n");
+    expect(s.trim().endsWith(".")).toBe(true);
+    // No numerals anywhere (rules out "(3 records)" and any digit leakage).
+    expect(/\d/.test(s)).toBe(false);
+    // Comfortably analytical length, not a one-liner or a runaway.
+    const words = s.trim().split(/\s+/).length;
+    expect(words).toBeGreaterThanOrEqual(55);
+    expect(words).toBeLessThanOrEqual(130);
+  });
+
+  it("uses none of the banned crutch phrases", () => {
+    const m = buildCargoPatternModel(RICH, { issueDate: ISSUE });
+    for (const phrase of BANNED) {
+      expect(m.executiveSummary).not.toContain(phrase);
+    }
+  });
+
+  it("appends the indicative-reporting note if and only if fewer than five unique incidents", () => {
+    const NOTE = "Reporting remains indicative rather than comprehensive.";
+    const rich = buildCargoPatternModel(RICH, { issueDate: ISSUE });
+    expect(rich.totalUnique).toBeGreaterThanOrEqual(5);
+    expect(rich.executiveSummary).not.toContain(NOTE);
+    const sparse = buildCargoPatternModel(SPARSE, { issueDate: ISSUE });
+    expect(sparse.totalUnique).toBeLessThan(5);
+    expect(sparse.executiveSummary).toContain(NOTE);
+    // The invariant itself: note presence tracks the totalUnique<5 threshold.
+    for (const m of [rich, sparse]) {
+      expect(m.executiveSummary.includes(NOTE)).toBe(m.totalUnique < 5);
+    }
+  });
+
+  it("names the empty period without fabricating rows", () => {
+    const m = buildCargoPatternModel([], { issueDate: ISSUE });
+    expect(m.totalUnique).toBe(0);
+    expect(m.executiveSummary).toContain("No qualifying cargo-security incidents");
+    expect(m.executiveSummary).toContain("Reporting remains indicative rather than comprehensive.");
+    expect(/\d/.test(m.executiveSummary)).toBe(false);
+  });
+});
+
+describe("cargo weekly-rising gate — isWeeklyRising", () => {
+  it("is true only for a genuine non-decreasing rise over the last three weeks", () => {
+    expect(isWeeklyRising([1, 2, 3])).toBe(true);
+    expect(isWeeklyRising([0, 0, 0, 1, 1, 2])).toBe(true); // reads the last three
+  });
+  it("is false for flat, falling, or too-short series", () => {
+    expect(isWeeklyRising([2, 2, 2])).toBe(false); // no real increase
+    expect(isWeeklyRising([3, 2, 1])).toBe(false); // falling
+    expect(isWeeklyRising([1, 3, 2])).toBe(false); // mid dip then below peak
+    expect(isWeeklyRising([1, 2])).toBe(false); // fewer than three weeks
   });
 });
