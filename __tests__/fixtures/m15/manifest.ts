@@ -15,6 +15,7 @@ export const M15_REQUIRED_FIXTURES = [
 export const M15_OPTIONAL_FIXTURES = [
   "centcom-press-release-4538814.html",
   "ukmto-warning-038-26-attack.html",
+  "ukmto-003-26-update-002.pdf",
 ] as const;
 
 export type M15FixtureName =

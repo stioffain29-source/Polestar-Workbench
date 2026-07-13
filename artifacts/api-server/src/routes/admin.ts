@@ -7,6 +7,7 @@ import {
   runReliefWebReportsOnce,
   runIccPiracyOnce,
   runCentcomOfficialOnce,
+  runUkmtoOfficialOnce,
   runMovementOnce,
   runGdeltStructuredOnce,
   runTapaPromoteOnce,
@@ -403,6 +404,78 @@ router.post("/admin/centcom-official", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin centcom-official failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Protected manual trigger for ONLY the UKMTO official products ingest.
+router.post("/admin/ukmto-official", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin ukmto-official called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  const commit =
+    req.query.commit === "true" ||
+    req.query.commit === "1" ||
+    req.body?.commit === true;
+
+  try {
+    req.log.info({ commit }, "admin ukmto-official started");
+    const result = await runUkmtoOfficialOnce({ commit });
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const r = result.ukmtoOfficial;
+    req.log.info(
+      {
+        commit,
+        itemsFetched: r.itemsFetched,
+        inserted: r.inserted,
+        pdfExtracted: r.pdfExtracted,
+        pdfPartial: r.pdfPartial,
+        durationMs: result.durationMs,
+      },
+      "admin ukmto-official finished",
+    );
+    res.json({
+      ok: true,
+      commit,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      ukmtoOfficial: {
+        mode: r.mode,
+        disabled: r.disabled,
+        itemsFetched: r.itemsFetched,
+        inserted: r.inserted,
+        duplicateInDb: r.duplicateInDb,
+        totalAfter: r.totalAfter,
+        pdfExtracted: r.pdfExtracted,
+        pdfPartial: r.pdfPartial,
+        errors: r.errors,
+        logLines: r.logLines,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin ukmto-official failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

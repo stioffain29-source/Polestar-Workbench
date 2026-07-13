@@ -268,6 +268,16 @@ export type CentcomOfficialRunResult =
     }
   | { ran: false; reason: "locked" };
 
+export type UkmtoOfficialRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      ukmtoOfficial: UkmtoIngestSummary;
+    }
+  | { ran: false; reason: "locked" };
+
 export type MovementRunResult =
   | {
       ran: true;
@@ -674,8 +684,14 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     try {
       ukmtoOfficial = await runUkmtoIngest({ commit: true });
       logger.info(
-        { ran: ukmtoOfficial.ran, disabled: ukmtoOfficial.disabled },
-        "UKMTO official ingest scaffold complete",
+        {
+          ran: ukmtoOfficial.ran,
+          disabled: ukmtoOfficial.disabled,
+          inserted: ukmtoOfficial.inserted,
+          itemsFetched: ukmtoOfficial.itemsFetched,
+          pdfExtracted: ukmtoOfficial.pdfExtracted,
+        },
+        "UKMTO official ingest complete",
       );
     } catch (err) {
       logger.error({ err }, "UKMTO official ingest scaffold failed");
@@ -1437,6 +1453,36 @@ export async function runCentcomOfficialOnce(
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       centcomOfficial,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the UKMTO official products ingest. Supports dry-run
+ * (commit=false) for operator validation before writing rows. Shares the same
+ * advisory lock so it can never collide with a full run.
+ */
+export async function runUkmtoOfficialOnce(
+  opts: { commit?: boolean } = {},
+): Promise<UkmtoOfficialRunResult> {
+  const commit = opts.commit ?? false;
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let ukmtoOfficial: UkmtoIngestSummary;
+    try {
+      ukmtoOfficial = await runUkmtoIngest({ commit });
+    } catch (err) {
+      logger.error({ err }, "UKMTO official ingest failed");
+      ukmtoOfficial = emptyUkmtoIngestSummary(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      ukmtoOfficial,
     };
   });
   if (!res.ran) return res;

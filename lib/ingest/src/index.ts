@@ -199,15 +199,20 @@ export {
   parseUkmtoListing,
   parseUkmtoDetail,
   resolveUkmtoUrl,
+  selectUkmtoListingForFetch,
+  extractUkmtoPdfText,
+  mergeUkmtoBodyWithPdf,
   UKMTO_SOURCE,
   UKMTO_HEALTH_TOPIC,
   UKMTO_SITE_ORIGIN,
 } from "./ukmtoIngest";
 export type {
   UkmtoIngestSummary,
+  UkmtoIngestOptions,
   UkmtoListingItem,
   UkmtoDetail,
   UkmtoProductType,
+  UkmtoPdfExtractResult,
 } from "./ukmtoIngest";
 export {
   runCentcomIngest,
