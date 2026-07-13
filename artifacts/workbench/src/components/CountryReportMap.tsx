@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CountryFastFactsIncident } from "@/lib/countryFastFacts";
-import { classifyLocationConfidence } from "@/lib/countryLocationConfidence";
 import { stripWireCruft } from "@/lib/incidentTitle";
 import {
   impactForIncident,
@@ -769,12 +768,15 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   const zoneMode = zonesDef !== null;
   const isJakarta = (countryName ?? "").trim().toLowerCase() === "jakarta";
 
-  // A record is plotted as a PRECISE marker only when it carries a coordinate
-  // AND the title/location text shows we actually know where it happened below
-  // city level (exact coords or a sub-city fix). City- / province-only records
-  // geocode to a centroid, so plotting them as exact dots is false precision —
-  // they are counted in totals, tables and the note instead. Memoised so the
-  // legend, the marker effect and the note all read one consistent set.
+  // A record plots as a marker only when the geocoder resolved it to a real
+  // sub-national place: it carries a coordinate AND a non-empty location. The
+  // geocoder sets `location` to a town/province name on any sub-national fix and
+  // leaves it null when it can only fall back to the bare country centroid, so a
+  // present location is the robust "we know roughly where it happened" signal.
+  // Centroid-only records (no place named) stay unplotted — counted in totals,
+  // tables and the note instead of stacking on one central dot that never moves.
+  // A marker is therefore a town/province-level fix, not an exact point.
+  // Memoised so the legend, the marker effect and the note read one consistent set.
   const plottable = useMemo(
     () =>
       incidents.filter(
@@ -783,10 +785,8 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           typeof i.longitude === "number" &&
           !Number.isNaN(i.latitude) &&
           !Number.isNaN(i.longitude) &&
-          classifyLocationConfidence({
-            title: (i.displayTitle && i.displayTitle.trim()) || i.title,
-            location: i.location,
-          }).plottable,
+          typeof i.location === "string" &&
+          i.location.trim().length > 0,
       ),
     [incidents],
   );
@@ -1165,9 +1165,9 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
-            Points show reported events with a confirmed local location; where several share a location one marker carries the count.
+            Points show reported events at the town or province named in the reporting; where several share a location one marker carries the count. A marker is a town or province-level fix, not an exact point.
             {unplotted > 0
-              ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} without a precise location are included in the totals and tables but not plotted.`
+              ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} name no specific place and are included in the totals and tables but not plotted.`
               : ""}
           </div>
         </>
@@ -1178,7 +1178,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         <div
           style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
         >
-          No reported operational issue carries a precise location this period; the map reflects country operating context only.
+          No reported operational issue names a mappable place this period; the map reflects country operating context only.
         </div>
       )}
       <MapReadNote />

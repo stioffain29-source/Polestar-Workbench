@@ -24,6 +24,7 @@ import {
   maxSeverity,
   SEVERITY_RANK,
   detectStaleEventDate,
+  geocode,
   isReliefWebConfigured,
   isGdeltConfigured,
   PROMOTE_MARKER_PREFIX,
@@ -1769,6 +1770,63 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { rows: total, marker: markerKey },
           "One-time relocation of cross-syndicated foreign (Turkey/UK/Venezuela) energy incidents mis-stamped onto a feed default country",
+        );
+      }
+    }
+
+    // 3d-1c) ONE-TIME re-geocode of Papua New Guinea incidents that fell back to
+    //     the bare country centroid (location IS NULL) before the geocoder learned
+    //     the country's provinces and district towns. The Operational Map plots a
+    //     marker only where a record resolved to a real sub-national place, so
+    //     every centroid-fallback row stacked invisibly on the one national point
+    //     and the map "stayed on the same spot each week". The gazetteer now
+    //     covers PNG's provinces / districts; this repairs rows already stored by
+    //     re-running the SAME geocoder over the record's title + summary. RELOCATE
+    //     (never delete): a row whose text still names no known place keeps its
+    //     centroid coordinates and stays honestly unplotted (counted, not shown).
+    //     Bound to location IS NULL so an analyst-placed or already-resolved point
+    //     is never overwritten; marker-gated so it runs once.
+    {
+      const markerKey = "png_centroid_regeocode_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const rows = await db.execute(sql`
+          SELECT id, title, summary
+          FROM incidents
+          WHERE country = 'Papua New Guinea'
+            AND location IS NULL
+            AND latitude IS NOT NULL
+            AND longitude IS NOT NULL
+        `);
+        let moved = 0;
+        for (const r of rows.rows as Array<{
+          id: number;
+          title: string | null;
+          summary: string | null;
+        }>) {
+          const text = `${r.title ?? ""} ${r.summary ?? ""}`.trim();
+          const geo = geocode("Papua New Guinea", text);
+          // Only relocate when the geocoder resolved a real sub-national place
+          // (location non-null); a bare-centroid result is left untouched.
+          if (!geo || geo.location == null) continue;
+          const res = await db.execute(sql`
+            UPDATE incidents
+            SET latitude = ${geo.latitude},
+                longitude = ${geo.longitude},
+                location = ${geo.location}
+            WHERE id = ${r.id} AND location IS NULL
+          `);
+          moved += res.rowCount ?? 0;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: rows.rows.length, moved, marker: markerKey },
+          "One-time re-geocode of Papua New Guinea centroid-fallback incidents onto their named province/town",
         );
       }
     }
