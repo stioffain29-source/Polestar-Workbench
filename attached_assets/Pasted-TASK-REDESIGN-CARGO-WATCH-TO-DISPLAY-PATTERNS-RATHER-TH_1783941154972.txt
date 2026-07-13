@@ -1,0 +1,556 @@
+TASK: REDESIGN CARGO WATCH TO DISPLAY PATTERNS RATHER THAN LONG INCIDENT LISTS
+
+OBJECTIVE
+
+Redesign the Cargo Watch PDF report so that the main report presents patterns, concentrations, operational exposure and business implications rather than several pages of individual incident records.
+
+This is a targeted change to Cargo Watch only.
+
+Do not rebuild the reporting system.
+Do not redesign other Watch products.
+Do not change the global report template.
+Do not refactor unrelated code.
+Do not introduce a database migration unless it is genuinely required and approved.
+
+Keep the existing:
+
+1. Cover design
+2. Polestar branding
+3. Roboto font
+4. Header and footer
+5. Fast Facts cards
+6. Country map
+7. Weekly trend chart
+8. Existing five tier risk terminology
+9. Existing PDF export process
+
+
+CURRENT PROBLEM
+
+The report begins with useful summary information, mapping and trend analysis, but then turns into several pages of incident rows.
+
+Many incidents are then repeated under a separate Related Incidents section.
+
+This makes the report feel like a printed incident database rather than an intelligence product.
+
+The report needs to move from:
+
+“22 separate incident stories”
+
+to:
+
+“Three or four operational patterns supported by 22 incidents”
+
+
+STAGE ONE: INSPECT BEFORE EDITING
+
+Before changing code, identify:
+
+1. The files responsible for the Cargo Watch report layout.
+2. The files responsible for charts and maps.
+3. The Cargo Watch incident data structure.
+4. The existing incident deduplication logic.
+5. The unique identifier used for incidents.
+6. Where category, country, severity, confidence, event date, location and coordinates are stored.
+7. Whether graphics use a chart library, SVG, HTML, canvas or another method.
+8. Which report sections are template driven.
+9. Which report sections use AI generated text.
+10. Whether the HTML preview and PDF export use the same rendering path.
+
+Provide a short implementation plan before making edits.
+
+
+REVISED REPORT STRUCTURE
+
+
+PAGE 1: EXECUTIVE SUMMARY AND FAST FACTS
+
+Retain:
+
+1. Executive Summary
+2. Reporting period
+3. Total records
+4. Highest severity
+5. Top issue type
+6. Most affected country
+7. Latest incident
+
+The Executive Summary should explain:
+
+1. The main cargo exposure.
+2. The main affected geography.
+3. The most important change during the period.
+4. The confidence or limitations in the available reporting.
+
+Do not use vague wording such as:
+
+“There is little to go on this month.”
+
+Use wording such as:
+
+“Reporting remains limited and should be treated as indicative rather than comprehensive.”
+
+
+PAGE 2: GEOGRAPHIC AND TIME PATTERN
+
+Retain:
+
+1. Country incident map
+2. Weekly Cargo Theft Trend chart
+
+Add one short analytical statement below each graphic.
+
+Examples:
+
+“Reporting was concentrated in Indonesia, although this may partly reflect stronger local media coverage.”
+
+“Activity increased during the final reporting week, driven mainly by warehouse and inland transport incidents.”
+
+These statements must be generated from the actual report data.
+
+Do not hardcode country names, dates or categories.
+
+
+PAGE 3: SUPPLY CHAIN EXPOSURE
+
+Replace detailed incident listings with a horizontal supply chain exposure graphic.
+
+Use these stages:
+
+1. Warehouse and depot
+2. Inland transport
+3. Staging yard
+4. Port and terminal
+5. Maritime
+6. Cross cutting or enforcement activity
+
+For each stage show:
+
+1. Number of unique incidents
+2. Percentage of the total
+3. Highest severity
+4. Main affected country
+5. Primary control concern
+
+Example presentation:
+
+Warehouse and Depot
+9 incidents
+41 percent of reporting
+Primary concern: access control and after hours security
+
+Inland Transport
+4 incidents
+18 percent of reporting
+Primary concern: route security and driver integrity
+
+Port and Terminal
+2 incidents
+9 percent of reporting
+Primary concern: access control and cargo custody
+
+This must be presented as connected cards or a supply chain graphic.
+
+Do not use another standard table.
+
+
+CATEGORY MAPPING
+
+Create a configurable category mapping.
+
+Do not hardcode the mapping directly inside the PDF component.
+
+WAREHOUSE AND DEPOT
+
+Warehouse theft
+Depot theft
+Yard theft
+Facility burglary
+Insider theft at a facility
+Warehouse robbery
+
+INLAND TRANSPORT
+
+Cargo theft in transit
+Truck theft
+Truck hijacking
+Inland container theft
+Driver collusion during transport
+Vehicle and load theft
+
+STAGING YARD
+
+Overnight staging theft
+Holding yard theft
+Trailer theft
+Handover compromise
+Seal compromise at a yard
+
+PORT AND TERMINAL
+
+Port armed robbery
+Port theft
+Terminal theft
+Cargo theft at port
+Contraband seizure at port
+Weapons seizure at port
+
+MARITIME
+
+Stowaway incident
+Vessel cargo theft
+Theft from vessel
+Container compromise at sea
+
+CROSS CUTTING OR ENFORCEMENT
+
+Arrest of cargo crime group
+Cargo recovery
+Police disruption
+Organised crime investigation
+Law enforcement operation
+
+Enforcement records must not be counted as cargo losses unless the source incident also describes a confirmed loss.
+
+
+PAGE 4: PATTERN DASHBOARD
+
+Create up to four analytical pattern cards.
+
+Cards must be selected dynamically based on the most significant grouped patterns during the reporting period.
+
+Each card must show:
+
+1. Pattern name
+2. Number of unique incidents
+3. Share of total reporting
+4. Primary geography
+5. Highest severity
+6. Operational concern
+7. Control affected
+8. Watch next indicator
+
+Example:
+
+WAREHOUSE INTRUSION
+
+9 incidents
+
+Primary geography: Indonesia
+
+Operational concern:
+Repeated access failures and after hours intrusion.
+
+Control affected:
+Perimeter security, CCTV, guarding and access control.
+
+Watch next:
+Repeat incidents involving the same location, operator or method.
+
+Do not create empty cards.
+
+Where fewer than four meaningful patterns exist, show two or three cards.
+
+Do not fill the page with weak or irrelevant categories simply to maintain a fixed number of cards.
+
+
+PAGE 5: INCIDENT TIMELINE
+
+Create a horizontal timeline grouped into category lanes.
+
+Suggested lanes:
+
+1. Warehouse and depot
+2. Inland transport
+3. Port and terminal
+4. Maritime
+5. Enforcement activity
+
+Each incident should appear as a small marker on the date it occurred.
+
+Marker information should be limited to:
+
+1. Date
+2. Short location
+3. Category
+4. Severity
+
+The timeline is intended to show clustering and changes in activity.
+
+Do not reproduce full news headlines on the timeline.
+
+Use the existing chart library where practical.
+
+Where no suitable chart component exists, use lightweight SVG.
+
+Do not add a large new chart dependency solely for this graphic.
+
+
+PAGE 6: PRIORITY MATRIX
+
+Create a two by two pattern matrix.
+
+Horizontal axis:
+Frequency
+
+Vertical axis:
+Operational consequence
+
+Plot grouped patterns rather than individual incidents.
+
+Use these quadrants:
+
+1. Monitor
+2. Emerging Concern
+3. Persistent Exposure
+4. Priority Action
+
+Frequency must be based on the number of unique incidents.
+
+Operational consequence must use a documented and configurable scoring model.
+
+The score may consider:
+
+1. Severity
+2. Violence or weapon involvement
+3. High value cargo involvement
+4. Organised crime indicators
+5. Insider involvement indicators
+6. Business interruption potential
+7. Confirmed cargo loss
+8. Repeat activity on the same route or facility
+
+The scoring rules must be visible in configuration or clearly documented in code comments.
+
+Do not ask an AI model to silently invent a score.
+
+Where the data is too limited to support a meaningful matrix, display:
+
+“Insufficient reporting for a meaningful priority comparison this period.”
+
+
+PAGE 7: OPERATIONAL ASSESSMENT
+
+Consolidate the current narrative sections into:
+
+1. Situation
+2. What Matters
+3. Business Priorities
+4. Watch Next
+5. Polestar View
+
+SITUATION
+
+Use no more than two short paragraphs.
+
+Describe the current exposure and where activity is concentrated.
+
+WHAT MATTERS
+
+Present three concise analytical findings.
+
+BUSINESS PRIORITIES
+
+Present no more than five recommended actions.
+
+Each action must be connected to a pattern identified in the report.
+
+WATCH NEXT
+
+Present no more than six forward indicators.
+
+POLestar VIEW
+
+Provide a clear assessment rather than repeating incident descriptions.
+
+Do not state that organised crime, insider involvement or route targeting is confirmed unless the underlying records support that conclusion.
+
+Where evidence is limited, use language such as:
+
+“The available reporting is consistent with possible route familiarity.”
+
+Do not present an inference as a confirmed fact.
+
+
+FINAL SECTION: CONDENSED INCIDENT APPENDIX
+
+Keep the complete incident register only as an appendix.
+
+Use one row per unique incident.
+
+Columns:
+
+1. Date
+2. Location
+3. Category
+4. Incident summary
+5. Severity
+6. Confidence
+
+Requirements:
+
+1. One sentence maximum for each incident.
+2. Do not reproduce long news headlines.
+3. Do not repeat the same incident in different sections.
+4. Remove the separate Related Incidents section.
+5. Do not print source count unless there is a specific analytical reason.
+6. Do not print “Vessel: not reported”.
+7. Do not print “Company: not reported”.
+8. Do not print “Time: not reported”.
+9. Do not repeatedly print “Location not reported”.
+10. Leave missing fields blank where appropriate.
+11. Use “Unconfirmed” only where analytically relevant.
+12. Keep the appendix to no more than two pages under normal reporting volumes.
+
+The same event must not appear once under land side incidents and again under port related incidents unless they are genuinely separate events.
+
+
+DEDUPLICATION REQUIREMENTS
+
+All calculations and displays must use the same deduplicated incident set.
+
+Use the existing unique incident ID where reliable.
+
+Where separate news reports describe the same event, deduplicate using a combination of:
+
+1. Normalised title
+2. Event date
+3. Location
+4. Category
+5. Named company, asset or organisation
+6. Cargo type
+7. Source similarity
+
+Do not deduplicate only by exact headline.
+
+Different publishers frequently use different headlines for the same incident.
+
+The following totals must reconcile exactly:
+
+1. Total Records card
+2. Country map
+3. Weekly trend
+4. Supply chain exposure graphic
+5. Pattern dashboard
+6. Timeline
+7. Priority matrix
+8. Incident appendix
+
+An incident may contribute to a country, category and supply chain stage, but it must only count once in the total number of records.
+
+
+SPARSE DATA BEHAVIOUR
+
+The report must work correctly when there are:
+
+1. No incidents
+2. One incident
+3. Fewer than five incidents
+4. No named country
+5. No named port
+6. No usable coordinates
+7. Only one category
+8. Only one severity level
+9. No meaningful comparison between patterns
+
+Do not create large empty report sections.
+
+NO NAMED PORTS
+
+Omit the Named Port Breakdown section completely.
+
+NO MEANINGFUL COUNTRY COMPARISON
+
+Replace the map with:
+
+“Insufficient location data for a meaningful geographic comparison.”
+
+NO MEANINGFUL TIMELINE
+
+Show a compact chronological strip rather than an empty chart.
+
+NO INCIDENTS
+
+Generate a short report stating that no qualifying incidents were identified during the reporting period.
+
+Do not generate empty charts, blank cards or empty tables.
+
+
+DESIGN REQUIREMENTS
+
+1. Maintain the existing Polestar colour palette.
+2. Maintain Roboto throughout.
+3. Keep the report light and clean.
+4. Do not introduce charcoal or taupe backgrounds.
+5. Do not reduce text to an unreadable size to force content onto a page.
+6. Avoid dense tables in the main report.
+7. Ensure all graphics render correctly in the exported PDF.
+8. Avoid page breaks through cards, graphics or table rows.
+9. Keep severity colours consistent with the existing five tier terminology.
+10. Do not use decorative graphics that do not communicate data.
+11. Do not change other Watch reports.
+12. Do not modify the shared PDF layout unless necessary for Cargo Watch and confirmed safe for other reports.
+
+
+TESTING REQUIREMENTS
+
+Test the redesigned report with:
+
+1. The current Cargo Watch dataset.
+2. A dataset containing no incidents.
+3. A dataset containing one incident.
+4. A dataset containing fewer than five incidents.
+5. A dataset with missing coordinates.
+6. A dataset with no named country.
+7. A dataset containing duplicate reporting of the same event.
+8. A dataset containing enforcement activity without a confirmed cargo loss.
+9. A dataset containing incidents across all supply chain stages.
+
+Confirm that:
+
+1. Totals reconcile.
+2. Duplicate incidents are not shown.
+3. Missing information does not produce repeated “not reported” text.
+4. Graphics do not overflow.
+5. Cards are not split by page breaks.
+6. The PDF renders correctly.
+7. The HTML preview and exported PDF are consistent.
+
+
+ACCEPTANCE CRITERIA
+
+The task is complete when:
+
+1. The main report no longer contains several pages of detailed incident rows.
+2. The Related Incidents section has been removed.
+3. Each unique incident appears once in the appendix.
+4. All report totals reconcile.
+5. The supply chain exposure graphic uses actual incident data.
+6. Pattern cards are generated dynamically.
+7. The timeline shows clustering by date and category.
+8. The priority matrix uses documented scoring logic.
+9. Empty sections are automatically omitted.
+10. Sparse datasets generate a readable report.
+11. Missing fields do not produce visual clutter.
+12. The exported PDF has been inspected page by page.
+13. No other Watch product has changed.
+14. No unrelated refactoring has been undertaken.
+
+
+DELIVERABLES
+
+Provide:
+
+1. The implementation plan.
+2. The files changed.
+3. An explanation of the category mappings.
+4. An explanation of the deduplication logic.
+5. An explanation of the priority scoring model.
+6. Screenshots of every generated PDF page.
+7. The completed Cargo Watch test PDF.
+8. Results from the sparse data tests.
+9. Any known limitations or remaining data gaps.
+
+Do not mark the task complete based only on the HTML preview.
+
+Inspect the final exported PDF page by page before completion.
