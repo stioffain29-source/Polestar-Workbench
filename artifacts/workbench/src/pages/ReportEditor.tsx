@@ -37,6 +37,7 @@ import ReportPreview from "@/components/ReportPreview";
 import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import ConflictReportPreview from "@/components/ConflictReportPreview";
+import CargoReportPreview from "@/components/CargoReportPreview";
 import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
@@ -2250,6 +2251,16 @@ export default function ReportEditor() {
               report={form}
               incidents={incidentsForExport}
               situationalReports={situationalReports}
+              incidentSummaries={effectiveSummaries}
+              aiProse={aiProseSections}
+            />
+          ) : form.topic === "cargo_watch" ? (
+            <CargoReportPreview
+              report={{
+                ...form,
+                hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+              }}
+              incidents={incidentsForExport}
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
             />

@@ -5,7 +5,14 @@ import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/compo
 import type { MarketPrice } from "@workspace/api-client-react";
 import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
-import { buildCargoCountryIntensity } from "./cargoReportChoropleth";
+import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
+import CargoPatternDashboard from "@/components/CargoPatternDashboard";
+import CargoIncidentTimeline from "@/components/CargoIncidentTimeline";
+import CargoPriorityMatrix from "@/components/CargoPriorityMatrix";
+import {
+  buildCargoPatternModel,
+  type CargoAppendixRow,
+} from "./cargoPatternModel";
 import {
   createCtx,
   newPage,
@@ -47,23 +54,12 @@ import {
 import { classifyIncidentType } from "./incidentClassifier";
 import { resolveIncidentSummary } from "./incidentSummary";
 import { selectRelatedIncidents } from "./relatedIncidents";
-import {
-  buildCargoGroupedDataset,
-  REPORT_CLUSTER_SECTION_KEYS,
-  cargoClusterLocationLabel,
-  cargoClusterDetailLine,
-  cargoClusterSourceLabel,
-  cargoClusterSeverityKey,
-  type CargoGroupedSection,
-} from "./cargoGroupedDataset";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant } from "./topicRelevance";
-import { buildCargoReportExtras } from "./cargoReportData";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import {
-  aiOr,
   resolveSimpleProse,
   stableDraftTopicReportProse,
   toDraftableIncidents,
@@ -85,20 +81,6 @@ import {
   capFuelMarketSeverity,
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
-import {
-  buildCargoSecurityRead,
-  buildCargoWhatHappened,
-  buildLogisticsHubRead,
-  buildCargoWhatMatters,
-  buildCargoImplications,
-  buildCargoWatchNext,
-  buildCargoPolestarView,
-  buildCargoSituation,
-  buildCargoCountryBreakdown,
-  buildCargoPortBreakdown,
-  type CargoCountryRow,
-  type CargoPortBreakdown,
-} from "./cargoNarratives";
 import { pickRead } from "./pickRead";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -326,259 +308,6 @@ function drawProducerBuyerActionsTable(
   ctx.y += 8;
 }
 
-// Country Risk Breakdown table for the Cargo Watch report. Mirrors
-// drawProducerBuyerActionsTable but the third column is a coloured five-tier
-// severity chip. Rows are built by buildCargoCountryBreakdown, the same source
-// the on-screen preview renders — so screen and PDF never disagree.
-function drawCargoCountryTable(ctx: Ctx, rows: CargoCountryRow[]) {
-  if (rows.length === 0) return;
-  const { pdf, MX, CW } = ctx;
-  const colCountryW = Math.round(CW * 0.18);
-  const colPatternW = Math.round(CW * 0.3);
-  const colSevW = Math.round(CW * 0.16);
-  const colReadW = CW - colCountryW - colPatternW - colSevW;
-  const headerH = 20;
-  const padX = 6;
-  const lineH = 11;
-
-  const drawHeader = () => {
-    setFill(pdf, NAVY);
-    pdf.rect(MX, ctx.y, CW, headerH, "F");
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text("REGION / COUNTRY", MX + padX, ctx.y + 12);
-    pdf.text("CURRENT PATTERN", MX + colCountryW + padX, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colCountryW + colPatternW + padX, ctx.y + 12);
-    pdf.text(
-      "OPERATIONAL READ",
-      MX + colCountryW + colPatternW + colSevW + padX,
-      ctx.y + 12,
-    );
-    ctx.y += headerH;
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
-  };
-
-  ensureSpace(ctx, headerH + 30);
-  drawHeader();
-
-  for (const r of rows) {
-    const countryText = `${r.country}\n${r.count} record${r.count === 1 ? "" : "s"}`;
-    const countryLines: string[] = pdf.splitTextToSize(
-      sanitize(countryText),
-      colCountryW - padX * 2,
-    );
-    const patternLines: string[] = pdf.splitTextToSize(
-      sanitize(r.pattern),
-      colPatternW - padX * 2,
-    );
-    const readLines: string[] = pdf.splitTextToSize(
-      sanitize(r.operationalRead),
-      colReadW - padX * 2,
-    );
-    const maxLines = Math.max(
-      countryLines.length,
-      patternLines.length,
-      readLines.length,
-      2,
-    );
-    const rh = Math.max(28, maxLines * lineH + 10);
-
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
-      newPage(ctx);
-      drawHeader();
-    }
-
-    // Row separator at the bottom of the row.
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.3);
-    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
-
-    setText(pdf, NAVY);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    // First country line bold; the "N records" line subdued regular.
-    pdf.text(countryLines.slice(0, 1), MX + padX, ctx.y + 12);
-    if (countryLines.length > 1) {
-      setText(pdf, DUSK);
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(7);
-      pdf.text(countryLines.slice(1), MX + padX, ctx.y + 12 + lineH);
-      pdf.setFontSize(8);
-    }
-
-    setText(pdf, DUSK);
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
-    pdf.text(patternLines, MX + colCountryW + padX, ctx.y + 12);
-    pdf.text(
-      readLines,
-      MX + colCountryW + colPatternW + colSevW + padX,
-      ctx.y + 12,
-    );
-
-    // Severity chip — coloured by the row's tier key, label may be a range.
-    const sk = sevKey(r.severityKey);
-    const sevColor = SEV_COLOR[sk] ?? "#999999";
-    const chipX = MX + colCountryW + colPatternW + padX;
-    const chipW = colSevW - padX * 2;
-    setFill(pdf, sevColor);
-    pdf.rect(chipX, ctx.y + 5, chipW, 12, "F");
-    // Every tier (incl. petrol-blue Insignificant) uses white chip text.
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(6.5);
-    pdf.text(
-      sanitize(r.severityLabel.toUpperCase()),
-      chipX + chipW / 2,
-      ctx.y + 13,
-      {
-        align: "center",
-      },
-    );
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8);
-
-    ctx.y += rh;
-  }
-  ctx.y += 8;
-}
-
-// Named Port Breakdown table for the Cargo Watch report. Mirrors
-// drawCargoCountryTable but the first column is the port (with a "country ·
-// N records" subline) and the widths match CargoPortTable in ReportPreview so
-// the screen preview and this PDF never disagree. Always renders: an empty set
-// draws "Not reported." and the coverage caption (which carries the only count,
-// keeping the narrative free of parenthetical record annotations).
-function drawCargoPortTable(ctx: Ctx, breakdown: CargoPortBreakdown) {
-  const { pdf, MX, CW } = ctx;
-  const rows = breakdown.rows;
-  if (rows.length === 0) {
-    ensureSpace(ctx, 26);
-    setText(pdf, DUSK);
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(9);
-    pdf.text("Not reported.", MX, ctx.y + 11);
-    ctx.y += 16;
-  } else {
-    const colPortW = Math.round(CW * 0.22);
-    const colPatternW = Math.round(CW * 0.28);
-    const colSevW = Math.round(CW * 0.16);
-    const colReadW = CW - colPortW - colPatternW - colSevW;
-    const headerH = 20;
-    const padX = 6;
-    const lineH = 11;
-
-    const drawHeader = () => {
-      setFill(pdf, NAVY);
-      pdf.rect(MX, ctx.y, CW, headerH, "F");
-      setText(pdf, WHITE);
-      setRoboto(pdf, "bold");
-      pdf.setFontSize(8);
-      pdf.text("PORT", MX + padX, ctx.y + 12);
-      pdf.text("CURRENT PATTERN", MX + colPortW + padX, ctx.y + 12);
-      pdf.text("SEVERITY", MX + colPortW + colPatternW + padX, ctx.y + 12);
-      pdf.text(
-        "OPERATIONAL READ",
-        MX + colPortW + colPatternW + colSevW + padX,
-        ctx.y + 12,
-      );
-      ctx.y += headerH;
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8);
-    };
-
-    ensureSpace(ctx, headerH + 30);
-    drawHeader();
-
-    for (const r of rows) {
-      const portText = `${r.port}\n${r.country} \u00b7 ${r.count} record${r.count === 1 ? "" : "s"}`;
-      const portLines: string[] = pdf.splitTextToSize(
-        sanitize(portText),
-        colPortW - padX * 2,
-      );
-      const patternLines: string[] = pdf.splitTextToSize(
-        sanitize(r.pattern),
-        colPatternW - padX * 2,
-      );
-      const readLines: string[] = pdf.splitTextToSize(
-        sanitize(r.operationalRead),
-        colReadW - padX * 2,
-      );
-      const maxLines = Math.max(
-        portLines.length,
-        patternLines.length,
-        readLines.length,
-        2,
-      );
-      const rh = Math.max(28, maxLines * lineH + 10);
-
-      if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
-        newPage(ctx);
-        drawHeader();
-      }
-
-      setStroke(pdf, POLAR);
-      pdf.setLineWidth(0.3);
-      pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
-
-      setText(pdf, NAVY);
-      setRoboto(pdf, "bold");
-      pdf.setFontSize(8);
-      // First port line bold; the "country · N records" line subdued regular.
-      pdf.text(portLines.slice(0, 1), MX + padX, ctx.y + 12);
-      if (portLines.length > 1) {
-        setText(pdf, DUSK);
-        setRoboto(pdf, "regular");
-        pdf.setFontSize(7);
-        pdf.text(portLines.slice(1), MX + padX, ctx.y + 12 + lineH);
-        pdf.setFontSize(8);
-      }
-
-      setText(pdf, DUSK);
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8);
-      pdf.text(patternLines, MX + colPortW + padX, ctx.y + 12);
-      pdf.text(
-        readLines,
-        MX + colPortW + colPatternW + colSevW + padX,
-        ctx.y + 12,
-      );
-
-      const sk = sevKey(r.severityKey);
-      const sevColor = SEV_COLOR[sk] ?? "#999999";
-      const chipX = MX + colPortW + colPatternW + padX;
-      const chipW = colSevW - padX * 2;
-      setFill(pdf, sevColor);
-      pdf.rect(chipX, ctx.y + 5, chipW, 12, "F");
-      setText(pdf, WHITE);
-      setRoboto(pdf, "bold");
-      pdf.setFontSize(6.5);
-      pdf.text(
-        sanitize(r.severityLabel.toUpperCase()),
-        chipX + chipW / 2,
-        ctx.y + 13,
-        { align: "center" },
-      );
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8);
-
-      ctx.y += rh;
-    }
-    ctx.y += 6;
-  }
-
-  // Coverage caption — subdued, italic, mirrors the preview's caption line.
-  ensureSpace(ctx, 16);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "italic");
-  pdf.setFontSize(7.5);
-  pdf.text(sanitize(breakdown.coverageLabel), MX, ctx.y + 8);
-  setRoboto(pdf, "regular");
-  ctx.y += 16;
-}
-
 function drawRelatedIncidents(
   ctx: Ctx,
   windowIncidents: TopicReportIncident[],
@@ -699,167 +428,133 @@ function drawRelatedIncidents(
   void reportCadence(topic);
 }
 
-// Render one partition's clusters as a table. Mirrors drawRelatedIncidents'
-// proven header/row/pagination shape so the on-screen CargoClustersSection can
-// match it line-for-line (preview == PDF).
-function drawCargoClusterTable(ctx: Ctx, section: CargoGroupedSection) {
+// Condensed incident appendix (cargo report only). One row per UNIQUE incident,
+// replacing the removed Related Incidents + Named Port Breakdown + Cargo
+// Incident Clusters sections. Paginates like drawRelatedIncidents so a heavy
+// period still runs to the two-page cap without orphaning rows across a break.
+function drawCargoAppendix(ctx: Ctx, rows: CargoAppendixRow[]) {
   const { pdf, MX, CW } = ctx;
-  ensureSpace(ctx, 34);
-  setText(pdf, NAVY);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(10);
-  pdf.text(sanitize(section.title), MX, ctx.y + 8);
-  ctx.y += 16;
+  if (rows.length === 0) {
+    drawSectionHeading(ctx, "Incident Appendix");
+    renderProse(ctx, "No cargo-crime incidents were recorded this period.");
+    return;
+  }
+  // Start the condensed reference list on a fresh page so its compact rows pack
+  // full pages and the whole appendix stays within ~2 pages.
+  if (ctx.y > ctx.TOP + 4) newPage(ctx);
+  drawSectionHeading(ctx, "Incident Appendix");
 
-  const colDateW = 78;
-  const colCatW = 120;
-  const colSevW = 70;
-  const colMainW = CW - colDateW - colCatW - colSevW - 6;
-  const rowH = 18;
+  const colDateW = 62;
+  const colLocW = 92;
+  const colCatW = 92;
+  const colSevW = 56;
+  const colConfW = 52;
+  const colSumW = CW - colDateW - colLocW - colCatW - colSevW - colConfW;
+  // Condensed reference list: one compact SINGLE-LINE row per unique incident so
+  // the full deduplicated set stays within ~2 pages (long cells are truncated
+  // with an ellipsis rather than wrapped). Small type + a fixed row height are
+  // what keep the appendix short; nothing is dropped.
+  const FONT = 6.5;
+  const headerH = 14;
+  const rowH = 14;
+  const xDate = MX + 6;
+  const xLoc = MX + colDateW + 6;
+  const xCat = MX + colDateW + colLocW + 6;
+  const xSum = MX + colDateW + colLocW + colCatW + 6;
+  const sevColX = MX + colDateW + colLocW + colCatW + colSumW;
+  const xConf = sevColX + colSevW + 6;
+
+  // Truncate a value to a single line within `w`, appending an ellipsis when it
+  // overflows. Assumes the caller has already selected the regular face at FONT.
+  const oneLine = (value: string, w: number): string => {
+    const clean = sanitize(value);
+    if (!clean) return "";
+    const lines: string[] = pdf.splitTextToSize(clean, w);
+    if (lines.length <= 1) return lines[0] ?? "";
+    let first = lines[0];
+    while (first.length > 1 && pdf.getTextWidth(first + "…") > w) {
+      first = first.slice(0, -1);
+    }
+    return first + "…";
+  };
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
-    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    pdf.rect(MX, ctx.y, CW, headerH, "F");
     setStroke(pdf, POLAR);
     pdf.setLineWidth(0.6);
     pdf.line(MX, ctx.y, MX + CW, ctx.y);
-    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
-    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
+    pdf.line(MX, ctx.y, MX, ctx.y + headerH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + headerH);
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    pdf.text("DATE", MX + 6, ctx.y + 12);
-    pdf.text("CATEGORY", MX + colDateW + 6, ctx.y + 12);
-    pdf.text("INCIDENT", MX + colDateW + colCatW + 6, ctx.y + 12);
-    pdf.text("SEVERITY", MX + colDateW + colCatW + colMainW + 6, ctx.y + 12);
-    ctx.y += rowH;
+    pdf.setFontSize(FONT);
+    pdf.text("DATE", xDate, ctx.y + 9);
+    pdf.text("LOCATION", xLoc, ctx.y + 9);
+    pdf.text("CATEGORY", xCat, ctx.y + 9);
+    pdf.text("INCIDENT SUMMARY", xSum, ctx.y + 9);
+    pdf.text("SEVERITY", sevColX + 6, ctx.y + 9);
+    pdf.text("CONF.", xConf, ctx.y + 9);
+    ctx.y += headerH;
     setRoboto(pdf, "regular");
-    pdf.setFontSize(7);
+    pdf.setFontSize(FONT);
   };
 
-  ensureSpace(ctx, rowH + 4);
+  ensureSpace(ctx, headerH + rowH);
   drawHeader();
 
-  for (const c of section.clusters) {
-    const titleLines: string[] = pdf.splitTextToSize(
-      sanitize(c.title),
-      colMainW - 8,
-    );
-    const catLines: string[] = pdf.splitTextToSize(
-      sanitize(c.enrichment.category),
-      colCatW - 8,
-    );
-    const meta = `${cargoClusterLocationLabel(c)} | Confidence: ${c.enrichment.confidence} | Status: ${c.enrichment.status}`;
-    pdf.setFontSize(6.5);
-    const metaLines: string[] = pdf.splitTextToSize(
-      sanitize(meta),
-      colMainW - 8,
-    );
-    const detailLines: string[] = pdf.splitTextToSize(
-      sanitize(cargoClusterDetailLine(c)),
-      colMainW - 8,
-    );
-    pdf.setFontSize(7);
-
-    const rh = Math.max(
-      rowH,
-      titleLines.length * 10 +
-        metaLines.length * 9 +
-        detailLines.length * 9 +
-        9 +
-        12,
-    );
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+  for (const r of rows) {
+    if (ctx.y + rowH > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
       drawHeader();
     }
     setStroke(pdf, POLAR);
     pdf.setLineWidth(0.6);
-    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
-    pdf.line(MX, ctx.y, MX, ctx.y + rh);
-    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y + rowH, MX + CW, ctx.y + rowH);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
 
+    const baseY = ctx.y + 9;
     setText(pdf, DUSK);
     let dateStr = "";
-    try {
-      dateStr = format(parseISO(c.latestOccurredAt), "dd MMM yyyy");
-    } catch {
-      dateStr = c.latestOccurredAt;
+    if (r.date) {
+      try {
+        dateStr = format(parseISO(r.date), "dd MMM yyyy");
+      } catch {
+        dateStr = r.date.slice(0, 10);
+      }
     }
-    pdf.text(dateStr, MX + 6, ctx.y + 12);
-    pdf.text(catLines, MX + colDateW + 6, ctx.y + 12);
-
-    const mainX = MX + colDateW + colCatW + 6;
+    pdf.text(dateStr, xDate, baseY);
+    pdf.text(oneLine(r.location, colLocW - 8), xLoc, baseY);
+    pdf.text(oneLine(r.category, colCatW - 8), xCat, baseY);
     setText(pdf, NAVY);
-    setRoboto(pdf, "medium");
-    pdf.text(titleLines, mainX, ctx.y + 12);
-    setRoboto(pdf, "regular");
+    pdf.text(oneLine(r.summary, colSumW - 8), xSum, baseY);
     setText(pdf, DUSK);
-    pdf.setFontSize(6.5);
-    let subY = ctx.y + 12 + titleLines.length * 10 + 2;
-    pdf.text(metaLines, mainX, subY);
-    subY += metaLines.length * 9;
-    pdf.text(detailLines, mainX, subY);
-    subY += detailLines.length * 9;
-    pdf.text(sanitize(cargoClusterSourceLabel(c)), mainX, subY);
-    pdf.setFontSize(7);
+    if (r.confidence) {
+      pdf.text(oneLine(r.confidence, colConfW - 8), xConf, baseY);
+    }
 
-    const sk = cargoClusterSeverityKey(c);
-    const sevText = sanitize((SEV_LABEL[sk] ?? "").toUpperCase());
-    setFill(pdf, SEV_COLOR[sk] ?? "#999999");
-    const chipX = MX + colDateW + colCatW + colMainW + 6;
-    const isSmall = sevText === "HIGH" || sevText === "LOW";
-    const chipW = isSmall ? 40 : 50;
-    pdf.rect(chipX, ctx.y + 3, chipW, 12, "F");
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(6);
-    pdf.text(sevText, chipX + chipW / 2, ctx.y + 11.5, { align: "center" });
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(7);
+    // Severity chip, keyed off the model's severity key so the colour ramp
+    // matches every other surface (A33232 Extreme, 1B6B7A Insignificant).
+    const sk = sevKey(r.severityKey);
+    const sevText = sanitize((r.severityLabel || "").toUpperCase());
+    if (sevText) {
+      setFill(pdf, SEV_COLOR[sk] ?? "#999999");
+      const chipW = colSevW - 8;
+      pdf.rect(sevColX + 4, ctx.y + 2.5, chipW, 9, "F");
+      setText(pdf, WHITE);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(5);
+      pdf.text(sevText, sevColX + 4 + chipW / 2, ctx.y + 8.5, {
+        align: "center",
+      });
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(FONT);
+    }
 
-    ctx.y += rh;
+    ctx.y += rowH;
   }
   ctx.y += 8;
-}
-
-// "Cargo Incident Clusters" section (cargo report only). Consumes the shared
-// grouping module and renders the same partition tables + watch-item bullets the
-// on-screen preview does, in the same order, before Related Incidents.
-function drawCargoClusters(
-  ctx: Ctx,
-  windowIncidents: TopicReportIncident[],
-  referenceDate: string | undefined,
-) {
-  const grouped = buildCargoGroupedDataset(
-    windowIncidents.map((i) => ({
-      id: i.id,
-      topic: i.topic,
-      title: i.title,
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-      sourceUrl: i.sourceUrl ?? null,
-      location: i.location ?? null,
-      country: i.country ?? null,
-      severity: i.severity ?? null,
-      occurredAt: i.occurredAt,
-    })),
-    { referenceDate: referenceDate ?? null },
-  );
-  const byKey = new Map(grouped.sections.map((s) => [s.key, s]));
-  const tables = REPORT_CLUSTER_SECTION_KEYS.map((k) => byKey.get(k)).filter(
-    (s): s is CargoGroupedSection => !!s && s.clusters.length > 0,
-  );
-  if (tables.length === 0 && grouped.watchItems.length === 0) return;
-
-  if (tables.length > 0) {
-    drawSectionHeading(ctx, "Cargo Incident Clusters");
-    for (const section of tables) drawCargoClusterTable(ctx, section);
-  }
-  if (grouped.watchItems.length > 0) {
-    const text = grouped.watchItems.map((w) => `- ${w}`).join("\n");
-    drawBulletSection(ctx, "Recommended Watch Items", text, 8);
-  }
 }
 
 export async function exportTopicReportPdf(
@@ -1127,15 +822,45 @@ export async function exportTopicReportPdf(
       ),
     );
   } else {
+    const isCargo = data.topic === "cargo_watch";
+    // Cargo Watch is a pattern report: one shared model drives Fast Facts, the
+    // four operational graphics, the deterministic assessment prose, and the
+    // condensed appendix — built ONCE from the SAME windowed set the on-screen
+    // preview uses so screen == PDF.
+    const cargoModel = isCargo
+      ? buildCargoPatternModel(
+          filterTopicReportIncidents(incidents, data.topic, data.issueDate).map(
+            (i) => ({
+              id: i.id,
+              topic: i.topic,
+              title: i.title,
+              summary: i.summary ?? null,
+              source: i.source ?? null,
+              sourceUrl: i.sourceUrl ?? null,
+              location: i.location ?? null,
+              country: i.country ?? null,
+              severity: i.severity ?? null,
+              occurredAt: i.occurredAt,
+            }),
+          ),
+          {
+            issueDate: data.issueDate,
+            topicLabel: topicLabels[data.topic] ?? data.topic,
+          },
+        )
+      : null;
+
     drawSectionHeading(ctx, "Fast Facts");
     drawFastFactsKpiCards(
       ctx,
-      computeTopicFastFacts({
-        topic: data.topic,
-        issueDate: data.issueDate,
-        incidents,
-        topicLabel: topicLabels[data.topic] ?? data.topic,
-      }) as KpiCardData[],
+      (cargoModel
+        ? cargoModel.fastFacts
+        : computeTopicFastFacts({
+            topic: data.topic,
+            issueDate: data.issueDate,
+            incidents,
+            topicLabel: topicLabels[data.topic] ?? data.topic,
+          })) as KpiCardData[],
     );
 
     if (data.topic === "energy") {
@@ -1151,121 +876,93 @@ export async function exportTopicReportPdf(
       }
     }
 
-    const isCargo = data.topic === "cargo_watch";
-    const pickProse = (
-      editor: string | null | undefined,
-      auto: string,
-    ): string => {
-      const t = (editor ?? "").trim();
-      return t.length > 0 ? t : auto;
-    };
-
-    if (isCargo) {
-      const cargoTrendSource = filterTopicReportIncidents(
-        incidents,
-        data.topic,
-        data.issueDate,
-      ).map((i) => ({
-        title: i.title,
-        summary: i.summary ?? null,
-        source: i.source ?? null,
-        location: i.location ?? null,
-        country: i.country ?? null,
-        occurredAt: i.occurredAt,
-      }));
-      // Country-intensity choropleth — the static SVG mirror of the monitor's
-      // Leaflet map, rasterised into the PDF from the SAME shared component the
-      // preview renders (preview == PDF). Same country counting + bands.
-      const cargoIntensity = buildCargoCountryIntensity(cargoTrendSource);
-      if (cargoIntensity.size > 0) {
+    if (cargoModel) {
+      // Geographic + time pattern. Map/trend caption strings are data-derived
+      // in the model, so they render identically on screen and in the PDF.
+      if (cargoModel.intensity.size > 0) {
         drawSectionHeading(ctx, "Cargo Theft Map");
         ensureSpace(ctx, 260);
         await embedReactChartInPdf(
           ctx,
-          createElement(CargoChoroplethStatic, { intensity: cargoIntensity }),
+          createElement(CargoChoroplethStatic, {
+            intensity: cargoModel.intensity,
+          }),
         );
+        if (cargoModel.mapCaption.trim()) renderProse(ctx, cargoModel.mapCaption);
       }
-
-      const cargoExtras = buildCargoReportExtras(cargoTrendSource);
-      if (cargoExtras.trend.length >= 2) {
+      if (cargoModel.extras.trend.length >= 2) {
         drawSectionHeading(ctx, "Cargo Theft Trend");
         ensureSpace(ctx, 220);
         await embedReactChartInPdf(
           ctx,
-          createElement(CargoTrendChart, { data: cargoExtras.trend }),
+          createElement(CargoTrendChart, { data: cargoModel.extras.trend }),
+        );
+        if (cargoModel.trendCaption.trim())
+          renderProse(ctx, cargoModel.trendCaption);
+      }
+
+      // Operational pattern graphics — supply-chain exposure, the pattern
+      // dashboard, the incident timeline, and the priority matrix. Each is the
+      // SAME React component the preview renders, rasterised here.
+      if (cargoModel.totalUnique > 0) {
+        drawSectionHeading(ctx, "Supply-Chain Exposure");
+        ensureSpace(ctx, 300);
+        await embedReactChartInPdf(
+          ctx,
+          createElement(CargoSupplyChainExposure, {
+            stages: cargoModel.stages,
+            total: cargoModel.totalUnique,
+          }),
+        );
+
+        drawSectionHeading(ctx, "Operational Patterns");
+        ensureSpace(ctx, 300);
+        await embedReactChartInPdf(
+          ctx,
+          createElement(CargoPatternDashboard, {
+            patterns: cargoModel.patterns,
+          }),
+        );
+      }
+      if (cargoModel.timeline.total > 0) {
+        drawSectionHeading(ctx, "Incident Timeline");
+        ensureSpace(ctx, 260);
+        await embedReactChartInPdf(
+          ctx,
+          createElement(CargoIncidentTimeline, {
+            timeline: cargoModel.timeline,
+          }),
+        );
+      }
+      if (cargoModel.matrix.sufficient) {
+        drawSectionHeading(ctx, "Priority Matrix");
+        ensureSpace(ctx, 320);
+        await embedReactChartInPdf(
+          ctx,
+          createElement(CargoPriorityMatrix, { matrix: cargoModel.matrix }),
         );
       }
 
-      const cargoSecurity = buildCargoSecurityRead(windowIncidents);
-      const cargoNode = buildLogisticsHubRead(windowIncidents);
-      // Cargo Security Read + Logistics Hub Read lead the analysis, in the same
-      // order the on-screen preview renders them.
-      for (const [label, body] of [
-        ["Cargo Security Read", pickRead(data.cargoSecurityRead, cargoSecurity)],
-        ["Logistics Hub Read", pickRead(data.logisticsHubRead, cargoNode)],
-      ] as [string, string][]) {
-        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
-      }
+      // Operational assessment. Editor text wins; the deterministic model
+      // assessment fills any blank field so the report reads with substance
+      // out of the box. Bullet lists join on newlines for drawBulletSection.
+      const a = cargoModel.assessment;
+      const sit = pickRead(data.situation, a.situation);
+      if (sit.trim()) drawSectionWithProse(ctx, "Situation", sit);
+      const wm = pickRead(data.whatMatters, a.whatMatters.join("\n"));
+      if (wm.trim()) drawBulletSection(ctx, "What Matters", wm, 3);
+      const bp = pickRead(data.implications, a.businessPriorities.join("\n"));
+      if (bp.trim()) drawBulletSection(ctx, "Business Priorities", bp, 5);
+      const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
+      if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 6);
+      const pv = pickRead(data.polestarView, a.polestarView);
+      if (pv.trim()) drawSectionWithProse(ctx, "Polestar View", pv);
 
-      // Country Risk Breakdown table + Regional Read, then the Named Port
-      // Breakdown — mirrors ReportPreview's cargo section order (between the
-      // Logistics Hub Read and the Situation) so screen and PDF never disagree.
-      const cargoCountry = buildCargoCountryBreakdown(windowIncidents);
-      if (cargoCountry.rows.length > 0) {
-        ensureSpace(ctx, 24 + 20 + 56);
-        drawSectionHeading(ctx, "Country Risk Breakdown");
-        drawCargoCountryTable(ctx, cargoCountry.rows);
-        const cargoRegionalRead = pickRead(
-          data.regionalCountryRead,
-          cargoCountry.regionalRead,
-        );
-        if (cargoRegionalRead.trim()) {
-          drawSectionWithProse(ctx, "Regional Read", cargoRegionalRead);
-        }
-      }
-      const cargoPorts = buildCargoPortBreakdown(windowIncidents);
-      ensureSpace(ctx, 24 + 20 + 40);
-      drawSectionHeading(ctx, "Named Port Breakdown");
-      drawCargoPortTable(ctx, cargoPorts);
-
-      // Editor text always wins on the standard analyst sections; auto-prose
-      // fills in when the editor leaves a field blank so the cargo report reads
-      // at Fuel-Watch substance out of the box.
-      const proseSections: [string, string][] = [
-        [
-          "Situation",
-          pickProse(data.situation, aiOr(aiProse?.situation, buildCargoSituation(windowIncidents))),
-        ],
-        [
-          "What Happened",
-          pickProse(data.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(windowIncidents))),
-        ],
-        [
-          "What Matters",
-          pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(windowIncidents))),
-        ],
-      ];
-      for (const [label, body] of proseSections) {
-        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
-      }
-      const implBody = pickProse(
-        data.implications,
-        aiOr(aiProse?.implications, buildCargoImplications(windowIncidents)),
-      );
-      if (implBody && implBody.trim())
-        drawBulletSection(ctx, "Implications for Business", implBody);
-      const wnBody = pickProse(
-        data.watchNext,
-        aiOr(aiProse?.watchNext, buildCargoWatchNext(windowIncidents)),
-      );
-      if (wnBody && wnBody.trim())
-        drawBulletSection(ctx, "Watch Next", wnBody, 8);
-      const psBody = pickProse(
-        data.polestarView,
-        aiOr(aiProse?.polestarView, buildCargoPolestarView(windowIncidents)),
-      );
-      if (psBody && psBody.trim())
-        drawSectionWithProse(ctx, "Polestar View", psBody);
+      // Condensed incident appendix — one row per unique incident, replacing
+      // the removed Related Incidents + Named Port Breakdown + Cargo Incident
+      // Clusters sections. Drawn with jsPDF primitives (not rasterised) so it
+      // paginates within the two-page cap.
+      drawCargoAppendix(ctx, cargoModel.appendix);
     } else {
       const proseSections: [string, string][] = [
         [
@@ -1323,19 +1020,11 @@ export async function exportTopicReportPdf(
   // (filterTopicReportIncidents) and selector (selectRelatedIncidents) so the
   // PDF table can never disagree with the on-screen preview. Fuel uses a
   // bespoke price-led layout that intentionally carries no related table, so
-  // the PDF omits it here too (matching the fuel preview branch).
-  // Cargo Incident Clusters — the regrouped, clustered view — sits directly
-  // before Related Incidents (cargo report only), built from the SAME windowed
-  // input the on-screen preview uses so the two surfaces cannot diverge.
-  if (data.topic === "cargo_watch") {
-    drawCargoClusters(
-      ctx,
-      filterTopicReportIncidents(incidents, data.topic, data.issueDate),
-      data.issueDate,
-    );
-  }
-
-  if (data.topic !== "fuel") {
+  // the PDF omits it here too (matching the fuel preview branch). Cargo Watch
+  // is a pattern report — it renders its own condensed appendix (one row per
+  // unique incident) inside its branch above, so it omits both the Cargo
+  // Incident Clusters and Related Incidents sections here.
+  if (data.topic !== "fuel" && data.topic !== "cargo_watch") {
     drawRelatedIncidents(
       ctx,
       filterTopicReportIncidents(incidents, data.topic, data.issueDate),
