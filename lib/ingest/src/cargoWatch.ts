@@ -126,6 +126,94 @@ const LOCAL_FEEDS: LocalFeed[] = [
       "LK:si",
     ),
   },
+  // Middle East — a second Arabic edition anchored on the Saudi/Gulf edition
+  // (gl=SA). The existing UAE Arabic edition (gl=AE) returned 0; the Saudi
+  // edition carries far more Gulf news volume, so genuine Gulf cargo-crime
+  // items (truck/warehouse/container theft, port pilferage) surface here. This
+  // is the region's Middle East feed the owner asked for — Cargo Watch is a
+  // regional report, not an Indonesia-only one.
+  {
+    label: "Local · Arabic (Saudi/Gulf)",
+    lang: "Arabic",
+    url: gnewsLocale(
+      `(سرقة OR سطو OR نهب OR اختلاس OR اختطاف) (شحنة OR بضائع OR مستودع OR شاحنة OR حاوية OR مخزن OR حمولة)`,
+      "ar",
+      "SA",
+      "SA:ar",
+    ),
+  },
+  // Vietnam. The English edition carries almost no VN cargo theft; the
+  // Vietnamese edition surfaces genuine truck/container/warehouse thefts.
+  {
+    label: "Local · Vietnamese",
+    lang: "Vietnamese",
+    url: gnewsLocale(
+      `(trộm OR cướp OR "trộm cắp" OR "mất trộm" OR "đánh cắp" OR "cướp giật") ("hàng hóa" OR container OR "xe tải" OR kho OR "kho hàng" OR "lô hàng")`,
+      "vi",
+      "VN",
+      "VN:vi",
+    ),
+  },
+  // Malaysia (Bahasa Melayu). Distinct from the Indonesian edition — surfaces
+  // Malaysian outlets (lorry/container/warehouse theft) the English feed misses.
+  {
+    label: "Local · Malay",
+    lang: "Malay",
+    url: gnewsLocale(
+      `(curi OR dicuri OR kecurian OR rompak OR dirompak OR rompakan OR samun) (kargo OR kontena OR lori OR trak OR gudang OR barang OR muatan)`,
+      "ms",
+      "MY",
+      "MY:ms",
+    ),
+  },
+  // India (Hindi). English "godown" hits dominate but miss most Hindi-language
+  // truck/consignment/warehouse thefts across the northern states.
+  {
+    label: "Local · Hindi",
+    lang: "Hindi",
+    url: gnewsLocale(
+      `(चोरी OR लूट OR डकैती OR चुराया OR लूटपाट OR लुटेरे) (माल OR कंटेनर OR ट्रक OR गोदाम OR खेप OR लॉरी)`,
+      "hi",
+      "IN",
+      "IN:hi",
+    ),
+  },
+  // Bangladesh (Bengali). Chittagong/Dhaka truck and container thefts are
+  // almost entirely in Bengali-language outlets.
+  {
+    label: "Local · Bengali",
+    lang: "Bengali",
+    url: gnewsLocale(
+      `(চুরি OR ডাকাতি OR ছিনতাই OR লুট OR লুটপাট) (পণ্য OR কন্টেইনার OR ট্রাক OR গুদাম OR চালান OR মালামাল)`,
+      "bn",
+      "BD",
+      "BD:bn",
+    ),
+  },
+  // Pakistan (Urdu). Karachi/Lahore truck and consignment thefts surface in
+  // Urdu-language outlets the English edition never carries.
+  {
+    label: "Local · Urdu",
+    lang: "Urdu",
+    url: gnewsLocale(
+      `(چوری OR ڈکیتی OR لوٹ OR "لوٹ مار" OR اغوا) (سامان OR کنٹینر OR ٹرک OR گودام OR مال OR کھیپ)`,
+      "ur",
+      "PK",
+      "PK:ur",
+    ),
+  },
+  // China (Simplified Chinese). Domestic truck/container/warehouse cargo theft
+  // is reported almost exclusively in Chinese-language outlets.
+  {
+    label: "Local · Chinese",
+    lang: "Chinese",
+    url: gnewsLocale(
+      `(盗窃 OR 偷窃 OR 抢劫 OR 失窃 OR 被盗 OR 劫持) (货物 OR 集装箱 OR 货车 OR 卡车 OR 仓库 OR 货柜)`,
+      "zh-CN",
+      "CN",
+      "CN:zh-Hans",
+    ),
+  },
 ];
 
 // Cap on the number of NEW (unseen) items screened per local feed per run. The LLM

@@ -161,6 +161,43 @@ durable, honest win — recall + precision — NOT a dramatically larger recent
 count. Resist inflating numbers with generic theft to satisfy the complaint;
 the depth lives in the wider windows.
 
+## "Regional not Indonesia-only": geography is a FEED lever, filter loosening is depth-only
+Owner recurring demand: Cargo Watch is a REGIONAL report (APAC **and** Middle
+East), not Indonesia-heavy. Two honest levers, and they do DIFFERENT jobs:
+- **Feeds (`LOCAL_FEEDS`)** rebalance GEOGRAPHY but only for FUTURE ingests, and
+  the local-language stage is `llmReady`-gated → it NO-OPS without
+  `AI_INTEGRATIONS_OPENAI_*`. So added Arabic-Saudi (gl=SA — the UAE gl=AE
+  edition historically returns 0), Vietnamese, Malay, Hindi, Bengali, Urdu,
+  Chinese editions help ONLY on the next prod ingest IF OpenAI is keyed there.
+  Adding feeds needs NO `RELEVANCE_RULE_VERSION` bump (ingest inputs, not rules).
+- **Frontend filter loosening (`classifyScope`)** re-scopes ALREADY-INGESTED rows
+  so it is the only lever that changes the CURRENT report — but it adds DEPTH, not
+  geography, and can even nudge Indonesia's share UP (most previously-excluded
+  rows are Indonesian generic theft). Be honest about this tension: loosening the
+  filter does NOT by itself fix an "too Indonesia-heavy" complaint.
+**Why:** the immediate report only shows rows already in the DB for its window;
+new feeds can't retro-populate it. Verified by replaying old-vs-new
+`classifyScope` over all live rows (base64-dump via executeSql → tsx replay
+importing the real `cargoScope` + a temporary reversed `.__old` copy for the
+before side; delete the copy after — an unused fn in `src/lib` breaks typecheck).
+
+## Transit-hijack rescue: a goods vehicle waylaid in transit is genuine cargo
+The owner-authorised loosening (REVERSING an earlier tightening) that admits
+borderline-but-genuine cargo crime the filter dropped: a HEAVY GOODS vehicle
+(`ten-wheeler/lorry/container truck/goods vehicle/tanker truck/prime mover/...`,
+`HEAVY_GOODS_VEHICLE_RE`) violently **ambushed / waylaid / intercepted / held up**
+(`TRANSIT_ATTACK_VERB_RE`) in transit is genuine cargo-in-transit crime even with
+NO named load — the freight IS the target. `hasTransitHijack = both REs present`.
+Wire it BOTH ways: `hasGenuineCargo` returns true on it AND `isCargoNoise`'s
+`NOISE_VEHICLE_TARGET_RE` line stands down on it (else the vehicle-theft noise
+gate drops it BEFORE the genuine-cargo gate runs — same trap as the `hasLoad`
+stand-down). `hijack` alone already passed via `CARGO_ACTION_RE`; the gap was the
+non-"hijack" ambush/road-robbery verbs. Precision holds because it fires only on
+verb+heavy-vehicle PAIR — parked-vehicle theft, premises burglary, cash-van, arms
+never match. Frontend-only, NO version bump. Replay proof: over 1123 live rows it
+flipped exactly 3 excluded→in_scope (1 truck ambush + 2 new commodities
+animal-feed/granite), zero noise; all 192 cargo jest tests still pass.
+
 ## "Cargo dashboard shows only 4 / hasn't changed" = the 30D filter, not a bug
 The recurring "cargo is light / nothing changed" report is usually the **30D
 range pill** being selected. The Cargo Watch page DEFAULTS to **All Time**

@@ -172,7 +172,25 @@ const STRONG_CARGO_BAHASA_RE = /\b(kargo|peti kemas|kontainer|logistik|ekspedisi
 // theft"). Deliberately omits petty-theft-prone consumer items (phones, laptops,
 // jewellery) and bare vehicles, which are not Cargo Watch.
 const CARGO_COMMODITY_RE =
-  /\b(scrap|copper|steel|nickel|aluminium|aluminum|iron ore|coal|rice|wheat|grain|grains|sugar|flour|maize|corn|coffee|tea|cocoa|palm oil|cooking oil|edible oil|rubber|timber|logs|plywood|cement|fertili[sz]er|fuel|diesel|petrol|gasoline|kerosene|lpg|tobacco|cigarettes?|liquor|alcohol|beer|wine|spirits|clothing|apparel|garments?|footwear|milk powder|infant formula)\b/i;
+  /\b(scrap|copper|steel|nickel|aluminium|aluminum|iron ore|coal|rice|wheat|grain|grains|sugar|flour|maize|corn|coffee|tea|cocoa|palm oil|cooking oil|edible oil|rubber|timber|logs|plywood|cement|fertili[sz]er|fuel|diesel|petrol|gasoline|kerosene|lpg|tobacco|cigarettes?|liquor|alcohol|beer|wine|spirits|clothing|apparel|garments?|footwear|milk powder|infant formula|animal feed|livestock feed|cattle feed|poultry feed|granite|marble)\b/i;
+
+// A HEAVY GOODS vehicle violently waylaid / ambushed / intercepted / held up on
+// the road is a genuine cargo-in-transit crime even when the report names no
+// commodity — the lorry's freight is the target. This rescues road ambushes and
+// robberies of goods vehicles that the generic NOISE_VEHICLE_TARGET_RE would
+// otherwise drop as ordinary vehicle theft. It is deliberately NARROW: it fires
+// only when a transit-attack verb sits alongside a heavy goods-vehicle noun, so a
+// parked-vehicle theft ("stole a pickup"), a premises burglary, a cash-van or an
+// arms case (none of which pair those two) is never rescued.
+const HEAVY_GOODS_VEHICLE_RE =
+  /\b(ten[- ]?wheeler|10[- ]?wheeler|twelve[- ]?wheeler|12[- ]?wheeler|six[- ]?wheeler|6[- ]?wheeler|eighteen[- ]?wheeler|18[- ]?wheeler|lorr(?:y|ies)|container (?:truck|lorry)|goods (?:truck|lorry|vehicle|carrier|van)|freight (?:truck|lorry|vehicle)|delivery (?:truck|lorry|van)|tanker (?:truck|lorry)|trailer truck|articulated (?:truck|lorry|vehicle)|semi[- ]?trailer|prime mover|cargo (?:truck|lorry)|haulage (?:truck|lorry|vehicle))\b/i;
+const TRANSIT_ATTACK_VERB_RE =
+  /\b(ambush\w*|waylaid|way[- ]?lay\w*|held up|hold[- ]?up|intercept\w*|flagged down|flag(?:s|ged)? down|stopped and (?:robbed|looted)|blocked and (?:robbed|looted)|hijack\w*)\b/i;
+
+// True when the text describes a goods vehicle attacked in transit (see above).
+function hasTransitHijack(text: string): boolean {
+  return HEAVY_GOODS_VEHICLE_RE.test(text) && TRANSIT_ATTACK_VERB_RE.test(text);
+}
 
 // Genuine-cargo predicate: keep ONLY incidents involving real cargo / goods —
 // freight in transit, containers, shipments, consignments, logistics-node
@@ -184,6 +202,7 @@ const CARGO_COMMODITY_RE =
 // product owner's decision to confine Cargo Watch to real cargo/goods crime.
 function hasGenuineCargo(text: string): boolean {
   if (CARGO_ACTION_RE.test(text)) return true;
+  if (hasTransitHijack(text)) return true;
   const hasLoad = CARGO_LOAD_CONTEXT_RE.test(text) || CARGO_COMMODITY_RE.test(text);
   if (CRIME_VERB_RE.test(text)) {
     if (STRONG_CARGO_NOUN_RE.test(text)) return true;
@@ -227,7 +246,7 @@ function isCargoNoise(text: string): boolean {
   if (NOISE_MONEY_AMOUNT_RE.test(text) && !hasLoad) return true;
   if (NOISE_CASH_IN_TRANSIT_RE.test(text) && !hasLoad) return true;
   if (NOISE_ARMS_DEALER_RE.test(text) && !hasLoad) return true;
-  if (NOISE_VEHICLE_TARGET_RE.test(text) && !hasLoad) return true;
+  if (NOISE_VEHICLE_TARGET_RE.test(text) && !hasLoad && !hasTransitHijack(text)) return true;
   if (NOISE_RESIDENTIAL_PARCEL_RE.test(text) && !hasLoad) return true;
   return false;
 }
