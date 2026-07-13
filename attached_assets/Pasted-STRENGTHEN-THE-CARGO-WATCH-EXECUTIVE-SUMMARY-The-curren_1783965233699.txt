@@ -1,0 +1,61 @@
+STRENGTHEN THE CARGO WATCH EXECUTIVE SUMMARY
+
+The current Executive Summary is too weak and reads like a list of incident categories and countries.
+
+It currently states what was reported, but does not explain:
+
+1. Where the main operational exposure sits
+2. What the pattern means for cargo operators
+3. Whether the risk is increasing, reducing or remaining active
+4. Which controls require attention
+5. How law enforcement activity affects the assessment
+
+Generate the Executive Summary as one concise paragraph of three to four sentences.
+
+The summary must include:
+
+1. The dominant supply chain exposure
+2. The leading incident patterns
+3. The principal affected geography
+4. Any meaningful change or law enforcement development
+5. The overall assessed severity
+6. The main operational implication for business
+
+Use direct analytical wording.
+
+Do not use phrases such as:
+
+“Cargo loss this month was shaped by”
+“The most serious reached”
+“There is little to go on”
+“Most consistent reporting”
+“Alongside”
+“Treat this as a rough guide”
+
+Do not simply list categories and countries.
+
+The summary should explain what the data means.
+
+Example structure:
+
+“Cargo risk during the period was concentrated in inland transport, with theft in transit and truck hijacking accounting for the most significant reported activity. India recorded the highest concentration of reporting, with additional incidents in Bangladesh and Malaysia, indicating continued exposure on regional road movements and predictable transport routes. Law enforcement activity disrupted at least one cargo crime group, but recurring transport losses indicate that the underlying exposure remains active. Overall severity was assessed as Moderate, with journey controls, driver integrity and route planning remaining the main business priorities.”
+
+The example wording is illustrative.
+
+Generate the final paragraph dynamically from the actual deduplicated report data.
+
+ANALYTICAL RULES
+
+1. Identify the dominant supply chain stage from the Supply Chain Exposure data.
+2. Identify the top one or two incident patterns.
+3. Identify the main geography without listing every country.
+4. Mention enforcement activity only where it materially affects the assessment.
+5. Do not imply organised crime unless supported by the records.
+6. Do not state that risk is rising unless the weekly data shows a genuine increase.
+7. Where reporting is limited, add one short qualification at the end:
+
+“Reporting remains indicative rather than comprehensive.”
+
+8. Do not repeat Fast Facts figures verbatim.
+9. Keep the summary between 70 and 110 words.
+10. Use British English.

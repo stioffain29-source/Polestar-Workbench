@@ -1,0 +1,215 @@
+REFINE THE SELECTED INCIDENTS SECTION
+
+The Selected Incidents section requires further revision.
+
+Do not remove the section, but make it more informative and credible.
+
+
+1. REMOVE CONFIDENCE FROM THE CLIENT DISPLAY
+
+Remove the visible:
+
+“Confidence: Low”
+“Confidence: Medium”
+“Confidence: High”
+
+from each incident card.
+
+Confidence should remain stored in the underlying record and remain available within the Workbench, but it should not appear prominently in the standard client PDF.
+
+The current placement beside the severity badge makes the entry appear contradictory and undermines confidence in the overall report.
+
+Retain the severity badge, but label it clearly as:
+
+SEVERITY: HIGH
+SEVERITY: MODERATE
+SEVERITY: LOW
+
+Do not show an unlabelled coloured badge.
+
+
+2. RENAME THE SECTION
+
+Change:
+
+SELECTED INCIDENTS
+
+to:
+
+KEY INCIDENTS
+
+Add the subtitle:
+
+“Incidents that best illustrate the main operational patterns identified during the reporting period.”
+
+
+3. SHOW FEWER, BETTER INCIDENTS
+
+Show a maximum of four key incidents.
+
+Do not automatically select six incidents.
+
+Each selected incident must add something distinct to the report.
+
+The four incidents should normally represent:
+
+1. The dominant incident pattern
+2. The most operationally significant incident
+3. A different affected geography or supply chain stage
+4. A meaningful arrest, recovery or disruption outcome
+
+Do not select several nearly identical incidents from the same country and category unless they demonstrate a genuine cluster.
+
+
+4. IMPROVE EACH INCIDENT CARD
+
+Each card should contain:
+
+DATE AND LOCATION
+
+Example:
+
+11 July 2026 | Gazaria, Bangladesh
+
+INCIDENT TYPE AND SEVERITY
+
+Example:
+
+Cargo theft in transit | Severity: High
+
+WHAT HAPPENED
+
+Use two concise sentences explaining:
+
+1. What was targeted
+2. How the incident occurred
+3. What cargo or property was lost
+4. Whether violence, weapons or organised activity were reported
+5. Any confirmed value or quantity
+6. The immediate outcome
+
+OPERATIONAL RELEVANCE
+
+Add one short line explaining why the incident matters to cargo owners or logistics operators.
+
+Example:
+
+“Demonstrates exposure on familiar highway routes and the vulnerability of vehicles moving without additional journey controls.”
+
+STATUS
+
+Where known, show one of:
+
+Ongoing
+Suspects arrested
+Cargo recovered
+Under investigation
+Unconfirmed
+
+Do not show a status where none is available.
+
+
+5. EXAMPLE CARD FORMAT
+
+11 JULY 2026 | GAZARIA, BANGLADESH
+
+CARGO THEFT IN TRANSIT                         SEVERITY: HIGH
+
+A commercial vehicle was intercepted beside the highway and goods reportedly valued at Tk 2 million were taken. The reporting indicates a planned roadside robbery, although the involvement of weapons and the recovery status were not confirmed.
+
+Operational relevance:
+Highlights exposure during road movement on predictable routes and the need for journey monitoring and escalation procedures.
+
+Status: Under investigation
+
+
+6. VALIDATE THAT INCIDENTS ARE ACTUALLY CARGO RELATED
+
+Before including an incident, confirm that it involves at least one of the following:
+
+1. Commercial cargo
+2. A freight vehicle
+3. A warehouse, depot or distribution centre
+4. A port, terminal or cargo yard
+5. A commercial vessel
+6. A logistics operator
+7. A commercial consignment
+8. Cargo handling or custody
+
+Exclude ordinary robberies involving:
+
+1. Private travellers
+2. Personal mobile phones
+3. Personal cash
+4. Passenger vehicles
+5. Household property
+
+unless the event clearly involved a commercial cargo movement or logistics operation.
+
+Do not classify every highway robbery as Cargo theft in transit.
+
+
+7. DEDUPLICATE SIMILAR INCIDENTS
+
+The two entries dated 08 July describing travellers being robbed appear to describe the same or closely related reporting.
+
+Ensure that different reports of the same event are merged into one incident.
+
+Deduplication should consider:
+
+1. Date
+2. Location
+3. Method
+4. Vehicle or cargo involved
+5. Loss description
+6. Named suspects or victims
+7. Similarity of the incident narrative
+
+Do not select two versions of the same incident.
+
+
+8. INCIDENT SELECTION MUST BE ANALYTICAL
+
+Do not simply select the latest four records.
+
+Rank eligible incidents using:
+
+1. Operational significance
+2. Relevance to the report’s main patterns
+3. Severity
+4. Confirmed commercial loss
+5. Violence or weapons
+6. Business interruption
+7. Organised or insider indicators
+8. Law enforcement outcome
+9. Geographic and category diversity
+
+The selected incidents should support the report’s assessment rather than fill space.
+
+
+9. DISPLAY REQUIREMENTS
+
+1. Keep the current clean card layout.
+2. Allow slightly more vertical space for each incident.
+3. Use readable body text.
+4. Do not shrink the wording to fit all cards on one page.
+5. Do not print full media headlines.
+6. Do not print confidence scores.
+7. Do not print source counts.
+8. Do not print repeated missing-data statements.
+9. Keep each card to approximately 80 words maximum.
+10. Prevent cards from splitting across pages.
+
+
+10. FINAL CHECK
+
+After making these changes:
+
+1. Confirm all displayed incidents are genuine cargo or logistics incidents.
+2. Confirm no duplicate incidents are shown.
+3. Confirm every card explains what happened and why it matters.
+4. Confirm confidence remains available internally but is absent from the standard PDF.
+5. Confirm severity is clearly labelled.
+6. Confirm the Key Incidents section contains no more than four entries.
+7. Export and inspect the PDF at normal page size.
+8. Do not change Supply Chain Exposure or Operational Patterns.
